@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Heart, MessageCircle, Share2, MoreVertical, Store } from 'lucide-react';
+import { MessageCircle, Share2, MoreVertical, Store } from 'lucide-react';
+import LikeButton from '@/components/ui/LikeButton';
 import type { CollectionDto } from '../../types/profile';
 import { formatPrice } from '@/utils/helpers';
 import { brandApi } from '@/api/BrandApi';
@@ -130,10 +131,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
 
         {/* Vertical Action Bar (like in Reels) - Right side */}
         <div className="absolute bottom-28 right-2 z-10 flex flex-col items-center gap-3">
-          <button className="flex flex-col items-center text-white hover:scale-110 transition-transform" onClick={(e) => e.stopPropagation()}>
-            <Heart className="w-5 h-5" />
-            <span className="text-[10px] font-semibold mt-0.5">{likesCount}</span>
-          </button>
+          <LikeButton contentType="COLLECTION" contentId={collection.id} initialCount={likesCount} />
           <button className="flex flex-col items-center text-white hover:scale-110 transition-transform" onClick={(e) => e.stopPropagation()}>
             <MessageCircle className="w-5 h-5" />
             <span className="text-[10px] font-semibold mt-0.5">{commentsCount}</span>
