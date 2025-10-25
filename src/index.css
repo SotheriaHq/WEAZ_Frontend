@@ -1,0 +1,352 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Unified Dark Theme - YouTube-style consistency */
+@layer base {
+  :root {
+    --dark-bg-primary: #0f0f0f;
+    --dark-bg-secondary: #1a1a1a;
+    --dark-bg-tertiary: #272727;
+    --dark-border: rgba(255, 255, 255, 0.1);
+    --dark-glass-bg: rgba(255, 255, 255, 0.05);
+    --dark-glass-light: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* Frosted-glass (glassmorphism) design tokens */
+@layer components {
+  .glass-panel {
+    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-xl rounded-2xl;
+  }
+  .dark .glass-panel {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--dark-border);
+  }
+  .glass-menu {
+    /* lighter frosted with a hint of purple */
+    @apply backdrop-blur-xl rounded-xl border border-white/30 dark:border-white/10 shadow-2xl;
+    background: radial-gradient(120% 120% at 0% 0%, rgba(216, 180, 254, 0.14) 0%, rgba(255, 255, 255, 0.88) 35%, rgba(255,255,255,0.78) 100%);
+    box-shadow: 0 8px 30px rgba(147, 51, 234, 0.08), 0 2px 10px rgba(0,0,0,0.04);
+  }
+  .glass-menu-soft {
+    @apply backdrop-blur-xl rounded-xl border border-white/20 dark:border-white/10 shadow-xl;
+    background: radial-gradient(120% 120% at 0% 0%, rgba(216, 180, 254, 0.10) 0%, rgba(255, 255, 255, 0.70) 35%, rgba(255,255,255,0.60) 100%);
+  }
+  .glass-chip {
+    @apply bg-white/70 dark:bg-white/10 backdrop-blur-md border border-white/30 dark:border-white/10 rounded-full;
+  }
+  .elev-1 { @apply shadow; }
+  .elev-2 { @apply shadow-md; }
+  .elev-3 { @apply shadow-lg; }
+  .elev-4 { @apply shadow-xl; }
+
+  /* Frosted buttons: tight padding, purple accents */
+  .btn-frost {
+    @apply inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-0;
+  }
+  .btn-frost-primary {
+    /* lighter purple gradient */
+    @apply btn-frost text-white bg-gradient-to-r from-purple-400 via-fuchsia-400 to-purple-500 hover:from-purple-500 hover:via-fuchsia-500 hover:to-purple-600 focus:ring-purple-300;
+  }
+  .btn-frost-ghost {
+    @apply btn-frost text-gray-900 dark:text-gray-100 bg-white/0 hover:bg-white/10 border border-white/20 focus:ring-purple-300;
+  }
+  .btn-frost-outline {
+    @apply btn-frost text-purple-700 dark:text-purple-300 bg-white/0 border border-purple-300/60 hover:bg-purple-400/10 focus:ring-purple-300;
+  }
+  .btn-tight-xs { @apply text-[11px] px-2.5 py-1; }
+  .btn-tight-sm { @apply text-[12px] px-3 py-1.5; }
+  .btn-tight-md { @apply text-[14px] px-3.5 py-2; }
+  .btn-tight-lg { @apply text-[15px] px-4 py-2.5; }
+
+  /* Tag sizes */
+  .chip-xs { @apply text-[11px] px-2 py-0.5; }
+  .chip-sm { @apply text-[12px] px-2.5 py-1; }
+  .chip-md { @apply text-[13px] px-3 py-1.5; }
+
+  /* Tag color accents */
+  .chip-purple { @apply text-purple-700 bg-purple-100/60 dark:text-purple-200 dark:bg-purple-400/15; }
+  .chip-blue { @apply text-blue-900 bg-blue-100/70 dark:text-blue-200 dark:bg-blue-500/15; }
+  .chip-green { @apply text-emerald-900 bg-emerald-100/70 dark:text-emerald-200 dark:bg-emerald-500/15; }
+  .chip-orange { @apply text-orange-900 bg-orange-100/70 dark:text-orange-200 dark:bg-orange-500/15; }
+  .chip-red { @apply text-rose-900 bg-rose-100/70 dark:text-rose-200 dark:bg-rose-500/15; }
+  .chip-gray { @apply text-gray-800 bg-gray-200/70 dark:text-gray-200 dark:bg-gray-600/20; }
+}
+
+/* Smooth theme transitions for key elements */
+html,
+body,
+nav,
+aside,
+main,
+div,
+section,
+article,
+header,
+footer {
+  transition: background-color 0.3s ease, border-color 0.3s ease !important;
+}
+
+/* Text color transitions */
+h1, h2, h3, h4, h5, h6, p, span, a, button, label {
+  transition: color 0.3s ease !important;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear,
+input::-ms-clear {
+  display: none;
+}
+
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+}
+
+html, body #root {
+    overflow-x: hidden;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    position: relative;
+    height: 100%;
+    @apply bg-[#FFFFFF] dark:bg-[#000000];
+}
+
+.title-text {
+    @apply text-black dark:text-white font-bold;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #000000 transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #000000;
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #000000;
+}
+
+/* Hide scrollbar for hashtag container */
+/* .scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+} */
+
+/* Animation for dropdown */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.2s ease-out;
+}
+
+.sidebar-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #000000 transparent;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #000000;
+  border-radius: 2px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #4B5563;
+}
+
+/* Brands dropdown scrollbar - more visible for the specific dropdown */
+.brands-dropdown-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #6B7280 #1F2937;
+}
+
+.brands-dropdown-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.brands-dropdown-scrollbar::-webkit-scrollbar-track {
+  background: #1F2937;
+  border-radius: 3px;
+}
+
+.brands-dropdown-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #6B7280;
+  border-radius: 3px;
+}
+
+.brands-dropdown-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #9CA3AF;
+}
+
+/* Hide scrollbar for hashtag container */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Animation for dropdown */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.2s ease-out;
+}
+
+.signup-page-container {
+  @apply min-h-screen w-full flex items-center justify-center p-4 bg-[#000000];
+  position: relative;
+  overflow: hidden;
+}
+
+/* Wrapper for the form to place it above the background */
+.form-wrapper {
+  @apply w-full max-w-md p-8 rounded-xl shadow-2xl;
+  background-color: rgba(17, 17, 17, 0.8); /* Dark, semi-transparent background */
+  backdrop-filter: blur(10px); /* Frosted glass effect */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 10;
+}
+
+.form-content {
+  @apply w-full h-full;
+}
+
+.form-input {
+  @apply w-full bg-gray-800/80 border border-gray-700 rounded-md p-3 text-white placeholder-gray-500;
+  @apply focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300;
+}
+
+.form-link {
+  @apply text-blue-500 hover:underline;
+}
+
+
+/* --- Background Doodle Styles --- */
+
+.doodle-text {
+  position: absolute;
+  color: rgba(255, 255, 255, 0.04); /* Very faint text color */
+  font-weight: 800; /* Bold font for better shape */
+  white-space: nowrap;
+  user-select: none;
+  z-index: 1;
+  animation-name: drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+
+/* --- Animations --- */
+
+/* Drifting animation for background doodles */
+@keyframes drift {
+  from {
+    transform: translateX(-150px) rotate(-10deg);
+  }
+  to {
+    transform: translateX(150px) rotate(10deg);
+  }
+}
+
+/* Simple slide-down animation for conditional fields */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+.v-loader__fillLoop {
+  transform-box: fill-box;
+  transform-origin: 60px 108px;
+  animation: v-loader-fill 2.2s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+@keyframes v-loader-fill {
+  0% {
+    transform: translateY(96px);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(96px);
+    opacity: 0.3;
+  }
+}
+
+
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.3s ease-out forwards;
+}

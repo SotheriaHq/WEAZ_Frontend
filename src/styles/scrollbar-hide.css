@@ -1,0 +1,27 @@
+/* Hide scrollbars utility */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+/* Hide all scrollbars (Webkit, Firefox, Edge/IE) */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+/* Transparent scrollbars (if shown) */
+.scrollbar-transparent::-webkit-scrollbar {
+  width: 8px;
+  background: transparent;
+}
+.scrollbar-transparent::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+.scrollbar-transparent {
+  scrollbar-color: transparent transparent;
+}

@@ -1,0 +1,219 @@
+import React, { useEffect, useState } from 'react';
+import { FiEdit2, FiShare2 } from 'react-icons/fi';
+import Tag from '@/components/ui/Tag';
+import { IconButton } from '@/components/ui/FrostedButton';
+import AvatarCard from '../profile/AvatarCard';
+import VLoader from '../loaders/VLoader';
+
+const DummyQRCode = () => (
+  <svg viewBox="0 0 100 100" className="h-full w-full object-cover text-gray-800 dark:text-white">
+    <path
+      d="M0 0h30v30H0zM10 10h10v10H10zM70 0h30v30H70zM80 10h10v10H80zM0 70h30v30H0zM10 80h10v10H10zM40 0h10v10H40zM60 0h10v10H60zM0 40h10v10H0zM0 60h10v10H0zM40 100h10v-10H40zM60 100h10v-10H60zM100 40h-10v10h10zM100 60h-10v10h10zM40 40h30v30H40zM50 50h10v10H50zM70 70h30v30H70zM80 80h10v10H80zM40 70h10v10H40zM60 70h10v10H60zM70 40h10v10H70zM90 40h10v10H90z"
+      fill="currentColor"
+    />
+  </svg>
+);
+
+interface ProfileHeaderProps {
+  profileData: {
+    name: string;
+    location: string;
+    username?: string;
+    avatar: string;
+    banner: string;
+    tags: string[];
+  };
+  canEdit?: boolean;
+  onEditProfile?: () => void;
+  onShareProfile?: () => void;
+  onEditAvatar?: () => void;
+  onEditBanner?: () => void;
+  onViewAvatar?: () => void;
+  avatarLoading?: boolean;
+  bannerLoading?: boolean;
+  avatarHighlight?: boolean;
+}
+
+const ActionButton: React.FC<{
+  Icon: React.ElementType;
+  label: string;
+  onClick?: () => void;
+  className?: string;
+  disabled?: boolean;
+}> = ({ Icon, label, onClick, className = '', disabled = false }) => (
+  <IconButton
+    icon={<Icon className="h-4 w-4" />}
+    aria-label={label}
+    variant="ghost"
+    size="sm"
+    className={className}
+    disabled={disabled}
+    onClick={onClick}
+  />
+);
+
+const ProfileHeader: React.FC<ProfileHeaderProps> = ({
+  profileData,
+  canEdit = false,
+  onEditProfile,
+  onShareProfile,
+  onEditAvatar,
+  onEditBanner,
+  onViewAvatar,
+  avatarLoading = false,
+  bannerLoading = false,
+  avatarHighlight = false,
+}) => {
+  const hasBannerImage = Boolean(profileData.banner);
+  const bannerLabel =
+    (profileData.username ? `@${profileData.username}` : profileData.name || '').trim() || 'Your Brand';
+
+  const [isBannerImageLoading, setIsBannerImageLoading] = useState<boolean>(hasBannerImage);
+
+  useEffect(() => {
+    setIsBannerImageLoading(hasBannerImage);
+  }, [hasBannerImage]);
+
+  const showBannerLoader = bannerLoading || (hasBannerImage && isBannerImageLoading);
+
+  // Split tags into rows of 3 so we always display max 3 tags per row
+  const tagRows: string[][] = [];
+  for (let i = 0; i < (profileData.tags || []).length; i += 3) {
+    tagRows.push(profileData.tags.slice(i, i + 3));
+  }
+
+  return (
+    <div className="w-full">
+      <div className="relative h-64 overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950">
+        {hasBannerImage ? (
+          <>
+            <img
+              src={profileData.banner}
+              alt={`${profileData.name} banner blurred`}
+              className="absolute inset-0 h-full w-full object-cover opacity-30 blur-2xl"
+              aria-hidden
+            />
+            <img
+              src={profileData.banner}
+              alt={`${profileData.name} banner`}
+              className="absolute inset-0 h-full w-full object-cover object-center"
+              onLoad={() => setIsBannerImageLoading(false)}
+              onError={() => setIsBannerImageLoading(false)}
+            />
+          </>
+        ) : (
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950" />
+            <div className="absolute inset-0 flex items-center justify-center p-6">
+              <div className="max-w-3xl w-full rounded-3xl border border-white/15 bg-white/10 backdrop-blur-md shadow-2xl px-6 py-4 text-center">
+                <div className="text-white/80 text-sm sm:text-base font-semibold tracking-wide">
+                  {bannerLabel}
+                </div>
+                <div className="mt-1 text-white/60 text-xs sm:text-sm">
+                  Showcase your brand story and visuals
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showBannerLoader && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+            <VLoader size={72} />
+          </div>
+        )}
+
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/15 pointer-events-none" />
+
+        <div className="absolute top-4 right-4 z-30 flex flex-col items-end gap-3">
+          {canEdit && onEditBanner ? (
+            <button
+              type="button"
+              onClick={onEditBanner}
+              className="rounded-full bg-white/90 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-800 shadow-lg transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-gray-900/85 dark:text-gray-100"
+              disabled={bannerLoading}
+            >
+              {bannerLoading ? 'Updating...' : 'Edit banner'}
+            </button>
+          ) : null}
+          <div className="h-48 w-48 rounded-lg bg-white p-2 shadow-xl dark:bg-gray-900">
+            <DummyQRCode />
+          </div>
+        </div>
+      </div>
+
+      <div className="-mt-24 px-4 sm:-mt-28 sm:px-6">
+        <div className="relative z-20 flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+          <div className="flex-shrink-0">
+            <div
+              className={`rounded-xl border-4 shadow-2xl transition-colors duration-300 ${
+                avatarHighlight
+                  ? 'border-emerald-400 ring-2 ring-emerald-200/70'
+                  : 'border-white ring-1 ring-black/10 dark:border-gray-900'
+              }`}
+            >
+              <AvatarCard
+                src={profileData.avatar}
+                name={profileData.name}
+                alt={profileData.name}
+                size="lg"
+                editable={canEdit && Boolean(onEditAvatar)}
+                onEdit={onEditAvatar}
+                loading={avatarLoading}
+                onClick={onViewAvatar}
+                className={onViewAvatar ? 'transition-transform duration-200 hover:scale-[1.01]' : ''}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-1 flex-col gap-2 text-white sm:mt-2">
+            <h1 className="text-md font-semibold italic tracking-[0.08em] text-blue-300 drop-shadow-lg sm:text-2xl">
+              {profileData.name}
+            </h1>
+            <p className="flex items-center gap-2 text-sm font-medium text-white/90 drop-shadow-md">
+              <span aria-hidden className="text-base leading-none">📍</span>
+              <span>{profileData.location}</span>
+            </p>
+            {profileData.username ? (
+              <span className="text-sm font-semibold italic tracking-[0.01em] text-blue-200">
+                @{profileData.username}
+              </span>
+            ) : null}
+            {profileData.tags.length > 0 ? (
+              <div className="mt-2 flex flex-col gap-2">
+                {tagRows.map((row, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    {row.map((tag, i) => {
+                      const palette = ['purple', 'blue', 'green', 'orange', 'red', 'gray'] as const;
+                      const color = palette[(i + idx) % palette.length];
+                      return <Tag key={tag} label={`#${tag}`} color={color} size="sm" />;
+                    })}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex gap-2 self-end sm:self-end sm:mt-4 mb-16">
+            {canEdit ? (
+              <ActionButton
+                Icon={FiEdit2}
+                label="Edit profile"
+                onClick={onEditProfile}
+                className="text-purple-600 hover:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+              />
+            ) : null}
+            <ActionButton
+              Icon={FiShare2}
+              label="Share profile"
+              onClick={onShareProfile}
+              className="text-rose-500 hover:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ProfileHeader;

@@ -1,0 +1,209 @@
+import React, { useEffect, useState } from 'react';
+import { Heart, MessageCircle, Share2, MoreVertical, Store } from 'lucide-react';
+import type { CollectionDto } from '../../types/profile';
+import { formatPrice } from '@/utils/helpers';
+import { brandApi } from '@/api/BrandApi';
+import ImageWithFallback from '@/components/ImageWithFallback';
+import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@/components/ui/Dropdown';
+
+interface CollectionCardProps {
+  collection: CollectionDto;
+  onClick?: () => void;
+  onEdit?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  showActions?: boolean;
+}
+
+const CollectionCard: React.FC<CollectionCardProps> = ({ 
+  collection, 
+  onClick,
+  onEdit, 
+  onDelete,
+  showActions = true,
+}) => {
+  const {
+    title,
+    coverImage,
+    coverFileId,
+    likesCount = 0,
+    commentsCount = 0,
+    itemCount = 0,
+    postsCount = 0,
+    minPrice = 0,
+    maxPrice = 0,
+    brandName,
+    username,
+    brandLogo,
+    isAvailableInStore = false,
+  } = collection;
+
+  const displayItemCount = itemCount || postsCount;
+  const [resolvedCover, setResolvedCover] = useState<string | undefined>(coverImage || undefined);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    const maybeResolve = async () => {
+      if (coverFileId) {
+        const url = await brandApi.getSignedFileUrl(coverFileId);
+        if (mounted) setResolvedCover(url ?? undefined);
+        return;
+      }
+      if (coverImage && coverImage.length > 0) {
+        setResolvedCover(coverImage);
+        return;
+      }
+    };
+    void maybeResolve();
+    return () => {
+      mounted = false;
+    };
+  }, [coverImage, coverFileId]);
+
+  // Reset loaded flag when image source changes
+  useEffect(() => {
+    setImgLoaded(false);
+  }, [resolvedCover]);
+
+  return (
+    <div 
+      className="relative group w-full glass-panel overflow-hidden rounded-lg cursor-pointer shadow-md transition-transform duration-200 hover:scale-[1.02]"
+      onClick={onClick}
+    >
+      {/* Background Image */}
+      <div className="relative w-full overflow-hidden">
+        {resolvedCover ? (
+          <>
+            {!imgLoaded && (
+              <div className="absolute inset-0 animate-pulse bg-white/10 dark:bg-white/5" />
+            )}
+            <img 
+              src={resolvedCover} 
+              alt={title} 
+              className={`block w-full object-cover transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+              style={{ minHeight: '320px' }}
+              onLoad={() => setImgLoaded(true)}
+            />
+          </>
+          ) : (
+            <div className="relative flex min-h-[320px] w-full items-center justify-center glass-panel">
+              <span className="text-white text-3xl font-bold opacity-70">
+                {title.charAt(0)}
+              </span>
+              {/* Resolving signed URL skeleton shimmer */}
+              {coverFileId && (
+                <div className="absolute inset-0 animate-pulse bg-white/10 dark:bg-white/5" />
+              )}
+            </div>
+          )}
+        
+        {/* Always-visible gradient overlay for text readability - lighter for more image visibility */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent" />
+        
+        {/* Available in Store badge (top left) */}
+        {isAvailableInStore && (
+          <div className="absolute top-3 left-3 z-20">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-500/80 backdrop-blur-sm text-white text-xs font-medium rounded-full">
+              <Store className="w-3.5 h-3.5" />
+              <span>In Store</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Three-dot menu for owners (top right) */}
+        {showActions && (onEdit || onDelete) && (
+          <div className="absolute top-3 right-3 z-50" onClick={(e) => e.stopPropagation()}>
+            <Dropdown>
+              <DropdownTrigger className="btn-tight-xs">
+                <MoreVertical className="w-4 h-4" />
+              </DropdownTrigger>
+              <DropdownMenu className="glass-menu-soft">
+                {onEdit && (
+                  <DropdownItem onClick={() => onEdit(collection.id)}>Edit</DropdownItem>
+                )}
+                {onDelete && (
+                  <DropdownItem onClick={() => onDelete(collection.id)}>Delete</DropdownItem>
+                )}
+              </DropdownMenu>
+            </Dropdown>
+          </div>
+        )}
+
+        {/* Vertical Action Bar (like in Reels) - Right side */}
+        <div className="absolute bottom-28 right-2 z-10 flex flex-col items-center gap-3">
+          <button className="flex flex-col items-center text-white hover:scale-110 transition-transform" onClick={(e) => e.stopPropagation()}>
+            <Heart className="w-5 h-5" />
+            <span className="text-[10px] font-semibold mt-0.5">{likesCount}</span>
+          </button>
+          <button className="flex flex-col items-center text-white hover:scale-110 transition-transform" onClick={(e) => e.stopPropagation()}>
+            <MessageCircle className="w-5 h-5" />
+            <span className="text-[10px] font-semibold mt-0.5">{commentsCount}</span>
+          </button>
+          <button className="flex flex-col items-center text-white hover:scale-110 transition-transform" onClick={(e) => e.stopPropagation()}>
+            <Share2 className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Bottom Info */}
+        <div className="absolute bottom-0 left-0 right-0 p-3 text-white z-10">
+          {/* Brand Info with Avatar */}
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 flex-shrink-0 ring-1 ring-white/30 rounded-sm overflow-hidden">
+              <ImageWithFallback
+                src={brandLogo}
+                fileId={collection.brandLogoFileId}
+                alt={brandName || username || 'Brand'}
+                containerClassName="w-full h-full"
+                rounded="sm"
+                fallbackName={brandName || username || 'B'}
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              {brandName && (
+                <p className="text-white font-bold text-xs truncate leading-tight">{brandName}</p>
+              )}
+              {username && (
+                <p className="text-white/70 text-[10px] truncate leading-tight">@{username}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Collection Title */}
+          <h3 className="text-base font-bold mb-1 line-clamp-2 leading-tight">{title}</h3>
+          
+          {/* Collection Stats */}
+          <div className="flex items-center gap-1.5 text-[11px] text-white/90 mb-2">
+            <span>{displayItemCount} pieces</span>
+            {minPrice > 0 && maxPrice > 0 && (
+              <>
+                <span>•</span>
+                <span>{formatPrice(minPrice)} - {formatPrice(maxPrice)}</span>
+              </>
+            )}
+          </div>
+
+          {/* Footer row with comment input placeholder (left) and compact View pill (right) */}
+          <div className="flex items-center gap-2">
+            {/* Comment input placeholder area */}
+            <div className="flex-1 min-w-0">
+              <input
+                type="text"
+                placeholder="Add a comment..."
+                className="w-full rounded-md bg-white/10 text-white placeholder-white/60 border border-white/20 backdrop-blur-sm px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-white/40"
+                onClick={(e) => e.stopPropagation()}
+                readOnly
+              />
+            </div>
+            <button
+              className="shrink-0 px-3 py-1 rounded-md bg-white/10 border border-white/20 text-white text-[11px] font-medium backdrop-blur-sm hover:bg-white/15 transition"
+              onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+            >
+              View
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CollectionCard;
