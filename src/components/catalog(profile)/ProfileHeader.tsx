@@ -125,8 +125,15 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/15 pointer-events-none" />
 
-        <div className="absolute top-4 right-4 z-30 flex flex-col items-end gap-3">
-          {canEdit && onEditBanner ? (
+        {/* Keep QR at top-right */}
+        <div className="absolute top-4 right-4 z-30">
+          <div className="h-48 w-48 rounded-lg bg-white p-2 shadow-xl dark:bg-gray-900">
+            <DummyQRCode />
+          </div>
+        </div>
+        {/* Move only the edit banner button to the top-left */}
+        {canEdit && onEditBanner ? (
+          <div className="absolute top-4 left-4 z-30">
             <button
               type="button"
               onClick={onEditBanner}
@@ -135,11 +142,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             >
               {bannerLoading ? 'Updating...' : 'Edit banner'}
             </button>
-          ) : null}
-          <div className="h-48 w-48 rounded-lg bg-white p-2 shadow-xl dark:bg-gray-900">
-            <DummyQRCode />
           </div>
-        </div>
+        ) : null}
       </div>
 
       <div className="-mt-24 px-4 sm:-mt-28 sm:px-6">

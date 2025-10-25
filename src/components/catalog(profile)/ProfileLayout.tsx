@@ -5,7 +5,6 @@ import type { RootState } from '../../store';
 import { useAuth } from '../../context/AuthContext';
 import { Sidebar } from '../SideBar';
 import { Navbar } from '../Navbar';
-import { ThemeProvider } from '../../context/ThemeContext';
 import ProfileHeaderSkeleton from '../profile/ProfileHeaderSkeleton';
 import CollectionsSkeleton from '../profile/CollectionsSkeleton';
 
@@ -22,7 +21,6 @@ export const ProfileLayout: React.FC = () => {
 
   if (loading && !user) {
     return (
-      <ThemeProvider>
         <div className="h-screen flex bg-white dark:bg-[#000000] text-gray-900 dark:text-black">
           <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
           <Navbar isCollapsed={isCollapsed} minimal />
@@ -44,7 +42,6 @@ export const ProfileLayout: React.FC = () => {
             </div>
           </main>
         </div>
-      </ThemeProvider>
     );
   }
 
@@ -53,7 +50,6 @@ export const ProfileLayout: React.FC = () => {
   }
 
   return (
-    <ThemeProvider>
       <div className="h-screen flex bg-white dark:bg-[#000000] text-gray-900 dark:text-black">
         <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
         <Navbar isCollapsed={isCollapsed} minimal />
@@ -63,6 +59,5 @@ export const ProfileLayout: React.FC = () => {
           </div>
         </main>
       </div>
-    </ThemeProvider>
   );
 };

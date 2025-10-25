@@ -1,5 +1,5 @@
 ﻿/* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useLayoutEffect, useState, useMemo } from 'react';
+import { createContext, useContext, useLayoutEffect, useState, useMemo, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
@@ -39,6 +39,34 @@ export function ThemeProvider({
     root.classList.remove('light', 'dark');
     root.classList.add(isDark ? 'dark' : 'light');
   }, [theme]);
+
+  // Sync when system theme changes (only when theme is 'system') and across tabs
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleMql = () => {
+      if (theme === 'system') {
+        const root = window.document.documentElement;
+        root.classList.remove('light', 'dark');
+        root.classList.add(mql.matches ? 'dark' : 'light');
+      }
+    };
+    mql.addEventListener?.('change', handleMql);
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === storageKey && e.newValue) {
+        const incoming = e.newValue as Theme;
+        if (incoming !== theme) {
+          setTheme(incoming);
+        }
+      }
+    };
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      mql.removeEventListener?.('change', handleMql);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [theme, storageKey]);
 
   const value = useMemo(() => ({
     theme,

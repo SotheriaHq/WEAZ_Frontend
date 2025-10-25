@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Filter, Bell, User, Tag, Settings, LogOut, ChevronDown, Globe, MapPin, Sun, Moon, Monitor, Heart } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Filter, Bell, User, Tag as TagIcon, Settings, LogOut, ChevronDown, Globe, MapPin, Sun, Moon, Monitor, Heart } from 'lucide-react';
 // Button variants available: FrostedButton (primary|ghost|outline) and IconButton
 // Sizes: xs|sm|md|lg via btn-tight-* classes
 import { FrostedButton } from '@/components/ui/FrostedButton';
@@ -12,6 +12,8 @@ import { clearUser, setUser } from '../features/userSlice';
 import type { RootState } from '../store';
 import type { AuthUserDto } from '../types/auth';
 import '../styles/scrollbar-hide.css';
+import TagChip from '@/components/ui/Tag';
+import SearchField from '@/components/SearchField';
 import { apiClient, dropStoredAccessToken } from '../api/httpClient';
 import { env } from '../config/env';
 import getProfileOrHomeUrl from '../lib/navigation';
@@ -20,16 +22,18 @@ import getProfileOrHomeUrl from '../lib/navigation';
 
 interface NavbarProps {
   isCollapsed: boolean;
+  minimal?: boolean; // profile pages: hide center controls
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ isCollapsed }) => {
+export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-  // location state removed - not used
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  // search focus handled inside SearchField
+  const [showTags, setShowTags] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const profileMenuRef = useRef(null);
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const { setLanguage, translate } = useLanguage();
   const { profile: userProfile, isAuthenticated } = useSelector((state: RootState) => state.user);
   const user = isAuthenticated ? userProfile : null;
@@ -51,10 +55,10 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed }) => {
   }, [user, dispatch]);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const hashtags = [
-    '#Ankara', '#Luxury', '#Streetwear', '#Spring2025',
-    '#Summer', '#Under50k', '#Dresses', '#Accessories'
+  const navTags = [
+    'Ankara', 'Luxury', 'Streetwear', 'Spring2025', 'Summer', 'Under50k', 'Dresses', 'Accessories'
   ];
 
   // Location sharing handler
@@ -91,6 +95,14 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Toggle frosted vs transparent on scroll
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 0);
+    onScroll();
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [location.pathname]);
 
   // Profile Menu Component
   const ProfileMenu = () => {
@@ -151,7 +163,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed }) => {
             {/* User Actions */}
             <div className="py-2 border-t border-gray-200 dark:border-gray-700">
               <button className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
-                <Tag className="w-4 h-4" />
+                <TagIcon className="w-4 h-4" />
                 <span>My Orders</span>
               </button>
               <button className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
@@ -221,7 +233,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed }) => {
             {/* Help & Sign Out */}
             <div className="py-2 border-t border-gray-200 dark:border-gray-700">
               <button className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
-                <Tag className="w-4 h-4" />
+                <TagIcon className="w-4 h-4" />
                 <span>Help</span>
               </button>
               <button
@@ -307,7 +319,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed }) => {
               </div>
 
               <button className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
-                <Tag className="w-4 h-4" />
+                <TagIcon className="w-4 h-4" />
                 <span>Help</span>
               </button>
             </div>
@@ -349,12 +361,19 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed }) => {
 
   return (
     <nav
-      className={`fixed top-0 right-0 bg-white/95 dark:bg-[#0f0f0f]/98 backdrop-blur-md px-4 sm:px-6 py-2 z-30 transition-all duration-300 border-b border-gray-200 dark:border-white/10
-      ${isCollapsed ? 'left-[64px]' : 'left-[192px]'}`}
+      className={`fixed top-0 right-0 px-4 sm:px-6 py-2 z-40 transition-all duration-300
+      ${isCollapsed ? 'left-[64px]' : 'left-[192px]'}
+      ${minimal
+        ? 'bg-transparent border-b border-transparent'
+        : scrolled
+          ? (theme === 'dark'
+              ? 'bg-black/30 backdrop-blur-sm border-b border-transparent'
+              : 'bg-transparent border-b border-transparent')
+          : 'bg-white/95 dark:bg-[#0f0f0f]/98 backdrop-blur-md border-b border-gray-200 dark:border-white/10'}`}
     >
      
       {/* Main Navbar Content */}
-      <div className="flex items-center justify-between min-h-[48px]">
+      <div className={`flex items-center min-h-[48px] ${minimal ? 'justify-between lg:justify-end' : 'justify-between'}`}>
 
         {/* Mobile Logo - Only visible on mobile/tablet */}
         <div className="flex items-center lg:hidden">
@@ -364,42 +383,47 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed }) => {
           </span>
         </div>
 
-        {/* Search Section - Centered on desktop, flexible on mobile */}
-        <div className="flex-1 flex justify-center lg:justify-start lg:max-w-md mx-2">
-          <div className="relative flex items-center w-full max-w-md">
-            {!isSearchFocused ? (
+        {/* Search Section - hidden in minimal mode */}
+        {!minimal && (
+          <div className="flex-1 flex justify-start mx-2">
+            <div className="relative flex items-center w-full min-w-0">
+              <SearchField placeholder={translate('searchPlaceholder') || 'Search...'} showFilter={false} className="!flex-none !max-w-none" />
               <button
-                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                onClick={() => setIsSearchFocused(true)}
-                aria-label="Open search"
+                type="button"
+                className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                aria-label="Filter"
               >
-                <Search className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                <Filter className="w-5 h-5 text-primary" />
               </button>
-            ) : (
-              <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  autoFocus
-                  placeholder={translate('searchPlaceholder') || 'Search...'}
-                  className="w-full pl-10 pr-4 py-2 border-2 border-primary/20 outline-none rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm transition-all duration-200 focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  onBlur={() => setIsSearchFocused(false)}
-                />
-              </div>
-            )}
-            <button
-              className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              aria-label="Filter"
-            >
-              <Filter className="w-5 h-5 text-primary" />
-            </button>
+              <button
+                type="button"
+                className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                aria-label="Toggle tags"
+                onClick={() => setShowTags(prev => !prev)}
+              >
+                <TagIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+              </button>
+              {showTags && (
+                <div className="ml-2 flex-1 min-w-0 overflow-hidden max-w-[calc(100%-12rem)] sm:max-w-[calc(100%-16rem)]">
+                  <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide whitespace-nowrap py-1">
+                    {navTags.map((tag, idx) => {
+                      const palette = ['purple', 'blue', 'green', 'orange', 'red', 'gray'] as const;
+                      const color = palette[idx % palette.length];
+                      return (
+                        <TagChip key={tag} label={`#${tag}`} size="sm" color={color} />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Right Side Actions */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 shrink-0">
           {/* Notifications - Hidden on mobile */}
-          <button className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative">
+          <button type="button" className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative">
             <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
           </button>
@@ -408,10 +432,10 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed }) => {
           {!user && (
             <>
               {/* You can switch to btn-frost-primary/ghost/outline and sizes via btn-tight-*. */}
-              <FrostedButton className="btn-frost-outline btn-tight-sm hidden sm:flex" onClick={() => navigate('/login')}>
+              <FrostedButton className="btn-frost-outline btn-tight-xs hidden sm:flex flex-none" onClick={() => navigate('/login')}>
                 Sign In
               </FrostedButton>
-              <FrostedButton className="btn-frost-primary btn-tight-sm" onClick={() => navigate('/signup')}>
+              <FrostedButton className="btn-frost-primary btn-tight-xs hidden md:flex flex-none" onClick={() => navigate('/signup')}>
                 Sign Up
               </FrostedButton>
             </>
@@ -420,13 +444,15 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed }) => {
           {/* Profile Menu */}
           <div className="relative">
             <button
-              onClick={() => setShowProfileMenu((prev) => !prev)}
+              type="button"
+              onClick={(e) => { e.preventDefault(); setShowProfileMenu((prev) => !prev); }}
               className="w-7 h-7 rounded-full flex items-center justify-center hover:ring-2 hover:ring-primary/20 transition-all duration-200 overflow-hidden"
               aria-label="Profile menu"
             >
               {user ? (
                 <ImageWithFallback
-                  src={user.profileImage ?? null}
+                  src={user.profileImage ?? user.profileImageFile?.s3Url ?? null}
+                  fileId={user.type === 'BRAND' ? (user.profileImageId ?? user.profileImageFile?.id ?? null) : null}
                   alt={`${user.firstName} ${user.lastName}`}
                   fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
                   className="w-full h-full object-cover"
@@ -444,19 +470,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed }) => {
         </div>
       </div>
 
-      {/* Hashtags Row */}
-      <div className="mt-1 overflow-hidden">
-        <div className="flex items-center space-x-1 overflow-x-auto scrollbar-hide pb-1 text-xs">
-          {hashtags.map((tag) => (
-            <button
-              key={tag}
-              className="flex-shrink-0 px-3 py-2 bg-gradient-to-r from-primary to-purple-600 text-white rounded-full text-xs font-medium hover:from-primary/90 hover:to-purple-600/90 transition-all duration-200 whitespace-nowrap shadow-sm"
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Hashtags Row removed to reduce navbar height */}
     </nav>
   );
 };

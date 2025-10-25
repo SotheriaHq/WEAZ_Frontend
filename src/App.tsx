@@ -9,6 +9,7 @@ import Success from './pages/Success';
 import LoginPage from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import Profile from './pages/catalog/BrandProfile';
 import { ProfileLayout } from './components/catalog(profile)/ProfileLayout';
 import CreateCollectionPage from './pages/catalog/CreateCollection';
@@ -60,10 +61,12 @@ const router = createBrowserRouter([
 
 const App: React.FC = () => (
   <AuthProvider>
-    <>
-      <ToastContainer position="top-right" theme="colored" newestOnTop toastClassName="text-sm font-medium" closeOnClick pauseOnFocusLoss={false} />
-      <RouterProvider router={router} />
-    </>
+    <ThemeProvider>
+      <>
+        <ToastContainer position="top-right" theme="colored" newestOnTop toastClassName="text-sm font-medium" closeOnClick pauseOnFocusLoss={false} />
+        <RouterProvider router={router} />
+      </>
+    </ThemeProvider>
   </AuthProvider>
 );
 

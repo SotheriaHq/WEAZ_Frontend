@@ -396,7 +396,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const DesktopSidebar = () => (
     <div
       // FIX 1 & 3: h-screen and flex-col for fixed height and proper stacking. duration-300 for smooth transitions.
-  className={`fixed left-0 top-0 h-screen ${sidebarWidth} bg-white/95 dark:bg-[#0f0f0f]/98 backdrop-blur-md flex flex-col z-40 transition-[width] duration-300 ease-out will-change-[width]`}
+  className={`fixed left-0 top-0 h-screen ${sidebarWidth} flex flex-col z-40 transition-[width] duration-300 ease-out will-change-[width]
+    border-r border-white/20 dark:border-white/10 bg-white dark:bg-[#000000]`}
     >
 
       {/* Logo/Header Section */}
@@ -503,7 +504,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     className="mb-6 last:mb-0"
                                     ref={(el) => { letterRefs.current[letter] = el; }}
                                   >
-                                    <h5 className="text-xs font-bold text-gray-400 mb-2 sticky top-0 bg-white/95 dark:bg-black/95 py-1">
+                                    <h5 className="text-xs font-bold text-gray-400 mb-2 sticky top-0 bg-white dark:bg-[#000000] py-1">
                                       {letter}
                                     </h5>
                                     <div className="space-y-0.5">
@@ -616,7 +617,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Mobile Footer (No changes needed, kept for completeness)
   const MobileFooter = () => (
-    <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-black/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 px-4 py-2 z-40">
+    <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-[#000000] border-t border-gray-200 dark:border-gray-800 px-4 py-2 z-40">
       <div className="flex justify-around items-center max-w-2xl mx-auto">
         {[...mainSidebarLinks, ...userSidebarLinks].slice(0, 5).map((link) => (
           <MobileFooterLink

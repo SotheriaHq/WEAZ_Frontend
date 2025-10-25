@@ -3,7 +3,6 @@ import { Sidebar } from './SideBar';
 import React from 'react';
 import { Navbar } from './Navbar';
 // import { Sidebar } from './Sidebar';
-import { ThemeProvider } from '../context/ThemeContext';
 import { Outlet } from 'react-router-dom';
 
 export const Layout: React.FC = () => {
@@ -11,7 +10,6 @@ export const Layout: React.FC = () => {
    const [isCollapsed, setIsCollapsed] = React.useState(false);
 
   return (
-    <ThemeProvider>
   <div className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-black">
         
         {/* Sidebar */}
@@ -32,6 +30,5 @@ export const Layout: React.FC = () => {
           </div>
         </main>
       </div>
-    </ThemeProvider>
   );
 };
