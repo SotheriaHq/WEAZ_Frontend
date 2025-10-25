@@ -57,39 +57,31 @@ const LikeButton: React.FC<Props> = ({ contentType, contentId, initialCount = 0,
     }
 
     const s = getSocket();
-    const created = (p: any) => {
+    const onLikeCreated = (p: any) => {
       if (p.contentType === contentType && p.contentId === contentId) {
-        // Ignore our own events here; self-events are handled in the self-reconcile effect
-        if (p.userId && p.userId === me) return;
-        dispatch(wsApplied({ contentType, contentId, likeCount: p.likeCount }));
+        if (p.userId === me) {
+          dispatch(reconcile({ contentType, contentId, likeCount: p.likeCount, likedByMe: true }));
+        } else {
+          dispatch(wsApplied({ contentType, contentId, likeCount: p.likeCount }));
+        }
       }
     };
-    const removed = created;
-    s.on('like.created', created);
-    s.on('like.removed', removed);
+    const onLikeRemoved = (p: any) => {
+      if (p.contentType === contentType && p.contentId === contentId) {
+        if (p.userId === me) {
+          dispatch(reconcile({ contentType, contentId, likeCount: p.likeCount, likedByMe: false }));
+        } else {
+          dispatch(wsApplied({ contentType, contentId, likeCount: p.likeCount }));
+        }
+      }
+    };
+    s.on('like.created', onLikeCreated);
+    s.on('like.removed', onLikeRemoved);
     return () => {
-      s.off('like.created', created);
-      s.off('like.removed', removed);
+      s.off('like.created', onLikeCreated);
+      s.off('like.removed', onLikeRemoved);
     };
   }, [contentType, contentId, dispatch, isAuth, me]);
-
-  // Reflect our own like/unlike events to keep the heart filled correctly in realtime and after refresh
-  useEffect(() => {
-    const s = getSocket();
-    const created = (p: any) => {
-      if (p.contentType === contentType && p.contentId === contentId && me && p.userId === me) {
-        dispatch(reconcile({ contentType, contentId, likeCount: p.likeCount, likedByMe: true }));
-      }
-    };
-    const removed = (p: any) => {
-      if (p.contentType === contentType && p.contentId === contentId && me && p.userId === me) {
-        dispatch(reconcile({ contentType, contentId, likeCount: p.likeCount, likedByMe: false }));
-      }
-    };
-    s.on('like.created', created);
-    s.on('like.removed', removed);
-    return () => { s.off('like.created', created); s.off('like.removed', removed); };
-  }, [contentType, contentId, dispatch, me]);
 
   const toggle = async () => {
     if (busy) return;
