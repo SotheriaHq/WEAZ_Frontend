@@ -107,7 +107,7 @@ export const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
       <div
         ref={ref}
         className={clsx(
-          'absolute z-[70] min-w-[180px] glass-menu p-1 animate-slideDown',
+          'absolute z-[90] min-w-[180px] glass-menu p-1 animate-slideDown',
           alignClasses[placement],
           className,
         )}

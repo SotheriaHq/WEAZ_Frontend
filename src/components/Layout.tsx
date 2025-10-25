@@ -22,7 +22,7 @@ export const Layout: React.FC = () => {
        
         {/* Main Content Area */}
       <main
-        className={`pt-32 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${isCollapsed ? 'lg:ml-[64px]' : 'lg:ml-[192px]'}`}
+        className={`pt-20 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${isCollapsed ? 'lg:ml-[64px]' : 'lg:ml-[192px]'}`}
       >
         {/* <main className="pt-32 pb-20 lg:pb-8 lg:ml-[240px] min-h-screen transition-all duration-200"> */}
        

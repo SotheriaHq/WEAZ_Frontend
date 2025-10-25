@@ -121,7 +121,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onViewCollection, 
               e.stopPropagation();
               onViewBrand?.(item.brandId);
             }}
-            className="flex items-center gap-2.5 mb-3 w-fit rounded-lg bg-gradient-to-r from-primary/60 to-purple-600/60 backdrop-blur-xl border border-white/30 px-3 py-2 shadow-lg hover:from-primary/70 hover:to-purple-600/70 transition-all"
+            className="flex items-center gap-2.5 mb-3 w-fit rounded-lg  backdrop-blur-l  px-3 py-2  hover:from-primary/70 hover:to-purple-600/70 transition-all"
           >
             <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/60 bg-gradient-to-br from-primary to-purple-500 shadow-md">
               {item.brandLogo ? (
