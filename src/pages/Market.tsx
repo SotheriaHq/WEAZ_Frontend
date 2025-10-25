@@ -53,12 +53,12 @@ const Market: React.FC = () => {
 
   const handleViewBrand = (brandId: string) => {
     if (!brandId) return;
-    navigate(`/profile?brand=${brandId}`);
+    navigate(`/brands/${brandId}`);
   };
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-      <section className="glass-panel relative overflow-hidden border border-white/40 bg-white/60 px-6 py-8 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-[#0f0f0f]/60 sm:px-10">
+      {/* <section className="glass-panel relative overflow-hidden border border-white/40 bg-white/60 px-6 py-8 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-[#0f0f0f]/60 sm:px-10">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-purple-400/10 to-transparent opacity-60 blur-3xl" />
         <div className="relative space-y-3">
           <p className="text-sm font-semibold uppercase tracking-[0.35em] text-primary/90">Discover</p>
@@ -69,7 +69,7 @@ const Market: React.FC = () => {
             Scroll through curated drops from across the Threadly community. Tap any story card to jump into the full collection, explore brand profiles, and experience each piece up close.
           </p>
         </div>
-      </section>
+      </section> */}
 
       {availableTags.length > 0 && (
         <section className="glass-panel flex flex-wrap items-center gap-3 border border-white/30 bg-white/50 px-4 py-4 backdrop-blur-xl dark:border-white/10 dark:bg-[#0f0f0f]/50 sm:px-6">

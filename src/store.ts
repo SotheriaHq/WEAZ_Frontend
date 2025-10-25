@@ -1,9 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
 import userReducer from './features/userSlice';
+import engagementReducer from './features/engagementSlice';
 
 export const store = configureStore({
   reducer: {
     user: userReducer,
+    engagement: engagementReducer,
   },
 });
 

@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { Heart, MessageCircle, Share2 } from 'lucide-react';
+import { MessageCircle, Share2, Send } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
+import { CommentsApi } from '@/api/CommentsApi';
+import { toast } from 'react-toastify';
+import LikeButton from '@/components/ui/LikeButton';
 import type { MarketItem } from '@/types/market';
 import { formatPrice } from '@/utils/helpers';
 
@@ -13,6 +18,10 @@ interface MarketCardProps {
 export const MarketCard: React.FC<MarketCardProps> = ({ item, onViewCollection, onViewBrand, className }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
   const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
+  const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const [commentText, setCommentText] = useState('');
+  const [commentBusy, setCommentBusy] = useState(false);
+  const [commentCount, setCommentCount] = useState<number>(item.commentsCount ?? 0);
   const priceRange =
     typeof item.minPrice === 'number' && typeof item.maxPrice === 'number'
       ? `${formatPrice(item.minPrice)} – ${formatPrice(item.maxPrice)}`
@@ -85,29 +94,21 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onViewCollection, 
 
         {/* Vertical Action Bar (Right Side - Instagram/TikTok Style) */}
         <div className="absolute bottom-24 right-3 z-10 flex flex-col items-center gap-4">
-          <button 
-            className="flex flex-col items-center text-white drop-shadow-lg hover:scale-110 transition-transform"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Handle like action
-            }}
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-md border border-white/30 shadow-lg">
-              <Heart className="h-5 w-5" />
-            </div>
-            <span className="text-xs font-bold mt-1 drop-shadow">{item.likesCount ?? 0}</span>
-          </button>
+          <LikeButton
+            contentType="COLLECTION_MEDIA"
+            contentId={item.id}
+            initialCount={item.likesCount ?? 0}
+            
+          />
           
           <button 
-            className="flex flex-col items-center text-white drop-shadow-lg hover:scale-110 transition-transform"
+            className="flex flex-col items-center text-white hover:scale-110 transition-transform"
             onClick={(e) => {
               e.stopPropagation();
               // Handle share action
             }}
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-md border border-white/30 shadow-lg">
-              <Share2 className="h-5 w-5" />
-            </div>
+            <Share2 className="h-5 w-5" />
             <span className="text-xs font-bold mt-1 drop-shadow">{item.patchesCount ?? 0}</span>
           </button>
         </div>
@@ -121,7 +122,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onViewCollection, 
               e.stopPropagation();
               onViewBrand?.(item.brandId);
             }}
-            className="flex items-center gap-2.5 mb-3 w-fit rounded-lg bg-gradient-to-r from-primary/60 to-purple-600/60 backdrop-blur-xl border border-white/30 px-3 py-2 shadow-lg hover:from-primary/70 hover:to-purple-600/70 transition-all"
+            className="flex items-center gap-2 mb-2 w-fit rounded-lg px-3 py-2 transition-all"
           >
             <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/60 bg-gradient-to-br from-primary to-purple-500 shadow-md">
               {item.brandLogo ? (
@@ -154,7 +155,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onViewCollection, 
           </button>
 
           {/* Collection Title */}
-          <h3 className="text-base font-bold mb-2 line-clamp-2 leading-tight drop-shadow-lg">
+          <h3 className="text-base font-bold mb-1 line-clamp-2 leading-tight drop-shadow-lg">
             {item.collectionTitle}
           </h3>
 
@@ -164,15 +165,61 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onViewCollection, 
               <MessageCircle className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/70" />
               <input
                 type="text"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!commentBusy) {
+                      const send = async () => {
+                        if (!isAuth) { toast.info('Please sign in to comment.'); return; }
+                        const content = commentText.trim();
+                        if (!content || content.length > 500) { toast.error('Comment must be 1-500 characters.'); return; }
+                        setCommentBusy(true);
+                        try {
+                          await CommentsApi.create('COLLECTION_MEDIA', item.id, content);
+                          setCommentText('');
+                          setCommentCount((c) => c + 1);
+                        } catch (err: any) {
+                          toast.error(err?.response?.data?.message ?? 'Failed to post comment');
+                        } finally { setCommentBusy(false); }
+                      };
+                      void send();
+                    }
+                  }
+                }}
                 placeholder="Add a comment..."
-                className="w-full rounded-lg bg-white/20 backdrop-blur-md border border-white/30 text-white placeholder-white/60 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 shadow-lg"
+                className="w-full rounded-lg bg-white/20 backdrop-blur-md border border-white/30 text-white placeholder-white/60 pl-9 pr-9 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 shadow-lg"
                 onClick={(e) => e.stopPropagation()}
-                readOnly
               />
+              <button
+                type="button"
+                aria-label="Send comment"
+                disabled={commentBusy || commentText.trim().length === 0}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!isAuth) { toast.info('Please sign in to comment.'); return; }
+                  const content = commentText.trim();
+                  if (!content || content.length > 500) { toast.error('Comment must be 1-500 characters.'); return; }
+                  (async () => {
+                    setCommentBusy(true);
+                    try {
+                      await CommentsApi.create('COLLECTION_MEDIA', item.id, content);
+                      setCommentText('');
+                      setCommentCount((c) => c + 1);
+                    } catch (err: any) {
+                      toast.error(err?.response?.data?.message ?? 'Failed to post comment');
+                    } finally { setCommentBusy(false); }
+                  })();
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-white/20 border border-white/30 text-white/90 hover:bg-white/30 disabled:opacity-50"
+              >
+                <Send size={14} />
+              </button>
             </div>
-            <span className="shrink-0 text-xs font-medium text-white/80 drop-shadow">
-              {item.commentsCount ?? 0}
-            </span>
+            <span className="shrink-0 text-xs font-medium text-white/80 drop-shadow">{commentCount}</span>
           </div>
         </div>
       </div>

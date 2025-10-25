@@ -1,5 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
+import CommentThread from '@/components/comments/CommentThread';
 
 const CollectionView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,14 @@ const CollectionView: React.FC = () => {
         {/* TODO: Render collection items */}
         <div className="col-span-full text-sm text-gray-500">Items will appear here.</div>
       </div>
+
+      {/* Comments Thread */}
+      {id && (
+        <section className="mt-10">
+          <h2 className="text-xl font-semibold mb-3">Comments</h2>
+          <CommentThread targetType="COLLECTION" targetId={id} />
+        </section>
+      )}
     </div>
   );
 };

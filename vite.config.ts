@@ -1,3 +1,4 @@
+// @ts-nocheck
 /// <reference types="vitest" />
 
 import path from 'path';

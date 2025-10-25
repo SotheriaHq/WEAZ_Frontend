@@ -5,9 +5,11 @@ import { Dropdown, DropdownMenu, DropdownTrigger, DropdownItem } from '@/compone
 interface SearchFieldProps {
   placeholder?: string;
   onSearch?: (value: string) => void;
+  showFilter?: boolean; // show the filter dropdown control
+  className?: string;
 }
 
-const SearchField: React.FC<SearchFieldProps> = ({ placeholder = 'Search...', onSearch }) => {
+const SearchField: React.FC<SearchFieldProps> = ({ placeholder = 'Search...', onSearch, showFilter = true, className }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -30,7 +32,7 @@ const SearchField: React.FC<SearchFieldProps> = ({ placeholder = 'Search...', on
   }, [isFocused]);
 
   return (
-    <div ref={wrapperRef} className="relative z-[60] flex-1 min-w-0 max-w-xl">
+    <div ref={wrapperRef} className={`relative z-[80] flex-1 min-w-0 max-w-xl ${className ?? ''}`}>
       {!isFocused && value.length === 0 ? (
         <div className="flex items-center gap-2">
           <button
@@ -41,16 +43,18 @@ const SearchField: React.FC<SearchFieldProps> = ({ placeholder = 'Search...', on
           >
             <Search className="w-4 h-4" />
           </button>
-          <Dropdown placement="bottom-end">
-            <DropdownTrigger className="btn-frost-ghost btn-tight-sm aspect-square p-0 min-w-[2rem]">
-              <SlidersHorizontal className="w-4 h-4" />
-            </DropdownTrigger>
-            <DropdownMenu>
-              <DropdownItem>Brands</DropdownItem>
-              <DropdownItem>Collections</DropdownItem>
-              <DropdownItem>People</DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
+          {showFilter && (
+            <Dropdown placement="bottom-end">
+              <DropdownTrigger className="btn-frost-ghost btn-tight-sm aspect-square p-0 min-w-[2rem]">
+                <SlidersHorizontal className="w-4 h-4" />
+              </DropdownTrigger>
+              <DropdownMenu>
+                <DropdownItem>Brands</DropdownItem>
+                <DropdownItem>Collections</DropdownItem>
+                <DropdownItem>People</DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          )}
         </div>
       ) : (
         <div className="glass-panel px-3 py-2 rounded-xl flex items-center gap-2">
@@ -71,16 +75,18 @@ const SearchField: React.FC<SearchFieldProps> = ({ placeholder = 'Search...', on
             placeholder={placeholder}
             className="w-full bg-transparent outline-none border-0 focus:ring-0 text-sm placeholder:text-gray-500"
           />
-          <Dropdown placement="bottom-end">
-            <DropdownTrigger className="btn-frost-ghost btn-tight-xs aspect-square p-0 min-w-[2rem]">
-              <SlidersHorizontal className="w-4 h-4" />
-            </DropdownTrigger>
-            <DropdownMenu>
-              <DropdownItem>Brands</DropdownItem>
-              <DropdownItem>Collections</DropdownItem>
-              <DropdownItem>People</DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
+          {showFilter && (
+            <Dropdown placement="bottom-end">
+              <DropdownTrigger className="btn-frost-ghost btn-tight-xs aspect-square p-0 min-w-[2rem]">
+                <SlidersHorizontal className="w-4 h-4" />
+              </DropdownTrigger>
+              <DropdownMenu>
+                <DropdownItem>Brands</DropdownItem>
+                <DropdownItem>Collections</DropdownItem>
+                <DropdownItem>People</DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          )}
         </div>
       )}
     </div>

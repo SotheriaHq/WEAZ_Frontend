@@ -77,16 +77,16 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
           ? (raw.maxPrice as number)
           : null,
     likesCount:
-      typeof collection.likesCount === 'number'
-        ? (collection.likesCount as number)
-        : typeof raw.likesCount === 'number'
-          ? (raw.likesCount as number)
+      typeof raw.likesCount === 'number'
+        ? (raw.likesCount as number)
+        : typeof collection.likesCount === 'number'
+          ? (collection.likesCount as number)
           : null,
     commentsCount:
-      typeof collection.commentsCount === 'number'
-        ? (collection.commentsCount as number)
-        : typeof raw.commentsCount === 'number'
-          ? (raw.commentsCount as number)
+      typeof raw.commentsCount === 'number'
+        ? (raw.commentsCount as number)
+        : typeof collection.commentsCount === 'number'
+          ? (collection.commentsCount as number)
           : null,
     patchesCount:
       typeof collection.patchesCount === 'number'
@@ -130,7 +130,8 @@ export const marketApi = {
         items?: RawMarketItem[];
       };
 
-    const items = Array.isArray(data.items) ? data.items.map((item) => toMarketItem(item)) : [];
+    const rawItems = (data as { items?: RawMarketItem[] }).items;
+    const items = Array.isArray(rawItems) ? rawItems.map((item) => toMarketItem(item)) : [];
     return {
       items,
       hasNextPage: Boolean((data as MarketFeedResponse)?.hasNextPage ?? items.length > 0),
@@ -140,3 +141,4 @@ export const marketApi = {
 };
 
 export default marketApi;
+

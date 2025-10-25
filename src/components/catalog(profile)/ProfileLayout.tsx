@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { useAuth } from '../../context/AuthContext';
 import { Sidebar } from '../SideBar';
-import { ThemeProvider } from '../../context/ThemeContext';
+import { Navbar } from '../Navbar';
 import ProfileHeaderSkeleton from '../profile/ProfileHeaderSkeleton';
 import CollectionsSkeleton from '../profile/CollectionsSkeleton';
 
@@ -21,13 +21,13 @@ export const ProfileLayout: React.FC = () => {
 
   if (loading && !user) {
     return (
-      <ThemeProvider>
         <div className="h-screen flex bg-white dark:bg-[#000000] text-gray-900 dark:text-black">
           <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
+          <Navbar isCollapsed={isCollapsed} minimal />
           <main
             className={`flex-1 overflow-hidden transition-all duration-300 ${mainContentMarginClass}`}
           >
-            <div className="h-full p-4 sm:p-6 pb-20 lg:pb-8 overflow-y-auto">
+            <div className="h-full p-4 sm:p-6 pb-20 lg:pb-8 pt-20 overflow-y-auto">
               <div className="max-w-screen-xl mx-auto space-y-6">
                 <ProfileHeaderSkeleton />
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -42,7 +42,6 @@ export const ProfileLayout: React.FC = () => {
             </div>
           </main>
         </div>
-      </ThemeProvider>
     );
   }
 
@@ -51,15 +50,14 @@ export const ProfileLayout: React.FC = () => {
   }
 
   return (
-    <ThemeProvider>
       <div className="h-screen flex bg-white dark:bg-[#000000] text-gray-900 dark:text-black">
         <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
+        <Navbar isCollapsed={isCollapsed} minimal />
         <main className={`flex-1 overflow-hidden transition-all duration-300 ${mainContentMarginClass}`}>
-          <div className="h-full p-4 sm:p-6 pb-20 lg:pb-8 overflow-y-auto">
+          <div className="h-full p-4 sm:p-6 pb-20 lg:pb-8 pt-20 overflow-y-auto">
             <Outlet />
           </div>
         </main>
       </div>
-    </ThemeProvider>
   );
 };
