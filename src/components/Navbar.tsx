@@ -367,9 +367,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) 
       ${minimal
         ? 'bg-transparent border-b border-transparent'
         : scrolled
-          ? (theme === 'dark'
-              ? 'bg-black/30 backdrop-blur-sm border-b border-transparent'
-              : 'bg-transparent border-b border-transparent')
+          ? 'bg-black/30 backdrop-blur-sm border-b border-transparent'
           : 'bg-white/95 dark:bg-[#0f0f0f]/98 backdrop-blur-md border-b border-gray-200 dark:border-white/10'}`}
     >
      
