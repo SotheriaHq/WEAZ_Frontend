@@ -49,6 +49,7 @@ const LikeButton: React.FC<Props> = ({
   });
   const initKeyRef = useRef<string | null>(null);
   const me = useSelector((s: RootState) => s.user.profile?.id);
+  const contentOwnerId = useRef<string | null>(null);
   
   // Prevent race conditions from overlapping requests
   const pendingRequestRef = useRef<AbortController | null>(null);
@@ -56,71 +57,64 @@ const LikeButton: React.FC<Props> = ({
 
   useEffect(() => {
     const thisKey = `${contentType}:${contentId}`;
-    const firstInitForKey = initKeyRef.current !== thisKey;
-
-    // Join room on every key change
+    // Always join the room to get real-time updates
     joinContentRoom(contentType, contentId);
 
-    // Initialize state only once per key to avoid flicker from prop resets
-    if (firstInitForKey) {
-      initKeyRef.current = thisKey;
-
-      // Always initialize state to prevent flickering, but only fetch if first time for this key
+    // If initialLiked is provided, we can immediately set the state and avoid a fetch.
+    if (initialLiked !== undefined) {
       dispatch(setLikeState({
         contentType,
         contentId,
-        likedByMe: !!initialLiked,
-        likeCount: initialCount
+        likedByMe: initialLiked,
+        likeCount: initialCount,
       }));
+      setInitializing(false);
+    } else if (isAuth) {
+      // Fetch only if the initial state is unknown and user is logged in.
+      setInitializing(true);
+      const fetchApi = contentType === 'COLLECTION_MEDIA'
+        ? ReactionsApi.getCollectionMediaIsLiked
+        : ReactionsApi.getCollectionIsLiked;
 
-      // Fetch current like status and count if user is authenticated
-      if (isAuth) {
-        if (contentType === 'COLLECTION_MEDIA') {
-          // Fetch both user like status and current total count
-          Promise.all([
-            ReactionsApi.getCollectionMediaIsLiked(contentId),
-            ReactionsApi.getCollectionMediaReactions(contentId, 1)
-          ]).then(([likeStatus, reactions]) => {
-            dispatch(setLikeState({
-              contentType,
-              contentId,
-              likedByMe: !!likeStatus.liked,
-              likeCount: reactions.totalLikes
-            }));
-          }).catch(() => {
-            // Fallback to initial values if API fails
-            dispatch(setLikeState({
-              contentType,
-              contentId,
-              likedByMe: !!initialLiked,
-              likeCount: initialCount
-            }));
-          }).finally(() => setInitializing(false));
-        } else if (contentType === 'COLLECTION') {
-          // Fetch both user like status and current total count
-          Promise.all([
-            ReactionsApi.getCollectionIsLiked(contentId),
-            ReactionsApi.getCollectionReactions(contentId, 1)
-          ]).then(([likeStatus, reactions]) => {
-            dispatch(setLikeState({
-              contentType,
-              contentId,
-              likedByMe: !!likeStatus.liked,
-              likeCount: reactions.totalLikes
-            }));
-          }).catch(() => {
-            // Fallback to initial values if API fails
-            dispatch(setLikeState({
-              contentType,
-              contentId,
-              likedByMe: !!initialLiked,
-              likeCount: initialCount
-            }));
-          }).finally(() => setInitializing(false));
-        }
-      } else {
-        setInitializing(false);
-      }
+      fetchApi(contentId)
+        .then(likeStatus => {
+          dispatch(setLikeState({
+            contentType,
+            contentId,
+            likedByMe: !!likeStatus.liked,
+            likeCount: initialCount, // Count is fetched separately or comes from props
+          }));
+        })
+        .catch(() => {
+          // On failure, fallback to the initial prop values.
+          dispatch(setLikeState({
+            contentType,
+            contentId,
+            likedByMe: false, // Assume not liked on error
+            likeCount: initialCount,
+          }));
+        })
+        .finally(() => setInitializing(false));
+    } else {
+      // Not authenticated and no initial value, so set to default.
+      dispatch(setLikeState({
+        contentType,
+        contentId,
+        likedByMe: false,
+        likeCount: initialCount,
+      }));
+      setInitializing(false);
+    }
+
+    // Fetch content owner to enable toast notifications
+    if (isAuth) {
+      ReactionsApi.getContentOwner(contentType, contentId)
+        .then(res => {
+          contentOwnerId.current = res.ownerId;
+        })
+        .catch(() => {
+          // Silently fail, toasts won't be triggered
+        });
     }
 
     const s = getSocket();
@@ -128,21 +122,20 @@ const LikeButton: React.FC<Props> = ({
     // Enhanced WebSocket handling: Only apply updates when no local request is pending
     const onLikeCreated = (p: any) => {
       if (p.contentType === contentType && p.contentId === contentId) {
-        // Only apply WS updates for OTHER users' actions and when no local request is active
-        if (p.userId !== me && !pendingRequestRef.current) {
-          dispatch(wsApplied({ contentType, contentId, likeCount: p.likeCount }));
+        // Always update the count for all users
+        dispatch(wsApplied({ contentType, contentId, likeCount: p.likeCount }));
+
+        // If the current user is the content owner and not the one who liked, show a toast
+        if (me && contentOwnerId.current === me && p.userId !== me) {
+          toast.info(`Someone liked your content!`);
         }
-        // If it's our own action or we have a pending request, ignore WS updates
       }
     };
 
     const onLikeRemoved = (p: any) => {
       if (p.contentType === contentType && p.contentId === contentId) {
-        // Only apply WS updates for OTHER users' actions and when no local request is active
-        if (p.userId !== me && !pendingRequestRef.current) {
-          dispatch(wsApplied({ contentType, contentId, likeCount: p.likeCount }));
-        }
-        // If it's our own action or we have a pending request, ignore WS updates
+        // Always update the count for all users
+        dispatch(wsApplied({ contentType, contentId, likeCount: p.likeCount }));
       }
     };
     

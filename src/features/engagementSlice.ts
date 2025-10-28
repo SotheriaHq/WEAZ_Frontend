@@ -28,10 +28,28 @@ export const engagementSlice = createSlice({
     reconcile: (state, action: PayloadAction<{ contentType: string; contentId: string; likedByMe?: boolean; likeCount?: number }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
       const prev = state.likes[k] ?? { likedByMe: false, likeCount: 0 };
-      state.likes[k] = {
-        likedByMe: action.payload.likedByMe ?? prev.likedByMe,
-        likeCount: typeof action.payload.likeCount === 'number' ? action.payload.likeCount : prev.likeCount,
-      };
+
+      // Create a new state object to avoid direct mutation issues
+      const newState: ItemState = { ...prev };
+
+      // Only update likedByMe if it's explicitly in the payload
+      if (typeof action.payload.likedByMe === 'boolean') {
+        newState.likedByMe = action.payload.likedByMe;
+      }
+
+      // Only update likeCount if it's explicitly in the payload
+      if (typeof action.payload.likeCount === 'number') {
+        newState.likeCount = action.payload.likeCount;
+      } else {
+        // If API doesn't return a new count, adjust optimistically
+        const prevLiked = prev.likedByMe;
+        const nextLiked = newState.likedByMe;
+        if (prevLiked !== nextLiked) {
+          newState.likeCount += (nextLiked ? 1 : -1);
+        }
+      }
+
+      state.likes[k] = newState;
     },
     wsApplied: (state, action: PayloadAction<{ contentType: string; contentId: string; likeCount: number }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
