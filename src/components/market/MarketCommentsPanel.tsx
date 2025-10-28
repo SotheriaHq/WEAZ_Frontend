@@ -156,6 +156,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
             onSubmit={submit}
             disabled={busy}
             busy={busy}
+            placeholder="Share your thoughts..."
           />
           {postedOk && (
             <div className="absolute -right-8 top-1/2 -translate-y-1/2 text-emerald-500">
