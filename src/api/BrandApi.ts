@@ -1,4 +1,4 @@
-import { apiClient } from './httpClient';
+﻿import { apiClient } from './httpClient';
 import { unwrapApiResponse, type AuthUserDto } from '../types/auth';
 import type {
   CollectionDto,
@@ -253,6 +253,16 @@ export const brandApi = {
     signedUrlPending.set(fileId, request);
     return request;
   },
+  // Get one collection with medias
+  async getCollectionDetail(collectionId: string): Promise<any> {
+    try {
+      const response = await apiClient.get(`/collections/${collectionId}`);
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error fetching collection detail:', error);
+      return null;
+    }
+  },
 };
 
 const extractUploadAsset = (raw: unknown): UploadAssetDto | null => {
@@ -309,3 +319,4 @@ const extractUploadAsset = (raw: unknown): UploadAssetDto | null => {
     updatedAt,
   };
 };
+

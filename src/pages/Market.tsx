@@ -8,6 +8,7 @@ import MarketCard from '@/components/market/MarketCard';
 import MarketSkeleton from '@/components/market/MarketSkeleton';
 import Tag from '@/components/ui/Tag';
 import { FrostedButton } from '@/components/ui/FrostedButton';
+import MarketViewModal from '@/components/market/MarketViewModal';
 
 const Market: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ const Market: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [viewItem, setViewItem] = useState<MarketItem | null>(null);
 
   const loadFeed = useCallback(async () => {
     setLoading(true);
@@ -130,6 +132,7 @@ const Market: React.FC = () => {
             <div key={item.id} className="w-full">
               <MarketCard
                 item={item}
+                onOpenView={(it) => setViewItem(it)}
                 onViewCollection={handleViewCollection}
                 onViewBrand={handleViewBrand}
               />
@@ -147,8 +150,16 @@ const Market: React.FC = () => {
           </FrostedButton>
         </section>
       )}
+      {/* View modal */}
+      <MarketViewModal open={Boolean(viewItem)} item={viewItem} onClose={() => setViewItem(null)} />
     </div>
   );
 };
 
 export default Market;
+
+// Modal outside of main layout tree for z-index safety
+// Render within page to keep simple routing for now
+export const MarketPageWithView: React.FC = () => {
+  return <Market />;
+};

@@ -459,18 +459,21 @@ const ProfilePage: React.FC = () => {
       )}
       {isBrandOwner && (
         <>
+          {/* Keep inputs in the DOM (sr-only) so programmatic click reliably opens the picker */}
           <input
+            id="avatar-file-input"
             ref={avatarInputRef}
             type="file"
             accept="image/*"
-            className="hidden"
+            className="sr-only"
             onChange={handleAvatarSelected}
           />
           <input
+            id="banner-file-input"
             ref={bannerInputRef}
             type="file"
             accept="image/*"
-            className="hidden"
+            className="sr-only"
             onChange={handleBannerSelected}
           />
         </>

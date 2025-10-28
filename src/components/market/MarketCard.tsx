@@ -1,21 +1,25 @@
 import React, { useState } from 'react';
-import { MessageCircle, Share2, Send } from 'lucide-react';
+import { Share2 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { CommentsApi } from '@/api/CommentsApi';
 import { toast } from 'react-toastify';
 import LikeButton from '@/components/ui/LikeButton';
+import CommentInput from '@/components/ui/CommentInput';
+import Tag from '@/components/ui/Tag';
 import type { MarketItem } from '@/types/market';
 import { formatPrice } from '@/utils/helpers';
+import { getTagColor } from '@/utils/tagColors';
 
 interface MarketCardProps {
   item: MarketItem;
+  onOpenView?: (item: MarketItem) => void;
   onViewCollection?: (collectionId: string) => void;
   onViewBrand?: (brandId: string) => void;
   className?: string;
 }
 
-export const MarketCard: React.FC<MarketCardProps> = ({ item, onViewCollection, onViewBrand, className }) => {
+export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onViewCollection, onViewBrand, className }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
   const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
@@ -36,7 +40,13 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onViewCollection, 
   return (
     <article
       className={`group relative w-full overflow-hidden rounded-lg shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(129,140,248,0.3)] cursor-pointer ${className ?? ''}`}
-      onClick={() => onViewCollection?.(item.collectionId)}
+      onClick={() => {
+        if (onOpenView) {
+          onOpenView(item);
+        } else {
+          onViewCollection?.(item.collectionId);
+        }
+      }}
     >
       {/* Full Image Background */}
       <div className="relative w-full overflow-hidden">
@@ -84,11 +94,12 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onViewCollection, 
         {/* Tags (Top Left) */}
         {displayTags.length > 0 && (
           <div className="absolute top-3 left-3 z-20 flex flex-wrap gap-1.5">
-            {displayTags.map((tag) => (
-              <div key={tag} className="rounded-full bg-primary/80 backdrop-blur-sm px-2.5 py-1 text-xs font-medium text-white">
-                #{tag}
-              </div>
-            ))}
+            {displayTags.map((tag) => {
+              const color = getTagColor(tag);
+              return (
+                <Tag key={tag} label={`#${tag}`} size="xs" color={color} />
+              );
+            })}
           </div>
         )}
 
@@ -161,63 +172,27 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onViewCollection, 
 
           {/* Comment Input Area (Bottom) */}
           <div className="flex items-center gap-2">
-            <div className="flex-1 min-w-0 relative">
-              <MessageCircle className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/70" />
-              <input
-                type="text"
+            <div className="flex-1 min-w-0">
+              <CommentInput
                 value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (!commentBusy) {
-                      const send = async () => {
-                        if (!isAuth) { toast.info('Please sign in to comment.'); return; }
-                        const content = commentText.trim();
-                        if (!content || content.length > 500) { toast.error('Comment must be 1-500 characters.'); return; }
-                        setCommentBusy(true);
-                        try {
-                          await CommentsApi.create('COLLECTION_MEDIA', item.id, content);
-                          setCommentText('');
-                          setCommentCount((c) => c + 1);
-                        } catch (err: any) {
-                          toast.error(err?.response?.data?.message ?? 'Failed to post comment');
-                        } finally { setCommentBusy(false); }
-                      };
-                      void send();
-                    }
-                  }
-                }}
-                placeholder="Add a comment..."
-                className="w-full rounded-lg bg-white/20 backdrop-blur-md border border-white/30 text-white placeholder-white/60 pl-9 pr-9 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 shadow-lg"
-                onClick={(e) => e.stopPropagation()}
-              />
-              <button
-                type="button"
-                aria-label="Send comment"
-                disabled={commentBusy || commentText.trim().length === 0}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
+                onChange={setCommentText}
+                onSubmit={async () => {
                   if (!isAuth) { toast.info('Please sign in to comment.'); return; }
                   const content = commentText.trim();
                   if (!content || content.length > 500) { toast.error('Comment must be 1-500 characters.'); return; }
-                  (async () => {
-                    setCommentBusy(true);
-                    try {
-                      await CommentsApi.create('COLLECTION_MEDIA', item.id, content);
-                      setCommentText('');
-                      setCommentCount((c) => c + 1);
-                    } catch (err: any) {
-                      toast.error(err?.response?.data?.message ?? 'Failed to post comment');
-                    } finally { setCommentBusy(false); }
-                  })();
+                  setCommentBusy(true);
+                  try {
+                    await CommentsApi.create('COLLECTION_MEDIA', item.id, content);
+                    setCommentText('');
+                    setCommentCount((c) => c + 1);
+                  } catch (err: any) {
+                    toast.error(err?.response?.data?.message ?? 'Failed to post comment');
+                  } finally { setCommentBusy(false); }
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-white/20 border border-white/30 text-white/90 hover:bg-white/30 disabled:opacity-50"
-              >
-                <Send size={14} />
-              </button>
+                disabled={commentBusy}
+                busy={commentBusy}
+                className="w-full"
+              />
             </div>
             <span className="shrink-0 text-xs font-medium text-white/80 drop-shadow">{commentCount}</span>
           </div>
