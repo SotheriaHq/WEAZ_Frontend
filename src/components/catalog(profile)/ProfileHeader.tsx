@@ -142,9 +142,11 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 if (bannerLoading) {
                   e.preventDefault();
                   e.stopPropagation();
+                  return;
                 }
-                // The htmlFor attribute will handle the click event.
-                // We only need to prevent it when loading.
+                // Prevent default to avoid double-firing if htmlFor is also working.
+                e.preventDefault();
+                onEditBanner?.();
               }}
               role="button"
               tabIndex={0}

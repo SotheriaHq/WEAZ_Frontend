@@ -38,4 +38,9 @@ export const ReactionsApi = {
     const { data } = await apiClient.get(`/collections/media/${mediaId}/is-liked`);
     return data as { liked: boolean };
   },
+
+  async getContentOwner(contentType: 'COLLECTION' | 'COLLECTION_MEDIA', contentId: string) {
+    const { data } = await apiClient.get(`/v1/reactions/owner/${contentType}/${contentId}`);
+    return data as { ownerId: string };
+  }
 };
