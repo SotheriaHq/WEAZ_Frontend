@@ -61,17 +61,17 @@ const LikeButton: React.FC<Props> = ({
     // Join room on every key change
     joinContentRoom(contentType, contentId);
 
-    // Always initialize state to prevent flickering, but only fetch if first time for this key
-    dispatch(setLikeState({
-      contentType,
-      contentId,
-      likedByMe: !!initialLiked,
-      likeCount: initialCount
-    }));
-
     // Initialize state only once per key to avoid flicker from prop resets
     if (firstInitForKey) {
       initKeyRef.current = thisKey;
+
+      // Always initialize state to prevent flickering, but only fetch if first time for this key
+      dispatch(setLikeState({
+        contentType,
+        contentId,
+        likedByMe: !!initialLiked,
+        likeCount: initialCount
+      }));
 
       // Fetch current like status and count if user is authenticated
       if (isAuth) {

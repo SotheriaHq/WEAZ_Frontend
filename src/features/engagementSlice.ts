@@ -25,12 +25,12 @@ export const engagementSlice = createSlice({
       const currentCount = Number(item.likeCount) || 0; // Ensure numeric
       state.likes[k] = { likedByMe: action.payload.nextLiked, likeCount: Math.max(0, currentCount + delta) };
     },
-    reconcile: (state, action: PayloadAction<{ contentType: string; contentId: string; likedByMe?: boolean; likeCount: number }>) => {
+    reconcile: (state, action: PayloadAction<{ contentType: string; contentId: string; likedByMe?: boolean; likeCount?: number }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
       const prev = state.likes[k] ?? { likedByMe: false, likeCount: 0 };
       state.likes[k] = {
         likedByMe: action.payload.likedByMe ?? prev.likedByMe,
-        likeCount: Number(action.payload.likeCount) || 0 // Ensure numeric
+        likeCount: typeof action.payload.likeCount === 'number' ? action.payload.likeCount : prev.likeCount,
       };
     },
     wsApplied: (state, action: PayloadAction<{ contentType: string; contentId: string; likeCount: number }>) => {

@@ -139,12 +139,12 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             <label
               htmlFor="banner-file-input"
               onClick={(e) => {
-                if (bannerLoading) { e.preventDefault(); e.stopPropagation(); return; }
-                // Proactively invoke the provided handler for reliability across browsers
-                if (onEditBanner) {
+                if (bannerLoading) {
                   e.preventDefault();
-                  onEditBanner();
+                  e.stopPropagation();
                 }
+                // The htmlFor attribute will handle the click event.
+                // We only need to prevent it when loading.
               }}
               role="button"
               tabIndex={0}
