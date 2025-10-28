@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { FiEdit2, FiShare2 } from 'react-icons/fi';
 import Tag from '@/components/ui/Tag';
 import { IconButton } from '@/components/ui/FrostedButton';
+import { getTagColor } from '@/utils/tagColors';
 import AvatarCard from '../profile/AvatarCard';
 import VLoader from '../loaders/VLoader';
 
@@ -132,16 +133,36 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </div>
         </div>
         {/* Move only the edit banner button to the top-left */}
-        {canEdit && onEditBanner ? (
+        {canEdit ? (
           <div className="absolute top-4 left-4 z-30">
-            <button
-              type="button"
-              onClick={onEditBanner}
-              className="rounded-full bg-white/90 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-800 shadow-lg transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-gray-900/85 dark:text-gray-100"
-              disabled={bannerLoading}
+            {/* Use a label bound to the hidden file input to ensure cross-browser reliability */}
+            <label
+              htmlFor="banner-file-input"
+              onClick={(e) => {
+                if (bannerLoading) { e.preventDefault(); e.stopPropagation(); return; }
+                // Proactively invoke the provided handler for reliability across browsers
+                if (onEditBanner) {
+                  e.preventDefault();
+                  onEditBanner();
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (bannerLoading) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onEditBanner?.();
+                }
+              }}
+              className={
+                `cursor-pointer rounded-full bg-white/90 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-800 shadow-lg transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 dark:bg-gray-900/85 dark:text-gray-100 ` +
+                (bannerLoading ? 'pointer-events-none opacity-70' : '')
+              }
+              aria-disabled={bannerLoading}
             >
               {bannerLoading ? 'Updating...' : 'Edit banner'}
-            </button>
+            </label>
           </div>
         ) : null}
       </div>
@@ -188,8 +209,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 {tagRows.map((row, idx) => (
                   <div key={idx} className="flex gap-2">
                     {row.map((tag, i) => {
-                      const palette = ['purple', 'blue', 'green', 'orange', 'red', 'gray'] as const;
-                      const color = palette[(i + idx) % palette.length];
+                      const color = getTagColor(tag);
                       return <Tag key={tag} label={`#${tag}`} color={color} size="sm" />;
                     })}
                   </div>

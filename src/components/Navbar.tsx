@@ -17,6 +17,7 @@ import SearchField from '@/components/SearchField';
 import { apiClient, dropStoredAccessToken } from '../api/httpClient';
 import { env } from '../config/env';
 import getProfileOrHomeUrl from '../lib/navigation';
+import { getTagColor } from '../utils/tagColors';
 
 
 
@@ -102,7 +103,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) 
     onScroll();
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
-  }, [location.pathname]);
+  }, [location.pathname, theme]);
 
   // Profile Menu Component
   const ProfileMenu = () => {
@@ -407,8 +408,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) 
                 <div className="ml-2 flex-1 min-w-0 overflow-hidden max-w-[calc(100%-12rem)] sm:max-w-[calc(100%-16rem)]">
                   <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide whitespace-nowrap py-1">
                     {navTags.map((tag, idx) => {
-                      const palette = ['purple', 'blue', 'green', 'orange', 'red', 'gray'] as const;
-                      const color = palette[idx % palette.length];
+                      const color = getTagColor(tag);
                       return (
                         <TagChip key={tag} label={`#${tag}`} size="sm" color={color} />
                       );

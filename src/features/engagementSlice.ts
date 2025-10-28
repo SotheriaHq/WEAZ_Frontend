@@ -22,17 +22,21 @@ export const engagementSlice = createSlice({
       const k = key(action.payload.contentType, action.payload.contentId);
       const item = state.likes[k] ?? { likedByMe: false, likeCount: 0 };
       const delta = action.payload.nextLiked ? 1 : -1;
-      state.likes[k] = { likedByMe: action.payload.nextLiked, likeCount: Math.max(0, item.likeCount + delta) };
+      const currentCount = Number(item.likeCount) || 0; // Ensure numeric
+      state.likes[k] = { likedByMe: action.payload.nextLiked, likeCount: Math.max(0, currentCount + delta) };
     },
     reconcile: (state, action: PayloadAction<{ contentType: string; contentId: string; likedByMe?: boolean; likeCount: number }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
       const prev = state.likes[k] ?? { likedByMe: false, likeCount: 0 };
-      state.likes[k] = { likedByMe: action.payload.likedByMe ?? prev.likedByMe, likeCount: action.payload.likeCount };
+      state.likes[k] = {
+        likedByMe: action.payload.likedByMe ?? prev.likedByMe,
+        likeCount: Number(action.payload.likeCount) || 0 // Ensure numeric
+      };
     },
     wsApplied: (state, action: PayloadAction<{ contentType: string; contentId: string; likeCount: number }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
       const prev = state.likes[k] ?? { likedByMe: false, likeCount: 0 };
-      state.likes[k] = { likedByMe: prev.likedByMe, likeCount: action.payload.likeCount };
+      state.likes[k] = { likedByMe: prev.likedByMe, likeCount: Number(action.payload.likeCount) || 0 };
     },
   },
 });
