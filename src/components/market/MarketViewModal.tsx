@@ -61,12 +61,12 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose }) => {
         {/* Left: Media */}
         <div className={`col-span-12 bg-black ${leftColsSm} ${leftColsMd}`}>
           <div className="flex h-full items-center justify-center overflow-hidden">
-            {/* Ensure the media is fully visible without cropping - use cover for tall images, contain for others */}
+            {/* Ensure the media is fully visible without cropping - use contain to respect aspect ratio */}
             <MediaViewer
               media={item.media}
               rounded={false}
-              objectFit={item.media.aspectRatio && item.media.aspectRatio > 1.5 ? "cover" : "contain"}
-              className="h-full w-full"
+              objectFit="contain"
+              className="h-full w-full max-h-full"
             />
           </div>
         </div>
@@ -128,7 +128,7 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose }) => {
           </div>
 
           {/* Comments Area */}
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 flex-1 border-t border-purple-200/50 dark:border-purple-800/50 pt-3 mt-3 flex flex-col">
             <MarketCommentsPanel mediaId={item.id} collectionId={item.collectionId} onCountChange={(c) => setCommentCount(c)} showComposer={true} />
           </div>
         </div>
