@@ -18,6 +18,7 @@ type Props = {
   initialLiked?: boolean;
   className?: string;
   size?: number;
+  ownerId?: string;
 };
 
 const LikeButton: React.FC<Props> = ({ 
@@ -26,7 +27,8 @@ const LikeButton: React.FC<Props> = ({
   initialCount = 0, 
   initialLiked, 
   className, 
-  size = 20 
+  size = 20,
+  ownerId,
 }) => {
   const dispatch = useDispatch();
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
@@ -49,7 +51,6 @@ const LikeButton: React.FC<Props> = ({
   });
   const initKeyRef = useRef<string | null>(null);
   const me = useSelector((s: RootState) => s.user.profile?.id);
-  const contentOwnerId = useRef<string | null>(null);
   
   // Prevent race conditions from overlapping requests
   const pendingRequestRef = useRef<AbortController | null>(null);
@@ -106,17 +107,6 @@ const LikeButton: React.FC<Props> = ({
       setInitializing(false);
     }
 
-    // Fetch content owner to enable toast notifications
-    if (isAuth) {
-      ReactionsApi.getContentOwner(contentType, contentId)
-        .then(res => {
-          contentOwnerId.current = res.ownerId;
-        })
-        .catch(() => {
-          // Silently fail, toasts won't be triggered
-        });
-    }
-
     const s = getSocket();
     
     // Enhanced WebSocket handling: Only apply updates when no local request is pending
@@ -125,9 +115,9 @@ const LikeButton: React.FC<Props> = ({
         // Always update the count for all users
         dispatch(wsApplied({ contentType, contentId, likeCount: p.likeCount }));
 
-        // If the current user is the content owner and not the one who liked, show a toast
-        if (me && contentOwnerId.current === me && p.userId !== me) {
-          toast.info(`Someone liked your content!`);
+        // If the current user is the content owner and someone else liked, show a toast
+        if (me && ownerId && ownerId === me && p.userId !== me) {
+          toast.info('Someone liked your content!');
         }
       }
     };
@@ -152,7 +142,7 @@ const LikeButton: React.FC<Props> = ({
         pendingRequestRef.current = null;
       }
     };
-  }, [contentType, contentId, dispatch, isAuth, initialCount, initialLiked, me]);
+  }, [contentType, contentId, dispatch, isAuth, initialCount, initialLiked, me, ownerId]);
 
   const toggle = async () => {
     // Prevent multiple simultaneous requests - strict deduplication

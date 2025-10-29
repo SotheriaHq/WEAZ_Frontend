@@ -48,7 +48,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onClick={(e) => e.stopPropagation()}
-        className="w-full rounded-lg bg-white/20 backdrop-blur-md border border-white/30 text-white placeholder-white/60 pl-9 pr-9 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 shadow-lg"
+        className="w-full rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-white/60 pl-9 pr-9 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 dark:focus:ring-white/20 shadow-lg"
         maxLength={maxLength}
         disabled={disabled || busy}
       />

@@ -18,6 +18,7 @@
     "@types/qrcode.react": "^1.0.5",
     "axios": "^1.10.0",
     "clsx": "^2.1.1",
+    "emoji-picker-react": "^4.15.0",
     "lucide-react": "^0.525.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.1.0",

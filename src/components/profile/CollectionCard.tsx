@@ -131,7 +131,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
 
         {/* Vertical Action Bar (like in Reels) - Right side */}
         <div className="absolute bottom-28 right-2 z-10 flex flex-col items-center gap-3">
-          <LikeButton contentType="COLLECTION" contentId={collection.id} initialCount={likesCount} />
+          <LikeButton contentType="COLLECTION" contentId={collection.id} initialCount={likesCount} ownerId={collection.ownerId} />
           <button className="flex flex-col items-center text-white hover:scale-110 transition-transform" onClick={(e) => e.stopPropagation()}>
             <MessageCircle className="w-5 h-5" />
             <span className="text-[10px] font-semibold mt-0.5">{commentsCount}</span>

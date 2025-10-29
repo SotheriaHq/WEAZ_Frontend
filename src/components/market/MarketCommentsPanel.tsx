@@ -27,6 +27,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
   const [collHasNext, setCollHasNext] = React.useState(false);
   const [text, setText] = React.useState('');
   const [postedOk, setPostedOk] = React.useState(false);
+  const errorToastShown = React.useRef(false);
 
   const mergeAndSort = (a: CommentV2Dto[], b: CommentV2Dto[]) => {
     const merged = [...a, ...b];
@@ -48,8 +49,13 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
       setCollCursor(collRes.endCursor);
       setMediaHasNext(mediaRes.hasNextPage);
       setCollHasNext(collRes.hasNextPage);
+      // Reset error guard on success
+      errorToastShown.current = false;
     } catch (e: any) {
-      toast.error(e?.response?.data?.message ?? 'Failed to load comments');
+      if (!errorToastShown.current) {
+        toast.error(e?.response?.data?.message ?? 'Failed to load comments');
+        errorToastShown.current = true;
+      }
     } finally {
       setBusy(false);
     }

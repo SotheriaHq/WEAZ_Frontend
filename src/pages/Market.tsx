@@ -58,8 +58,16 @@ const Market: React.FC = () => {
     navigate(`/brands/${brandId}`);
   };
 
+  const handleCommentCountChange = (itemId: string, newCount: number) => {
+    setItems((prevItems) =>
+      prevItems.map((item) =>
+        item.id === itemId ? { ...item, commentsCount: newCount } : item
+      )
+    );
+  };
+
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
+    <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-8 px-4">
       {/* <section className="glass-panel relative overflow-hidden border border-white/40 bg-white/60 px-6 py-8 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-[#0f0f0f]/60 sm:px-10">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-purple-400/10 to-transparent opacity-60 blur-3xl" />
         <div className="relative space-y-3">
@@ -151,7 +159,16 @@ const Market: React.FC = () => {
         </section>
       )}
       {/* View modal */}
-      <MarketViewModal open={Boolean(viewItem)} item={viewItem} onClose={() => setViewItem(null)} />
+      <MarketViewModal
+        open={Boolean(viewItem)}
+        item={viewItem}
+        onClose={() => setViewItem(null)}
+        onCommentCountChange={(newCount) => {
+          if (viewItem) {
+            handleCommentCountChange(viewItem.id, newCount);
+          }
+        }}
+      />
     </div>
   );
 };

@@ -407,7 +407,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) 
         ? 'bg-transparent border-b border-transparent'
         : scrolled
           ? 'bg-black/30 backdrop-blur-sm border-b border-transparent'
-          : 'bg-white/95 dark:bg-[#0f0f0f]/98 backdrop-blur-md border-b border-gray-200 dark:border-white/10'}`}
+          : 'bg-white dark:bg-black border-b border-gray-200 dark:border-white/10'}`}
     >
      
       {/* Main Navbar Content */}
