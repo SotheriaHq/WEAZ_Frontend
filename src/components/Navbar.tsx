@@ -9,7 +9,10 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearUser, setUser } from '../features/userSlice';
+import { setUnreadCount } from '../features/notificationsSlice';
 import type { RootState } from '../store';
+import { NotificationsApi } from '../api/NotificationsApi';
+import { getSocket } from '../lib/ws';
 import type { AuthUserDto } from '../types/auth';
 import '../styles/scrollbar-hide.css';
 import TagChip from '@/components/ui/Tag';
@@ -37,6 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) 
   const { theme, setTheme } = useTheme();
   const { setLanguage, translate } = useLanguage();
   const { profile: userProfile, isAuthenticated } = useSelector((state: RootState) => state.user);
+  const { unreadCount } = useSelector((state: RootState) => state.notifications);
   const user = isAuthenticated ? userProfile : null;
   const dispatch = useDispatch();
 
@@ -104,6 +108,41 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) 
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, [location.pathname, theme]);
+
+  // Fetch unread notification count on mount and when user changes
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      const fetchUnreadCount = async () => {
+        try {
+          const response = await NotificationsApi.getUnreadCount();
+          dispatch(setUnreadCount(response.count));
+        } catch (error) {
+          console.error('Failed to fetch unread notification count:', error);
+        }
+      };
+      fetchUnreadCount();
+    } else {
+      dispatch(setUnreadCount(0));
+    }
+  }, [isAuthenticated, user?.id, dispatch]);
+
+  // WebSocket listener for real-time notification updates
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+
+    const socket = getSocket();
+    const onNotificationCreated = (data: any) => {
+      if (data && typeof data === 'object') {
+        dispatch(setUnreadCount(unreadCount + 1));
+      }
+    };
+
+    socket.on('notification.created', onNotificationCreated);
+
+    return () => {
+      socket.off('notification.created', onNotificationCreated);
+    };
+  }, [isAuthenticated, user?.id, unreadCount, dispatch]);
 
   // Profile Menu Component
   const ProfileMenu = () => {
@@ -425,7 +464,11 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) 
           {/* Notifications - Hidden on mobile */}
           <button type="button" className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative">
             <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white px-1">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
 
           {/* Auth Buttons - Only when not logged in */}
