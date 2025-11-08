@@ -18,6 +18,7 @@ import RequireBrand from './components/RequireBrand';
 import { ToastContainer, Slide } from 'react-toastify';
 import CollectionView from './pages/catalog/CollectionView';
 import DropdownDemo from './pages/ui/DropdownDemo';
+import AcceptInvite from './pages/AcceptInvite';
 
 const router = createBrowserRouter([
   {
@@ -29,6 +30,7 @@ const router = createBrowserRouter([
       { path: 'market', element: <Market /> },
       { path: 'brands/:id', element: <BrandPublic /> },
       { path: 'collections/:id', element: <CollectionView /> },
+      { path: 'collections/invite', element: <AcceptInvite /> },
   { path: 'ui/dropdowns', element: <DropdownDemo /> },
       // { path: 'profile', element: <Profile /> },
       { path: 'success', element: <Success /> },

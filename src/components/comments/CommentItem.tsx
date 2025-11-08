@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { CommentsApi } from '@/api/CommentsApi';
 import { toast } from 'react-toastify';
-import { getSocket } from '@/lib/ws';
+import { useRealtime } from '@/realtime';
 
 type Props = {
   comment: CommentV2Dto;
@@ -19,21 +19,16 @@ const CommentItem: React.FC<Props> = ({ comment, onLike, onReply, onDelete }) =>
   const [liked, setLiked] = React.useState(Boolean(comment.isLikedByMe));
   const [likeCount, setLikeCount] = React.useState(comment.likeCount ?? 0);
 
+  const { onComment } = useRealtime();
   React.useEffect(() => {
-    // Join comment room for live like updates
-    const s = getSocket();
-    const room = `COMMENT:${comment.id}`;
-    s.emit('join', { room });
-    const onLiked = (p: any) => {
+    const unsubscribe = onComment(`COMMENT:${comment.id}`, (p: any) => {
       if (p.commentId === comment.id) {
-        setLikeCount(p.likeCount ?? likeCount);
+        setLikeCount(p.likeCount ?? (p.likeCount || likeCount));
         if (onLike) onLike(comment.id, p.likeCount ?? likeCount, undefined as any);
       }
-    };
-    s.on('comment.liked', onLiked);
-    return () => {
-      s.off('comment.liked', onLiked);
-    };
+    });
+    return () => unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comment.id]);
 
   const toggle = async () => {

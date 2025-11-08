@@ -74,7 +74,7 @@ const MediaPreview: React.FC<MediaPreviewProps> = ({ items, onDeleteItem, onAddM
 
   return (
     <div className="w-full">
-      <div className="mb-4 rounded-lg bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 overflow-hidden relative" style={{ height: '500px' }}>
+      <div className="mb-4 rounded-lg  dark:bg-gray-900/50 dark:border-gray-700 overflow-hidden relative" style={{ height: '500px' }}>
         {isVideo ? (
           <video src={selected.url} controls className="h-full w-full object-contain" />
         ) : (
@@ -91,7 +91,7 @@ const MediaPreview: React.FC<MediaPreviewProps> = ({ items, onDeleteItem, onAddM
               key={(pf.id ?? pf.url) + idx}
               className={`relative h-28 w-28 flex-shrink-0 rounded-md overflow-hidden border ${
                 selectedIndex === idx
-                  ? 'ring-2 ring-purple-500 dark:ring-purple-300'
+                  ? 'ring-2 ring-purple-200 dark:ring-purple-300'
                   : 'border-gray-200 dark:border-gray-700'
               } ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-purple-400/60 dark:hover:border-purple-300/60'}`}
               onClick={() => {
@@ -103,14 +103,16 @@ const MediaPreview: React.FC<MediaPreviewProps> = ({ items, onDeleteItem, onAddM
               {!disabled && (
                 <button
                   type="button"
+                  title="Remove"
+                  aria-label="Remove media"
                   onClick={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
                     if (pf.id) onDeleteItem(pf.id);
                   }}
-                  className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+                  className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-red-500/90 text-white hover:bg-red-600 shadow-sm transition-colors"
                 >
-                  <FiX size={12} />
+                  <FiX size={14} />
                 </button>
               )}
               {typeof normalizedProgress === 'number' && (

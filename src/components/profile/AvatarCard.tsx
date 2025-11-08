@@ -5,7 +5,7 @@ import VLoader from '../loaders/VLoader';
 
 interface AvatarCardProps {
   src?: string | null;
-  name?: string | null;      
+  name?: string | null;
   alt?: string;
   size?: 'sm' | 'md' | 'lg';
   editable?: boolean;
@@ -13,6 +13,7 @@ interface AvatarCardProps {
   loading?: boolean;
   className?: string;
   onClick?: () => void;
+  fallbackInitials?: string; // optional initials to display when image fails
 }
 
 const sizeMap: Record<'sm' | 'md' | 'lg', string> = {
@@ -31,6 +32,7 @@ const AvatarCard: React.FC<AvatarCardProps> = ({
   loading = false,
   className = '',
   onClick,
+  fallbackInitials,
 }) => {
   const [errored, setErrored] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState<boolean>(Boolean(src));
@@ -70,8 +72,7 @@ const AvatarCard: React.FC<AvatarCardProps> = ({
           }}
         />
       ) : (
-        // Default avatar uses the name (falls back to alt)
-        <DefaultAvatar name={name ?? alt ?? 'User'} className="w-full h-full" />
+        <DefaultAvatar name={fallbackInitials ?? name ?? alt ?? 'User'} className="w-full h-full" />
       )}
 
       {(loading || isImageLoading) && (

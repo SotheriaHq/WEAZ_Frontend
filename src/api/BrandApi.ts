@@ -1,4 +1,4 @@
-﻿import { apiClient } from './httpClient';
+import { apiClient } from './httpClient';
 import { unwrapApiResponse, type AuthUserDto } from '../types/auth';
 import type {
   CollectionDto,
@@ -39,7 +39,58 @@ const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 const signedUrlPending = new Map<string, Promise<string | null>>();
 
 // Brand Profile API
+// In‑memory cache for categories to improve perceived reliability and reduce re-fetch churn
+const categoriesCache: {
+  items: Array<{ id: string; slug: string; name: string; description?: string | null }>;
+  lastFetched: number;
+} = { items: [], lastFetched: 0 };
+const CATEGORIES_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 export const brandApi = {
+  async getCategories(force = false): Promise<Array<{ id: string; slug: string; name: string; description?: string | null }>> {
+    // Serve cached categories if fresh and not forcing a reload
+    if (!force && categoriesCache.items.length && Date.now() - categoriesCache.lastFetched < CATEGORIES_TTL_MS) {
+      return categoriesCache.items;
+    }
+    try {
+      const response = await apiClient.get(`/collections/categories`);
+      // Support plain array or wrapped { data } or nested { data: { data } }
+      const payload = (response?.data ?? undefined) as unknown;
+      const items = Array.isArray(payload)
+        ? payload
+        : Array.isArray((payload as any)?.data)
+          ? (payload as any).data
+          : Array.isArray((payload as any)?.data?.data)
+            ? (payload as any).data.data
+            : [];
+
+      const mapped = items.map((c: any) => ({
+        id: String(c?.id ?? ''),
+        slug: String(c?.slug ?? ''),
+        name: String(c?.name ?? ''),
+        description: c?.description ?? null,
+      }));
+
+      categoriesCache.items = mapped;
+      categoriesCache.lastFetched = Date.now();
+      return mapped;
+    } catch (e: any) {
+      const isNetworkError = !e?.response;
+      console.error('Error fetching categories', e);
+      // If we have a stale cache, surface it rather than returning empty so UI remains populated
+      if (categoriesCache.items.length) {
+        return categoriesCache.items;
+      }
+      // Provide synthetic fallback list for offline scenario to avoid an empty select
+      if (isNetworkError) {
+        return [
+          { id: 'fallback-ready-to-wear', slug: 'ready-to-wear', name: 'Ready To Wear', description: 'Fallback category' },
+          { id: 'fallback-accessories', slug: 'accessories', name: 'Accessories', description: 'Fallback category' },
+        ];
+      }
+      return [];
+    }
+  },
   // Fetch brand profile details
   async getBrandProfile(brandId: string): Promise<BrandProfileDto | null> {
     try {
@@ -89,6 +140,11 @@ export const brandApi = {
           description: (backendItem.description as string) || '',
           ownerId: backendItem.ownerId as string,
           isPublic: backendItem.status === 'PUBLISHED',
+          visibility:
+            ((backendItem as any).visibility as any) ??
+            (backendItem.status === 'PUBLISHED' ? 'PUBLIC' : 'PRIVATE'),
+          type: (backendItem as any).type as any,
+          categoryId: (backendItem.categoryId as string) || undefined,
           coverImage: coverImageUrl,
           coverFileId,
           itemCount: mediaCount,
@@ -119,9 +175,18 @@ export const brandApi = {
   },
 
   // Create collection
-  async createCollection(data: { name: string; description?: string; isPublic?: boolean }): Promise<CollectionDto | null> {
+  async createCollection(data: { name: string; description?: string; isPublic?: boolean; categoryId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY' }): Promise<CollectionDto | null> {
     try {
-      const response = await apiClient.post('/collections', data);
+      const payload: any = {
+        name: data.name,
+        description: data.description,
+        isPublic: data.isPublic,
+        // map to backend DTO fields when create endpoint is available
+        visibility: data.isPublic === false ? 'PRIVATE' : 'PUBLIC',
+        categoryId: data.categoryId,
+        type: data.type ?? 'EVERYBODY',
+      };
+      const response = await apiClient.post('/collections', payload);
       return unwrapApiResponse<CollectionDto>(response.data);
     } catch (error) {
       console.error('Error creating collection:', error);
@@ -319,4 +384,5 @@ const extractUploadAsset = (raw: unknown): UploadAssetDto | null => {
     updatedAt,
   };
 };
+
 

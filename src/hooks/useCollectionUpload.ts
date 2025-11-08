@@ -67,6 +67,7 @@ export function useCollectionUpload() {
       maxPrice?: number,
       isAvailableInStore?: boolean,
       tags?: string[],
+      meta?: { categoryId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY'; visibility?: 'PUBLIC' | 'PRIVATE' },
       onProgress?: (value: number) => void
     ) => {
       if (!items || items.length === 0) {
@@ -104,7 +105,10 @@ export function useCollectionUpload() {
           maxPrice,
           isAvailableInStore,
           tags: normalizedTags.slice(0, 10),
-          files: filesPayload 
+          files: filesPayload,
+          categoryId: meta?.categoryId,
+          type: meta?.type,
+          visibility: meta?.visibility,
         }) as InitializeCollectionResponse & { id?: string };
         const collectionId = init.collectionId ?? init.id;
         if (!collectionId) {

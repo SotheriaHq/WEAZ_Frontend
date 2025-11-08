@@ -16,14 +16,18 @@ export interface InitializeCollectionResponse {
   uploads: PresignEntry[];
 }
 export async function initializeCollectionUploads(
-  dto: { 
-    title: string; 
-    description?: string; 
+  dto: {
+    title: string;
+    description?: string;
     minPrice?: number;
     maxPrice?: number;
     isAvailableInStore?: boolean;
     tags: string[];
-    files: { name: string; type: string; size: number }[] 
+    files: { name: string; type: string; size: number }[];
+    // New metadata required by backend
+    categoryId?: string;
+    type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
+    visibility?: 'PUBLIC' | 'PRIVATE';
   },
 ): Promise<InitializeCollectionResponse> {
   const resp = await apiClient.post('/collections/initialize', dto);

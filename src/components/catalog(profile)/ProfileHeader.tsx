@@ -134,37 +134,40 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         </div>
         {/* Move only the edit banner button to the top-left */}
         {canEdit ? (
-          <div className="absolute top-4 left-4 z-30">
-            {/* Use a label bound to the hidden file input to ensure cross-browser reliability */}
-            <label
-              htmlFor="banner-file-input"
-              onClick={(e) => {
-                if (bannerLoading) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  return;
-                }
-                // Prevent default to avoid double-firing if htmlFor is also working.
-                e.preventDefault();
-                onEditBanner?.();
-              }}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (bannerLoading) return;
-                if (e.key === 'Enter' || e.key === ' ') {
+          <div className="absolute top-3 left-3 z-30">
+            {/* Enlarge the hit target via a padded container while keeping visual button compact */}
+            <div className="p-2 rounded-xl hover:bg-white/20 focus-within:ring-2 focus-within:ring-purple-300">
+              <label
+                htmlFor="banner-file-input"
+                title="Change banner image"
+                onClick={(e) => {
+                  if (bannerLoading) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                  }
+                  // Prevent default to avoid double-firing if htmlFor is also working.
                   e.preventDefault();
                   onEditBanner?.();
+                }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (bannerLoading) return;
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onEditBanner?.();
+                  }
+                }}
+                className={
+                  `cursor-pointer rounded-full bg-white/90 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-gray-800 shadow-lg transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 dark:bg-gray-900/85 dark:text-gray-100 ` +
+                  (bannerLoading ? 'pointer-events-none opacity-70' : '')
                 }
-              }}
-              className={
-                `cursor-pointer rounded-full bg-white/90 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-800 shadow-lg transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 dark:bg-gray-900/85 dark:text-gray-100 ` +
-                (bannerLoading ? 'pointer-events-none opacity-70' : '')
-              }
-              aria-disabled={bannerLoading}
-            >
-              {bannerLoading ? 'Updating...' : 'Edit banner'}
-            </label>
+                aria-disabled={bannerLoading}
+              >
+                {bannerLoading ? 'Updating…' : 'Edit banner'}
+              </label>
+            </div>
           </div>
         ) : null}
       </div>
@@ -187,6 +190,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 editable={canEdit && Boolean(onEditAvatar)}
                 onEdit={onEditAvatar}
                 loading={avatarLoading}
+                fallbackInitials={(profileData.username ? profileData.username[0] : profileData.name?.[0]) ?? 'U'}
                 onClick={onViewAvatar}
                 className={onViewAvatar ? 'transition-transform duration-200 hover:scale-[1.01]' : ''}
               />
@@ -210,7 +214,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               <div className="mt-2 flex flex-col gap-2">
                 {tagRows.map((row, idx) => (
                   <div key={idx} className="flex gap-2">
-                    {row.map((tag, i) => {
+                    {row.map((tag) => {
                       const color = getTagColor(tag);
                       return <Tag key={tag} label={`#${tag}`} color={color} size="sm" />;
                     })}

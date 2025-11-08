@@ -12,7 +12,7 @@ import { clearUser, setUser } from '../features/userSlice';
 import { setUnreadCount } from '../features/notificationsSlice';
 import type { RootState } from '../store';
 import { NotificationsApi } from '../api/NotificationsApi';
-import { getSocket } from '../lib/ws';
+import { useRealtime } from '@/realtime';
 import type { AuthUserDto } from '../types/auth';
 import '../styles/scrollbar-hide.css';
 import TagChip from '@/components/ui/Tag';
@@ -127,22 +127,17 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) 
   }, [isAuthenticated, user?.id, dispatch]);
 
   // WebSocket listener for real-time notification updates
+  const realtime = useRealtime();
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
-
-    const socket = getSocket();
-    const onNotificationCreated = (data: any) => {
-      if (data && typeof data === 'object') {
-        dispatch(setUnreadCount(unreadCount + 1));
-      }
-    };
-
-    socket.on('notification.created', onNotificationCreated);
-
-    return () => {
-      socket.off('notification.created', onNotificationCreated);
-    };
-  }, [isAuthenticated, user?.id, unreadCount, dispatch]);
+    const { joinUser, onNotification } = realtime;
+    joinUser(user.id);
+    const unsub = onNotification(() => {
+      // Increment by 1; we already have unreadCount in state
+      dispatch(setUnreadCount(unreadCount + 1));
+    });
+    return () => { unsub(); };
+  }, [isAuthenticated, user?.id, unreadCount, realtime, dispatch]);
 
   // Profile Menu Component
   const ProfileMenu = () => {
@@ -444,7 +439,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) 
               {showTags && (
                 <div className="ml-2 flex-1 min-w-0 overflow-hidden max-w-[calc(100%-12rem)] sm:max-w-[calc(100%-16rem)]">
                   <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide whitespace-nowrap py-1">
-                    {navTags.map((tag, idx) => {
+                    {navTags.map((tag) => {
                       const color = getTagColor(tag);
                       return (
                         <TagChip key={tag} label={`#${tag}`} size="sm" color={color} />

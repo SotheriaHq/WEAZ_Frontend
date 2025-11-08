@@ -6,6 +6,9 @@ export interface CollectionDto {
   ownerId: string;
   title: string;
   isPublic: boolean;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+  type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
+  categoryId?: string;
   coverImage?: string;
   coverFileId?: string;
   itemCount?: number;

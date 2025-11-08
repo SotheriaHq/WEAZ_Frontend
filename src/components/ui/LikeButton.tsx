@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { optimisticToggle, reconcile, setLikeState, wsApplied } from '@/features/engagementSlice';
 import { ReactionsApi } from '@/api/ReactionsApi';
-import { getSocket, joinContentRoom } from '@/lib/ws';
+import { useRealtime } from '@/realtime';
 import LikerListModal from '@/components/engagement/LikerListModal';
 import { OfflineLikes } from '@/lib/offlineLikes';
 import { toast } from 'react-toastify';
@@ -49,17 +49,20 @@ const LikeButton: React.FC<Props> = ({
       likeCount: initialCount
     };
   });
-  const initKeyRef = useRef<string | null>(null);
+  // const initKeyRef = useRef<string | null>(null); // no longer needed
   const me = useSelector((s: RootState) => s.user.profile?.id);
+  const realtime = useRealtime();
   
   // Prevent race conditions from overlapping requests
   const pendingRequestRef = useRef<AbortController | null>(null);
   const requestVersionRef = useRef(0);
 
   useEffect(() => {
-    const thisKey = `${contentType}:${contentId}`;
+  // Establish realtime joins & subscriptions
     // Always join the room to get real-time updates
-    joinContentRoom(contentType, contentId);
+  const { joinCollection, joinCollectionMedia, onLike } = realtime;
+  if (contentType === 'COLLECTION') joinCollection(contentId);
+  else if (contentType === 'COLLECTION_MEDIA') joinCollectionMedia(contentId);
 
     // If initialLiked is provided, we can immediately set the state and avoid a fetch.
     if (initialLiked !== undefined) {
@@ -107,34 +110,16 @@ const LikeButton: React.FC<Props> = ({
       setInitializing(false);
     }
 
-    const s = getSocket();
-    
-    // Enhanced WebSocket handling: Only apply updates when no local request is pending
-    const onLikeCreated = (p: any) => {
+  const unsub = onLike(contentType, contentId, (p: any) => {
       if (p.contentType === contentType && p.contentId === contentId) {
-        // Always update the count for all users
         dispatch(wsApplied({ contentType, contentId, likeCount: p.likeCount }));
-
-        // If the current user is the content owner and someone else liked, show a toast
-        if (me && ownerId && ownerId === me && p.userId !== me) {
+        if (p.userId && me && ownerId && ownerId === me && p.userId !== me && p.likeCount > item.likeCount) {
           toast.info('Someone liked your content!');
         }
       }
-    };
-
-    const onLikeRemoved = (p: any) => {
-      if (p.contentType === contentType && p.contentId === contentId) {
-        // Always update the count for all users
-        dispatch(wsApplied({ contentType, contentId, likeCount: p.likeCount }));
-      }
-    };
-    
-    s.on('like.created', onLikeCreated);
-    s.on('like.removed', onLikeRemoved);
-    
+    });
     return () => {
-      s.off('like.created', onLikeCreated);
-      s.off('like.removed', onLikeRemoved);
+      unsub();
       
       // Clean up any pending request when component unmounts or key changes
       if (pendingRequestRef.current) {
@@ -142,7 +127,8 @@ const LikeButton: React.FC<Props> = ({
         pendingRequestRef.current = null;
       }
     };
-  }, [contentType, contentId, dispatch, isAuth, initialCount, initialLiked, me, ownerId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentType, contentId, dispatch, isAuth, initialCount, initialLiked, ownerId]);
 
   const toggle = async () => {
     // Prevent multiple simultaneous requests - strict deduplication
@@ -272,3 +258,4 @@ const LikeButton: React.FC<Props> = ({
 };
 
 export default LikeButton;
+

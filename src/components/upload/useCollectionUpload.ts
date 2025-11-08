@@ -26,17 +26,25 @@ export function useCollectionUpload() {
   const [progress, setProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
 
-  const uploadCollection = useCallback(async (files: File[], title: string, description?: string) => {
+  const uploadCollection = useCallback(async (
+    files: File[],
+    title: string,
+    description?: string,
+    opts?: { visibility?: 'PUBLIC' | 'PRIVATE'; categoryId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY' }
+  ) => {
     if (!files || files.length === 0) throw new Error('No files');
     setIsUploading(true);
     setProgress(0);
 
     // Step 1: initialize and get presigned upload instructions
-    const dto = {
+    const dto: any = {
       title,
       description,
       files: files.map((f) => ({ name: f.name, type: f.type, size: f.size })),
     };
+    if (opts?.visibility) (dto as any).visibility = opts.visibility;
+    if (opts?.categoryId) (dto as any).categoryId = opts.categoryId;
+    if (opts?.type) (dto as any).type = opts.type;
 
     const initResp = await apiClient.post('/collections/initialize', dto);
     const initJson = initResp.data as InitializeResp;

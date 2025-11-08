@@ -4,7 +4,7 @@ import type { CommentV2Dto } from '@/types/comments';
 import { CommentsApi } from '@/api/CommentsApi';
 import CommentItem from '@/components/comments/CommentItem';
 import CommentInput from '@/components/ui/CommentInput';
-import { getSocket, joinContentRoom } from '@/lib/ws';
+import { useRealtime } from '@/realtime';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { toast } from 'react-toastify';
@@ -80,22 +80,16 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
     finally { setBusy(false); }
   };
 
+  const { joinCollection, joinCollectionMedia, onComment } = useRealtime();
   React.useEffect(() => {
     setItems([]); setMediaCursor(null); setCollCursor(null); setMediaHasNext(false); setCollHasNext(false);
     void loadInitial();
-    joinContentRoom('COLLECTION_MEDIA', mediaId);
-    joinContentRoom('COLLECTION', collectionId);
-    const s = getSocket();
-    const onCreated = (p: any) => {
-      if ((p?.targetType === 'COLLECTION_MEDIA' && p?.targetId === mediaId) || (p?.targetType === 'COLLECTION' && p?.targetId === collectionId)) {
-        // Just reload the first page to keep cursors consistent
-        void loadInitial();
-      }
-    };
-    const onDeleted = onCreated;
-    s.on('comment.created', onCreated);
-    s.on('comment.deleted', onDeleted);
-    return () => { s.off('comment.created', onCreated); s.off('comment.deleted', onDeleted); };
+    joinCollectionMedia(mediaId);
+    joinCollection(collectionId);
+    const unsubMedia = onComment(`COLLECTION_MEDIA:${mediaId}`, () => void loadInitial());
+    const unsubCollection = onComment(`COLLECTION:${collectionId}`, () => void loadInitial());
+    return () => { unsubMedia(); unsubCollection(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaId, collectionId]);
 
   const submit = async () => {

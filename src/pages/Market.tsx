@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCcw } from 'lucide-react';
 import Masonry from 'react-masonry-css';
@@ -6,7 +6,7 @@ import marketApi from '@/api/MarketApi';
 import type { MarketItem } from '@/types/market';
 import MarketCard from '@/components/market/MarketCard';
 import MarketSkeleton from '@/components/market/MarketSkeleton';
-import Tag from '@/components/ui/Tag';
+// Category chips live directly on page; tag chips removed for now
 import { FrostedButton } from '@/components/ui/FrostedButton';
 import MarketViewModal from '@/components/market/MarketViewModal';
 
@@ -16,38 +16,63 @@ const Market: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [viewItem, setViewItem] = useState<MarketItem | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const loadFeed = useCallback(async () => {
-    setLoading(true);
+    // First load shows skeleton; subsequent loads use a soft overlay
+    if (!hasLoadedOnce) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     setError(null);
     try {
-      const feed = await marketApi.getFeed();
+      const feed = await marketApi.getFeed({
+        // Backend may ignore category until supported
+        category: selectedCategory !== 'ALL' ? selectedCategory : undefined,
+      });
       setItems(feed.items);
+      setHasLoadedOnce(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to load market feed';
       setError(message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, []);
+  }, [selectedCategory, hasLoadedOnce]);
 
   useEffect(() => {
     void loadFeed();
   }, [loadFeed]);
 
-  const availableTags = useMemo(() => {
-    const collected = new Set<string>();
-    items.forEach((item) => item.tags.forEach((tag) => collected.add(tag)));
-    return Array.from(collected).sort((a, b) => a.localeCompare(b)).slice(0, 12);
-  }, [items]);
+  // Tag filter UI removed for now; keep hook slots lean
 
+  // Heuristic category matching (until backend category is wired into feed)
   const filteredItems = useMemo(() => {
-    if (!selectedTag) return items;
-    return items.filter((item) =>
-      item.tags.some((tag) => tag.toLowerCase() === selectedTag.toLowerCase()),
-    );
-  }, [items, selectedTag]);
+    let result = items;
+    if (selectedCategory && selectedCategory !== 'ALL') {
+      const keysByCat: Record<string, string[]> = {
+        AFRICAN_FASHION: ['african', 'ankara', 'kente', 'aso oke', 'adire', 'dashiki', 'gele', 'africa'],
+        WESTERN_FASHION: ['western', 'streetwear', 'workwear', 'couture', 'runway', 'denim', 'suit', 'casual', 'formal'],
+        DE_HOUSE: ['house', 'home', 'lounge', 'cozy', 'basics', 'stay home', 'loungewear', 'sleep', 'pajama'],
+      };
+      const keys = keysByCat[selectedCategory] ?? [];
+      result = result.filter((item) =>
+        item.tags.some((t) => keys.some((k) => t.toLowerCase().includes(k))),
+      );
+    }
+    if (selectedTag) {
+      result = result.filter((item) =>
+        item.tags.some((tag) => tag.toLowerCase() === selectedTag.toLowerCase()),
+      );
+    }
+    return result;
+  }, [items, selectedTag, selectedCategory]);
 
   const handleViewCollection = (collectionId: string) => {
     navigate(`/collections/${collectionId}`);
@@ -68,50 +93,42 @@ const Market: React.FC = () => {
 
   return (
     <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-8 px-4">
-      {/* <section className="glass-panel relative overflow-hidden border border-white/40 bg-white/60 px-6 py-8 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-[#0f0f0f]/60 sm:px-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-purple-400/10 to-transparent opacity-60 blur-3xl" />
-        <div className="relative space-y-3">
-          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-primary/90">Discover</p>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl dark:text-white">
-            The Market
-          </h1>
-          <p className="max-w-2xl text-sm leading-relaxed text-gray-600 dark:text-gray-300">
-            Scroll through curated drops from across the Threadly community. Tap any story card to jump into the full collection, explore brand profiles, and experience each piece up close.
-          </p>
-        </div>
-      </section> */}
+               <div className="flex w-full gap-3 overflow-x-auto no-scrollbar my-4 mb-5">
+        {[
+          { slug: 'ALL', label: 'All', border: 'border-slate-300/80 dark:border-slate-400/60', bgActive: 'bg-slate-500/20 backdrop-blur-md', hoverBg: 'hover:bg-slate-500/10' },
+          { slug: 'AFRICAN_FASHION', label: 'African Fashion', border: 'border-fuchsia-300/80 dark:border-fuchsia-400/60', bgActive: 'bg-fuchsia-500/20 backdrop-blur-md', hoverBg: 'hover:bg-fuchsia-500/10' },
+          { slug: 'WESTERN_FASHION', label: 'Western Fashion', border: 'border-blue-300/80 dark:border-blue-400/60', bgActive: 'bg-blue-500/20 backdrop-blur-md', hoverBg: 'hover:bg-blue-500/10' },
+          { slug: 'DE_HOUSE', label: 'De House', border: 'border-emerald-300/80 dark:border-emerald-400/60', bgActive: 'bg-emerald-500/20 backdrop-blur-md', hoverBg: 'hover:bg-emerald-500/10' },
+        ].map((cat) => {
+          const active = selectedCategory === cat.slug;
+          return (
+            <button
+              type="button"
+              key={cat.slug}
+              onClick={() => startTransition(() => setSelectedCategory(cat.slug))}
+              className={
+                `shrink-0 inline-flex items-center rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 border-2 ` +
+                `${cat.border} text-gray-900 dark:text-white ` +
+                (active
+                  ? `${cat.bgActive} shadow-lg`
+                  : `bg-transparent ${cat.hoverBg} shadow-md backdrop-blur-sm`) +
+                (isPending ? ' opacity-60' : '')
+              }
+            >
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
 
-      {availableTags.length > 0 && (
-        <section className="glass-panel flex flex-wrap items-center gap-3 border border-white/30 bg-white/50 px-4 py-4 backdrop-blur-xl dark:border-white/10 dark:bg-[#0f0f0f]/50 sm:px-6">
-          <span className="text-xs font-semibold uppercase tracking-[0.3em] text-primary/80">Browse by tag</span>
-          <div className="flex flex-wrap gap-2">
-            {availableTags.map((tag) => {
-              const isActive = selectedTag === tag;
-              return (
-                <button
-                  type="button"
-                  key={tag}
-                  onClick={() => setSelectedTag((current) => (current === tag ? null : tag))}
-                  className={`transition-transform duration-150 hover:-translate-y-[1px] ${isActive ? 'ring-2 ring-primary/60 ring-offset-2 ring-offset-white dark:ring-offset-slate-950' : ''}`}
-                >
-                  <Tag label={`#${tag}`} size="sm" className={isActive ? 'chip-purple font-semibold' : undefined} />
-                </button>
-              );
-            })}
-            {selectedTag && (
-              <FrostedButton variant="ghost" size="sm" onClick={() => setSelectedTag(null)}>
-                Clear filter
-              </FrostedButton>
-            )}
-          </div>
-        </section>
-      )}
-
-      {loading ? (
+      {/* Content + soft overlay wrapper for smooth transitions */}
+      <div className="relative min-h-[240px]">
+      <div className={`transition-opacity duration-300 ${(!loading && (refreshing || isPending)) ? 'opacity-60' : 'opacity-100'}`}>
+      {loading && !hasLoadedOnce ? (
         <MarketSkeleton />
       ) : error ? (
         <section className="glass-panel border border-red-200/60 bg-red-50/70 px-6 py-10 text-center shadow-lg backdrop-blur-xl dark:border-red-500/30 dark:bg-[#1a0a0a]/80">
-          <h2 className="text-lg font-semibold text-red-600 dark:text-red-300">We couldn&apos;t load the market feed.</h2>
+          <h2 className="text-lg font-semibold text-red-600 dark:text-red-300">We couldn&apos;t find any design for market.</h2>
           <p className="mt-2 text-sm text-red-500 dark:text-red-200/80">{error}</p>
           <FrostedButton
             variant="primary"
@@ -126,7 +143,8 @@ const Market: React.FC = () => {
       ) : filteredItems.length > 0 ? (
         <Masonry
           breakpointCols={{
-            default: 4,
+            default: 3,
+            1920: 5,
             1536: 4,
             1280: 3,
             1024: 3,
@@ -147,17 +165,47 @@ const Market: React.FC = () => {
             </div>
           ))}
         </Masonry>
+      ) : selectedCategory === 'ALL' ? (
+        // Default empty state when no items at all (not category-specific)
+        <section className="glass-panel border border-red-200/60 bg-red-50/70 px-6 py-10 text-center shadow-lg backdrop-blur-xl dark:border-red-500/30 dark:bg-[#1a0a0a]/80">
+          <h2 className="text-lg font-semibold text-red-600 dark:text-red-300">We couldn&apos;t find any design for market.</h2>
+          <p className="mt-2 text-sm text-red-500 dark:text-red-200/80">{error}</p>
+          <FrostedButton
+            variant="primary"
+            size="sm"
+            className="mt-4 inline-flex items-center gap-2"
+            onClick={() => void loadFeed()}
+          >
+            <RefreshCcw className="h-4 w-4" />
+            Try again
+          </FrostedButton>
+        </section>
       ) : (
+        // Category-specific empty state (show Clear filter only when not ALL)
         <section className="glass-panel border border-white/40 bg-white/60 px-6 py-16 text-center backdrop-blur-xl dark:border-white/10 dark:bg-[#0f0f0f]/50">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Nothing matches that tag yet</h2>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-300">
-            Hit clear filter or check back later—new collections are dropping every week.
-          </p>
-          <FrostedButton variant="primary" size="sm" className="mt-4" onClick={() => setSelectedTag(null)}>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Nothing in this category yet</h2>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-300">Change or clear the category filter, or check back later.</p>
+          <FrostedButton
+            variant="primary"
+            size="sm"
+            className="mt-4"
+            onClick={() => {
+              setSelectedCategory('ALL');
+              setSelectedTag(null);
+            }}
+          >
             Clear filter
           </FrostedButton>
         </section>
       )}
+      </div>
+      {/* Soft overlay while refreshing/filtering (keeps layout stable) */}
+      {(!loading && (refreshing || isPending)) && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/40 dark:bg-black/30 backdrop-blur-[2px] transition-opacity duration-300">
+          <div className="h-6 w-6 rounded-full border-2 border-white/70 border-t-transparent animate-spin" />
+        </div>
+      )}
+      </div>
       {/* View modal */}
       <MarketViewModal
         open={Boolean(viewItem)}
@@ -180,3 +228,8 @@ export default Market;
 export const MarketPageWithView: React.FC = () => {
   return <Market />;
 };
+
+
+
+
+

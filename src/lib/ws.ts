@@ -10,8 +10,7 @@ export function getSocket(): Socket {
   return socket;
 }
 
-export function joinContentRoom(contentType: string, contentId: string) {
+export function joinContentRoom(contentType: string, contentId: string, userId?: string) {
   const s = getSocket();
-  s.emit('join', { room: `${contentType}:${contentId}` });
+  s.emit('join', { room: `${contentType}:${contentId}`, userId });
 }
-

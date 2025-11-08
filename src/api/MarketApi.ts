@@ -6,6 +6,8 @@ export interface GetMarketFeedParams {
   cursor?: string;
   limit?: number;
   tag?: string;
+  // Optional category filter; backend may ignore until supported
+  category?: string;
 }
 
 type RawMarketItem = Record<string, unknown>;

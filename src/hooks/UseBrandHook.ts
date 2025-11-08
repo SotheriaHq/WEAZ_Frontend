@@ -10,6 +10,7 @@ import type {
 } from '../types/profile';
 import type { AuthProfileImageFileDto } from '../types/auth';
 import { env } from '../config/env';
+import { useSignedFileUrl } from './useSignedFileUrl';
 
 export const useBrandProfile = () => {
   const { profile: user } = useSelector((state: RootState) => state.user);
@@ -189,76 +190,10 @@ export const useBrandProfile = () => {
     return null;
   }, [brandProfile?.logoImageMeta, user?.profileImageFile, user?.profileImageId, user?.profileImage, user?.createdAt, user?.updatedAt]);
 
-  const [resolvedBannerUrl, setResolvedBannerUrl] = useState<string | null>(
-    user?.bannerImage ?? null,
-  );
-  const [resolvedLogoUrl, setResolvedLogoUrl] = useState<string | null>(user?.profileImage ?? null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fallback =
-      user?.bannerImage ??
-      brandProfile?.bannerImage ??
-      bannerAsset?.url ??
-      null;
-    setResolvedBannerUrl(fallback ?? null);
-
-    const load = async () => {
-      if (!bannerAsset?.fileId) {
-        return;
-      }
-      try {
-        const signed = await brandApi.getSignedFileUrl(bannerAsset.fileId);
-        if (!cancelled && signed) {
-          setResolvedBannerUrl(signed);
-        }
-      } catch (error) {
-        console.error('Unable to resolve banner image URL', error);
-      }
-    };
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    bannerAsset?.fileId,
-    bannerAsset?.url,
-    brandProfile?.bannerImage,
-    user?.bannerImage,
-  ]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fallback = user?.profileImage ?? brandProfile?.logoImage ?? logoAsset?.url ?? null;
-    setResolvedLogoUrl(fallback ?? null);
-
-    const load = async () => {
-      if (!logoAsset?.fileId) return;
-      try {
-        // log useful info but never break rendering
-        console.log('[avatar] resolving signed URL for', logoAsset.fileId);
-      } catch {
-        // ignore logging failures
-      }
-      try {
-        const signed = await brandApi.getSignedFileUrl(logoAsset.fileId);
-        if (!cancelled && signed) { setResolvedLogoUrl(signed); }
-      } catch (error) {
-        console.error('Unable to resolve logo image URL', error);
-      }
-    };
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    logoAsset?.fileId,
-    logoAsset?.url,
-    brandProfile?.logoImage,
-    user?.profileImage,
-  ]);
+  const bannerInitial = user?.bannerImage ?? brandProfile?.bannerImage ?? bannerAsset?.url ?? null;
+  const logoInitial = user?.profileImage ?? brandProfile?.logoImage ?? logoAsset?.url ?? null;
+  const { url: resolvedBannerUrl } = useSignedFileUrl(bannerAsset?.fileId ?? null, bannerInitial);
+  const { url: resolvedLogoUrl } = useSignedFileUrl(logoAsset?.fileId ?? null, logoInitial);
 
   const displayData = {
     brandName:

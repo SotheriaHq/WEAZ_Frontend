@@ -6,6 +6,7 @@ import { formatPrice } from '@/utils/helpers';
 import { brandApi } from '@/api/BrandApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@/components/ui/Dropdown';
+import ManageAccessModal from './ManageAccessModal';
 
 interface CollectionCardProps {
   collection: CollectionDto;
@@ -64,8 +65,10 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   useEffect(() => {
     setImgLoaded(false);
   }, [resolvedCover]);
+  const [accessOpen, setAccessOpen] = useState(false);
 
   return (
+    <>
     <div 
       className="relative group w-full glass-panel overflow-hidden rounded-lg cursor-pointer shadow-md transition-transform duration-200 hover:scale-[1.02]"
       onClick={onClick}
@@ -124,6 +127,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
                 {onDelete && (
                   <DropdownItem onClick={() => onDelete(collection.id)}>Delete</DropdownItem>
                 )}
+                <DropdownItem onClick={() => setAccessOpen(true)}>Manage Access</DropdownItem>
               </DropdownMenu>
             </Dropdown>
           </div>
@@ -201,7 +205,11 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
         </div>
       </div>
     </div>
+    <ManageAccessModal open={accessOpen} collectionId={collection.id} onClose={() => setAccessOpen(false)} />
+    </>
   );
 };
 
 export default CollectionCard;
+
+

@@ -3,7 +3,7 @@ import type { CommentTarget, CommentV2Dto } from '@/types/comments';
 import { CommentsApi } from '@/api/CommentsApi';
 import CommentComposer from './CommentComposer';
 import CommentItem from './CommentItem';
-import { getSocket, joinContentRoom } from '@/lib/ws';
+import { useRealtime } from '@/realtime';
 import { toast } from 'react-toastify';
 
 type Props = {
@@ -37,16 +37,31 @@ const CommentThread: React.FC<Props> = ({ targetType, targetId, className }) => 
     }
   };
 
+  // Keep for potential per-user room routing; currently not used
+  // const me = useSelector((s: RootState) => s.user.profile?.id);
+
+  const { onComment, joinCollection, joinCollectionMedia } = useRealtime();
   React.useEffect(() => {
     setItems([]); setCursor(null); setHasNext(false);
     void load(true);
-    joinContentRoom(targetType, targetId);
-    const s = getSocket();
-    const onCreated = (p: any) => { if (p?.targetType === targetType && p?.targetId === targetId) void load(true); };
-    const onDeleted = onCreated;
-    s.on('comment.created', onCreated);
-    s.on('comment.deleted', onDeleted);
-    return () => { s.off('comment.created', onCreated); s.off('comment.deleted', onDeleted); };
+    // Join appropriate room via provider
+    if (targetType === 'COLLECTION') joinCollection(targetId);
+    else if (targetType === 'COLLECTION_MEDIA') joinCollectionMedia(targetId);
+    const unsubscribeCreated = onComment(`${targetType}:${targetId}`, (p) => {
+      if (p?.contentType === targetType && p?.contentId === targetId && p?.event !== 'comment.deleted') {
+        void load(true);
+      }
+    });
+    const unsubscribeDeleted = onComment(`${targetType}:${targetId}`, (p) => {
+      if (p?.contentType === targetType && p?.contentId === targetId && p?.event === 'comment.deleted') {
+        void load(true);
+      }
+    });
+    return () => {
+      unsubscribeCreated();
+      unsubscribeDeleted();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetType, targetId]);
 
   const applyCreated = (c: CommentV2Dto) => {
@@ -100,4 +115,7 @@ const CommentThread: React.FC<Props> = ({ targetType, targetId, className }) => 
 };
 
 export default CommentThread;
+
+
+
 
