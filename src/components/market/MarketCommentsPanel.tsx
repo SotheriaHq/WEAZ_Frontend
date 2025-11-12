@@ -126,12 +126,22 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
     joinCollection(collectionId);
     // Incremental patching for comment events
     const unsubMedia = onComment(`COLLECTION_MEDIA:${mediaId}`, (p: any) => {
+      // New comment created
       if (p.comment && p.commentId && p.targetType === 'COLLECTION_MEDIA' && p.targetId === mediaId) {
+        const isReply = !!p.comment.parentId;
         setItems((prev) => {
           if (prev.some((c) => c.id === p.commentId)) return prev;
+          if (isReply) {
+            // Update parent only (avoid showing reply as a new top-level item)
+            const parentId = p.comment.parentId as string;
+            return prev.map((c) =>
+              c.id === parentId
+                ? { ...c, replyCount: (c.replyCount ?? 0) + 1, children: c.children && c.children.length > 0 ? [p.comment, ...c.children] : c.children }
+                : c
+            );
+          }
           const next = [p.comment, ...prev];
           onCountChange?.(next.length);
-          // Join room for new comment likes realtime
           joinComment(p.commentId);
           dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
           return next;
@@ -147,8 +157,17 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
     });
     const unsubCollection = onComment(`COLLECTION:${collectionId}`, (p: any) => {
       if (p.comment && p.commentId && p.targetType === 'COLLECTION' && p.targetId === collectionId) {
+        const isReply = !!p.comment.parentId;
         setItems((prev) => {
           if (prev.some((c) => c.id === p.commentId)) return prev;
+          if (isReply) {
+            const parentId = p.comment.parentId as string;
+            return prev.map((c) =>
+              c.id === parentId
+                ? { ...c, replyCount: (c.replyCount ?? 0) + 1, children: c.children && c.children.length > 0 ? [p.comment, ...c.children] : c.children }
+                : c
+            );
+          }
           const next = [p.comment, ...prev];
           onCountChange?.(next.length);
           joinComment(p.commentId);
@@ -215,6 +234,17 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
     } catch {}
   };
 
+  // Track collapsed/expanded replies per comment
+  const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
+  const toggleReplies = async (parentId: string, replyCount: number) => {
+    setExpanded((e) => ({ ...e, [parentId]: !e[parentId] }));
+    // Lazy load on first expand if no children yet but count exists
+    const parent = items.find((c) => c.id === parentId);
+    if (parent && !parent.children && replyCount > 0) {
+      await loadReplies(parentId);
+    }
+  };
+
   return (
     <div className={`flex h-full flex-col ${className ?? ''}`}>
       {/* List */}
@@ -231,10 +261,22 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
                 onCreateReply={async (parentId, content) => {
                   const created = await CommentsApi.create(c.targetType, c.targetId, content, parentId);
                   // Insert reply locally under parent
-                  setItems((prev) => prev.map((it) => it.id === parentId ? { ...it, children: [created, ...(it.children ?? [])] } : it));
+                  setItems((prev) => prev.map((it) => it.id === parentId ? { ...it, children: [created, ...(it.children ?? [])], replyCount: (it.replyCount ?? 0) + 1 } : it));
+                  // Auto-expand on posting
+                  setExpanded((e) => ({ ...e, [parentId]: true }));
                 }}
               />
-              {c.children && c.children.length > 0 && (
+              {/* Replies toggler */}
+              {c.replyCount > 0 && (
+                <button
+                  type="button"
+                  className="ml-10 mt-1 text-[12px] text-purple-600 hover:text-purple-700 dark:text-purple-300"
+                  onClick={() => void toggleReplies(c.id, c.replyCount)}
+                >
+                  {expanded[c.id] ? `Hide replies (${c.replyCount})` : `View replies (${c.replyCount})`}
+                </button>
+              )}
+              {expanded[c.id] && c.children && c.children.length > 0 && (
                 <div className="mt-1 space-y-1 pl-10">
                   {c.children.map((r) => (
                     <CommentItem

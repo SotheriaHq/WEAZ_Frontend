@@ -110,9 +110,6 @@ const CommentItem: React.FC<Props> = ({ comment, onLike, onReply, onDelete, curr
           </span>
         </div>
         <div className={`text-xs mt-0.5 ${comment.deletedAt ? 'italic text-gray-500' : ''}`}>
-          <span className="mr-2 inline-flex items-center rounded bg-gray-200/60 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-gray-700 dark:bg-gray-700/40 dark:text-gray-300">
-            {comment.targetType === 'COLLECTION_MEDIA' ? 'MEDIA' : comment.targetType === 'COLLECTION' ? 'COLL' : 'POST'}
-          </span>
           {comment.deletedAt ? '[deleted]' : comment.contentSanitized}
           {comment.optimistic && (
             <span className="ml-2 text-[10px] italic text-blue-500">(pending)</span>

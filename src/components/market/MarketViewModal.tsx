@@ -93,7 +93,7 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-stretch justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
-      <div className="relative m-4 grid max-h-[90vh] w-[95%] max-w-6xl grid-cols-12 gap-0 rounded-2xl border border-white/15 bg-white/5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+  <div className="relative m-4 grid max-h-[90vh] w-[95%] max-w-6xl grid-cols-12 gap-0 rounded-2xl bg-white/5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Close button */}
         <button
           type="button"
@@ -104,21 +104,20 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           <X size={18} />
         </button>
 
-  {/* Left: Media (no scroll to avoid double scrollbars) */}
-  <div className={`col-span-12 bg-black ${leftColsSm} ${leftColsMd} overflow-hidden`}>
-          <div className="flex min-h-full items-start justify-center">
-            {/* Ensure the media is fully visible without cropping - use contain to respect aspect ratio */}
+        {/* Left: Media (own scroll so tall images/videos can be panned) */}
+        <div className={`col-span-12 ${leftColsSm} ${leftColsMd} overflow-y-auto rounded-l-2xl bg-black`}> 
+          <div className="flex items-start justify-center min-h-full">
             <MediaViewer
               media={item.media}
               rounded={false}
               objectFit="contain"
-              className="w-full"
+              className="max-h-[90vh] w-auto rounded-l-2xl"
             />
           </div>
         </div>
 
         {/* Right: Data Area + Comments */}
-  <div className={`col-span-12 flex flex-col glass-panel p-4 ${rightColsSm} ${rightColsMd} overflow-y-auto modal-scrollbar`}>
+  <div className={`col-span-12 flex flex-col p-4 ${rightColsSm} ${rightColsMd} overflow-y-auto modal-scrollbar relative bg-white/60 dark:bg-white/5 backdrop-blur-xl border-l border-white/20 dark:border-white/10 rounded-r-2xl` }>
           {/* Data Area */}
           <div className="pb-4">
             <div className="mb-3 flex items-center gap-3">
@@ -193,8 +192,8 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               }}
               showComposer={false}
             />
-            {/* Inline Comment Input */}
-            <div className="relative mt-3">
+            {/* Inline Comment Input (sticky) */}
+            <div className="sticky bottom-0 left-0 right-0 z-10 mt-3 pt-2 bg-transparent">
               <CommentInput
                 value={commentText}
                 onChange={setCommentText}
@@ -207,7 +206,7 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               <button
                 type="button"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-200"
+                className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
               >
                 <Smile size={18} />
               </button>
@@ -220,15 +219,20 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
               {/* Emoji Picker */}
               {showEmojiPicker && (
-                <div className="absolute bottom-full right-0 mb-2 z-10">
+                <div className="fixed inset-0 z-20" onClick={() => setShowEmojiPicker(false)}>
+                  {/* click-catcher */}
+                </div>
+              )}
+              {showEmojiPicker && (
+                <div className="absolute bottom-full right-0 mb-2 z-30">
                   <EmojiPicker
                     onEmojiClick={onEmojiClick}
                     autoFocusSearch={false}
                     emojiStyle={EmojiStyle.APPLE}
                     theme={Theme.LIGHT}
                     lazyLoadEmojis
-                    height={350}
-                    className="glass-menu-soft"
+                    height={280}
+                    className="glass-emoji-picker"
                   />
                 </div>
               )}

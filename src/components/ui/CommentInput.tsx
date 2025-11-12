@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageCircle, Send } from 'lucide-react';
+import { MessageCircle, Send, Loader2 } from 'lucide-react';
 
 interface CommentInputProps {
   value: string;
@@ -40,7 +40,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
 
   return (
     <div className={`relative ${className}`}>
-      <MessageCircle className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" />
+      <MessageCircle className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-600 dark:text-white/70" />
       <input
         type="text"
         value={value}
@@ -48,7 +48,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onClick={(e) => e.stopPropagation()}
-        className="w-full rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-white/60 pl-9 pr-9 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/50 dark:focus:ring-white/20 shadow-lg"
+        className="w-full rounded-lg bg-white/80 dark:bg-black/40 backdrop-blur-md border border-white/60 dark:border-white/20 text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/70 pl-9 pr-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300/60 dark:focus:ring-purple-500/30 shadow-lg"
         maxLength={maxLength}
         disabled={disabled || busy}
       />
@@ -57,9 +57,9 @@ export const CommentInput: React.FC<CommentInputProps> = ({
         aria-label="Send comment"
         disabled={busy || disabled || value.trim().length === 0}
         onClick={handleSubmit}
-        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-white/20 border border-white/30 text-white/90 hover:bg-white/30 disabled:opacity-50"
+        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white shadow-md hover:brightness-110 disabled:opacity-60"
       >
-        <Send size={14} />
+        {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={14} />}
       </button>
     </div>
   );
