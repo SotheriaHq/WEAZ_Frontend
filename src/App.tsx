@@ -7,7 +7,7 @@ import Trouble from './pages/Trouble';
 import SignupPage from './pages/SignUp';
 import Success from './pages/Success';
 import LoginPage from './pages/Login';
-import BrandPublic from './pages/BrandPublic';
+// Removed separate BrandPublic visitor page; unified profile view handles both owner & visitor modes
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -28,7 +28,8 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Market /> },
       { path: 'market', element: <Market /> },
-      { path: 'brands/:id', element: <BrandPublic /> },
+  // Route brand profile (visitor or owner) to unified Profile component
+  { path: 'brands/:id', element: <Profile /> },
       { path: 'collections/:id', element: <CollectionView /> },
       { path: 'collections/invite', element: <AcceptInvite /> },
   { path: 'ui/dropdowns', element: <DropdownDemo /> },
@@ -75,8 +76,6 @@ const App: React.FC = () => (
           autoClose={6500}
           transition={Slide}
           toastClassName="text-sm font-medium bg-gradient-to-br from-purple-600/80 via-fuchsia-600/75 to-indigo-600/80 text-white backdrop-blur-md border border-white/20 shadow-xl rounded-xl"
-          bodyClassName="text-white/95"
-          progressClassName="bg-white/70"
         />
         <RouterProvider router={router} />
       </>

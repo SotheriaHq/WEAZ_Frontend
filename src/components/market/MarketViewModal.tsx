@@ -93,7 +93,7 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-stretch justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
-  <div className="relative m-4 grid max-h-[90vh] w-[95%] max-w-6xl grid-cols-12 gap-0 rounded-2xl bg-white/5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+  <div className="relative m-4 grid h-[90vh] w-[95%] max-w-6xl grid-cols-12 gap-0 rounded-2xl bg-white/5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Close button */}
         <button
           type="button"
@@ -104,14 +104,14 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           <X size={18} />
         </button>
 
-        {/* Left: Media (own scroll so tall images/videos can be panned) */}
-        <div className={`col-span-12 ${leftColsSm} ${leftColsMd} overflow-y-auto rounded-l-2xl bg-black`}> 
-          <div className="flex items-start justify-center min-h-full">
+        {/* Left: Media - full width with vertical scroll for tall images */}
+        <div className={`col-span-12 ${leftColsSm} ${leftColsMd} rounded-l-2xl bg-black overflow-y-auto`}> 
+          <div className="relative mx-auto w-full">
             <MediaViewer
               media={item.media}
               rounded={false}
               objectFit="contain"
-              className="max-h-[90vh] w-auto rounded-l-2xl"
+              className="!w-full !h-auto rounded-l-2xl"
             />
           </div>
         </div>
@@ -231,7 +231,11 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     emojiStyle={EmojiStyle.APPLE}
                     theme={Theme.LIGHT}
                     lazyLoadEmojis
-                    height={280}
+                    /* Make more rows visible by collapsing header/search and preview */
+                    searchDisabled
+                    skinTonesDisabled
+                    previewConfig={{ showPreview: false }}
+                    height={360}
                     className="glass-emoji-picker"
                   />
                 </div>

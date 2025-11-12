@@ -128,10 +128,11 @@ body.modal-open {
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #000000 transparent;
+  
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 1px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -188,7 +189,7 @@ body.modal-open {
 
 .sidebar-scrollbar::-webkit-scrollbar-thumb {
   background-color: #000000;
-  border-radius: 2px;
+  border-radius: 4px;
 }
 
 .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
@@ -361,24 +362,24 @@ body.modal-open {
 .modal-scrollbar::-webkit-scrollbar { width: 8px; }
 .modal-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .modal-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(147, 51, 234, 0.4); /* purple-600/40 */
-  border-radius: 9999px;
-  border: 2px solid transparent;
+  background-color: rgba(34, 33, 34, 0.4); /* purple-600/40 */
+  border-radius: 99px;
+  border: 0.5px solid transparent;
   background-clip: content-box;
 }
 .modal-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(147, 51, 234, 0.7);
+  background-color: rgba(23, 22, 23, 0.7);
 }
-.modal-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(147, 51, 234, 0.6) transparent; }
+.modal-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(21, 21, 21, 0.6) transparent; }
 
 /* Custom styles for Glassmorphism Emoji Picker */
 .glass-emoji-picker {
   /* Main container styling */
-  background-color: rgba(10, 10, 10, 0.7) !important;
+  background-color: rgba(36, 35, 35, 0.7) !important;
   backdrop-filter: blur(12px) !important;
   border: 1px solid rgba(192, 132, 252, 0.3) !important;
   box-shadow: 0 0 20px rgba(192, 132, 252, 0.4) !important; /* Neon glow */
-  border-radius: 1rem !important;
+  border-radius: 0.5rem !important;
 }
 
 /* Reduce emoji picker header & search area footprint */
@@ -398,6 +399,18 @@ body.modal-open {
   /* Category name styling */
   color: rgba(255, 255, 255, 0.7) !important;
 }
+
+/* v4 emoji-picker-react specific class overrides */
+/* Reduce header/search and hide sticky category labels to gain more rows */
+.glass-emoji-picker .EmojiPickerReact {
+  /* Tighter grid spacing for more rows */
+  --epr-emoji-gap: 6px;
+  --epr-emoji-size: 24px;
+}
+.glass-emoji-picker .EmojiPickerReact .epr-search-container { padding: 4px 6px !important; min-height: 0 !important; }
+.glass-emoji-picker .EmojiPickerReact .epr-category-label { display: none !important; }
+.glass-emoji-picker .EmojiPickerReact .epr-preview { display: none !important; }
+
 
 /* Utility class to prevent body scrolling when a modal is open */
 body.modal-open {

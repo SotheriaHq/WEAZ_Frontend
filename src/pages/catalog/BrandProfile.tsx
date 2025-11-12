@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
 import { useDispatch } from 'react-redux';
 
@@ -22,12 +22,15 @@ import { brandApi } from '../../api/BrandApi';
 import ProfileImageModal from '../../components/profile/ProfileImageModal';
 import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQuickEditModal';
 import ImageCropModal from '../../components/upload/ImageCropModal';
+import type { BrandProfileDto, CollectionDto } from '../../types/profile';
+import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedFileUrl';
 
 type TabType = 'Collections' | 'Reviews' | 'About';
 // CollectionType removed — dropdown opens modal directly
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
+  const { id: routeBrandId } = useParams<{ id: string }>();
   const {
     user,
     brandProfile,
@@ -41,16 +44,15 @@ const ProfilePage: React.FC = () => {
     fetchReviews,
     fetchBrandProfile,
   } = useBrandProfile();
-  const isBrandOwner = user?.type === 'BRAND';
+  // Owner view when no route param or when the param matches the logged-in brand user's id
+  const isOwner = Boolean(user?.type === 'BRAND' && (!routeBrandId || routeBrandId === user?.id));
+  const isVisitorView = !isOwner && Boolean(routeBrandId);
   const dispatch = useDispatch();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const filteredCollections = (collections || []).filter(c =>
-    (c.name || c.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (c.description || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   const [activeTab, setActiveTab] = useState<TabType>('Collections');
+  const [visibilityFilter, setVisibilityFilter] = useState<'Public' | 'Private'>('Public');
   const [isAddOpen, setIsAddOpen] = useState(false);
   // collectionType state removed; modal is opened with the selected type via handler
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -97,10 +99,11 @@ const ProfilePage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!isOwner) return;
     if (bannerPreviewUrl && displayData.bannerImage && displayData.bannerImage !== bannerPreviewUrl) {
       updateBannerPreview(null);
     }
-  }, [displayData.bannerImage, bannerPreviewUrl]);
+  }, [isOwner, displayData.bannerImage, bannerPreviewUrl]);
 
   useEffect(() => {
     return () => {
@@ -113,8 +116,9 @@ const ProfilePage: React.FC = () => {
     };
   }, []);
 
-  // Always try to resolve a signed avatar URL when we have a profileImageId to ensure visibility after refresh
+  // Always try to resolve a signed avatar URL for owner after refresh
   useEffect(() => {
+    if (!isOwner) return;
     const run = async () => {
       if (!user?.profileImageId) return;
       try {
@@ -127,16 +131,17 @@ const ProfilePage: React.FC = () => {
       }
     };
     void run();
-  }, [user?.profileImageId]);
+  }, [isOwner, user?.profileImageId]);
 
   useEffect(() => {
+    if (!isOwner) return;
     if (
       displayData.logoImage &&
       (!localAvatarPreview || localAvatarPreview.startsWith('blob:'))
     ) {
       updateAvatarPreview(displayData.logoImage);
     }
-  }, [displayData.logoImage, localAvatarPreview]);
+  }, [isOwner, displayData.logoImage, localAvatarPreview]);
 
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
@@ -152,13 +157,20 @@ const ProfilePage: React.FC = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    if (activeTab === 'Reviews' && isBrandOwner && reviews.length === 0 && !reviewsLoading) {
-      void fetchReviews(user.id);
+    if (activeTab === 'Reviews') {
+      if (isOwner && user && reviews.length === 0 && !reviewsLoading) {
+        void fetchReviews(user.id);
+      }
+      if (isVisitorView && routeBrandId) {
+        void (async () => {
+          try { await brandApi.getReviews(routeBrandId); } catch {/* noop */}
+        })();
+      }
     }
-  }, [activeTab, isBrandOwner, user, reviews.length, reviewsLoading, fetchReviews]);
+  }, [activeTab, isOwner, isVisitorView, user, reviews.length, reviewsLoading, fetchReviews, routeBrandId]);
 
   const requiresProfileSetup = useMemo(() => {
-    if (!isBrandOwner || !user) {
+    if (!isOwner || !user) {
       return false;
     }
     const description = (brandProfile?.description ?? user.brandDescription ?? '').trim();
@@ -172,11 +184,11 @@ const ProfilePage: React.FC = () => {
       Boolean((brandProfile?.state ?? user.brandState ?? '').trim());
 
     return description.length < 20 || tags.length === 0 || !hasLocation;
-  }, [isBrandOwner, user, brandProfile]);
+  }, [isOwner, user, brandProfile]);
 
   useEffect(() => {
     if (
-      isBrandOwner &&
+      isOwner &&
       !brandProfileLoading &&
       requiresProfileSetup &&
       !hasDismissedSetup &&
@@ -186,7 +198,7 @@ const ProfilePage: React.FC = () => {
       setIsEditModalOpen(true);
     }
   }, [
-    isBrandOwner,
+    isOwner,
     brandProfileLoading,
     requiresProfileSetup,
     hasDismissedSetup,
@@ -260,13 +272,13 @@ const ProfilePage: React.FC = () => {
   };
 
   const handleTriggerAvatarUpload = () => {
-    if (isBrandOwner) {
+    if (isOwner) {
       avatarInputRef.current?.click();
     }
   };
 
   const handleTriggerBannerUpload = () => {
-    if (isBrandOwner) {
+    if (isOwner) {
       bannerInputRef.current?.click();
     }
   };
@@ -394,25 +406,113 @@ const ProfilePage: React.FC = () => {
     await processAvatarUpload(result.file, result.previewUrl);
   };
 
+  // ---------------- Visitor data fetch ----------------
+  const [visitorProfile, setVisitorProfile] = useState<BrandProfileDto | null>(null);
+  const [visitorCollections, setVisitorCollections] = useState<CollectionDto[]>([]);
+  const [visitorLoading, setVisitorLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      if (!isVisitorView || !routeBrandId) return;
+      setVisitorLoading(true);
+      try {
+        const [p, cols] = await Promise.all([
+          brandApi.getBrandProfile(routeBrandId),
+          brandApi.getCollections(routeBrandId),
+        ]);
+        if (!mounted) return;
+        setVisitorProfile(p ?? null);
+        setVisitorCollections(cols ?? []);
+      } finally {
+        if (mounted) setVisitorLoading(false);
+      }
+    };
+    void run();
+    return () => { mounted = false; };
+  }, [isVisitorView, routeBrandId]);
+
+  const activeCollections = (isVisitorView ? visitorCollections : collections) || [];
+  const visibilityFiltered = activeCollections.filter((c) =>
+    visibilityFilter === 'Public' ? (c.isPublic || c.visibility === 'PUBLIC') : (!c.isPublic || c.visibility === 'PRIVATE')
+  );
+  const searchAndVisibilityFiltered = visibilityFiltered.filter(c =>
+    (c.name || c.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Resolve signed URLs for visitor profile assets if necessary
+  const visitorBannerInitial = visitorProfile?.bannerImage ?? visitorProfile?.bannerImageMeta?.url ?? null;
+  const visitorLogoInitial = visitorProfile?.logoImage ?? visitorProfile?.logoImageMeta?.url ?? null;
+  const { url: visitorBannerUrl } = useSignedFileUrlHook(visitorProfile?.bannerImageMeta?.fileId ?? null, visitorBannerInitial);
+  const { url: visitorLogoUrl } = useSignedFileUrlHook(visitorProfile?.logoImageMeta?.fileId ?? null, visitorLogoInitial);
+
+  const viewDisplayData = isVisitorView && visitorProfile
+    ? {
+        brandName: visitorProfile.brandFullName,
+        location: visitorProfile.location ?? [visitorProfile.city, visitorProfile.state, visitorProfile.country].filter(Boolean).join(', '),
+        username: '',
+        logoImage: visitorLogoUrl ?? undefined,
+        bannerImage: visitorBannerUrl ?? undefined,
+        hashtags: visitorProfile.hashtags ?? visitorProfile.tags ?? [],
+        description: visitorProfile.description ?? '',
+        socialLinks: visitorProfile.socialLinks,
+        contactInfo: visitorProfile.contactInfo,
+        country: visitorProfile.country,
+        state: visitorProfile.state,
+        city: visitorProfile.city,
+      }
+    : displayData;
+
   const brandData = {
-    brandName: displayData.brandName,
+    brandName: viewDisplayData.brandName,
     title: 'About Brand',
     description:
-      displayData.description || (isBrandOwner
-        ? `${displayData.brandName} is a Lagos-based fashion brand where indigenous Nigerian textiles meet modern fashion innovation.`
+      viewDisplayData.description || (isOwner
+        ? `${viewDisplayData.brandName} is a Lagos-based fashion brand where indigenous Nigerian textiles meet modern fashion innovation.`
         : 'Welcome to our profile!'),
-    socialLinks: displayData.socialLinks,
-    contactInfo: displayData.contactInfo,
-    tags: displayData.hashtags || [],
-    businessType: displayData.contactInfo?.businessType,
-    country: displayData.country,
-    state: displayData.state,
-    city: displayData.city,
-    bannerImage: displayData.bannerImage,
-    established: undefined, // Could be added to backend later
+    socialLinks: {
+      instagram: viewDisplayData.socialLinks?.instagram || undefined,
+      facebook: viewDisplayData.socialLinks?.facebook || undefined,
+      twitter: viewDisplayData.socialLinks?.twitter || undefined,
+      website: viewDisplayData.socialLinks?.website || undefined,
+    },
+    contactInfo: {
+      email: viewDisplayData.contactInfo?.email ?? 'contact@brand.com',
+      phone: viewDisplayData.contactInfo?.phone ?? '',
+    },
+    tags: viewDisplayData.hashtags || [],
+    businessType: viewDisplayData.contactInfo?.businessType || undefined,
+    country: viewDisplayData.country,
+    state: viewDisplayData.state,
+    city: viewDisplayData.city,
+    bannerImage: viewDisplayData.bannerImage,
+    established: undefined,
   };
 
-  if (!user) {
+  if (!isOwner && isVisitorView && visitorLoading) {
+    return (
+      <div className="w-full">
+        <div className="max-w-screen-xl mx-auto p-4 space-y-6">
+          <ProfileHeaderSkeleton />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-3">
+              <div className="h-64 w-full rounded-2xl bg-gray-100 dark:bg-gray-900/40 animate-pulse" />
+            </div>
+            <div className="lg:col-span-9">
+              <CollectionsSkeleton />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isOwner && isVisitorView && !visitorProfile) {
+    return <div className="max-w-screen-xl mx-auto p-6">Brand not found.</div>;
+  }
+
+  if (!user && !isVisitorView) {
     return (
       <div className="w-full">
         <div className="max-w-screen-xl mx-auto p-4 space-y-6">
@@ -438,7 +538,7 @@ const ProfilePage: React.FC = () => {
         alt={displayData.brandName}
         onClose={() => setIsAvatarModalOpen(false)}
       />
-      {user && (
+      {isOwner && user && (
         <ProfileHeaderQuickEditModal
           open={isHeaderQuickEditOpen}
           onClose={() => {
@@ -457,7 +557,7 @@ const ProfilePage: React.FC = () => {
           onOpenFullEditor={() => handleOpenEditModal(false)}
         />
       )}
-      {isBrandOwner && (
+      {isOwner && (
         <>
           {/* Keep inputs in the DOM (sr-only) so programmatic click reliably opens the picker */}
           <input
@@ -480,14 +580,14 @@ const ProfilePage: React.FC = () => {
       )}
       <ProfileHeader
         profileData={{
-          name: displayData.brandName,
-          location: displayData.location,
-          username: displayData.username,
-          avatar: (localAvatarPreview ?? displayData.logoImage) ?? '',
-          banner: bannerPreviewUrl ?? displayData.bannerImage ?? '',
-          tags: displayData.hashtags || [],
+          name: viewDisplayData.brandName,
+          location: viewDisplayData.location,
+          username: viewDisplayData.username,
+          avatar: (localAvatarPreview ?? viewDisplayData.logoImage) ?? '',
+          banner: bannerPreviewUrl ?? viewDisplayData.bannerImage ?? '',
+          tags: viewDisplayData.hashtags || [],
         }}
-        canEdit={isBrandOwner}
+        canEdit={isOwner}
         onEditProfile={() => setIsHeaderQuickEditOpen(true)}
         onShareProfile={() => undefined}
         onEditAvatar={handleTriggerAvatarUpload}
@@ -496,7 +596,7 @@ const ProfilePage: React.FC = () => {
         bannerLoading={bannerUploading}
         avatarHighlight={avatarHighlight}
         onViewAvatar={() => {
-          if (localAvatarPreview || displayData.logoImage) {
+          if (localAvatarPreview || viewDisplayData.logoImage) {
             setIsAvatarModalOpen(true);
             if (avatarHighlight) {
               setAvatarHighlight(false);
@@ -531,24 +631,44 @@ const ProfilePage: React.FC = () => {
                   <div className="flex-1 w-full sm:w-auto">
                     <SearchField placeholder="Search collections..." onSearch={setSearchQuery} />
                   </div>
-                  {isBrandOwner && (
+                  {/* Show create controls only for owner */}
+                  {isOwner && (
                     <AddCollectionDropdown openModal={() => handleOpenAddModal()} />
                   )}
                 </div>
 
+                {/* Visibility filter chips */}
+                <div className="mb-4">
+                  <div className="inline-flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                    {(['Public','Private'] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => setVisibilityFilter(opt)}
+                        className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                          visibilityFilter === opt
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* For now use CollectionsSkeleton when loading, otherwise show grid or placeholder */}
                 {/* Note: fetchCollections is called on modal create; new users will see the EmptyState */}
-                {collectionsLoading ? (
+                {(isOwner ? collectionsLoading : visitorLoading) ? (
                   <CollectionsSkeleton />
-                ) : collections && collections.length > 0 ? (
+                ) : (isVisitorView ? visitorCollections : collections) && (isVisitorView ? visitorCollections : collections).length > 0 ? (
                   <CollectionsGrid
-                    collections={filteredCollections}
-                    onEdit={isBrandOwner ? () => {} : undefined}
-                    onDelete={isBrandOwner ? () => {} : undefined}
+                    collections={searchAndVisibilityFiltered}
+                    onEdit={isOwner ? () => {} : undefined}
+                    onDelete={isOwner ? () => {} : undefined}
                     onCollectionClick={(id) => navigate(`/collections/${id}`)}
                   />
                 ) : (
-                  isBrandOwner ? (
+                  isOwner ? (
                     <EmptyState
                       title="No collections yet"
                       description="Create a collection to save and curate posts."
@@ -572,7 +692,7 @@ const ProfilePage: React.FC = () => {
         </div>
       </div>
 
-      {isBrandOwner && (
+      {isOwner && (
         <AddCollectionModal
           isOpen={isAddOpen}
           onClose={() => setIsAddOpen(false)}
@@ -583,10 +703,10 @@ const ProfilePage: React.FC = () => {
         />
       )}
 
-      {isBrandOwner && (
+      {isOwner && (
         <EditProfileModal
           isOpen={isEditModalOpen}
-          user={user}
+          user={user!}
           brandProfile={brandProfile}
           showSkip={openedFromPrompt}
           onSkip={handleDismissModal}

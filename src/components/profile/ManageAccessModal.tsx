@@ -85,7 +85,7 @@ const ManageAccessModal: React.FC<Props> = ({ open, collectionId, onClose }) => 
                     </div>
                     <div className="flex gap-2">
                       <FrostedButton size="sm" variant="primary" onClick={() => void handleApprove(r.viewer.id)} disabled={busy}>Approve</FrostedButton>
-                      <FrostedButton size="sm" variant="danger" onClick={() => void handleRevoke(r.viewer.id)} disabled={busy}>Reject</FrostedButton>
+                      <FrostedButton size="sm" variant="outline" className="text-red-300 hover:text-red-200 border-red-400/40 hover:border-red-400" onClick={() => void handleRevoke(r.viewer.id)} disabled={busy}>Reject</FrostedButton>
                     </div>
                   </div>
                 ))}
