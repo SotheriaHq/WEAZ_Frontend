@@ -26,6 +26,8 @@ export interface CommentV2Dto {
   deletedAt?: string | null;
   isLikedByMe?: boolean;
   children?: CommentV2Dto[];
+  optimistic?: boolean;
+  pending?: boolean;
 }
 
 export interface PageResult<T> {

@@ -23,9 +23,12 @@ export interface MarketItem {
   maxPrice?: number | null;
   likesCount?: number | null;
   commentsCount?: number | null;
+  // When requested with counts=combined, backend may supply combined total
+  combinedCommentsCount?: number | null;
   patchesCount?: number | null;
   tags: string[];
   media: MarketMedia;
+  isLiked?: boolean; // Backend includes this for authenticated users
 }
 
 export interface MarketFeedResponse {

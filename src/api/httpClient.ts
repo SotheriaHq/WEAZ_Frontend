@@ -78,6 +78,10 @@ export const refreshAccessToken = async (): Promise<string | null> => {
         return token;
       } catch {
         dropStoredAccessToken();
+        try {
+          // Broadcast a global auth-expired signal for UI to react (toast, redirect, etc.)
+          window.dispatchEvent(new CustomEvent('auth:expired'));
+        } catch {}
         return null;
       } finally {
         refreshPromise = null;
@@ -129,6 +133,7 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest);
       } catch (refreshError) {
+        try { window.dispatchEvent(new CustomEvent('auth:expired')); } catch {}
         return Promise.reject(refreshError);
       }
     }

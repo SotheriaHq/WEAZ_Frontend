@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { io, Socket } from 'socket.io-client';
 import { env } from '@/config/env';
 import { getStoredAccessToken } from '@/api/httpClient';
+import { useDispatch } from 'react-redux';
+import { wsApplied, incrementCommentCount, decrementCommentCount } from '@/features/engagementSlice';
 
 interface LikeEventPayload {
   contentType: string;
@@ -29,10 +31,12 @@ interface RealtimeContextValue {
   joinCollection: (collectionId: string) => void;
   joinCollectionMedia: (mediaId: string) => void;
   joinUser: (userId: string) => void;
+  joinComment: (commentId: string) => void;
   onLike: (contentType: string, contentId: string, handler: LikeHandler) => () => void;
   onComment: (room: string, handler: CommentHandler) => () => void;
   onNotification: (handler: (payload: any) => void) => () => void;
   socketConnected: boolean;
+  degraded: boolean;
 }
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
@@ -54,11 +58,14 @@ const buildUrl = () => {
 };
 
 export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const dispatch = useDispatch();
   const socketRef = useRef<Socket | null>(null);
   const likeSubs = useRef<SubscriptionMap<LikeHandler>>({});
   const commentSubs = useRef<SubscriptionMap<CommentHandler>>({});
   const pendingJoins = useRef<Set<string>>(new Set());
   const [socketConnected, setSocketConnected] = useState(false);
+  const failureCountRef = useRef(0);
+  const [degraded, setDegraded] = useState(false);
 
   // Establish socket
   useEffect(() => {
@@ -72,9 +79,24 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
       reconnectionDelay: 500,
     });
     socketRef.current = s;
-    s.on('connect', () => setSocketConnected(true));
+  s.on('connect', () => setSocketConnected(true));
     s.on('disconnect', () => setSocketConnected(false));
+
+    const onConnErr = () => {
+      failureCountRef.current += 1;
+      if (failureCountRef.current >= 5 && !degraded) {
+        setDegraded(true);
+        try { (s.io as any).opts.reconnection = false; } catch {}
+      }
+    };
+  s.on('reconnect_error', onConnErr);
+    s.on('reconnect_failed', onConnErr);
+    s.on('error', onConnErr);
+  s.on('connect', () => { failureCountRef.current = 0; setDegraded(false); window.dispatchEvent(new CustomEvent('ws:restored')); });
     return () => {
+      s.off('reconnect_error', onConnErr);
+      s.off('reconnect_failed', onConnErr);
+      s.off('error', onConnErr);
       s.disconnect();
       socketRef.current = null;
     };
@@ -82,6 +104,15 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
 
   const safeJoin = useCallback((room: string) => {
     if (!room) return;
+    // Validate basic room formats to avoid backend errors
+    const [type, id] = room.split(':');
+    const uuidRe = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    if (!type || !id) return;
+    if (type === 'USER') {
+      if (!id.trim()) return;
+    } else if (type === 'COLLECTION' || type === 'COLLECTION_MEDIA' || type === 'COMMENT') {
+      if (!uuidRe.test(id)) return; // discard malformed
+    }
     if (pendingJoins.current.has(room)) return;
     pendingJoins.current.add(room);
     const s = socketRef.current;
@@ -95,6 +126,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
   const joinCollection = useCallback((collectionId: string) => safeJoin(`COLLECTION:${collectionId}`), [safeJoin]);
   const joinCollectionMedia = useCallback((mediaId: string) => safeJoin(`COLLECTION_MEDIA:${mediaId}`), [safeJoin]);
   const joinUser = useCallback((userId: string) => safeJoin(`USER:${userId}`), [safeJoin]);
+  const joinComment = useCallback((commentId: string) => safeJoin(`COMMENT:${commentId}`), [safeJoin]);
 
   // Generic event router
   useEffect(() => {
@@ -105,6 +137,14 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     for (const ev of likeEvents) {
       s.on(ev, (payload: LikeEventPayload) => {
         const room = `${payload.contentType}:${payload.contentId}`;
+        
+        // Dispatch Redux action for like count update
+        dispatch(wsApplied({ 
+          contentType: payload.contentType, 
+          contentId: payload.contentId, 
+          likeCount: payload.likeCount 
+        }));
+        
         const handlers = likeSubs.current[room];
         if (handlers) handlers.forEach((h) => h(payload));
       });
@@ -112,11 +152,23 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
 
     const commentEvents = ['comment.created', 'comment.deleted', 'comment.liked'] as const;
     for (const ev of commentEvents) {
-      s.on(ev, (payload: CommentEventPayload & { room?: string }) => {
-        const room = payload.room || (payload.contentType && payload.contentId ? `${payload.contentType}:${payload.contentId}` : undefined);
+      s.on(ev, (payload: CommentEventPayload & { room?: string; targetType?: string; targetId?: string }) => {
+        // Normalize keys and compute room
+        const normType = (payload.contentType || payload.targetType) as string | undefined;
+        const normId = (payload.contentId || payload.targetId) as string | undefined;
+        const room = payload.room || (normType && normId ? `${normType}:${normId}` : undefined);
         if (!room) return;
+        const enriched = { ...payload, event: ev, contentType: normType, contentId: normId } as any;
+
+        // Dispatch Redux actions for comment count updates
+        if (ev === 'comment.created' && normType && normId) {
+          dispatch(incrementCommentCount({ contentType: normType, contentId: normId }));
+        } else if (ev === 'comment.deleted' && normType && normId) {
+          dispatch(decrementCommentCount({ contentType: normType, contentId: normId }));
+        }
+
         const handlers = commentSubs.current[room];
-        if (handlers) handlers.forEach((h) => h(payload));
+        if (handlers) handlers.forEach((h) => h(enriched));
       });
     }
 
@@ -125,18 +177,22 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
         s.off(ev);
       }
     };
-  }, []);
+  }, [dispatch]);
 
   const onLike = useCallback((contentType: string, contentId: string, handler: LikeHandler) => {
     const room = `${contentType}:${contentId}`;
     if (!likeSubs.current[room]) likeSubs.current[room] = new Set();
     likeSubs.current[room].add(handler);
-    joinCollection(contentType === 'COLLECTION' ? contentId : ''); // only auto join collection if needed
+    if (contentType === 'COLLECTION') {
+      joinCollection(contentId);
+    } else if (contentType === 'COLLECTION_MEDIA') {
+      joinCollectionMedia(contentId);
+    }
     return () => {
       likeSubs.current[room]?.delete(handler);
       if (likeSubs.current[room]?.size === 0) delete likeSubs.current[room];
     };
-  }, [joinCollection]);
+  }, [joinCollection, joinCollectionMedia]);
 
   const onComment = useCallback((room: string, handler: CommentHandler) => {
     if (!commentSubs.current[room]) commentSubs.current[room] = new Set();
@@ -159,10 +215,12 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     joinCollection,
     joinCollectionMedia,
     joinUser,
+    joinComment,
     onLike,
     onComment,
     onNotification,
     socketConnected,
+    degraded,
   };
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;

@@ -8,6 +8,7 @@ export interface GetMarketFeedParams {
   tag?: string;
   // Optional category filter; backend may ignore until supported
   category?: string;
+  counts?: 'combined';
 }
 
 type RawMarketItem = Record<string, unknown>;
@@ -97,6 +98,7 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
           ? (raw.patchesCount as number)
           : null,
     tags,
+    isLiked: typeof raw.isLiked === 'boolean' ? (raw.isLiked as boolean) : false,
     media: {
       fileId: mediaFileId || '',
       url: mediaUrl,
@@ -133,7 +135,13 @@ export const marketApi = {
       };
 
     const rawItems = (data as { items?: RawMarketItem[] }).items;
-    const items = Array.isArray(rawItems) ? rawItems.map((item) => toMarketItem(item)) : [];
+    const items = Array.isArray(rawItems) ? rawItems.map((item) => {
+      const mapped = toMarketItem(item);
+      if (typeof (item as any).combinedCommentsCount === 'number') {
+        mapped.commentsCount = (item as any).combinedCommentsCount as number;
+      }
+      return mapped;
+    }) : [];
     return {
       items,
       hasNextPage: Boolean((data as MarketFeedResponse)?.hasNextPage ?? items.length > 0),

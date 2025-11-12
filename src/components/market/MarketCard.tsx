@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Share2 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -10,6 +10,8 @@ import Tag from '@/components/ui/Tag';
 import type { MarketItem } from '@/types/market';
 import { formatPrice } from '@/utils/helpers';
 import { getTagColor } from '@/utils/tagColors';
+import { selectCommentCount } from '@/features/engagementSlice';
+import { useRealtime } from '@/realtime/RealtimeProvider';
 
 interface MarketCardProps {
   item: MarketItem;
@@ -25,7 +27,17 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const [commentText, setCommentText] = useState('');
   const [commentBusy, setCommentBusy] = useState(false);
-  const [commentCount, setCommentCount] = useState<number>(item.commentsCount ?? 0);
+  const realtime = useRealtime();
+  
+  // Join WebSocket room for real-time comment/like updates
+  useEffect(() => {
+    realtime.joinCollectionMedia(item.id);
+  }, [item.id, realtime]);
+  
+  // Use Redux selector for real-time comment count synchronization
+  const commentCount = useSelector((s: RootState) => 
+    selectCommentCount(s, 'COLLECTION_MEDIA', item.id) ?? item.commentsCount ?? 0
+  );
   const priceRange =
     typeof item.minPrice === 'number' && typeof item.maxPrice === 'number'
       ? `${formatPrice(item.minPrice)} – ${formatPrice(item.maxPrice)}`
@@ -109,6 +121,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
             contentType="COLLECTION_MEDIA"
             contentId={item.id}
             initialCount={item.likesCount ?? 0}
+            initialLiked={item.isLiked}
             ownerId={item.brandId}
           />
           
@@ -184,7 +197,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
                   try {
                     await CommentsApi.create('COLLECTION_MEDIA', item.id, content);
                     setCommentText('');
-                    setCommentCount((c) => c + 1);
+                    // Comment count will be updated via WebSocket real-time event (comment.created)
                   } catch (err: any) {
                     toast.error(err?.response?.data?.message ?? 'Failed to post comment');
                   } finally { setCommentBusy(false); }

@@ -14,6 +14,7 @@ import {
   persistAccessToken,
 } from '../api/httpClient';
 import { isAxiosError } from 'axios';
+import { toast } from 'react-toastify';
 
 interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
@@ -105,6 +106,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     let isMounted = true;
 
+    const onAuthExpired = () => {
+      dropStoredAccessToken();
+      dispatch(clearUser());
+      try { toast.info('Session expired. Please sign in again.'); } catch {}
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('auth:expired', onAuthExpired);
+    }
+
     const initialize = async () => {
       try {
         const storedToken = getStoredAccessToken();
@@ -126,6 +136,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     return () => {
       isMounted = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('auth:expired', onAuthExpired);
+      }
     };
   }, [dispatch, fetchUserProfile, handleProfileError]);
 

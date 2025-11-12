@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { RefreshCcw } from 'lucide-react';
 import Masonry from 'react-masonry-css';
 import marketApi from '@/api/MarketApi';
@@ -9,9 +10,11 @@ import MarketSkeleton from '@/components/market/MarketSkeleton';
 // Category chips live directly on page; tag chips removed for now
 import { FrostedButton } from '@/components/ui/FrostedButton';
 import MarketViewModal from '@/components/market/MarketViewModal';
+import { setEngagementState } from '@/features/engagementSlice';
 
 const Market: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [items, setItems] = useState<MarketItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,8 +37,22 @@ const Market: React.FC = () => {
       const feed = await marketApi.getFeed({
         // Backend may ignore category until supported
         category: selectedCategory !== 'ALL' ? selectedCategory : undefined,
+        counts: 'combined',
       });
       setItems(feed.items);
+      
+      // Initialize Redux engagement state for all items (CRITICAL for like persistence & real-time comment sync)
+      feed.items.forEach((item) => {
+        dispatch(setEngagementState({
+          contentType: 'COLLECTION_MEDIA',
+          contentId: item.id,
+          likedByMe: item.isLiked ?? false,
+          likeCount: item.likesCount ?? 0,
+          commentCount: item.commentsCount ?? 0,
+          patchCount: item.patchesCount ?? 0,
+        }));
+      });
+      
       setHasLoadedOnce(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to load market feed';
@@ -44,7 +61,7 @@ const Market: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedCategory, hasLoadedOnce]);
+  }, [selectedCategory, hasLoadedOnce, dispatch]);
 
   useEffect(() => {
     void loadFeed();

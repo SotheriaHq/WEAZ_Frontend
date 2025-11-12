@@ -25,6 +25,7 @@ export interface CollectionDto {
   brandLogoFileId?: string;
   isAvailableInStore?: boolean;
   tags?: string[];
+  isLiked?: boolean; // Backend includes this for authenticated users
 }
 
 // Review Types

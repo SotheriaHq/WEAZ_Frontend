@@ -174,6 +174,17 @@ export const brandApi = {
     }
   },
 
+  // Fetch draft collections (PHASE 6)
+  async getMyDraftCollections(): Promise<any[]> {
+    try {
+      const response = await apiClient.get('/collections/my/drafts');
+      return response.data?.items ?? response.data ?? [];
+    } catch (error) {
+      console.error('Error fetching draft collections:', error);
+      return [];
+    }
+  },
+
   // Create collection
   async createCollection(data: { name: string; description?: string; isPublic?: boolean; categoryId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY' }): Promise<CollectionDto | null> {
     try {

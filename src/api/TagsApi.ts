@@ -25,7 +25,7 @@ export const TagsApi = {
       // ignore, fallback below
     }
     try {
-      const feed = await marketApi.getFeed({ limit });
+  const feed = await marketApi.getFeed({ limit, counts: 'combined' });
       const set = new Set<string>();
       for (const item of feed.items ?? []) {
         for (const tag of item.tags ?? []) {

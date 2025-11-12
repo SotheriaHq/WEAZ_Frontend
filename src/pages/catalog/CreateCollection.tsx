@@ -6,6 +6,7 @@ import FrostedButton from '../../components/ui/FrostedButton';
 import TextField from '../../components/forms/TextField';
 import TextAreaField from '../../components/forms/TextAreaField';
 import TagPicker from '@/components/forms/TagPicker';
+import SimpleAccordion from '@/components/forms/SimpleAccordion';
 import TagsApi from '@/api/TagsApi';
 import { brandApi } from '@/api/BrandApi';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
@@ -192,13 +193,9 @@ const CreateCollectionInner: React.FC = () => {
   );
 
   const Section: React.FC<React.PropsWithChildren<{ title: string; defaultOpen?: boolean }>> = ({ title, defaultOpen = true, children }) => (
-    <details className="group rounded-xl border border-white/20 bg-white/5 p-3 backdrop-blur-md open:pb-3" open={defaultOpen}>
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-gray-800 dark:text-white">
-        <span>{title}</span>
-        <span className="transition-transform group-open:rotate-180">▾</span>
-      </summary>
-      <div className="mt-3 space-y-3">{children}</div>
-    </details>
+    <SimpleAccordion title={title} defaultOpen={defaultOpen}>
+      {children}
+    </SimpleAccordion>
   );
 
   const PillGroup: React.FC<{ options: { key: string; label: string; title?: string }[]; value: string; onChange: (v: string) => void }>
@@ -277,7 +274,6 @@ const CreateCollectionInner: React.FC = () => {
               onChange={setSelectedTags}
               allowCustom
               max={10}
-              horizontal
             />
           </div>
           <TextField

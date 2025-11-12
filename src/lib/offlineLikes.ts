@@ -1,6 +1,6 @@
 import { ReactionsApi } from '@/api/ReactionsApi';
 
-type QueueItem = { kind: 'COLLECTION_TOGGLE'; id: string; ts: number };
+type QueueItem = { kind: 'COLLECTION_TOGGLE' | 'COLLECTION_MEDIA_TOGGLE'; id: string; ts: number };
 const KEY = 'offline_like_queue_v1';
 
 function load(): QueueItem[] {
@@ -14,6 +14,11 @@ export const OfflineLikes = {
     items.push({ kind: 'COLLECTION_TOGGLE', id, ts: Date.now() });
     save(items);
   },
+  enqueueCollectionMediaToggle(id: string) {
+    const items = load();
+    items.push({ kind: 'COLLECTION_MEDIA_TOGGLE', id, ts: Date.now() });
+    save(items);
+  },
   async flush() {
     const items = load();
     if (items.length === 0) return;
@@ -22,6 +27,8 @@ export const OfflineLikes = {
       try {
         if (it.kind === 'COLLECTION_TOGGLE') {
           await ReactionsApi.toggleCollectionLike(it.id);
+        } else if (it.kind === 'COLLECTION_MEDIA_TOGGLE') {
+          await ReactionsApi.toggleCollectionMediaLike(it.id);
         }
       } catch {
         remaining.push(it); // keep for later if failed

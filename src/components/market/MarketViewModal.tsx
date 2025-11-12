@@ -13,7 +13,7 @@ import { CommentsApi } from '@/api/CommentsApi';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { toast } from 'react-toastify';
-import EmojiPicker, { EmojiStyle, type EmojiClickData } from 'emoji-picker-react';
+import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
 
 type Props = {
   open: boolean;
@@ -30,6 +30,7 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const [postingComment, setPostingComment] = React.useState(false);
   const [commentPosted, setCommentPosted] = React.useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
+  const currentUserId = useSelector((s: RootState) => s.user.profile?.id);
 
   function onEmojiClick(emojiData: EmojiClickData) {
     setCommentText((prevText) => prevText + emojiData.emoji);
@@ -103,8 +104,8 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           <X size={18} />
         </button>
 
-        {/* Left: Media */}
-        <div className={`col-span-12 bg-black ${leftColsSm} ${leftColsMd} overflow-y-auto modal-scrollbar`}>
+  {/* Left: Media (no scroll to avoid double scrollbars) */}
+  <div className={`col-span-12 bg-black ${leftColsSm} ${leftColsMd} overflow-hidden`}>
           <div className="flex min-h-full items-start justify-center">
             {/* Ensure the media is fully visible without cropping - use contain to respect aspect ratio */}
             <MediaViewer
@@ -117,7 +118,7 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         </div>
 
         {/* Right: Data Area + Comments */}
-        <div className={`col-span-12 flex flex-col bg-black/30 backdrop-blur-lg p-4 ${rightColsSm} ${rightColsMd} overflow-y-auto modal-scrollbar`}>
+  <div className={`col-span-12 flex flex-col glass-panel p-4 ${rightColsSm} ${rightColsMd} overflow-y-auto modal-scrollbar`}>
           {/* Data Area */}
           <div className="pb-4">
             <div className="mb-3 flex items-center gap-3">
@@ -157,7 +158,14 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
             {/* Actions */}
             <div className="mt-4 flex items-center gap-4">
-              <LikeButton contentType="COLLECTION_MEDIA" contentId={item.id} initialCount={item.likesCount ?? 0} ownerId={item.brandId} />
+              {/* Pass initialLiked to avoid an extra authenticated fetch in the modal */}
+              <LikeButton
+                contentType="COLLECTION_MEDIA"
+                contentId={item.id}
+                initialCount={item.likesCount ?? 0}
+                initialLiked={item.isLiked}
+                ownerId={item.brandId}
+              />
               <IconButton variant="ghost" size="sm" icon={<Share2 size={16} />} onClick={() => { /* TODO: share */ }} tooltip="Share" />
               <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
                 <MessageCircle size={16} />
@@ -173,10 +181,12 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           </div>
 
           {/* Comments Area */}
-          <div className="min-h-0 flex-1 border-t border-purple-200/50 dark:border-purple-800/50 pt-3 mt-3 flex flex-col">
+          <div className="min-h-0 flex-1 pt-3 mt-3 flex flex-col">
             <MarketCommentsPanel
               mediaId={item.id}
               collectionId={item.collectionId}
+              contentOwnerId={item.brandId}
+              currentUserId={currentUserId}
               onCountChange={(c) => {
                 setCommentCount(c);
                 onCommentCountChange?.(c);
@@ -214,11 +224,11 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                   <EmojiPicker
                     onEmojiClick={onEmojiClick}
                     autoFocusSearch={false}
-                    emojiStyle={EmojiStyle.NATIVE}
-                    theme="dark"
+                    emojiStyle={EmojiStyle.APPLE}
+                    theme={Theme.LIGHT}
                     lazyLoadEmojis
                     height={350}
-                    className="glass-emoji-picker"
+                    className="glass-menu-soft"
                   />
                 </div>
               )}

@@ -37,7 +37,7 @@ const LikeButton: React.FC<Props> = ({
   const [initializing, setInitializing] = React.useState(true);
   const k = `${contentType}:${contentId}`;
   const item = useSelector((s: RootState) => {
-    const stateItem = s.engagement.likes[k];
+    const stateItem = s.engagement.items?.[k];
     if (stateItem) {
       return {
         likedByMe: stateItem.likedByMe ?? !!initialLiked,
@@ -188,9 +188,11 @@ const LikeButton: React.FC<Props> = ({
       if (thisRequestVersion === requestVersionRef.current &&
           pendingRequestRef.current === abortController) {
         if (!navigator.onLine) {
-          // Queue only collection toggles for offline handling
+          // Queue toggle for offline handling (collection or media)
           if (contentType === 'COLLECTION') {
             OfflineLikes.enqueueCollectionToggle(contentId);
+          } else if (contentType === 'COLLECTION_MEDIA') {
+            OfflineLikes.enqueueCollectionMediaToggle(contentId);
           }
           // Keep optimistic state; reconciliation will happen on flush
         } else {

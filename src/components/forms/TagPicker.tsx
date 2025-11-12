@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { normalizeTag, validateTag, tagExists, TAG_CONFIG } from '@/utils/tagValidator';
 
 interface Props {
   suggestions: string[];
@@ -6,7 +7,6 @@ interface Props {
   onChange: (tags: string[]) => void;
   allowCustom?: boolean;
   max?: number;
-  horizontal?: boolean;
 }
 
 type VariantKey =
@@ -53,7 +53,7 @@ const Chip: React.FC<{ active?: boolean; onClick?: () => void; color: VariantKey
   );
 };
 
-const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom = true, max = 10, horizontal = true }) => {
+const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom = true, max = TAG_CONFIG.MAX_TAGS_PER_COLLECTION }) => {
   const [query, setQuery] = useState('');
   const [newTagColor, setNewTagColor] = useState<VariantKey>('SLATE');
   const [colorMap, setColorMap] = useState<Record<string, VariantKey>>({});
@@ -73,32 +73,43 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
     return palette[sum % palette.length];
   };
 
-  const isValidSingleWord = (t: string) => /^[A-Za-z0-9._-]{1,24}$/.test(t);
-
   const toggle = (tag: string) => {
-    const t = tag.trim();
-    if (!t) return;
-    if (!isValidSingleWord(t)) return; // silently ignore invalid
-    if (value.includes(t)) {
-      onChange(value.filter((x) => x !== t));
+    const normalized = normalizeTag(tag);
+    if (!normalized) return;
+    
+    const validation = validateTag(normalized);
+    if (!validation.valid) return; // silently ignore invalid
+    
+    if (tagExists(normalized, value)) {
+      // Remove the tag (case-insensitive match)
+      onChange(value.filter((x) => normalizeTag(x) !== normalized));
     } else if (value.length < max) {
-      onChange([...value, t]);
+      onChange([...value, normalized]);
     }
   };
 
   const addCustom = () => {
-    const t = query.trim();
-    if (!t) return;
-    if (!isValidSingleWord(t)) {
-      // basic UX: show a transient inline hint by clearing and restoring placeholder
+    const normalized = normalizeTag(query);
+    if (!normalized) return;
+    
+    const validation = validateTag(normalized);
+    if (!validation.valid) {
       setQuery('');
       // eslint-disable-next-line no-alert
-      alert('Tags must be a single word without spaces or commas. Allowed: letters, numbers, dash, underscore, dot.');
+      alert(validation.error || 'Invalid tag format');
       return;
     }
-    if (!value.includes(t) && value.length < max) onChange([...value, t]);
+    
+    if (tagExists(normalized, value)) {
+      setQuery('');
+      return; // Already exists
+    }
+    
+    if (value.length < max) {
+      onChange([...value, normalized]);
+      setColorMap((m) => ({ ...m, [normalized]: newTagColor }));
+    }
     setQuery('');
-    setColorMap((m) => ({ ...m, [t]: newTagColor }));
   };
 
   return (
@@ -145,7 +156,7 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
         </div>
       )}
 
-      <div className={`${horizontal ? 'overflow-x-auto no-scrollbar flex gap-2 py-1 max-w-full' : 'flex flex-wrap gap-2 max-w-full'}`}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 max-w-full">
         {filtered.slice(0, 80).map((t) => (
           <Chip key={t} color={pickColor(t)} active={value.includes(t)} onClick={() => toggle(t)}>
             #{t}
