@@ -226,6 +226,16 @@ export const brandApi = {
       return false;
     }
   },
+  // Delete a single item (media) from a collection
+  async deleteCollectionItem(collectionId: string, itemId: string): Promise<boolean> {
+    try {
+      await apiClient.delete(`/collections/${collectionId}/items/${itemId}`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting collection item:', error);
+      return false;
+    }
+  },
 
   // Fetch reviews
   async getReviews(brandId: string): Promise<{ reviews: ReviewDto[]; averageRating: number; totalReviews: number }> {

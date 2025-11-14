@@ -21,6 +21,7 @@ import { apiClient, dropStoredAccessToken } from '../api/httpClient';
 import { env } from '../config/env';
 import getProfileOrHomeUrl from '../lib/navigation';
 import { getTagColor } from '../utils/tagColors';
+import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
 
 
 
@@ -31,12 +32,14 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   // search focus handled inside SearchField
   const [showTags, setShowTags] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const profileMenuRef = useRef(null);
+  const notificationsAnchorRef = useRef<HTMLElement | null>(null);
   const { theme, setTheme } = useTheme();
   const { setLanguage, translate } = useLanguage();
   const { profile: userProfile, isAuthenticated } = useSelector((state: RootState) => state.user);
@@ -454,15 +457,23 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) 
 
         {/* Right Side Actions */}
         <div className="flex items-center space-x-3 shrink-0">
-          {/* Notifications - Hidden on mobile */}
-          <button type="button" className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative">
-            <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white px-1">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </button>
+          {/* Notifications Dropdown */}
+          <div className="relative hidden sm:block">
+            <button
+              type="button"
+              ref={(el) => { (notificationsAnchorRef as any).current = el; }}
+              onClick={() => setShowNotifications((p) => !p)}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+            >
+              <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white px-1">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+            <NotificationsDropdown open={showNotifications} onClose={() => setShowNotifications(false)} anchorRef={notificationsAnchorRef as any} />
+          </div>
 
           {/* Auth Buttons - Only when not logged in */}
           {!user && (

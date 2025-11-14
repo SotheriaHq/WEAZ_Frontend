@@ -1,18 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import CommentThread from '@/components/comments/CommentThread';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { brandApi } from '@/api/BrandApi';
-import AccessApi from '@/api/AccessApi';
-import type { AccessState } from '@/api/AccessApi';
+import AccessApi, { type AccessState } from '@/api/AccessApi';
 import { FrostedButton } from '@/components/ui/FrostedButton';
 import { toast } from 'react-toastify';
+import CollectionFlipbook, { type FlipbookMediaItem } from '@/components/collections/CollectionFlipbook';
+import CollectionMetaPanel from '@/components/collections/CollectionMetaPanel';
+import CollectionCommentsPanel from '@/components/collections/CollectionCommentsPanel';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
+import { Trash2 } from 'lucide-react';
 
 const CollectionView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(false);
   const [detail, setDetail] = useState<any | null>(null);
   const [requestState, setRequestState] = useState<AccessState | null>(null);
+  const me = useSelector((s: RootState) => s.user.profile);
 
   useEffect(() => {
     let mounted = true;
@@ -43,10 +49,58 @@ const CollectionView: React.FC = () => {
 
   if (!id) return null;
 
+  const isOwner = useMemo(() => Boolean(me?.id && detail?.owner?.id && me.id === detail.owner.id), [me?.id, detail?.owner?.id]);
+
+  // Shape media items for flipbook
+  const mediaItems: FlipbookMediaItem[] = useMemo(() => {
+    const medias = (detail?.medias ?? []) as Array<any>;
+    return medias.map((m: any, idx: number) => {
+      const file = m?.file; // file may contain s3Url/url
+      const rawUrl = (file?.s3Url || file?.url || '') as string;
+      const mime = (file?.mimeType || '') as string;
+      const type: 'image' | 'video' = mime.startsWith('video') ? 'video' : 'image';
+      return { id: m.id, url: rawUrl, type, fileId: file?.id, caption: m.caption ?? null, order: m.orderIndex ?? idx };
+    });
+  }, [detail?.medias]);
+
+  const [activeIndex, setActiveIndex] = useState(0);
+  const activeMediaId = mediaItems[activeIndex]?.id;
+
+  const handleDeleteCollection = async () => {
+    if (!id) return; if (!confirm('Delete this entire collection? This cannot be undone.')) return;
+    try {
+      const ok = await brandApi.deleteCollection(id);
+      if (ok) {
+        toast.success('Collection deleted');
+        navigate('/profile');
+      } else toast.error('Failed to delete');
+    } catch { toast.error('Failed to delete'); }
+  };
+
+  const handleDeleteItem = async () => {
+    if (!id || !activeMediaId) return; if (!confirm('Delete this item from the collection?')) return;
+    try {
+      const ok = await brandApi.deleteCollectionItem(id, activeMediaId);
+      if (ok) {
+        toast.success('Item deleted');
+        const d = await brandApi.getCollectionDetail(id);
+        setDetail(d);
+        setActiveIndex(0);
+      } else toast.error('Failed to delete item');
+    } catch { toast.error('Failed to delete item'); }
+  };
+
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto">
-        <div className="text-sm text-gray-500">Loading collection…</div>
+        <div className="animate-pulse h-10 w-40 bg-gray-200 dark:bg-gray-800 rounded mb-4" />
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-12 md:col-span-8 h-[640px] rounded-xl bg-gray-100 dark:bg-gray-900 animate-pulse" />
+          <div className="col-span-12 md:col-span-4 space-y-4">
+            <div className="h-32 rounded-xl bg-gray-100 dark:bg-gray-900 animate-pulse" />
+            <div className="h-48 rounded-xl bg-gray-100 dark:bg-gray-900 animate-pulse" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -91,22 +145,59 @@ const CollectionView: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">{detail?.title || 'Collection'}</h1>
-        <p className="text-gray-500">ID: {id}</p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      {/* Header Row */}
+      <div className="flex items-center justify-between py-4">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate(-1)} className="text-xs px-2 py-1 rounded bg-white/70 dark:bg-white/5 border border-white/20">Back</button>
+          <h1 className="text-xl font-semibold tracking-tight">{detail?.title || 'Collection'}</h1>
+          {isOwner && (
+            <button onClick={handleDeleteCollection} className="text-xs inline-flex items-center gap-1 px-2 py-1 rounded bg-red-50 text-red-600 border border-red-300/50 dark:bg-red-900/20 dark:text-red-300 dark:border-red-700/40"><Trash2 className="w-3 h-3"/> Delete</button>
+          )}
+        </div>
+        <div className="text-[11px] text-gray-500">ID: {id}</div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        <div className="col-span-full text-sm text-gray-500">Items will appear here.</div>
-      </div>
+      <div className="grid grid-cols-12 gap-8">
+        {/* Flipbook */}
+        <div className="col-span-12 md:col-span-8">
+          <CollectionFlipbook
+            items={mediaItems}
+            initialIndex={0}
+            onFlip={(i) => setActiveIndex(i)}
+            height={640}
+            className="mb-8"
+          />
+          {isOwner && mediaItems.length > 0 && (
+            <div className="flex justify-end mb-8">
+              <button onClick={handleDeleteItem} className="text-xs px-3 py-1.5 rounded border border-red-300/60 text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-600/40 dark:text-red-300">Delete Current Item</button>
+            </div>
+          )}
+          <div className="mt-4">
+            <CollectionCommentsPanel collectionId={id!} activeMediaId={activeMediaId} />
+          </div>
+        </div>
 
-      {id && (
-        <section className="mt-10">
-          <h2 className="text-xl font-semibold mb-3">Comments</h2>
-          <CommentThread targetType="COLLECTION" targetId={id} />
-        </section>
-      )}
+        {/* Meta Sidebar */}
+        <div className="col-span-12 md:col-span-4 space-y-6">
+            <CollectionMetaPanel
+              title={detail?.title || 'Collection'}
+              description={detail?.description}
+              tags={detail?.tags || []}
+              owner={{ id: detail?.owner?.id, name: detail?.owner?.brandFullName || detail?.owner?.username, username: detail?.owner?.username, avatarUrl: detail?.owner?.profileImage }}
+              stats={{ likes: detail?.totalLikes, comments: detail?._count?.comments, items: detail?._count?.medias, views: detail?._count?.views }}
+              price={{ min: detail?.minPrice, max: detail?.maxPrice }}
+              availabilityInStore={detail?.isAvailableInStore}
+              visibility={detail?.visibility}
+              isOwner={isOwner}
+              onEdit={() => toast.info('Edit collection coming soon')}
+              onDelete={handleDeleteCollection}
+            />
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              <p>Flipping through this catalog lets visitors appreciate each piece individually. Comments update live.</p>
+            </div>
+        </div>
+      </div>
     </div>
   );
 };
