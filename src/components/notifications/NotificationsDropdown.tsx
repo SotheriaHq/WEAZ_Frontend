@@ -50,18 +50,26 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   const { onNotification } = useRealtime();
 
   const fetchList = async (reset = false) => {
-    if (loading) return; setLoading(true);
+    if (loading) return;
+    setLoading(true);
     try {
       const res = await NotificationsApi.list(reset ? undefined : cursor ?? undefined, 20);
-      const data = res as ListResponse;
+      // Handle different response formats
+      const data = (res?.data || res) as ListResponse;
+      const newItems = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      
       if (reset) {
-        setItems(data.items);
+        setItems(newItems);
       } else {
-        setItems((prev) => [...prev, ...data.items]);
+        setItems((prev) => [...prev, ...newItems]);
       }
-      setHasNext(data.hasNextPage);
+      setHasNext(data.hasNextPage ?? false);
       setCursor(data.endCursor ?? null);
-    } catch {} finally { setLoading(false); }
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Load on first open
