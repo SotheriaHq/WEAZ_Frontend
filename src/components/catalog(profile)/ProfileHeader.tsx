@@ -69,6 +69,18 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   const bannerLabel =
     (profileData.username ? `@${profileData.username}` : profileData.name || '').trim() || 'Your Brand';
 
+  if (import.meta.env.DEV) {
+    console.log('[PROFILE_DEBUG][ProfileHeader] 🎨 Rendering ProfileHeader', {
+      name: profileData.name,
+      location: profileData.location,
+      username: profileData.username,
+      hasAvatar: Boolean(profileData.avatar),
+      hasBanner: Boolean(profileData.banner),
+      tagsCount: profileData.tags?.length || 0,
+      canEdit,
+    });
+  }
+
   const [isBannerImageLoading, setIsBannerImageLoading] = useState<boolean>(hasBannerImage);
 
   useEffect(() => {

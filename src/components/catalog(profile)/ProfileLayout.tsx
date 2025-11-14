@@ -22,13 +22,13 @@ export const ProfileLayout: React.FC = () => {
 
   if (loading && !user) {
     return (
-        <div className="h-screen flex bg-white dark:bg-[#000000] text-gray-900 dark:text-black">
+        <div className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-white">
           <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
           <Navbar isCollapsed={isCollapsed} minimal />
           <main
-            className={`flex-1 overflow-hidden transition-all duration-300 ${mainContentMarginClass}`}
+            className={`pt-20 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${mainContentMarginClass}`}
           >
-            <div className="h-full p-4 sm:p-6 pb-20 lg:pb-8 pt-20 overflow-y-auto">
+            <div className="p-4 sm:p-6">
               <div className="max-w-screen-xl mx-auto space-y-6">
                 <ProfileHeaderSkeleton />
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -51,11 +51,11 @@ export const ProfileLayout: React.FC = () => {
   }
 
   return (
-      <div className="h-screen flex bg-white dark:bg-[#000000] text-gray-900 dark:text-black">
+      <div className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-white">
         <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
         <Navbar isCollapsed={isCollapsed} minimal />
-        <main className={`flex-1 overflow-hidden transition-all duration-300 ${mainContentMarginClass}`}>
-          <div className="h-full p-4 sm:p-6 pb-20 lg:pb-8 pt-20 overflow-y-auto">
+        <main className={`pt-20 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${mainContentMarginClass}`}>
+          <div className="p-4 sm:p-6">
             {location.pathname === '/profile' ? <Profile /> : <Outlet />}
           </div>
         </main>

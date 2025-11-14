@@ -351,6 +351,15 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     return null;
   }
 
+  if (import.meta.env.DEV) {
+    console.log('[PROFILE_DEBUG][EditProfileModal] 🎭 Modal is rendering with full-screen overlay', {
+      isOpen,
+      showSkip,
+      className: 'fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm',
+      message: 'This overlay covers the entire viewport - if you see blank page, modal content may be invisible',
+    });
+  }
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 py-8"

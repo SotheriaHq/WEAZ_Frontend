@@ -31,6 +31,7 @@ type TabType = 'Collections' | 'Reviews' | 'About';
 
 const ProfilePage: React.FC = () => {
   const { id: routeBrandId } = useParams<{ id: string }>();
+  const DEBUG_PROFILE = import.meta.env.DEV;
   const {
     user,
     brandProfile,
@@ -47,6 +48,20 @@ const ProfilePage: React.FC = () => {
   // Owner view when no route param or when the param matches the logged-in brand user's id
   const isOwner = Boolean(user?.type === 'BRAND' && (!routeBrandId || routeBrandId === user?.id));
   const isVisitorView = !isOwner && Boolean(routeBrandId);
+  
+  if (DEBUG_PROFILE && isOwner) {
+    console.log('[PROFILE_DEBUG][displayData]', {
+      brandName: displayData.brandName,
+      location: displayData.location,
+      username: displayData.username,
+      hasLogo: Boolean(displayData.logoImage),
+      hasBanner: Boolean(displayData.bannerImage),
+      tagsCount: displayData.hashtags?.length || 0,
+      tags: displayData.hashtags,
+      description: displayData.description ? `${displayData.description.substring(0, 50)}...` : null,
+    });
+  }
+  
   const dispatch = useDispatch();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -184,8 +199,32 @@ const ProfilePage: React.FC = () => {
       Boolean((brandProfile?.country ?? user.brandCountry ?? '').trim()) ||
       Boolean((brandProfile?.state ?? user.brandState ?? '').trim());
 
-    return description.length < 20 || tags.length === 0 || !hasLocation;
-  }, [isOwner, user, brandProfile]);
+    const needsSetup = description.length < 20 || tags.length === 0 || !hasLocation;
+    
+    if (DEBUG_PROFILE) {
+      console.log('[PROFILE_DEBUG][requiresProfileSetup]', {
+        needsSetup,
+        descriptionLength: description.length,
+        tagsCount: tags.length,
+        hasLocation,
+        description: description.substring(0, 50),
+        tags,
+      });
+    }
+    
+    return needsSetup;
+  }, [isOwner, user, brandProfile, DEBUG_PROFILE]);
+
+  // Debug log when modal state changes
+  useEffect(() => {
+    if (DEBUG_PROFILE && isOwner && isEditModalOpen) {
+      console.log('[PROFILE_DEBUG][MODAL STATE] 🔴 EditProfileModal is OPEN - This is covering the page!', {
+        isEditModalOpen,
+        showSkip: openedFromPrompt,
+        message: 'The modal has fixed inset-0 z-60 bg-black/60 - entire page is covered',
+      });
+    }
+  }, [DEBUG_PROFILE, isOwner, isEditModalOpen, openedFromPrompt]);
 
   useEffect(() => {
     if (
@@ -195,6 +234,16 @@ const ProfilePage: React.FC = () => {
       !hasDismissedSetup &&
       !isEditModalOpen
     ) {
+      if (DEBUG_PROFILE) {
+        console.log('[PROFILE_DEBUG][AUTO-OPENING MODAL] ⚠️ EditProfileModal is being auto-opened!', {
+          isOwner,
+          brandProfileLoading,
+          requiresProfileSetup,
+          hasDismissedSetup,
+          isEditModalOpen,
+          reason: 'Profile setup incomplete - modal will cover entire page',
+        });
+      }
       setOpenedFromPrompt(true);
       setIsEditModalOpen(true);
     }
@@ -204,6 +253,7 @@ const ProfilePage: React.FC = () => {
     requiresProfileSetup,
     hasDismissedSetup,
     isEditModalOpen,
+    DEBUG_PROFILE,
   ]);
 
   const handleOpenEditModal = (openedByPrompt = false) => {
@@ -529,6 +579,15 @@ const ProfilePage: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  if (DEBUG_PROFILE && isOwner) {
+    console.log('[PROFILE_DEBUG][BrandProfile] 📄 About to render main content', {
+      hasUser: Boolean(user),
+      viewDisplayDataBrandName: viewDisplayData.brandName,
+      viewDisplayDataLocation: viewDisplayData.location,
+      isEditModalOpen,
+    });
   }
 
   return (
