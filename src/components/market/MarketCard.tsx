@@ -123,6 +123,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
             initialCount={item.likesCount ?? 0}
             initialLiked={item.isLiked}
             ownerId={item.brandId}
+            parentCollectionId={item.collectionId}
           />
           
           <button 

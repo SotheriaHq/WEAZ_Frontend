@@ -42,5 +42,9 @@ export const CommentsApi = {
     const { data } = await apiClient.get(`/api/v1/comments/${commentId}/stats`);
     return unwrapApiResponse<{ likeCount: number; replyCount: number }>(data);
   },
+  async listUnifiedForCollection(collectionId: string, cursor?: string, limit = 20) {
+    const { data } = await apiClient.get(`/api/v1/collections/${collectionId}/comments-unified`, { params: { cursor, limit } });
+    return unwrapApiResponse<PageResult<CommentV2Dto>>(data);
+  },
 };
 

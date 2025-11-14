@@ -82,6 +82,14 @@ export const engagementSlice = createSlice({
       item.likeCount = Number(action.payload.likeCount) || 0;
     },
 
+    // Adjust (aggregate) a collection's like count when a media like is toggled.
+    // This is a UI-level aggregation so backend remains unchanged.
+    adjustAggregatedCollectionLikes: (state, action: PayloadAction<{ collectionId: string; delta: number }>) => {
+      const k = key('COLLECTION', action.payload.collectionId);
+      const item = ensureItem(state, k);
+      item.likeCount = Math.max(0, item.likeCount + action.payload.delta);
+    },
+
     // Update comment count
     updateCommentCount: (state, action: PayloadAction<{ contentType: string; contentId: string; commentCount: number }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
@@ -132,6 +140,7 @@ export const {
   optimisticToggle, 
   reconcile, 
   wsApplied,
+  adjustAggregatedCollectionLikes,
   updateCommentCount,
   incrementCommentCount,
   decrementCommentCount,

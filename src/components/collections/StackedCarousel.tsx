@@ -16,6 +16,9 @@ interface StackedCarouselProps {
   onIndexChange?: (index: number, item: CarouselMediaItem) => void;
   className?: string;
   autoplay?: boolean;
+  isOwner?: boolean;
+  coverMediaId?: string | null;
+  onSetCover?: (item: CarouselMediaItem) => void;
 }
 
 function calculateGap(width: number) {
@@ -34,6 +37,9 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
   onIndexChange,
   className = '',
   autoplay = false,
+  isOwner = false,
+  coverMediaId,
+  onSetCover,
 }) => {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [containerWidth, setContainerWidth] = useState(800);
@@ -166,10 +172,31 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
         className="relative w-full h-[500px] sm:h-[600px] lg:h-[700px] flex items-center justify-center"
         style={{ perspective: '1200px' }}
       >
+        {/* Overlay navigation controls to keep them visible without scrolling */}
+        {itemsLength > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={handlePrev}
+              className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-40 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md shadow-lg flex items-center justify-center"
+              aria-label="Previous"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={handleNext}
+              className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-40 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md shadow-lg flex items-center justify-center"
+              aria-label="Next"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </>
+        )}
         {items.map((item, index) => (
           <div
             key={item.id}
-            className="absolute w-full max-w-[85%] sm:max-w-[75%] lg:max-w-[65%] h-[90%] rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-gray-900 dark:via-gray-950 dark:to-black"
+            className="absolute w-full max-w-[95%] sm:max-w-[85%] lg:max-w-[75%] h-[90%] rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-gray-900 dark:via-gray-950 dark:to-black"
             style={getItemStyle(index)}
           >
             <div className="relative w-full h-full flex items-center justify-center p-2 sm:p-4">
@@ -177,7 +204,7 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
                 <img
                   src={item.url}
                   alt={item.caption ?? 'Collection media'}
-                  className="w-full h-full object-contain select-none rounded-lg"
+                  className="w-full h-full object-cover select-none rounded-lg"
                   draggable={false}
                   loading="lazy"
                 />
@@ -194,6 +221,16 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
                   muted
                   preload="metadata"
                 />
+              )}
+              {isOwner && index === activeIndex && (
+                <button
+                  type="button"
+                  onClick={() => onSetCover?.(item)}
+                  className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-semibold shadow backdrop-blur-md transition
+                  ${coverMediaId === item.id ? 'bg-emerald-600 text-white' : 'bg-black/50 text-white hover:bg-black/70'}`}
+                >
+                  {coverMediaId === item.id ? 'Cover Set' : 'Set As Cover'}
+                </button>
               )}
               {item.type === 'video' && index === activeIndex && (
                 <button
@@ -226,47 +263,7 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
         ))}
       </div>
 
-      {/* Navigation Controls */}
-      <div className="flex items-center justify-center gap-4 mt-6">
-        <button
-          type="button"
-          onClick={handlePrev}
-          className="w-11 h-11 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 dark:from-gray-700 dark:to-gray-800 text-white hover:from-purple-600 hover:to-purple-700 transition-all shadow-lg flex items-center justify-center"
-          aria-label="Previous"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <div className="text-xs font-medium text-gray-600 dark:text-gray-400 min-w-[60px] text-center">
-          {activeIndex + 1} / {itemsLength}
-        </div>
-        <button
-          type="button"
-          onClick={handleNext}
-          className="w-11 h-11 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 dark:from-gray-700 dark:to-gray-800 text-white hover:from-purple-600 hover:to-purple-700 transition-all shadow-lg flex items-center justify-center"
-          aria-label="Next"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
-
-      {/* Position Indicators */}
-      <div className="flex items-center justify-center gap-2 mt-4">
-        {items.map((_, idx) => (
-          <button
-            key={idx}
-            onClick={() => {
-              setActiveIndex(idx);
-              if (onIndexChange && items[idx]) onIndexChange(idx, items[idx]);
-            }}
-            className={`h-1.5 rounded-full transition-all ${
-              idx === activeIndex
-                ? 'w-8 bg-purple-600 dark:bg-purple-500'
-                : 'w-1.5 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
-            }`}
-            aria-label={`Go to item ${idx + 1}`}
-          />
-        ))}
-      </div>
+      {/* Removed bottom navigator & indicators for cleaner view */}
     </div>
   );
 };

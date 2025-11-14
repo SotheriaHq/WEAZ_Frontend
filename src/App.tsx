@@ -19,6 +19,7 @@ import { ToastContainer, Slide } from 'react-toastify';
 import CollectionView from './pages/catalog/CollectionView';
 import DropdownDemo from './pages/ui/DropdownDemo';
 import AcceptInvite from './pages/AcceptInvite';
+import EditCollection from './pages/catalog/EditCollection';
 
 const router = createBrowserRouter([
   {
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
   // Route brand profile (visitor or owner) to unified Profile component
   { path: 'brands/:id', element: <Profile /> },
       { path: 'collections/:id', element: <CollectionView /> },
+  { path: 'collections/:id/edit', element: <EditCollection /> },
       { path: 'collections/invite', element: <AcceptInvite /> },
   { path: 'ui/dropdowns', element: <DropdownDemo /> },
       // { path: 'profile', element: <Profile /> },

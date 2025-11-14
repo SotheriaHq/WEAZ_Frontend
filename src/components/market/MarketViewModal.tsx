@@ -164,6 +164,7 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                 initialCount={item.likesCount ?? 0}
                 initialLiked={item.isLiked}
                 ownerId={item.brandId}
+                parentCollectionId={item.collectionId}
               />
               <IconButton variant="ghost" size="sm" icon={<Share2 size={16} />} onClick={() => { /* TODO: share */ }} tooltip="Share" />
               <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">

@@ -30,14 +30,14 @@ interface NavbarProps {
   minimal?: boolean; // profile pages: hide center controls
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) => {
+export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, minimal = false }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   // search focus handled inside SearchField
   const [showTags, setShowTags] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [, setScrolled] = useState(false); // removed scroll usage
   const profileMenuRef = useRef(null);
   const notificationsAnchorRef = useRef<HTMLElement | null>(null);
   const { theme, setTheme } = useTheme();
@@ -104,13 +104,8 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) 
     };
   }, []);
 
-  // Toggle frosted vs transparent on scroll
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 0);
-    onScroll();
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [location.pathname, theme]);
+  // Remove scroll transparency behavior; always solid background
+  useEffect(() => { setScrolled(false); }, [location.pathname, theme]);
 
   // Fetch unread notification count on mount and when user changes
   useEffect(() => {
@@ -399,13 +394,10 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) 
 
   return (
     <nav
-      className={`fixed top-0 right-0 px-4 sm:px-6 py-2 z-40 transition-all duration-300
-      ${isCollapsed ? 'left-[64px]' : 'left-[192px]'}
+      className={`w-full px-4 sm:px-5 py-1.5 z-30 transition-all duration-200
       ${minimal
         ? 'bg-transparent border-b border-transparent'
-        : scrolled
-          ? 'bg-black/30 backdrop-blur-sm border-b border-transparent'
-          : 'bg-white dark:bg-black border-b border-gray-200 dark:border-white/10'}`}
+        : 'bg-white dark:bg-black border-b border-gray-200 dark:border-white/10'}`}
     >
      
       {/* Main Navbar Content */}

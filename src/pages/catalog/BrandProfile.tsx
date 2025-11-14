@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
 import { useDispatch } from 'react-redux';
 
@@ -16,6 +16,7 @@ import ProfileHeaderSkeleton from '../../components/profile/ProfileHeaderSkeleto
 import EditProfileModal from '../../components/profile/EditProfileModal';
 import AboutTab from '../../components/profile/tabs/AboutTab';
 import ReviewsTab from '../../components/profile/tabs/ReviewsTab';
+import InlineCollectionViewer from '../../components/collections/InlineCollectionViewer';
 import type { AuthUserDto } from '../../types/auth';
 import { setUser } from '../../features/userSlice';
 import { brandApi } from '../../api/BrandApi';
@@ -29,7 +30,6 @@ type TabType = 'Collections' | 'Reviews' | 'About';
 // CollectionType removed — dropdown opens modal directly
 
 const ProfilePage: React.FC = () => {
-  const navigate = useNavigate();
   const { id: routeBrandId } = useParams<{ id: string }>();
   const {
     user,
@@ -50,6 +50,7 @@ const ProfilePage: React.FC = () => {
   const dispatch = useDispatch();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabType>('Collections');
   const [visibilityFilter, setVisibilityFilter] = useState<'Public' | 'Private'>('Public');
@@ -627,56 +628,67 @@ const ProfilePage: React.FC = () => {
           <div className="mt-6">
             {activeTab === 'Collections' && (
               <div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-                  <div className="flex-1 w-full sm:w-auto">
-                    <SearchField placeholder="Search collections..." onSearch={setSearchQuery} />
-                  </div>
-                  {/* Show create controls only for owner */}
-                  {isOwner && (
-                    <AddCollectionDropdown openModal={() => handleOpenAddModal()} />
-                  )}
-                </div>
-
-                {/* Visibility filter chips */}
-                <div className="mb-4">
-                  <div className="inline-flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
-                    {(['Public','Private'] as const).map((opt) => (
-                      <button
-                        key={opt}
-                        onClick={() => setVisibilityFilter(opt)}
-                        className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-                          visibilityFilter === opt
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                        }`}
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* For now use CollectionsSkeleton when loading, otherwise show grid or placeholder */}
-                {/* Note: fetchCollections is called on modal create; new users will see the EmptyState */}
-                {(isOwner ? collectionsLoading : visitorLoading) ? (
-                  <CollectionsSkeleton />
-                ) : (isVisitorView ? visitorCollections : collections) && (isVisitorView ? visitorCollections : collections).length > 0 ? (
-                  <CollectionsGrid
-                    collections={searchAndVisibilityFiltered}
-                    onEdit={isOwner ? () => {} : undefined}
-                    onDelete={isOwner ? () => {} : undefined}
-                    onCollectionClick={(id) => navigate(`/collections/${id}`)}
+                {selectedCollectionId ? (
+                  // Show inline collection viewer
+                  <InlineCollectionViewer
+                    collectionId={selectedCollectionId}
+                    onBack={() => setSelectedCollectionId(null)}
+                    brandName={displayData?.brandName || displayData?.username || 'Brand'}
                   />
                 ) : (
-                  isOwner ? (
-                    <EmptyState
-                      title="No collections yet"
-                      description="Create a collection to save and curate posts."
-                      cta={<AddCollectionDropdown openModal={() => handleOpenAddModal()} asLink />}
-                    />
-                  ) : (
-                    <div className="text-center text-gray-500">No collections available.</div>
-                  )
+                  // Show collections grid
+                  <>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                      <div className="flex-1 w-full sm:w-auto">
+                        <SearchField placeholder="Search collections..." onSearch={setSearchQuery} />
+                      </div>
+                      {/* Show create controls only for owner */}
+                      {isOwner && (
+                        <AddCollectionDropdown openModal={() => handleOpenAddModal()} />
+                      )}
+                    </div>
+
+                    {/* Visibility filter chips */}
+                    <div className="mb-4">
+                      <div className="inline-flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                        {(['Public','Private'] as const).map((opt) => (
+                          <button
+                            key={opt}
+                            onClick={() => setVisibilityFilter(opt)}
+                            className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                              visibilityFilter === opt
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Collections Grid */}
+                    {(isOwner ? collectionsLoading : visitorLoading) ? (
+                      <CollectionsSkeleton />
+                    ) : (isVisitorView ? visitorCollections : collections) && (isVisitorView ? visitorCollections : collections).length > 0 ? (
+                      <CollectionsGrid
+                        collections={searchAndVisibilityFiltered}
+                        onEdit={isOwner ? () => {} : undefined}
+                        onDelete={isOwner ? () => {} : undefined}
+                        onCollectionClick={(id) => setSelectedCollectionId(id)}
+                      />
+                    ) : (
+                      isOwner ? (
+                        <EmptyState
+                          title="No collections yet"
+                          description="Create a collection to save and curate posts."
+                          cta={<AddCollectionDropdown openModal={() => handleOpenAddModal()} asLink />}
+                        />
+                      ) : (
+                        <div className="text-center text-gray-500">No collections available.</div>
+                      )
+                    )}
+                  </>
                 )}
               </div>
             )}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Trash2, Pencil } from 'lucide-react';
+import { Heart, Trash2 } from 'lucide-react';
 import TagChip from '@/components/ui/Tag';
 import { FrostedButton } from '@/components/ui/FrostedButton';
 
@@ -56,7 +56,7 @@ export const CollectionMetaPanel: React.FC<MetaPanelProps> = ({
         </div>
         {isOwner && (
           <div className="flex items-center gap-2">
-            <FrostedButton size="sm" variant="ghost" onClick={onEdit}><Pencil className="w-4 h-4"/> Edit</FrostedButton>
+            <FrostedButton size="sm" variant="ghost" onClick={onEdit}><span className="mr-1">✏️</span> Edit</FrostedButton>
             <FrostedButton size="sm" variant="outline" onClick={onDelete} className="!text-red-600 !border-red-300/60 hover:!bg-red-50 dark:!border-red-500/40 dark:hover:!bg-red-900/20"><Trash2 className="w-4 h-4"/> Delete</FrostedButton>
           </div>
         )}

@@ -50,7 +50,7 @@ const CollectionView: React.FC = () => {
     };
   }, [id]);
 
-  if (!id) return null;
+  // allow hooks to run consistently; handle missing id in render path
 
   const isOwner = useMemo(() => Boolean(me?.id && detail?.owner?.id && me.id === detail.owner.id), [me?.id, detail?.owner?.id]);
 
@@ -66,8 +66,7 @@ const CollectionView: React.FC = () => {
     });
   }, [detail?.medias]);
 
-  const [activeIndex, setActiveIndex] = useState(0);
-  const activeMediaId = mediaItems[activeIndex]?.id;
+  // local media index not required here as comments are unified
 
   const handleDeleteCollection = async () => {
     if (!id) return;
@@ -118,12 +117,18 @@ const CollectionView: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-20 bg-gray-200 dark:bg-gray-800 rounded-xl" />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 h-[600px] bg-gray-200 dark:bg-gray-800 rounded-xl" />
-            <div className="h-[600px] bg-gray-200 dark:bg-gray-800 rounded-xl" />
+      <div className="min-h-screen w-full">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 py-8">
+          <div className="animate-pulse space-y-6">
+            <div className="h-20 bg-gray-200 dark:bg-gray-800 rounded-xl" />
+            <div className="h-8 w-64 bg-gray-200 dark:bg-gray-800 rounded-lg" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 h-[600px] bg-gray-200 dark:bg-gray-800 rounded-xl" />
+              <div className="space-y-4">
+                <div className="h-[300px] bg-gray-200 dark:bg-gray-800 rounded-xl" />
+                <div className="h-[300px] bg-gray-200 dark:bg-gray-800 rounded-xl" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -144,6 +149,10 @@ const CollectionView: React.FC = () => {
             <FrostedButton
               variant="primary"
               onClick={async () => {
+                if (!id) {
+                  toast.error('No collection id');
+                  return;
+                }
                 try {
                   const res = await AccessApi.requestAccess(id);
                   setRequestState(res.state);
@@ -169,57 +178,77 @@ const CollectionView: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-      {/* Brand Header */}
-      <BrandHeader
-        brandName={detail?.owner?.brandFullName || detail?.owner?.username || 'Brand'}
-        brandUsername={detail?.owner?.username}
-        brandAvatar={detail?.owner?.profileImage}
-        collectionTitle={detail?.title || 'Collection'}
-        onBack={() => navigate(-1)}
-      />
+    <div className="min-h-screen w-full">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6">
+        {/* Brand Header */}
+        <BrandHeader
+          brandName={detail?.owner?.brandFullName || detail?.owner?.username || 'Brand'}
+          brandUsername={detail?.owner?.username}
+          brandAvatar={detail?.owner?.profileImage}
+          brandBio={detail?.owner?.brandDescription || detail?.owner?.bio}
+          totalCollections={detail?.owner?._count?.collections}
+          totalFollowers={detail?.owner?._count?.followers}
+          onBack={() => navigate(-1)}
+        />
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Carousel (2/3 width on desktop) */}
-        <div className="lg:col-span-2">
-          <StackedCarousel
-            items={mediaItems}
-            initialIndex={0}
-            onIndexChange={(index) => setActiveIndex(index)}
-            className="mb-6"
-          />
+        {/* Collection Title & Piece Count */}
+        <div className="flex items-center gap-3 mb-4 px-2">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight italic uppercase" style={{ fontFamily: 'Georgia, serif' }}>
+            {detail?.title || 'Collection'}
+          </h2>
+          {typeof detail?._count?.medias === 'number' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold border border-purple-200 dark:border-purple-700/40">
+              <span>{detail._count.medias}</span>
+              <span>piece{detail._count.medias !== 1 ? 's' : ''}</span>
+            </span>
+          )}
         </div>
 
-        {/* Right: Metadata & Comments (1/3 width on desktop) */}
-        <div className="lg:col-span-1 flex flex-col gap-6">
-          {/* Metadata Section */}
-          <div className="glass-panel rounded-2xl p-4 border border-white/20 bg-white/70 dark:bg-white/5 backdrop-blur-md">
-            <CollectionMetadata
-              title={detail?.title || 'Collection'}
-              description={detail?.description}
-              tags={detail?.tags || []}
-              stats={{
-                likes: detail?.totalLikes,
-                comments: detail?._count?.comments,
-                items: detail?._count?.medias,
-                views: detail?._count?.views,
-              }}
-              price={{ min: detail?.minPrice, max: detail?.maxPrice }}
-              availabilityInStore={detail?.isAvailableInStore}
-              visibility={detail?.visibility}
-              isOwner={isOwner}
-              isLiked={isLiked}
-              onLike={handleLike}
-              onShare={handleShare}
-              onAddToCart={handleAddToCart}
-              onDelete={handleDeleteCollection}
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left: Carousel (2/3 width on desktop) */}
+          <div className="lg:col-span-2">
+            <StackedCarousel
+              items={mediaItems}
+              initialIndex={0}
+              className="mb-4"
             />
           </div>
 
-          {/* Comments Section */}
-          <div className="glass-panel rounded-2xl p-4 border border-white/20 bg-white/70 dark:bg-white/5 backdrop-blur-md flex-1 min-h-[300px] max-h-[500px] overflow-hidden">
-            <CompactCommentsSection collectionId={id!} activeMediaId={activeMediaId} />
+          {/* Right: Metadata & Comments (1/3 width on desktop) */}
+          <div className="lg:col-span-1 flex flex-col gap-4">
+            {/* Metadata Section */}
+            <div className="glass-panel rounded-2xl p-4 border border-white/20 bg-white/70 dark:bg-white/5 backdrop-blur-md">
+              <CollectionMetadata
+                title={detail?.title || 'Collection'}
+                description={detail?.description}
+                tags={detail?.tags || []}
+                stats={{
+                  likes: detail?.totalLikes,
+                  comments: detail?._count?.comments,
+                  items: detail?._count?.medias,
+                  views: detail?._count?.views,
+                }}
+                price={{ min: detail?.minPrice, max: detail?.maxPrice }}
+                availabilityInStore={detail?.isAvailableInStore}
+                visibility={detail?.visibility}
+                isOwner={isOwner}
+                isLiked={isLiked}
+                onLike={handleLike}
+                onShare={handleShare}
+                onAddToCart={handleAddToCart}
+                onDelete={handleDeleteCollection}
+              />
+            </div>
+
+            {/* Comments Section - Fixed height, scrollable */}
+            <div className="glass-panel rounded-2xl p-4 border border-white/20 bg-white/70 dark:bg-white/5 backdrop-blur-md lg:h-[400px] overflow-hidden flex flex-col">
+              {id ? (
+                <CompactCommentsSection collectionId={id} />
+              ) : (
+                <div className="text-sm text-gray-500">Collection not found.</div>
+              )}
+            </div>
           </div>
         </div>
       </div>

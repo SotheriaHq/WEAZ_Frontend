@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Heart } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import { optimisticToggle, reconcile, setLikeState, wsApplied } from '@/features/engagementSlice';
+import { optimisticToggle, reconcile, setLikeState, wsApplied, adjustAggregatedCollectionLikes } from '@/features/engagementSlice';
 import { ReactionsApi } from '@/api/ReactionsApi';
 import { useRealtime } from '@/realtime';
 import LikerListModal from '@/components/engagement/LikerListModal';
@@ -19,6 +19,7 @@ type Props = {
   className?: string;
   size?: number;
   ownerId?: string;
+  parentCollectionId?: string; // For COLLECTION_MEDIA likes aggregation
 };
 
 const LikeButton: React.FC<Props> = ({ 
@@ -29,6 +30,7 @@ const LikeButton: React.FC<Props> = ({
   className, 
   size = 20,
   ownerId,
+  parentCollectionId,
 }) => {
   const dispatch = useDispatch();
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
@@ -155,7 +157,13 @@ const LikeButton: React.FC<Props> = ({
     const thisRequestVersion = ++requestVersionRef.current;
 
     const next = !item.likedByMe;
+    const previousLikeCount = item.likeCount;
     dispatch(optimisticToggle({ contentType, contentId, nextLiked: next }));
+    // Optimistically bump aggregated collection likes if liking media
+    if (contentType === 'COLLECTION_MEDIA' && parentCollectionId) {
+      const delta = next ? 1 : -1;
+      dispatch(adjustAggregatedCollectionLikes({ collectionId: parentCollectionId, delta }));
+    }
     setBusy(true);
 
     try {
@@ -177,6 +185,17 @@ const LikeButton: React.FC<Props> = ({
           likeCount: res.likes,
           likedByMe: next
         }));
+        // Reconcile aggregated collection likes using actual delta if media like
+        if (contentType === 'COLLECTION_MEDIA' && parentCollectionId) {
+          const delta = res.likes - previousLikeCount;
+          if (delta !== (next ? 1 : -1)) {
+            // Adjust difference between optimistic and actual delta
+            const correction = delta - (next ? 1 : -1);
+            if (correction !== 0) {
+              dispatch(adjustAggregatedCollectionLikes({ collectionId: parentCollectionId, delta: correction }));
+            }
+          }
+        }
       }
     } catch (err: any) {
       // Don't handle aborted requests
@@ -198,6 +217,11 @@ const LikeButton: React.FC<Props> = ({
         } else {
           // Revert optimistic update on error
           dispatch(optimisticToggle({ contentType, contentId, nextLiked: !next }));
+          // Roll back optimistic aggregation if media like failed
+          if (contentType === 'COLLECTION_MEDIA' && parentCollectionId) {
+            const rollbackDelta = next ? -1 : 1;
+            dispatch(adjustAggregatedCollectionLikes({ collectionId: parentCollectionId, delta: rollbackDelta }));
+          }
         }
       }
     } finally {

@@ -276,14 +276,14 @@ const LoginPage = () => {
 
       dispatch(setUser(user));
       toast.success('Login successful!');
+      // Navigate immediately to reduce flicker/blank states
+      const redirectPath = user.type === 'BRAND' ? '/profile' : '/';
+      navigate(redirectPath, { replace: true });
+      // Optional subtle loading state if the component lingers
       setIsRedirecting(true);
       reset({ email: rememberMe ? normalizedEmail : '', password: '' });
       setShowPassword(false);
-      setTimeout(() => {
-        // After login, redirect based on user type
-        const redirectPath = user.type === 'BRAND' ? '/profile' : '/';
-        navigate(redirectPath, { replace: true });
-      }, 1200);
+      // We already navigated; previously delayed redirect has been removed.
     } catch (error: unknown) {
       if (isAxiosError(error)) {
         const data = error.response?.data as Record<string, unknown> | undefined;

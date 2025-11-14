@@ -3,11 +3,24 @@ import { Sidebar } from './SideBar';
 import React from 'react';
 import { Navbar } from './Navbar';
 // import { Sidebar } from './Sidebar';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
 
 export const Layout: React.FC = () => {
 
    const [isCollapsed, setIsCollapsed] = React.useState(false);
+   const user = useSelector((s: RootState) => s.user.profile);
+   const location = useLocation();
+   const navigate = useNavigate();
+
+   // If a BRAND lands on the app root, prefer showing their profile by default
+   React.useEffect(() => {
+     if (!user) return;
+     if (user.type === 'BRAND' && (location.pathname === '/' || location.pathname === '/market')) {
+       navigate('/profile', { replace: true });
+     }
+   }, [user, location.pathname, navigate]);
 
   return (
   <div className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-black">

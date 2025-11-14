@@ -1,5 +1,6 @@
 import React from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Smile } from 'lucide-react';
+import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
 import type { CommentV2Dto } from '@/types/comments';
 import { CommentsApi } from '@/api/CommentsApi';
 import { OfflineComments } from '@/lib/offlineComments';
@@ -32,6 +33,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
   const [collHasNext, setCollHasNext] = React.useState(false);
   const [text, setText] = React.useState('');
   const [postedOk, setPostedOk] = React.useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const errorToastShown = React.useRef(false);
 
   const mergeAndSort = (a: CommentV2Dto[], b: CommentV2Dto[]) => {
@@ -245,13 +247,18 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
     }
   };
 
+  function onEmojiClick(emojiData: EmojiClickData) {
+    setText((prev) => prev + emojiData.emoji);
+    setShowEmojiPicker(false);
+  }
+
   return (
     <div className={`flex h-full flex-col ${className ?? ''}`}>
       {/* List */}
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-        <div>
+        <div className="space-y-1">
           {items.map((c) => (
-            <div key={c.id} className="py-2">
+            <div key={c.id} className="py-1.5">
               <CommentItem
                 comment={c}
                 onReply={loadReplies}
@@ -277,7 +284,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
                 </button>
               )}
               {expanded[c.id] && c.children && c.children.length > 0 && (
-                <div className="mt-1 space-y-1 pl-10">
+                <div className="mt-0.5 space-y-1 pl-10">
                   {c.children.map((r) => (
                     <CommentItem
                       key={r.id}
@@ -304,7 +311,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
 
       {/* Composer pinned bottom – styled for visibility on light panel */}
       {showComposer && (
-        <div className="mt-3">
+        <div className="mt-2 relative">
           <CommentInput
             value={text}
             onChange={setText}
@@ -312,7 +319,27 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
             disabled={busy}
             busy={busy}
             placeholder="Share your thoughts..."
+            className=""
           />
+          <button
+            type="button"
+            onClick={() => setShowEmojiPicker((p) => !p)}
+            className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+          >
+            <Smile size={18} />
+          </button>
+          {showEmojiPicker && (
+            <div className="absolute bottom-full right-0 mb-2 z-50">
+              <EmojiPicker
+                onEmojiClick={onEmojiClick}
+                emojiStyle={EmojiStyle.NATIVE}
+                theme={Theme.DARK}
+                searchDisabled
+                skinTonesDisabled
+                lazyLoadEmojis
+              />
+            </div>
+          )}
           {postedOk && (
             <div className="absolute -right-8 top-1/2 -translate-y-1/2 text-emerald-500">
               <CheckCircle2 size={18} />

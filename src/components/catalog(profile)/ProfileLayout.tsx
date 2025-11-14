@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
+import Profile from '@/pages/catalog/BrandProfile';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { useAuth } from '../../context/AuthContext';
@@ -55,7 +56,7 @@ export const ProfileLayout: React.FC = () => {
         <Navbar isCollapsed={isCollapsed} minimal />
         <main className={`flex-1 overflow-hidden transition-all duration-300 ${mainContentMarginClass}`}>
           <div className="h-full p-4 sm:p-6 pb-20 lg:pb-8 pt-20 overflow-y-auto">
-            <Outlet />
+            {location.pathname === '/profile' ? <Profile /> : <Outlet />}
           </div>
         </main>
       </div>
