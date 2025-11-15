@@ -396,7 +396,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const DesktopSidebar = () => (
     <div
       // FIX 1 & 3: h-screen and flex-col for fixed height and proper stacking. duration-300 for smooth transitions.
-  className={`fixed left-0 top-0 h-screen ${sidebarWidth} flex flex-col z-50 transition-[width] duration-300 ease-out will-change-[width]
+  className={`fixed left-0 top-0 h-screen ${sidebarWidth} flex flex-col z-50 transition-all duration-300 ease-out will-change-[width]
     border-r border-white/20 dark:border-white/10 bg-white dark:bg-[#000000]`}
     >
 

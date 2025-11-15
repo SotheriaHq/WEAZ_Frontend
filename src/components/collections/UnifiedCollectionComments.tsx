@@ -1,7 +1,9 @@
 import React from 'react';
 import { CommentsApi } from '@/api/CommentsApi';
 import type { CommentV2Dto } from '@/types/comments';
-import CommentComposer from '@/components/comments/CommentComposer';
+import CommentInput from '@/components/ui/CommentInput';
+import { Smile } from 'lucide-react';
+import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
 import CommentItem from '@/components/comments/CommentItem';
 import { toast } from 'react-toastify';
 
@@ -14,6 +16,8 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
   const [cursor, setCursor] = React.useState<string | null>(null);
   const [hasNext, setHasNext] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [text, setText] = React.useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
 
   const load = async (reset = false) => {
     if (busy) return;
@@ -38,9 +42,9 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto space-y-1 pr-1">
+      <div className="flex-1 overflow-y-auto space-y-0.5 pr-1">
         {items.map((c) => (
-          <div key={c.id} className="py-1.5">
+          <div key={c.id} className="py-0.5">
             <div className="flex items-center gap-1 pb-0.5">
               <span className="inline-block text-[9px] px-1 py-0.5 rounded bg-white/30 dark:bg-white/10 text-gray-700 dark:text-gray-300">
                 {c.targetType === 'COLLECTION' ? 'collection' : 'item'}
@@ -63,8 +67,49 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
           </div>
         )}
       </div>
-      <div className="sticky bottom-0 pt-2 border-t border-white/20">
-        <CommentComposer targetType="COLLECTION" targetId={collectionId} onCreated={applyCreated} />
+      <div className="sticky bottom-0 pt-2 border-t border-gray-200 dark:border-white/20">
+        <div className="relative">
+          <CommentInput
+          value={text}
+          onChange={setText}
+          onSubmit={async () => {
+            const content = text.trim();
+            if (!content) return;
+            setBusy(true);
+            try {
+              const created = await CommentsApi.create('COLLECTION', collectionId, content);
+              setText('');
+              applyCreated(created);
+            } catch (e: any) {
+              toast.error(e?.response?.data?.message ?? 'Failed to post comment');
+            } finally { setBusy(false); }
+          }}
+          disabled={busy}
+          busy={busy}
+            placeholder="Add a comment..."
+        />
+        <button
+          type="button"
+          onClick={() => setShowEmojiPicker((p) => !p)}
+          className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+        >
+          <Smile size={18} />
+        </button>
+        {showEmojiPicker && (
+          <div className="absolute bottom-full right-0 mb-2 z-50 w-56 max-h-64 overflow-y-auto rounded-lg shadow-xl bg-black/80 border border-white/10 p-1">
+            <div style={{ width: 224, height: 256 }}>
+              <EmojiPicker
+                onEmojiClick={(e: EmojiClickData) => { setText((prev) => prev + e.emoji); setShowEmojiPicker(false); }}
+                emojiStyle={EmojiStyle.NATIVE}
+                theme={Theme.DARK}
+                searchDisabled
+                skinTonesDisabled
+                lazyLoadEmojis
+              />
+            </div>
+          </div>
+        )}
+        </div>
       </div>
     </div>
   );

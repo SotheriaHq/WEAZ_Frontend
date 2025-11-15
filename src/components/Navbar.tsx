@@ -10,6 +10,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearUser, setUser } from '../features/userSlice';
 import { setUnreadCount } from '../features/notificationsSlice';
+import { addLocalNotification } from '../features/notificationsSlice';
 import type { RootState } from '../store';
 import { NotificationsApi } from '../api/NotificationsApi';
 import { useRealtime } from '@/realtime';
@@ -274,6 +275,8 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, minim
                   try {
                     await apiClient.post('/auth/logout');
                   } catch (e) { void e; }
+                  // Announce logout before clearing user
+                  dispatch(addLocalNotification({ message: 'Signed out successfully.' }));
                   localStorage.removeItem(env.tokenStorageKey);
                   localStorage.removeItem('access_token');
                   localStorage.removeItem('accessToken');
@@ -394,7 +397,8 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, minim
 
   return (
     <nav
-      className={`w-full px-4 sm:px-5 py-1.5 z-30 transition-all duration-200
+      className={`w-full px-4 sm:px-5 py-1.5 z-40 transition-all duration-300 ease-out
+      ${_isCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[192px]'}
       ${minimal
         ? 'bg-transparent border-b border-transparent'
         : 'bg-white dark:bg-black border-b border-gray-200 dark:border-white/10'}`}

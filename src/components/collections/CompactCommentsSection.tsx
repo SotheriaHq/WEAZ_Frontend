@@ -19,7 +19,7 @@ export const CompactCommentsSection: React.FC<Props> = ({ collectionId, classNam
       </div>
 
       {/* All Comments - Scrollable with hidden scrollbar */}
-      <div className="flex-1 overflow-y-auto pt-3 space-y-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div className="flex-1 overflow-y-auto pt-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         <style>{`
           .compact-comments-scroll::-webkit-scrollbar {
             display: none;

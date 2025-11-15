@@ -34,6 +34,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const [, setActiveIndex] = useState(0); // track index changes for potential side-effects
   const [showUpdateMeta, setShowUpdateMeta] = useState(false);
   const me = useSelector((s: RootState) => s.user.profile);
+  const [resolvedItems, setResolvedItems] = useState<CarouselMediaItem[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -85,6 +86,31 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       };
     });
   }, [detail?.medias]);
+
+  // Resolve signed URLs for media files to ensure content displays in modal/viewer
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      const items = await Promise.all(
+        mediaItems.map(async (item) => {
+          if (item.fileId) {
+            try {
+              const url = await brandApi.getSignedFileUrl(item.fileId);
+              return { ...item, url: url || item.url };
+            } catch {
+              return item;
+            }
+          }
+          return item;
+        })
+      );
+      if (mounted) setResolvedItems(items);
+    };
+    run();
+    return () => {
+      mounted = false;
+    };
+  }, [mediaItems]);
 
   const unifiedCommentsCount = useMemo(() => {
     const base = detail?.commentsCount ?? detail?._count?.comments ?? 0;
@@ -209,7 +235,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
         {/* Left: Carousel (2/3 width on desktop) */}
         <div className="lg:col-span-2">
           <StackedCarousel
-            items={mediaItems}
+            items={resolvedItems.length ? resolvedItems : mediaItems}
             initialIndex={0}
             onIndexChange={(index) => setActiveIndex(index)}
             className="mb-2"
@@ -258,6 +284,8 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                   buttonLabel={<span className="text-base leading-none">✏️</span>}
                   variant="ghost"
                   className="!p-1 !rounded-md"
+                  hideCaret
+                  buttonClassName="!p-1 !rounded-md focus:ring-0 focus:ring-offset-0 outline-none focus:outline-none"
                   options={[
                     { label: 'Update Price & Tags', onClick: () => setShowUpdateMeta(true) },
                     { label: 'Edit Collection Details', onClick: () => { window.location.href = `/collections/${collectionId}/edit`; } },

@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { NotificationsApi } from '@/api/NotificationsApi';
 import { useRealtime } from '@/realtime';
-import { useDispatch } from 'react-redux';
-import { setUnreadCount } from '@/features/notificationsSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { setUnreadCount, clearLocalNotifications } from '@/features/notificationsSlice';
+import type { RootState } from '@/store';
 
 interface NotificationItem {
   id: string;
@@ -86,6 +87,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         try {
           await NotificationsApi.markAllAsRead();
           dispatch(setUnreadCount(0));
+          dispatch(clearLocalNotifications());
         } catch {}
       })();
     }
@@ -124,6 +126,8 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     if (!hasNext || loading) return; void fetchList(false);
   }, [hasNext, loading]);
 
+  const localItems = useSelector((s: RootState) => s.notifications.local);
+
   if (!open) return null;
 
   return (
@@ -136,7 +140,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         <button onClick={onClose} className="text-[11px] text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Close</button>
       </div>
       <div className="flex-1 overflow-y-auto scrollbar-hide px-2 py-1 space-y-1">
-        {items.map((n) => (
+        {[...localItems.map((ln) => ({ ...ln, type: 'LOCAL', isRead: false } as any)), ...items].map((n: any) => (
           <div key={n.id} className="px-3 py-2 rounded-md bg-white/70 dark:bg-white/5 border border-white/30 dark:border-white/10 text-xs flex flex-col gap-1">
             <div className="italic text-gray-700 dark:text-gray-200 leading-snug">{n.message}</div>
             <div className="flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400">

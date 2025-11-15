@@ -84,8 +84,9 @@ export const brandApi = {
       // Provide synthetic fallback list for offline scenario to avoid an empty select
       if (isNetworkError) {
         return [
-          { id: 'fallback-ready-to-wear', slug: 'ready-to-wear', name: 'Ready To Wear', description: 'Fallback category' },
-          { id: 'fallback-accessories', slug: 'accessories', name: 'Accessories', description: 'Fallback category' },
+          { id: 'fallback-african-fashion', slug: 'african-fashion', name: 'African Fashion', description: 'Fallback category' },
+          { id: 'fallback-western-fashion', slug: 'western-fashion', name: 'Western Fashion', description: 'Fallback category' },
+          { id: 'fallback-de-house', slug: 'de-house', name: 'De House', description: 'Fallback category' },
         ];
       }
       return [];
@@ -123,9 +124,10 @@ export const brandApi = {
       const items = Array.isArray(data?.items) ? data.items : [];
       return items.map((item: unknown) => {
         const backendItem = item as Record<string, unknown>;
-        const medias = (backendItem.medias as Array<{ file?: { url?: string; s3Url?: string; id?: string } }>) || [];
-        const firstMedia = medias[0] ?? null;
-        const fileObj = (firstMedia?.file as { url?: string; s3Url?: string; id?: string } | undefined) ?? undefined;
+        const medias = (backendItem.medias as Array<{ id?: string; commentsCount?: number; likesCount?: number; file?: { url?: string; s3Url?: string; id?: string } }>) || [];
+        const coverMediaId = (backendItem as any)?.coverMediaId as string | undefined;
+        const preferredMedia = (coverMediaId && medias.find((m) => String(m.id) === String(coverMediaId))) || medias[0] || null;
+        const fileObj = (preferredMedia?.file as { url?: string; s3Url?: string; id?: string } | undefined) ?? undefined;
         const coverImageUrl =
           (fileObj?.s3Url && typeof fileObj.s3Url === 'string' ? fileObj.s3Url : undefined) ||
           (fileObj?.url && typeof fileObj.url === 'string' ? fileObj.url : undefined) ||
@@ -133,6 +135,13 @@ export const brandApi = {
         const coverFileId = typeof fileObj?.id === 'string' ? fileObj!.id : undefined;
         const countObj = (backendItem._count as { medias?: number } | undefined) ?? undefined;
         const mediaCount = typeof countObj?.medias === 'number' ? countObj!.medias! : ((backendItem.medias as unknown[])?.length || 0);
+        // Aggregate total likes/comments: include media-level counts if available
+        const baseLikes = (backendItem as any)?.likesCount as number | undefined;
+        const baseComments = (backendItem as any)?.commentsCount as number | undefined;
+        const mediaLikesSum = Array.isArray(medias) ? medias.reduce((sum, m) => sum + (m?.likesCount || 0), 0) : 0;
+        const mediaCommentsSum = Array.isArray(medias) ? medias.reduce((sum, m) => sum + (m?.commentsCount || 0), 0) : 0;
+        const totalLikes = (baseLikes || 0) + mediaLikesSum;
+        const totalComments = (baseComments || 0) + mediaCommentsSum;
         return {
           id: backendItem.id as string,
           name: (backendItem.title as string) || '',
@@ -149,8 +158,8 @@ export const brandApi = {
           coverFileId,
           itemCount: mediaCount,
           postsCount: mediaCount,
-          likesCount: (backendItem.likesCount as number) || 0,
-          commentsCount: (backendItem.commentsCount as number) || 0,
+          likesCount: totalLikes,
+          commentsCount: totalComments,
           minPrice: (backendItem.minPrice as number) || 0,
           maxPrice: (backendItem.maxPrice as number) || 0,
           isAvailableInStore: (backendItem.isAvailableInStore as boolean) || false,

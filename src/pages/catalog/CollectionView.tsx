@@ -68,6 +68,18 @@ const CollectionView: React.FC = () => {
 
   // local media index not required here as comments are unified
 
+  const unifiedCounts = useMemo(() => {
+    const medias = Array.isArray(detail?.medias) ? detail?.medias as Array<any> : [];
+    const mediaComments = medias.reduce((sum, m) => sum + (m?.commentsCount || 0), 0);
+    const mediaLikes = medias.reduce((sum, m) => sum + (m?.likesCount || 0), 0);
+    const baseComments = (detail as any)?.commentsCount ?? detail?._count?.comments ?? 0;
+    const baseLikes = (detail as any)?.totalLikes ?? (detail as any)?.likesCount ?? 0;
+    return {
+      comments: baseComments + mediaComments,
+      likes: baseLikes + mediaLikes,
+    };
+  }, [detail]);
+
   const handleDeleteCollection = async () => {
     if (!id) return;
     if (!confirm('Delete this entire collection? This cannot be undone.')) return;
@@ -218,14 +230,14 @@ const CollectionView: React.FC = () => {
           {/* Right: Metadata & Comments (1/3 width on desktop) */}
           <div className="lg:col-span-1 flex flex-col gap-4">
             {/* Metadata Section */}
-            <div className="glass-panel rounded-2xl p-4 border border-white/20 bg-white/70 dark:bg-white/5 backdrop-blur-md">
+            <div className="glass-panel rounded-2xl p-4 border border-white/20 bg-white/90 dark:bg-black/70 backdrop-blur-sm">
               <CollectionMetadata
                 title={detail?.title || 'Collection'}
                 description={detail?.description}
                 tags={detail?.tags || []}
                 stats={{
-                  likes: detail?.totalLikes,
-                  comments: detail?._count?.comments,
+                  likes: unifiedCounts.likes,
+                  comments: unifiedCounts.comments,
                   items: detail?._count?.medias,
                   views: detail?._count?.views,
                 }}
@@ -242,7 +254,7 @@ const CollectionView: React.FC = () => {
             </div>
 
             {/* Comments Section - Fixed height, scrollable */}
-            <div className="glass-panel rounded-2xl p-4 border border-white/20 bg-white/70 dark:bg-white/5 backdrop-blur-md lg:h-[400px] overflow-hidden flex flex-col">
+            <div className="glass-panel rounded-2xl p-4 border border-white/20 bg-white/95 dark:bg-black/80 backdrop-blur-sm lg:h-[420px] overflow-hidden flex flex-col">
               {id ? (
                 <CompactCommentsSection collectionId={id} />
               ) : (

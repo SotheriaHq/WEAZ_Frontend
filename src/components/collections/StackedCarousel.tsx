@@ -204,7 +204,7 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
                 <img
                   src={item.url}
                   alt={item.caption ?? 'Collection media'}
-                  className="w-full h-full object-cover select-none rounded-lg"
+                  className="w-full h-full object-contain select-none rounded-lg bg-black"
                   draggable={false}
                   loading="lazy"
                 />

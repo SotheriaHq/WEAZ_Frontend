@@ -24,9 +24,9 @@ export const ProfileLayout: React.FC = () => {
     return (
         <div className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-white">
           <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-          <Navbar isCollapsed={isCollapsed} minimal />
+          <Navbar isCollapsed={isCollapsed} />
           <main
-            className={`pt-20 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${mainContentMarginClass}`}
+            className={`pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${mainContentMarginClass}`}
           >
             <div className="p-4 sm:p-6">
               <div className="max-w-screen-xl mx-auto space-y-6">
@@ -53,8 +53,8 @@ export const ProfileLayout: React.FC = () => {
   return (
       <div className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-white">
         <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-        <Navbar isCollapsed={isCollapsed} minimal />
-        <main className={`pt-20 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${mainContentMarginClass}`}>
+        <Navbar isCollapsed={isCollapsed} />
+        <main className={`pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${mainContentMarginClass}`}>
           <div className="p-4 sm:p-6">
             {location.pathname === '/profile' ? <Profile /> : <Outlet />}
           </div>

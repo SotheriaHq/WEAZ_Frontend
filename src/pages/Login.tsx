@@ -10,6 +10,7 @@ import type { AuthTokensResponse, ApiSuccessPayload } from '../types/auth';
 import { unwrapApiResponse } from '../types/auth';
 import { useDispatch } from 'react-redux';
 import { setUser } from '../features/userSlice';
+import { addLocalNotification } from '../features/notificationsSlice';
 import { useNavigate } from 'react-router-dom';
 import AnimatedBackground from '../lib/Animation';
 // import voguelyLogo from '../lib/voguelyLogo';
@@ -275,6 +276,7 @@ const LoginPage = () => {
       }
 
       dispatch(setUser(user));
+      dispatch(addLocalNotification({ message: 'Signed in successfully.' }));
       toast.success('Login successful!');
       // Navigate immediately to reduce flicker/blank states
       const redirectPath = user.type === 'BRAND' ? '/profile' : '/';

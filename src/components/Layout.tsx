@@ -17,7 +17,8 @@ export const Layout: React.FC = () => {
    // If a BRAND lands on the app root, prefer showing their profile by default
    React.useEffect(() => {
      if (!user) return;
-     if (user.type === 'BRAND' && (location.pathname === '/' || location.pathname === '/market')) {
+     // Do not redirect away from the Market page; it's public for all users
+     if (user.type === 'BRAND' && (location.pathname === '/')) {
        navigate('/profile', { replace: true });
      }
    }, [user, location.pathname, navigate]);
@@ -33,12 +34,12 @@ export const Layout: React.FC = () => {
        
         {/* Main Content Area */}
       <main
-        className={`pt-20 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${isCollapsed ? 'lg:ml-[64px]' : 'lg:ml-[192px]'}`}
+        className={`pt-2 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${isCollapsed ? 'lg:ml-[64px]' : 'lg:ml-[192px]'}`}
       >
         {/* <main className="pt-32 pb-20 lg:pb-8 lg:ml-[240px] min-h-screen transition-all duration-200"> */}
        
         
-          <div className="p-4 sm:p-6">
+          <div className="p-2 sm:p-6">
             <Outlet />
           </div>
         </main>

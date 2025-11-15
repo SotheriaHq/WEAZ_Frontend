@@ -1,8 +1,4 @@
-/**
- * PHASE 5: Category Suggestions API Client
- */
-import { apiClient } from '@/api/httpClient';
-
+// Legacy client removed. Keep a tiny stub to avoid import churn.
 export interface CategorySuggestionDto {
   id: string;
   name: string;
@@ -18,34 +14,7 @@ export interface CategorySuggestionDto {
 }
 
 export const CategorySuggestionsApi = {
-  /**
-   * Get all category suggestions (admin only)
-   */
-  async getAll(): Promise<CategorySuggestionDto[]> {
-    const response = await apiClient.get('/collections/categories/suggestions');
-    return response.data;
-  },
-
-  /**
-   * Submit a new category suggestion
-   */
-  async submit(name: string): Promise<CategorySuggestionDto> {
-    const response = await apiClient.post('/collections/categories/suggest', { name });
-    return response.data;
-  },
-
-  /**
-   * Moderate a category suggestion (approve/reject)
-   */
-  async moderate(
-    id: string,
-    status: 'APPROVED' | 'REJECTED',
-    reason?: string
-  ): Promise<CategorySuggestionDto> {
-    const response = await apiClient.patch(`/collections/categories/suggestions/${id}`, {
-      status,
-      reason,
-    });
-    return response.data;
-  },
+  async getAll(): Promise<CategorySuggestionDto[]> { return []; },
+  async submit(): Promise<never> { throw new Error('Category suggestions are disabled'); },
+  async moderate(): Promise<never> { throw new Error('Category suggestions are disabled'); },
 };
