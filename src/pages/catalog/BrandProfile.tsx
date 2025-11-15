@@ -637,6 +637,15 @@ const ProfilePage: React.FC = () => {
                     collectionId={selectedCollectionId}
                     onBack={() => setSelectedCollectionId(null)}
                     brandName={displayData?.brandName || displayData?.username || 'Brand'}
+                    onPriceUpdated={async () => {
+                      // Refresh collections to show updated prices on cards
+                      if (isVisitorView && routeBrandId) {
+                        const cols = await brandApi.getCollections(routeBrandId);
+                        setVisitorCollections(cols ?? []);
+                      } else if (user) {
+                        await fetchCollections();
+                      }
+                    }}
                   />
                 ) : (
                   // Show collections grid

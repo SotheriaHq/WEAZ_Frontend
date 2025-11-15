@@ -18,16 +18,9 @@ export const CompactCommentsSection: React.FC<Props> = ({ collectionId, classNam
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Comments</h3>
       </div>
 
-      {/* All Comments - Scrollable with hidden scrollbar */}
-      <div className="flex-1 overflow-y-auto pt-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-        <style>{`
-          .compact-comments-scroll::-webkit-scrollbar {
-            display: none;
-          }
-        `}</style>
-        <div className="compact-comments-scroll">
-          <UnifiedCollectionComments collectionId={collectionId} />
-        </div>
+      {/* Comments container - let UnifiedCollectionComments handle its own scroll */}
+      <div className="flex-1 pt-2 overflow-hidden">
+        <UnifiedCollectionComments collectionId={collectionId} />
       </div>
     </div>
   );

@@ -43,13 +43,13 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
   return (
     <div className="flex flex-col h-full">
       {/* Scrollable Comments Area */}
-      <div className="flex-1 overflow-y-auto space-y-0.5 pr-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div className="flex-1 overflow-y-auto space-y-0.5 pr-1 unified-comments-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         <style>{`
           .unified-comments-scroll::-webkit-scrollbar {
             display: none;
           }
         `}</style>
-        <div className="unified-comments-scroll">
+        <div>
           {items.map((c) => (
             <div key={c.id} className="py-0.5">
               <div className="flex items-center gap-1 pb-0.5">
@@ -77,7 +77,7 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
       </div>
       
       {/* Fixed Input at Bottom */}
-      <div className="flex-shrink-0 pt-2 mt-2 border-t border-gray-200 dark:border-white/20 bg-white/95 dark:bg-black/80">
+      <div className="flex-shrink-0 pt-2 mt-2 border-t border-gray-200 dark:border-white/20 bg-white dark:bg-black relative z-10">
         <div className="relative">
           <CommentInput
             value={text}
@@ -111,12 +111,18 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
                 .emoji-picker-react {
                   overflow: hidden !important;
                 }
-                .emoji-picker-react .emoji-scroll-wrapper {
+                .emoji-picker-react .emoji-scroll-wrapper,
+                .emoji-picker-react .emoji-categories,
+                .emoji-picker-react .emoji-group {
                   scrollbar-width: none !important;
                   -ms-overflow-style: none !important;
                 }
-                .emoji-picker-react .emoji-scroll-wrapper::-webkit-scrollbar {
+                .emoji-picker-react .emoji-scroll-wrapper::-webkit-scrollbar,
+                .emoji-picker-react .emoji-categories::-webkit-scrollbar,
+                .emoji-picker-react .emoji-group::-webkit-scrollbar {
                   display: none !important;
+                  width: 0 !important;
+                  height: 0 !important;
                 }
               `}</style>
               <EmojiPicker

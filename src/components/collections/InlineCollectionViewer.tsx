@@ -21,12 +21,14 @@ interface InlineCollectionViewerProps {
   collectionId: string;
   onBack: () => void;
   brandName?: string;
+  onPriceUpdated?: () => void | Promise<void>;
 }
 
 export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   collectionId,
   onBack,
   brandName = 'Brand',
+  onPriceUpdated,
 }) => {
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<any | null>(null);
@@ -315,8 +317,12 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
           currentMin={detail?.minPrice}
           currentMax={detail?.maxPrice}
           currentTags={detail?.tags ?? []}
-          onUpdated={(p) => {
+          onUpdated={async (p) => {
             setDetail((prev: any) => ({ ...(prev ?? {}), minPrice: p.minPrice ?? prev?.minPrice, maxPrice: p.maxPrice ?? prev?.maxPrice, tags: p.tags ?? prev?.tags, saleMinPrice: p.saleMinPrice ?? prev?.saleMinPrice, saleMaxPrice: p.saleMaxPrice ?? prev?.saleMaxPrice }));
+            // Notify parent to refresh collections list so cards show updated prices
+            if (onPriceUpdated) {
+              await onPriceUpdated();
+            }
           }}
         />
       )}
