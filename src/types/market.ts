@@ -21,6 +21,11 @@ export interface MarketItem {
   brandLogoFileId?: string | null;
   minPrice?: number | null;
   maxPrice?: number | null;
+  // Optional sale fields from backend when a sale is active or specified
+  saleMinPrice?: number | null;
+  saleMaxPrice?: number | null;
+  saleStartAt?: string | null;
+  saleEndAt?: string | null;
   likesCount?: number | null;
   commentsCount?: number | null;
   // When requested with counts=combined, backend may supply combined total

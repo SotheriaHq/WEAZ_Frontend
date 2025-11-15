@@ -38,14 +38,23 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
   const commentCount = useSelector((s: RootState) => 
     selectCommentCount(s, 'COLLECTION_MEDIA', item.id) ?? item.commentsCount ?? 0
   );
-  const priceRange =
-    typeof item.minPrice === 'number' && typeof item.maxPrice === 'number'
-      ? `${formatPrice(item.minPrice)} – ${formatPrice(item.maxPrice)}`
-      : typeof item.minPrice === 'number'
-        ? `From ${formatPrice(item.minPrice)}`
-        : typeof item.maxPrice === 'number'
-          ? `Up to ${formatPrice(item.maxPrice)}`
-          : null;
+  // Compact price badge with sale support
+  const baseBand = (() => {
+    const min = typeof item.minPrice === 'number' ? formatPrice(item.minPrice) : undefined;
+    const max = typeof item.maxPrice === 'number' ? formatPrice(item.maxPrice) : undefined;
+    if (min && max) return `${min} – ${max}`;
+    if (min) return `From ${min}`;
+    if (max) return `Up to ${max}`;
+    return null;
+  })();
+  const saleBand = (() => {
+    const min = typeof item.saleMinPrice === 'number' ? formatPrice(item.saleMinPrice) : undefined;
+    const max = typeof item.saleMaxPrice === 'number' ? formatPrice(item.saleMaxPrice) : undefined;
+    if (min && max) return `${min} – ${max}`;
+    if (min) return `${min}+`;
+    if (max) return `Up to ${max}`;
+    return null;
+  })();
 
   const displayTags = item.tags.slice(0, 2);
 
@@ -95,11 +104,22 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
         
         {/* Price Badge (Top Right) */}
-        {priceRange && (
-          <div className="absolute top-3 right-3 z-20">
-            <div className="inline-flex items-center rounded-full bg-white/20 backdrop-blur-md border border-white/30 px-3 py-1.5 text-xs font-semibold text-white shadow-lg">
-              {priceRange}
-            </div>
+        {(baseBand || saleBand) && (
+          <div className="absolute top-3 right-3 z-20 text-[10px]">
+            {saleBand && baseBand ? (
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="rounded-full bg-black/40 text-white/80 line-through px-1.5 py-0.5 border border-white/20 backdrop-blur-sm">
+                  {baseBand}
+                </span>
+                <span className="rounded-full bg-emerald-500/80 text-white font-medium px-1.5 py-0.5 border border-white/20 backdrop-blur-sm">
+                  {saleBand}
+                </span>
+              </div>
+            ) : (
+              <span className="inline-flex items-center rounded-full bg-white/20 backdrop-blur-md border border-white/30 px-2 py-0.5 font-semibold text-white shadow-lg">
+                {baseBand}
+              </span>
+            )}
           </div>
         )}
 

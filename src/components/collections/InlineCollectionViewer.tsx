@@ -5,7 +5,7 @@ import StackedCarousel, { type CarouselMediaItem } from '@/components/collection
 import CollectionMetadata from '@/components/collections/CollectionMetadata';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import { BreadCrumb } from 'primereact/breadcrumb';
+import { ArrowLeft } from 'lucide-react';
 import UnifiedCollectionComments from '@/components/collections/UnifiedCollectionComments';
 import Dropdown from '@/components/Dropdown';
 import UpdatePriceTagsModal from '@/components/collections/UpdatePriceTagsModal';
@@ -169,16 +169,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
 
   // legacy stub (dropdown handles edit options)
 
-  const breadcrumbItems: MenuItem[] = [
-    { label: brandName, command: onBack },
-    { label: 'Collections', command: onBack },
-    { label: detail?.title || 'Collection' },
-  ];
-
-  const breadcrumbHome: MenuItem = {
-    icon: 'pi pi-home',
-    command: onBack,
-  };
+  void brandName;
 
   if (loading) {
     return (
@@ -209,9 +200,16 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Breadcrumb */}
-      <div className="breadcrumb-wrapper">
-        <BreadCrumb model={breadcrumbItems} home={breadcrumbHome} />
+      {/* Simple back arrow instead of breadcrumbs */}
+      <div className="px-1">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/70 dark:bg-white/5 px-2.5 py-1 text-xs text-gray-700 dark:text-gray-300 hover:bg-white/90 dark:hover:bg-white/10"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to collections
+        </button>
       </div>
 
       {/* Collection Title & Piece Count */}

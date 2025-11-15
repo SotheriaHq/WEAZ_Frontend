@@ -58,14 +58,22 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
   if (!open || !item) return null;
 
-  const priceRange =
-    typeof item.minPrice === 'number' && typeof item.maxPrice === 'number'
-      ? `${formatPrice(item.minPrice)} – ${formatPrice(item.maxPrice)}`
-      : typeof item.minPrice === 'number'
-        ? `From ${formatPrice(item.minPrice)}`
-        : typeof item.maxPrice === 'number'
-          ? `Up to ${formatPrice(item.maxPrice)}`
-          : null;
+  const baseBand = (() => {
+    const min = typeof item.minPrice === 'number' ? formatPrice(item.minPrice) : undefined;
+    const max = typeof item.maxPrice === 'number' ? formatPrice(item.maxPrice) : undefined;
+    if (min && max) return `${min} – ${max}`;
+    if (min) return `From ${min}`;
+    if (max) return `Up to ${max}`;
+    return null;
+  })();
+  const saleBand = (() => {
+    const min = typeof (item as any).saleMinPrice === 'number' ? formatPrice((item as any).saleMinPrice) : undefined;
+    const max = typeof (item as any).saleMaxPrice === 'number' ? formatPrice((item as any).saleMaxPrice) : undefined;
+    if (min && max) return `${min} – ${max}`;
+    if (min) return `${min}+`;
+    if (max) return `Up to ${max}`;
+    return null;
+  })();
 
   const brandLabel = item.brandName ?? item.username ?? 'Brand';
 
@@ -172,9 +180,14 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                 <span className="font-medium">{commentCount}</span>
               </div>
               <div className="ml-auto flex items-center gap-3">
-                {priceRange && (
-                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{priceRange}</span>
-                )}
+                {(saleBand && baseBand) ? (
+                  <div className="flex flex-col items-end text-[12px] leading-tight">
+                    <span className="line-through text-gray-500">{baseBand}</span>
+                    <span className="text-emerald-700 dark:text-emerald-300 font-semibold">{saleBand}</span>
+                  </div>
+                ) : baseBand ? (
+                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{baseBand}</span>
+                ) : null}
                 <IconButton variant="primary" size="sm" icon={<Plus size={16} />} onClick={() => { /* TODO: cart */ }} tooltip="Add to cart" />
               </div>
             </div>

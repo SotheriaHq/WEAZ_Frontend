@@ -19,6 +19,10 @@ export interface CollectionDto {
   commentsCount?: number;
   minPrice?: number;
   maxPrice?: number;
+  saleMinPrice?: number | null;
+  saleMaxPrice?: number | null;
+  saleStartAt?: string | null;
+  saleEndAt?: string | null;
   brandName?: string;
   username?: string;
   brandLogo?: string;

@@ -42,73 +42,95 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto space-y-0.5 pr-1">
-        {items.map((c) => (
-          <div key={c.id} className="py-0.5">
-            <div className="flex items-center gap-1 pb-0.5">
-              <span className="inline-block text-[9px] px-1 py-0.5 rounded bg-white/30 dark:bg-white/10 text-gray-700 dark:text-gray-300">
-                {c.targetType === 'COLLECTION' ? 'collection' : 'item'}
-              </span>
-            </div>
-            <CommentItem comment={c} onLike={handleLike} onDelete={handleDelete} onReply={() => {}} />
-            {c.children && c.children.length > 0 && (
-              <div className="pl-8 mt-0.5 space-y-1">
-                {c.children.map((r) => (
-                  <CommentItem key={r.id} comment={r} onLike={handleLike} onDelete={handleDelete} onReply={() => {}} />
-                ))}
+      {/* Scrollable Comments Area */}
+      <div className="flex-1 overflow-y-auto space-y-0.5 pr-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <style>{`
+          .unified-comments-scroll::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+        <div className="unified-comments-scroll">
+          {items.map((c) => (
+            <div key={c.id} className="py-0.5">
+              <div className="flex items-center gap-1 pb-0.5">
+                <span className="inline-block text-[9px] px-1 py-0.5 rounded bg-white/30 dark:bg-white/10 text-gray-700 dark:text-gray-300">
+                  {c.targetType === 'COLLECTION' ? 'collection' : 'item'}
+                </span>
               </div>
-            )}
-          </div>
-        ))}
-        {!items.length && <div className="text-xs text-gray-500 py-4">Be the first to comment.</div>}
-        {hasNext && (
-          <div className="py-2 text-center">
-            <button type="button" className="px-2 py-1.5 text-[11px] rounded bg-white/30 dark:bg-white/10 border border-white/30" onClick={() => load(false)} disabled={busy}>Load more</button>
-          </div>
-        )}
+              <CommentItem comment={c} onLike={handleLike} onDelete={handleDelete} onReply={() => {}} />
+              {c.children && c.children.length > 0 && (
+                <div className="pl-8 mt-0.5 space-y-1">
+                  {c.children.map((r) => (
+                    <CommentItem key={r.id} comment={r} onLike={handleLike} onDelete={handleDelete} onReply={() => {}} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          {!items.length && <div className="text-xs text-gray-500 py-4">Be the first to comment.</div>}
+          {hasNext && (
+            <div className="py-2 text-center">
+              <button type="button" className="px-2 py-1.5 text-[11px] rounded bg-white/30 dark:bg-white/10 border border-white/30" onClick={() => load(false)} disabled={busy}>Load more</button>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="sticky bottom-0 pt-2 border-t border-gray-200 dark:border-white/20">
+      
+      {/* Fixed Input at Bottom */}
+      <div className="flex-shrink-0 pt-2 mt-2 border-t border-gray-200 dark:border-white/20 bg-white/95 dark:bg-black/80">
         <div className="relative">
           <CommentInput
-          value={text}
-          onChange={setText}
-          onSubmit={async () => {
-            const content = text.trim();
-            if (!content) return;
-            setBusy(true);
-            try {
-              const created = await CommentsApi.create('COLLECTION', collectionId, content);
-              setText('');
-              applyCreated(created);
-            } catch (e: any) {
-              toast.error(e?.response?.data?.message ?? 'Failed to post comment');
-            } finally { setBusy(false); }
-          }}
-          disabled={busy}
-          busy={busy}
+            value={text}
+            onChange={setText}
+            onSubmit={async () => {
+              const content = text.trim();
+              if (!content) return;
+              setBusy(true);
+              try {
+                const created = await CommentsApi.create('COLLECTION', collectionId, content);
+                setText('');
+                applyCreated(created);
+              } catch (e: any) {
+                toast.error(e?.response?.data?.message ?? 'Failed to post comment');
+              } finally { setBusy(false); }
+            }}
+            disabled={busy}
+            busy={busy}
             placeholder="Add a comment..."
-        />
-        <button
-          type="button"
-          onClick={() => setShowEmojiPicker((p) => !p)}
-          className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
-        >
-          <Smile size={18} />
-        </button>
-        {showEmojiPicker && (
-          <div className="absolute bottom-full right-0 mb-2 z-50 w-56 max-h-64 overflow-y-auto rounded-lg shadow-xl bg-black/80 border border-white/10 p-1">
-            <div style={{ width: 224, height: 256 }}>
+          />
+          <button
+            type="button"
+            onClick={() => setShowEmojiPicker((p) => !p)}
+            className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+          >
+            <Smile size={18} />
+          </button>
+          {showEmojiPicker && (
+            <div className="absolute bottom-full right-0 mb-2 z-50 rounded-lg shadow-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 overflow-hidden" style={{ width: 280, height: 320 }}>
+              <style>{`
+                .emoji-picker-react {
+                  overflow: hidden !important;
+                }
+                .emoji-picker-react .emoji-scroll-wrapper {
+                  scrollbar-width: none !important;
+                  -ms-overflow-style: none !important;
+                }
+                .emoji-picker-react .emoji-scroll-wrapper::-webkit-scrollbar {
+                  display: none !important;
+                }
+              `}</style>
               <EmojiPicker
                 onEmojiClick={(e: EmojiClickData) => { setText((prev) => prev + e.emoji); setShowEmojiPicker(false); }}
                 emojiStyle={EmojiStyle.NATIVE}
-                theme={Theme.DARK}
+                theme={Theme.AUTO}
                 searchDisabled
                 skinTonesDisabled
                 lazyLoadEmojis
+                width="100%"
+                height="100%"
               />
             </div>
-          </div>
-        )}
+          )}
         </div>
       </div>
     </div>

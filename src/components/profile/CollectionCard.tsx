@@ -175,12 +175,19 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
           {/* Collection Stats */}
           <div className="flex items-center gap-1.5 text-[11px] text-white/90 mb-2">
             <span>{displayItemCount} pieces</span>
-            {minPrice > 0 && maxPrice > 0 && (
+            {/* Sale pricing with strikethrough */}
+            {collection.saleMinPrice && collection.saleMaxPrice && minPrice > 0 && maxPrice > 0 ? (
+              <>
+                <span>•</span>
+                <span className="line-through opacity-70">{formatPrice(minPrice)} - {formatPrice(maxPrice)}</span>
+                <span className="text-emerald-300 font-semibold">{formatPrice(collection.saleMinPrice)} - {formatPrice(collection.saleMaxPrice)}</span>
+              </>
+            ) : minPrice > 0 && maxPrice > 0 ? (
               <>
                 <span>•</span>
                 <span>{formatPrice(minPrice)} - {formatPrice(maxPrice)}</span>
               </>
-            )}
+            ) : null}
           </div>
 
           {/* Footer row with comment input placeholder (left) and compact View pill (right) */}

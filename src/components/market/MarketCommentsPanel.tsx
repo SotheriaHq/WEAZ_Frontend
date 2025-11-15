@@ -255,7 +255,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
   return (
     <div className={`flex h-full flex-col ${className ?? ''}`}>
       {/* List */}
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide pr-1">
         <div className="space-y-1">
           {items.map((c) => (
             <div key={c.id} className="py-1.5">
@@ -329,7 +329,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
             <Smile size={18} />
           </button>
           {showEmojiPicker && (
-            <div className="absolute bottom-full right-0 mb-2 z-50">
+            <div className="absolute bottom-full right-0 mb-2 z-50 scrollbar-hide">
               <EmojiPicker
                 onEmojiClick={onEmojiClick}
                 emojiStyle={EmojiStyle.NATIVE}
