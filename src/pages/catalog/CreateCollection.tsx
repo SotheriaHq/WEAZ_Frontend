@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import FileUploader from '../../components/upload/FileUploader';
 import MediaPreview from '../../components/upload/MediaPreview';
 import { MediaProvider, useMediaStore } from '../../hooks/useMediaStore';
@@ -25,7 +25,6 @@ const CreateCollectionInner: React.FC = () => {
   const [maxPrice, setMaxPrice] = useState('');
   const [isAvailableInStore, setIsAvailableInStore] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tags, setTags] = useState<string>('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
@@ -40,16 +39,6 @@ const CreateCollectionInner: React.FC = () => {
 
   const disabled = isSubmitting || isUploading;
   const picker = useFilePicker({ accept: ['image/*', 'video/*'], maxFiles: 20, onFiles: mediaStore.addFiles, disabled });
-
-  const parsedTags = useMemo(
-    () =>
-      tags
-        .split(',')
-        .map((t) => t.trim())
-        .filter((t) => t.length > 0)
-        .slice(0, 10),
-    [tags],
-  );
 
   useEffect(() => {
     let mounted = true;
@@ -76,16 +65,7 @@ const CreateCollectionInner: React.FC = () => {
     };
   }, []);
 
-  // Keep parsed text in sync (for users who prefer typing)
-  useEffect(() => {
-    const typed = parsedTags;
-    if (typed.length && typed.join(',') !== selectedTags.join(',')) {
-      setSelectedTags(typed);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tags]);
-
-  const isValid = title.trim().length > 0 && files.length > 0 && (selectedTags.length > 0 || parsedTags.length > 0);
+  const isValid = title.trim().length > 0 && files.length > 0 && selectedTags.length > 0;
 
   const handleDelete = (id: string) => {
     mediaStore.remove(id);
@@ -94,11 +74,11 @@ const CreateCollectionInner: React.FC = () => {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!isValid) {
-      // Validation requires title, at least one file, and at least one tag (selected or typed)
+      // Validation requires title, at least one file, and at least one tag
       const reasons: string[] = [];
       if (title.trim().length === 0) reasons.push('a title');
       if (files.length === 0) reasons.push('at least one file');
-      const hasTags = selectedTags.length > 0 || parsedTags.length > 0;
+      const hasTags = selectedTags.length > 0;
       if (!hasTags) reasons.push('at least one tag');
       toast.error(`Please provide ${reasons.join(', ')}.`);
       return;
@@ -108,8 +88,8 @@ const CreateCollectionInner: React.FC = () => {
     try {
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
       const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
-      
-      const finalTags = (selectedTags.length ? selectedTags : parsedTags).slice(0, 10);
+
+      const finalTags = selectedTags.slice(0, 10);
       if (finalTags.length === 0) {
         toast.error('Add at least one tag.');
         return;
@@ -134,7 +114,6 @@ const CreateCollectionInner: React.FC = () => {
       setMinPrice('');
       setMaxPrice('');
       setIsAvailableInStore(false);
-      setTags('');
       setSelectedTags([]);
       mediaStore.clear();
       navigate('/profile');
@@ -220,7 +199,7 @@ const CreateCollectionInner: React.FC = () => {
     );
 
   const rightContent = (
-    <div className="space-y-4 glass-panel p-4">
+    <div className="space-y-4 glass-panel p-0">
       <Section title="Basics" defaultOpen>
         <TextField 
           label="Collection Title" 
@@ -276,21 +255,12 @@ const CreateCollectionInner: React.FC = () => {
               max={10}
             />
           </div>
-          <TextField
-            label="Or type tags (optional, comma separated)"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="e.g., summer, linen, resort"
-            disabled={disabled}
-            variant="glass"
-            inputClassName="border-0 focus:ring-0"
-          />
         </div>
       </Section>
 
       <Section title="Advanced" defaultOpen={false}>
         {/* Price Range */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <TextField 
             label="Min Price (₦)" 
             type="number"

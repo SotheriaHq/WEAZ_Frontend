@@ -20,7 +20,7 @@ export const SimpleAccordion: React.FC<SimpleAccordionProps> = ({ title, default
   }, []);
 
   const containerClass = useMemo(() => 
-    `rounded-xl border border-white/20 bg-white/5 p-3 backdrop-blur-md transition-all duration-300 ${isOpen ? 'pb-3' : ''}`,
+    `rounded-xl border border-white/20 bg-white/5 px-1 py-3 backdrop-blur-md transition-all duration-300 ${isOpen ? 'pb-3' : ''}`,
     [isOpen]
   );
 

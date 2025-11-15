@@ -40,12 +40,12 @@ const VARIANTS: Record<VariantKey, { border: string; bgActive: string; text: str
   SKY:     { border: 'border-sky-300/80 dark:border-sky-400/60',       bgActive: 'bg-sky-500/20 backdrop-blur-md',     text: 'text-gray-900 dark:text-white' },
 };
 
-const CHIP_BASE = 'px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 border-2 backdrop-blur-lg ring-1 ring-white/30 dark:ring-white/10';
+const CHIP_BASE = 'px-3 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all duration-200 border-2 backdrop-blur-lg';
 
 const Chip: React.FC<{ active?: boolean; onClick?: () => void; color: VariantKey } & React.PropsWithChildren> = ({ active, onClick, children, color }) => {
   const v = VARIANTS[color] ?? VARIANTS.SLATE;
-  const activeCls = `${v.bgActive} ${v.text} ${v.border} shadow`;
-  const idleCls = `bg-transparent ${v.text} ${v.border} hover:opacity-90`;
+  const activeCls = `${v.bgActive} ${v.text} ${v.border} ring-2 ring-black/10 dark:ring-white/30`;
+  const idleCls = `bg-transparent ${v.text} ${v.border} opacity-80 hover:opacity-100`;
   return (
     <button type="button" onClick={onClick} className={`${CHIP_BASE} ${active ? activeCls : idleCls}`}>
       {children}
@@ -133,7 +133,7 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
       </div>
 
       {allowCustom && (
-        <div className="grid grid-cols-10 sm:grid-cols-12 md:grid-cols-14 gap-2 max-w-full">
+        <div className="flex flex-wrap gap-2 max-w-full">
           {palette.map((k) => (
             <button
               key={k}
@@ -156,9 +156,9 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 max-w-full">
+      <div className="flex flex-wrap gap-2 max-w-full">
         {filtered.slice(0, 80).map((t) => (
-          <Chip key={t} color={pickColor(t)} active={value.includes(t)} onClick={() => toggle(t)}>
+          <Chip key={t} color={pickColor(t)} active={tagExists(t, value)} onClick={() => toggle(t)}>
             #{t}
           </Chip>
         ))}
