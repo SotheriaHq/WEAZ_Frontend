@@ -16,6 +16,13 @@ import useCollectionUpload from '../../hooks/useCollectionUpload';
 import WizardLayout from '../../components/layouts/WizardLayout';
 import { useNavigate } from 'react-router-dom';
 
+// Stable wrapper around SimpleAccordion so it doesn't remount on each render
+const Section: React.FC<React.PropsWithChildren<{ title: string; defaultOpen?: boolean }>> = ({ title, defaultOpen = true, children }) => (
+  <SimpleAccordion title={title} defaultOpen={defaultOpen}>
+    {children}
+  </SimpleAccordion>
+);
+
 const CreateCollectionInner: React.FC = () => {
   const mediaStore = useMediaStore();
   const files = mediaStore.items;
@@ -171,12 +178,6 @@ const CreateCollectionInner: React.FC = () => {
     </div>
   );
 
-  const Section: React.FC<React.PropsWithChildren<{ title: string; defaultOpen?: boolean }>> = ({ title, defaultOpen = true, children }) => (
-    <SimpleAccordion title={title} defaultOpen={defaultOpen}>
-      {children}
-    </SimpleAccordion>
-  );
-
   const PillGroup: React.FC<{ options: { key: string; label: string; title?: string }[]; value: string; onChange: (v: string) => void }>
     = ({ options, value, onChange }) => (
       <div className="inline-flex rounded-full border border-slate-300 dark:border-white/20 bg-white/60 dark:bg-white/5 p-1 backdrop-blur-md shadow-sm" role="tablist" aria-label="Options">
@@ -187,7 +188,7 @@ const CreateCollectionInner: React.FC = () => {
             title={opt.title ?? opt.label}
             aria-pressed={value === opt.key}
             onClick={() => onChange(opt.key)}
-            className={`min-w-[64px] px-3 py-2 text-xs rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 ${
+            className={`min-w-[52px] px-2.5 py-1.5 text-xs rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 ${
               value === opt.key ? 'bg-black/10 text-gray-900 dark:bg-white/20 dark:text-white' : 'text-gray-700 dark:text-white/80'
             }`}
             disabled={disabled}

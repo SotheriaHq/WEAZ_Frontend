@@ -361,7 +361,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       if (isCollapsed) setIsCollapsed(false);
       setActiveLink(labelKey);
       setBrandsOpen(false);
-      navigate('/');
+      // Navigate explicitly to /market to avoid brand-root redirect
+      navigate('/market');
       return;
     }
 

@@ -46,6 +46,8 @@ export const SimpleAccordion: React.FC<SimpleAccordionProps> = ({ title, default
         style={{
           gridTemplateRows: isOpen ? '1fr' : '0fr',
         }}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="overflow-hidden">
           {isOpen && (

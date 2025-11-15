@@ -284,7 +284,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, minim
                   localStorage.removeItem(env.userStorageKey);
                   dispatch(clearUser());
                   setShowProfileMenu(false);
-                  navigate('/login', { replace: true });
+                  navigate('/', { replace: true });
                 }}
                 className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-3"
               >

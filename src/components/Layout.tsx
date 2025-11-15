@@ -14,13 +14,9 @@ export const Layout: React.FC = () => {
    const location = useLocation();
    const navigate = useNavigate();
 
-   // If a BRAND lands on the app root, prefer showing their profile by default
+   // Root path ('/') should always render Market; no brand-specific redirect
    React.useEffect(() => {
-     if (!user) return;
-     // Do not redirect away from the Market page; it's public for all users
-     if (user.type === 'BRAND' && (location.pathname === '/')) {
-       navigate('/profile', { replace: true });
-     }
+     void user; void location; void navigate;
    }, [user, location.pathname, navigate]);
 
   return (
