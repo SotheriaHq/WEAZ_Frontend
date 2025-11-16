@@ -228,11 +228,11 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
         </button>
       </div>
 
-      {/* Collection Title & Piece Count */}
+      {/* Collection Title & Piece Count - Fancy Typography */}
       <div className="flex items-center gap-3 px-2">
         <h2
-          className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight italic uppercase"
-          style={{ fontFamily: 'Georgia, serif' }}
+          className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 tracking-tight italic uppercase drop-shadow-sm"
+          style={{ fontFamily: 'Georgia, "Playfair Display", serif', fontWeight: 700, letterSpacing: '0.02em' }}
         >
           {detail?.title || 'Collection'}
         </h2>
@@ -247,7 +247,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Carousel (2/3 width on desktop) */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 relative">
           <StackedCarousel
             items={resolvedItems.length ? resolvedItems : mediaItems}
             initialIndex={0}
@@ -266,6 +266,15 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               } catch {
                 toast.error('Failed to set cover');
               }
+            }}
+            tags={detail?.tags || []}
+            price={{ 
+              min: detail?.minPrice, 
+              max: detail?.maxPrice, 
+              saleMin: detail?.saleMinPrice ?? null, 
+              saleMax: detail?.saleMaxPrice ?? null,
+              saleStartAt: detail?.saleStartAt ?? null,
+              saleEndAt: detail?.saleEndAt ?? null
             }}
           />
         </div>

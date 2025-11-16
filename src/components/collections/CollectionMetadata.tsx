@@ -204,9 +204,12 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
       {/* Tags */}
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {tags.slice(0, 6).map((t) => (
-            <TagChip key={t} label={`#${t}`} size="sm" />
-          ))}
+          {tags.slice(0, 6).map((t, idx) => {
+            const colors: Array<'purple' | 'blue' | 'green' | 'orange' | 'red'> = ['purple', 'blue', 'green', 'orange', 'red'];
+            const color = colors[idx % colors.length];
+            console.log('[CollectionMetadata] Rendering tag:', { tag: t, color, index: idx });
+            return <TagChip key={t} label={`#${t}`} size="sm" color={color} />;
+          })}
         </div>
       )}
 

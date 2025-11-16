@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Pause, Tag as TagIcon } from 'lucide-react';
+import TagChip from '@/components/ui/Tag';
+import { useNavigate } from 'react-router-dom';
 
 export interface CarouselMediaItem {
   id: string;
@@ -19,6 +21,8 @@ interface StackedCarouselProps {
   isOwner?: boolean;
   coverMediaId?: string | null;
   onSetCover?: (item: CarouselMediaItem) => void;
+  tags?: string[];
+  price?: { min?: number | null; max?: number | null; saleMin?: number | null; saleMax?: number | null; saleStartAt?: string | null; saleEndAt?: string | null };
 }
 
 function calculateGap(width: number) {
@@ -31,6 +35,49 @@ function calculateGap(width: number) {
   return minGap + (maxGap - minGap) * ((width - minWidth) / (maxWidth - minWidth));
 }
 
+// Countdown timer hook
+function useCountdown(endDate: string | null) {
+  const [timeLeft, setTimeLeft] = useState<string>('');
+
+  useEffect(() => {
+    if (!endDate) {
+      setTimeLeft('');
+      return;
+    }
+
+    const calculateTimeLeft = () => {
+      const end = new Date(endDate).getTime();
+      const now = Date.now();
+      const diff = end - now;
+
+      if (diff <= 0) {
+        setTimeLeft('Ended');
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      if (days > 0) {
+        setTimeLeft(`${days}d ${hours}h`);
+      } else if (hours > 0) {
+        setTimeLeft(`${hours}h ${minutes}m`);
+      } else {
+        setTimeLeft(`${minutes}m ${seconds}s`);
+      }
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 1000);
+
+    return () => clearInterval(interval);
+  }, [endDate]);
+
+  return timeLeft;
+}
+
 export const StackedCarousel: React.FC<StackedCarouselProps> = ({
   items,
   initialIndex = 0,
@@ -40,14 +87,25 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
   isOwner = false,
   coverMediaId,
   onSetCover,
+  tags = [],
+  price,
 }) => {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [containerWidth, setContainerWidth] = useState(800);
   const containerRef = useRef<HTMLDivElement>(null);
   const autoplayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const [showTags, setShowTags] = useState(false);
+  const [tagsHovered, setTagsHovered] = useState(false);
+  const tagsRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const countdown = useCountdown(price?.saleEndAt || null);
 
   const itemsLength = items.length;
+  const hasTags = tags.length > 0;
+  const hasActiveSale = price?.saleMin && price?.saleMax;
+
+  console.log('[StackedCarousel] Rendering with tags:', { tags, hasTags, price, countdown });
 
   // Responsive width tracking
   useEffect(() => {
@@ -165,13 +223,146 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
     );
   }
 
+  // Click outside handler for tags
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tagsRef.current && !tagsRef.current.contains(event.target as Node)) {
+        console.log('[StackedCarousel] Clicked outside tags, collapsing');
+        setShowTags(false);
+      }
+    };
+
+    if (showTags) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showTags]);
+
+  const handleTagClick = (tag: string) => {
+    console.log('[StackedCarousel] Tag clicked:', tag);
+    navigate(`/search?q=${encodeURIComponent(tag)}`);
+  };
+
   return (
     <div className={`w-full ${className}`}>
       <div
         ref={containerRef}
         className="relative w-full h-[500px] sm:h-[600px] lg:h-[700px] flex items-center justify-center"
         style={{ perspective: '1200px' }}
+        onClick={(e) => {
+          // Collapse tags when clicking on the carousel itself
+          if (e.target === containerRef.current || (e.target as HTMLElement).tagName === 'IMG' || (e.target as HTMLElement).tagName === 'VIDEO') {
+            console.log('[StackedCarousel] Clicked on carousel, collapsing tags');
+            setShowTags(false);
+          }
+        }}
       >
+        {/* Tags Overlay - Top Left */}
+        {hasTags && (
+          <div
+            ref={tagsRef}
+            className="absolute top-4 left-4 z-50"
+            onMouseEnter={() => {
+              console.log('[StackedCarousel] Mouse enter tags');
+              setTagsHovered(true);
+              setShowTags(true);
+            }}
+            onMouseLeave={() => {
+              console.log('[StackedCarousel] Mouse leave tags');
+              setTagsHovered(false);
+              // Keep open if clicked, otherwise close after delay
+              setTimeout(() => {
+                if (!tagsHovered && !showTags) {
+                  setShowTags(false);
+                }
+              }, 200);
+            }}
+          >
+            {/* Tag Icon Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('[StackedCarousel] Tag icon clicked, toggling:', !showTags);
+                setShowTags(!showTags);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/80 dark:bg-black/60 backdrop-blur-md border border-white/40 hover:bg-white dark:hover:bg-black/80 transition shadow-lg"
+              aria-label="View tags"
+            >
+              <TagIcon size={14} className="text-purple-600 dark:text-purple-400" />
+              <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{tags.length}</span>
+            </button>
+
+            {/* Expanded Tags */}
+            {showTags && (
+              <div className="mt-2 flex flex-wrap gap-1.5 max-w-[280px]">
+                {tags.map((t, idx) => {
+                  const colors: Array<'purple' | 'blue' | 'green' | 'orange' | 'red'> = ['purple', 'blue', 'green', 'orange', 'red'];
+                  const color = colors[idx % colors.length];
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTagClick(t);
+                      }}
+                      className="transition hover:scale-105"
+                    >
+                      <TagChip label={`#${t}`} size="sm" color={color} />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Price Overlay - Top Right with Countdown */}
+        {price && (price.min || price.saleMin) && (
+          <div className="absolute top-4 right-4 z-50 flex flex-col items-end gap-1.5">
+            {/* Sale Price */}
+            {hasActiveSale && (
+              <div className="flex flex-col items-end gap-1">
+                <div className="px-3 py-1.5 rounded-full bg-emerald-500/90 backdrop-blur-md border border-emerald-400/60 shadow-lg">
+                  <span className="text-white font-bold text-sm" style={{ fontFamily: 'system-ui, sans-serif' }}>
+                    ₦{price.saleMin!.toLocaleString()} - ₦{price.saleMax!.toLocaleString()}
+                  </span>
+                </div>
+                {/* Countdown Timer */}
+                {countdown && countdown !== 'Ended' && (
+                  <div className="px-2.5 py-1 rounded-md bg-red-500/90 backdrop-blur-md border border-red-400/60 shadow-md animate-pulse">
+                    <span className="text-white font-bold text-[10px] uppercase tracking-wide" style={{ fontFamily: 'monospace' }}>
+                      🔥 {countdown}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Original Price (strikethrough if on sale) */}
+            {price.min && price.max && hasActiveSale && (
+              <div className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/20">
+                <span className="text-white/80 font-medium text-xs line-through">
+                  ₦{price.min.toLocaleString()} - ₦{price.max.toLocaleString()}
+                </span>
+              </div>
+            )}
+            
+            {/* Regular Price (no sale) */}
+            {price.min && price.max && !hasActiveSale && (
+              <div className="px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md border border-white/30 shadow-lg">
+                <span className="text-white font-bold text-sm" style={{ fontFamily: 'system-ui, sans-serif' }}>
+                  ₦{price.min.toLocaleString()} - ₦{price.max.toLocaleString()}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Overlay navigation controls to keep them visible without scrolling */}
         {itemsLength > 1 && (
           <>

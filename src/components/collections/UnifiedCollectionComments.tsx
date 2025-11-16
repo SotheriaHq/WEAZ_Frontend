@@ -24,12 +24,19 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
   const load = async (reset = false) => {
     if (busy) return;
     setBusy(true);
+    console.log('[UnifiedComments] Loading comments:', { collectionId, reset, cursor });
     try {
       const res = await CommentsApi.listUnifiedForCollection(collectionId, reset ? undefined : cursor ?? undefined, 20);
+      console.log('[UnifiedComments] Loaded comments:', { 
+        itemsCount: res.items.length, 
+        hasNextPage: res.hasNextPage,
+        totalItems: reset ? res.items.length : items.length + res.items.length
+      });
       if (reset) setItems(res.items); else setItems((prev) => [...prev, ...res.items]);
       setHasNext(res.hasNextPage);
       setCursor(res.endCursor);
     } catch (e: any) {
+      console.error('[UnifiedComments] Failed to load comments:', e);
       toast.error(e?.response?.data?.message ?? 'Failed to load comments');
     } finally {
       setBusy(false);
@@ -38,26 +45,7 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
 
   React.useEffect(() => { setItems([]); setCursor(null); setHasNext(false); void load(true); }, [collectionId]);
 
-  // Debug: log scroll container dimensions
-  const logScrollMetrics = React.useCallback((label: string) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    console.log('[UnifiedComments]', label, {
-      clientHeight: el.clientHeight,
-      scrollHeight: el.scrollHeight,
-      scrollTop: el.scrollTop,
-      hasOverflow: el.scrollHeight > el.clientHeight,
-    });
-  }, []);
 
-  React.useEffect(() => {
-    logScrollMetrics('mounted');
-    const onResize = () => logScrollMetrics('resize');
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [logScrollMetrics]);
-
-  React.useEffect(() => { logScrollMetrics('items-updated'); }, [items, logScrollMetrics]);
 
   const applyCreated = (c: CommentV2Dto) => setItems((prev) => [c, ...prev]);
   const handleLike = (commentId: string, likeCount: number) => setItems((prev) => prev.map((c) => c.id === commentId ? { ...c, likeCount } : { ...c, children: c.children?.map(r => r.id === commentId ? { ...r, likeCount } : r) }));
@@ -70,50 +58,71 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
     });
   };
 
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+  };
+
   return (
-    <div className="flex flex-col h-full min-h-0">
-      {/* Scrollable Comments Area */}
+    <div 
+      className="flex flex-col"
+      style={{ height: '100%', minHeight: 0, maxHeight: '100%' }}
+    >
+      {/* Scrollable Comments Area - NOW AT TOP */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto overscroll-contain scroll-smooth space-y-0.5 pr-2 pb-20 unified-comments-scroll min-h-0 max-h-full"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', touchAction: 'pan-y' }}
-        onWheel={(e) => { e.stopPropagation(); }}
-        onScroll={() => logScrollMetrics('scroll')}
+        className="overflow-y-scroll overscroll-contain unified-comments-scroll"
+        style={{ 
+          flex: '1 1 0',
+          minHeight: 0,
+          maxHeight: '100%',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          touchAction: 'pan-y',
+          WebkitOverflowScrolling: 'touch',
+        }}
+        onWheel={handleWheel}
+        onScroll={handleScroll}
       >
         <style>{`
           .unified-comments-scroll::-webkit-scrollbar {
             display: none;
           }
         `}</style>
-        <div>
-          {items.map((c) => (
-            <div key={c.id} className="py-0.5">
-              <div className="flex items-center gap-1 pb-0.5">
-                <span className="inline-block text-[9px] px-1 py-0.5 rounded bg-white/30 dark:bg-white/10 text-gray-700 dark:text-gray-300">
-                  {c.targetType === 'COLLECTION' ? 'collection' : 'item'}
-                </span>
+        <div className="space-y-0 px-1 pb-2">
+          {items.map((c) => {
+            console.log('[UnifiedComments] Rendering comment:', { 
+              id: c.id, 
+              targetType: c.targetType, 
+              hasChildren: c.children?.length || 0 
+            });
+            return (
+              <div key={c.id} className="py-0.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
+                <CommentItem comment={c} onLike={handleLike} onDelete={handleDelete} onReply={() => {}} />
+                {c.children && c.children.length > 0 && (
+                  <div className="pl-6 mt-0.5">
+                    <button
+                      type="button"
+                      className="text-[10px] text-gray-600 dark:text-gray-300 hover:underline"
+                      onClick={() => toggleReplies(c.id)}
+                    >
+                      {expanded.has(c.id) ? 'Hide replies' : `View replies (${c.children.length})`}
+                    </button>
+                    {expanded.has(c.id) && (
+                      <div className="mt-0.5 space-y-0.5">
+                        {c.children.map((r) => (
+                          <CommentItem key={r.id} comment={r} onLike={handleLike} onDelete={handleDelete} onReply={() => {}} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <CommentItem comment={c} onLike={handleLike} onDelete={handleDelete} onReply={() => {}} />
-              {c.children && c.children.length > 0 && (
-                <div className="pl-8 mt-0.5">
-                  <button
-                    type="button"
-                    className="text-[11px] text-gray-600 dark:text-gray-300 hover:underline"
-                    onClick={() => toggleReplies(c.id)}
-                  >
-                    {expanded.has(c.id) ? 'Hide replies' : `View replies (${c.children.length})`}
-                  </button>
-                  {expanded.has(c.id) && (
-                    <div className="mt-0.5 space-y-0.5">
-                      {c.children.map((r) => (
-                        <CommentItem key={r.id} comment={r} onLike={handleLike} onDelete={handleDelete} onReply={() => {}} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
           {!items.length && <div className="text-xs text-gray-500 py-4">Be the first to comment.</div>}
           {hasNext && (
             <div className="py-2 text-center">
@@ -122,10 +131,10 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
           )}
         </div>
       </div>
-      
-      {/* Fixed Input at Bottom */}
+
+      {/* Fixed Input at BOTTOM */}
       <div className="flex-shrink-0 pt-3 mt-2 border-t border-gray-200 dark:border-white/20 bg-white dark:bg-black sticky bottom-0 z-20 shadow-[0_-4px_12px_-6px_rgba(0,0,0,0.25)]">
-        <div className="relative">
+        <div className="relative w-full">
           <CommentInput
             value={text}
             onChange={setText}

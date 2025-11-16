@@ -97,17 +97,27 @@ const CommentItem: React.FC<Props> = ({ comment, onLike, onReply, onDelete, curr
           <span>{(comment.user?.username ?? 'U').charAt(0).toUpperCase()}</span>
         )}
       </div>
-      <div className="flex-1">
-        <div className="text-xs leading-snug">
-          {(() => {
-            const username = comment.user?.username;
-            const full = `${comment.user?.firstName ?? ''} ${comment.user?.lastName ?? ''}`.trim();
-            const display = (username ?? full) || 'User';
-            return <span className="font-semibold mr-2">{display}</span>;
-          })()}
-          <span className="text-gray-500">
-            {formatRelativeTime(comment.createdAt)}
+      <div className="flex-1 min-w-0">
+        {/* Header: Username on left, Time and Like on right */}
+        <div className="flex items-center justify-between gap-2 text-xs leading-snug">
+          <span className="font-semibold truncate">
+            {(() => {
+              const username = comment.user?.username;
+              const full = `${comment.user?.firstName ?? ''} ${comment.user?.lastName ?? ''}`.trim();
+              const display = (username ?? full) || 'User';
+              console.log('[CommentItem] Rendering comment:', { commentId: comment.id, display, createdAt: comment.createdAt });
+              return display;
+            })()}
           </span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-gray-500 text-[11px]">
+              {formatRelativeTime(comment.createdAt)}
+            </span>
+            <button type="button" onClick={toggle} className={`flex items-center gap-1 ${liked ? 'text-rose-600' : 'text-gray-600'}`}>
+              <Heart className={liked ? 'fill-current' : ''} size={13} />
+              <span className="text-[11px]">{likeCount}</span>
+            </button>
+          </div>
         </div>
         <div className={`text-xs mt-0.5 ${comment.deletedAt ? 'italic text-gray-500' : ''}`}>
           {comment.deletedAt ? '[deleted]' : comment.contentSanitized}
@@ -115,22 +125,20 @@ const CommentItem: React.FC<Props> = ({ comment, onLike, onReply, onDelete, curr
             <span className="ml-2 text-[10px] italic text-blue-500">(pending)</span>
           )}
         </div>
-        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
-          <button type="button" onClick={toggle} className={`flex items-center gap-1 ${liked ? 'text-rose-600' : ''}`}>
-            <Heart className={liked ? 'fill-current' : ''} size={14} />
-            <span>{likeCount}</span>
-          </button>
-          {comment.depth < 2 && enableReplyComposer && (
-            <button type="button" onClick={() => { setReplying((p) => !p); onReply?.(comment.id); }} className="flex items-center gap-1">
-              <Reply size={14} /> {replying ? 'Cancel' : 'Reply'}
-            </button>
-          )}
-          {canDelete && (
-            <button type="button" onClick={remove} className="flex items-center gap-1 text-gray-500 hover:text-red-600">
-              <Trash2 size={14} /> Delete
-            </button>
-          )}
-        </div>
+        {(comment.depth < 2 && enableReplyComposer) || canDelete ? (
+          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
+            {comment.depth < 2 && enableReplyComposer && (
+              <button type="button" onClick={() => { setReplying((p) => !p); onReply?.(comment.id); }} className="flex items-center gap-1">
+                <Reply size={13} /> {replying ? 'Cancel' : 'Reply'}
+              </button>
+            )}
+            {canDelete && (
+              <button type="button" onClick={remove} className="flex items-center gap-1 text-gray-500 hover:text-red-600">
+                <Trash2 size={13} /> Delete
+              </button>
+            )}
+          </div>
+        ) : null}
         {replying && enableReplyComposer && (
           <div className="mt-1 pl-1 flex flex-col gap-1">
             <textarea
