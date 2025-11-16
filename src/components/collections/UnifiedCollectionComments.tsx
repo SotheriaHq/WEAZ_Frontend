@@ -20,6 +20,7 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const emojiPickerRef = React.useRef<HTMLDivElement>(null);
 
   const load = async (reset = false) => {
     if (busy) return;
@@ -45,7 +46,23 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
 
   React.useEffect(() => { setItems([]); setCursor(null); setHasNext(false); void load(true); }, [collectionId]);
 
+  // Click outside handler for emoji picker
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        console.log('[UnifiedComments] Clicked outside emoji picker, closing');
+        setShowEmojiPicker(false);
+      }
+    };
 
+    if (showEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
 
   const applyCreated = (c: CommentV2Dto) => setItems((prev) => [c, ...prev]);
   const handleLike = (commentId: string, likeCount: number) => setItems((prev) => prev.map((c) => c.id === commentId ? { ...c, likeCount } : { ...c, children: c.children?.map(r => r.id === commentId ? { ...r, likeCount } : r) }));
@@ -88,8 +105,37 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
         onScroll={handleScroll}
       >
         <style>{`
+          /* Elegant scrollbar styling - minimal, no background */
           .unified-comments-scroll::-webkit-scrollbar {
-            display: none;
+            width: 4px;
+          }
+          
+          .unified-comments-scroll::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          
+          .unified-comments-scroll::-webkit-scrollbar-thumb {
+            background: rgba(139, 92, 246, 0.3);
+            border-radius: 2px;
+            transition: background 0.2s ease;
+          }
+          
+          .unified-comments-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(139, 92, 246, 0.5);
+          }
+          
+          .dark .unified-comments-scroll::-webkit-scrollbar-thumb {
+            background: rgba(167, 139, 250, 0.3);
+          }
+          
+          .dark .unified-comments-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(167, 139, 250, 0.5);
+          }
+          
+          /* Firefox scrollbar */
+          .unified-comments-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(139, 92, 246, 0.3) transparent;
           }
         `}</style>
         <div className="space-y-0 px-1 pb-2">
@@ -162,27 +208,70 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
             <Smile size={18} />
           </button>
           {showEmojiPicker && (
-            <div className="absolute bottom-full right-0 mb-2 z-50 rounded-lg shadow-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 overflow-hidden" style={{ width: 280, height: 320 }}>
+            <div 
+              ref={emojiPickerRef}
+              className="absolute bottom-full right-0 mb-2 z-50 rounded-xl shadow-2xl overflow-hidden backdrop-blur-md"
+              style={{ width: 320, height: 380 }}
+            >
               <style>{`
+                /* Emoji Picker Custom Styling */
                 .emoji-picker-react {
-                  overflow: hidden !important;
+                  background: rgba(255, 255, 255, 0.95) !important;
+                  border: 1px solid rgba(139, 92, 246, 0.2) !important;
+                  border-radius: 12px !important;
+                  box-shadow: 0 20px 25px -5px rgba(139, 92, 246, 0.1), 0 10px 10px -5px rgba(139, 92, 246, 0.04) !important;
                 }
+                
+                .dark .emoji-picker-react {
+                  background: rgba(17, 24, 39, 0.95) !important;
+                  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+                }
+                
+                /* Hide all scrollbars in emoji picker */
                 .emoji-picker-react .emoji-scroll-wrapper,
                 .emoji-picker-react .emoji-categories,
-                .emoji-picker-react .emoji-group {
+                .emoji-picker-react .emoji-group,
+                .emoji-picker-react * {
                   scrollbar-width: none !important;
                   -ms-overflow-style: none !important;
                 }
+                
                 .emoji-picker-react .emoji-scroll-wrapper::-webkit-scrollbar,
                 .emoji-picker-react .emoji-categories::-webkit-scrollbar,
-                .emoji-picker-react .emoji-group::-webkit-scrollbar {
+                .emoji-picker-react .emoji-group::-webkit-scrollbar,
+                .emoji-picker-react *::-webkit-scrollbar {
                   display: none !important;
                   width: 0 !important;
                   height: 0 !important;
                 }
+                
+                /* Style emoji picker header */
+                .emoji-picker-react .emoji-header {
+                  padding: 8px 12px !important;
+                  border-bottom: 1px solid rgba(139, 92, 246, 0.1) !important;
+                }
+                
+                /* Category buttons styling */
+                .emoji-picker-react .emoji-categories button {
+                  transition: all 0.2s ease !important;
+                }
+                
+                .emoji-picker-react .emoji-categories button:hover {
+                  background: rgba(139, 92, 246, 0.1) !important;
+                }
+                
+                /* Selected category */
+                .emoji-picker-react .emoji-categories button.active {
+                  background: rgba(139, 92, 246, 0.2) !important;
+                  border-color: rgba(139, 92, 246, 0.4) !important;
+                }
               `}</style>
               <EmojiPicker
-                onEmojiClick={(e: EmojiClickData) => { setText((prev) => prev + e.emoji); setShowEmojiPicker(false); }}
+                onEmojiClick={(e: EmojiClickData) => { 
+                  console.log('[UnifiedComments] Emoji selected:', e.emoji);
+                  setText((prev) => prev + e.emoji); 
+                  setShowEmojiPicker(false); 
+                }}
                 emojiStyle={EmojiStyle.NATIVE}
                 theme={Theme.AUTO}
                 searchDisabled
@@ -190,6 +279,7 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
                 lazyLoadEmojis
                 width="100%"
                 height="100%"
+                previewConfig={{ showPreview: false }}
               />
             </div>
           )}
