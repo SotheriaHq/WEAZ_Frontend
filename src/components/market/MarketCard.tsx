@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Share2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Share2, Tag as TagIcon } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { CommentsApi } from '@/api/CommentsApi';
@@ -9,9 +9,9 @@ import CommentInput from '@/components/ui/CommentInput';
 import Tag from '@/components/ui/Tag';
 import type { MarketItem } from '@/types/market';
 import { formatPrice } from '@/utils/helpers';
-import { getTagColor } from '@/utils/tagColors';
 import { selectCommentCount } from '@/features/engagementSlice';
 import { useRealtime } from '@/realtime/RealtimeProvider';
+import { useNavigate } from 'react-router-dom';
 
 interface MarketCardProps {
   item: MarketItem;
@@ -28,11 +28,70 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
   const [commentText, setCommentText] = useState('');
   const [commentBusy, setCommentBusy] = useState(false);
   const realtime = useRealtime();
+  const [showTags, setShowTags] = useState(false);
+  const tagsRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const [countdown, setCountdown] = useState<string>('');
   
   // Join WebSocket room for real-time comment/like updates
   useEffect(() => {
     realtime.joinCollectionMedia(item.id);
   }, [item.id, realtime]);
+
+  // Countdown timer for sale end
+  useEffect(() => {
+    if (!item.saleEndAt) {
+      setCountdown('');
+      return;
+    }
+
+    const calculateTimeLeft = () => {
+      const end = new Date(item.saleEndAt!).getTime();
+      const now = Date.now();
+      const diff = end - now;
+
+      if (diff <= 0) {
+        setCountdown('Ended');
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      if (days > 0) {
+        setCountdown(`${days}d ${hours}h`);
+      } else if (hours > 0) {
+        setCountdown(`${hours}h ${minutes}m`);
+      } else {
+        setCountdown(`${minutes}m ${seconds}s`);
+      }
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 1000);
+
+    return () => clearInterval(interval);
+  }, [item.saleEndAt]);
+
+  // Click outside handler for tags
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tagsRef.current && !tagsRef.current.contains(event.target as Node)) {
+        console.log('[MarketCard] Clicked outside tags, collapsing');
+        setShowTags(false);
+      }
+    };
+
+    if (showTags) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showTags]);
   
   // Use Redux selector for real-time comment count synchronization
   const commentCount = useSelector((s: RootState) => 
@@ -90,8 +149,6 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
 
   console.log('💵 [MarketCard] Computed price bands + decision:', { baseBand, saleBand, showStacked, singleBand });
 
-  const displayTags = item.tags.slice(0, 2);
-
   return (
     <article
       className={`group relative w-full overflow-hidden rounded-lg shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(129,140,248,0.3)] cursor-pointer ${className ?? ''}`}
@@ -137,35 +194,89 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
         {/* Gradient Overlay for Text Readability */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
         
-        {/* Price Badge (Top Right) */}
+        {/* Price Badge with Countdown (Top Right) */}
         {(baseBand || saleBand) && (
           <div className="absolute top-3 right-3 z-20 text-[10px]">
             {showStacked ? (
-              <div className="flex flex-col items-end gap-0.5">
-                <span className="rounded-full bg-black/40 text-white/80 line-through px-1.5 py-0.5 border border-white/20 backdrop-blur-sm">
-                  {baseBand}
-                </span>
-                <span className="rounded-full bg-emerald-500/80 text-white font-medium px-1.5 py-0.5 border border-white/20 backdrop-blur-sm">
+              <div className="flex flex-col items-end gap-1">
+                {/* Sale Price */}
+                <span className="rounded-full bg-emerald-500/90 text-white font-bold px-2 py-1 border border-emerald-400/60 backdrop-blur-md shadow-lg text-[11px]">
                   {saleBand}
+                </span>
+                {/* Countdown */}
+                {countdown && countdown !== 'Ended' && (
+                  <span className="rounded-md bg-red-500/90 text-white font-bold px-2 py-0.5 border border-red-400/60 backdrop-blur-md shadow-md animate-pulse text-[9px] uppercase tracking-wide" style={{ fontFamily: 'monospace' }}>
+                    🔥 {countdown}
+                  </span>
+                )}
+                {/* Original Price */}
+                <span className="rounded-full bg-black/60 text-white/80 line-through px-2 py-0.5 border border-white/20 backdrop-blur-sm">
+                  {baseBand}
                 </span>
               </div>
             ) : (
-              <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-semibold text-white shadow-lg backdrop-blur-md border ${saleBand ? 'bg-emerald-500/80 border-white/20' : 'bg-white/20 border-white/30'}`}>
+              <span className={`inline-flex items-center rounded-full px-2 py-1 font-bold text-white shadow-lg backdrop-blur-md border ${saleBand ? 'bg-emerald-500/90 border-emerald-400/60' : 'bg-black/70 border-white/30'}`}>
                 {singleBand}
               </span>
             )}
           </div>
         )}
 
-        {/* Tags (Top Left) */}
-        {displayTags.length > 0 && (
-          <div className="absolute top-3 left-3 z-20 flex flex-wrap gap-1.5">
-            {displayTags.map((tag) => {
-              const color = getTagColor(tag);
-              return (
-                <Tag key={tag} label={`#${tag}`} size="xs" color={color} />
-              );
-            })}
+        {/* Collapsible Tags with Icon (Top Left) */}
+        {item.tags.length > 0 && (
+          <div
+            ref={tagsRef}
+            className="absolute top-3 left-3 z-20"
+            onMouseEnter={() => {
+              console.log('[MarketCard] Mouse enter tags');
+              setShowTags(true);
+            }}
+            onMouseLeave={() => {
+              console.log('[MarketCard] Mouse leave tags');
+              setTimeout(() => setShowTags(false), 200);
+            }}
+          >
+            {/* Tag Icon Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('[MarketCard] Tag icon clicked, toggling:', !showTags);
+                setShowTags(!showTags);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 dark:bg-black/70 backdrop-blur-md border border-white/50 hover:bg-white dark:hover:bg-black/90 transition shadow-lg"
+              aria-label="View tags"
+            >
+              <TagIcon size={12} className="text-purple-600 dark:text-purple-400" />
+              <span className="text-[10px] font-bold text-gray-800 dark:text-gray-200">{item.tags.length}</span>
+            </button>
+
+            {/* Expanded Tags */}
+            {showTags && (
+              <div 
+                className="mt-1.5 flex flex-wrap gap-1 max-w-[200px]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {item.tags.map((tag, idx) => {
+                  const colors: Array<'purple' | 'blue' | 'green' | 'orange' | 'red'> = ['purple', 'blue', 'green', 'orange', 'red'];
+                  const color = colors[idx % colors.length];
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('[MarketCard] Tag clicked:', tag);
+                        navigate(`/search?q=${encodeURIComponent(tag)}`);
+                      }}
+                      className="transition hover:scale-105"
+                    >
+                      <Tag label={`#${tag}`} size="xs" color={color} />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -233,8 +344,11 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
             </div>
           </button>
 
-          {/* Collection Title */}
-          <h3 className="text-base font-bold mb-1 line-clamp-2 leading-tight drop-shadow-lg">
+          {/* Collection Title - Fancy Typography */}
+          <h3 
+            className="text-base font-bold mb-1 line-clamp-2 leading-tight drop-shadow-lg text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-100 to-white"
+            style={{ fontFamily: 'Georgia, "Playfair Display", serif', fontWeight: 700, letterSpacing: '0.03em', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}
+          >
             {item.collectionTitle}
           </h3>
 
