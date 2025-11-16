@@ -92,6 +92,78 @@ export const brandApi = {
       return [];
     }
   },
+  async listBrandAccessRequests(
+    brandId: string,
+    args?: { status?: 'pending' | 'approved'; cursor?: string; limit?: number; q?: string; page?: number; pageSize?: number }
+  ) {
+    const params = new URLSearchParams();
+    if (args?.status) params.set('status', args.status);
+    if (args?.cursor) params.set('cursor', args.cursor);
+    if (args?.limit) params.set('limit', String(args.limit));
+    if (args?.q) params.set('q', args.q);
+    if (args?.page) params.set('page', String(args.page));
+    if (args?.pageSize) params.set('pageSize', String(args.pageSize));
+    const res = await apiClient.get(`/brands/${brandId}/private-access/requests?${params.toString()}`);
+    const payload = res.data;
+    const container: any = payload?.data ?? payload ?? {};
+    const items = (container?.items ?? []) as any[];
+    return {
+      items: items.map((r: any) => ({
+        id: r.id,
+        collectionId: r.collectionId,
+        title: r.collection?.title ?? '',
+        viewer: r.viewer ?? null,
+        state: r.state,
+        createdAt: r.createdAt,
+      })),
+      hasNextPage: container?.hasNextPage,
+      endCursor: container?.endCursor ?? null,
+      totalCount: container?.totalCount,
+      page: container?.page,
+      pageSize: container?.pageSize,
+      totalPages: container?.totalPages,
+    };
+  },
+  async brandUpdateAccess(brandId: string, collectionId: string, userId: string, state: 'APPROVED' | 'REVOKED') {
+    const res = await apiClient.patch(`/brands/${brandId}/private-access/${collectionId}/${userId}`, { state });
+    return res.data?.data ?? res.data;
+  },
+  async brandRejectAccess(brandId: string, collectionId: string, userId: string) {
+    const res = await apiClient.patch(`/brands/${brandId}/private-access/${collectionId}/${userId}/reject`);
+    return res.data?.data ?? res.data;
+  },
+
+  // Request access to a private collection
+  async requestPrivateAccess(collectionId: string): Promise<{ state: 'PENDING' | 'APPROVED'; cooldownActive?: boolean; nextAllowedAt?: string } | null> {
+    try {
+      const response = await apiClient.post(`/collections/${collectionId}/access-requests`);
+      const payload = response.data;
+        return (payload?.data ?? payload) as { state: 'PENDING' | 'APPROVED'; cooldownActive?: boolean; nextAllowedAt?: string };
+    } catch (error) {
+      console.error('Error requesting private access:', error);
+      return null;
+    }
+  },
+
+  // Viewer access states for a brand's private collections
+  async getBrandPrivateStates(brandId: string): Promise<Array<{ collectionId: string; title: string; coverUrl?: string | null; coverFileId?: string | null; itemCount?: number; state: 'APPROVED' | 'PENDING' | 'REVOKED' | 'NONE' }>> {
+    try {
+      const response = await apiClient.get(`/brands/${brandId}/private-access/my-states`);
+      const payload = response.data;
+      const items = (payload?.data?.items ?? payload?.items ?? []) as any[];
+      return items.map((it) => ({
+        collectionId: String(it.collectionId),
+        title: String(it.title ?? ''),
+        coverUrl: it.coverUrl ?? null,
+        coverFileId: typeof it.coverFileId === 'string' ? it.coverFileId : undefined,
+        itemCount: typeof it.itemCount === 'number' ? it.itemCount : undefined,
+        state: (it.state as any) ?? 'NONE',
+      }));
+    } catch (error) {
+      console.error('Error fetching brand private states:', error);
+      return [];
+    }
+  },
   // Fetch brand profile details
   async getBrandProfile(brandId: string): Promise<BrandProfileDto | null> {
     try {
@@ -115,14 +187,18 @@ export const brandApi = {
   },
 
   // Fetch collections
-  async getCollections(ownerId: string): Promise<CollectionDto[]> {
+  async getCollections(ownerId: string, opts?: { visibility?: 'public' | 'private' | 'all' }): Promise<CollectionDto[]> {
     try {
-      const response = await apiClient.get(`/collections/user/${ownerId}`);
+      const params = new URLSearchParams();
+      if (opts?.visibility) params.append('visibility', opts.visibility);
+      const query = params.toString();
+      console.debug('[BrandApi.getCollections] request', { ownerId, visibility: opts?.visibility ?? 'all' });
+      const response = await apiClient.get(`/collections/user/${ownerId}${query ? `?${query}` : ''}`);
       const data = unwrapApiResponse<{ items: unknown[]; hasNextPage: boolean; endCursor?: string }>(response.data);
       
       // Transform backend data to frontend format
       const items = Array.isArray(data?.items) ? data.items : [];
-      return items.map((item: unknown) => {
+      const mapped = items.map((item: unknown) => {
         const backendItem = item as Record<string, unknown>;
         const medias = (backendItem.medias as Array<{ id?: string; commentsCount?: number; likesCount?: number; file?: { url?: string; s3Url?: string; id?: string } }>) || [];
         const coverMediaId = (backendItem as any)?.coverMediaId as string | undefined;
@@ -142,16 +218,19 @@ export const brandApi = {
         const mediaCommentsSum = Array.isArray(medias) ? medias.reduce((sum, m) => sum + (m?.commentsCount || 0), 0) : 0;
         const totalLikes = (baseLikes || 0) + mediaLikesSum;
         const totalComments = (baseComments || 0) + mediaCommentsSum;
-        return {
+        const visibility =
+          ((backendItem as any).visibility as any) ??
+          (backendItem.status === 'PUBLISHED' ? 'PUBLIC' : 'PRIVATE');
+
+        const out = {
           id: backendItem.id as string,
           name: (backendItem.title as string) || '',
           title: (backendItem.title as string) || '',
           description: (backendItem.description as string) || '',
           ownerId: backendItem.ownerId as string,
-          isPublic: backendItem.status === 'PUBLISHED',
-          visibility:
-            ((backendItem as any).visibility as any) ??
-            (backendItem.status === 'PUBLISHED' ? 'PUBLIC' : 'PRIVATE'),
+          // Public/private derives from Collection.visibility, not publish status
+          isPublic: visibility === 'PUBLIC',
+          visibility,
           type: (backendItem as any).type as any,
           categoryId: (backendItem.categoryId as string) || undefined,
           coverImage: coverImageUrl,
@@ -181,7 +260,17 @@ export const brandApi = {
             ? (backendItem.tags as unknown[]).map((tag) => (typeof tag === 'string' ? tag : '')).filter(Boolean)
             : [],
         };
+        return out;
       });
+      try {
+        const totals = mapped.reduce((acc, c) => {
+          acc.all += 1;
+          if ((c as any).visibility === 'PRIVATE') acc.private += 1; else acc.public += 1;
+          return acc;
+        }, { all: 0, public: 0, private: 0 } as any);
+        console.debug('[BrandApi.getCollections] response', { count: mapped.length, ...totals });
+      } catch {}
+      return mapped;
     } catch (error) {
       console.error('Error fetching collections:', error);
       return [];
@@ -358,8 +447,14 @@ export const brandApi = {
     try {
       const response = await apiClient.get(`/collections/${collectionId}`);
       return unwrapApiResponse<any>(response.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching collection detail:', error);
+      // Propagate the error so components can handle permission/not-found cases
+      // Don't return null - throw the error to allow proper error handling
+      if (error?.response?.status === 404 || error?.response?.status === 403) {
+        throw error;
+      }
+      // For other errors, return null for backward compatibility
       return null;
     }
   },

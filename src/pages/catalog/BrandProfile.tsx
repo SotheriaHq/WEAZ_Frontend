@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
 import { useDispatch } from 'react-redux';
 
@@ -17,6 +17,7 @@ import EditProfileModal from '../../components/profile/EditProfileModal';
 import AboutTab from '../../components/profile/tabs/AboutTab';
 import ReviewsTab from '../../components/profile/tabs/ReviewsTab';
 import InlineCollectionViewer from '../../components/collections/InlineCollectionViewer';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import type { AuthUserDto } from '../../types/auth';
 import { setUser } from '../../features/userSlice';
 import { brandApi } from '../../api/BrandApi';
@@ -45,6 +46,7 @@ const ProfilePage: React.FC = () => {
     fetchReviews,
     fetchBrandProfile,
   } = useBrandProfile();
+  const navigate = useNavigate();
   // Owner view when no route param or when the param matches the logged-in brand user's id
   const isOwner = Boolean(user?.type === 'BRAND' && (!routeBrandId || routeBrandId === user?.id));
   const isVisitorView = !isOwner && Boolean(routeBrandId);
@@ -77,6 +79,7 @@ const ProfilePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('Collections');
   const [visibilityFilter, setVisibilityFilter] = useState<'Public' | 'Private'>('Public');
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [pendingAccessConfirm, setPendingAccessConfirm] = useState<string | null>(null);
   // collectionType state removed; modal is opened with the selected type via handler
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [hasDismissedSetup, setHasDismissedSetup] = useState(false);
@@ -462,7 +465,7 @@ const ProfilePage: React.FC = () => {
       try {
         const [p, cols] = await Promise.all([
           brandApi.getBrandProfile(routeBrandId),
-          brandApi.getCollections(routeBrandId),
+          brandApi.getCollections(routeBrandId, { visibility: 'all' }),
         ]);
         if (!mounted) return;
         setVisitorProfile(p ?? null);
@@ -470,6 +473,21 @@ const ProfilePage: React.FC = () => {
       } finally {
         if (mounted) setVisitorLoading(false);
       }
+    };
+    void run();
+    return () => { mounted = false; };
+  }, [isVisitorView, routeBrandId]);
+
+  // Visitor: fetch private access states for Private view
+  const [privateStates, setPrivateStates] = useState<Array<{ collectionId: string; title: string; coverUrl?: string | null; coverFileId?: string | null; itemCount?: number; state: 'APPROVED' | 'PENDING' | 'REVOKED' | 'NONE' }>>([]);
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      if (!isVisitorView || !routeBrandId) return;
+      try {
+        const items = await brandApi.getBrandPrivateStates(routeBrandId);
+        if (mounted) setPrivateStates(items);
+      } catch {}
     };
     void run();
     return () => { mounted = false; };
@@ -483,6 +501,27 @@ const ProfilePage: React.FC = () => {
     (c.name || c.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (c.description || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Debug: track filtering pipeline when tab or lists change
+  useEffect(() => {
+    try {
+      const totals = activeCollections.reduce((acc, c) => {
+        acc.all += 1;
+        if (c.visibility === 'PRIVATE' || c.isPublic === false) acc.private += 1; else acc.public += 1;
+        return acc;
+      }, { all: 0, public: 0, private: 0 } as any);
+      console.debug('[BrandProfile] view', {
+        isOwner,
+        isVisitorView,
+        activeTab,
+        visibilityFilter,
+        total: activeCollections.length,
+        ...totals,
+        filtered: visibilityFiltered.length,
+        searched: searchAndVisibilityFiltered.length,
+      });
+    } catch {}
+  }, [isOwner, isVisitorView, activeTab, visibilityFilter, activeCollections, visibilityFiltered.length, searchAndVisibilityFiltered.length]);
 
   // Resolve signed URLs for visitor profile assets if necessary
   const visitorBannerInitial = visitorProfile?.bannerImage ?? visitorProfile?.bannerImageMeta?.url ?? null;
@@ -718,25 +757,186 @@ const ProfilePage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Collections Grid */}
-                    {(isOwner ? collectionsLoading : visitorLoading) ? (
-                      <CollectionsSkeleton />
-                    ) : (isVisitorView ? visitorCollections : collections) && (isVisitorView ? visitorCollections : collections).length > 0 ? (
-                      <CollectionsGrid
-                        collections={searchAndVisibilityFiltered}
-                        onEdit={isOwner ? () => {} : undefined}
-                        onDelete={isOwner ? () => {} : undefined}
-                        onCollectionClick={(id) => setSelectedCollectionId(id)}
-                      />
+                    {/* Collections Grid (Owner or Visitor/Public) */}
+                    {isVisitorView && visibilityFilter === 'Private' ? (
+                      // Visitor Private view: Show approved collections or permission request
+                      (() => {
+                        const approvedCollections = privateStates.filter(s => s.state === 'APPROVED');
+                        const hasUnapproved = privateStates.some(s => s.state !== 'APPROVED');
+                        const hasPending = privateStates.some(s => s.state === 'PENDING');
+                        const hasRevoked = privateStates.some(s => s.state === 'REVOKED');
+                        const hasNone = privateStates.some(s => s.state === 'NONE');
+
+                        // If user has approved access, show those collections
+                        if (approvedCollections.length > 0) {
+                          return (
+                            <div className="space-y-6">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                {approvedCollections.map((s) => (
+                                  <button
+                                    key={s.collectionId}
+                                    onClick={() => setSelectedCollectionId(s.collectionId)}
+                                    className="relative group rounded-xl overflow-hidden border border-emerald-200/50 dark:border-emerald-500/20 bg-white/80 dark:bg-white/5 backdrop-blur shadow-md hover:shadow-xl transition-all duration-300 text-left"
+                                  >
+                                    <div className="relative h-44 w-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
+                                      {s.coverUrl ? (
+                                        <img src={s.coverUrl} alt={s.title} className="h-full w-full object-cover" />
+                                      ) : (
+                                        <div className="h-full w-full flex items-center justify-center">
+                                          <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                          </svg>
+                                        </div>
+                                      )}
+                                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+                                      <div className="absolute top-2 right-2">
+                                        <div className="bg-emerald-600/90 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full font-medium shadow-lg">
+                                          ✓ Approved
+                                        </div>
+                                      </div>
+                                      <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+                                        <div className="text-sm font-bold line-clamp-1">{s.title || 'Private Collection'}</div>
+                                        <div className="text-xs text-white/90 mt-0.5">{s.itemCount ?? 0} piece{(s.itemCount ?? 0) !== 1 ? 's' : ''}</div>
+                                      </div>
+                                    </div>
+                                    <div className="p-3">
+                                      <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Click to view →</div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                              
+                              {/* Show request card for remaining collections */}
+                              {hasUnapproved && (
+                                <div className="mt-8 max-w-2xl mx-auto">
+                                  <div className="glass-panel rounded-2xl p-6 border border-purple-200/50 dark:border-purple-500/20 bg-gradient-to-br from-white/80 via-purple-50/30 to-white/80 dark:from-purple-900/10 dark:via-purple-800/5 dark:to-gray-900/20 backdrop-blur-xl shadow-lg">
+                                    <div className="text-center space-y-3">
+                                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/40">
+                                        <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        </svg>
+                                      </div>
+                                      <p className="text-sm text-gray-700 dark:text-gray-300">
+                                        {hasPending ? '✓ Access request pending for other collections' : hasRevoked ? 'Some requests were declined (wait 72h to re-request)' : 'Request access to view all private collections'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        // No approved collections - show single permission request card
+                        if (privateStates.length > 0) {
+                          return (
+                            <div className="max-w-2xl mx-auto py-8">
+                              <div className="glass-panel rounded-2xl p-8 border border-purple-200/50 dark:border-purple-500/20 bg-gradient-to-br from-white/90 via-purple-50/50 to-white/90 dark:from-purple-900/20 dark:via-purple-800/10 dark:to-gray-900/40 backdrop-blur-xl shadow-xl">
+                                <div className="flex flex-col items-center text-center space-y-4">
+                                  {/* Icon */}
+                                  <div className="relative">
+                                    <div className="absolute inset-0 bg-purple-400/30 dark:bg-purple-500/20 blur-2xl rounded-full" />
+                                    <div className="relative bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/60 dark:to-purple-800/40 p-5 rounded-2xl border border-purple-300/50 dark:border-purple-500/30 shadow-lg">
+                                      <svg className="w-10 h-10 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                      </svg>
+                                    </div>
+                                  </div>
+
+                                  {/* Title & Message */}
+                                  <div className="space-y-2">
+                                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                                      Private Collections
+                                    </h2>
+                                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                                      You do not have permission to view private collections from this brand. Request access to view exclusive drops and content.
+                                    </p>
+                                  </div>
+
+                                  {/* Collection Count */}
+                                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/60 dark:bg-white/5 border border-gray-200 dark:border-gray-700">
+                                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                    </svg>
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{privateStates.length} private collection{privateStates.length !== 1 ? 's' : ''}</span>
+                                  </div>
+
+                                  {/* Request State */}
+                                  <div className="pt-2 w-full">
+                                    {hasPending ? (
+                                      <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/30">
+                                        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                        <span className="text-sm font-medium text-amber-700 dark:text-amber-300">Access request pending</span>
+                                      </div>
+                                    ) : hasRevoked ? (
+                                      <div className="px-4 py-3 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700/30">
+                                        <p className="text-sm font-medium text-red-700 dark:text-red-300">Access request was declined</p>
+                                        <p className="text-xs text-red-600 dark:text-red-400 mt-1">Wait 72 hours before requesting again</p>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        className="w-full px-6 py-3 rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-colors font-medium shadow-md"
+                                        onClick={() => {
+                                          if (!user) {
+                                            const returnTo = `${window.location.pathname}${window.location.search}`;
+                                            navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+                                            return;
+                                          }
+                                          // Use first collection to request access (applies to all)
+                                          if (privateStates[0]) {
+                                            setPendingAccessConfirm(privateStates[0].collectionId);
+                                          }
+                                        }}
+                                      >
+                                        Request Access
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    One request gives you access to all private collections from this brand
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // No private collections at all
+                        return (
+                          <div className="text-center py-12">
+                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
+                              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                              </svg>
+                            </div>
+                            <p className="text-gray-600 dark:text-gray-400 font-medium">No private collections available</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">This brand hasn't created any private collections yet</p>
+                          </div>
+                        );
+                      })()
                     ) : (
-                      isOwner ? (
-                        <EmptyState
-                          title="No collections yet"
-                          description="Create a collection to save and curate posts."
-                          cta={<AddCollectionDropdown openModal={() => handleOpenAddModal()} asLink />}
+                      (isOwner ? collectionsLoading : visitorLoading) ? (
+                        <CollectionsSkeleton />
+                      ) : (isVisitorView ? visitorCollections : collections) && (isVisitorView ? visitorCollections : collections).length > 0 ? (
+                        <CollectionsGrid
+                          collections={searchAndVisibilityFiltered}
+                          onEdit={isOwner ? () => {} : undefined}
+                          onDelete={isOwner ? () => {} : undefined}
+                          onCollectionClick={(id) => setSelectedCollectionId(id)}
                         />
                       ) : (
-                        <div className="text-center text-gray-500">No collections available.</div>
+                        isOwner ? (
+                          <EmptyState
+                            title="No collections yet"
+                            description="Create a collection to save and curate posts."
+                            cta={<AddCollectionDropdown openModal={() => handleOpenAddModal()} asLink />}
+                          />
+                        ) : (
+                          <div className="text-center text-gray-500">
+                            No collections available.
+                          </div>
+                        )
                       )
                     )}
                   </>
@@ -765,6 +965,44 @@ const ProfilePage: React.FC = () => {
           }}
         />
       )}
+
+      {/* Confirm access request dialog for visitor */}
+      <ConfirmDialog
+        open={Boolean(pendingAccessConfirm)}
+        title="Request Private Access"
+        message="Request access to this private collection? If the brand rejects your request, you must wait 72 hours before trying again."
+        confirmText="Request Access"
+        cancelText="Cancel"
+        onCancel={() => setPendingAccessConfirm(null)}
+        onConfirm={async () => {
+          const collectionId = pendingAccessConfirm;
+          setPendingAccessConfirm(null);
+          if (!collectionId || !user) return;
+          const res = await brandApi.requestPrivateAccess(collectionId);
+          if (res) {
+            if ((res as any).cooldownActive) {
+              const nextStr = (res as any).nextAllowedAt as string | undefined;
+              let label = 'later';
+              if (nextStr) {
+                const next = new Date(nextStr);
+                const now = new Date();
+                const sameDay = next.toDateString() === now.toDateString();
+                label = sameDay
+                  ? next.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                  : next.toLocaleString([], { month: 'short', day: 'numeric', minute: '2-digit' });
+              }
+              toast.info(`Try again after ${label}`);
+              return;
+            }
+            setPrivateStates(prev => prev.map(p => p.collectionId === collectionId ? { ...p, state: res.state } : p));
+            if (res.state === 'PENDING') {
+              toast.success('Access requested');
+            }
+          } else {
+            toast.error('Failed to request access');
+          }
+        }}
+      />
 
       {isOwner && (
         <EditProfileModal

@@ -180,7 +180,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               className={`rounded-xl border-4 shadow-2xl transition-colors duration-300 ${
                 avatarHighlight
                   ? 'border-emerald-400 ring-2 ring-emerald-200/70'
-                  : 'border-white ring-1 ring-black/10 dark:border-gray-900'
+                  : 'border-gray-400 ring-1 ring-black/10 dark:border-gray-900'
               }`}
             >
               <AvatarCard
@@ -230,7 +230,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </div>
 
           {/* 🔧 FIX #4: Reduced bottom margin from mb-16 to mb-6 */}
-          <div className="flex gap-2 self-end sm:self-end sm:mt-4 mb-6">
+          <div className="flex gap-2 self-end sm:self-end mb-24 ">
             {canEdit ? (
               <ActionButton
                 Icon={FiEdit2}

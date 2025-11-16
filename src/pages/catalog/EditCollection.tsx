@@ -18,6 +18,7 @@ const EditCollection: React.FC = () => {
   const [saleRange, setSaleRange] = React.useState<[Date | null, Date | null] | null>(null);
   const [tags, setTags] = React.useState<string>('');
   const [saving, setSaving] = React.useState(false);
+  const [visibility, setVisibility] = React.useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
 
   React.useEffect(() => {
     let mounted = true;
@@ -37,6 +38,7 @@ const EditCollection: React.FC = () => {
         setSaleRange([d?.saleStartAt ? new Date(d.saleStartAt) : null, d?.saleEndAt ? new Date(d.saleEndAt) : null]);
       }
       setTags(Array.isArray(d?.tags) ? d.tags.join(', ') : '');
+      setVisibility((d?.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC'));
       setLoading(false);
     })();
     return () => { mounted = false; };
@@ -56,6 +58,7 @@ const EditCollection: React.FC = () => {
         saleStartAt: saleRange?.[0]?.toISOString() ?? null,
         saleEndAt: saleRange?.[1]?.toISOString() ?? null,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
+        visibility,
       };
       const res = await brandApi.updateCollection(id, payload);
       if (res) {
@@ -95,6 +98,23 @@ const EditCollection: React.FC = () => {
             <label className="text-xs text-gray-600 dark:text-gray-300">Max Price</label>
             <input type="number" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value === '' ? '' : Number(e.target.value))} className="mt-1 w-full px-3 py-2 rounded-lg bg-white/70 dark:bg-white/5 border border-gray-300 dark:border-gray-700" />
           </div>
+        </div>
+        <div>
+          <label className="text-xs text-gray-600 dark:text-gray-300">Visibility</label>
+          <div className="mt-1 inline-flex rounded-full border border-gray-300 dark:border-gray-700 bg-white/70 dark:bg-white/5 p-1">
+            {(['PUBLIC','PRIVATE'] as const).map(v => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setVisibility(v)}
+                className={`px-3 py-1 text-xs rounded-full ${visibility===v ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' : 'text-gray-700 dark:text-gray-300'}`}
+                disabled={saving}
+              >{v === 'PUBLIC' ? 'Public' : 'Private'}</button>
+            ))}
+          </div>
+          {visibility === 'PRIVATE' && (
+            <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">Private collections require viewers to request access. If rejected they must wait 72 hours before re-requesting.</p>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>

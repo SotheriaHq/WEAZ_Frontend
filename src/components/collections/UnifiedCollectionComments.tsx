@@ -159,26 +159,20 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
                   currentUserId={me?.id}
                   enableReplyComposer={true}
                   onCreateReply={async (parentId: string, content: string) => {
-                    try {
-                      // Use the parent's own target to avoid backend mismatch (collection vs media)
-                      const targetType = c.targetType; // 'COLLECTION' | 'COLLECTION_MEDIA' | 'POST'
-                      const targetId = c.targetId;      // the id expected by the backend for the parent target
-                      const created = await CommentsApi.create(targetType, targetId, content, parentId);
-                      // Add reply to parent's children array
-                      setItems((prev) => prev.map((c) => {
-                        if (c.id === parentId) {
-                          return { ...c, children: [...(c.children || []), created] };
-                        }
-                        return c;
-                      }));
-                      // Auto-expand to show new reply
-                      if (!expanded.has(parentId)) {
-                        setExpanded((prev) => new Set(prev).add(parentId));
+                    // Use the parent's own target to avoid backend mismatch (collection vs media)
+                    const targetType = c.targetType;
+                    const targetId = c.targetId;
+                    const created = await CommentsApi.create(targetType, targetId, content, parentId);
+                    setItems((prev) => prev.map((c) => {
+                      if (c.id === parentId) {
+                        return { ...c, children: [...(c.children || []), created] };
                       }
-                      toast.success('Reply posted!');
-                    } catch (e: any) {
-                      throw e;
+                      return c;
+                    }));
+                    if (!expanded.has(parentId)) {
+                      setExpanded((prev) => new Set(prev).add(parentId));
                     }
+                    toast.success('Reply posted!');
                   }}
                 />
                 {c.children && c.children.length > 0 && (

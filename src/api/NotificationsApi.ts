@@ -3,7 +3,8 @@ import { apiClient } from './httpClient';
 export class NotificationsApi {
   static async getUnreadCount(): Promise<{ count: number }> {
     const response = await apiClient.get('/notifications/unread-count');
-    return response.data;
+    const payload = response.data;
+    return (payload?.data ?? payload) as { count: number };
   }
 
   static async list(cursor?: string, limit?: number, type?: string) {
@@ -13,16 +14,19 @@ export class NotificationsApi {
     if (type) params.append('type', type);
 
     const response = await apiClient.get(`/notifications?${params.toString()}`);
-    return response.data;
+    const payload = response.data;
+    return payload?.data ?? payload;
   }
 
   static async markAsRead(id: string): Promise<{ success: boolean }> {
     const response = await apiClient.patch(`/notifications/${id}/read`);
-    return response.data;
+    const payload = response.data;
+    return (payload?.data ?? payload) as { success: boolean };
   }
 
   static async markAllAsRead(): Promise<{ success: boolean; count: number }> {
     const response = await apiClient.post('/notifications/mark-all-read');
-    return response.data;
+    const payload = response.data;
+    return (payload?.data ?? payload) as { success: boolean; count: number };
   }
 }

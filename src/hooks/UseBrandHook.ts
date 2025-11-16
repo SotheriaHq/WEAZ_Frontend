@@ -57,8 +57,18 @@ export const useBrandProfile = () => {
     setCollectionsLoading(true);
     setCollectionsError(null);
     try {
-      const data = await brandApi.getCollections(ownerId);
+      console.debug('[useBrandProfile.fetchCollections] start', { ownerId });
+      // Request both public and approved-private collections by default
+      const data = await brandApi.getCollections(ownerId, { visibility: 'all' });
       setCollections(data);
+      try {
+        const totals = data.reduce((acc, c) => {
+          acc.all += 1;
+          if (c.visibility === 'PRIVATE' || c.isPublic === false) acc.private += 1; else acc.public += 1;
+          return acc;
+        }, { all: 0, public: 0, private: 0 } as any);
+        console.debug('[useBrandProfile.fetchCollections] done', { count: data.length, ...totals });
+      } catch {}
     } catch (error) {
       setCollectionsError('Failed to load collections');
       console.error('Error fetching collections:', error);

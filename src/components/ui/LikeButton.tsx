@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { Heart } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -38,8 +38,8 @@ const LikeButton: React.FC<Props> = ({
   const [busy, setBusy] = React.useState(false);
   const [initializing, setInitializing] = React.useState(true);
   const k = `${contentType}:${contentId}`;
-  const item = useSelector((s: RootState) => {
-    const stateItem = s.engagement.items?.[k];
+  const stateItem = useSelector((s: RootState) => s.engagement.items?.[k]);
+  const item = useMemo(() => {
     if (stateItem) {
       return {
         likedByMe: stateItem.likedByMe ?? !!initialLiked,
@@ -50,7 +50,7 @@ const LikeButton: React.FC<Props> = ({
       likedByMe: !!initialLiked,
       likeCount: initialCount
     };
-  });
+  }, [stateItem, initialLiked, initialCount]);
   // const initKeyRef = useRef<string | null>(null); // no longer needed
   const me = useSelector((s: RootState) => s.user.profile?.id);
   const realtime = useRealtime();

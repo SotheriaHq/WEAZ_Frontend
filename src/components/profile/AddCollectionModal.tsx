@@ -14,6 +14,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
+  const cooldownNotice = 'If a viewer is rejected they must wait 72 hours before re-requesting access.';
   const [categoryId, setCategoryId] = useState<string>('');
   const [type, setType] = useState<'MALE' | 'FEMALE' | 'EVERYBODY'>('EVERYBODY');
   const [categories, setCategories] = useState<Array<{ id: string; slug: string; name: string }>>([]);
@@ -121,6 +122,9 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
                 </button>
               ))}
             </div>
+            {!isPublic && (
+              <p className="mt-1 text-xs text-white/70">{cooldownNotice}</p>
+            )}
           </div>
 
           <div>

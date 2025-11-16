@@ -7,6 +7,7 @@ import { toast } from 'react-toastify';
 import { brandApi } from '@/api/BrandApi';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Trash2, Eye } from 'lucide-react';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface DraftCollection {
   id: string;
@@ -23,6 +24,8 @@ const MyDraftsPage: React.FC = () => {
   const [drafts, setDrafts] = useState<DraftCollection[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
   const navigate = useNavigate();
 
   const fetchDrafts = async () => {
@@ -41,11 +44,14 @@ const MyDraftsPage: React.FC = () => {
     fetchDrafts();
   }, []);
 
-  const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) {
-      return;
-    }
+  const handleDelete = (id: string, title: string) => {
+    setPendingDelete({ id, title });
+    setConfirmOpen(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const { id } = pendingDelete;
     setDeleting(id);
     try {
       await brandApi.deleteCollection(id);
@@ -55,6 +61,8 @@ const MyDraftsPage: React.FC = () => {
       toast.error(error?.response?.data?.message ?? 'Failed to delete draft');
     } finally {
       setDeleting(null);
+      setConfirmOpen(false);
+      setPendingDelete(null);
     }
   };
 
@@ -183,6 +191,15 @@ const MyDraftsPage: React.FC = () => {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete draft?"
+        message={pendingDelete ? `Are you sure you want to delete "${pendingDelete.title}"? This cannot be undone.` : 'This action cannot be undone.'}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDelete}
+        onCancel={() => { setConfirmOpen(false); setPendingDelete(null); }}
+      />
     </div>
   );
 };

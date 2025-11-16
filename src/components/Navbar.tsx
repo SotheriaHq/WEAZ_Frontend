@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Filter, Bell, User, Tag as TagIcon, Settings, LogOut, ChevronDown, Globe, MapPin, Sun, Moon, Monitor, Heart } from 'lucide-react';
+import { Filter, Bell, User, Tag as TagIcon, Settings, LogOut, ChevronDown, Globe, MapPin, Sun, Moon, Monitor, Heart, Menu } from 'lucide-react';
 // Button variants available: FrostedButton (primary|ghost|outline) and IconButton
 // Sizes: xs|sm|md|lg via btn-tight-* classes
 import { FrostedButton } from '@/components/ui/FrostedButton';
@@ -26,10 +26,11 @@ import NotificationsDropdown from '@/components/notifications/NotificationsDropd
 
 interface NavbarProps {
   isCollapsed: boolean;
+  onToggleSidebar?: () => void;
   minimal?: boolean; // profile pages: hide center controls
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, minimal = false }) => {
+export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onToggleSidebar, minimal = false }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
@@ -158,7 +159,10 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, minim
                 <User className="w-4 h-4" />
                 <span>{translate('profile')}</span>
               </button>
-              <button className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
+              <button
+                onClick={() => { navigate('/settings'); setShowProfileMenu(false); }}
+                className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3"
+              >
                 <Settings className="w-4 h-4" />
                 <span>{translate('settings')}</span>
               </button>
@@ -268,7 +272,10 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, minim
           <>
             {/* Not authenticated menu */}
             <div className="py-2 border-t border-gray-200 dark:border-gray-700">
-              <button className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
+              <button
+                onClick={() => { navigate('/settings'); setShowProfileMenu(false); }}
+                className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3"
+              >
                 <Settings className="w-4 h-4" />
                 <span>{translate('settings')}</span>
               </button>
@@ -368,23 +375,49 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, minim
 
   return (
     <nav
-      className={`w-full px-4 sm:px-5 py-1.5 z-40 transition-all duration-300 ease-out
-      ${_isCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[192px]'}
+      className={`w-full px-4 sm:px-5 py-1.5 z-40 transition-all duration-300 ease-out lg:pl-[var(--sidebar-width)]
       ${minimal
         ? 'bg-transparent border-b border-transparent'
         : 'bg-white dark:bg-black border-b border-gray-200 dark:border-white/10'}`}
+      style={{
+        // Share the same sidebar offset used by Layout via CSS var.
+        // On small screens sidebar is overlaid, so padding-left has no visual effect.
+        paddingLeft: undefined,
+      }}
     >
      
       {/* Main Navbar Content */}
       <div className={`flex items-center min-h-[48px] ${minimal ? 'justify-between lg:justify-end' : 'justify-between'}`}>
 
-        {/* Mobile Logo - Only visible on mobile/tablet */}
+        {/* Mobile Logo - Visible only below lg */}
         <div className="flex items-center lg:hidden">
           <ThreadlyLogo />
           <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight">
             Threadly
           </span>
         </div>
+
+        {/* Desktop: Hamburger to toggle sidebar overlay */}
+        {!minimal && (
+          <button
+            type="button"
+            onClick={() => onToggleSidebar?.()}
+            className="hidden lg:inline-flex items-center justify-center p-2 mr-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+          </button>
+        )}
+
+        {/* Desktop Brand: Logo + Name (Menu → Logo → Name) */}
+        {!minimal && (
+          <div className="hidden lg:flex items-center flex-none mr-3">
+            <ThreadlyLogo />
+            <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight max-w-[200px] truncate" title="Threadly">
+              Threadly
+            </span>
+          </div>
+        )}
 
         {/* Search Section - hidden in minimal mode */}
         {!minimal && (

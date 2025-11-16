@@ -17,6 +17,8 @@ export interface RemoteNotification {
   createdAt: string;
   isRead: boolean;
   actor?: RemoteNotificationActor | null;
+  payload?: any;
+  targetUrl?: string;
 }
 
 interface LocalNotification {
@@ -61,7 +63,7 @@ export const fetchNotifications = createAsyncThunk(
   'notifications/fetchList',
   async (args: { cursor?: string; limit?: number; type?: string } | undefined) => {
     const res = await NotificationsApi.list(args?.cursor, args?.limit, args?.type);
-    return res as { items: RemoteNotification[]; hasNextPage: boolean; endCursor: string | null };
+    return res as { items: any[]; hasNextPage: boolean; endCursor: string | null };
   },
 );
 
@@ -107,6 +109,7 @@ export const notificationsSlice = createSlice({
       state.unreadCount += 1;
     },
     clearLocalNotifications: (state) => { state.local = []; },
+    resetState: () => ({ ...initialState }),
     ingestRealtime: (
       state,
       action: PayloadAction<{
@@ -116,11 +119,23 @@ export const notificationsSlice = createSlice({
         createdAt: string;
         isRead: boolean;
         actor?: RemoteNotificationActor | null;
+        payload?: any;
+        targetUrl?: string;
       }>,
     ) => {
       const exists = state.items.find((n) => n.id === action.payload.id);
       if (!exists) {
-        state.items.unshift(action.payload as RemoteNotification);
+        const incoming: RemoteNotification = {
+          id: action.payload.id,
+          type: action.payload.type,
+          message: action.payload.message,
+          createdAt: action.payload.createdAt,
+          isRead: action.payload.isRead,
+          actor: action.payload.actor ?? null,
+          payload: action.payload.payload,
+          targetUrl: action.payload.targetUrl ?? action.payload.payload?.targetUrl,
+        };
+        state.items.unshift(incoming);
         state.unreadCount += 1;
         // cap list length
         if (state.items.length > 200) state.items.pop();
@@ -129,43 +144,53 @@ export const notificationsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // unread count
       .addCase(fetchUnreadCount.fulfilled, (state, action) => {
         state.unreadCount = action.payload;
       })
-      // list fetch
       .addCase(fetchNotifications.pending, (state) => {
-        state.loadingList = true; state.error = null;
+        state.loadingList = true;
+        state.error = null;
       })
       .addCase(fetchNotifications.fulfilled, (state, action) => {
         state.loadingList = false;
-        // Merge avoiding duplicates when pagination
-        const incoming = action.payload.items;
+        const payload = action.payload as any;
+        const incoming = Array.isArray(payload.items) ? payload.items : [];
+        const hasNextPage = !!payload.hasNextPage;
+        const endCursor = typeof payload.endCursor === 'string' || payload.endCursor === null ? payload.endCursor : null;
         const existingIds = new Set(state.items.map((n) => n.id));
-        const merged = [...state.items];
-        for (const n of incoming) if (!existingIds.has(n.id)) merged.push(n);
-        // Sort by createdAt desc
-        merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        state.items = merged;
-        state.hasNextPage = action.payload.hasNextPage;
-        state.endCursor = action.payload.endCursor;
+        for (const n of incoming) {
+          if (n && typeof n === 'object' && typeof n.id === 'string' && !existingIds.has(n.id)) {
+            state.items.push({
+              id: n.id,
+              type: n.type,
+              message: n.message,
+              createdAt: typeof n.createdAt === 'string' ? n.createdAt : new Date(n.createdAt).toISOString(),
+              isRead: !!n.isRead,
+              actor: n.actor ?? null,
+              payload: n.payload,
+              targetUrl: n.targetUrl ?? n.payload?.targetUrl,
+            });
+          }
+        }
+        state.items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        state.hasNextPage = hasNextPage;
+        state.endCursor = endCursor;
         state.initialized = true;
-        // Recompute unread count if server items include isRead states (optional)
-        const unreadServer = state.items.filter((n) => !n.isRead).length;
-        if (unreadServer > state.unreadCount) state.unreadCount = unreadServer; // don't clobber higher realtime
+        const serverUnread = state.items.filter((n) => !n.isRead).length;
+        if (serverUnread > state.unreadCount) state.unreadCount = serverUnread;
       })
       .addCase(fetchNotifications.rejected, (state, action) => {
-        state.loadingList = false; state.error = action.error.message || 'Failed to load notifications';
+        state.loadingList = false;
+        state.error = action.error.message || 'Failed to load notifications';
       })
-      // mark read single
-      .addCase(markNotificationRead.pending, (state) => { state.loadingMark = true; })
+      .addCase(markNotificationRead.pending, (state) => {
+        state.loadingMark = true;
+      })
       .addCase(markNotificationRead.fulfilled, (state, action) => {
         state.loadingMark = false;
-        state.items = state.items.map((n) => n.id === action.payload.id ? { ...n, isRead: true } : n);
-        state.unreadCount = Math.max(0, state.items.filter((n) => !n.isRead).length);
+        state.items = state.items.map((n) => (n.id === action.payload.id ? { ...n, isRead: true } : n));
+        state.unreadCount = state.items.filter((n) => !n.isRead).length;
       })
-      .addCase(markNotificationRead.rejected, (state) => { state.loadingMark = false; })
-      // mark all read
       .addCase(markAllNotificationsRead.fulfilled, (state) => {
         state.items = state.items.map((n) => ({ ...n, isRead: true }));
         state.unreadCount = 0;
@@ -181,6 +206,7 @@ export const {
   resetUnreadCount,
   addLocalNotification,
   clearLocalNotifications,
+  resetState,
   ingestRealtime,
 } = notificationsSlice.actions;
 

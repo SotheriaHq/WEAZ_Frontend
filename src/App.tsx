@@ -3,7 +3,8 @@ import React from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import Market from './pages/Market';
-import Trouble from './pages/Trouble';
+import SettingsHome from './pages/settings/SettingsHome';
+import CollectionsSettings from './pages/settings/CollectionsSettings';
 import SignupPage from './pages/SignUp';
 import Success from './pages/Success';
 import LoginPage from './pages/Login';
@@ -37,7 +38,8 @@ const router = createBrowserRouter([
   { path: 'ui/dropdowns', element: <DropdownDemo /> },
       // { path: 'profile', element: <Profile /> },
       { path: 'success', element: <Success /> },
-      { path: 'settings', element: <Trouble /> },
+      { path: 'settings', element: <SettingsHome /> },
+      { path: 'settings/collections', element: <CollectionsSettings /> },
     ],
   },
   {
@@ -54,7 +56,8 @@ const router = createBrowserRouter([
         ],
       },
       { path: 'success', element: <Success /> },
-      { path: 'settings', element: <Trouble /> },
+      { path: 'settings', element: <SettingsHome /> },
+      { path: 'settings/collections', element: <CollectionsSettings /> },
     ],
   },
   {

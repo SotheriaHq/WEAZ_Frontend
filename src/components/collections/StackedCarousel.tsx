@@ -33,48 +33,7 @@ function calculateGap(width: number) {
   return minGap + (maxGap - minGap) * ((width - minWidth) / (maxWidth - minWidth));
 }
 
-// Countdown timer hook
-function useCountdown(endDate: string | null) {
-  const [timeLeft, setTimeLeft] = useState<string>('');
-
-  useEffect(() => {
-    if (!endDate) {
-      setTimeLeft('');
-      return;
-    }
-
-    const calculateTimeLeft = () => {
-      const end = new Date(endDate).getTime();
-      const now = Date.now();
-      const diff = end - now;
-
-      if (diff <= 0) {
-        setTimeLeft('Ended');
-        return;
-      }
-
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      if (days > 0) {
-        setTimeLeft(`${days}d ${hours}h`);
-      } else if (hours > 0) {
-        setTimeLeft(`${hours}h ${minutes}m`);
-      } else {
-        setTimeLeft(`${minutes}m ${seconds}s`);
-      }
-    };
-
-    calculateTimeLeft();
-    const interval = setInterval(calculateTimeLeft, 1000);
-
-    return () => clearInterval(interval);
-  }, [endDate]);
-
-  return timeLeft;
-}
+// Countdown overlay removed; hook removed to satisfy TS noUnusedLocals
 
 export const StackedCarousel: React.FC<StackedCarouselProps> = ({
   items,
@@ -85,15 +44,13 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
   isOwner = false,
   coverMediaId,
   onSetCover,
-  tags = [],
-  price,
 }) => {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [containerWidth, setContainerWidth] = useState(800);
   const containerRef = useRef<HTMLDivElement>(null);
   const autoplayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
-  const countdown = useCountdown(price?.saleEndAt || null);
+  // Countdown currently unused after UI simplification; remove to satisfy TS noUnusedLocals
 
   const itemsLength = items.length;
 

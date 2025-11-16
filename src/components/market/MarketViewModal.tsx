@@ -24,14 +24,34 @@ type Props = {
 };
 
 const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountChange }) => {
-  // Hooks must be called in the same order every render
-  const [commentCount, setCommentCount] = React.useState<number>(item?.commentsCount ?? 0);
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
+  const [commentCount, setCommentCount] = React.useState<number>(0);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const [commentText, setCommentText] = React.useState('');
   const [postingComment, setPostingComment] = React.useState(false);
   const [commentPosted, setCommentPosted] = React.useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const currentUserId = useSelector((s: RootState) => s.user.profile?.id);
+  
+  // Calculate sale end time for countdown (always call hook)
+  const saleEndTime = React.useMemo(() => {
+    if (!item) return undefined;
+    const now = Date.now();
+    const hasValidSale = item.saleMinPrice || item.saleMaxPrice;
+    const startOk = !item.saleStartAt || new Date(item.saleStartAt).getTime() <= now;
+    const endOk = !item.saleEndAt || new Date(item.saleEndAt).getTime() >= now;
+    const saleActive = Boolean(hasValidSale && startOk && endOk);
+    return saleActive ? item.saleEndAt ?? undefined : undefined;
+  }, [item]);
+  
+  const { label: countdownLabel, expired } = useCountdown(saleEndTime);
+
+  // Sync comment count when item changes
+  React.useEffect(() => {
+    if (item) {
+      setCommentCount(item.commentsCount ?? 0);
+    }
+  }, [item]);
 
   function onEmojiClick(emojiData: EmojiClickData) {
     setCommentText((prevText) => prevText + emojiData.emoji);
@@ -57,34 +77,27 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     };
   }, [open]);
 
+  // Guard rendering until item is available to avoid null property access.
   if (!open || !item) return null;
 
   const baseBand = (() => {
-    const min = typeof item.minPrice === 'number' ? formatPrice(item.minPrice) : undefined;
-    const max = typeof item.maxPrice === 'number' ? formatPrice(item.maxPrice) : undefined;
+    const min = typeof item?.minPrice === 'number' ? formatPrice(item.minPrice) : undefined;
+    const max = typeof item?.maxPrice === 'number' ? formatPrice(item.maxPrice) : undefined;
     if (min && max) return `${min} – ${max}`;
     if (min) return `From ${min}`;
     if (max) return `Up to ${max}`;
     return null;
   })();
   const saleBand = (() => {
-    const min = typeof (item as any).saleMinPrice === 'number' ? formatPrice((item as any).saleMinPrice) : undefined;
-    const max = typeof (item as any).saleMaxPrice === 'number' ? formatPrice((item as any).saleMaxPrice) : undefined;
+    const min = typeof (item as any)?.saleMinPrice === 'number' ? formatPrice((item as any).saleMinPrice) : undefined;
+    const max = typeof (item as any)?.saleMaxPrice === 'number' ? formatPrice((item as any).saleMaxPrice) : undefined;
     if (min && max) return `${min} – ${max}`;
     if (min) return `${min}+`;
     if (max) return `Up to ${max}`;
     return null;
   })();
 
-  // Countdown only within active sale window
-  const now = Date.now();
-  const saleActive = (() => {
-    const startOk = !item.saleStartAt || new Date(item.saleStartAt).getTime() <= now;
-    const endOk = !item.saleEndAt || new Date(item.saleEndAt).getTime() >= now;
-    return Boolean((item.saleMinPrice || item.saleMaxPrice) && startOk && endOk);
-  })();
-  const { label: countdownLabel, expired } = useCountdown(saleActive ? item.saleEndAt ?? undefined : undefined);
-
+  const saleActive = Boolean(saleEndTime); // Sale is active if saleEndTime is defined
   const brandLabel = item.brandName ?? item.username ?? 'Brand';
 
   // Two-section modal: left (media) and right (data + comments)
@@ -108,6 +121,8 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
       toast.error(e?.response?.data?.message ?? 'Failed to post comment');
     } finally { setPostingComment(false); }
   };
+
+  // (Handled earlier)
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-stretch justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
@@ -191,12 +206,14 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               </div>
               <div className="ml-auto flex items-center gap-3">
                 {(saleBand && baseBand) ? (
-                  <div className="flex flex-col items-end text-[12px] leading-tight">
-                    <span className="line-through text-gray-500">{baseBand}</span>
-                    <span className="text-emerald-700 dark:text-emerald-300 font-semibold">{saleBand}</span>
+                  <div className="flex flex-col items-end gap-1">
+                    {/* Base price container with rounded edges */}
+                    <span className="rounded-lg px-2 py-1 text-[12px] line-through text-gray-500 bg-white/50 dark:bg-white/10 border border-gray-300 dark:border-gray-600">{baseBand}</span>
+                    {/* Sale price container with background and rounded edges */}
+                    <span className="rounded-lg px-2 py-1 text-[12px] text-white font-semibold bg-emerald-600 dark:bg-emerald-700 border border-emerald-700 dark:border-emerald-800 shadow-sm">{saleBand}</span>
                   </div>
                 ) : baseBand ? (
-                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{baseBand}</span>
+                  <span className="rounded-lg px-2 py-1 text-sm font-semibold text-gray-800 dark:text-gray-200 bg-white/50 dark:bg-white/10 border border-gray-300 dark:border-gray-600">{baseBand}</span>
                 ) : null}
                 {/* Countdown indicator (compact) */}
                 {saleActive && !expired && countdownLabel && (

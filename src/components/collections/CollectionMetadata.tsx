@@ -220,26 +220,31 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
       {/* Price Band - with sale support and frosted glass styling */}
       {/* 🔧 FIX #6: Responsive padding */}
       {(baseBand || availabilityInStore || saleBand) && (
-        <div className="rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 border border-white/20 bg-white/60 dark:bg-white/10 backdrop-blur-md shadow-sm">
+        <div className="rounded-lg px-3 py-2 border border-gray-200 dark:border-white/15 bg-white/70 dark:bg-white/5 backdrop-blur-md shadow-sm flex flex-col gap-1">
           {showStacked ? (
-            <div className="flex flex-col items-start gap-0.5">
-              <span className="text-[11px] text-gray-600 dark:text-gray-400 line-through" aria-label="Original price">{baseBand}</span>
-              <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300" aria-label="Sale price">{saleBand}</span>
-              <span
-                className={`mt-0.5 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold backdrop-blur-md shadow-sm border ${
-                  urgencyLevel === 'critical' ? 'bg-red-600/30 border-red-400/40 text-red-50' :
-                  urgencyLevel === 'high' ? 'bg-orange-500/30 border-orange-400/40 text-orange-50' :
-                  urgencyLevel === 'medium' ? 'bg-yellow-500/30 border-yellow-400/40 text-yellow-50' :
-                  'bg-emerald-500/25 border-emerald-400/40 text-emerald-50'
-                }`}
-                aria-label="Sale countdown"
-              >
-                {timeLeftLabel ? `${timeLeftLabel} left` : 'Sale'}
-              </span>
-            </div>
+            <>
+              <div className="text-[11px] text-gray-600 dark:text-gray-400 line-through" aria-label="Original price">{baseBand}</div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300" aria-label="Sale price">{saleBand}</span>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-600/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300" aria-label="Sale badge">Sale</span>
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border backdrop-blur-md shadow-sm ${
+                    urgencyLevel === 'critical' ? 'bg-red-600/25 border-red-500/40 text-red-700 dark:text-red-300' :
+                    urgencyLevel === 'high' ? 'bg-orange-500/25 border-orange-500/40 text-orange-700 dark:text-orange-300' :
+                    urgencyLevel === 'medium' ? 'bg-yellow-500/25 border-yellow-400/40 text-yellow-700 dark:text-yellow-300' :
+                    'bg-emerald-500/20 border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
+                  }`}
+                  aria-label="Sale countdown"
+                >
+                  {timeLeftLabel ? `${timeLeftLabel} left` : 'Sale active'}
+                </span>
+              </div>
+            </>
           ) : (
             singleBand && (
-              <div className="text-xs flex items-center gap-2">
+              <div className="text-xs flex items-center gap-1">
                 <span className="text-gray-600 dark:text-gray-400">Price:</span>
                 <span className="font-bold text-gray-900 dark:text-white" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{singleBand}</span>
               </div>

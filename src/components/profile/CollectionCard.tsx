@@ -212,24 +212,29 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
           {/* Collection Stats */}
           <div className="flex items-center gap-1.5 text-[11px] text-white/90 mb-2">
             <span>{displayItemCount} pieces</span>
-            {(baseBand || saleBand) && (
-              <>
-                <span>•</span>
-                {showStacked ? (
-                  <>
-                    {baseBand && (
-                      <span className="line-through opacity-70">{baseBand}</span>
+          </div>
+          {/* Sale / Price Container */}
+          {(baseBand || saleBand) && (
+            <div className="mb-2 rounded-md bg-white/15 backdrop-blur-sm border border-white/25 p-2 flex flex-col gap-1">
+              {showStacked ? (
+                <>
+                  {baseBand && (
+                    <div className="text-[10px] text-white/70 line-through" aria-label="Original price">{baseBand}</div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    {saleBand && (
+                      <div className="text-xs font-bold text-emerald-300" aria-label="Sale price">{saleBand}</div>
                     )}
                     {saleBand && (
-                      <span className="text-emerald-300 font-semibold">{saleBand}</span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-600/40 border border-emerald-400/60 text-white" aria-label="Sale badge">Sale</span>
                     )}
-                  </>
-                ) : (
-                  <span className={saleBand ? 'text-emerald-300 font-semibold' : ''}>{singleBand}</span>
-                )}
-              </>
-            )}
-          </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-xs font-semibold {saleBand ? 'text-emerald-300' : ''}" aria-label="Price band">{singleBand}</div>
+              )}
+            </div>
+          )}
 
           {/* Footer row with comment input placeholder (left) and compact View pill (right) */}
           <div className="flex items-center gap-2">
