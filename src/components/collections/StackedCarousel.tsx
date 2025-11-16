@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
-import uiDebug from '@/utils/uiDebug';
 
 export interface CarouselMediaItem {
   id: string;
@@ -95,13 +94,8 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
   const autoplayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const countdown = useCountdown(price?.saleEndAt || null);
-  const debug = uiDebug();
 
   const itemsLength = items.length;
-  const hasActiveSale = price?.saleMin && price?.saleMax;
-  if (debug) {
-    console.log('[StackedCarousel] debug render', { items: items.length, hasActiveSale, price });
-  }
 
   // Responsive width tracking
   useEffect(() => {
@@ -227,27 +221,9 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
         ref={containerRef}
         className="relative w-full h-[500px] sm:h-[600px] lg:h-[700px] flex items-center justify-center"
         style={{ perspective: '1200px' }}
-        onClick={(e) => {
-          // Collapse tags when clicking on the carousel itself
-          if (e.target === containerRef.current || (e.target as HTMLElement).tagName === 'IMG' || (e.target as HTMLElement).tagName === 'VIDEO') {
-            console.log('[StackedCarousel] Clicked on carousel, collapsing tags');
-            setShowTags(false);
-          }
-        }}
+        onClick={undefined}
       >
-        {/* Tags overlay removed. Show a debug outline box if UI debug is on. */}
-        {debug && (
-          <div className="absolute top-4 left-4 z-50 px-2 py-1 border border-dashed border-red-400 text-[10px] bg-white/40 text-red-700 rounded">
-            tags overlay removed
-          </div>
-        )}
-
-        {/* Price overlay removed. Debug box if enabled. */}
-        {debug && (
-          <div className="absolute top-4 right-4 z-50 px-2 py-1 border border-dashed border-blue-400 text-[10px] bg-white/40 text-blue-700 rounded">
-            price overlay removed
-          </div>
-        )}
+        
 
         {/* Overlay navigation controls to keep them visible without scrolling */}
         {itemsLength > 1 && (

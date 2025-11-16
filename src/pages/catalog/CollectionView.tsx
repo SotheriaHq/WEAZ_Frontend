@@ -32,15 +32,6 @@ const CollectionView: React.FC = () => {
         const d = await brandApi.getCollectionDetail(id);
         if (!mounted) return;
         if (d) {
-          // Track price data from backend
-          console.log('🔍 [CollectionView] Collection detail price data:', {
-            minPrice: d.minPrice,
-            maxPrice: d.maxPrice,
-            saleMinPrice: d.saleMinPrice,
-            saleMaxPrice: d.saleMaxPrice,
-            saleStartAt: d.saleStartAt,
-            saleEndAt: d.saleEndAt,
-          });
           setDetail(d);
           // TODO: Check if user has liked this collection
           setIsLiked(false);

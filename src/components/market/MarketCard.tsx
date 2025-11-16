@@ -9,7 +9,6 @@ import CommentInput from '@/components/ui/CommentInput';
 import type { MarketItem } from '@/types/market';
 import { selectCommentCount } from '@/features/engagementSlice';
 import { useRealtime } from '@/realtime/RealtimeProvider';
-import uiDebug from '@/utils/uiDebug';
 
 interface MarketCardProps {
   item: MarketItem;
@@ -26,7 +25,6 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
   const [commentText, setCommentText] = useState('');
   const [commentBusy, setCommentBusy] = useState(false);
   const realtime = useRealtime();
-  const debug = uiDebug();
   
   // Join WebSocket room for real-time comment/like updates
   useEffect(() => {
@@ -87,18 +85,6 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
         {/* Gradient Overlay for Text Readability */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-        {/* Debug placeholders to confirm overlays are removed */}
-        {debug && (
-          <>
-            <div className="absolute top-3 right-3 z-20 px-2 py-1 border border-dashed border-blue-400 text-[10px] bg-white/40 text-blue-700 rounded pointer-events-none">
-              price overlay removed
-            </div>
-            <div className="absolute top-3 left-3 z-20 px-2 py-1 border border-dashed border-red-400 text-[10px] bg-white/40 text-red-700 rounded pointer-events-none">
-              tags overlay removed
-            </div>
-          </>
-        )}
-        
 
         {/* Vertical Action Bar (Right Side - Instagram/TikTok Style) */}
         <div className="absolute bottom-24 right-3 z-10 flex flex-col items-center gap-4">

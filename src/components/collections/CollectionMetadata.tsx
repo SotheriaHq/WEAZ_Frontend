@@ -49,7 +49,6 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
   onCancelSale,
 }) => {
   // Track received price data
-  console.log('🏷️ [CollectionMetadata] Received price prop:', price);
 
   const baseBand = (() => {
     const min = formatCurrency(price?.min);
@@ -87,14 +86,6 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
   const showStacked = Boolean(saleBand && baseBand);
   const singleBand = saleBand ?? baseBand;
 
-  console.log('💰 [CollectionMetadata] Price computation:', {
-    baseBand,
-    saleBand,
-    showStacked,
-    singleBand,
-    saleStart: price?.saleStartAt,
-    saleEnd: price?.saleEndAt,
-  });
 
   // 🔧 FIX #7: Enhanced countdown with color coding and urgency levels
   const [timeLeftLabel, setTimeLeftLabel] = React.useState<string | null>(null);
@@ -133,7 +124,6 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
         setTimeLeftLabel(`${d}d ${h}h left`);
       }
       
-      console.log('✅ [FIX #7 - Countdown Enhancement] Updated:', { timeLeftLabel, urgencyLevel, diff });
     };
     update();
     // Update more frequently for better accuracy
@@ -234,7 +224,6 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
           {tags.slice(0, 6).map((t, idx) => {
             const colors: Array<'purple' | 'blue' | 'green' | 'orange' | 'red'> = ['purple', 'blue', 'green', 'orange', 'red'];
             const color = colors[idx % colors.length];
-            console.log('[CollectionMetadata] Rendering tag:', { tag: t, color, index: idx });
             return <TagChip key={t} label={`#${t}`} size="sm" color={color} />;
           })}
         </div>

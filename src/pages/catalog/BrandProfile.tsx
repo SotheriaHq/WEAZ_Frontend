@@ -59,13 +59,10 @@ const ProfilePage: React.FC = () => {
   
   // 🔧 FIX #1: Sync URL params when selectedCollectionId changes
   useEffect(() => {
-    console.log('🔧 [FIX #1 - Routing Persistence] Collection ID changed:', selectedCollectionId);
     if (selectedCollectionId) {
       setSearchParams({ collectionId: selectedCollectionId }, { replace: true });
-      console.log('✅ [FIX #1] URL updated with collectionId:', selectedCollectionId);
     } else {
       setSearchParams({}, { replace: true });
-      console.log('✅ [FIX #1] URL cleared (back to collections grid)');
     }
   }, [selectedCollectionId, setSearchParams]);
   
@@ -73,7 +70,6 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     const urlCollectionId = searchParams.get('collectionId');
     if (urlCollectionId && urlCollectionId !== selectedCollectionId) {
-      console.log('🔧 [FIX #1] Restoring collection view from URL:', urlCollectionId);
       setSelectedCollectionId(urlCollectionId);
     }
   }, []);

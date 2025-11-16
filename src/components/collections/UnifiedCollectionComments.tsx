@@ -36,14 +36,8 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
   const load = async (reset = false) => {
     if (busy) return;
     setBusy(true);
-    console.log('[UnifiedComments] Loading comments:', { collectionId, reset, cursor });
     try {
       const res = await CommentsApi.listUnifiedForCollection(collectionId, reset ? undefined : cursor ?? undefined, 20);
-      console.log('[UnifiedComments] Loaded comments:', { 
-        itemsCount: res.items.length, 
-        hasNextPage: res.hasNextPage,
-        totalItems: reset ? res.items.length : items.length + res.items.length
-      });
       if (reset) setItems(res.items); else setItems((prev) => [...prev, ...res.items]);
       setHasNext(res.hasNextPage);
       setCursor(res.endCursor);
@@ -61,7 +55,6 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
-        console.log('[UnifiedComments] Clicked outside emoji picker, closing');
         setShowEmojiPicker(false);
       }
     };
@@ -151,20 +144,13 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
         `}</style>
         <div className="space-y-0 px-1 pb-2">
           {items.map((c) => {
-            console.log('[UnifiedComments] Rendering comment:', { 
-              id: c.id, 
-              targetType: c.targetType, 
-              hasChildren: c.children?.length || 0 
-            });
             return (
               <div key={c.id} className="py-0.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
-                {console.log('✅ [FIX #3 - Reply Functionality] Rendering comment with reply enabled:', c.id)}
                 <CommentItem 
                   comment={c} 
                   onLike={handleLike} 
                   onDelete={handleDelete} 
                   onReply={(parentId) => {
-                    console.log('🔧 [FIX #3] Reply button clicked for comment:', parentId);
                     // Auto-expand replies when user clicks Reply
                     if (!expanded.has(parentId)) {
                       toggleReplies(parentId);
@@ -173,13 +159,11 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
                   currentUserId={me?.id}
                   enableReplyComposer={true}
                   onCreateReply={async (parentId: string, content: string) => {
-                    console.log('🔧 [FIX #3] Creating reply:', { parentId, content, parentTargetType: c.targetType, parentTargetId: c.targetId });
                     try {
                       // Use the parent's own target to avoid backend mismatch (collection vs media)
                       const targetType = c.targetType; // 'COLLECTION' | 'COLLECTION_MEDIA' | 'POST'
                       const targetId = c.targetId;      // the id expected by the backend for the parent target
                       const created = await CommentsApi.create(targetType, targetId, content, parentId);
-                      console.log('✅ [FIX #3] Reply created successfully:', created.id);
                       // Add reply to parent's children array
                       setItems((prev) => prev.map((c) => {
                         if (c.id === parentId) {
@@ -193,7 +177,6 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
                       }
                       toast.success('Reply posted!');
                     } catch (e: any) {
-                      console.error('❌ [FIX #3] Failed to create reply:', e);
                       throw e;
                     }
                   }}
@@ -326,7 +309,6 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
               `}</style>
               <EmojiPicker
                 onEmojiClick={(e: EmojiClickData) => { 
-                  console.log('[UnifiedComments] Emoji selected:', e.emoji);
                   setText((prev) => prev + e.emoji); 
                   setShowEmojiPicker(false); 
                 }}

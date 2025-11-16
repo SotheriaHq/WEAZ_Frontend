@@ -137,19 +137,6 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
     },
   };
 
-  if (mapped.saleMinPrice != null || mapped.saleMaxPrice != null) {
-    // Surface when sale data is present so UI should render stacked/green badge
-    // Also helps detect numeric-string coercion working as intended
-    // eslint-disable-next-line no-console
-    console.log('🧾 [MarketApi] Sale fields mapped', {
-      id: mapped.id,
-      saleMinPrice: mapped.saleMinPrice,
-      saleMaxPrice: mapped.saleMaxPrice,
-      saleStartAt: mapped.saleStartAt,
-      saleEndAt: mapped.saleEndAt,
-    });
-  }
-
   return mapped;
 };
 
