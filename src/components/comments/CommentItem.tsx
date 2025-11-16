@@ -89,7 +89,7 @@ const CommentItem: React.FC<Props> = ({ comment, onLike, onReply, onDelete, curr
   };
 
   return (
-    <div className="flex gap-3 py-1">
+    <div className="flex gap-2 py-0.5">
       <div className="h-8 w-8 rounded-full overflow-hidden bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold">
         {comment.user?.profileImage ? (
           <img src={comment.user.profileImage} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -115,7 +115,7 @@ const CommentItem: React.FC<Props> = ({ comment, onLike, onReply, onDelete, curr
             <span className="ml-2 text-[10px] italic text-blue-500">(pending)</span>
           )}
         </div>
-        <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-600">
+        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
           <button type="button" onClick={toggle} className={`flex items-center gap-1 ${liked ? 'text-rose-600' : ''}`}>
             <Heart className={liked ? 'fill-current' : ''} size={14} />
             <span>{likeCount}</span>

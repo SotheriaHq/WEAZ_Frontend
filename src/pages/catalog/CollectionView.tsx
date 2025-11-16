@@ -32,6 +32,15 @@ const CollectionView: React.FC = () => {
         const d = await brandApi.getCollectionDetail(id);
         if (!mounted) return;
         if (d) {
+          // Track price data from backend
+          console.log('🔍 [CollectionView] Collection detail price data:', {
+            minPrice: d.minPrice,
+            maxPrice: d.maxPrice,
+            saleMinPrice: d.saleMinPrice,
+            saleMaxPrice: d.saleMaxPrice,
+            saleStartAt: d.saleStartAt,
+            saleEndAt: d.saleEndAt,
+          });
           setDetail(d);
           // TODO: Check if user has liked this collection
           setIsLiked(false);
@@ -125,6 +134,26 @@ const CollectionView: React.FC = () => {
 
   const handleAddToCart = () => {
     toast.info('Add to cart feature coming soon');
+  };
+
+  const handleCancelSale = async () => {
+    if (!id) return;
+    try {
+      const res = await brandApi.updateCollection(id, {
+        saleMinPrice: null as any,
+        saleMaxPrice: null as any,
+        saleStartAt: null as any,
+        saleEndAt: null as any,
+      });
+      if (res) {
+        setDetail((d: any) => ({ ...(d ?? {}), saleMinPrice: null, saleMaxPrice: null, saleStartAt: null, saleEndAt: null }));
+        toast.success('Sale cancelled; reverted to main price');
+      } else {
+        toast.error('Could not cancel sale');
+      }
+    } catch (e) {
+      toast.error('Failed to cancel sale');
+    }
   };
 
   if (loading) {
@@ -228,7 +257,7 @@ const CollectionView: React.FC = () => {
           </div>
 
           {/* Right: Metadata & Comments (1/3 width on desktop) */}
-          <div className="lg:col-span-1 flex flex-col gap-4">
+          <div className="lg:col-span-1 flex flex-col gap-4 min-h-0">
             {/* Metadata Section */}
             <div className="glass-panel rounded-2xl p-4 border border-white/20 bg-white/90 dark:bg-black/70 backdrop-blur-sm">
               <CollectionMetadata
@@ -241,7 +270,14 @@ const CollectionView: React.FC = () => {
                   items: detail?._count?.medias,
                   views: detail?._count?.views,
                 }}
-                price={{ min: detail?.minPrice, max: detail?.maxPrice }}
+                price={{
+                  min: detail?.minPrice,
+                  max: detail?.maxPrice,
+                  saleMin: detail?.saleMinPrice,
+                  saleMax: detail?.saleMaxPrice,
+                  saleStartAt: detail?.saleStartAt,
+                  saleEndAt: detail?.saleEndAt,
+                }}
                 availabilityInStore={detail?.isAvailableInStore}
                 visibility={detail?.visibility}
                 isOwner={isOwner}
@@ -250,11 +286,12 @@ const CollectionView: React.FC = () => {
                 onShare={handleShare}
                 onAddToCart={handleAddToCart}
                 onDelete={handleDeleteCollection}
+                onCancelSale={isOwner ? handleCancelSale : undefined}
               />
             </div>
 
             {/* Comments Section - Fixed height, scrollable */}
-            <div className="glass-panel rounded-2xl p-4 border border-white/20 bg-white/95 dark:bg-black/80 backdrop-blur-sm lg:h-[420px] overflow-hidden flex flex-col">
+            <div className="glass-panel rounded-2xl p-4 border border-white/20 bg-white/95 dark:bg-black/80 backdrop-blur-sm h-[60vh] lg:h-[420px] overflow-hidden flex flex-col min-h-0">
               {id ? (
                 <CompactCommentsSection collectionId={id} />
               ) : (

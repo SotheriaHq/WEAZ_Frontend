@@ -11,7 +11,7 @@ interface Props {
 export const CompactCommentsSection: React.FC<Props> = ({ collectionId, className = '' }) => {
 
   return (
-    <div className={`flex flex-col h-full ${className}`}>
+    <div className={`flex flex-col h-full min-h-0 ${className}`}>
       {/* Header */}
       <div className="flex items-center gap-2 pb-3 border-b border-gray-200 dark:border-gray-700">
         <MessageCircle className="w-4 h-4 text-gray-700 dark:text-gray-300" />
@@ -19,7 +19,7 @@ export const CompactCommentsSection: React.FC<Props> = ({ collectionId, classNam
       </div>
 
       {/* Comments container - let UnifiedCollectionComments handle its own scroll */}
-      <div className="flex-1 pt-2 overflow-hidden">
+      <div className="flex-1 pt-2 overflow-hidden min-h-0">
         <UnifiedCollectionComments collectionId={collectionId} />
       </div>
     </div>

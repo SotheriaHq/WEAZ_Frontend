@@ -196,15 +196,15 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
         {items.map((item, index) => (
           <div
             key={item.id}
-            className="absolute w-full max-w-[95%] sm:max-w-[85%] lg:max-w-[75%] h-[90%] rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-gray-900 dark:via-gray-950 dark:to-black"
+            className="absolute w-full max-w-[95%] sm:max-w-[85%] lg:max-w-[75%] h-[90%] rounded-2xl overflow-hidden shadow-2xl"
             style={getItemStyle(index)}
           >
-            <div className="relative w-full h-full flex items-center justify-center p-2 sm:p-4">
+            <div className="relative w-full h-full flex items-center justify-center">
               {item.type === 'image' ? (
                 <img
                   src={item.url}
                   alt={item.caption ?? 'Collection media'}
-                  className="w-full h-full object-contain select-none rounded-lg bg-black"
+                  className="w-full h-full object-contain select-none bg-black"
                   draggable={false}
                   loading="lazy"
                 />
@@ -215,7 +215,7 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
                     else videoRefs.current.delete(item.id);
                   }}
                   src={item.url}
-                  className="w-full h-full object-contain rounded-lg bg-black"
+                  className="w-full h-full object-contain bg-black"
                   controls={false}
                   playsInline
                   muted

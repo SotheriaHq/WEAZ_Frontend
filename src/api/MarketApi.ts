@@ -43,7 +43,13 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
 
   const mediaType = (raw.mediaType as MarketMediaType) ?? ((media.mediaType || media.type) as MarketMediaType) ?? 'POST_IMAGE';
 
-  return {
+  const num = (v: unknown): number | null => {
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v);
+    return null;
+  };
+
+  const mapped: MarketItem = {
     id: String(raw.id ?? mediaFileId ?? ''),
     collectionId: String(raw.collectionId ?? collection.id ?? ''),
     collectionTitle: String(collection.title ?? raw.collectionTitle ?? ''),
@@ -68,16 +74,23 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
       (raw.brandLogoFileId as string | undefined) ??
       null,
     minPrice:
-      typeof collection.minPrice === 'number'
-        ? (collection.minPrice as number)
-        : typeof raw.minPrice === 'number'
-          ? (raw.minPrice as number)
-          : null,
+      num(collection.minPrice) ?? num(raw.minPrice),
     maxPrice:
-      typeof collection.maxPrice === 'number'
-        ? (collection.maxPrice as number)
-        : typeof raw.maxPrice === 'number'
-          ? (raw.maxPrice as number)
+      num(collection.maxPrice) ?? num(raw.maxPrice),
+    // Include sale fields if provided by backend; accept number or numeric string
+    saleMinPrice: num((collection as any).saleMinPrice ?? (raw as any).saleMinPrice),
+    saleMaxPrice: num((collection as any).saleMaxPrice ?? (raw as any).saleMaxPrice),
+    saleStartAt:
+      (collection as any).saleStartAt && typeof (collection as any).saleStartAt === 'string'
+        ? ((collection as any).saleStartAt as string)
+        : typeof (raw as any).saleStartAt === 'string'
+          ? ((raw as any).saleStartAt as string)
+          : null,
+    saleEndAt:
+      (collection as any).saleEndAt && typeof (collection as any).saleEndAt === 'string'
+        ? ((collection as any).saleEndAt as string)
+        : typeof (raw as any).saleEndAt === 'string'
+          ? ((raw as any).saleEndAt as string)
           : null,
     likesCount:
       typeof raw.likesCount === 'number'
@@ -123,6 +136,21 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
             : null,
     },
   };
+
+  if (mapped.saleMinPrice != null || mapped.saleMaxPrice != null) {
+    // Surface when sale data is present so UI should render stacked/green badge
+    // Also helps detect numeric-string coercion working as intended
+    // eslint-disable-next-line no-console
+    console.log('🧾 [MarketApi] Sale fields mapped', {
+      id: mapped.id,
+      saleMinPrice: mapped.saleMinPrice,
+      saleMaxPrice: mapped.saleMaxPrice,
+      saleStartAt: mapped.saleStartAt,
+      saleEndAt: mapped.saleEndAt,
+    });
+  }
+
+  return mapped;
 };
 
 export const marketApi = {

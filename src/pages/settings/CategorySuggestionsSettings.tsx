@@ -4,20 +4,6 @@
  */
 import React from 'react';
 
-interface CategorySuggestion {
-  id: string;
-  name: string;
-  proposedBy: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  reason?: string;
-  createdAt: string;
-  updatedAt: string;
-  proposerId: string;
-  proposerUsername?: string;
-  decidedBy?: string;
-  decidedByUsername?: string;
-}
-
 const CategorySuggestionsSettings: React.FC = () => {
   return (
     <div className="min-h-screen p-6">

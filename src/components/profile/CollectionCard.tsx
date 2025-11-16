@@ -33,6 +33,10 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
     postsCount = 0,
     minPrice = 0,
     maxPrice = 0,
+    saleMinPrice,
+    saleMaxPrice,
+    saleStartAt,
+    saleEndAt,
     brandName,
     username,
     brandLogo,
@@ -66,6 +70,39 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
     setImgLoaded(false);
   }, [resolvedCover]);
   const [accessOpen, setAccessOpen] = useState(false);
+
+  // Compute compact price bands (align with MarketCard)
+  const baseBand = (() => {
+    const hasMin = typeof minPrice === 'number' && Number.isFinite(minPrice) && minPrice > 0;
+    const hasMax = typeof maxPrice === 'number' && Number.isFinite(maxPrice) && maxPrice > 0;
+    const min = hasMin ? formatPrice(minPrice) : undefined;
+    const max = hasMax ? formatPrice(maxPrice) : undefined;
+    if (min && max) return `${min} - ${max}`;
+    if (min) return `${min}+`;
+    if (max) return `Up to ${max}`;
+    return null;
+  })();
+
+  const now = Date.now();
+  const saleWindowOk = (() => {
+    const startOk = !saleStartAt || (new Date(saleStartAt).getTime() <= now);
+    const endOk = !saleEndAt || (new Date(saleEndAt).getTime() >= now);
+    return startOk && endOk;
+  })();
+
+  const hasSaleMin = typeof saleMinPrice === 'number' && Number.isFinite(saleMinPrice);
+  const hasSaleMax = typeof saleMaxPrice === 'number' && Number.isFinite(saleMaxPrice);
+  const saleBand = saleWindowOk ? (() => {
+    const min = hasSaleMin ? formatPrice(saleMinPrice as number) : undefined;
+    const max = hasSaleMax ? formatPrice(saleMaxPrice as number) : undefined;
+    if (min && max) return `${min} - ${max}`;
+    if (min) return `${min}+`;
+    if (max) return `Up to ${max}`;
+    return null;
+  })() : null;
+
+  const showStacked = Boolean(saleBand && baseBand);
+  const singleBand = saleBand ?? baseBand;
 
   return (
     <>
@@ -175,19 +212,23 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
           {/* Collection Stats */}
           <div className="flex items-center gap-1.5 text-[11px] text-white/90 mb-2">
             <span>{displayItemCount} pieces</span>
-            {/* Sale pricing with strikethrough */}
-            {collection.saleMinPrice && collection.saleMaxPrice && minPrice > 0 && maxPrice > 0 ? (
+            {(baseBand || saleBand) && (
               <>
                 <span>•</span>
-                <span className="line-through opacity-70">{formatPrice(minPrice)} - {formatPrice(maxPrice)}</span>
-                <span className="text-emerald-300 font-semibold">{formatPrice(collection.saleMinPrice)} - {formatPrice(collection.saleMaxPrice)}</span>
+                {showStacked ? (
+                  <>
+                    {baseBand && (
+                      <span className="line-through opacity-70">{baseBand}</span>
+                    )}
+                    {saleBand && (
+                      <span className="text-emerald-300 font-semibold">{saleBand}</span>
+                    )}
+                  </>
+                ) : (
+                  <span className={saleBand ? 'text-emerald-300 font-semibold' : ''}>{singleBand}</span>
+                )}
               </>
-            ) : minPrice > 0 && maxPrice > 0 ? (
-              <>
-                <span>•</span>
-                <span>{formatPrice(minPrice)} - {formatPrice(maxPrice)}</span>
-              </>
-            ) : null}
+            )}
           </div>
 
           {/* Footer row with comment input placeholder (left) and compact View pill (right) */}

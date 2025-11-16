@@ -287,6 +287,24 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  const handleShareProfile = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: viewDisplayData.brandName,
+          text: `Check out ${viewDisplayData.brandName} on Threadly`,
+          url,
+        });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success('Profile link copied to clipboard');
+      }
+    } catch {
+      // Silently ignore cancellation
+    }
+  };
+
   const processAvatarUpload = async (file: File, previewUrl: string) => {
     if (!user) return;
     const currentUser = user;
@@ -593,7 +611,7 @@ const ProfilePage: React.FC = () => {
         }}
         canEdit={isOwner}
         onEditProfile={() => setIsHeaderQuickEditOpen(true)}
-        onShareProfile={() => undefined}
+        onShareProfile={handleShareProfile}
         onEditAvatar={handleTriggerAvatarUpload}
         onEditBanner={handleTriggerBannerUpload}
         avatarLoading={avatarUploading}
@@ -633,7 +651,7 @@ const ProfilePage: React.FC = () => {
               <div>
                 {selectedCollectionId ? (
                   // Show inline collection viewer
-                  <InlineCollectionViewer
+                    <InlineCollectionViewer
                     collectionId={selectedCollectionId}
                     onBack={() => setSelectedCollectionId(null)}
                     brandName={displayData?.brandName || displayData?.username || 'Brand'}
@@ -643,7 +661,7 @@ const ProfilePage: React.FC = () => {
                         const cols = await brandApi.getCollections(routeBrandId);
                         setVisitorCollections(cols ?? []);
                       } else if (user) {
-                        await fetchCollections();
+                        await fetchCollections(user.id);
                       }
                     }}
                   />

@@ -38,6 +38,19 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
   const commentCount = useSelector((s: RootState) => 
     selectCommentCount(s, 'COLLECTION_MEDIA', item.id) ?? item.commentsCount ?? 0
   );
+  
+  // Track price data from market item
+  console.log('🛍️ [MarketCard] Item price data:', {
+    id: item.id,
+    collectionId: item.collectionId,
+    minPrice: item.minPrice,
+    maxPrice: item.maxPrice,
+    saleMinPrice: item.saleMinPrice,
+    saleMaxPrice: item.saleMaxPrice,
+    saleStartAt: item.saleStartAt,
+    saleEndAt: item.saleEndAt,
+  });
+  
   // Compact price badge with sale support
   const baseBand = (() => {
     const min = typeof item.minPrice === 'number' ? formatPrice(item.minPrice) : undefined;
@@ -47,14 +60,35 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
     if (max) return `Up to ${max}`;
     return null;
   })();
-  const saleBand = (() => {
-    const min = typeof item.saleMinPrice === 'number' ? formatPrice(item.saleMinPrice) : undefined;
-    const max = typeof item.saleMaxPrice === 'number' ? formatPrice(item.saleMaxPrice) : undefined;
+  const hasSaleMin = typeof item.saleMinPrice === 'number' && Number.isFinite(item.saleMinPrice);
+  const hasSaleMax = typeof item.saleMaxPrice === 'number' && Number.isFinite(item.saleMaxPrice);
+  if (!hasSaleMin && item.saleMinPrice != null) {
+    console.warn('⚠️ [MarketCard] saleMinPrice is not a number', { id: item.id, value: item.saleMinPrice, type: typeof item.saleMinPrice });
+  }
+  if (!hasSaleMax && item.saleMaxPrice != null) {
+    console.warn('⚠️ [MarketCard] saleMaxPrice is not a number', { id: item.id, value: item.saleMaxPrice, type: typeof item.saleMaxPrice });
+  }
+  const saleBandRaw = (() => {
+    const min = hasSaleMin ? formatPrice(item.saleMinPrice as number) : undefined;
+    const max = hasSaleMax ? formatPrice(item.saleMaxPrice as number) : undefined;
     if (min && max) return `${min} – ${max}`;
     if (min) return `${min}+`;
     if (max) return `Up to ${max}`;
     return null;
   })();
+
+  const now = Date.now();
+  const windowActive = (() => {
+    const startOk = !item.saleStartAt || new Date(item.saleStartAt).getTime() <= now;
+    const endOk = !item.saleEndAt || new Date(item.saleEndAt).getTime() >= now;
+    return startOk && endOk;
+  })();
+  const saleBand = windowActive ? saleBandRaw : null;
+
+  const showStacked = Boolean(saleBand && baseBand);
+  const singleBand = saleBand ?? baseBand;
+
+  console.log('💵 [MarketCard] Computed price bands + decision:', { baseBand, saleBand, showStacked, singleBand });
 
   const displayTags = item.tags.slice(0, 2);
 
@@ -106,7 +140,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
         {/* Price Badge (Top Right) */}
         {(baseBand || saleBand) && (
           <div className="absolute top-3 right-3 z-20 text-[10px]">
-            {saleBand && baseBand ? (
+            {showStacked ? (
               <div className="flex flex-col items-end gap-0.5">
                 <span className="rounded-full bg-black/40 text-white/80 line-through px-1.5 py-0.5 border border-white/20 backdrop-blur-sm">
                   {baseBand}
@@ -116,8 +150,8 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
                 </span>
               </div>
             ) : (
-              <span className="inline-flex items-center rounded-full bg-white/20 backdrop-blur-md border border-white/30 px-2 py-0.5 font-semibold text-white shadow-lg">
-                {baseBand}
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-semibold text-white shadow-lg backdrop-blur-md border ${saleBand ? 'bg-emerald-500/80 border-white/20' : 'bg-white/20 border-white/30'}`}>
+                {singleBand}
               </span>
             )}
           </div>

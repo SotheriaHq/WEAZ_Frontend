@@ -11,12 +11,6 @@ import Dropdown from '@/components/Dropdown';
 import UpdatePriceTagsModal from '@/components/collections/UpdatePriceTagsModal';
 import { MessageCircle } from 'lucide-react';
 
-interface MenuItem {
-  label?: string;
-  icon?: string;
-  command?: () => void;
-}
-
 interface InlineCollectionViewerProps {
   collectionId: string;
   onBack: () => void;
@@ -169,6 +163,26 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
     toast.info('Add to cart feature coming soon');
   };
 
+  const handleCancelSale = async () => {
+    try {
+      const res = await brandApi.updateCollection(collectionId, {
+        saleMinPrice: null as any,
+        saleMaxPrice: null as any,
+        saleStartAt: null as any,
+        saleEndAt: null as any,
+      });
+      if (res) {
+        setDetail((d: any) => ({ ...(d ?? {}), saleMinPrice: null, saleMaxPrice: null, saleStartAt: null, saleEndAt: null }));
+        toast.success('Sale cancelled');
+        if (onPriceUpdated) await onPriceUpdated();
+      } else {
+        toast.error('Could not cancel sale');
+      }
+    } catch {
+      toast.error('Failed to cancel sale');
+    }
+  };
+
   // legacy stub (dropdown handles edit options)
 
   void brandName;
@@ -279,6 +293,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               onShare={handleShare}
               onAddToCart={handleAddToCart}
               onDelete={handleDeleteCollection}
+              onCancelSale={isOwner ? handleCancelSale : undefined}
               ownerMenu={isOwner ? (
                 <Dropdown
                   buttonLabel={<span className="text-base leading-none">✏️</span>}
@@ -288,6 +303,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                   buttonClassName="!p-1 !rounded-md focus:ring-0 focus:ring-offset-0 outline-none focus:outline-none"
                   options={[
                     { label: 'Update Price & Tags', onClick: () => setShowUpdateMeta(true) },
+                    { label: 'Cancel Discount Sale', onClick: handleCancelSale },
                     { label: 'Edit Collection Details', onClick: () => { window.location.href = `/collections/${collectionId}/edit`; } },
                   ]}
                 />

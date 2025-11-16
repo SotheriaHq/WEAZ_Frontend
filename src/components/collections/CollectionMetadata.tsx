@@ -18,6 +18,7 @@ interface CollectionMetadataProps {
   onDelete?: () => void;
   onEdit?: () => void;
   ownerMenu?: React.ReactNode;
+  onCancelSale?: () => void;
 }
 
 const formatCurrency = (n?: number) => {
@@ -45,19 +46,11 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
   onDelete,
   onEdit,
   ownerMenu,
+  onCancelSale,
 }) => {
-  const hasSaleValues = (typeof price?.saleMin === 'number' && price?.saleMin !== price?.min) || (typeof price?.saleMax === 'number' && price?.saleMax !== price?.max);
-  const isSaleActive = (() => {
-    const start = price?.saleStartAt ? Date.parse(price.saleStartAt) : null;
-    const end = price?.saleEndAt ? Date.parse(price.saleEndAt) : null;
-    const now = Date.now();
-    if (!hasSaleValues) return false;
-    if (start && isNaN(start)) return false;
-    if (end && isNaN(end)) return false;
-    if (start && now < start) return false;
-    if (end && now > end) return false;
-    return true;
-  })();
+  // Track received price data
+  console.log('🏷️ [CollectionMetadata] Received price prop:', price);
+
   const baseBand = (() => {
     const min = formatCurrency(price?.min);
     const max = formatCurrency(price?.max);
@@ -66,14 +59,63 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
     if (max) return `Up to ${max}`;
     return undefined;
   })();
-  const saleBand = (() => {
-    const min = formatCurrency(price?.saleMin ?? undefined);
-    const max = formatCurrency(price?.saleMax ?? undefined);
+  const hasSaleMin = typeof price?.saleMin === 'number' && Number.isFinite(price?.saleMin as number);
+  const hasSaleMax = typeof price?.saleMax === 'number' && Number.isFinite(price?.saleMax as number);
+  if (!hasSaleMin && price?.saleMin != null) {
+    console.warn('⚠️ [CollectionMetadata] saleMin is not numeric', { value: price?.saleMin, type: typeof price?.saleMin });
+  }
+  if (!hasSaleMax && price?.saleMax != null) {
+    console.warn('⚠️ [CollectionMetadata] saleMax is not numeric', { value: price?.saleMax, type: typeof price?.saleMax });
+  }
+  const saleBandRaw = (() => {
+    const min = hasSaleMin ? formatCurrency(price?.saleMin as number) : undefined;
+    const max = hasSaleMax ? formatCurrency(price?.saleMax as number) : undefined;
     if (min && max) return `${min} - ${max}`;
     if (min) return `${min}+`;
     if (max) return `Up to ${max}`;
     return undefined;
   })();
+
+  const now = Date.now();
+  const windowActive = (() => {
+    const startOk = !price?.saleStartAt || new Date(price?.saleStartAt).getTime() <= now;
+    const endOk = !price?.saleEndAt || new Date(price?.saleEndAt).getTime() >= now;
+    return startOk && endOk;
+  })();
+  const saleBand = windowActive ? saleBandRaw : undefined;
+
+  const showStacked = Boolean(saleBand && baseBand);
+  const singleBand = saleBand ?? baseBand;
+
+  console.log('💰 [CollectionMetadata] Price computation:', {
+    baseBand,
+    saleBand,
+    showStacked,
+    singleBand,
+    saleStart: price?.saleStartAt,
+    saleEnd: price?.saleEndAt,
+  });
+
+  // Countdown for active sale end time
+  const [timeLeftLabel, setTimeLeftLabel] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!saleBand || !price?.saleEndAt) { setTimeLeftLabel(null); return; }
+    const end = new Date(price.saleEndAt).getTime();
+    const update = () => {
+      const diff = end - Date.now();
+      if (diff <= 0) { setTimeLeftLabel('Ends soon'); return; }
+      const s = Math.floor(diff / 1000);
+      const d = Math.floor(s / 86400);
+      const h = Math.floor((s % 86400) / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      if (d > 0) setTimeLeftLabel(`${d}d ${h}h left`);
+      else if (h > 0) setTimeLeftLabel(`${h}h ${m}m left`);
+      else setTimeLeftLabel(`${m}m left`);
+    };
+    update();
+    const id = window.setInterval(update, 60000);
+    return () => window.clearInterval(id);
+  }, [saleBand, price?.saleEndAt]);
 
   return (
     <div className="space-y-3">
@@ -168,24 +210,31 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
         </div>
       )}
 
-      {/* Price Band - with sale support */}
+      {/* Price Band - with sale support and frosted glass styling */}
       {(baseBand || availabilityInStore || saleBand) && (
-        <div className="rounded-lg bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 px-3 py-2 border border-purple-200/60 dark:border-purple-700/40">
-              {(isSaleActive && saleBand && baseBand) ? (
+        <div className="rounded-lg px-3 py-2 border border-white/20 bg-white/60 dark:bg-white/10 backdrop-blur-md shadow-sm">
+              {showStacked ? (
                 <div className="space-y-1">
-                  <div className="text-[11px] px-2 py-1 rounded-md bg-red-50 dark:bg-red-900/30 border border-red-200/60 dark:border-red-700/40 flex items-center gap-1 justify-between">
+                  <div className="text-[11px] px-2 py-1 rounded-md bg-white/50 dark:bg-white/10 backdrop-blur-sm border border-white/30 flex items-center gap-1 justify-between">
                     <span className="text-red-700 dark:text-red-300 font-medium line-through" aria-label="Original price">{baseBand}</span>
                   </div>
-                  <div className="text-[12px] px-2 py-1 rounded-md bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200/60 dark:border-emerald-700/40 flex items-center gap-1 justify-between">
+                  <div className="text-[12px] px-2 py-1 rounded-md bg-emerald-500/10 dark:bg-emerald-500/20 backdrop-blur-sm border border-emerald-400/40 flex items-center gap-2 justify-between w-full">
                     <span className="font-semibold text-emerald-700 dark:text-emerald-300" aria-label="Sale price">{saleBand}</span>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Sale</span>
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium whitespace-nowrap">
+                      {timeLeftLabel ? timeLeftLabel : 'Sale'}
+                    </span>
                   </div>
                 </div>
           ) : (
-            baseBand && (
-              <div className="text-xs">
-                <span className="text-gray-600 dark:text-gray-400">Price:</span>{' '}
-                <span className="font-bold text-gray-900 dark:text-white" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{baseBand}</span>
+            singleBand && (
+              <div className={`text-xs ${saleBand ? 'bg-emerald-500/10 dark:bg-emerald-500/20 backdrop-blur-sm border border-emerald-400/40 rounded-md px-2 py-1 inline-flex items-center justify-between gap-2 w-full' : ''}`}>
+                {!saleBand && <span className="text-gray-600 dark:text-gray-400">Price: </span>}
+                <span className={`font-bold ${saleBand ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-900 dark:text-white'}`} style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{singleBand}</span>
+                {saleBand && (
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium whitespace-nowrap">
+                    {timeLeftLabel ? timeLeftLabel : 'Sale'}
+                  </span>
+                )}
               </div>
             )
           )}
@@ -217,6 +266,20 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
             </button>
           )}
         </>
+      )}
+
+      {/* Owner-only actions */}
+      {isOwner && saleBandRaw && (
+        <div className="flex gap-2">
+          {onCancelSale && (
+            <button
+              onClick={onCancelSale}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-red-300/40 bg-white/50 dark:bg-white/10 text-red-700 dark:text-red-300 hover:bg-white/70 dark:hover:bg-white/15 transition text-xs font-semibold backdrop-blur-md shadow-sm"
+            >
+              Cancel Sale
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

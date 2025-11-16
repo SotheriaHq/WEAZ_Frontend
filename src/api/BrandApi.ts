@@ -162,6 +162,11 @@ export const brandApi = {
           commentsCount: totalComments,
           minPrice: (backendItem.minPrice as number) || 0,
           maxPrice: (backendItem.maxPrice as number) || 0,
+          // Include sale fields so profile cards reflect active sales
+          saleMinPrice: (backendItem as any)?.saleMinPrice ?? null,
+          saleMaxPrice: (backendItem as any)?.saleMaxPrice ?? null,
+          saleStartAt: (backendItem as any)?.saleStartAt ?? null,
+          saleEndAt: (backendItem as any)?.saleEndAt ?? null,
           isAvailableInStore: (backendItem.isAvailableInStore as boolean) || false,
           createdAt: backendItem.createdAt as string,
           updatedAt: backendItem.updatedAt as string,
