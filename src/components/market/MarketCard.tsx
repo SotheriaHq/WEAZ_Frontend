@@ -38,7 +38,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
     realtime.joinCollectionMedia(item.id);
   }, [item.id, realtime]);
 
-  // Countdown timer for sale end
+  // 🔧 FIX #7: Enhanced countdown timer with urgency indicators
   useEffect(() => {
     if (!item.saleEndAt) {
       setCountdown('');
@@ -60,13 +60,18 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-      if (days > 0) {
+      // Add urgency indicators based on time remaining
+      if (hours < 1) {
+        setCountdown(`🔥 ${minutes}m ${seconds}s`);
+      } else if (hours < 6) {
+        setCountdown(`⚡ ${hours}h ${minutes}m`);
+      } else if (days > 0) {
         setCountdown(`${days}d ${hours}h`);
-      } else if (hours > 0) {
-        setCountdown(`${hours}h ${minutes}m`);
       } else {
-        setCountdown(`${minutes}m ${seconds}s`);
+        setCountdown(`${hours}h ${minutes}m`);
       }
+      
+      console.log('✅ [FIX #7 - MarketCard Countdown] Updated:', countdown);
     };
 
     calculateTimeLeft();
@@ -304,15 +309,17 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
         </div>
 
         {/* Bottom Content Overlay */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 text-white z-10">
+        {/* 🔧 FIX #6: Responsive padding for different screen sizes */}
+        <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3 md:p-4 text-white z-10">
           {/* Brand Info with Glassmorphism */}
+          {/* 🔧 FIX #6: Responsive padding and spacing */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onViewBrand?.(item.brandId);
             }}
-            className="flex items-center gap-2 mb-2 w-fit rounded-lg px-3 py-2 transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 w-fit rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 transition-all"
           >
             <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/60 bg-gradient-to-br from-primary to-purple-500 shadow-md">
               {item.brandLogo ? (
@@ -333,11 +340,18 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
               )}
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <p className="font-bold text-sm truncate leading-tight text-white drop-shadow">
+              {/* 🔧 FIX #5: Responsive font sizing, removed truncate, allow wrapping with line-clamp */}
+              <p 
+                className="font-bold leading-tight text-white drop-shadow line-clamp-2"
+                style={{ fontSize: 'clamp(0.75rem, 2.5vw, 0.875rem)' }}
+              >
                 {item.brandName ?? item.username ?? 'Brand'}
               </p>
               {item.username && item.brandName !== item.username && (
-                <p className="text-xs truncate leading-tight text-white/80">
+                <p 
+                  className="leading-tight text-white/80 line-clamp-1"
+                  style={{ fontSize: 'clamp(0.625rem, 2vw, 0.75rem)' }}
+                >
                   @{item.username}
                 </p>
               )}
@@ -345,9 +359,16 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
           </button>
 
           {/* Collection Title - Fancy Typography */}
+          {/* 🔧 FIX #5: Responsive title sizing */}
           <h3 
-            className="text-base font-bold mb-1 line-clamp-2 leading-tight drop-shadow-lg text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-100 to-white"
-            style={{ fontFamily: 'Georgia, "Playfair Display", serif', fontWeight: 700, letterSpacing: '0.03em', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}
+            className="font-bold mb-1 line-clamp-2 leading-tight drop-shadow-lg text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-100 to-white"
+            style={{ 
+              fontFamily: 'Georgia, "Playfair Display", serif', 
+              fontWeight: 700, 
+              letterSpacing: '0.03em', 
+              textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              fontSize: 'clamp(0.875rem, 2.5vw, 1rem)'
+            }}
           >
             {item.collectionTitle}
           </h3>

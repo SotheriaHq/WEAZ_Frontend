@@ -96,34 +96,59 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
     saleEnd: price?.saleEndAt,
   });
 
-  // Countdown for active sale end time
+  // 🔧 FIX #7: Enhanced countdown with color coding and urgency levels
   const [timeLeftLabel, setTimeLeftLabel] = React.useState<string | null>(null);
+  const [urgencyLevel, setUrgencyLevel] = React.useState<'low' | 'medium' | 'high' | 'critical'>('low');
+  
   React.useEffect(() => {
-    if (!saleBand || !price?.saleEndAt) { setTimeLeftLabel(null); return; }
+    if (!saleBand || !price?.saleEndAt) { 
+      setTimeLeftLabel(null); 
+      return; 
+    }
     const end = new Date(price.saleEndAt).getTime();
     const update = () => {
       const diff = end - Date.now();
-      if (diff <= 0) { setTimeLeftLabel('Ends soon'); return; }
+      if (diff <= 0) { 
+        setTimeLeftLabel('Ended'); 
+        setUrgencyLevel('critical');
+        return; 
+      }
       const s = Math.floor(diff / 1000);
       const d = Math.floor(s / 86400);
       const h = Math.floor((s % 86400) / 3600);
       const m = Math.floor((s % 3600) / 60);
-      if (d > 0) setTimeLeftLabel(`${d}d ${h}h left`);
-      else if (h > 0) setTimeLeftLabel(`${h}h ${m}m left`);
-      else setTimeLeftLabel(`${m}m left`);
+      
+      // Set urgency level based on time remaining
+      if (h < 1) {
+        setUrgencyLevel('critical');
+        setTimeLeftLabel(`🔥 ${m}m left`);
+      } else if (h < 6) {
+        setUrgencyLevel('high');
+        setTimeLeftLabel(`⚠️ ${h}h ${m}m left`);
+      } else if (d < 1) {
+        setUrgencyLevel('medium');
+        setTimeLeftLabel(`${h}h ${m}m left`);
+      } else {
+        setUrgencyLevel('low');
+        setTimeLeftLabel(`${d}d ${h}h left`);
+      }
+      
+      console.log('✅ [FIX #7 - Countdown Enhancement] Updated:', { timeLeftLabel, urgencyLevel, diff });
     };
     update();
-    const id = window.setInterval(update, 60000);
+    // Update more frequently for better accuracy
+    const id = window.setInterval(update, 30000);
     return () => window.clearInterval(id);
   }, [saleBand, price?.saleEndAt]);
 
   return (
     <div className="space-y-3">
       {/* Title & Actions Header */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1.5">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight tracking-tight" style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif' }}>
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5">
+            {/* 🔧 FIX #6: Responsive title sizing */}
+            <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white leading-tight tracking-tight" style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif' }}>
               {title}
             </h2>
             {visibility && (
@@ -140,7 +165,8 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
           </div>
           
           {/* Engagement Stats - Top Position with Icons */}
-          <div className="flex items-center gap-3 text-sm">
+          {/* 🔧 FIX #6: Responsive gap and text sizing */}
+          <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
             {typeof stats?.likes === 'number' && (
               <button
                 onClick={onLike}
@@ -195,8 +221,9 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
       </div>
 
       {/* Description */}
+      {/* 🔧 FIX #6: Responsive description text */}
       {description && (
-        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3" style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic' }}>
+        <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3" style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic' }}>
           {description}
         </p>
       )}
@@ -214,16 +241,32 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
       )}
 
       {/* Price Band - with sale support and frosted glass styling */}
+      {/* 🔧 FIX #6: Responsive padding */}
       {(baseBand || availabilityInStore || saleBand) && (
-        <div className="rounded-lg px-3 py-2 border border-white/20 bg-white/60 dark:bg-white/10 backdrop-blur-md shadow-sm">
+        <div className="rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 border border-white/20 bg-white/60 dark:bg-white/10 backdrop-blur-md shadow-sm">
+              {/* 🔧 FIX #2: Removed strikethrough price display, show only sale price */}
               {showStacked ? (
                 <div className="space-y-1">
-                  <div className="text-[11px] px-2 py-1 rounded-md bg-white/50 dark:bg-white/10 backdrop-blur-sm border border-white/30 flex items-center gap-1 justify-between">
-                    <span className="text-red-700 dark:text-red-300 font-medium line-through" aria-label="Original price">{baseBand}</span>
-                  </div>
-                  <div className="text-[12px] px-2 py-1 rounded-md bg-emerald-500/10 dark:bg-emerald-500/20 backdrop-blur-sm border border-emerald-400/40 flex items-center gap-2 justify-between w-full">
-                    <span className="font-semibold text-emerald-700 dark:text-emerald-300" aria-label="Sale price">{saleBand}</span>
-                    <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium whitespace-nowrap">
+                  {console.log('✅ [FIX #2 - Price Display] Showing sale price only, strikethrough removed')}
+                  {/* 🔧 FIX #7: Color-coded countdown with urgency styling */}
+                  <div className={`text-[13px] px-3 py-2 rounded-md backdrop-blur-sm border flex items-center gap-2 justify-between w-full transition-all duration-300 ${
+                    urgencyLevel === 'critical' ? 'bg-red-500/20 border-red-400/60 animate-pulse' :
+                    urgencyLevel === 'high' ? 'bg-orange-500/20 border-orange-400/60' :
+                    urgencyLevel === 'medium' ? 'bg-yellow-500/20 border-yellow-400/60' :
+                    'bg-emerald-500/10 border-emerald-400/40'
+                  }`}>
+                    <span className={`font-bold ${
+                      urgencyLevel === 'critical' ? 'text-red-700 dark:text-red-300' :
+                      urgencyLevel === 'high' ? 'text-orange-700 dark:text-orange-300' :
+                      urgencyLevel === 'medium' ? 'text-yellow-700 dark:text-yellow-300' :
+                      'text-emerald-700 dark:text-emerald-300'
+                    }`} aria-label="Sale price">{saleBand}</span>
+                    <span className={`text-[11px] font-semibold whitespace-nowrap flex items-center gap-1 ${
+                      urgencyLevel === 'critical' ? 'text-red-700 dark:text-red-300' :
+                      urgencyLevel === 'high' ? 'text-orange-700 dark:text-orange-300' :
+                      urgencyLevel === 'medium' ? 'text-yellow-700 dark:text-yellow-300' :
+                      'text-emerald-700 dark:text-emerald-300'
+                    }`}>
                       {timeLeftLabel ? timeLeftLabel : 'Sale'}
                     </span>
                   </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
 import { useDispatch } from 'react-redux';
 
@@ -31,6 +31,7 @@ type TabType = 'Collections' | 'Reviews' | 'About';
 
 const ProfilePage: React.FC = () => {
   const { id: routeBrandId } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     user,
     brandProfile,
@@ -51,7 +52,31 @@ const ProfilePage: React.FC = () => {
   const dispatch = useDispatch();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  // 🔧 FIX #1: Initialize from URL params to persist on refresh
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(
+    searchParams.get('collectionId') || null
+  );
+  
+  // 🔧 FIX #1: Sync URL params when selectedCollectionId changes
+  useEffect(() => {
+    console.log('🔧 [FIX #1 - Routing Persistence] Collection ID changed:', selectedCollectionId);
+    if (selectedCollectionId) {
+      setSearchParams({ collectionId: selectedCollectionId }, { replace: true });
+      console.log('✅ [FIX #1] URL updated with collectionId:', selectedCollectionId);
+    } else {
+      setSearchParams({}, { replace: true });
+      console.log('✅ [FIX #1] URL cleared (back to collections grid)');
+    }
+  }, [selectedCollectionId, setSearchParams]);
+  
+  // 🔧 FIX #1: Initialize from URL on mount
+  useEffect(() => {
+    const urlCollectionId = searchParams.get('collectionId');
+    if (urlCollectionId && urlCollectionId !== selectedCollectionId) {
+      console.log('🔧 [FIX #1] Restoring collection view from URL:', urlCollectionId);
+      setSelectedCollectionId(urlCollectionId);
+    }
+  }, []);
 
   const [activeTab, setActiveTab] = useState<TabType>('Collections');
   const [visibilityFilter, setVisibilityFilter] = useState<'Public' | 'Private'>('Public');

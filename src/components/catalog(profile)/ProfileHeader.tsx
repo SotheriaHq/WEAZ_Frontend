@@ -172,7 +172,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         ) : null}
       </div>
 
-      <div className="-mt-24 px-4 sm:-mt-28 sm:px-6">
+      {/* 🔧 FIX #4: Reduced negative margin from -mt-24/-mt-28 to -mt-16/-mt-20 */}
+      <div className="-mt-16 px-4 sm:-mt-20 sm:px-6">
+        {console.log('✅ [FIX #4 - Profile Gap] Reduced top margin for tighter layout')}
         <div className="relative z-20 flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
           <div className="flex-shrink-0">
             <div
@@ -198,7 +200,12 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </div>
 
           <div className="mt-4 flex flex-1 flex-col gap-2 text-white sm:mt-2">
-            <h1 className="text-md font-semibold italic tracking-[0.08em] text-blue-300 drop-shadow-lg sm:text-2xl">
+            {/* 🔧 FIX #5: Responsive font sizing without truncation */}
+            {console.log('✅ [FIX #5 - Brand Name Display] Using responsive font with clamp, no ellipses')}
+            <h1 
+              className="font-semibold italic tracking-[0.08em] text-blue-300 drop-shadow-lg leading-tight"
+              style={{ fontSize: 'clamp(1rem, 3vw, 1.5rem)' }}
+            >
               {profileData.name}
             </h1>
             <p className="flex items-center gap-2 text-sm font-medium text-white/90 drop-shadow-md">
@@ -224,7 +231,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             ) : null}
           </div>
 
-          <div className="flex gap-2 self-end sm:self-end sm:mt-4 mb-16">
+          {/* 🔧 FIX #4: Reduced bottom margin from mb-16 to mb-6 */}
+          <div className="flex gap-2 self-end sm:self-end sm:mt-4 mb-6">
             {canEdit ? (
               <ActionButton
                 Icon={FiEdit2}

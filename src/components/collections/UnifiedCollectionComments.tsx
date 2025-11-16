@@ -21,6 +21,17 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const emojiPickerRef = React.useRef<HTMLDivElement>(null);
+  
+  // 🔧 FIX #3: Add state for reply functionality
+  const me = React.useMemo(() => {
+    // Get current user from Redux store if available
+    try {
+      const state = (window as any).__REDUX_STATE__ || {};
+      return state.user?.profile || null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const load = async (reset = false) => {
     if (busy) return;
@@ -147,7 +158,56 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
             });
             return (
               <div key={c.id} className="py-0.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
-                <CommentItem comment={c} onLike={handleLike} onDelete={handleDelete} onReply={() => {}} />
+                {console.log('✅ [FIX #3 - Reply Functionality] Rendering comment with reply enabled:', c.id)}
+                <CommentItem 
+                  comment={c} 
+                  onLike={handleLike} 
+                  onDelete={handleDelete} 
+                  onReply={(parentId) => {
+                    console.log('🔧 [FIX #3] Reply button clicked for comment:', parentId);
+                    // Auto-expand replies when user clicks Reply
+                    if (!expanded.has(parentId)) {
+                      toggleReplies(parentId);
+                    }
+                  }}
+                  currentUserId={me?.id}
+                  enableReplyComposer={true}
+                  onCreateReply={async (parentId: string, content: string) => {
+                    console.log('🔧 [FIX #3] Creating reply:', { parentId, content });
+                    try {
+                      // 🔧 FIX #3: Determine correct target based on parent comment
+                      const parent = items.find(item => item.id === parentId);
+                      if (!parent) {
+                        throw new Error('Parent comment not found');
+                      }
+                      
+                      // Use parent's targetType and targetId for the reply
+                      const targetType = parent.targetType || 'COLLECTION';
+                      const targetId = parent.targetId || collectionId;
+                      
+                      console.log('🔧 [FIX #3] Reply target:', { targetType, targetId, parentTargetType: parent.targetType });
+                      
+                      const created = await CommentsApi.create(targetType as any, targetId, content, parentId);
+                      console.log('✅ [FIX #3] Reply created successfully:', created.id);
+                      
+                      // Add reply to parent's children array
+                      setItems((prev) => prev.map((c) => {
+                        if (c.id === parentId) {
+                          return { ...c, children: [...(c.children || []), created] };
+                        }
+                        return c;
+                      }));
+                      // Auto-expand to show new reply
+                      if (!expanded.has(parentId)) {
+                        setExpanded((prev) => new Set(prev).add(parentId));
+                      }
+                      toast.success('Reply posted!');
+                    } catch (e: any) {
+                      console.error('❌ [FIX #3] Failed to create reply:', e);
+                      throw e;
+                    }
+                  }}
+                />
                 {c.children && c.children.length > 0 && (
                   <div className="pl-6 mt-0.5">
                     <button
@@ -160,7 +220,15 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
                     {expanded.has(c.id) && (
                       <div className="mt-0.5 space-y-0.5">
                         {c.children.map((r) => (
-                          <CommentItem key={r.id} comment={r} onLike={handleLike} onDelete={handleDelete} onReply={() => {}} />
+                          <CommentItem 
+                            key={r.id} 
+                            comment={r} 
+                            onLike={handleLike} 
+                            onDelete={handleDelete} 
+                            onReply={() => {}} 
+                            currentUserId={me?.id}
+                            enableReplyComposer={false}
+                          />
                         ))}
                       </div>
                     )}
