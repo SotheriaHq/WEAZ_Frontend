@@ -92,42 +92,30 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
   const [urgencyLevel, setUrgencyLevel] = React.useState<'low' | 'medium' | 'high' | 'critical'>('low');
   
   React.useEffect(() => {
-    if (!saleBand || !price?.saleEndAt) { 
-      setTimeLeftLabel(null); 
-      return; 
-    }
+    if (!saleBand || !price?.saleEndAt) { setTimeLeftLabel(null); return; }
     const end = new Date(price.saleEndAt).getTime();
-    const update = () => {
+    const calc = () => {
       const diff = end - Date.now();
-      if (diff <= 0) { 
-        setTimeLeftLabel('Ended'); 
-        setUrgencyLevel('critical');
-        return; 
-      }
+      if (diff <= 0) { setTimeLeftLabel('Ended'); setUrgencyLevel('critical'); return; }
       const s = Math.floor(diff / 1000);
       const d = Math.floor(s / 86400);
       const h = Math.floor((s % 86400) / 3600);
       const m = Math.floor((s % 3600) / 60);
-      
-      // Set urgency level based on time remaining
-      if (h < 1) {
-        setUrgencyLevel('critical');
-        setTimeLeftLabel(`🔥 ${m}m left`);
-      } else if (h < 6) {
-        setUrgencyLevel('high');
-        setTimeLeftLabel(`⚠️ ${h}h ${m}m left`);
-      } else if (d < 1) {
-        setUrgencyLevel('medium');
-        setTimeLeftLabel(`${h}h ${m}m left`);
-      } else {
-        setUrgencyLevel('low');
-        setTimeLeftLabel(`${d}d ${h}h left`);
-      }
-      
+      const sec = s % 60;
+      if (h < 1) { setUrgencyLevel('critical'); setTimeLeftLabel(`${m}m ${sec}s`); }
+      else if (h < 6) { setUrgencyLevel('high'); setTimeLeftLabel(`${h}h ${m}m`); }
+      else if (d < 1) { setUrgencyLevel('medium'); setTimeLeftLabel(`${h}h ${m}m`); }
+      else { setUrgencyLevel('low'); setTimeLeftLabel(`${d}d ${h}h`); }
     };
-    update();
-    // Update more frequently for better accuracy
-    const id = window.setInterval(update, 30000);
+    calc();
+    const intervalMs = (() => {
+      const remaining = end - Date.now();
+      if (remaining < 10 * 60 * 1000) return 1000; // <10m update per second
+      if (remaining < 60 * 60 * 1000) return 5000; // <1h fast updates
+      if (remaining < 6 * 60 * 60 * 1000) return 15000; // <6h moderate
+      return 60000; // otherwise minute granularity
+    })();
+    const id = window.setInterval(calc, intervalMs);
     return () => window.clearInterval(id);
   }, [saleBand, price?.saleEndAt]);
 
@@ -234,18 +222,19 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
       {(baseBand || availabilityInStore || saleBand) && (
         <div className="rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 border border-white/20 bg-white/60 dark:bg-white/10 backdrop-blur-md shadow-sm">
           {showStacked ? (
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-600 dark:text-gray-400 line-through" aria-label="Original price">{baseBand}</span>
-                <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300" aria-label="Sale price">{saleBand}</span>
-              </div>
-              <span className={`text-[11px] font-semibold whitespace-nowrap px-2 py-0.5 rounded-md ${
-                urgencyLevel === 'critical' ? 'bg-red-500/20 text-red-700' :
-                urgencyLevel === 'high' ? 'bg-orange-500/20 text-orange-700' :
-                urgencyLevel === 'medium' ? 'bg-yellow-500/20 text-yellow-700' :
-                'bg-emerald-500/20 text-emerald-700'
-              }`}>
-                {timeLeftLabel ? timeLeftLabel : 'Sale'}
+            <div className="flex flex-col items-start gap-0.5">
+              <span className="text-[11px] text-gray-600 dark:text-gray-400 line-through" aria-label="Original price">{baseBand}</span>
+              <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300" aria-label="Sale price">{saleBand}</span>
+              <span
+                className={`mt-0.5 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold backdrop-blur-md shadow-sm border ${
+                  urgencyLevel === 'critical' ? 'bg-red-600/30 border-red-400/40 text-red-50' :
+                  urgencyLevel === 'high' ? 'bg-orange-500/30 border-orange-400/40 text-orange-50' :
+                  urgencyLevel === 'medium' ? 'bg-yellow-500/30 border-yellow-400/40 text-yellow-50' :
+                  'bg-emerald-500/25 border-emerald-400/40 text-emerald-50'
+                }`}
+                aria-label="Sale countdown"
+              >
+                {timeLeftLabel ? `${timeLeftLabel} left` : 'Sale'}
               </span>
             </div>
           ) : (

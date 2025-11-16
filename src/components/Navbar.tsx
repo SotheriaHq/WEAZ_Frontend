@@ -9,11 +9,9 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearUser, setUser } from '../features/userSlice';
-import { setUnreadCount } from '../features/notificationsSlice';
-import { addLocalNotification } from '../features/notificationsSlice';
+import { addLocalNotification, resetUnreadCount } from '../features/notificationsSlice';
 import type { RootState } from '../store';
-import { NotificationsApi } from '../api/NotificationsApi';
-import { useRealtime } from '@/realtime';
+// Notifications bootstrap logic moved to useNotificationsBootstrap hook mounted at app root.
 import type { AuthUserDto } from '../types/auth';
 import '../styles/scrollbar-hide.css';
 import TagChip from '@/components/ui/Tag';
@@ -108,35 +106,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, minim
   // Remove scroll transparency behavior; always solid background
   useEffect(() => { setScrolled(false); }, [location.pathname, theme]);
 
-  // Fetch unread notification count on mount and when user changes
-  useEffect(() => {
-    if (isAuthenticated && user?.id) {
-      const fetchUnreadCount = async () => {
-        try {
-          const response = await NotificationsApi.getUnreadCount();
-          dispatch(setUnreadCount(response.count));
-        } catch (error) {
-          console.error('Failed to fetch unread notification count:', error);
-        }
-      };
-      fetchUnreadCount();
-    } else {
-      dispatch(setUnreadCount(0));
-    }
-  }, [isAuthenticated, user?.id, dispatch]);
-
-  // WebSocket listener for real-time notification updates
-  const realtime = useRealtime();
-  useEffect(() => {
-    if (!isAuthenticated || !user?.id) return;
-    const { joinUser, onNotification } = realtime;
-    joinUser(user.id);
-    const unsub = onNotification(() => {
-      // Increment by 1; we already have unreadCount in state
-      dispatch(setUnreadCount(unreadCount + 1));
-    });
-    return () => { unsub(); };
-  }, [isAuthenticated, user?.id, unreadCount, realtime, dispatch]);
+  // Removed local fetch + realtime subscription; handled globally via useNotificationsBootstrap.
 
   // Profile Menu Component
   const ProfileMenu = () => {
@@ -283,6 +253,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, minim
                   dropStoredAccessToken();
                   localStorage.removeItem(env.userStorageKey);
                   dispatch(clearUser());
+                  dispatch(resetUnreadCount());
                   setShowProfileMenu(false);
                   navigate('/', { replace: true });
                 }}

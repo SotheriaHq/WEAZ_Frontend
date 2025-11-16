@@ -6,6 +6,7 @@ import { Navbar } from './Navbar';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
+import { useNotificationsBootstrap } from '@/hooks/useNotifications';
 
 export const Layout: React.FC = () => {
 
@@ -18,6 +19,9 @@ export const Layout: React.FC = () => {
    React.useEffect(() => {
      void user; void location; void navigate;
    }, [user, location.pathname, navigate]);
+
+  // Mount global notifications bootstrap once.
+  useNotificationsBootstrap();
 
   return (
   <div className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-black">
