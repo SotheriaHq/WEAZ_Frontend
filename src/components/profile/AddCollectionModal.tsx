@@ -104,28 +104,44 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Visibility</label>
-            <div className="inline-flex rounded-full border border-white/20 bg-white/5 p-1 backdrop-blur-sm">
-              {[
-                { key: true, label: 'Public' },
-                { key: false, label: 'Private' },
-              ].map((opt) => (
-                <button
-                  key={String(opt.key)}
-                  type="button"
-                  onClick={() => setIsPublic(opt.key)}
-                  className={`px-3 py-1 text-xs rounded-full ${isPublic === opt.key ? 'bg-white/20 text-white' : 'text-white/80'}`}
-                  disabled={isSubmitting}
-                >
-                  {opt.label}
-                </button>
-              ))}
+          {/* Type and Visibility - Side by Side */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Type Dropdown */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Type
+              </label>
+              <select
+                className="w-full px-3 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none cursor-pointer"
+                value={type}
+                onChange={(e) => setType(e.target.value as 'MALE' | 'FEMALE' | 'EVERYBODY')}
+                disabled={isSubmitting}
+              >
+                <option value="EVERYBODY" className="bg-slate-900 text-white">Everybody</option>
+                <option value="MALE" className="bg-slate-900 text-white">Male</option>
+                <option value="FEMALE" className="bg-slate-900 text-white">Female</option>
+              </select>
             </div>
-            {!isPublic && (
-              <p className="mt-1 text-xs text-white/70">{cooldownNotice}</p>
-            )}
+
+            {/* Visibility Dropdown */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Visibility
+              </label>
+              <select
+                className="w-full px-3 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none cursor-pointer"
+                value={isPublic ? 'public' : 'private'}
+                onChange={(e) => setIsPublic(e.target.value === 'public')}
+                disabled={isSubmitting}
+              >
+                <option value="public" className="bg-slate-900 text-white">Public</option>
+                <option value="private" className="bg-slate-900 text-white">Private</option>
+              </select>
+            </div>
           </div>
+          {!isPublic && (
+            <p className="text-xs text-white/70">{cooldownNotice}</p>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category <span className="text-red-500">*</span></label>
@@ -153,21 +169,17 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
             </select>
           </div>
 
+          {/* Collaborators Search Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type <span className="text-red-500">*</span></label>
-            <div className="flex gap-2">
-              {(['MALE','FEMALE','EVERYBODY'] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setType(t)}
-                  className={`px-3 py-1 rounded-md border ${type === t ? 'bg-white/20 text-white border-white/40' : 'border-white/20 text-white/80'}`}
-                  disabled={isSubmitting}
-                >
-                  {t.charAt(0) + t.slice(1).toLowerCase()}
-                </button>
-              ))}
-            </div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Collaborators
+            </label>
+            <input
+              type="text"
+              className="w-full px-3 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              placeholder="Search by username or email"
+              disabled={isSubmitting}
+            />
           </div>
 
           <div>

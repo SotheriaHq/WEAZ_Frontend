@@ -114,7 +114,15 @@ export const brandApi = {
         collection: {
           title: r.collection?.title ?? '',
         },
-        viewer: r.viewer ?? null,
+        viewer: r.viewer ? {
+          id: r.viewer.id,
+          username: r.viewer.username,
+          firstName: r.viewer.firstName,
+          lastName: r.viewer.lastName,
+          profileImage: r.viewer.profileImage,
+          profileImageId: r.viewer.profileImageId,
+          profileImageFile: r.viewer.profileImageFile,
+        } : null,
         coverUrl: r.collection?.medias?.[0]?.file?.s3Url ?? null,
         itemCount: r.collection?._count?.medias ?? 0,
         state: r.state,
@@ -186,8 +194,25 @@ export const brandApi = {
     const res = await apiClient.get(`/users/me/private-access/requests?${params.toString()}`);
     const payload = res.data;
     const container: any = payload?.data ?? payload ?? {};
+    const items = (container?.items ?? []) as any[];
     return {
-      items: (container?.items ?? []) as any[],
+      items: items.map((r: any) => ({
+        id: r.id,
+        collectionId: r.collectionId,
+        title: r.title,
+        brand: r.brand ? {
+          id: r.brand.id,
+          name: r.brand.name,
+          profileImage: r.brand.profileImage,
+          profileImageId: r.brand.profileImageId,
+          profileImageFile: r.brand.profileImageFile,
+        } : null,
+        coverUrl: r.coverUrl,
+        itemCount: r.itemCount,
+        state: r.state,
+        requestedAt: r.requestedAt,
+        updatedAt: r.updatedAt,
+      })),
       totalCount: container?.totalCount ?? 0,
       page: container?.page ?? 1,
       pageSize: container?.pageSize ?? 20,
@@ -209,8 +234,23 @@ export const brandApi = {
     const res = await apiClient.get(`/users/me/private-access/granted?${params.toString()}`);
     const payload = res.data;
     const container: any = payload?.data ?? payload ?? {};
+    const items = (container?.items ?? []) as any[];
     return {
-      items: (container?.items ?? []) as any[],
+      items: items.map((r: any) => ({
+        id: r.id,
+        collectionId: r.collectionId,
+        title: r.title,
+        brand: r.brand ? {
+          id: r.brand.id,
+          name: r.brand.name,
+          profileImage: r.brand.profileImage,
+          profileImageId: r.brand.profileImageId,
+          profileImageFile: r.brand.profileImageFile,
+        } : null,
+        coverUrl: r.coverUrl,
+        itemCount: r.itemCount,
+        grantedAt: r.grantedAt,
+      })),
       totalCount: container?.totalCount ?? 0,
       page: container?.page ?? 1,
       pageSize: container?.pageSize ?? 20,

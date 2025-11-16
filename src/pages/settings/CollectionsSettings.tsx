@@ -4,12 +4,28 @@ import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
 import { toast } from 'react-toastify';
 import SettingsSidebar from '@/components/settings/SettingsSidebar';
+import { ImageWithFallback } from '@/components/ImageWithFallback';
 
 interface AccessItem {
   id?: string;
   collectionId: string;
   title: string;
-  viewer?: { id: string; username?: string | null; profileImage?: string | null } | null;
+  viewer?: { 
+    id: string; 
+    username?: string | null; 
+    firstName?: string | null;
+    lastName?: string | null;
+    profileImage?: string | null; 
+    profileImageId?: string | null;
+    profileImageFile?: { id: string; s3Url: string } | null;
+  } | null;
+  brand?: { 
+    id: string; 
+    name?: string | null; 
+    profileImage?: string | null; 
+    profileImageId?: string | null;
+    profileImageFile?: { id: string; s3Url: string } | null;
+  } | null;
   coverUrl?: string | null;
   itemCount?: number;
   state: 'PENDING' | 'APPROVED' | 'REVOKED' | 'NONE';
@@ -65,10 +81,12 @@ const CollectionsSettings: React.FC = () => {
         // Regular user view: manage own requests
         if (tab === 'myRequests') {
           const res = await brandApi.listMyAccessRequests({ page, pageSize });
+          console.log('[CollectionsSettings] myRequests data:', res.items);
           setMyRequests(res.items);
           setTotalCount(res.totalCount || 0);
         } else if (tab === 'myAccess') {
           const res = await brandApi.listMyGrantedAccesses({ page, pageSize });
+          console.log('[CollectionsSettings] myAccess data:', res.items);
           setMyAccess(res.items);
           setTotalCount(res.totalCount || 0);
         }
@@ -209,20 +227,17 @@ const CollectionsSettings: React.FC = () => {
             // Determine display info based on brand vs user view
             let displayName: string;
             let collectionTitle: string;
-            let coverImageUrl: string | null;
             let itemKey: string;
 
             if (isBrand) {
               // Brand view: show viewer info and collection title
               displayName = it.viewer?.username || it.viewer?.id || 'Unknown';
               collectionTitle = it.collection?.title || 'Untitled';
-              coverImageUrl = it.coverUrl || null;
               itemKey = `${it.collectionId}:${it.viewer?.id}`;
             } else {
               // User view: show brand info and collection title
               displayName = it.brand?.name || 'Unknown Brand';
               collectionTitle = it.title || 'Untitled';
-              coverImageUrl = it.coverUrl || null;
               itemKey = it.id || `${it.collectionId}:${Math.random()}`;
             }
             
@@ -236,11 +251,39 @@ const CollectionsSettings: React.FC = () => {
               </span>
             );
 
+            // Get profile image for display
+            let profileImageUrl: string | null;
+            let profileImageFileId: string | null;
+            let fallbackName: string;
+
+            if (isBrand) {
+              // Brand view: show viewer's info
+              profileImageUrl = it.viewer?.profileImage || it.viewer?.profileImageFile?.s3Url || null;
+              profileImageFileId = it.viewer?.profileImageId || it.viewer?.profileImageFile?.id || null;
+              fallbackName = it.viewer?.firstName && it.viewer?.lastName 
+                ? `${it.viewer.firstName} ${it.viewer.lastName}`
+                : (it.viewer?.username || displayName);
+            } else {
+              // User view: show brand's info
+              profileImageUrl = it.brand?.profileImage || it.brand?.profileImageFile?.s3Url || null;
+              profileImageFileId = it.brand?.profileImageId || it.brand?.profileImageFile?.id || null;
+              fallbackName = it.brand?.name || displayName;
+            }
+
             return (
               <div key={itemKey} role="listitem" className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-white/5 backdrop-blur">
                 <div className="flex items-center gap-3">
-                  <div className="w-16 h-12 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800">
-                    {coverImageUrl ? <img src={coverImageUrl} alt={collectionTitle} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">No cover</div>}
+                  {/* User/Brand Profile Avatar - Square Design */}
+                  <div className="w-10 h-10 flex-shrink-0">
+                    <ImageWithFallback
+                      src={profileImageUrl}
+                      fileId={profileImageFileId}
+                      alt={displayName}
+                      fallbackName={fallbackName}
+                      className="w-full h-full object-cover"
+                      containerClassName="w-full h-full"
+                      rounded="md"
+                    />
                   </div>
                   <div>
                     <div className="text-sm font-semibold">

@@ -299,34 +299,48 @@ const CreateCollectionInner: React.FC = () => {
           </label>
         </div>
 
-        {/* Type */}
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Type</label>
-          <PillGroup
-            options={[
-              { key: 'MALE', label: 'Male', title: 'Primarily menswear' },
-              { key: 'FEMALE', label: 'Female', title: 'Primarily womenswear' },
-              { key: 'EVERYBODY', label: 'Everybody', title: 'Unisex / inclusive' },
-            ]}
-            value={type}
-            onChange={(v) => setType(v as any)}
-          />
+        {/* Type and Visibility - Side by Side Dropdowns */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Type Dropdown */}
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Type</label>
+            <select
+              className="w-full rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-gray-900 dark:text-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none cursor-pointer"
+              value={type}
+              onChange={(e) => setType(e.target.value as 'MALE' | 'FEMALE' | 'EVERYBODY')}
+              disabled={disabled}
+            >
+              <option value="EVERYBODY" className="bg-slate-900 text-white">Everybody</option>
+              <option value="MALE" className="bg-slate-900 text-white">Male</option>
+              <option value="FEMALE" className="bg-slate-900 text-white">Female</option>
+            </select>
+          </div>
+
+          {/* Visibility Dropdown */}
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Visibility</label>
+            <select
+              className="w-full rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-gray-900 dark:text-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none cursor-pointer"
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value as 'PUBLIC' | 'PRIVATE')}
+              disabled={disabled}
+            >
+              <option value="PUBLIC" className="bg-slate-900 text-white">Public</option>
+              <option value="PRIVATE" className="bg-slate-900 text-white">Private</option>
+            </select>
+          </div>
         </div>
 
-        {/* Visibility */}
+        {/* Collaborators - More Prominent */}
         <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Visibility</label>
-          <PillGroup
-            options={[
-              { key: 'PUBLIC', label: 'Public', title: 'Visible to everyone' },
-              { key: 'PRIVATE', label: 'Private', title: 'Restricted access' },
-            ]}
-            value={visibility}
-            onChange={(v) => setVisibility(v as any)}
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Collaborators</label>
+          <input
+            type="text"
+            placeholder="Search by username or email"
+            disabled={disabled}
+            className="w-full rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
           />
         </div>
-
-        <TextField label="Collaborators" placeholder="Search by username or email" disabled={disabled} variant="glass" inputClassName="border-0 focus:ring-0" />
       </Section>
 
       <FrostedButton 
