@@ -19,9 +19,19 @@ interface AccessItem {
 const CollectionsSettings: React.FC = () => {
   const me = useSelector((s: RootState) => s.user.profile);
   const brandId = me?.id;
-  const [tab, setTab] = useState<'requests' | 'approved'>('requests');
+  const isBrand = me?.type === 'BRAND';
+  
+  // Brand tabs: requests (pending) | approved
+  // User tabs: myRequests (all statuses) | myAccess (granted)
+  const [tab, setTab] = useState<'requests' | 'approved' | 'myRequests' | 'myAccess'>(
+    isBrand ? 'requests' : 'myRequests'
+  );
+  
   const [pending, setPending] = useState<AccessItem[]>([]);
   const [approved, setApproved] = useState<AccessItem[]>([]);
+  const [myRequests, setMyRequests] = useState<any[]>([]);
+  const [myAccess, setMyAccess] = useState<any[]>([]);
+  
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -37,31 +47,41 @@ const CollectionsSettings: React.FC = () => {
 
   const refresh = async () => {
     if (!brandId) return;
+    
     setLoading(true);
     try {
-      if (tab === 'requests') {
-        const res = await brandApi.listBrandAccessRequests(brandId, { status: 'pending', q: debouncedSearch || undefined, page, pageSize });
-        setPending(res.items as any);
-        setTotalCount(res.totalCount || 0);
+      if (isBrand) {
+        // Brand view: manage incoming requests
+        if (tab === 'requests') {
+          const res = await brandApi.listBrandAccessRequests(brandId, { status: 'pending', q: debouncedSearch || undefined, page, pageSize });
+          setPending(res.items as any);
+          setTotalCount(res.totalCount || 0);
+        } else if (tab === 'approved') {
+          const res = await brandApi.listBrandAccessRequests(brandId, { status: 'approved', q: debouncedSearch || undefined, page, pageSize });
+          setApproved(res.items as any);
+          setTotalCount(res.totalCount || 0);
+        }
       } else {
-        const res = await brandApi.listBrandAccessRequests(brandId, { status: 'approved', q: debouncedSearch || undefined, page, pageSize });
-        setApproved(res.items as any);
-        setTotalCount(res.totalCount || 0);
+        // Regular user view: manage own requests
+        if (tab === 'myRequests') {
+          const res = await brandApi.listMyAccessRequests({ page, pageSize });
+          setMyRequests(res.items);
+          setTotalCount(res.totalCount || 0);
+        } else if (tab === 'myAccess') {
+          const res = await brandApi.listMyGrantedAccesses({ page, pageSize });
+          setMyAccess(res.items);
+          setTotalCount(res.totalCount || 0);
+        }
       }
     } catch (e: any) {
-      const status = e?.response?.status;
-      const message = e?.response?.data?.message;
-      
-      // Handle specific error cases
-      if (status === 400 && message?.includes('user type BRAND')) {
-        toast.error('This feature is only available for brand accounts');
-      } else {
-        toast.error('Failed to load access requests');
-      }
+      console.error('Failed to load data:', e);
+      toast.error('Failed to load data');
       
       // Clear data on error
       setPending([]);
       setApproved([]);
+      setMyRequests([]);
+      setMyAccess([]);
       setTotalCount(0);
     } finally {
       setLoading(false);
@@ -71,7 +91,13 @@ const CollectionsSettings: React.FC = () => {
   useEffect(() => { setPage(1); }, [tab]);
   useEffect(() => { void refresh(); }, [brandId, tab, debouncedSearch, page, pageSize]);
 
-  const items = useMemo(() => (tab === 'requests' ? pending : approved), [tab, pending, approved]);
+  const items = useMemo(() => {
+    if (isBrand) {
+      return tab === 'requests' ? pending : approved;
+    } else {
+      return tab === 'myRequests' ? myRequests : myAccess;
+    }
+  }, [isBrand, tab, pending, approved, myRequests, myAccess]);
 
   const approveOne = async (it: AccessItem) => {
     if (!brandId) return;
@@ -106,6 +132,27 @@ const CollectionsSettings: React.FC = () => {
     }
   };
 
+  // User actions
+  const cancelRequest = async (requestId: string) => {
+    try {
+      await brandApi.cancelAccessRequest(requestId);
+      toast.success('Request cancelled');
+      void refresh();
+    } catch {
+      toast.error('Failed to cancel request');
+    }
+  };
+
+  const revokeMyAccessAction = async (accessId: string) => {
+    try {
+      await brandApi.revokeMyAccess(accessId);
+      toast.success('Access revoked');
+      void refresh();
+    } catch {
+      toast.error('Failed to revoke access');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Settings Sidebar */}
@@ -116,12 +163,25 @@ const CollectionsSettings: React.FC = () => {
         <div className="max-w-4xl mx-auto">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Collections Access</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Manage access requests for your private collections</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              {isBrand ? 'Manage access requests for your private collections' : 'Manage your private collection access'}
+            </p>
           </div>
+          
       <div className="mb-4 inline-flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700" role="tablist" aria-label="Collections access tabs">
-        {[{k:'requests',label:'Pending Requests'},{k:'approved',label:'Approved'}].map((opt:any) => (
-          <button key={opt.k} role="tab" aria-selected={tab===opt.k} onClick={() => setTab(opt.k)} className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab===opt.k?'bg-purple-600 text-white':'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>{opt.label}</button>
-        ))}
+        {isBrand ? (
+          <>
+            {[{k:'requests',label:'Pending Requests'},{k:'approved',label:'Approved'}].map((opt:any) => (
+              <button key={opt.k} role="tab" aria-selected={tab===opt.k} onClick={() => setTab(opt.k)} className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab===opt.k?'bg-purple-600 text-white':'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>{opt.label}</button>
+            ))}
+          </>
+        ) : (
+          <>
+            {[{k:'myRequests',label:'My Requests'},{k:'myAccess',label:'My Access'}].map((opt:any) => (
+              <button key={opt.k} role="tab" aria-selected={tab===opt.k} onClick={() => setTab(opt.k)} className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab===opt.k?'bg-purple-600 text-white':'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>{opt.label}</button>
+            ))}
+          </>
+        )}
       </div>
       <div className="flex items-center justify-between gap-3 mb-4">
         <input
@@ -145,29 +205,76 @@ const CollectionsSettings: React.FC = () => {
         <div className="text-gray-500">No items</div>
       ) : (
         <div className="space-y-3" role="list" aria-label="Access items">
-          {items.map((it) => (
-            <div key={`${it.collectionId}:${it.viewer?.id ?? it.id ?? Math.random()}`} role="listitem" className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-white/5 backdrop-blur">
-              <div className="flex items-center gap-3">
-                <div className="w-16 h-12 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800">
-                  {it.coverUrl ? <img src={it.coverUrl} alt={it.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">No cover</div>}
+          {items.map((it) => {
+            // Determine display info based on brand vs user view
+            let displayName: string;
+            let collectionTitle: string;
+            let coverImageUrl: string | null;
+            let itemKey: string;
+
+            if (isBrand) {
+              // Brand view: show viewer info and collection title
+              displayName = it.viewer?.username || it.viewer?.id || 'Unknown';
+              collectionTitle = it.collection?.title || 'Untitled';
+              coverImageUrl = it.coverUrl || null;
+              itemKey = `${it.collectionId}:${it.viewer?.id}`;
+            } else {
+              // User view: show brand info and collection title
+              displayName = it.brand?.name || 'Unknown Brand';
+              collectionTitle = it.title || 'Untitled';
+              coverImageUrl = it.coverUrl || null;
+              itemKey = it.id || `${it.collectionId}:${Math.random()}`;
+            }
+            
+            const statusBadge = !isBrand && (tab === 'myRequests') && (
+              <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                it.state === 'APPROVED' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                it.state === 'PENDING' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+              }`}>
+                {it.state}
+              </span>
+            );
+
+            return (
+              <div key={itemKey} role="listitem" className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-white/5 backdrop-blur">
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-12 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800">
+                    {coverImageUrl ? <img src={coverImageUrl} alt={collectionTitle} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">No cover</div>}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">
+                      {collectionTitle}
+                      {statusBadge}
+                    </div>
+                    <div className="text-xs text-gray-500">{displayName}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm font-semibold">{it.title}</div>
-                  <div className="text-xs text-gray-500">{it.viewer?.username || it.viewer?.id}</div>
+                <div className="flex items-center gap-2">
+                  {isBrand ? (
+                    // Brand actions
+                    tab === 'requests' ? (
+                      <>
+                        <button className="text-xs px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => approveOne(it)}>Approve</button>
+                        <button className="text-xs px-3 py-1.5 rounded-md bg-red-600 text-white hover:bg-red-700" onClick={() => rejectOne(it)}>Reject</button>
+                      </>
+                    ) : (
+                      <button className="text-xs px-3 py-1.5 rounded-md bg-red-600 text-white hover:bg-red-700" onClick={() => revokeOne(it)}>Revoke</button>
+                    )
+                  ) : (
+                    // User actions
+                    tab === 'myRequests' ? (
+                      it.state === 'PENDING' && (
+                        <button className="text-xs px-3 py-1.5 rounded-md bg-red-600 text-white hover:bg-red-700" onClick={() => cancelRequest(it.id)}>Cancel</button>
+                      )
+                    ) : (
+                      <button className="text-xs px-3 py-1.5 rounded-md bg-red-600 text-white hover:bg-red-700" onClick={() => revokeMyAccessAction(it.id)}>Revoke</button>
+                    )
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {tab === 'requests' ? (
-                  <>
-                    <button className="text-xs px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => approveOne(it)}>Approve</button>
-                    <button className="text-xs px-3 py-1.5 rounded-md bg-red-600 text-white hover:bg-red-700" onClick={() => rejectOne(it)}>Reject</button>
-                  </>
-                ) : (
-                  <button className="text-xs px-3 py-1.5 rounded-md bg-red-600 text-white hover:bg-red-700" onClick={() => revokeOne(it)}>Revoke</button>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
           <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700 mt-4">
             <div className="text-xs text-gray-600 dark:text-gray-300">{totalCount} results</div>
             <div className="flex items-center gap-2" role="navigation" aria-label="Pagination">

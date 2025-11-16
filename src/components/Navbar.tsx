@@ -457,23 +457,25 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
 
         {/* Right Side Actions */}
         <div className="flex items-center space-x-3 shrink-0">
-          {/* Notifications Dropdown */}
-          <div className="relative hidden sm:block">
-            <button
-              type="button"
-              ref={(el) => { (notificationsAnchorRef as any).current = el; }}
-              onClick={() => setShowNotifications((p) => !p)}
-              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
-            >
-              <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white px-1">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              )}
-            </button>
-            <NotificationsDropdown open={showNotifications} onClose={() => setShowNotifications(false)} anchorRef={notificationsAnchorRef as any} />
-          </div>
+          {/* Notifications Dropdown - Only for authenticated users */}
+          {user && (
+            <div className="relative hidden sm:block">
+              <button
+                type="button"
+                ref={(el) => { (notificationsAnchorRef as any).current = el; }}
+                onClick={() => setShowNotifications((p) => !p)}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+              >
+                <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white px-1">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              <NotificationsDropdown open={showNotifications} onClose={() => setShowNotifications(false)} anchorRef={notificationsAnchorRef as any} />
+            </div>
+          )}
 
           {/* Auth Buttons - Only when not logged in */}
           {!user && (

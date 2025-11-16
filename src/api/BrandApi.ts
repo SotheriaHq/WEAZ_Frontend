@@ -111,8 +111,12 @@ export const brandApi = {
       items: items.map((r: any) => ({
         id: r.id,
         collectionId: r.collectionId,
-        title: r.collection?.title ?? '',
+        collection: {
+          title: r.collection?.title ?? '',
+        },
         viewer: r.viewer ?? null,
+        coverUrl: r.collection?.medias?.[0]?.file?.s3Url ?? null,
+        itemCount: r.collection?._count?.medias ?? 0,
         state: r.state,
         createdAt: r.createdAt,
       })),
@@ -164,6 +168,73 @@ export const brandApi = {
       return [];
     }
   },
+
+  // ===================== User-scoped Private Access Management =====================
+  
+  /**
+   * List all access requests sent by the current user
+   */
+  async listMyAccessRequests(args?: { 
+    status?: 'pending' | 'approved' | 'rejected'; 
+    page?: number; 
+    pageSize?: number;
+  }) {
+    const params = new URLSearchParams();
+    if (args?.status) params.set('status', args.status);
+    if (args?.page) params.set('page', String(args.page));
+    if (args?.pageSize) params.set('pageSize', String(args.pageSize));
+    const res = await apiClient.get(`/users/me/private-access/requests?${params.toString()}`);
+    const payload = res.data;
+    const container: any = payload?.data ?? payload ?? {};
+    return {
+      items: (container?.items ?? []) as any[],
+      totalCount: container?.totalCount ?? 0,
+      page: container?.page ?? 1,
+      pageSize: container?.pageSize ?? 20,
+      totalPages: container?.totalPages ?? 1,
+      hasNextPage: container?.hasNextPage ?? false,
+    };
+  },
+
+  /**
+   * List all granted accesses for the current user
+   */
+  async listMyGrantedAccesses(args?: { 
+    page?: number; 
+    pageSize?: number;
+  }) {
+    const params = new URLSearchParams();
+    if (args?.page) params.set('page', String(args.page));
+    if (args?.pageSize) params.set('pageSize', String(args.pageSize));
+    const res = await apiClient.get(`/users/me/private-access/granted?${params.toString()}`);
+    const payload = res.data;
+    const container: any = payload?.data ?? payload ?? {};
+    return {
+      items: (container?.items ?? []) as any[],
+      totalCount: container?.totalCount ?? 0,
+      page: container?.page ?? 1,
+      pageSize: container?.pageSize ?? 20,
+      totalPages: container?.totalPages ?? 1,
+      hasNextPage: container?.hasNextPage ?? false,
+    };
+  },
+
+  /**
+   * Cancel a pending access request
+   */
+  async cancelAccessRequest(requestId: string) {
+    const res = await apiClient.patch(`/users/me/private-access/requests/${requestId}/cancel`);
+    return res.data?.data ?? res.data;
+  },
+
+  /**
+   * Revoke own access to a private collection
+   */
+  async revokeMyAccess(accessId: string) {
+    const res = await apiClient.patch(`/users/me/private-access/granted/${accessId}/revoke`);
+    return res.data?.data ?? res.data;
+  },
+
   // Fetch brand profile details
   async getBrandProfile(brandId: string): Promise<BrandProfileDto | null> {
     try {

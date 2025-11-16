@@ -63,9 +63,23 @@ const Market: React.FC = () => {
     }
   }, [selectedCategory, hasLoadedOnce, dispatch]);
 
+  // Load feed on mount and when dependencies change
   useEffect(() => {
     void loadFeed();
   }, [loadFeed]);
+  
+  // Force reload when navigating back to this page (fixes image loading issue after route changes)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && hasLoadedOnce) {
+        // Refresh data when page becomes visible again
+        void loadFeed();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [loadFeed, hasLoadedOnce]);
 
   // Tag filter UI removed for now; keep hook slots lean
 

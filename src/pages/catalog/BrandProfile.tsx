@@ -17,6 +17,7 @@ import EditProfileModal from '../../components/profile/EditProfileModal';
 import AboutTab from '../../components/profile/tabs/AboutTab';
 import ReviewsTab from '../../components/profile/tabs/ReviewsTab';
 import InlineCollectionViewer from '../../components/collections/InlineCollectionViewer';
+import CollectionCard from '../../components/profile/CollectionCard';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import type { AuthUserDto } from '../../types/auth';
 import { setUser } from '../../features/userSlice';
@@ -767,42 +768,23 @@ const ProfilePage: React.FC = () => {
                         const hasRevoked = privateStates.some(s => s.state === 'REVOKED');
                         const hasNone = privateStates.some(s => s.state === 'NONE');
 
-                        // If user has approved access, show those collections
+                        // If user has approved access, show those collections using regular collection cards
                         if (approvedCollections.length > 0) {
+                          // Get full collection data for approved collections from visitorCollections
+                          const approvedCollectionData = visitorCollections.filter(c => 
+                            approvedCollections.some(ac => ac.collectionId === c.id)
+                          );
+                          
                           return (
                             <div className="space-y-6">
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                                {approvedCollections.map((s) => (
-                                  <button
-                                    key={s.collectionId}
-                                    onClick={() => setSelectedCollectionId(s.collectionId)}
-                                    className="relative group rounded-xl overflow-hidden border border-emerald-200/50 dark:border-emerald-500/20 bg-white/80 dark:bg-white/5 backdrop-blur shadow-md hover:shadow-xl transition-all duration-300 text-left"
-                                  >
-                                    <div className="relative h-44 w-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
-                                      {s.coverUrl ? (
-                                        <img src={s.coverUrl} alt={s.title} className="h-full w-full object-cover" />
-                                      ) : (
-                                        <div className="h-full w-full flex items-center justify-center">
-                                          <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                          </svg>
-                                        </div>
-                                      )}
-                                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-                                      <div className="absolute top-2 right-2">
-                                        <div className="bg-emerald-600/90 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full font-medium shadow-lg">
-                                          ✓ Approved
-                                        </div>
-                                      </div>
-                                      <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-                                        <div className="text-sm font-bold line-clamp-1">{s.title || 'Private Collection'}</div>
-                                        <div className="text-xs text-white/90 mt-0.5">{s.itemCount ?? 0} piece{(s.itemCount ?? 0) !== 1 ? 's' : ''}</div>
-                                      </div>
-                                    </div>
-                                    <div className="p-3">
-                                      <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Click to view →</div>
-                                    </div>
-                                  </button>
+                                {approvedCollectionData.map((collection) => (
+                                  <CollectionCard
+                                    key={collection.id}
+                                    collection={collection}
+                                    onClick={() => setSelectedCollectionId(collection.id)}
+                                    showActions={false}
+                                  />
                                 ))}
                               </div>
                               

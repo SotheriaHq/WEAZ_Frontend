@@ -17,11 +17,12 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   const dispatch = useDispatch<AppDispatch>();
   const { items, hasNextPage, endCursor, loadingList, unreadCount, initialized } = useSelector((s: RootState) => s.notifications);
   const user = useSelector((s: RootState) => s.user.profile);
+  const isAuthenticated = useSelector((s: RootState) => s.user.isAuthenticated);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
 
-  // initial fetch
-  useEffect(() => { if (open && !initialized) { dispatch(fetchNotifications({ limit: 30 })); dispatch(fetchUnreadCount()); } }, [open, initialized, dispatch]);
+  // initial fetch - only if authenticated
+  useEffect(() => { if (open && !initialized && isAuthenticated) { dispatch(fetchNotifications({ limit: 30 })); dispatch(fetchUnreadCount()); } }, [open, initialized, isAuthenticated, dispatch]);
 
   // outside click
   useEffect(() => { if (!open) return; const handler = (e: MouseEvent) => { if (!containerRef.current) return; if (containerRef.current.contains(e.target as Node)) return; if (anchorRef.current && anchorRef.current.contains(e.target as Node)) return; onClose(); }; document.addEventListener('mousedown', handler); return () => document.removeEventListener('mousedown', handler); }, [open, onClose, anchorRef]);
@@ -53,7 +54,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
             <button
               key={n.id}
               onClick={() => {
-                if (!n.isRead) dispatch(markNotificationRead(n.id));
+                if (!n.isRead && isAuthenticated) dispatch(markNotificationRead(n.id));
                 if (hasAction) {
                   navigate(n.targetUrl);
                   onClose();
