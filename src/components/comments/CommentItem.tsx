@@ -6,6 +6,7 @@ import type { RootState } from '@/store';
 import { CommentsApi } from '@/api/CommentsApi';
 import { toast } from 'react-toastify';
 import { useRealtime } from '@/realtime';
+import CommentInput from '@/components/ui/CommentInput';
 
 type Props = {
   comment: CommentV2Dto;
@@ -140,20 +141,15 @@ const CommentItem: React.FC<Props> = ({ comment, onLike, onReply, onDelete, curr
           </div>
         ) : null}
         {replying && enableReplyComposer && (
-          <div className="mt-1 pl-1 flex flex-col gap-1">
-            <textarea
-              className="w-full rounded bg-white/10 dark:bg-black/20 text-xs p-2 border border-white/20 focus:outline-none"
-              rows={2}
+          <div className="mt-1 pl-1">
+            <CommentInput
               value={replyText}
-              maxLength={500}
-              onChange={(e) => setReplyText(e.target.value)}
+              onChange={setReplyText}
+              onSubmit={() => void submitReply()}
               placeholder="Write a reply..."
+              className="text-xs"
+              maxLength={500}
             />
-            <div className="flex justify-end gap-2">
-              <button type="button" disabled={!replyText.trim()} onClick={() => void submitReply()} className="px-2 py-1 rounded text-[11px] bg-purple-600 text-white disabled:opacity-40">
-                {submittingReply.current ? 'Posting…' : 'Post'}
-              </button>
-            </div>
           </div>
         )}
       </div>

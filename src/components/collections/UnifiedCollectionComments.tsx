@@ -173,23 +173,13 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
                   currentUserId={me?.id}
                   enableReplyComposer={true}
                   onCreateReply={async (parentId: string, content: string) => {
-                    console.log('🔧 [FIX #3] Creating reply:', { parentId, content });
+                    console.log('🔧 [FIX #3] Creating reply:', { parentId, content, parentTargetType: c.targetType, parentTargetId: c.targetId });
                     try {
-                      // 🔧 FIX #3: Determine correct target based on parent comment
-                      const parent = items.find(item => item.id === parentId);
-                      if (!parent) {
-                        throw new Error('Parent comment not found');
-                      }
-                      
-                      // Use parent's targetType and targetId for the reply
-                      const targetType = parent.targetType || 'COLLECTION';
-                      const targetId = parent.targetId || collectionId;
-                      
-                      console.log('🔧 [FIX #3] Reply target:', { targetType, targetId, parentTargetType: parent.targetType });
-                      
-                      const created = await CommentsApi.create(targetType as any, targetId, content, parentId);
+                      // Use the parent's own target to avoid backend mismatch (collection vs media)
+                      const targetType = c.targetType; // 'COLLECTION' | 'COLLECTION_MEDIA' | 'POST'
+                      const targetId = c.targetId;      // the id expected by the backend for the parent target
+                      const created = await CommentsApi.create(targetType, targetId, content, parentId);
                       console.log('✅ [FIX #3] Reply created successfully:', created.id);
-                      
                       // Add reply to parent's children array
                       setItems((prev) => prev.map((c) => {
                         if (c.id === parentId) {

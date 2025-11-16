@@ -14,6 +14,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { toast } from 'react-toastify';
 import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
+import { useCountdown } from '@/hooks/useCountdown';
 
 type Props = {
   open: boolean;
@@ -74,6 +75,15 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     if (max) return `Up to ${max}`;
     return null;
   })();
+
+  // Countdown only within active sale window
+  const now = Date.now();
+  const saleActive = (() => {
+    const startOk = !item.saleStartAt || new Date(item.saleStartAt).getTime() <= now;
+    const endOk = !item.saleEndAt || new Date(item.saleEndAt).getTime() >= now;
+    return Boolean((item.saleMinPrice || item.saleMaxPrice) && startOk && endOk);
+  })();
+  const { label: countdownLabel, expired } = useCountdown(saleActive ? item.saleEndAt ?? undefined : undefined);
 
   const brandLabel = item.brandName ?? item.username ?? 'Brand';
 
@@ -188,6 +198,12 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                 ) : baseBand ? (
                   <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{baseBand}</span>
                 ) : null}
+                {/* Countdown indicator (compact) */}
+                {saleActive && !expired && countdownLabel && (
+                  <span className="rounded-md bg-rose-600/90 text-white text-[11px] font-semibold px-2 py-0.5 border border-white/20 shadow-sm" title="Sale ends">
+                    {countdownLabel}
+                  </span>
+                )}
                 <IconButton variant="primary" size="sm" icon={<Plus size={16} />} onClick={() => { /* TODO: cart */ }} tooltip="Add to cart" />
               </div>
             </div>

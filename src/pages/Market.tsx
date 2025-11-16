@@ -109,8 +109,8 @@ const Market: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-8 px-4">
-               <div className="flex w-full gap-3 overflow-x-auto no-scrollbar my-4 mb-5">
+    <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4">
+           <div className="flex w-full gap-3 overflow-x-auto no-scrollbar mt-2 mb-3">
         {[
           { slug: 'ALL', label: 'All', border: 'border-slate-300/80 dark:border-slate-400/60', bgActive: 'bg-slate-500/20 backdrop-blur-md', hoverBg: 'hover:bg-slate-500/10' },
           { slug: 'AFRICAN_FASHION', label: 'African Fashion', border: 'border-fuchsia-300/80 dark:border-fuchsia-400/60', bgActive: 'bg-fuchsia-500/20 backdrop-blur-md', hoverBg: 'hover:bg-fuchsia-500/10' },

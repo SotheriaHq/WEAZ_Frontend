@@ -244,43 +244,26 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
       {/* 🔧 FIX #6: Responsive padding */}
       {(baseBand || availabilityInStore || saleBand) && (
         <div className="rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 border border-white/20 bg-white/60 dark:bg-white/10 backdrop-blur-md shadow-sm">
-              {/* 🔧 FIX #2: Removed strikethrough price display, show only sale price */}
-              {showStacked ? (
-                <div className="space-y-1">
-                  {console.log('✅ [FIX #2 - Price Display] Showing sale price only, strikethrough removed')}
-                  {/* 🔧 FIX #7: Color-coded countdown with urgency styling */}
-                  <div className={`text-[13px] px-3 py-2 rounded-md backdrop-blur-sm border flex items-center gap-2 justify-between w-full transition-all duration-300 ${
-                    urgencyLevel === 'critical' ? 'bg-red-500/20 border-red-400/60 animate-pulse' :
-                    urgencyLevel === 'high' ? 'bg-orange-500/20 border-orange-400/60' :
-                    urgencyLevel === 'medium' ? 'bg-yellow-500/20 border-yellow-400/60' :
-                    'bg-emerald-500/10 border-emerald-400/40'
-                  }`}>
-                    <span className={`font-bold ${
-                      urgencyLevel === 'critical' ? 'text-red-700 dark:text-red-300' :
-                      urgencyLevel === 'high' ? 'text-orange-700 dark:text-orange-300' :
-                      urgencyLevel === 'medium' ? 'text-yellow-700 dark:text-yellow-300' :
-                      'text-emerald-700 dark:text-emerald-300'
-                    }`} aria-label="Sale price">{saleBand}</span>
-                    <span className={`text-[11px] font-semibold whitespace-nowrap flex items-center gap-1 ${
-                      urgencyLevel === 'critical' ? 'text-red-700 dark:text-red-300' :
-                      urgencyLevel === 'high' ? 'text-orange-700 dark:text-orange-300' :
-                      urgencyLevel === 'medium' ? 'text-yellow-700 dark:text-yellow-300' :
-                      'text-emerald-700 dark:text-emerald-300'
-                    }`}>
-                      {timeLeftLabel ? timeLeftLabel : 'Sale'}
-                    </span>
-                  </div>
-                </div>
+          {showStacked ? (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-600 dark:text-gray-400 line-through" aria-label="Original price">{baseBand}</span>
+                <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300" aria-label="Sale price">{saleBand}</span>
+              </div>
+              <span className={`text-[11px] font-semibold whitespace-nowrap px-2 py-0.5 rounded-md ${
+                urgencyLevel === 'critical' ? 'bg-red-500/20 text-red-700' :
+                urgencyLevel === 'high' ? 'bg-orange-500/20 text-orange-700' :
+                urgencyLevel === 'medium' ? 'bg-yellow-500/20 text-yellow-700' :
+                'bg-emerald-500/20 text-emerald-700'
+              }`}>
+                {timeLeftLabel ? timeLeftLabel : 'Sale'}
+              </span>
+            </div>
           ) : (
             singleBand && (
-              <div className={`text-xs ${saleBand ? 'bg-emerald-500/10 dark:bg-emerald-500/20 backdrop-blur-sm border border-emerald-400/40 rounded-md px-2 py-1 inline-flex items-center justify-between gap-2 w-full' : ''}`}>
-                {!saleBand && <span className="text-gray-600 dark:text-gray-400">Price: </span>}
-                <span className={`font-bold ${saleBand ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-900 dark:text-white'}`} style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{singleBand}</span>
-                {saleBand && (
-                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium whitespace-nowrap">
-                    {timeLeftLabel ? timeLeftLabel : 'Sale'}
-                  </span>
-                )}
+              <div className="text-xs flex items-center gap-2">
+                <span className="text-gray-600 dark:text-gray-400">Price:</span>
+                <span className="font-bold text-gray-900 dark:text-white" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{singleBand}</span>
               </div>
             )
           )}
