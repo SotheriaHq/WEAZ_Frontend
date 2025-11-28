@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { useRealtime } from '@/realtime';
+import { toast } from 'react-toastify';
 import {
   fetchNotifications,
   fetchUnreadCount,
@@ -64,6 +65,10 @@ export function useNotificationsBootstrap() {
             targetUrl: payload.payload?.targetUrl ?? undefined,
         }),
       );
+      // Show toast for real-time notification
+      if (payload.message) {
+        toast.info(payload.message);
+      }
     });
     return () => { unsub(); };
   }, [userId, realtime, dispatch]);

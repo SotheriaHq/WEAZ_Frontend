@@ -169,7 +169,7 @@ const Reviews: React.FC<ReviewsProps> = ({
           onClick={() => setFilter('all')}
           className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-colors ${
             filter === 'all'
-              ? 'bg-purple-600 text-white shadow-md'
+              ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md'
               : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
           }`}
         >
@@ -181,7 +181,7 @@ const Reviews: React.FC<ReviewsProps> = ({
             onClick={() => setFilter(stars as 5 | 4 | 3 | 2 | 1)}
             className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-colors ${
               filter === stars
-                ? 'bg-purple-600 text-white shadow-md'
+                ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
             }`}
           >

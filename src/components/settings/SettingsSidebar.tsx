@@ -37,12 +37,12 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
   };
 
   return (
-    <aside className="hidden md:block fixed left-0 top-0 h-screen w-[280px] bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-white/10 z-20 lg:left-[64px] pt-16 lg:pt-0">
+    <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[280px] bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-white/10 z-20 lg:left-[64px] pt-4 lg:pt-0">
       <div className="px-4 py-6 border-b border-gray-200 dark:border-white/10">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Settings</h2>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Manage your account and preferences</p>
       </div>
-      <nav className="px-2 py-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 120px)' }}>
+      <nav className="px-2 py-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
         {items.map(({ key, label, icon: Icon, path }) => {
           const isActive = getActive(key, path);
           return (
@@ -51,7 +51,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
               onClick={() => handleSelect(key, path)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
                 isActive
-                  ? 'bg-purple-600 text-white shadow-md'
+                  ? 'bg-gradient-to-br from-purple-600/70 via-fuchsia-600/60 to-indigo-600/70 text-white shadow-md backdrop-blur-md'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
             >

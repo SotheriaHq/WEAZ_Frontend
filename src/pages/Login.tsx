@@ -340,7 +340,7 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex bg-gradient-to-br from-gray-800 to-black relative">
+    <div className="min-h-screen w-full flex bg-gradient-to-br from-purple-600/70 via-fuchsia-600/60 to-indigo-600/70 relative">
       {/* Animated background covers the entire screen */}
       <AnimatedBackground />
       {/* Centered Left Feature List */}
@@ -504,7 +504,7 @@ const LoginPage = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
+              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-br from-purple-600/70 via-fuchsia-600/60 to-indigo-600/70 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
             >
               {isLoading ? (
                 <div className="flex items-center">

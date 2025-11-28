@@ -177,7 +177,7 @@ const CollectionsSettings: React.FC = () => {
       <SettingsSidebar active="collections" onSelect={() => {}} />
 
       {/* Content area with proper spacing */}
-      <div className="min-h-screen pt-20 pb-10 px-4 md:pl-[300px] lg:pl-[344px]">
+      <div className="min-h-screen pt-16 pb-10 px-4 md:pl-[300px] lg:pl-[344px]">
         <div className="max-w-4xl mx-auto">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Collections Access</h1>
@@ -190,13 +190,13 @@ const CollectionsSettings: React.FC = () => {
         {isBrand ? (
           <>
             {[{k:'requests',label:'Pending Requests'},{k:'approved',label:'Approved'}].map((opt:any) => (
-              <button key={opt.k} role="tab" aria-selected={tab===opt.k} onClick={() => setTab(opt.k)} className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab===opt.k?'bg-purple-600 text-white':'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>{opt.label}</button>
+              <button key={opt.k} role="tab" aria-selected={tab===opt.k} onClick={() => setTab(opt.k)} className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab===opt.k?'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white':'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>{opt.label}</button>
             ))}
           </>
         ) : (
           <>
             {[{k:'myRequests',label:'My Requests'},{k:'myAccess',label:'My Access'}].map((opt:any) => (
-              <button key={opt.k} role="tab" aria-selected={tab===opt.k} onClick={() => setTab(opt.k)} className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab===opt.k?'bg-purple-600 text-white':'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>{opt.label}</button>
+              <button key={opt.k} role="tab" aria-selected={tab===opt.k} onClick={() => setTab(opt.k)} className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab===opt.k?'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white':'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>{opt.label}</button>
             ))}
           </>
         )}

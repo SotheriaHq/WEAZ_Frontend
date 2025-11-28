@@ -375,7 +375,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
 
   return (
     <nav
-      className={`w-full px-4 sm:px-5 py-1.5 z-40 transition-all duration-300 ease-out lg:pl-[var(--sidebar-width)]
+      className={`sticky top-0 w-full px-4 sm:px-5 py-1.5 z-40 transition-all duration-300 ease-out lg:pl-[var(--sidebar-width)]
       ${minimal
         ? 'bg-transparent border-b border-transparent'
         : 'bg-white dark:bg-black border-b border-gray-200 dark:border-white/10'}`}
@@ -410,9 +410,8 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
         )}
 
         {/* Desktop Brand: Logo + Name (Menu → Logo → Name) */}
-        {!minimal && (
+        {!minimal && _isCollapsed && (
           <div className="hidden lg:flex items-center flex-none mr-3">
-            <ThreadlyLogo />
             <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight max-w-[200px] truncate" title="Threadly">
               Threadly
             </span>
@@ -483,9 +482,6 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
               {/* You can switch to btn-frost-primary/ghost/outline and sizes via btn-tight-*. */}
               <FrostedButton className="btn-frost-outline btn-tight-xs hidden sm:flex flex-none" onClick={() => navigate('/login')}>
                 Sign In
-              </FrostedButton>
-              <FrostedButton className="btn-frost-primary btn-tight-xs hidden md:flex flex-none" onClick={() => navigate('/signup')}>
-                Sign Up
               </FrostedButton>
             </>
           )}

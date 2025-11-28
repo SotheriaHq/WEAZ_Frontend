@@ -116,7 +116,7 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
       setCommentText('');
       setCommentPosted(true);
       setTimeout(() => setCommentPosted(false), 1200);
-      setCommentCount(prev => prev + 1);
+      // setCommentCount(prev => prev + 1); // Rely on realtime via MarketCommentsPanel
     } catch (e: any) {
       toast.error(e?.response?.data?.message ?? 'Failed to post comment');
     } finally { setPostingComment(false); }
@@ -233,9 +233,19 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               collectionId={item.collectionId}
               contentOwnerId={item.brandId}
               currentUserId={currentUserId}
-              onCountChange={(c) => {
-                setCommentCount(c);
-                onCommentCountChange?.(c);
+              onCommentAdded={() => {
+                setCommentCount((prev) => {
+                  const next = prev + 1;
+                  onCommentCountChange?.(next);
+                  return next;
+                });
+              }}
+              onCommentRemoved={() => {
+                setCommentCount((prev) => {
+                  const next = Math.max(0, prev - 1);
+                  onCommentCountChange?.(next);
+                  return next;
+                });
               }}
               showComposer={false}
             />

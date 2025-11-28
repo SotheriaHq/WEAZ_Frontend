@@ -45,12 +45,12 @@ export const Layout: React.FC = () => {
         {/* Main Content Area */}
       {/* Keep content offset to collapsed width only; expanded sidebar overlays */}
       <main
-        className={`pt-2 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out lg:ml-[var(--sidebar-width)]`}
+        className={`pt-0 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out lg:ml-[var(--sidebar-width)]`}
       >
         {/* <main className="pt-32 pb-20 lg:pb-8 lg:ml-[240px] min-h-screen transition-all duration-200"> */}
        
         
-          <div className="p-2 sm:p-6">
+          <div className="p-0 sm:p-2">
             <Outlet />
           </div>
         </main>

@@ -263,7 +263,7 @@ const SignUpPage: React.FC = () => {
   };
 
   const LoadingScreen = () => (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-purple-800 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-gradient-to-br from-purple-600/70 via-fuchsia-600/60 to-indigo-600/70 z-50 flex items-center justify-center">
       <div className="text-center">
         <div className="text-5xl font-bold text-white mb-4 animate-pulse">
           voguely
@@ -281,7 +281,7 @@ const SignUpPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-purple-800 relative overflow-hidden flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-purple-600/70 via-fuchsia-600/60 to-indigo-600/70 relative overflow-hidden flex items-center justify-center p-4">
       {/* Animated Background */}
       <AnimatedBackground />
       <div className="relative z-10 w-full max-w-md bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl p-8 border border-white/10">

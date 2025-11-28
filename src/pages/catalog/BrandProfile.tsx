@@ -748,7 +748,7 @@ const ProfilePage: React.FC = () => {
                             onClick={() => setVisibilityFilter(opt)}
                             className={`px-4 py-1.5 text-sm font-medium transition-colors ${
                               visibilityFilter === opt
-                                ? 'bg-purple-600 text-white'
+                                ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white'
                                 : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                             }`}
                           >
@@ -857,7 +857,7 @@ const ProfilePage: React.FC = () => {
                                       </div>
                                     ) : (
                                       <button
-                                        className="w-full px-6 py-3 rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-colors font-medium shadow-md"
+                                        className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white hover:opacity-90 transition-opacity font-medium shadow-md"
                                         onClick={() => {
                                           if (!user) {
                                             const returnTo = `${window.location.pathname}${window.location.search}`;

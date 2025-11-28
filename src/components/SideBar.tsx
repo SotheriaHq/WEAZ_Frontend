@@ -41,7 +41,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
       <button
         onClick={onClick}
         className={`w-full px-1 py-3 rounded-lg transition-all duration-200 flex flex-col items-center justify-center ${active
-          ? 'bg-primary text-white'
+          ? 'bg-gradient-to-br from-purple-600/70 via-fuchsia-600/60 to-indigo-600/70 text-white backdrop-blur-md'
           : 'text-gray-700 dark:text-gray-300 hover:bg-primary/10 dark:hover:bg-primary/20 hover:text-primary'
           }`}
         aria-label={label}
@@ -58,7 +58,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
     <button
       onClick={onClick}
       className={`w-full flex items-center space-x-4 px-4 py-3 rounded-lg transition-all duration-200 ${active
-        ? 'bg-primary text-white'
+        ? 'bg-gradient-to-br from-purple-600/70 via-fuchsia-600/60 to-indigo-600/70 text-white backdrop-blur-md'
         : 'text-gray-700 dark:text-gray-300 hover:bg-primary/10 dark:hover:bg-primary/20 hover:text-primary'
         }`}
       title={label}
@@ -92,7 +92,7 @@ const MobileFooterLink: React.FC<SidebarLinkProps> = ({
     <button
       onClick={onClick}
       className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-all duration-200 ${active
-        ? 'bg-primary text-white'
+        ? 'bg-gradient-to-br from-purple-600/70 via-fuchsia-600/60 to-indigo-600/70 text-white backdrop-blur-md'
         : 'text-gray-700 dark:text-gray-300 hover:bg-primary/10 dark:hover:bg-primary/20 hover:text-primary'
         }`}
     >
@@ -416,8 +416,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     border-r border-white/20 dark:border-white/10 bg-white dark:bg-[#000000]`}
     >
 
-      {/* Logo/Header Section */}
-      <div className="flex items-center justify-start px-4 py-3   flex-shrink-0">
+      <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start px-4'} py-3 flex-shrink-0`}>
         <div className="flex items-center space-x-3">
           <ThreadlyLogo />
           {!isCollapsed && (
@@ -427,6 +426,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
       </div>
+      <div className="h-4"></div>
 
       {/* Navigation Links Wrapper - Takes remaining space and provides main scrolling area */}
       <div className="flex-1 flex flex-col min-h-0">

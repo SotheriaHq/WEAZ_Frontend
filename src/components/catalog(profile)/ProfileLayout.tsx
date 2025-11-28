@@ -10,7 +10,7 @@ import ProfileHeaderSkeleton from '../profile/ProfileHeaderSkeleton';
 import CollectionsSkeleton from '../profile/CollectionsSkeleton';
 
 export const ProfileLayout: React.FC = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const { loading } = useAuth();
   const user = useSelector((state: RootState) => state.user.profile);
   const location = useLocation();
@@ -24,7 +24,7 @@ export const ProfileLayout: React.FC = () => {
     return (
         <div className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-white">
           <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-          <Navbar isCollapsed={isCollapsed} />
+          <Navbar isCollapsed={isCollapsed} onToggleSidebar={() => setIsCollapsed((v) => !v)} />
           <main
             className={`pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${mainContentMarginClass}`}
           >
@@ -51,11 +51,18 @@ export const ProfileLayout: React.FC = () => {
   }
 
   return (
-      <div className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-white">
+      <div 
+        className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-white"
+        style={{
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore: CSS custom prop
+          ['--sidebar-width' as any]: isCollapsed ? '64px' : '192px',
+        }}
+      >
         <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
-        <Navbar isCollapsed={isCollapsed} />
-        <main className={`pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${mainContentMarginClass}`}>
-          <div className="p-4 sm:p-6">
+        <Navbar isCollapsed={isCollapsed} onToggleSidebar={() => setIsCollapsed((v) => !v)} />
+        <main className={`pt-0 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${mainContentMarginClass}`}>
+          <div className="p-0 sm:p-2">
             {location.pathname === '/profile' ? <Profile /> : <Outlet />}
           </div>
         </main>

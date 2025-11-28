@@ -54,7 +54,7 @@ const SettingsHome: React.FC = () => {
       <SettingsSidebar active={active} onSelect={setActive} />
 
       {/* Content area shifts for the settings sidebar + global collapsed rail */}
-      <div className="min-h-screen pt-20 pb-10 px-4 md:pl-[300px] lg:pl-[344px]">
+      <div className="min-h-screen pt-16 pb-10 px-4 md:pl-[300px] lg:pl-[344px]">
         <div className="max-w-4xl mx-auto">
           {dummySections[active]}
         </div>

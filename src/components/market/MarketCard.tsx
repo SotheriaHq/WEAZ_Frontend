@@ -196,6 +196,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
                 disabled={commentBusy}
                 busy={commentBusy}
                 className="w-full"
+                variant="overlay"
               />
             </div>
             <span className="shrink-0 text-xs font-medium text-white/80 drop-shadow">{commentCount}</span>

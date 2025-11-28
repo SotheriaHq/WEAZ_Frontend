@@ -16,13 +16,15 @@ type Props = {
   mediaId: string;
   collectionId: string;
   className?: string;
-  onCountChange?: (count: number) => void;
+  onCountChange?: (count: number) => void; // Deprecated: use onCommentAdded/Removed
+  onCommentAdded?: () => void;
+  onCommentRemoved?: () => void;
   showComposer?: boolean;
   contentOwnerId?: string; // brand/content owner for delete gating
   currentUserId?: string; // viewer id
 };
 
-const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className, onCountChange, showComposer = true, contentOwnerId, currentUserId }) => {
+const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className, onCountChange, onCommentAdded, onCommentRemoved, showComposer = true, contentOwnerId, currentUserId }) => {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const dispatch = useDispatch();
   const [items, setItems] = React.useState<CommentV2Dto[]>([]);
@@ -61,7 +63,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
   const collItems = Array.isArray(collItemsRaw) ? collItemsRaw : [];
   const merged = mergeAndSort(mediaItems, collItems);
   setItems(merged);
-  onCountChange?.(merged.length);
+  // onCountChange?.(merged.length); // Removed to prevent overwriting total count with partial count
   // Normalize global comment count for the media item to reflect combined view
   dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: merged.length }));
     // Join comment rooms for realtime like updates
@@ -112,7 +114,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
     const moreColl = Array.isArray(moreCollRaw) ? moreCollRaw : [];
     const next = mergeAndSort([...(items ?? []), ...moreMedia], moreColl);
       setItems(next);
-      onCountChange?.(next.length);
+      // onCountChange?.(next.length); // Removed
   dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
       if (mediaRes.ok) { setMediaCursor(mediaRes.r.endCursor); setMediaHasNext(mediaRes.r.hasNextPage); }
       if (collRes.ok) { setCollCursor(collRes.r.endCursor); setCollHasNext(collRes.r.hasNextPage); }
@@ -143,7 +145,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
             );
           }
           const next = [p.comment, ...prev];
-          onCountChange?.(next.length);
+          onCommentAdded?.();
           joinComment(p.commentId);
           dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
           return next;
@@ -151,7 +153,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
       } else if (!p.comment && p.commentId && p.targetType === 'COLLECTION_MEDIA' && p.targetId === mediaId && (p.deleted || p.event === 'comment.deleted')) {
         setItems((prev) => {
           const next = prev.filter((c) => c.id !== p.commentId);
-          onCountChange?.(next.length);
+          onCommentRemoved?.();
           dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
           return next;
         });
@@ -171,7 +173,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
             );
           }
           const next = [p.comment, ...prev];
-          onCountChange?.(next.length);
+          onCommentAdded?.();
           joinComment(p.commentId);
           dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
           return next;
@@ -180,7 +182,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
       if (!p.comment && p.commentId && p.targetType === 'COLLECTION' && p.targetId === collectionId && (p.deleted || p.event === 'comment.deleted')) {
         setItems((prev) => {
           const next = prev.filter((c) => c.id !== p.commentId);
-          onCountChange?.(next.length);
+          onCommentRemoved?.();
           dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
           return next;
         });
@@ -212,7 +214,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
         setPostedOk(true);
         setTimeout(() => setPostedOk(false), 1200);
         setItems((prev) => [optimistic, ...prev]);
-        onCountChange?.((items?.length ?? 0) + 1);
+        onCommentAdded?.();
       } else {
         const created = await CommentsApi.create('COLLECTION_MEDIA', mediaId, content);
         setText('');
@@ -220,7 +222,7 @@ const MarketCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
         setTimeout(() => setPostedOk(false), 1200);
         setItems((prev) => {
           const next = [created, ...prev];
-          onCountChange?.(next.length);
+          onCommentAdded?.();
           return next;
         });
       }

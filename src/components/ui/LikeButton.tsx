@@ -58,6 +58,7 @@ const LikeButton: React.FC<Props> = ({
   // Prevent race conditions from overlapping requests
   const pendingRequestRef = useRef<AbortController | null>(null);
   const requestVersionRef = useRef(0);
+  const pendingActionsCount = useRef(0);
 
   useEffect(() => {
   // Establish realtime joins & subscriptions
@@ -134,13 +135,9 @@ const LikeButton: React.FC<Props> = ({
 
   const toggle = async () => {
     // Prevent multiple simultaneous requests - strict deduplication
-    if (busy || pendingRequestRef.current || initializing) {
-      return; // Silently ignore duplicate requests and prevent interaction during initialization
-    }
-
-    // Prevent toggling during initialization to avoid state conflicts
-    if (initializing) {
-      return;
+    // Limit to 3 concurrent actions to prevent spam/flicker
+    if (pendingActionsCount.current >= 3 || initializing) {
+      return; 
     }
 
     // Show toast and abort if user is not authenticated
@@ -152,6 +149,7 @@ const LikeButton: React.FC<Props> = ({
     // Create new abort controller for this request
     const abortController = new AbortController();
     pendingRequestRef.current = abortController;
+    pendingActionsCount.current += 1;
 
     // Increment version to track request order
     const thisRequestVersion = ++requestVersionRef.current;
@@ -229,6 +227,7 @@ const LikeButton: React.FC<Props> = ({
       if (pendingRequestRef.current === abortController) {
         pendingRequestRef.current = null;
       }
+      pendingActionsCount.current = Math.max(0, pendingActionsCount.current - 1);
       setBusy(false);
     }
   };
@@ -241,7 +240,7 @@ const LikeButton: React.FC<Props> = ({
           e.stopPropagation();
           void toggle();
         }}
-        disabled={busy}
+        disabled={busy && pendingActionsCount.current >= 3}
         aria-label={item.likedByMe ? "Unlike" : "Like"}
         className={`transition-transform disabled:opacity-60 disabled:cursor-not-allowed hover:scale-110 ${
           busy ? 'animate-pulse' : ''
@@ -254,7 +253,7 @@ const LikeButton: React.FC<Props> = ({
           <Heart
             className={`transition-colors duration-200 ${
               item.likedByMe
-                ? 'fill-rose-500 text-rose-500'
+                ? 'fill-red-600 text-red-600'
                 : 'fill-transparent text-white'
             }`}
             width={size}

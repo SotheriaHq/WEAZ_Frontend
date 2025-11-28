@@ -2,7 +2,8 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { io, Socket } from 'socket.io-client';
 import { env } from '@/config/env';
 import { getStoredAccessToken } from '@/api/httpClient';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState } from '@/store';
 import { wsApplied, incrementCommentCount, decrementCommentCount } from '@/features/engagementSlice';
 
 interface LikeEventPayload {
@@ -59,6 +60,7 @@ const buildUrl = () => {
 
 export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const dispatch = useDispatch();
+  const userId = useSelector((state: RootState) => state.user.profile?.id);
   const socketRef = useRef<Socket | null>(null);
   const likeSubs = useRef<SubscriptionMap<LikeHandler>>({});
   const commentSubs = useRef<SubscriptionMap<CommentHandler>>({});
@@ -117,11 +119,11 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     pendingJoins.current.add(room);
     const s = socketRef.current;
     if (!s) return;
-    s.emit('join', { room });
+    s.emit('join', { room, userId });
     const cleanup = () => pendingJoins.current.delete(room);
     s.once('joined', cleanup);
     s.once('join.denied', cleanup);
-  }, []);
+  }, [userId]);
 
   const joinCollection = useCallback((collectionId: string) => safeJoin(`COLLECTION:${collectionId}`), [safeJoin]);
   const joinCollectionMedia = useCallback((mediaId: string) => safeJoin(`COLLECTION_MEDIA:${mediaId}`), [safeJoin]);
