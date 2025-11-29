@@ -1,29 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Clock, History, XCircle, CheckCircle } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Users, Clock, History, XCircle } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '../../../store';
+import { fetchPatches, respondToPatch } from '../../../features/patchesSlice';
 
 const PatchesSettings: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const filter = searchParams.get('filter') as 'pending' | 'active' | 'history' || 'pending';
+  const filter = (searchParams.get('filter') as 'pending' | 'active' | 'history') || 'pending';
+  const dispatch = useDispatch<AppDispatch>();
   
+  // Fix: UserState has 'profile', not 'user'
+  const { profile: user } = useSelector((state: RootState) => state.user);
+  const { pending, active, history, loading } = useSelector((state: RootState) => state.patches);
+
+  useEffect(() => {
+    if (user?.id) {
+      if (filter === 'pending') {
+        dispatch(fetchPatches({ brandId: user.id, status: 'PENDING' }));
+      } else if (filter === 'active') {
+        dispatch(fetchPatches({ brandId: user.id, status: 'ACCEPTED' }));
+      } else {
+        dispatch(fetchPatches({ brandId: user.id, status: 'REJECTED' }));
+      }
+    }
+  }, [dispatch, user?.id, filter]);
+
   const setActiveTab = (tab: 'pending' | 'active' | 'history') => {
     setSearchParams({ tab: 'patches', filter: tab });
   };
 
-  // Mock data - replace with API call
-  const patches = {
-    pending: [
-      { id: 1, brand: 'Urban Style', status: 'PENDING', type: 'incoming', date: '2024-03-15' },
-      { id: 2, brand: 'Eco Wear', status: 'PENDING', type: 'outgoing', date: '2024-03-14' },
-    ],
-    active: [
-      { id: 3, brand: 'Street King', status: 'ACCEPTED', date: '2024-02-10' },
-      { id: 4, brand: 'Denim Co', status: 'ACCEPTED', date: '2024-01-20' },
-    ],
-    history: [
-      { id: 5, brand: 'Fast Fashion', status: 'REJECTED', date: '2023-12-05' },
-      { id: 6, brand: 'Old Brand', status: 'REVOKED', date: '2023-11-15' },
-    ],
+  const handleAccept = (patchId: string) => {
+    dispatch(respondToPatch({ patchId, action: 'ACCEPTED' }));
+  };
+
+  const handleReject = (patchId: string) => {
+    dispatch(respondToPatch({ patchId, action: 'REJECTED' }));
   };
 
   return (
@@ -45,9 +57,11 @@ const PatchesSettings: React.FC = () => {
           >
             <Clock className="w-4 h-4" />
             Pending
-            <span className="px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 rounded-full">
-              {patches.pending.length}
-            </span>
+            {pending.length > 0 && (
+              <span className="px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 rounded-full">
+                {pending.length}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab('active')}
@@ -74,79 +88,86 @@ const PatchesSettings: React.FC = () => {
         </div>
 
         <div className="p-6">
-          {filter === 'pending' && (
-            <div className="space-y-4">
-              {patches.pending.map((patch) => (
-                <div key={patch.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-white/10">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800" />
-                    <div>
-                      <h3 className="font-medium text-gray-900 dark:text-white">{patch.brand}</h3>
-                      <p className="text-sm text-gray-500">
-                        {patch.type === 'incoming' ? 'Requested to patch with you' : 'Request sent'} • {patch.date}
-                      </p>
+          {loading ? (
+            <div className="text-center py-8 text-gray-500">Loading patches...</div>
+          ) : (
+            <>
+              {filter === 'pending' && (
+                <div className="space-y-4">
+                  {pending.length === 0 && <p className="text-gray-500 text-center">No pending requests.</p>}
+                  {pending.map((patch) => (
+                    <div key={patch.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-white/10">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
+                           {patch.partner.profileImage && <img src={patch.partner.profileImage} alt="" className="w-full h-full object-cover" />}
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900 dark:text-white">{patch.partner.brandFullName || patch.partner.username}</h3>
+                          <p className="text-sm text-gray-500">
+                            {new Date(patch.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                         <button onClick={() => handleAccept(patch.id)} className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700">
+                           Accept
+                         </button>
+                         <button onClick={() => handleReject(patch.id)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">
+                           Decline
+                         </button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {patch.type === 'incoming' ? (
-                      <>
-                        <button className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700">
-                          Accept
-                        </button>
-                        <button className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">
-                          Decline
-                        </button>
-                      </>
-                    ) : (
+                  ))}
+                </div>
+              )}
+
+              {filter === 'active' && (
+                <div className="space-y-4">
+                  {active.length === 0 && <p className="text-gray-500 text-center">No active patches.</p>}
+                  {active.map((patch) => (
+                    <div key={patch.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-white/10">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
+                            {patch.partner.profileImage && <img src={patch.partner.profileImage} alt="" className="w-full h-full object-cover" />}
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900 dark:text-white">{patch.partner.brandFullName || patch.partner.username}</h3>
+                          <p className="text-sm text-gray-500">Patched since {new Date(patch.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
                       <button className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 dark:bg-red-900/10 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/20">
-                        Cancel Request
+                        Revoke
                       </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {filter === 'active' && (
-            <div className="space-y-4">
-              {patches.active.map((patch) => (
-                <div key={patch.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-white/10">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800" />
-                    <div>
-                      <h3 className="font-medium text-gray-900 dark:text-white">{patch.brand}</h3>
-                      <p className="text-sm text-gray-500">Patched since {patch.date}</p>
                     </div>
-                  </div>
-                  <button className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 dark:bg-red-900/10 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/20">
-                    Revoke Patch
-                  </button>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
 
-          {filter === 'history' && (
-            <div className="space-y-4">
-              {patches.history.map((patch) => (
-                <div key={patch.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-white/10 opacity-75">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800" />
-                    <div>
-                      <h3 className="font-medium text-gray-900 dark:text-white">{patch.brand}</h3>
-                      <p className="text-sm text-gray-500">
-                        {patch.status} • {patch.date}
-                      </p>
+              {filter === 'history' && (
+                <div className="space-y-4">
+                  {history.length === 0 && <p className="text-gray-500 text-center">No history.</p>}
+                  {history.map((patch) => (
+                    <div key={patch.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-white/10 opacity-75">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
+                            {patch.partner.profileImage && <img src={patch.partner.profileImage} alt="" className="w-full h-full object-cover" />}
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900 dark:text-white">{patch.partner.brandFullName || patch.partner.username}</h3>
+                          <p className="text-sm text-gray-500">
+                            {patch.status} • {new Date(patch.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        {patch.status === 'REJECTED' ? <XCircle className="w-4 h-4" /> : <History className="w-4 h-4" />}
+                        {patch.status}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    {patch.status === 'REJECTED' ? <XCircle className="w-4 h-4" /> : <History className="w-4 h-4" />}
-                    {patch.status}
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>

@@ -39,7 +39,14 @@ const uploadWithProgress = (entry: PresignEntry, file: File, onProgress: (value:
     // Determine upload method: presigned POST if fields exist, else PUT
     const method = entry.method ?? (entry.uploadFields ? 'POST' : 'PUT');
     if (method === 'POST') {
-      xhr.open('POST', entry.uploadUrl, true);
+      if (!entry.uploadUrl) {
+        return reject(new Error('Missing upload URL for file ' + file.name));
+      }
+      try {
+        xhr.open('POST', entry.uploadUrl, true);
+      } catch (e) {
+        return reject(new Error(`Invalid upload URL: ${entry.uploadUrl}`));
+      }
       const form = new FormData();
       if (entry.uploadFields) {
         Object.entries(entry.uploadFields).forEach(([key, value]) => {
@@ -49,7 +56,14 @@ const uploadWithProgress = (entry: PresignEntry, file: File, onProgress: (value:
       form.append('file', file, file.name);
       xhr.send(form);
     } else {
-      xhr.open('PUT', entry.uploadUrl, true);
+      if (!entry.uploadUrl) {
+        return reject(new Error('Missing upload URL for file ' + file.name));
+      }
+      try {
+        xhr.open('PUT', entry.uploadUrl, true);
+      } catch (e) {
+        return reject(new Error(`Invalid upload URL: ${entry.uploadUrl}`));
+      }
       xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
       xhr.send(file);
     }

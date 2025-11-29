@@ -42,12 +42,12 @@ const SettingsHome: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-white dark:bg-[#000000]">
       {/* Local settings sidebar with its own panel */}
       <SettingsSidebar active={active} onSelect={setActive} />
 
       {/* Content area shifts for the settings sidebar + global collapsed rail */}
-      <div className="min-h-screen pt-16 pb-10 px-4 md:pl-[300px] lg:pl-[344px]">
+      <div className="min-h-screen pb-10 px-4 md:pl-[300px]">
         <div className="max-w-4xl mx-auto">
           {sections[active]}
         </div>

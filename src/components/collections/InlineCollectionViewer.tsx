@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { brandApi } from '@/api/BrandApi';
 import AccessApi, { type AccessState } from '@/api/AccessApi';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import StackedCarousel, { type CarouselMediaItem } from '@/components/collections/StackedCarousel';
 import CollectionMetadata from '@/components/collections/CollectionMetadata';
 import { useSelector } from 'react-redux';
@@ -30,6 +30,8 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   onPriceUpdated,
 }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const highlightCommentId = searchParams.get('commentId');
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(false);
   const [detail, setDetail] = useState<any | null>(null);
@@ -538,7 +540,10 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">All Comments</h3>
             </div>
             <div className="flex-1 mt-2">
-              <UnifiedCollectionComments collectionId={collectionId} />
+              <UnifiedCollectionComments 
+                collectionId={collectionId} 
+                highlightCommentId={highlightCommentId || undefined}
+              />
             </div>
           </div>
         </div>

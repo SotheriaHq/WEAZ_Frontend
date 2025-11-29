@@ -10,9 +10,10 @@ import { toast } from 'react-toastify';
 interface Props {
   collectionId: string;
   onCommentAdded?: () => void;
+  highlightCommentId?: string;
 }
 
-const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdded }) => {
+const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdded, highlightCommentId }) => {
   const [items, setItems] = React.useState<CommentV2Dto[]>([]);
   const [cursor, setCursor] = React.useState<string | null>(null);
   const [hasNext, setHasNext] = React.useState(false);
@@ -51,6 +52,20 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
   };
 
   React.useEffect(() => { setItems([]); setCursor(null); setHasNext(false); void load(true); }, [collectionId]);
+
+  // Scroll to highlighted comment when items load
+  React.useEffect(() => {
+    if (highlightCommentId && items.length > 0) {
+      const el = document.getElementById(`comment-${highlightCommentId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('bg-purple-50', 'dark:bg-purple-900/20', 'transition-colors', 'duration-1000');
+        setTimeout(() => {
+          el.classList.remove('bg-purple-50', 'dark:bg-purple-900/20');
+        }, 3000);
+      }
+    }
+  }, [highlightCommentId, items]);
 
   // Click outside handler for emoji picker
   React.useEffect(() => {
@@ -146,7 +161,7 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
         <div className="space-y-0 px-1 pb-2">
           {items.map((c) => {
             return (
-              <div key={c.id} className="py-0.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
+              <div id={`comment-${c.id}`} key={c.id} className="py-0.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
                 <CommentItem 
                   comment={c} 
                   onLike={handleLike} 

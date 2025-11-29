@@ -1,68 +1,118 @@
-
+import React, { useEffect } from 'react';
 import { Sidebar } from './SideBar';
-import React from 'react';
 import { Navbar } from './Navbar';
-// import { Sidebar } from './Sidebar';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store';
+import { useSelector, useDispatch } from 'react-redux';
+import type { RootState, AppDispatch } from '@/store';
 import { useNotificationsBootstrap } from '@/hooks/useNotifications';
+import { setSidebarMode, closeSidebar, toggleSidebar } from '@/features/uiSlice';
 
 export const Layout: React.FC = () => {
-
-  // Default to collapsed for both visitors and signed-in users
-  const [isCollapsed, setIsCollapsed] = React.useState(true);
-   const user = useSelector((s: RootState) => s.user.profile);
-   const location = useLocation();
-   const navigate = useNavigate();
-
-   // Root path ('/') should always render Market; no brand-specific redirect
-   React.useEffect(() => {
-     void user; void location; void navigate;
-   }, [user, location.pathname, navigate]);
+  const dispatch = useDispatch<AppDispatch>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
+  const user = useSelector((s: RootState) => s.user.profile);
 
   // Mount global notifications bootstrap once.
   useNotificationsBootstrap();
 
-  return (
-  <div
-    className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-black"
-    style={{
-      // Drive alignment for navbar/content relative to sidebar width on desktop
-      // Collapsed: 64px rail; Expanded: 192px overlay (content still offset by rail)
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore: CSS custom prop
-      ['--sidebar-width' as any]: isCollapsed ? '64px' : '192px',
-    }}
-  >
-        
-        {/* Sidebar */}
-        <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}/>
-       
-        {/* Navbar */}
-        <Navbar isCollapsed={isCollapsed} onToggleSidebar={() => setIsCollapsed((v) => !v)}/>
-       
-        {/* Main Content Area */}
-      {/* Keep content offset to collapsed width only; expanded sidebar overlays */}
-      <main
-        className={`pt-0 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out lg:ml-[var(--sidebar-width)]`}
-      >
-        {/* <main className="pt-32 pb-20 lg:pb-8 lg:ml-[240px] min-h-screen transition-all duration-200"> */}
-       
-        
-          <div className="p-0 sm:p-2">
-            <Outlet />
-          </div>
-        </main>
+  // Determine mode based on route
+  useEffect(() => {
+    const isSettingsPage = location.pathname.startsWith('/settings');
+    
+    // Mobile check (simple width check for initial load)
+    const isMobile = window.innerWidth < 1024;
 
-        {/* Backdrop overlay when the sidebar is expanded (desktop only) */}
-        {(!isCollapsed) && (
-          <div
-            className="hidden lg:block fixed inset-0 left-[192px] bg-black/40 backdrop-blur-[1px] z-40"
-            onClick={() => setIsCollapsed(true)}
-            aria-hidden
-          />
-        )}
-      </div>
+    if (isMobile) {
+       // Mobile always defaults to hidden/overlay logic handled by component
+       // But for global state, we can set it to HIDDEN initially
+       dispatch(setSidebarMode('HIDDEN'));
+    } else {
+      if (isSettingsPage) {
+        dispatch(setSidebarMode('HIDDEN')); // Settings page has its own sidebar, global is hidden/overlay
+      } else {
+        // Default to RAIL for other pages on desktop
+        // If it was DRAWER, we might want to keep it, but for now reset to RAIL on nav?
+        // Let's keep it persistent if already set, otherwise default RAIL
+        // Actually, YouTube defaults to RAIL on home usually, or persistent.
+        // Let's default to RAIL for now.
+        dispatch(setSidebarMode('RAIL'));
+      }
+    }
+  }, [location.pathname, dispatch]);
+
+  // Handle resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        dispatch(setSidebarMode('HIDDEN'));
+      } else {
+        if (location.pathname.startsWith('/settings')) {
+          dispatch(setSidebarMode('HIDDEN'));
+        } else {
+          // If coming from mobile, default to RAIL
+          dispatch(setSidebarMode('RAIL'));
+        }
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [dispatch, location.pathname]);
+
+
+  // Calculate margins and classes based on mode
+  // RAIL: 64px left margin
+  // HIDDEN: 0px left margin (Settings page)
+  // OVERLAY/DRAWER: We now treat expanded state as Overlay, so margin doesn't change.
+  
+  let mainMarginLeft = '0px';
+  if (sidebarMode === 'RAIL') mainMarginLeft = '72px'; // Updated to 72px to match Sidebar width
+  // if (sidebarMode === 'DRAWER') mainMarginLeft = '240px'; // REMOVED: No push behavior
+  // OVERLAY and HIDDEN have 0px margin (or 72px if Rail is behind it)
+  
+  // Actually, if we are in RAIL mode, the rail is always there.
+  // If we open the sidebar, it becomes an overlay ON TOP of the rail.
+  // So the content margin should stay at 72px (Rail width).
+  // If we are in HIDDEN mode (Settings), margin is 0.
+  
+  if (sidebarMode === 'RAIL') {
+      mainMarginLeft = '72px';
+  } else if (sidebarMode === 'HIDDEN') {
+      mainMarginLeft = '0px';
+  }
+
+  return (
+    <div className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-black">
+        
+      {/* Navbar */}
+      <Navbar 
+        isCollapsed={sidebarMode === 'RAIL'} 
+        onToggleSidebar={() => dispatch(toggleSidebar())}
+      />
+
+      {/* Sidebar */}
+      <Sidebar />
+       
+      {/* Main Content Area */}
+      <main
+        className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out"
+        style={{ marginLeft: mainMarginLeft }}
+      >
+        <div className="p-0 sm:p-2">
+          <Outlet />
+        </div>
+      </main>
+
+      {/* Backdrop for OVERLAY mode or Mobile Drawer */}
+      {isSidebarOpen && (sidebarMode === 'OVERLAY' || sidebarMode === 'HIDDEN' || (window.innerWidth < 1024 && sidebarMode !== 'HIDDEN')) && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-[1px] z-30"
+          onClick={() => dispatch(closeSidebar())}
+          aria-hidden="true"
+        />
+      )}
+    </div>
   );
 };

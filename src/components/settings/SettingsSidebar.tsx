@@ -1,5 +1,4 @@
 import React from 'react';
-import { User, Bell, Shield, CreditCard, SlidersHorizontal, FolderLock, Share2, Users, Building2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface SettingsSidebarProps {
@@ -9,22 +8,24 @@ interface SettingsSidebarProps {
 
 const groups = [
   {
-    title: 'Brand Management',
+    title: 'Account',
     items: [
-      { key: 'brand-profile', label: 'Brand Profile', icon: Building2, path: '/settings' },
-      { key: 'patches', label: 'Patches', icon: Share2, path: '/settings' },
-      { key: 'subscriptions', label: 'Subscriptions', icon: Users, path: '/settings' },
+      { key: 'account', label: 'Account', path: '/settings' },
+      { key: 'notifications', label: 'Notifications', path: '/settings' },
+      { key: 'playback', label: 'Playback and performance', path: '/settings' },
+      { key: 'downloads', label: 'Downloads', path: '/settings' },
+      { key: 'privacy', label: 'Privacy', path: '/settings' },
+      { key: 'connected', label: 'Connected apps', path: '/settings' },
+      { key: 'billing', label: 'Billing & payments', path: '/settings' },
+      { key: 'advanced', label: 'Advanced settings', path: '/settings' },
     ]
   },
   {
-    title: 'Account',
+    title: 'Brand Management',
     items: [
-      { key: 'account', label: 'Account', icon: User, path: '/settings' },
-      { key: 'collections', label: 'Collections', icon: FolderLock, path: '/settings/collections' },
-      { key: 'notifications', label: 'Notifications', icon: Bell, path: '/settings' },
-      { key: 'privacy', label: 'Privacy', icon: Shield, path: '/settings' },
-      { key: 'billing', label: 'Billing & payments', icon: CreditCard, path: '/settings' },
-      { key: 'advanced', label: 'Advanced', icon: SlidersHorizontal, path: '/settings' },
+      { key: 'brand-profile', label: 'Brand Profile', path: '/settings' },
+      { key: 'patches', label: 'Brand Patches', path: '/settings' },
+      { key: 'subscriptions', label: 'Subscriptions', path: '/settings' },
     ]
   }
 ];
@@ -41,48 +42,37 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
     }
   };
 
-  // Determine active based on current path for collections
-  const getActive = (key: string, path: string) => {
-    if (key === 'collections' && location.pathname === '/settings/collections') {
-      return true;
-    }
-    return active === key;
-  };
-
   return (
-    <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[280px] bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-white/10 z-20 lg:left-[64px] pt-4 lg:pt-0">
-      <div className="px-4 py-6 border-b border-gray-200 dark:border-white/10">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Settings</h2>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Manage your account and preferences</p>
-      </div>
-      <nav className="px-2 py-4 space-y-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
-        {groups.map((group) => (
-          <div key={group.title}>
-            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              {group.title}
-            </h3>
-            <div className="space-y-1">
-              {group.items.map(({ key, label, icon: Icon, path }) => {
-                const isActive = getActive(key, path);
-                return (
-                  <button
-                    key={key}
-                    onClick={() => handleSelect(key, path)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
-                      isActive
-                        ? 'bg-gradient-to-br from-purple-600/70 via-fuchsia-600/60 to-indigo-600/70 text-white shadow-md backdrop-blur-md'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-sm font-medium">{label}</span>
-                  </button>
-                );
-              })}
+    <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[240px] bg-white dark:bg-[#0f0f0f] z-20 overflow-y-auto scrollbar-hide">
+      <div className="py-4">
+        <h2 className="px-4 text-xl font-semibold text-gray-900 dark:text-white mb-4">Settings</h2>
+        
+        <nav className="space-y-6">
+          {groups.map((group) => (
+            <div key={group.title}>
+              <div className="space-y-0">
+                {group.items.map(({ key, label, path }) => {
+                  const isActive = active === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => handleSelect(key, path)}
+                      className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                        isActive
+                          ? 'font-medium text-primary border-l-4 border-primary bg-primary/10' // Primary color active state
+                          : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="border-t border-gray-200 dark:border-gray-800 my-2 mx-4" />
             </div>
-          </div>
-        ))}
-      </nav>
+          ))}
+        </nav>
+      </div>
     </aside>
   );
 };

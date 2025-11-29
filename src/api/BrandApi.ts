@@ -150,7 +150,7 @@ export const brandApi = {
     try {
       const response = await apiClient.post(`/collections/${collectionId}/access-requests`);
       const payload = response.data;
-        return (payload?.data ?? payload) as { state: 'PENDING' | 'APPROVED'; cooldownActive?: boolean; nextAllowedAt?: string };
+      return (payload?.data ?? payload) as { state: 'PENDING' | 'APPROVED'; cooldownActive?: boolean; nextAllowedAt?: string };
     } catch (error) {
       console.error('Error requesting private access:', error);
       return null;
@@ -178,13 +178,13 @@ export const brandApi = {
   },
 
   // ===================== User-scoped Private Access Management =====================
-  
+
   /**
    * List all access requests sent by the current user
    */
-  async listMyAccessRequests(args?: { 
-    status?: 'pending' | 'approved' | 'rejected'; 
-    page?: number; 
+  async listMyAccessRequests(args?: {
+    status?: 'pending' | 'approved' | 'rejected';
+    page?: number;
     pageSize?: number;
   }) {
     const params = new URLSearchParams();
@@ -224,8 +224,8 @@ export const brandApi = {
   /**
    * List all granted accesses for the current user
    */
-  async listMyGrantedAccesses(args?: { 
-    page?: number; 
+  async listMyGrantedAccesses(args?: {
+    page?: number;
     pageSize?: number;
   }) {
     const params = new URLSearchParams();
@@ -306,7 +306,7 @@ export const brandApi = {
       console.debug('[BrandApi.getCollections] request', { ownerId, visibility: opts?.visibility ?? 'all' });
       const response = await apiClient.get(`/collections/user/${ownerId}${query ? `?${query}` : ''}`);
       const data = unwrapApiResponse<{ items: unknown[]; hasNextPage: boolean; endCursor?: string }>(response.data);
-      
+
       // Transform backend data to frontend format
       const items = Array.isArray(data?.items) ? data.items : [];
       const mapped = items.map((item: unknown) => {
@@ -380,7 +380,7 @@ export const brandApi = {
           return acc;
         }, { all: 0, public: 0, private: 0 } as any);
         console.debug('[BrandApi.getCollections] response', { count: mapped.length, ...totals });
-      } catch {}
+      } catch { }
       return mapped;
     } catch (error) {
       console.error('Error fetching collections:', error);
@@ -392,8 +392,23 @@ export const brandApi = {
   async getMyDraftCollections(): Promise<CollectionDto[]> {
     try {
       const response = await apiClient.get('/collections/my/drafts');
-      const items = response.data?.items ?? response.data ?? [];
-      
+      const payload = response.data;
+      // Robustly extract items array handling { data: [...] }, { items: [...] }, or [...]
+      const items = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload?.items)
+            ? payload.items
+            : Array.isArray(payload?.data?.items)
+              ? payload.data.items
+              : [];
+
+      if (!Array.isArray(items)) {
+        console.warn('getMyDraftCollections: Expected array but got', typeof items);
+        return [];
+      }
+
       return items.map((item: any) => ({
         id: item.id,
         name: item.title || '',
@@ -568,7 +583,7 @@ export const brandApi = {
           return directUrl;
         }
         return null;
-        } catch (error) {
+      } catch (error) {
         if (
           error &&
           typeof error === 'object' &&
@@ -603,6 +618,48 @@ export const brandApi = {
       // For other errors, return null for backward compatibility
       return null;
     }
+  },
+
+  // ============================================
+  // BRAND PATCHES
+  // ============================================
+
+  async getBrandPatches(brandId: string, status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'REVOKED' = 'ACCEPTED', page = 1, limit = 20) {
+    try {
+      const response = await apiClient.get(`/brands/${brandId}/patches`, {
+        params: { status, page, limit },
+      });
+      return unwrapApiResponse<{ items: any[]; total: number; page: number; totalPages: number }>(response.data);
+    } catch (error) {
+      console.error('Error fetching brand patches:', error);
+      return { items: [], total: 0, page: 1, totalPages: 1 };
+    }
+  },
+
+  async requestBrandPatch(targetBrandId: string) {
+    const response = await apiClient.post(`/brands/patches/request`, { targetBrandId });
+    return unwrapApiResponse<{ status: string; message: string }>(response.data);
+  },
+
+  async respondToBrandPatch(patchId: string, action: 'ACCEPTED' | 'REJECTED') {
+    const response = await apiClient.patch(`/brands/patches/${patchId}/respond`, { status: action });
+    return unwrapApiResponse<{ status: string; message: string }>(response.data);
+  },
+
+  async cancelBrandPatch(patchId: string) {
+    // Assuming cancel is just a status update or delete. Using DELETE for now if API supports it, or PATCH to REVOKED/CANCELLED
+    // Based on backend service, there isn't a specific 'cancel' endpoint exposed in the snippet, 
+    // but usually it's a status update. If not implemented, we might need to add it to backend.
+    // For now, let's assume we can use respond with REJECTED or a specific cancel endpoint if it existed.
+    // Wait, the backend service `respondToBrandPatch` checks if `patch.receiverId === responderId`.
+    // The requester cannot use `respondToBrandPatch`.
+    // We need a `cancelPatchRequest` endpoint in backend? 
+    // The backend service snippet didn't show a `cancel` method for requester.
+    // I will add a placeholder here, but note that backend might need update if not present.
+    // Actually, let's check `brands.controller.ts` if I could... but I don't have it.
+    // I'll assume a DELETE endpoint for now as per REST conventions for cancelling pending resources.
+    const response = await apiClient.delete(`/brands/patches/${patchId}`);
+    return unwrapApiResponse<{ message: string }>(response.data);
   },
 };
 

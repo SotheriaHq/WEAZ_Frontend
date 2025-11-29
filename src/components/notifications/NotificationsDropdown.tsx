@@ -22,7 +22,13 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   const navigate = useNavigate();
 
   // initial fetch - only if authenticated
-  useEffect(() => { if (open && !initialized && isAuthenticated) { dispatch(fetchNotifications({ limit: 30 })); dispatch(fetchUnreadCount()); } }, [open, initialized, isAuthenticated, dispatch]);
+  useEffect(() => { 
+    if (open && isAuthenticated) { 
+      // Always refresh list and count when opening to ensure consistency
+      dispatch(fetchNotifications({ limit: 30 })); 
+      dispatch(fetchUnreadCount()); 
+    } 
+  }, [open, isAuthenticated, dispatch]);
 
   // outside click
   useEffect(() => { if (!open) return; const handler = (e: MouseEvent) => { if (!containerRef.current) return; if (containerRef.current.contains(e.target as Node)) return; if (anchorRef.current && anchorRef.current.contains(e.target as Node)) return; onClose(); }; document.addEventListener('mousedown', handler); return () => document.removeEventListener('mousedown', handler); }, [open, onClose, anchorRef]);
@@ -50,6 +56,9 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         {items.length === 0 && !loadingList && <div className="p-6 text-center text-sm text-gray-600 dark:text-gray-400">No notifications yet.</div>}
         {items.map(n => {
           const hasAction = n.targetUrl && typeof n.targetUrl === 'string';
+          const actorName = n.actor?.username || n.actor?.firstName || 'System';
+          const actorImage = n.actor?.profileImage;
+
           return (
             <button
               key={n.id}
@@ -60,15 +69,46 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                   onClose();
                 }
               }}
-              className={`group w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition ${n.isRead ? 'opacity-70' : ''} ${hasAction ? 'cursor-pointer' : 'cursor-default'}`}
+              className={`group w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition border-l-2 ${n.isRead ? 'border-transparent opacity-80' : 'border-purple-500 bg-purple-50/30 dark:bg-purple-900/10'} ${hasAction ? 'cursor-pointer' : 'cursor-default'}`}
             > 
-              <div className={`mt-1 w-2 h-2 rounded-full ${n.isRead ? 'bg-gray-300 dark:bg-gray-600' : 'bg-purple-500 animate-pulse'}`}/> 
+              {/* Avatar */}
+              <div className="shrink-0 relative">
+                {actorImage ? (
+                  <img src={actorImage} alt={actorName} className="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-gray-700 shadow-sm" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 flex items-center justify-center text-xs font-bold text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                    {actorName.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                {!n.isRead && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 border-2 border-white dark:border-gray-900 rounded-full"></span>
+                )}
+              </div>
+
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-gray-800 dark:text-gray-200 line-clamp-2" aria-label="Notification message">
-                  {n.message}
-                  {hasAction && <span className="ml-1.5 text-[10px] text-purple-600 dark:text-purple-400 font-semibold">→</span>}
-                </p>
-                <p className="mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">{timeAgo(n.createdAt)}</p>
+                <div className="text-sm text-gray-700 dark:text-gray-300 leading-snug">
+                  {/* Attempt to highlight actor name if present in message */}
+                  {n.message.toLowerCase().startsWith(actorName.toLowerCase()) ? (
+                    <>
+                      <span className="font-medium italic text-purple-600 dark:text-purple-400">{actorName}</span>
+                      <span dangerouslySetInnerHTML={{
+                        __html: n.message.slice(actorName.length)
+                          .replace(/\b(commented|created|deleted|liked|started following|replied)\b/gi, 
+                            '<span class="font-semibold text-gray-900 dark:text-white decoration-purple-300/50 underline decoration-2 underline-offset-2">$1</span>')
+                      }} />
+                    </>
+                  ) : (
+                    n.message
+                  )}
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500">{timeAgo(n.createdAt)}</span>
+                  {hasAction && (
+                    <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-0.5">
+                      View <span className="text-xs">→</span>
+                    </span>
+                  )}
+                </div>
               </div>
             </button>
           );

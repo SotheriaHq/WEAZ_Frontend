@@ -10,6 +10,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearUser, setUser } from '../features/userSlice';
 import { addLocalNotification, resetUnreadCount } from '../features/notificationsSlice';
+import { toggleSidebar } from '../features/uiSlice';
 import type { RootState } from '../store';
 // Notifications bootstrap logic moved to useNotificationsBootstrap hook mounted at app root.
 import type { AuthUserDto } from '../types/auth';
@@ -347,22 +348,6 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
   // Threadly Logo SVG Component
   const ThreadlyLogo = () => (
     <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="32" height="32" rx="8" fill="url(#threadly-gradient)" />
-      <path
-        d="M8 20C8 16.5 13 16.5 13 13C13 9.5 8 9.5 8 13"
-        stroke="white"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M24 12C24 15.5 19 15.5 19 19C19 22.5 24 22.5 24 19"
-        stroke="white"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="16" cy="16" r="2" fill="white" />
       <defs>
         <linearGradient id="threadly-gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
           <stop stopColor="#6366F1" />
@@ -370,50 +355,57 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
           <stop offset="1" stopColor="#A21CAF" />
         </linearGradient>
       </defs>
+      <path
+        d="M8 20C8 16.5 13 16.5 13 13C13 9.5 8 9.5 8 13"
+        stroke="url(#threadly-gradient)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M24 12C24 15.5 19 15.5 19 19C19 22.5 24 22.5 24 19"
+        stroke="url(#threadly-gradient)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="16" cy="16" r="2.5" fill="url(#threadly-gradient)" />
     </svg>
   );
 
   return (
     <nav
-      className={`sticky top-0 w-full px-4 sm:px-5 h-16 z-50 transition-all duration-300 ease-out
+      className={`fixed top-0 left-0 w-full px-4 sm:px-5 h-16 z-50 transition-all duration-300 ease-out
       ${minimal
         ? 'bg-transparent border-b border-transparent'
-        : 'bg-white dark:bg-black border-b border-gray-200 dark:border-white/10'}
-      lg:ml-[var(--sidebar-width)] lg:w-[calc(100%-var(--sidebar-width))]`}
+        : 'bg-white dark:bg-black border-b border-gray-200 dark:border-white/10'}`}
     >
      
       {/* Main Navbar Content */}
       <div className={`flex items-center h-full ${minimal ? 'justify-between lg:justify-end' : 'justify-between'}`}>
 
-        {/* Mobile Logo - Visible only below lg */}
-        <div className="flex items-center lg:hidden" onClick={() => navigate('/')} role="button">
-          <ThreadlyLogo />
-          <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight">
-            Threadly
-          </span>
-        </div>
-
-        {/* Desktop: Hamburger to toggle sidebar overlay */}
-        {!minimal && (
-          <div className="hidden lg:flex items-center">
+        {/* Left Section: Hamburger + Logo */}
+        <div className="flex items-center">
+          {/* Hamburger - Visible on both Mobile and Desktop (unless minimal) */}
+          {!minimal && (
             <button
               type="button"
-              onClick={() => onToggleSidebar?.()}
-              className="inline-flex items-center justify-center p-2 mr-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              onClick={() => dispatch(toggleSidebar())}
+              className="inline-flex items-center justify-center p-2 mr-1 sm:mr-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               aria-label="Toggle sidebar"
             >
               <Menu className="w-5 h-5 text-gray-700 dark:text-gray-300" />
             </button>
-            
-            {/* Brand: Logo + Name (Menu → Logo → Name) - Always visible on Desktop */}
-            <div className="flex items-center cursor-pointer" onClick={() => navigate('/')}>
-              <ThreadlyLogo />
-              <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight max-w-[200px] truncate" title="Threadly">
-                Threadly
-              </span>
-            </div>
+          )}
+
+          {/* Brand: Logo + Name */}
+          <div className="flex items-center cursor-pointer" onClick={() => navigate('/')}>
+            <ThreadlyLogo />
+            <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight max-w-[200px] truncate" title="Threadly">
+              Threadly
+            </span>
           </div>
-        )}
+        </div>
 
         {/* Search Section - hidden in minimal mode */}
         {!minimal && (

@@ -83,27 +83,16 @@ const Market: React.FC = () => {
 
   // Tag filter UI removed for now; keep hook slots lean
 
-  // Heuristic category matching (until backend category is wired into feed)
+  // Backend now handles category filtering
   const filteredItems = useMemo(() => {
     let result = items;
-    if (selectedCategory && selectedCategory !== 'ALL') {
-      const keysByCat: Record<string, string[]> = {
-        AFRICAN_FASHION: ['african', 'ankara', 'kente', 'aso oke', 'adire', 'dashiki', 'gele', 'africa'],
-        WESTERN_FASHION: ['western', 'streetwear', 'workwear', 'couture', 'runway', 'denim', 'suit', 'casual', 'formal'],
-        DE_HOUSE: ['house', 'home', 'lounge', 'cozy', 'basics', 'stay home', 'loungewear', 'sleep', 'pajama'],
-      };
-      const keys = keysByCat[selectedCategory] ?? [];
-      result = result.filter((item) =>
-        item.tags.some((t) => keys.some((k) => t.toLowerCase().includes(k))),
-      );
-    }
     if (selectedTag) {
       result = result.filter((item) =>
         item.tags.some((tag) => tag.toLowerCase() === selectedTag.toLowerCase()),
       );
     }
     return result;
-  }, [items, selectedTag, selectedCategory]);
+  }, [items, selectedTag]);
 
   const handleViewCollection = (collectionId: string) => {
     navigate(`/collections/${collectionId}`);

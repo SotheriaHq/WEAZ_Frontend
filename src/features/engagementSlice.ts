@@ -28,10 +28,10 @@ export const engagementSlice = createSlice({
   initialState,
   reducers: {
     // Initialize engagement state for a piece of content
-    setEngagementState: (state, action: PayloadAction<{ 
-      contentType: string; 
-      contentId: string; 
-      likedByMe?: boolean; 
+    setEngagementState: (state, action: PayloadAction<{
+      contentType: string;
+      contentId: string;
+      likedByMe?: boolean;
       likeCount?: number;
       commentCount?: number;
       patchCount?: number;
@@ -134,11 +134,11 @@ export const engagementSlice = createSlice({
   },
 });
 
-export const { 
+export const {
   setEngagementState,
-  setLikeState, 
-  optimisticToggle, 
-  reconcile, 
+  setLikeState,
+  optimisticToggle,
+  reconcile,
   wsApplied,
   adjustAggregatedCollectionLikes,
   updateCommentCount,

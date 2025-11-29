@@ -150,7 +150,7 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         </div>
 
         {/* Right: Data Area + Comments */}
-  <div className={`col-span-12 flex flex-col p-4 ${rightColsSm} ${rightColsMd} overflow-y-auto modal-scrollbar relative bg-white/60 dark:bg-white/5 backdrop-blur-xl border-l border-white/20 dark:border-white/10 rounded-r-2xl` }>
+  <div className={`col-span-12 flex flex-col p-4 ${rightColsSm} ${rightColsMd} overflow-y-auto modal-scrollbar relative bg-white/60 dark:bg-white/5 backdrop-blur-xl border-l border-white/20 dark:border-white/10 rounded-r-2xl text-gray-900 dark:text-gray-100` }>
           {/* Data Area */}
           <div className="pb-4">
             <div className="mb-3 flex items-center gap-3">
