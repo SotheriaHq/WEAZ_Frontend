@@ -6,9 +6,10 @@ interface Props {
   collectionId: string;
   activeMediaId?: string | null;
   className?: string;
+  onCommentAdded?: () => void;
 }
 
-export const CompactCommentsSection: React.FC<Props> = ({ collectionId, className = '' }) => {
+export const CompactCommentsSection: React.FC<Props> = ({ collectionId, className = '', onCommentAdded }) => {
   return (
     <div className={`flex flex-col h-full min-h-0 ${className}`}>
       {/* Header */}
@@ -23,7 +24,7 @@ export const CompactCommentsSection: React.FC<Props> = ({ collectionId, classNam
         style={{ display: 'flex', flexDirection: 'column' }}
       >
         <div className="flex-1 min-h-0">
-          <UnifiedCollectionComments collectionId={collectionId} />
+          <UnifiedCollectionComments collectionId={collectionId} onCommentAdded={onCommentAdded} />
         </div>
       </div>
     </div>

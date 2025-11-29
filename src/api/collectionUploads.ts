@@ -44,8 +44,8 @@ export async function initializeCollectionUploads(
 
 export type CompletionDto = { fileId: string; s3Key: string; actualSize: number; actualMimeType: string };
 
-export async function finalizeCollectionUploads(collectionId: string, completions: CompletionDto[]) {
-  const resp = await apiClient.post(`/collections/${collectionId}/finalize`, { completions });
+export async function finalizeCollectionUploads(collectionId: string, completions: CompletionDto[], shouldPublish = true) {
+  const resp = await apiClient.post(`/collections/${collectionId}/finalize`, { completions, shouldPublish });
   // Unwrap interceptor-wrapped response
   return unwrapApiResponse(resp.data);
 }

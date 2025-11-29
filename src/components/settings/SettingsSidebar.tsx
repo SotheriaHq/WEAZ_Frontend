@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Bell, Shield, CreditCard, SlidersHorizontal, FolderLock } from 'lucide-react';
+import { User, Bell, Shield, CreditCard, SlidersHorizontal, FolderLock, Share2, Users, Building2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface SettingsSidebarProps {
@@ -7,13 +7,26 @@ interface SettingsSidebarProps {
   onSelect: (key: string) => void;
 }
 
-const items = [
-  { key: 'account', label: 'Account', icon: User, path: '/settings' },
-  { key: 'collections', label: 'Collections', icon: FolderLock, path: '/settings/collections' },
-  { key: 'notifications', label: 'Notifications', icon: Bell, path: '/settings' },
-  { key: 'privacy', label: 'Privacy', icon: Shield, path: '/settings' },
-  { key: 'billing', label: 'Billing & payments', icon: CreditCard, path: '/settings' },
-  { key: 'advanced', label: 'Advanced', icon: SlidersHorizontal, path: '/settings' },
+const groups = [
+  {
+    title: 'Brand Management',
+    items: [
+      { key: 'brand-profile', label: 'Brand Profile', icon: Building2, path: '/settings' },
+      { key: 'patches', label: 'Patches', icon: Share2, path: '/settings' },
+      { key: 'subscriptions', label: 'Subscriptions', icon: Users, path: '/settings' },
+    ]
+  },
+  {
+    title: 'Account',
+    items: [
+      { key: 'account', label: 'Account', icon: User, path: '/settings' },
+      { key: 'collections', label: 'Collections', icon: FolderLock, path: '/settings/collections' },
+      { key: 'notifications', label: 'Notifications', icon: Bell, path: '/settings' },
+      { key: 'privacy', label: 'Privacy', icon: Shield, path: '/settings' },
+      { key: 'billing', label: 'Billing & payments', icon: CreditCard, path: '/settings' },
+      { key: 'advanced', label: 'Advanced', icon: SlidersHorizontal, path: '/settings' },
+    ]
+  }
 ];
 
 export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSelect }) => {
@@ -42,24 +55,33 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Settings</h2>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Manage your account and preferences</p>
       </div>
-      <nav className="px-2 py-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
-        {items.map(({ key, label, icon: Icon, path }) => {
-          const isActive = getActive(key, path);
-          return (
-            <button
-              key={key}
-              onClick={() => handleSelect(key, path)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
-                isActive
-                  ? 'bg-gradient-to-br from-purple-600/70 via-fuchsia-600/60 to-indigo-600/70 text-white shadow-md backdrop-blur-md'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span className="text-sm font-medium">{label}</span>
-            </button>
-          );
-        })}
+      <nav className="px-2 py-4 space-y-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
+        {groups.map((group) => (
+          <div key={group.title}>
+            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              {group.title}
+            </h3>
+            <div className="space-y-1">
+              {group.items.map(({ key, label, icon: Icon, path }) => {
+                const isActive = getActive(key, path);
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleSelect(key, path)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
+                      isActive
+                        ? 'bg-gradient-to-br from-purple-600/70 via-fuchsia-600/60 to-indigo-600/70 text-white shadow-md backdrop-blur-md'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span className="text-sm font-medium">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
     </aside>
   );

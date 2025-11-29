@@ -14,6 +14,7 @@ interface CollectionCardProps {
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   showActions?: boolean;
+  isDraft?: boolean;
 }
 
 const CollectionCard: React.FC<CollectionCardProps> = ({ 
@@ -22,6 +23,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   onEdit, 
   onDelete,
   showActions = true,
+  isDraft = false,
 }) => {
   const {
     title,
@@ -49,6 +51,13 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   useEffect(() => {
     let mounted = true;
     const maybeResolve = async () => {
+      // Optimization: If coverImage is already a signed URL (has query params), use it directly.
+      // This avoids an extra network request on initial load and fixes "barely loaded" issues.
+      if (coverImage && (coverImage.includes('?') || !coverImage.includes('s3'))) {
+         setResolvedCover(coverImage);
+         return;
+      }
+
       if (coverFileId) {
         const url = await brandApi.getSignedFileUrl(coverFileId);
         if (mounted) setResolvedCover(url ?? undefined);
@@ -85,7 +94,8 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
 
   const now = Date.now();
   const saleWindowOk = (() => {
-    const startOk = !saleStartAt || (new Date(saleStartAt).getTime() <= now);
+    // Allow 5 minute clock skew buffer for start time
+    const startOk = !saleStartAt || (new Date(saleStartAt).getTime() <= now + 5 * 60 * 1000);
     const endOk = !saleEndAt || (new Date(saleEndAt).getTime() >= now);
     return startOk && endOk;
   })();
@@ -171,6 +181,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
         )}
 
         {/* Vertical Action Bar (like in Reels) - Right side */}
+        {!isDraft && (
         <div className="absolute bottom-28 right-2 z-10 flex flex-col items-center gap-3">
           <LikeButton contentType="COLLECTION" contentId={collection.id} initialCount={likesCount} ownerId={collection.ownerId} />
           <button className="flex flex-col items-center text-white hover:scale-110 transition-transform" onClick={(e) => e.stopPropagation()}>
@@ -181,6 +192,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
             <Share2 className="w-5 h-5" />
           </button>
         </div>
+        )}
 
         {/* Bottom Info */}
         <div className="absolute bottom-0 left-0 right-0 p-3 text-white z-10">
@@ -252,7 +264,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
               className="shrink-0 px-3 py-1 rounded-md bg-white/10 border border-white/20 text-white text-[11px] font-medium backdrop-blur-sm hover:bg-white/15 transition"
               onClick={(e) => { e.stopPropagation(); onClick?.(); }}
             >
-              View
+              {isDraft ? 'Continue Creation' : 'View'}
             </button>
           </div>
         </div>

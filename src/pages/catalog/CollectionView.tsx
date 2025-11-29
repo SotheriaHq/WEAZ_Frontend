@@ -157,6 +157,38 @@ const CollectionView: React.FC = () => {
     }
   };
 
+  const handleCommentAdded = () => {
+    setDetail((prev: any) => {
+      if (!prev) return prev;
+      const current = prev.commentsCount ?? prev._count?.comments ?? 0;
+      return {
+        ...prev,
+        commentsCount: current + 1,
+        _count: {
+          ...prev._count,
+          comments: (prev._count?.comments ?? 0) + 1
+        }
+      };
+    });
+  };
+
+  const handleSetCover = async (item: CarouselMediaItem) => {
+    if (!id) return;
+    try {
+      const res = await brandApi.updateCollection(id, {
+        coverMediaId: item.id,
+      } as any);
+      if (res) {
+        setDetail((d: any) => ({ ...d, coverMediaId: item.id }));
+        toast.success('Cover updated');
+      } else {
+        toast.error('Failed to update cover');
+      }
+    } catch (e) {
+      toast.error('Failed to update cover');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen w-full">
@@ -361,6 +393,9 @@ const CollectionView: React.FC = () => {
               items={mediaItems}
               initialIndex={0}
               className="mb-4"
+              isOwner={isOwner}
+              coverMediaId={detail?.coverMediaId}
+              onSetCover={handleSetCover}
             />
           </div>
 
@@ -401,7 +436,7 @@ const CollectionView: React.FC = () => {
             {/* Comments Section - Fixed height, scrollable */}
             <div className="glass-panel rounded-2xl p-4 border border-white/20 bg-white/95 dark:bg-black/80 backdrop-blur-sm h-[60vh] lg:h-[420px] overflow-hidden flex flex-col min-h-0">
               {id ? (
-                <CompactCommentsSection collectionId={id} />
+                <CompactCommentsSection collectionId={id} onCommentAdded={handleCommentAdded} />
               ) : (
                 <div className="text-sm text-gray-500">Collection not found.</div>
               )}

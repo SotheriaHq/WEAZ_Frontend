@@ -14,6 +14,13 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
     let cancelled = false;
     setError(null);
 
+    // Optimization: If initial is already a signed URL, use it.
+    if (initial && (initial.includes('?') || !initial.includes('s3'))) {
+        setUrl(initial);
+        setLoading(false);
+        return;
+    }
+
     if (!fileId) {
       // No fileId, just use initial and mark as not loading
       setUrl(initial ?? null);

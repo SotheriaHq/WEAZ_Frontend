@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Home, TrendingUp, Grid3X3, Heart, Tag, Trophy, ChevronDown, Shield, Users, BarChart, Settings, UserCheck, Crown, Search, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext'; // Assuming this import path is correct
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 // import { useSelector } from 'react-redux';
 // import type { RootState } from '../store';
 
@@ -242,6 +242,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsCollapsed
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   // const userProfile = useSelector((state: RootState) => state.user.profile);
   const [activeLink, setActiveLink] = useState('market');
   const [brandsOpen, setBrandsOpen] = useState(false); // deprecated; retained to avoid large refactor
@@ -250,6 +251,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { translate } = useLanguage();
 
   const [isHovered] = useState(false); // Retained but not used for sidebar width, only link styles
+
+  // Hide sidebar on settings pages
+  if (location.pathname.startsWith('/settings')) {
+    return null;
+  }
 
   const sidebarWidth = isCollapsed ? 'w-[64px]' : 'w-[192px]';
 
@@ -411,25 +417,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Desktop/Tablet Sidebar
   const DesktopSidebar = () => (
     <div
-      // FIX 1 & 3: h-screen and flex-col for fixed height and proper stacking. duration-300 for smooth transitions.
-  className={`fixed left-0 top-0 h-screen ${sidebarWidth} flex flex-col z-50 transition-all duration-300 ease-out will-change-[width]
+      // FIX: Full height (h-screen), top-0, and higher z-index to sit above/beside navbar
+      className={`fixed left-0 top-0 h-screen ${sidebarWidth} flex flex-col z-[60] transition-all duration-300 ease-out will-change-[width]
     border-r border-white/20 dark:border-white/10 bg-white dark:bg-[#000000]`}
     >
 
-      <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start px-4'} py-3 flex-shrink-0`}>
-        <div className="flex items-center space-x-3">
-          <ThreadlyLogo />
-          {!isCollapsed && (
-            <span className="font-bold text-lg text-gray-900 dark:text-white tracking-tight">
-              Threadly
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="h-4"></div>
-
       {/* Navigation Links Wrapper - Takes remaining space and provides main scrolling area */}
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col min-h-0 pt-4">
         <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ overscrollBehavior: 'contain' }}>
           {/* Main Navigation */}
           <div className="px-2 py-4 space-y-1">

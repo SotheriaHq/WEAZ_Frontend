@@ -375,22 +375,18 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
 
   return (
     <nav
-      className={`sticky top-0 w-full px-4 sm:px-5 py-1.5 z-40 transition-all duration-300 ease-out lg:pl-[var(--sidebar-width)]
+      className={`sticky top-0 w-full px-4 sm:px-5 h-16 z-50 transition-all duration-300 ease-out
       ${minimal
         ? 'bg-transparent border-b border-transparent'
-        : 'bg-white dark:bg-black border-b border-gray-200 dark:border-white/10'}`}
-      style={{
-        // Share the same sidebar offset used by Layout via CSS var.
-        // On small screens sidebar is overlaid, so padding-left has no visual effect.
-        paddingLeft: undefined,
-      }}
+        : 'bg-white dark:bg-black border-b border-gray-200 dark:border-white/10'}
+      lg:ml-[var(--sidebar-width)] lg:w-[calc(100%-var(--sidebar-width))]`}
     >
      
       {/* Main Navbar Content */}
-      <div className={`flex items-center min-h-[48px] ${minimal ? 'justify-between lg:justify-end' : 'justify-between'}`}>
+      <div className={`flex items-center h-full ${minimal ? 'justify-between lg:justify-end' : 'justify-between'}`}>
 
         {/* Mobile Logo - Visible only below lg */}
-        <div className="flex items-center lg:hidden">
+        <div className="flex items-center lg:hidden" onClick={() => navigate('/')} role="button">
           <ThreadlyLogo />
           <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight">
             Threadly
@@ -399,22 +395,23 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
 
         {/* Desktop: Hamburger to toggle sidebar overlay */}
         {!minimal && (
-          <button
-            type="button"
-            onClick={() => onToggleSidebar?.()}
-            className="hidden lg:inline-flex items-center justify-center p-2 mr-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            aria-label="Toggle sidebar"
-          >
-            <Menu className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-          </button>
-        )}
-
-        {/* Desktop Brand: Logo + Name (Menu → Logo → Name) */}
-        {!minimal && _isCollapsed && (
-          <div className="hidden lg:flex items-center flex-none mr-3">
-            <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight max-w-[200px] truncate" title="Threadly">
-              Threadly
-            </span>
+          <div className="hidden lg:flex items-center">
+            <button
+              type="button"
+              onClick={() => onToggleSidebar?.()}
+              className="inline-flex items-center justify-center p-2 mr-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Toggle sidebar"
+            >
+              <Menu className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            </button>
+            
+            {/* Brand: Logo + Name (Menu → Logo → Name) - Always visible on Desktop */}
+            <div className="flex items-center cursor-pointer" onClick={() => navigate('/')}>
+              <ThreadlyLogo />
+              <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight max-w-[200px] truncate" title="Threadly">
+                Threadly
+              </span>
+            </div>
           </div>
         )}
 

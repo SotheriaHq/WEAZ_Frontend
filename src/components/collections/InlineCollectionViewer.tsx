@@ -11,6 +11,7 @@ import { ArrowLeft, Lock, Eye } from 'lucide-react';
 import UnifiedCollectionComments from '@/components/collections/UnifiedCollectionComments';
 import Dropdown from '@/components/Dropdown';
 import UpdatePriceTagsModal from '@/components/collections/UpdatePriceTagsModal';
+import DiscountSaleModal from '@/components/collections/DiscountSaleModal';
 import { MessageCircle } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { FrostedButton } from '@/components/ui/FrostedButton';
@@ -36,6 +37,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const [isLiked, setIsLiked] = useState(false);
   const [, setActiveIndex] = useState(0); // track index changes for potential side-effects
   const [showUpdateMeta, setShowUpdateMeta] = useState(false);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
   const me = useSelector((s: RootState) => s.user.profile);
   const [resolvedItems, setResolvedItems] = useState<CarouselMediaItem[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -120,6 +122,10 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
     () => Boolean(me?.id && detail?.owner?.id && me.id === detail.owner.id),
     [me?.id, detail?.owner?.id]
   );
+
+  const hasActiveSale = useMemo(() => {
+    return (detail?.saleMinPrice != null || detail?.saleMaxPrice != null);
+  }, [detail]);
 
   const mediaItems: CarouselMediaItem[] = useMemo(() => {
     const medias = (detail?.medias ?? []) as Array<any>;
@@ -504,6 +510,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               onAddToCart={handleAddToCart}
               onDelete={handleDeleteCollection}
               onCancelSale={isOwner ? handleCancelSale : undefined}
+              onSetupSale={isOwner ? () => setShowDiscountModal(true) : undefined}
               ownerMenu={isOwner ? (
                 <Dropdown
                   buttonLabel={<span className="text-base leading-none">✏️</span>}
@@ -513,7 +520,10 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                   buttonClassName="!p-1 !rounded-md focus:ring-0 focus:ring-offset-0 outline-none focus:outline-none"
                   options={[
                     { label: 'Update Price & Tags', onClick: () => setShowUpdateMeta(true) },
-                    { label: 'Cancel Discount Sale', onClick: handleCancelSale },
+                    ...(hasActiveSale 
+                      ? [{ label: 'Cancel Discount Sale', onClick: handleCancelSale }]
+                      : [{ label: 'Discount Sale', onClick: () => setShowDiscountModal(true) }]
+                    ),
                     { label: 'Edit Collection Details', onClick: () => { window.location.href = `/collections/${collectionId}/edit`; } },
                   ]}
                 />
@@ -549,6 +559,25 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
             if (onPriceUpdated) {
               await onPriceUpdated();
             }
+          }}
+        />
+      )}
+      {isOwner && (
+        <DiscountSaleModal
+          open={showDiscountModal}
+          onClose={() => setShowDiscountModal(false)}
+          collectionId={collectionId}
+          currentMin={detail?.minPrice}
+          currentMax={detail?.maxPrice}
+          onUpdated={async (p) => {
+            setDetail((prev: any) => ({
+              ...(prev ?? {}),
+              saleMinPrice: p.saleMinPrice,
+              saleMaxPrice: p.saleMaxPrice,
+              saleStartAt: p.saleStartAt,
+              saleEndAt: p.saleEndAt,
+            }));
+            if (onPriceUpdated) await onPriceUpdated();
           }}
         />
       )}

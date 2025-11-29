@@ -14,7 +14,7 @@ export const ProfileLayout: React.FC = () => {
   const { loading } = useAuth();
   const user = useSelector((state: RootState) => state.user.profile);
   const location = useLocation();
-  const mainContentMarginClass = isCollapsed ? 'lg:ml-[64px]' : 'lg:ml-[192px]';
+  const mainContentMarginClass = 'lg:ml-[64px]';
 
   if (user && user.type !== 'BRAND') {
     return <Navigate to="/" replace />;
@@ -61,7 +61,7 @@ export const ProfileLayout: React.FC = () => {
       >
         <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
         <Navbar isCollapsed={isCollapsed} onToggleSidebar={() => setIsCollapsed((v) => !v)} />
-        <main className={`pt-0 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out ${mainContentMarginClass}`}>
+        <main className={`pt-0 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out lg:ml-[var(--sidebar-width)]`}>
           <div className="p-0 sm:p-2">
             {location.pathname === '/profile' ? <Profile /> : <Outlet />}
           </div>

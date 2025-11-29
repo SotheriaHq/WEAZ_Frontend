@@ -16,6 +16,9 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const uploadWithProgress = (entry: PresignEntry, file: File, onProgress: (value: number) => void): Promise<void> =>
   new Promise((resolve, reject) => {
+    if (!entry.uploadUrl) {
+      return reject(new Error('Missing upload URL for file ' + file.name));
+    }
     const xhr = new XMLHttpRequest();
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
@@ -68,7 +71,8 @@ export function useCollectionUpload() {
       isAvailableInStore?: boolean,
       tags?: string[],
       meta?: { categoryId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY'; visibility?: 'PUBLIC' | 'PRIVATE' },
-      onProgress?: (value: number) => void
+      onProgress?: (value: number) => void,
+      shouldPublish: boolean = true
     ) => {
       if (!items || items.length === 0) {
         throw new Error('No files to upload');
@@ -201,7 +205,7 @@ export function useCollectionUpload() {
         const workers = Array.from({ length: Math.min(MAX_PARALLEL_UPLOADS, queue.length) }, () => worker());
         await Promise.all(workers);
 
-        const finalizeResp = (await finalizeCollectionUploads(collectionId, completions)) as
+        const finalizeResp = (await finalizeCollectionUploads(collectionId, completions, shouldPublish)) as
           | { data?: unknown }
           | unknown;
         const finalizeResponse = finalizeResp && typeof finalizeResp === 'object' && 'data' in finalizeResp

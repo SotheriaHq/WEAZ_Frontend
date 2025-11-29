@@ -31,6 +31,9 @@ const roundClass = (rounded: ImageWithFallbackProps['rounded']) => {
   }
 };
 
+// Simple in-memory cache for signed URLs to prevent flickering on navigation
+const urlCache: Record<string, string> = {};
+
 export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   src,
   fileId,
@@ -42,27 +45,67 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   draggable = false,
   onClick,
 }) => {
-  const [resolved, setResolved] = useState<string | null>(src ?? null);
+  const [resolved, setResolved] = useState<string | null>(() => {
+    if (src) return src;
+    if (fileId && urlCache[fileId]) return urlCache[fileId];
+    return null;
+  });
   const [hadError, setHadError] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(() => {
+    // If we have a value initially, assume it might be loaded (browser cache) 
+    // or we want to show it immediately. 
+    // But for smooth transition, we usually wait for onLoad.
+    // However, if it's from our cache, we can try to show it.
+    return !!(src || (fileId && urlCache[fileId]));
+  });
 
   useEffect(() => {
     let mounted = true;
     const run = async () => {
+      // If src/fileId changed, reset error
       setHadError(false);
-      setLoaded(false);
+
+      // Optimization: If src is already a signed URL, use it.
+      if (src && (src.includes('?') || !src.includes('s3'))) {
+          setResolved(src);
+          if (src !== resolved) setLoaded(false);
+          return;
+      }
+
       if (fileId) {
-        const url = await brandApi.getSignedFileUrl(fileId);
-        if (mounted) setResolved(url ?? (src ?? null));
+        // Check cache first
+        if (urlCache[fileId]) {
+            setResolved(urlCache[fileId]);
+            // Don't reset loaded here, keep previous state or let it be true
+            if (!resolved) setLoaded(true); 
+        } else {
+            setLoaded(false);
+        }
+
+        try {
+            const url = await brandApi.getSignedFileUrl(fileId);
+            if (mounted && url) {
+                urlCache[fileId] = url;
+                setResolved(url);
+            }
+        } catch (e) {
+            if (mounted) setHadError(true);
+        }
       } else {
         setResolved(src ?? null);
+        if (!src) setLoaded(true); // Nothing to load
       }
     };
-    void run();
+    
+    // Only run if inputs actually changed
+    if (src !== resolved && (!fileId || urlCache[fileId] !== resolved)) {
+        void run();
+    }
+    
     return () => {
       mounted = false;
     };
-  }, [fileId, src]);
+  }, [fileId, src]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showFallback = hadError || !resolved;
 

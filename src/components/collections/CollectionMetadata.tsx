@@ -19,6 +19,7 @@ interface CollectionMetadataProps {
   onEdit?: () => void;
   ownerMenu?: React.ReactNode;
   onCancelSale?: () => void;
+  onSetupSale?: () => void;
 }
 
 const formatCurrency = (n?: number) => {
@@ -47,6 +48,7 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
   onEdit,
   ownerMenu,
   onCancelSale,
+  onSetupSale,
 }) => {
   // Track received price data
 
@@ -77,7 +79,8 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
 
   const now = Date.now();
   const windowActive = (() => {
-    const startOk = !price?.saleStartAt || new Date(price?.saleStartAt).getTime() <= now;
+    // Allow 5 minute clock skew buffer for start time
+    const startOk = !price?.saleStartAt || new Date(price?.saleStartAt).getTime() <= now + 5 * 60 * 1000;
     const endOk = !price?.saleEndAt || new Date(price?.saleEndAt).getTime() >= now;
     return startOk && endOk;
   })();
@@ -90,34 +93,64 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
   // 🔧 FIX #7: Enhanced countdown with color coding and urgency levels
   const [timeLeftLabel, setTimeLeftLabel] = React.useState<string | null>(null);
   const [urgencyLevel, setUrgencyLevel] = React.useState<'low' | 'medium' | 'high' | 'critical'>('low');
+  const [progressPercent, setProgressPercent] = React.useState(100);
   
   React.useEffect(() => {
-    if (!saleBand || !price?.saleEndAt) { setTimeLeftLabel(null); return; }
+    if (!saleBand || !price?.saleEndAt) { 
+      setTimeLeftLabel(null); 
+      return; 
+    }
+    
     const end = new Date(price.saleEndAt).getTime();
+    // Use start time if available, otherwise assume sale started 24h ago for progress bar visual fallback
+    // or just use current time if start is in future (which shouldn't happen due to windowActive check)
+    const start = price.saleStartAt ? new Date(price.saleStartAt).getTime() : end - (24 * 60 * 60 * 1000);
+    const totalDuration = Math.max(1, end - start);
+
     const calc = () => {
-      const diff = end - Date.now();
-      if (diff <= 0) { setTimeLeftLabel('Ended'); setUrgencyLevel('critical'); return; }
+      const now = Date.now();
+      const diff = end - now;
+      
+      // Calculate progress percentage (0% at start, 100% at end - or inverted for "remaining")
+      // Let's do "remaining" bar: 100% full at start, 0% at end.
+      const elapsed = now - start;
+      const remainingPct = Math.max(0, Math.min(100, 100 - (elapsed / totalDuration) * 100));
+      setProgressPercent(remainingPct);
+
+      if (diff <= 0) { 
+        setTimeLeftLabel('Ended'); 
+        setUrgencyLevel('critical'); 
+        // Trigger sale cancellation if expired
+        if (onCancelSale) onCancelSale();
+        return; 
+      }
+      
       const s = Math.floor(diff / 1000);
       const d = Math.floor(s / 86400);
       const h = Math.floor((s % 86400) / 3600);
       const m = Math.floor((s % 3600) / 60);
       const sec = s % 60;
-      if (h < 1) { setUrgencyLevel('critical'); setTimeLeftLabel(`${m}m ${sec}s`); }
-      else if (h < 6) { setUrgencyLevel('high'); setTimeLeftLabel(`${h}h ${m}m`); }
-      else if (d < 1) { setUrgencyLevel('medium'); setTimeLeftLabel(`${h}h ${m}m`); }
-      else { setUrgencyLevel('low'); setTimeLeftLabel(`${d}d ${h}h`); }
+      
+      if (h < 1) { 
+        setUrgencyLevel('critical'); 
+        setTimeLeftLabel(`${m}m ${sec}s`); 
+      } else if (h < 6) { 
+        setUrgencyLevel('high'); 
+        setTimeLeftLabel(`${h}h ${m}m`); 
+      } else if (d < 1) { 
+        setUrgencyLevel('medium'); 
+        setTimeLeftLabel(`${h}h ${m}m`); 
+      } else { 
+        setUrgencyLevel('low'); 
+        setTimeLeftLabel(`${d}d ${h}h`); 
+      }
     };
+    
     calc();
-    const intervalMs = (() => {
-      const remaining = end - Date.now();
-      if (remaining < 10 * 60 * 1000) return 1000; // <10m update per second
-      if (remaining < 60 * 60 * 1000) return 5000; // <1h fast updates
-      if (remaining < 6 * 60 * 60 * 1000) return 15000; // <6h moderate
-      return 60000; // otherwise minute granularity
-    })();
-    const id = window.setInterval(calc, intervalMs);
+    // Update every second to ensure smooth progress bar and seconds countdown
+    const id = window.setInterval(calc, 1000);
     return () => window.clearInterval(id);
-  }, [saleBand, price?.saleEndAt]);
+  }, [saleBand, price?.saleEndAt, price?.saleStartAt]);
 
   return (
     <div className="space-y-3">
@@ -217,38 +250,18 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
         </div>
       )}
 
-      {/* Price Band - with sale support and frosted glass styling */}
-      {/* 🔧 FIX #6: Responsive padding */}
-      {(baseBand || availabilityInStore || saleBand) && (
+      {/* Price Band - Original Price */}
+      {(baseBand || availabilityInStore) && (
         <div className="rounded-lg px-3 py-2 border border-gray-200 dark:border-white/15 bg-white/70 dark:bg-white/5 backdrop-blur-md shadow-sm flex flex-col gap-1">
-          {showStacked ? (
-            <>
-              <div className="text-[11px] text-gray-600 dark:text-gray-400 line-through" aria-label="Original price">{baseBand}</div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300" aria-label="Sale price">{saleBand}</span>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-600/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300" aria-label="Sale badge">Sale</span>
-              </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border backdrop-blur-md shadow-sm ${
-                    urgencyLevel === 'critical' ? 'bg-red-600/25 border-red-500/40 text-red-700 dark:text-red-300' :
-                    urgencyLevel === 'high' ? 'bg-orange-500/25 border-orange-500/40 text-orange-700 dark:text-orange-300' :
-                    urgencyLevel === 'medium' ? 'bg-yellow-500/25 border-yellow-400/40 text-yellow-700 dark:text-yellow-300' :
-                    'bg-emerald-500/20 border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
-                  }`}
-                  aria-label="Sale countdown"
-                >
-                  {timeLeftLabel ? `${timeLeftLabel} left` : 'Sale active'}
-                </span>
-              </div>
-            </>
+          {saleBand ? (
+            <div className="text-xs text-gray-500 dark:text-gray-400 line-through decoration-red-500/50 decoration-2" aria-label="Original price">
+              {baseBand}
+            </div>
           ) : (
-            singleBand && (
-              <div className="text-xs flex items-center gap-1">
-                <span className="text-gray-600 dark:text-gray-400">Price:</span>
-                <span className="font-bold text-gray-900 dark:text-white" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{singleBand}</span>
-              </div>
-            )
+            <div className="text-xs flex items-center gap-1">
+              <span className="text-gray-600 dark:text-gray-400">Price:</span>
+              <span className="font-bold text-gray-900 dark:text-white" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{baseBand}</span>
+            </div>
           )}
           {availabilityInStore && (
             <div className="text-[10px] mt-0.5 text-emerald-700 dark:text-emerald-300 font-medium">✓ In-store</div>
@@ -256,28 +269,64 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
         </div>
       )}
 
-      {/* Action Buttons */}
-      {!isOwner && (
-        <>
-          <div className="flex gap-2">
-            <button
-              onClick={onShare}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border bg-white/80 border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-white/5 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-white/10 transition text-xs font-medium"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              Share
-            </button>
+      {/* Sale Container - Discount Price & Countdown */}
+      {saleBand && (
+        <div className="rounded-lg px-3 py-2 border border-emerald-200/50 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-900/10 backdrop-blur-md shadow-sm flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400" aria-label="Sale price">{saleBand}</span>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                Sale
+              </span>
+            </div>
           </div>
-          {onAddToCart && (
-            <button
-              onClick={onAddToCart}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold text-sm hover:from-purple-700 hover:to-pink-700 transition shadow-lg shadow-purple-500/30"
+          
+          {/* Countdown Timer */}
+          <div className="flex items-center gap-2">
+            <div className={`flex-1 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden`}>
+              <div 
+                className={`h-full rounded-full transition-all duration-1000 ease-linear ${
+                  urgencyLevel === 'critical' ? 'bg-red-500' :
+                  urgencyLevel === 'high' ? 'bg-orange-500' :
+                  urgencyLevel === 'medium' ? 'bg-yellow-500' :
+                  'bg-emerald-500'
+                }`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <span
+              className={`text-[10px] font-bold tabular-nums ${
+                urgencyLevel === 'critical' ? 'text-red-600 dark:text-red-400' :
+                urgencyLevel === 'high' ? 'text-orange-600 dark:text-orange-400' :
+                urgencyLevel === 'medium' ? 'text-yellow-600 dark:text-yellow-400' :
+                'text-emerald-600 dark:text-emerald-400'
+              }`}
             >
-              <ShoppingCart className="w-4 h-4" />
-              Add to Cart
-            </button>
-          )}
-        </>
+              {timeLeftLabel ? `${timeLeftLabel} left` : 'Ending soon'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={onShare}
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border bg-white/80 border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-white/5 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-white/10 transition text-xs font-medium"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+          Share
+        </button>
+      </div>
+
+      {!isOwner && onAddToCart && (
+        <button
+          onClick={onAddToCart}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold text-sm hover:from-purple-700 hover:to-pink-700 transition shadow-lg shadow-purple-500/30"
+        >
+          <ShoppingCart className="w-4 h-4" />
+          Add to Cart
+        </button>
       )}
 
       {/* Owner-only actions */}

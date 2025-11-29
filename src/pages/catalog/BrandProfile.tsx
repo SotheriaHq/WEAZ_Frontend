@@ -28,7 +28,7 @@ import ImageCropModal from '../../components/upload/ImageCropModal';
 import type { BrandProfileDto, CollectionDto } from '../../types/profile';
 import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedFileUrl';
 
-type TabType = 'Collections' | 'Reviews' | 'About';
+type TabType = 'Collections' | 'Reviews' | 'About' | 'Drafts';
 // CollectionType removed — dropdown opens modal directly
 
 const ProfilePage: React.FC = () => {
@@ -47,6 +47,10 @@ const ProfilePage: React.FC = () => {
     fetchReviews,
     fetchBrandProfile,
   } = useBrandProfile();
+  
+  const [drafts, setDrafts] = useState<CollectionDto[]>([]);
+  const [draftsLoading, setDraftsLoading] = useState(false);
+
   const navigate = useNavigate();
   // Owner view when no route param or when the param matches the logged-in brand user's id
   const isOwner = Boolean(user?.type === 'BRAND' && (!routeBrandId || routeBrandId === user?.id));
@@ -74,6 +78,10 @@ const ProfilePage: React.FC = () => {
     const urlCollectionId = searchParams.get('collectionId');
     if (urlCollectionId && urlCollectionId !== selectedCollectionId) {
       setSelectedCollectionId(urlCollectionId);
+    }
+    const tab = searchParams.get('tab');
+    if (tab && ['Collections', 'Reviews', 'About', 'Drafts'].includes(tab)) {
+        setActiveTab(tab as TabType);
     }
   }, []);
 
@@ -195,6 +203,16 @@ const ProfilePage: React.FC = () => {
       }
     }
   }, [activeTab, isOwner, isVisitorView, user, reviews.length, reviewsLoading, fetchReviews, routeBrandId]);
+
+  useEffect(() => {
+    if (activeTab === 'Drafts' && isOwner) {
+      setDraftsLoading(true);
+      brandApi.getMyDraftCollections()
+        .then(items => setDrafts(items))
+        .catch(err => console.error(err))
+        .finally(() => setDraftsLoading(false));
+    }
+  }, [activeTab, isOwner]);
 
   const requiresProfileSetup = useMemo(() => {
     if (!isOwner || !user) {
@@ -702,9 +720,15 @@ const ProfilePage: React.FC = () => {
       <div className="w-full px-4 sm:px-6 pb-12">
         <div className="mt-6">
           <Tabs
-            tabs={["Collections", "Reviews", "About"]}
+            tabs={isOwner ? ["Collections", "Drafts", "Reviews", "About"] : ["Collections", "Reviews", "About"]}
             activeTab={activeTab}
-            onTabChange={(tab) => setActiveTab(tab as TabType)}
+            onTabChange={(tab) => {
+                setActiveTab(tab as TabType);
+                setSearchParams(prev => {
+                    prev.set('tab', tab);
+                    return prev;
+                });
+            }}
           />
 
           <div className="mt-6">
@@ -922,6 +946,25 @@ const ProfilePage: React.FC = () => {
                       )
                     )}
                   </>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'Drafts' && (
+              <div>
+                {draftsLoading ? (
+                  <CollectionsSkeleton />
+                ) : drafts.length > 0 ? (
+                  <CollectionsGrid
+                    collections={drafts}
+                    isDraft={true}
+                    onCollectionClick={(id) => navigate(`/collections/${id}/edit`)}
+                  />
+                ) : (
+                  <EmptyState
+                    title="No drafts"
+                    description="You don't have any unfinished collections."
+                  />
                 )}
               </div>
             )}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import FileUploader from '../../components/upload/FileUploader';
 import MediaPreview from '../../components/upload/MediaPreview';
 import { MediaProvider, useMediaStore } from '../../hooks/useMediaStore';
@@ -7,6 +7,7 @@ import TextField from '../../components/forms/TextField';
 import TextAreaField from '../../components/forms/TextAreaField';
 import TagPicker from '@/components/forms/TagPicker';
 import SimpleAccordion from '@/components/forms/SimpleAccordion';
+import UniversalSelect from '@/components/forms/UniversalSelect';
 import TagsApi from '@/api/TagsApi';
 import { brandApi } from '@/api/BrandApi';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
@@ -14,7 +15,8 @@ import useFilePicker from '../../components/upload/useFilePicker';
 import { toast } from 'react-toastify';
 import useCollectionUpload from '../../hooks/useCollectionUpload';
 import WizardLayout from '../../components/layouts/WizardLayout';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import type { MediaItem } from '@/types/media';
 
 // Stable wrapper around SimpleAccordion so it doesn't remount on each render
 const Section: React.FC<React.PropsWithChildren<{ title: string; defaultOpen?: boolean }>> = ({ title, defaultOpen = true, children }) => (
@@ -24,6 +26,9 @@ const Section: React.FC<React.PropsWithChildren<{ title: string; defaultOpen?: b
 );
 
 const CreateCollectionInner: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const isEditMode = !!id;
+  
   const mediaStore = useMediaStore();
   const files = mediaStore.items;
   const [title, setTitle] = useState('');
@@ -39,13 +44,16 @@ const CreateCollectionInner: React.FC = () => {
   const [categoryId, setCategoryId] = useState<string>('');
   const [type, setType] = useState<'MALE' | 'FEMALE' | 'EVERYBODY'>('EVERYBODY');
   const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+  
+  // Track original items for deletion in edit mode
+  const originalItemIds = useRef<Set<string>>(new Set());
 
   const { uploadCollection, isUploading, progress, perFileProgress } = useCollectionUpload();
   const { user, fetchCollections } = useBrandProfile();
   const navigate = useNavigate();
 
   const disabled = isSubmitting || isUploading;
-  const picker = useFilePicker({ accept: ['image/*', 'video/*'], maxFiles: 20, onFiles: mediaStore.addFiles, disabled });
+  const picker = useFilePicker({ accept: ['image/*', 'video/*'], maxFiles: 20, onFiles: mediaStore.addFiles, disabled: disabled || isEditMode });
 
   useEffect(() => {
     let mounted = true;
@@ -61,6 +69,39 @@ const CreateCollectionInner: React.FC = () => {
           setCategories(mapped);
           if (!categoryId && mapped.length) setCategoryId(mapped[0].id);
         }
+        
+        // If edit mode, fetch collection details
+        if (isEditMode && id) {
+            const d = await brandApi.getCollectionDetail(id);
+            if (mounted && d) {
+                setTitle(d.title || '');
+                setDescription(d.description || '');
+                setMinPrice(d.minPrice ? String(d.minPrice) : '');
+                setMaxPrice(d.maxPrice ? String(d.maxPrice) : '');
+                setIsAvailableInStore(!!d.isAvailableInStore);
+                setSelectedTags(d.tags || []);
+                setCategoryId(d.categoryId || '');
+                setType(d.type || 'EVERYBODY');
+                setVisibility(d.visibility || 'PUBLIC');
+                
+                // Populate media
+                if (d.medias && Array.isArray(d.medias)) {
+                    const items: MediaItem[] = await Promise.all(d.medias.map(async (m: any) => {
+                        const fileId = m.file?.id || m.fileId;
+                        const url = await brandApi.getSignedFileUrl(fileId);
+                        originalItemIds.current.add(m.id);
+                        return {
+                            id: m.id,
+                            file: undefined,
+                            previewUrl: url || '',
+                            kind: m.type === 'VIDEO' ? 'video' : 'image',
+                            remoteId: m.id
+                        };
+                    }));
+                    mediaStore.set(items);
+                }
+            }
+        }
       } finally {
         if (mounted) {
           setLoadingCategories(false);
@@ -70,18 +111,17 @@ const CreateCollectionInner: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [id, isEditMode]);
 
   const isValid = title.trim().length > 0 && files.length > 0 && selectedTags.length > 0;
 
-  const handleDelete = (id: string) => {
-    mediaStore.remove(id);
+  const handleDelete = (itemId: string) => {
+    mediaStore.remove(itemId);
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!isValid) {
-      // Validation requires title, at least one file, and at least one tag
       const reasons: string[] = [];
       if (title.trim().length === 0) reasons.push('a title');
       if (files.length === 0) reasons.push('at least one file');
@@ -95,38 +135,65 @@ const CreateCollectionInner: React.FC = () => {
     try {
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
       const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
-
       const finalTags = selectedTags.slice(0, 10);
-      if (finalTags.length === 0) {
-        toast.error('Add at least one tag.');
-        return;
+
+      if (isEditMode && id) {
+          // Update mode
+          // 1. Update metadata
+          await brandApi.updateCollection(id, {
+              name: title, // API expects 'name' but DTO might map it
+              description,
+              minPrice: parsedMinPrice,
+              maxPrice: parsedMaxPrice,
+              isAvailableInStore,
+              tags: finalTags,
+              categoryId,
+              type,
+              visibility
+          } as any);
+
+          // 2. Handle deletions
+          const currentIds = new Set(files.map(f => f.id));
+          const toDelete = Array.from(originalItemIds.current).filter(oid => !currentIds.has(oid));
+          
+          if (toDelete.length > 0) {
+              await Promise.all(toDelete.map(itemId => brandApi.deleteCollectionItem(id, itemId)));
+          }
+          
+          toast.success('Collection updated');
+      } else {
+          // Create mode
+          await uploadCollection(
+            files,
+            title,
+            description,
+            parsedMinPrice,
+            parsedMaxPrice,
+            isAvailableInStore,
+            finalTags,
+            { categoryId, type, visibility },
+          );
+          toast.success('Collection created');
       }
 
-      await uploadCollection(
-        files,
-        title,
-        description,
-        parsedMinPrice,
-        parsedMaxPrice,
-        isAvailableInStore,
-        finalTags,
-        { categoryId, type, visibility },
-      );
       if (user?.id) {
         await fetchCollections(user.id);
       }
-      toast.success('Collection created');
-      setTitle('');
-      setDescription('');
-      setMinPrice('');
-      setMaxPrice('');
-      setIsAvailableInStore(false);
-      setSelectedTags([]);
-      mediaStore.clear();
+      
+      // Reset and navigate
+      if (!isEditMode) {
+          setTitle('');
+          setDescription('');
+          setMinPrice('');
+          setMaxPrice('');
+          setIsAvailableInStore(false);
+          setSelectedTags([]);
+          mediaStore.clear();
+      }
       navigate('/profile');
     } catch (error) {
       console.error(error);
-      toast.error('Failed to create collection');
+      toast.error(isEditMode ? 'Failed to update collection' : 'Failed to create collection');
     } finally {
       setIsSubmitting(false);
     }
@@ -169,35 +236,15 @@ const CreateCollectionInner: React.FC = () => {
           <MediaPreview 
             items={files} 
             onDeleteItem={handleDelete} 
-            onAddMore={() => picker.open()} 
+            onAddMore={() => !isEditMode && picker.open()} 
             disabled={disabled} 
             progressById={perFileProgress} 
           />
+          {isEditMode && <p className="text-xs text-gray-500 text-center mt-2">Adding new files to existing collections is currently disabled.</p>}
         </>
       )}
     </div>
   );
-
-  const PillGroup: React.FC<{ options: { key: string; label: string; title?: string }[]; value: string; onChange: (v: string) => void }>
-    = ({ options, value, onChange }) => (
-      <div className="inline-flex rounded-full border border-slate-300 dark:border-white/20 bg-white/60 dark:bg-white/5 p-1 backdrop-blur-md shadow-sm" role="tablist" aria-label="Options">
-        {options.map((opt) => (
-          <button
-            key={opt.key}
-            type="button"
-            title={opt.title ?? opt.label}
-            aria-pressed={value === opt.key}
-            onClick={() => onChange(opt.key)}
-            className={`min-w-[52px] px-2.5 py-1.5 text-xs rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 ${
-              value === opt.key ? 'bg-black/10 text-gray-900 dark:bg-white/20 dark:text-white' : 'text-gray-700 dark:text-white/80'
-            }`}
-            disabled={disabled}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-    );
 
   const rightContent = (
     <div className="space-y-4 glass-panel p-0">
@@ -222,27 +269,14 @@ const CreateCollectionInner: React.FC = () => {
         />
         {/* Category */}
         <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
-          <select
-            className="w-full rounded-md bg-white/70 dark:bg-white/5 backdrop-blur-sm text-gray-900 dark:text-white border border-slate-300 dark:border-white/20 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300/60 dark:focus:ring-white/30"
+          <UniversalSelect
+            label="Category"
             value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
+            onChange={setCategoryId}
+            options={categories.map(c => ({ value: c.id, label: c.name }))}
+            placeholder={loadingCategories ? 'Loading...' : 'Select a category'}
             disabled={disabled}
-          >
-            {!categories.length && (
-              <option value="" disabled className="bg-white text-gray-700">
-                {loadingCategories ? 'Loading categories…' : 'No categories available'}
-              </option>
-            )}
-            {!categoryId && categories.length > 0 && (
-              <option value="" className="bg-white text-gray-700">Select a category</option>
-            )}
-            {categories.map((c) => (
-              <option key={c.id} value={c.id} className="bg-white text-gray-900 dark:bg-slate-900 dark:text-white">
-                {c.name}
-              </option>
-            ))}
-          </select>
+          />
         </div>
         {/* Tags */}
         <div className="space-y-2">
@@ -303,31 +337,31 @@ const CreateCollectionInner: React.FC = () => {
         <div className="grid grid-cols-2 gap-3">
           {/* Type Dropdown */}
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Type</label>
-            <select
-              className="w-full rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-gray-900 dark:text-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none cursor-pointer"
-              value={type}
-              onChange={(e) => setType(e.target.value as 'MALE' | 'FEMALE' | 'EVERYBODY')}
-              disabled={disabled}
-            >
-              <option value="EVERYBODY" className="bg-slate-900 text-white">Everybody</option>
-              <option value="MALE" className="bg-slate-900 text-white">Male</option>
-              <option value="FEMALE" className="bg-slate-900 text-white">Female</option>
-            </select>
+            <UniversalSelect
+                label="Type"
+                value={type}
+                onChange={(v) => setType(v as any)}
+                options={[
+                    { value: 'EVERYBODY', label: 'Everybody' },
+                    { value: 'MALE', label: 'Male' },
+                    { value: 'FEMALE', label: 'Female' }
+                ]}
+                disabled={disabled}
+            />
           </div>
 
           {/* Visibility Dropdown */}
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Visibility</label>
-            <select
-              className="w-full rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-gray-900 dark:text-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none cursor-pointer"
-              value={visibility}
-              onChange={(e) => setVisibility(e.target.value as 'PUBLIC' | 'PRIVATE')}
-              disabled={disabled}
-            >
-              <option value="PUBLIC" className="bg-slate-900 text-white">Public</option>
-              <option value="PRIVATE" className="bg-slate-900 text-white">Private</option>
-            </select>
+            <UniversalSelect
+                label="Visibility"
+                value={visibility}
+                onChange={(v) => setVisibility(v as any)}
+                options={[
+                    { value: 'PUBLIC', label: 'Public' },
+                    { value: 'PRIVATE', label: 'Private' }
+                ]}
+                disabled={disabled}
+            />
           </div>
         </div>
 
@@ -343,16 +377,68 @@ const CreateCollectionInner: React.FC = () => {
         </div>
       </Section>
 
-      <FrostedButton 
-        type="submit" 
-        variant="primary" 
-        size="lg" 
-        className="w-full" 
-        disabled={disabled} 
-        loading={isSubmitting || isUploading}
-      >
-        {isUploading ? `Uploading... ${progress}%` : 'Create Collection'}
-      </FrostedButton>
+      <div className="flex gap-3">
+        <FrostedButton 
+          type="button" 
+          variant="secondary" 
+          size="lg" 
+          className="flex-1" 
+          disabled={disabled} 
+          onClick={async () => {
+            if (!isValid) {
+              const reasons: string[] = [];
+              if (title.trim().length === 0) reasons.push('a title');
+              if (files.length === 0) reasons.push('at least one file');
+              const hasTags = selectedTags.length > 0;
+              if (!hasTags) reasons.push('at least one tag');
+              toast.error(`Please provide ${reasons.join(', ')}.`);
+              return;
+            }
+
+            setIsSubmitting(true);
+            try {
+              const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
+              const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
+              const finalTags = selectedTags.slice(0, 10);
+
+              await uploadCollection(
+                files,
+                title,
+                description,
+                parsedMinPrice,
+                parsedMaxPrice,
+                isAvailableInStore,
+                finalTags,
+                { categoryId, type, visibility },
+                undefined,
+                false // shouldPublish = false -> Save as Draft
+              );
+              toast.success('Saved to drafts');
+              if (user?.id) {
+                await fetchCollections(user.id);
+              }
+              navigate('/profile?tab=Drafts');
+            } catch (error) {
+              console.error(error);
+              toast.error('Failed to save draft');
+            } finally {
+              setIsSubmitting(false);
+            }
+          }}
+        >
+          Save to Draft
+        </FrostedButton>
+        <FrostedButton 
+          type="submit" 
+          variant="primary" 
+          size="lg" 
+          className="flex-1" 
+          disabled={disabled} 
+          loading={isSubmitting || isUploading}
+        >
+          {isUploading ? `Uploading... ${progress}%` : (isEditMode ? 'Update Collection' : 'Create Collection')}
+        </FrostedButton>
+      </div>
     </div>
   );
 
@@ -360,8 +446,8 @@ const CreateCollectionInner: React.FC = () => {
     <div className="min-h-screen  p-6 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
       <form onSubmit={handleSubmit}>
         <WizardLayout
-          title="Create a Collection"
-          description="Upload imagery, craft your story, and publish the collection in one seamless flow."
+          title={isEditMode ? "Edit Collection" : "Create a Collection"}
+          description={isEditMode ? "Update your collection details and manage media." : "Upload imagery, craft your story, and publish the collection in one seamless flow."}
           left={leftContent}
           right={rightContent}
         />

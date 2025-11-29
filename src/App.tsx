@@ -20,20 +20,20 @@ import { ToastContainer, Slide } from 'react-toastify';
 import CollectionView from './pages/catalog/CollectionView';
 import DropdownDemo from './pages/ui/DropdownDemo';
 import AcceptInvite from './pages/AcceptInvite';
-import EditCollection from './pages/catalog/EditCollection';
+import ErrorPage from './pages/ErrorPage';
 
 const router = createBrowserRouter([
   {
     path: '/',
     element: <Layout />,
-    errorElement: <div className="min-h-screen flex items-center justify-center text-2xl">404 - Page Not Found</div>,
+    errorElement: <ErrorPage />,
     children: [
       { index: true, element: <Market /> },
       { path: 'market', element: <Market /> },
   // Route brand profile (visitor or owner) to unified Profile component
   { path: 'brands/:id', element: <Profile /> },
       { path: 'collections/:id', element: <CollectionView /> },
-  { path: 'collections/:id/edit', element: <EditCollection /> },
+  { path: 'collections/:id/edit', element: <CreateCollectionPage /> },
       { path: 'collections/invite', element: <AcceptInvite /> },
   { path: 'ui/dropdowns', element: <DropdownDemo /> },
       // { path: 'profile', element: <Profile /> },
@@ -45,7 +45,7 @@ const router = createBrowserRouter([
   {
     path: '/profile',
     element: <ProfileLayout />,
-    errorElement: <div className="min-h-screen flex items-center justify-center text-2xl">404 - Page Not Found</div>,
+    errorElement: <ErrorPage />,
     children: [
       { index: true, element: <Profile /> },
       {

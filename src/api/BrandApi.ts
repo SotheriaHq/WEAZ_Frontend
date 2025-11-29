@@ -389,10 +389,45 @@ export const brandApi = {
   },
 
   // Fetch draft collections (PHASE 6)
-  async getMyDraftCollections(): Promise<any[]> {
+  async getMyDraftCollections(): Promise<CollectionDto[]> {
     try {
       const response = await apiClient.get('/collections/my/drafts');
-      return response.data?.items ?? response.data ?? [];
+      const items = response.data?.items ?? response.data ?? [];
+      
+      return items.map((item: any) => ({
+        id: item.id,
+        name: item.title || '',
+        title: item.title || '',
+        description: item.description || '',
+        ownerId: '', // Not returned by draft endpoint, but implied to be current user
+        isPublic: false,
+        visibility: 'PRIVATE',
+        type: 'EVERYBODY', // Default
+        categoryId: '',
+        coverImage: item.coverImage || '',
+        coverFileId: undefined,
+        itemCount: item.itemCount || 0,
+        postsCount: item.itemCount || 0,
+        likesCount: 0,
+        commentsCount: 0,
+        minPrice: 0,
+        maxPrice: 0,
+        saleMinPrice: null,
+        saleMaxPrice: null,
+        saleStartAt: null,
+        saleEndAt: null,
+        isAvailableInStore: false,
+        createdAt: item.createdAt,
+        updatedAt: item.createdAt,
+        brandName: '',
+        username: '',
+        brandLogo: '',
+        brandLogoFileId: undefined,
+        tags: [],
+        // Extra fields for drafts
+        pendingCategoryName: item.pendingCategoryName,
+        draftReason: item.draftReason,
+      }));
     } catch (error) {
       console.error('Error fetching draft collections:', error);
       return [];

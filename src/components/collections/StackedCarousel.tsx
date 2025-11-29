@@ -122,43 +122,48 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
   // Compute transforms for stacked effect
   function getItemStyle(index: number): React.CSSProperties {
     const gap = calculateGap(containerWidth);
-    const maxStickUp = gap * 0.7;
+    // const maxStickUp = gap * 0.7; // Removed for cleaner cover-flow look
     const isActive = index === activeIndex;
     const isLeft = (activeIndex - 1 + itemsLength) % itemsLength === index;
     const isRight = (activeIndex + 1) % itemsLength === index;
 
     if (isActive) {
       return {
-        zIndex: 3,
+        zIndex: 10,
         opacity: 1,
         pointerEvents: 'auto',
-        transform: `translateX(0px) translateY(0px) scale(1) rotateY(0deg)`,
-        transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: `translateX(0px) translateZ(0px) rotateY(0deg) scale(1)`,
+        filter: 'brightness(100%)',
+        transition: 'all 0.6s cubic-bezier(0.23, 1, 0.32, 1)', // Ease-out-quint for smoother snap
+        boxShadow: '0 20px 50px -12px rgba(0, 0, 0, 0.5)',
       };
     }
     if (isLeft) {
       return {
-        zIndex: 2,
-        opacity: 0.7,
+        zIndex: 5,
+        opacity: 0.6,
         pointerEvents: 'auto',
-        transform: `translateX(-${gap}px) translateY(-${maxStickUp}px) scale(0.88) rotateY(12deg)`,
-        transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: `translateX(-${gap * 1.2}px) translateZ(-100px) rotateY(25deg) scale(0.85)`,
+        filter: 'brightness(60%)',
+        transition: 'all 0.6s cubic-bezier(0.23, 1, 0.32, 1)',
       };
     }
     if (isRight) {
       return {
-        zIndex: 2,
-        opacity: 0.7,
+        zIndex: 5,
+        opacity: 0.6,
         pointerEvents: 'auto',
-        transform: `translateX(${gap}px) translateY(-${maxStickUp}px) scale(0.88) rotateY(-12deg)`,
-        transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: `translateX(${gap * 1.2}px) translateZ(-100px) rotateY(-25deg) scale(0.85)`,
+        filter: 'brightness(60%)',
+        transition: 'all 0.6s cubic-bezier(0.23, 1, 0.32, 1)',
       };
     }
     return {
-      zIndex: 1,
+      zIndex: 0,
       opacity: 0,
       pointerEvents: 'none',
-      transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+      transform: `translateX(0px) translateZ(-200px) scale(0.5)`,
+      transition: 'all 0.6s cubic-bezier(0.23, 1, 0.32, 1)',
     };
   }
 

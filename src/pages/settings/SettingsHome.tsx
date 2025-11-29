@@ -1,34 +1,22 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import SettingsSidebar from '@/components/settings/SettingsSidebar';
+import BrandProfileSettings from '@/components/settings/tabs/BrandProfileSettings';
+import PatchesSettings from '@/components/settings/tabs/PatchesSettings';
+import SubscriptionsSettings from '@/components/settings/tabs/SubscriptionsSettings';
+import AccountSettings from '@/components/settings/tabs/AccountSettings';
+import NotificationSettings from '@/components/settings/tabs/NotificationSettings';
 
-const dummySections: Record<string, React.ReactNode> = {
-  account: (
-    <>
-      <h1 className="text-2xl font-semibold mb-2">Choose how you appear</h1>
-      <p className="text-gray-600 dark:text-gray-400 mb-6">Signed in as user@example.com</p>
-      <div className="rounded-lg border border-gray-200 dark:border-white/10 p-4">
-        <div className="h-32 rounded bg-gray-50 dark:bg-gray-900" />
-      </div>
-    </>
-  ),
-  notifications: (
-    <>
-      <h1 className="text-2xl font-semibold mb-2">Notifications</h1>
-      <p className="text-gray-600 dark:text-gray-400 mb-6">Dummy preferences for now.</p>
-      <div className="space-y-3">
-        {[1,2,3].map((i) => (
-          <label key={i} className="flex items-center gap-3">
-            <input type="checkbox" className="accent-primary" defaultChecked={i%2===0} />
-            <span>Email alert #{i}</span>
-          </label>
-        ))}
-      </div>
-    </>
-  ),
+const sections: Record<string, React.ReactNode> = {
+  'brand-profile': <BrandProfileSettings />,
+  patches: <PatchesSettings />,
+  subscriptions: <SubscriptionsSettings />,
+  account: <AccountSettings />,
+  notifications: <NotificationSettings />,
   privacy: (
     <>
       <h1 className="text-2xl font-semibold mb-2">Privacy</h1>
-      <p className="text-gray-600 dark:text-gray-400">Placeholder content.</p>
+      <p className="text-gray-600 dark:text-gray-400">Manage your privacy settings.</p>
     </>
   ),
   billing: (
@@ -46,7 +34,12 @@ const dummySections: Record<string, React.ReactNode> = {
 };
 
 const SettingsHome: React.FC = () => {
-  const [active, setActive] = React.useState<string>('account');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const active = searchParams.get('tab') || 'brand-profile';
+
+  const setActive = (key: string) => {
+    setSearchParams({ tab: key });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -56,7 +49,7 @@ const SettingsHome: React.FC = () => {
       {/* Content area shifts for the settings sidebar + global collapsed rail */}
       <div className="min-h-screen pt-16 pb-10 px-4 md:pl-[300px] lg:pl-[344px]">
         <div className="max-w-4xl mx-auto">
-          {dummySections[active]}
+          {sections[active]}
         </div>
       </div>
     </div>

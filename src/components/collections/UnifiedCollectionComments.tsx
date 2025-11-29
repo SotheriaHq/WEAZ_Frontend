@@ -9,9 +9,10 @@ import { toast } from 'react-toastify';
 
 interface Props {
   collectionId: string;
+  onCommentAdded?: () => void;
 }
 
-const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
+const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdded }) => {
   const [items, setItems] = React.useState<CommentV2Dto[]>([]);
   const [cursor, setCursor] = React.useState<string | null>(null);
   const [hasNext, setHasNext] = React.useState(false);
@@ -214,7 +215,7 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
       </div>
 
       {/* Fixed Input at BOTTOM */}
-      <div className="flex-shrink-0 pt-3 mt-2 border-t border-gray-200 dark:border-white/20 bg-white dark:bg-black sticky bottom-0 z-20 shadow-[0_-4px_12px_-6px_rgba(0,0,0,0.25)]">
+      <div className="flex-shrink-0 pt-3 mt-2 border-t border-gray-200/50 dark:border-white/10 bg-white/80 dark:bg-black/80 backdrop-blur-md sticky bottom-0 z-20 shadow-[0_-4px_20px_-6px_rgba(0,0,0,0.1)]">
         <div className="relative w-full">
           <CommentInput
             value={text}
@@ -227,6 +228,7 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId }) => {
                 const created = await CommentsApi.create('COLLECTION', collectionId, content);
                 setText('');
                 applyCreated(created);
+                onCommentAdded?.();
               } catch (e: any) {
                 toast.error(e?.response?.data?.message ?? 'Failed to post comment');
               } finally { setBusy(false); }
