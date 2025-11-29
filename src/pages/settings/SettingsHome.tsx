@@ -1,14 +1,14 @@
 import React, { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import SettingsSidebar from '@/components/settings/SettingsSidebar';
-import BrandProfileSettings from '@/components/settings/tabs/BrandProfileSettings';
+import SecuritySettings from '@/components/settings/tabs/SecuritySettings';
 import PatchesSettings from '@/components/settings/tabs/PatchesSettings';
 import SubscriptionsSettings from '@/components/settings/tabs/SubscriptionsSettings';
 import AccountSettings from '@/components/settings/tabs/AccountSettings';
 import NotificationSettings from '@/components/settings/tabs/NotificationSettings';
 
 const sections: Record<string, React.ReactNode> = {
-  'brand-profile': <BrandProfileSettings />,
+  security: <SecuritySettings />,
   patches: <PatchesSettings />,
   subscriptions: <SubscriptionsSettings />,
   account: <AccountSettings />,
@@ -35,7 +35,7 @@ const sections: Record<string, React.ReactNode> = {
 
 const SettingsHome: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const active = searchParams.get('tab') || 'brand-profile';
+  const active = searchParams.get('tab') || 'account';
 
   const setActive = (key: string) => {
     setSearchParams({ tab: key });

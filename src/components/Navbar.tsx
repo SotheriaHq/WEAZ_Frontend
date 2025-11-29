@@ -1,11 +1,3 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Filter, Bell, User, Tag as TagIcon, Settings, LogOut, ChevronDown, Globe, MapPin, Sun, Moon, Monitor, Heart, Menu } from 'lucide-react';
-// Button variants available: FrostedButton (primary|ghost|outline) and IconButton
-// Sizes: xs|sm|md|lg via btn-tight-* classes
-import { FrostedButton } from '@/components/ui/FrostedButton';
-import { ImageWithFallback } from '@/components/ImageWithFallback';
-import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearUser, setUser } from '../features/userSlice';
@@ -382,10 +374,10 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
     >
      
       {/* Main Navbar Content */}
-      <div className={`flex items-center h-full ${minimal ? 'justify-between lg:justify-end' : 'justify-between'}`}>
+      <div className={`flex items-center h-full justify-between gap-4`}>
 
         {/* Left Section: Hamburger + Logo */}
-        <div className="flex items-center">
+        <div className="flex items-center shrink-0 min-w-[180px]">
           {/* Hamburger - Visible on both Mobile and Desktop (unless minimal) */}
           {!minimal && (
             <button
@@ -407,45 +399,40 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
           </div>
         </div>
 
-        {/* Search Section - hidden in minimal mode */}
+        {/* Center Section: Search - Hidden in minimal mode, centered on desktop */}
         {!minimal && (
-          <div className="flex-1 flex justify-start mx-2">
-            <div className="relative flex items-center w-full min-w-0">
-              <SearchField placeholder={translate('searchPlaceholder') || 'Search...'} showFilter={false} className="!flex-none !max-w-none" />
+          <div className="hidden sm:flex flex-1 justify-center max-w-[720px]">
+            <div className="flex items-center w-full">
+              <SearchField placeholder={translate('searchPlaceholder') || 'Search...'} showFilter={false} className="!flex-none w-full" />
               <button
                 type="button"
-                className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
                 aria-label="Filter"
               >
                 <Filter className="w-5 h-5 text-primary" />
               </button>
               <button
                 type="button"
-                className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
                 aria-label="Toggle tags"
                 onClick={() => setShowTags(prev => !prev)}
               >
                 <TagIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
               </button>
-              {showTags && (
-                <div className="ml-2 flex-1 min-w-0 overflow-hidden max-w-[calc(100%-12rem)] sm:max-w-[calc(100%-16rem)]">
-                  <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide whitespace-nowrap py-1">
-                    {navTags.map((tag) => {
-                      const color = getTagColor(tag);
-                      return (
-                        <TagChip key={tag} label={`#${tag}`} size="sm" color={color} />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
 
-        {/* Right Side Actions */}
-        <div className="flex items-center space-x-3 shrink-0">
-          {/* Notifications Dropdown - Only for authenticated users */}
+        {/* Right Section: Actions */}
+        <div className="flex items-center justify-end shrink-0 min-w-[100px] space-x-2 sm:space-x-3">
+          {/* Mobile Search Icon (visible only on mobile when search is hidden) */}
+          {!minimal && (
+            <button className="sm:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+               <SearchIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+            </button>
+          )}
+
+          {/* Notifications */}
           {user && (
             <div className="relative hidden sm:block">
               <button
@@ -465,14 +452,11 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
             </div>
           )}
 
-          {/* Auth Buttons - Only when not logged in */}
+          {/* Auth Buttons */}
           {!user && (
-            <>
-              {/* You can switch to btn-frost-primary/ghost/outline and sizes via btn-tight-*. */}
-              <FrostedButton className="btn-frost-outline btn-tight-xs hidden sm:flex flex-none" onClick={() => navigate('/login')}>
-                Sign In
-              </FrostedButton>
-            </>
+            <FrostedButton className="btn-frost-outline btn-tight-xs hidden sm:flex flex-none" onClick={() => navigate('/login')}>
+              Sign In
+            </FrostedButton>
           )}
 
           {/* Profile Menu */}
@@ -480,7 +464,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
             <button
               type="button"
               onClick={(e) => { e.preventDefault(); setShowProfileMenu((prev) => !prev); }}
-              className="w-7 h-7 rounded-full flex items-center justify-center hover:ring-2 hover:ring-primary/20 transition-all duration-200 overflow-hidden"
+              className="w-8 h-8 rounded-full flex items-center justify-center hover:ring-2 hover:ring-primary/20 transition-all duration-200 overflow-hidden"
               aria-label="Profile menu"
             >
               {user ? (

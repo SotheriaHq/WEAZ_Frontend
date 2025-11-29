@@ -4,7 +4,7 @@ import { useBrandProfile } from '../../hooks/UseBrandHook';
 import { useDispatch } from 'react-redux';
 
 import { toast } from 'react-toastify';
-import ProfileHeader from '../../components/catalog(profile)/ProfileHeader';
+import ProfileHeader from '../../components/catalog/ProfileHeader';
 import Tabs from '../../components/Tabs';
 import AddCollectionModal from '../../components/profile/AddCollectionModal';
 import CollectionsGrid from '../../components/profile/CollectionsGrid';
@@ -580,11 +580,11 @@ const ProfilePage: React.FC = () => {
 
   const brandData = {
     brandName: viewDisplayData.brandName,
-    title: 'About Brand',
+    title: 'About Catalog',
     description:
       viewDisplayData.description || (isOwner
         ? `${viewDisplayData.brandName} is a Lagos-based fashion brand where indigenous Nigerian textiles meet modern fashion innovation.`
-        : 'Welcome to our profile!'),
+        : 'Welcome to our catalog!'),
     socialLinks: {
       instagram: viewDisplayData.socialLinks?.instagram || undefined,
       facebook: viewDisplayData.socialLinks?.facebook || undefined,
@@ -623,7 +623,7 @@ const ProfilePage: React.FC = () => {
   }
 
   if (!isOwner && isVisitorView && !visitorProfile) {
-    return <div className="max-w-screen-xl mx-auto p-6">Brand not found.</div>;
+    return <div className="max-w-screen-xl mx-auto p-6">Catalog not found.</div>;
   }
 
   if (!user && !isVisitorView) {

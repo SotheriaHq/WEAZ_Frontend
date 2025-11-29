@@ -65,7 +65,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${active ? 'bg-gray-100 dark:bg-gray-800 font-medium text-black dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}
+      className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors ${active ? 'bg-primary/10 font-medium text-primary' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
       title={label}
     >
       <Icon className={`w-6 h-6 mr-4 ${active ? 'fill-current' : ''}`} />

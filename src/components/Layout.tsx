@@ -105,10 +105,10 @@ export const Layout: React.FC = () => {
         </div>
       </main>
 
-      {/* Backdrop for OVERLAY mode or Mobile Drawer */}
-      {isSidebarOpen && (sidebarMode === 'OVERLAY' || sidebarMode === 'HIDDEN' || (window.innerWidth < 1024 && sidebarMode !== 'HIDDEN')) && (
+      {/* Backdrop for OVERLAY mode, Mobile Drawer, or Expanded Rail */}
+      {isSidebarOpen && (sidebarMode === 'OVERLAY' || sidebarMode === 'HIDDEN' || sidebarMode === 'RAIL' || window.innerWidth < 1024) && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-[1px] z-30"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30"
           onClick={() => dispatch(closeSidebar())}
           aria-hidden="true"
         />

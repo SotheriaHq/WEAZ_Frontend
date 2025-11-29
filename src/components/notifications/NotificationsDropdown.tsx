@@ -51,7 +51,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
           <CheckCheck className="w-3.5 h-3.5"/>Mark all read
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto divide-y divide-gray-200 dark:divide-gray-800 aria-live=polite">
+      <div className="flex-1 overflow-y-auto sleek-scrollbar divide-y divide-gray-200 dark:divide-gray-800 aria-live=polite">
         {loadingList && items.length === 0 && <div className="p-6 flex items-center justify-center text-sm text-gray-600 dark:text-gray-400"><Loader2 className="w-5 h-5 animate-spin mr-2"/>Loading...</div>}
         {items.length === 0 && !loadingList && <div className="p-6 text-center text-sm text-gray-600 dark:text-gray-400">No notifications yet.</div>}
         {items.map(n => {

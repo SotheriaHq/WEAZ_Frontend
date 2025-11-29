@@ -23,7 +23,7 @@ const groups = [
   {
     title: 'Brand Management',
     items: [
-      { key: 'brand-profile', label: 'Brand Profile', path: '/settings' },
+      { key: 'security', label: 'Security', path: '/settings?tab=security' }, // Renamed from Brand Profile
       { key: 'patches', label: 'Brand Patches', path: '/settings' },
       { key: 'subscriptions', label: 'Subscriptions', path: '/settings' },
     ]
@@ -32,22 +32,23 @@ const groups = [
 
 export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSelect }) => {
   const navigate = useNavigate();
-  const location = useLocation();
+  // const location = useLocation(); // Unused
 
   const handleSelect = (key: string, path: string) => {
     if (key === 'collections') {
       navigate(path);
     } else {
       onSelect(key);
+      navigate(path); // Ensure navigation happens
     }
   };
 
   return (
     <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[240px] bg-white dark:bg-[#0f0f0f] z-20 overflow-y-auto scrollbar-hide">
-      <div className="py-4">
-        <h2 className="px-4 text-xl font-semibold text-gray-900 dark:text-white mb-4">Settings</h2>
+      <div className="py-2">
+        <h2 className="px-4 text-xl font-semibold text-gray-900 dark:text-white mb-2">Settings</h2>
         
-        <nav className="space-y-6">
+        <nav className="space-y-2">
           {groups.map((group) => (
             <div key={group.title}>
               <div className="space-y-0">
@@ -57,9 +58,9 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
                     <button
                       key={key}
                       onClick={() => handleSelect(key, path)}
-                      className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
                         isActive
-                          ? 'font-medium text-primary border-l-4 border-primary bg-primary/10' // Primary color active state
+                          ? 'font-medium text-primary border-l-4 border-primary bg-primary/10' 
                           : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                       }`}
                     >

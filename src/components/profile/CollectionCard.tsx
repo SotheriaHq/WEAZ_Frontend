@@ -120,20 +120,41 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
       className="relative group w-full glass-panel overflow-hidden rounded-lg cursor-pointer shadow-md transition-transform duration-200 hover:scale-[1.02]"
       onClick={onClick}
     >
-      {/* Background Image */}
+      {/* Background Media */}
       <div className="relative w-full overflow-hidden">
         {resolvedCover ? (
           <>
             {!imgLoaded && (
               <div className="absolute inset-0 animate-pulse bg-white/10 dark:bg-white/5" />
             )}
-            <img 
-              src={resolvedCover} 
-              alt={title} 
-              className={`block w-full object-cover transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-              style={{ minHeight: '320px' }}
-              onLoad={() => setImgLoaded(true)}
-            />
+            
+            {/* Check if video based on extension */}
+            {(() => {
+              const isVideo = resolvedCover.match(/\.(mp4|webm|mov|m4v)($|\?)/i);
+              if (isVideo) {
+                return (
+                  <video
+                    src={resolvedCover}
+                    className={`block w-full object-cover transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ minHeight: '320px' }}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    onLoadedData={() => setImgLoaded(true)}
+                  />
+                );
+              }
+              return (
+                <img 
+                  src={resolvedCover} 
+                  alt={title} 
+                  className={`block w-full object-cover transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  style={{ minHeight: '320px' }}
+                  onLoad={() => setImgLoaded(true)}
+                />
+              );
+            })()}
           </>
           ) : (
             <div className="relative flex min-h-[320px] w-full items-center justify-center glass-panel">
