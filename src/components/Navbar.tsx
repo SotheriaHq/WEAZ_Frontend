@@ -7,18 +7,23 @@ import type { RootState } from '../store';
 // Notifications bootstrap logic moved to useNotificationsBootstrap hook mounted at app root.
 import type { AuthUserDto } from '../types/auth';
 import '../styles/scrollbar-hide.css';
-import TagChip from '@/components/ui/Tag';
 import SearchField from '@/components/SearchField';
 import { apiClient, dropStoredAccessToken } from '../api/httpClient';
 import { env } from '../config/env';
 import getProfileOrHomeUrl from '../lib/navigation';
-import { getTagColor } from '../utils/tagColors';
+import { useEffect, useRef, useState } from 'react';
+import { useTheme } from '@/context/ThemeContext';
+import React from 'react';
+import { User, Settings, TagIcon, Heart, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, Menu, SearchIcon, Bell, Filter } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import ImageWithFallback from './ImageWithFallback';
+import FrostedButton from './ui/FrostedButton';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
 
 
 
 interface NavbarProps {
-  isCollapsed: boolean;
+  isCollapsed?: boolean;
   onToggleSidebar?: () => void;
   minimal?: boolean; // profile pages: hide center controls
 }
@@ -58,9 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
   const navigate = useNavigate();
   const location = useLocation();
 
-  const navTags = [
-    'Ankara', 'Luxury', 'Streetwear', 'Spring2025', 'Summer', 'Under50k', 'Dresses', 'Accessories'
-  ];
+
 
   // Location sharing handler
   const handleLocationShare = () => {
