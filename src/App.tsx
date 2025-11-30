@@ -21,6 +21,13 @@ import CollectionView from './pages/catalog/CollectionView';
 import DropdownDemo from './pages/ui/DropdownDemo';
 import AcceptInvite from './pages/AcceptInvite';
 import ErrorPage from './pages/ErrorPage';
+import { DashboardLayout } from './components/dashboard/DashboardLayout';
+import DashboardHome from './pages/dashboard/DashboardHome';
+import OrderManagement from './pages/dashboard/OrderManagement';
+import AnalyticsPage from './pages/dashboard/AnalyticsPage';
+import FinancePage from './pages/dashboard/FinancePage';
+import SettingsPage from './pages/dashboard/SettingsPage';
+import { Navigate } from 'react-router-dom';
 
 const router = createBrowserRouter([
   {
@@ -38,8 +45,32 @@ const router = createBrowserRouter([
   { path: 'ui/dropdowns', element: <DropdownDemo /> },
       // { path: 'profile', element: <Profile /> },
       { path: 'success', element: <Success /> },
-      { path: 'settings', element: <SettingsHome /> },
-      { path: 'settings/collections', element: <CollectionsSettings /> },
+      {
+        element: <ProtectedRoute />,
+        children: [
+          { path: 'settings', element: <SettingsHome /> },
+          { path: 'settings/collections', element: <CollectionsSettings /> },
+        ],
+      },
+    ],
+  },
+  {
+    path: '/dashboard',
+    element: (
+      <ProtectedRoute>
+        <RequireBrand>
+          <DashboardLayout />
+        </RequireBrand>
+      </ProtectedRoute>
+    ),
+    errorElement: <ErrorPage />,
+    children: [
+      { index: true, element: <Navigate to="overview" replace /> },
+      { path: 'overview', element: <DashboardHome /> },
+      { path: 'orders', element: <OrderManagement /> },
+      { path: 'analytics', element: <AnalyticsPage /> },
+      { path: 'finance', element: <FinancePage /> },
+      { path: 'settings', element: <SettingsPage /> },
     ],
   },
   {

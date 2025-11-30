@@ -661,6 +661,94 @@ export const brandApi = {
     const response = await apiClient.delete(`/brands/patches/${patchId}`);
     return unwrapApiResponse<{ message: string }>(response.data);
   },
+
+  // ============================================
+  // DASHBOARD
+  // ============================================
+
+  async getDashboardOverview(brandId: string) {
+    try {
+      const response = await apiClient.get(`/brands/${brandId}/dashboard/overview`);
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error fetching dashboard overview:', error);
+      return null;
+    }
+  },
+
+  async getDashboardAnalytics(brandId: string, range: '7d' | '30d' | 'ytd' = '30d') {
+    try {
+      const response = await apiClient.get(`/brands/${brandId}/dashboard/analytics?range=${range}`);
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error fetching dashboard analytics:', error);
+      return null;
+    }
+  },
+
+  // ============================================
+  // ORDERS
+  // ============================================
+
+  async getOrders(brandId: string, params?: { page?: number; limit?: number; status?: string; q?: string }) {
+    try {
+      const query = new URLSearchParams();
+      if (params?.page) query.append('page', String(params.page));
+      if (params?.limit) query.append('limit', String(params.limit));
+      if (params?.status) query.append('status', params.status);
+      if (params?.q) query.append('q', params.q);
+
+      const response = await apiClient.get(`/brands/${brandId}/orders?${query.toString()}`);
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      return null;
+    }
+  },
+
+  async getOrderDetail(brandId: string, orderId: string) {
+    try {
+      const response = await apiClient.get(`/brands/${brandId}/orders/${orderId}`);
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error fetching order detail:', error);
+      return null;
+    }
+  },
+
+  async updateOrderStatus(brandId: string, orderId: string, status: string) {
+    try {
+      const response = await apiClient.patch(`/brands/${brandId}/orders/${orderId}/status`, { status });
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      return null;
+    }
+  },
+
+  // ============================================
+  // PAYOUTS
+  // ============================================
+
+  async getPayouts(brandId: string) {
+    try {
+      const response = await apiClient.get(`/brands/${brandId}/payouts`);
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error fetching payouts:', error);
+      return null;
+    }
+  },
+
+  async requestPayout(brandId: string, amount: number) {
+    try {
+      const response = await apiClient.post(`/brands/${brandId}/payouts/request`, { amount });
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error requesting payout:', error);
+      throw error; // Re-throw to handle in UI
+    }
+  },
 };
 
 const extractUploadAsset = (raw: unknown): UploadAssetDto | null => {

@@ -3,7 +3,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AuthUserDto } from '../types/auth';
 import { env } from '../config/env';
 
-interface UserState {
+export interface UserState {
   profile: AuthUserDto | null;
   isAuthenticated: boolean;
 }

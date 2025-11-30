@@ -228,7 +228,8 @@ export const Sidebar: React.FC = () => {
             <div className="border-t border-gray-200 dark:border-gray-800 my-3 mx-2" />
 
             {/* Settings Link */}
-             <div className="space-y-1 mb-3">
+            {user && (
+              <div className="space-y-1 mb-3">
                 <SidebarLink
                   icon={Settings}
                   label="Settings"
@@ -236,7 +237,8 @@ export const Sidebar: React.FC = () => {
                   onClick={() => handleLinkClick('/settings')}
                   isRail={isRail}
                 />
-             </div>
+              </div>
+            )}
           </>
         )}
       </div>
