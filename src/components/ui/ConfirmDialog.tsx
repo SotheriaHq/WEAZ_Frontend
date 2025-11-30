@@ -6,6 +6,7 @@ interface ConfirmDialogProps {
   message?: string;
   confirmText?: string;
   cancelText?: string;
+  isDestructive?: boolean;
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }
@@ -16,6 +17,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   message = 'This action cannot be undone.',
   confirmText = 'Confirm',
   cancelText = 'Cancel',
+  isDestructive = false,
   onConfirm,
   onCancel,
 }) => {
@@ -40,14 +42,18 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <div className="flex justify-end gap-2">
           <button
             onClick={onCancel}
-            className="px-3 py-1.5 rounded-md text-sm font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+            className="px-3 py-1.5 rounded-md text-sm font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
             autoFocus
-            className="px-3 py-1.5 rounded-md text-sm font-semibold bg-red-600 text-white hover:bg-red-700"
+            className={`px-3 py-1.5 rounded-md text-sm font-semibold text-white ${
+              isDestructive
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-black dark:bg-white dark:text-black hover:opacity-90'
+            }`}
           >
             {confirmText}
           </button>

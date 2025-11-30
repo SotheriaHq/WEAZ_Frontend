@@ -197,6 +197,7 @@ const MyDraftsPage: React.FC = () => {
         message={pendingDelete ? `Are you sure you want to delete "${pendingDelete.title}"? This cannot be undone.` : 'This action cannot be undone.'}
         confirmText="Delete"
         cancelText="Cancel"
+        isDestructive
         onConfirm={confirmDelete}
         onCancel={() => { setConfirmOpen(false); setPendingDelete(null); }}
       />

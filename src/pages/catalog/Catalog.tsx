@@ -772,7 +772,16 @@ const ProfilePage: React.FC = () => {
                       </div>
                       {/* Show create controls only for owner */}
                       {isOwner && (
-                        <AddCollectionDropdown openModal={() => handleOpenAddModal()} />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => navigate('/dashboard')}
+                            className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl font-medium hover:opacity-90 transition-opacity flex items-center gap-2"
+                          >
+                            <span>📊</span>
+                            <span>Dashboard</span>
+                          </button>
+                          <AddCollectionDropdown openModal={() => handleOpenAddModal()} />
+                        </div>
                       )}
                     </div>
 
@@ -783,12 +792,13 @@ const ProfilePage: React.FC = () => {
                           <button
                             key={opt}
                             onClick={() => setVisibilityFilter(opt as any)}
-                            className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                            className={`px-4 py-1.5 text-sm font-medium transition-colors flex items-center gap-2 ${
                               visibilityFilter === opt
                                 ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white'
                                 : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                             }`}
                           >
+                            <span>{opt === 'Public' ? '🌍' : opt === 'Private' ? '🔒' : '📝'}</span>
                             {opt}
                           </button>
                         ))}

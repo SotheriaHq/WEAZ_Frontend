@@ -592,6 +592,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
         message="Delete this entire collection? This cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
+        isDestructive
         onConfirm={confirmDelete}
         onCancel={() => setConfirmOpen(false)}
       />

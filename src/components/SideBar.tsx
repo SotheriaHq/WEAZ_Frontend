@@ -88,13 +88,6 @@ export const Sidebar: React.FC = () => {
   const { profile: user } = useSelector((state: RootState) => state.user);
   const userRole = user?.role || 'user';
 
-  // Determine effective state for rendering
-  // Base state is determined by sidebarMode (RAIL or HIDDEN)
-  // Expanded state is determined by isSidebarOpen
-  
-  // If isSidebarOpen is true, we show the Overlay Sidebar (Full width, z-51)
-  // If isSidebarOpen is false, we show the Base Sidebar (Rail or nothing)
-
   const showOverlay = isSidebarOpen;
   const showRail = sidebarMode === 'RAIL' && !isSidebarOpen;
 
@@ -108,12 +101,7 @@ export const Sidebar: React.FC = () => {
       return null; 
   }
 
-  // We might need to render TWO sidebars if we want the Rail to stay visible behind the Overlay?
-  // Or just render the Overlay *instead* of the Rail when open?
-  // YouTube keeps the Rail visible behind? No, the Drawer usually covers it or replaces it.
-  // If we render Overlay, it covers the Rail area anyway.
-  
-  // Let's render the active state.
+
   const isRail = !showOverlay; // If not overlay, it's rail (assuming not hidden/mobile-closed)
   
   const widthClass = isRail ? 'w-[72px]' : 'w-[240px]';
@@ -135,6 +123,10 @@ export const Sidebar: React.FC = () => {
     { icon: PlaySquare, label: 'Shorts', path: '/shorts' }, // Placeholder
     { icon: Grid3X3, label: 'Subscriptions', path: '/subscriptions' }, // Placeholder
   ];
+
+  if (userRole === 'BRAND') {
+    mainLinks.unshift({ icon: BarChart, label: 'Dashboard', path: '/dashboard' });
+  }
 
   const youLinks = [
     { icon: History, label: 'History', path: '/history' },
