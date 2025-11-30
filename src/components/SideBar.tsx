@@ -86,7 +86,6 @@ export const Sidebar: React.FC = () => {
   
   const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
   const { profile: user } = useSelector((state: RootState) => state.user);
-  const userRole = user?.role || 'user';
 
   const showOverlay = isSidebarOpen;
   const showRail = sidebarMode === 'RAIL' && !isSidebarOpen;
@@ -124,7 +123,7 @@ export const Sidebar: React.FC = () => {
     { icon: Grid3X3, label: 'Subscriptions', path: '/subscriptions' }, // Placeholder
   ];
 
-  if (userRole === 'BRAND') {
+  if (user?.type === 'BRAND') {
     mainLinks.unshift({ icon: BarChart, label: 'Dashboard', path: '/dashboard' });
   }
 
