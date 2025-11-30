@@ -420,7 +420,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
                 aria-label="Toggle tags"
                 onClick={() => setShowTags(prev => !prev)}
               >
-                <TagIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                <span className="text-xl leading-none filter drop-shadow-sm hover:scale-110 transition-transform block">🏷️</span>
               </button>
             </div>
           </div>

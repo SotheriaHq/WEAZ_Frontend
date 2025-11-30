@@ -15,6 +15,7 @@ const groups = [
       { key: 'playback', label: 'Playback and performance', path: '/settings' },
       { key: 'downloads', label: 'Downloads', path: '/settings' },
       { key: 'privacy', label: 'Privacy', path: '/settings' },
+      { key: 'hidden-content', label: 'Hidden Content', path: '/settings' },
       { key: 'connected', label: 'Connected apps', path: '/settings' },
       { key: 'billing', label: 'Billing & payments', path: '/settings' },
       { key: 'advanced', label: 'Advanced settings', path: '/settings' },

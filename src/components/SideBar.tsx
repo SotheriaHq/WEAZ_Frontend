@@ -53,7 +53,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
     return (
       <button
         onClick={onClick}
-        className={`w-full py-4 flex flex-col items-center justify-center gap-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors ${active ? 'text-black dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}
+        className={`w-full py-4 flex flex-col items-center justify-center gap-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors ${active ? 'text-purple-600 dark:text-purple-400' : 'text-gray-600 dark:text-gray-400'}`}
         title={label}
       >
         <Icon className={`w-6 h-6 ${active ? 'fill-current' : ''}`} />
@@ -65,10 +65,14 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors ${active ? 'bg-primary/10 font-medium text-primary' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+      className={`w-full flex items-center px-3 py-2 rounded-lg transition-all duration-200 ${
+        active 
+          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md font-medium' 
+          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+      }`}
       title={label}
     >
-      <Icon className={`w-6 h-6 mr-4 ${active ? 'fill-current' : ''}`} />
+      <Icon className={`w-5 h-5 mr-3 ${active ? 'fill-white/20' : ''}`} />
       <span className="text-sm truncate flex-1 text-left">{label}</span>
     </button>
   );

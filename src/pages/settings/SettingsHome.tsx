@@ -6,6 +6,7 @@ import PatchesSettings from '@/components/settings/tabs/PatchesSettings';
 import SubscriptionsSettings from '@/components/settings/tabs/SubscriptionsSettings';
 import AccountSettings from '@/components/settings/tabs/AccountSettings';
 import NotificationSettings from '@/components/settings/tabs/NotificationSettings';
+import HiddenContentSettings from './HiddenContentSettings';
 
 const sections: Record<string, React.ReactNode> = {
   security: <SecuritySettings />,
@@ -13,6 +14,7 @@ const sections: Record<string, React.ReactNode> = {
   subscriptions: <SubscriptionsSettings />,
   account: <AccountSettings />,
   notifications: <NotificationSettings />,
+  'hidden-content': <HiddenContentSettings />,
   privacy: (
     <>
       <h1 className="text-2xl font-semibold mb-2">Privacy</h1>
