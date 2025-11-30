@@ -10,6 +10,7 @@ import Success from './pages/Success';
 import LoginPage from './pages/Login';
 // Removed separate BrandPublic visitor page; unified profile view handles both owner & visitor modes
 import ProtectedRoute from './components/ProtectedRoute';
+import GuestRoute from './components/GuestRoute';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Profile from './pages/catalog/Catalog';
@@ -57,11 +58,9 @@ const router = createBrowserRouter([
   {
     path: '/dashboard',
     element: (
-      <ProtectedRoute>
         <RequireBrand>
           <DashboardLayout />
         </RequireBrand>
-      </ProtectedRoute>
     ),
     errorElement: <ErrorPage />,
     children: [
@@ -92,7 +91,7 @@ const router = createBrowserRouter([
     ],
   },
   {
-    element: <ProtectedRoute />,
+    element: <GuestRoute />,
     children: [
       { path: '/signup', element: <SignupPage /> },
       { path: '/login', element: <LoginPage /> },

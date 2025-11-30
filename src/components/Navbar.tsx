@@ -14,7 +14,7 @@ import getProfileOrHomeUrl from '../lib/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import React from 'react';
-import { User, Settings, TagIcon, Heart, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, Menu, SearchIcon, Bell, Filter } from 'lucide-react';
+import { User, Settings, TagIcon, Heart, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, Menu, SearchIcon, Bell, Filter, LayoutDashboard } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
@@ -141,6 +141,15 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
 
             {/* Main Links */}
             <div className="py-2">
+              {user.type === 'BRAND' && (
+                <button
+                  onClick={() => { navigate('/dashboard'); setShowProfileMenu(false); }}
+                  className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Dashboard</span>
+                </button>
+              )}
               <button
                 onClick={() => {
                   if (user) {

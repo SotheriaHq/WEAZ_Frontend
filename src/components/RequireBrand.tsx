@@ -3,7 +3,11 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 
-const RequireBrand: React.FC = () => {
+interface RequireBrandProps {
+  children?: React.ReactNode;
+}
+
+const RequireBrand: React.FC<RequireBrandProps> = ({ children }) => {
   const { profile: user } = useSelector((state: RootState) => state.user);
 
   if (!user) {
@@ -16,7 +20,7 @@ const RequireBrand: React.FC = () => {
     return <Navigate to="/" replace />;
   }
 
-  return <Outlet />;
+  return children ? <>{children}</> : <Outlet />;
 };
 
 export default RequireBrand;

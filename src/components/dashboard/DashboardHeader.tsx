@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button } from '@/components/ui/Button';
+// Fixed: Removed unused Button import to resolve named export error
+
 import { Menu } from 'lucide-react';
 
 interface DashboardHeaderProps {

@@ -123,9 +123,7 @@ export const Sidebar: React.FC = () => {
     { icon: Grid3X3, label: 'Subscriptions', path: '/subscriptions' }, // Placeholder
   ];
 
-  if (user?.type === 'BRAND') {
-    mainLinks.unshift({ icon: BarChart, label: 'Dashboard', path: '/dashboard' });
-  }
+
 
   const youLinks = [
     { icon: History, label: 'History', path: '/history' },
