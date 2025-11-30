@@ -559,7 +559,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
           currentMax={detail?.maxPrice}
           currentTags={detail?.tags ?? []}
           onUpdated={async (p) => {
-            setDetail((prev: any) => ({ ...(prev ?? {}), minPrice: p.minPrice ?? prev?.minPrice, maxPrice: p.maxPrice ?? prev?.maxPrice, tags: p.tags ?? prev?.tags, saleMinPrice: p.saleMinPrice ?? prev?.saleMinPrice, saleMaxPrice: p.saleMaxPrice ?? prev?.saleMaxPrice }));
+            setDetail((prev: any) => ({ ...(prev ?? {}), minPrice: p.minPrice ?? prev?.minPrice, maxPrice: p.maxPrice ?? prev?.maxPrice, tags: p.tags ?? prev?.tags }));
             // Notify parent to refresh collections list so cards show updated prices
             if (onPriceUpdated) {
               await onPriceUpdated();
