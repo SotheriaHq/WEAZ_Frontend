@@ -8,7 +8,7 @@ import FrostedButton, { IconButton } from '@/components/ui/FrostedButton';
 import type { AuthUserDto } from '../../types/auth';
 import type { BrandProfileDto } from '../../types/profile';
 import { brandApi, type UpdateBrandProfilePayload } from '../../api/BrandApi';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import { BRAND_TAG_OPTIONS } from '../../data/brandTags';
 import {
   DEFAULT_COUNTRY,

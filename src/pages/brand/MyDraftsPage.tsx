@@ -3,7 +3,7 @@
  * Shows collections pending category approval
  */
 import React, { useEffect, useState } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import { brandApi } from '@/api/BrandApi';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Trash2, Eye } from 'lucide-react';

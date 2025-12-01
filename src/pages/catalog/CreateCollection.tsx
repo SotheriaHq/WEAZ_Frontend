@@ -12,7 +12,7 @@ import TagsApi from '@/api/TagsApi';
 import { brandApi } from '@/api/BrandApi';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
 import useFilePicker from '../../components/upload/useFilePicker';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import useCollectionUpload from '../../hooks/useCollectionUpload';
 import WizardLayout from '../../components/layouts/WizardLayout';
 import { useNavigate, useParams } from 'react-router-dom';

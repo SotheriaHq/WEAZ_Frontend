@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '@/components/ui/Modal';
 import { brandApi } from '@/api/BrandApi';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import { Calendar, Clock } from 'lucide-react';
 
 interface Props {

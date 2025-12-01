@@ -15,7 +15,7 @@ import {
   Twitter,
   Briefcase
 } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 interface SettingsForm {
   brandFullName: string;

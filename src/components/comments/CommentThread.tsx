@@ -4,7 +4,7 @@ import { CommentsApi } from '@/api/CommentsApi';
 import CommentComposer from './CommentComposer';
 import CommentItem from './CommentItem';
 import { useRealtime } from '@/realtime';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 type Props = {
   targetType: CommentTarget;

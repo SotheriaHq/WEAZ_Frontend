@@ -10,23 +10,23 @@ const groups = [
   {
     title: 'Account',
     items: [
-      { key: 'account', label: 'Account', path: '/settings' },
-      { key: 'notifications', label: 'Notifications', path: '/settings' },
-      { key: 'playback', label: 'Playback and performance', path: '/settings' },
-      { key: 'downloads', label: 'Downloads', path: '/settings' },
-      { key: 'privacy', label: 'Privacy', path: '/settings' },
-      { key: 'hidden-content', label: 'Hidden Content', path: '/settings' },
-      { key: 'connected', label: 'Connected apps', path: '/settings' },
-      { key: 'billing', label: 'Billing & payments', path: '/settings' },
-      { key: 'advanced', label: 'Advanced settings', path: '/settings' },
+      { key: 'account', label: 'Account', path: '/settings?tab=account' },
+      { key: 'notifications', label: 'Notifications', path: '/settings?tab=notifications' },
+      { key: 'playback', label: 'Playback and performance', path: '/settings?tab=playback' },
+      { key: 'downloads', label: 'Downloads', path: '/settings?tab=downloads' },
+      { key: 'privacy', label: 'Privacy', path: '/settings?tab=privacy' },
+      { key: 'hidden-content', label: 'Hidden Content', path: '/settings?tab=hidden-content' },
+      { key: 'connected', label: 'Connected apps', path: '/settings?tab=connected' },
+      { key: 'billing', label: 'Billing & payments', path: '/settings?tab=billing' },
+      { key: 'advanced', label: 'Advanced settings', path: '/settings?tab=advanced' },
     ]
   },
   {
     title: 'Brand Management',
     items: [
-      { key: 'security', label: 'Security', path: '/settings?tab=security' }, // Renamed from Brand Profile
-      { key: 'patches', label: 'Brand Patches', path: '/settings' },
-      { key: 'subscriptions', label: 'Subscriptions', path: '/settings' },
+      { key: 'security', label: 'Security', path: '/settings?tab=security' },
+      { key: 'patches', label: 'Brand Patches', path: '/settings?tab=patches' },
+      { key: 'subscriptions', label: 'Subscriptions', path: '/settings?tab=subscriptions' },
     ]
   }
 ];

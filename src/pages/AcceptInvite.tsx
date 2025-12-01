@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AccessApi from '@/api/AccessApi';
 import { FrostedButton } from '@/components/ui/FrostedButton';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 const AcceptInvite: React.FC = () => {
   const location = useLocation();

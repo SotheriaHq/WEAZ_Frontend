@@ -14,7 +14,7 @@ import {
   persistAccessToken,
 } from '../api/httpClient';
 import { isAxiosError } from 'axios';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;

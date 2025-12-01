@@ -4,7 +4,7 @@ import { Heart, Reply, Trash2 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { CommentsApi } from '@/api/CommentsApi';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import { useRealtime } from '@/realtime';
 import CommentInput from '@/components/ui/CommentInput';
 

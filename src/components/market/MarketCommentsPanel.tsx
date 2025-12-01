@@ -9,7 +9,7 @@ import CommentInput from '@/components/ui/CommentInput';
 import { useRealtime } from '@/realtime';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import { updateCommentCount } from '@/features/engagementSlice';
 
 type Props = {

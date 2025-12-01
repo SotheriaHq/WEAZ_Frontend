@@ -12,7 +12,7 @@ import { getTagColor } from '@/utils/tagColors';
 import { CommentsApi } from '@/api/CommentsApi';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
 import { useCountdown } from '@/hooks/useCountdown';
 

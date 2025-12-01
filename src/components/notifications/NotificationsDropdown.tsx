@@ -8,9 +8,22 @@ import { useNavigate } from 'react-router-dom';
 interface Props { open: boolean; onClose: () => void; anchorRef: React.RefObject<HTMLElement>; }
 
 const timeAgo = (iso: string) => {
-  const date = new Date(iso); const diff = Date.now() - date.getTime();
-  const mins = Math.floor(diff / 60000); if (mins < 1) return 'just now'; if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60); if (hrs < 24) return `${hrs}h ago`; const days = Math.floor(hrs / 24); return `${days}d ago`;
+  try {
+    const date = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+
+    if (diffSecs < 60) return 'just now';
+    const mins = Math.floor(diffSecs / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+  } catch (e) {
+    return '';
+  }
 };
 
 export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRef }) => {

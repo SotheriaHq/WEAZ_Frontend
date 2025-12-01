@@ -144,7 +144,7 @@ const OrderManagement: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-black dark:border-white"></div>
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </td>
                 </tr>
               ) : orders.length === 0 ? (

@@ -75,7 +75,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     const url = buildUrl();
     const s = io(url, {
       auth: token ? { token } : undefined,
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       autoConnect: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 500,
@@ -213,7 +213,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     return () => { s.off('notification.created', handler); };
   }, []);
 
-  const value: RealtimeContextValue = {
+  const value = React.useMemo<RealtimeContextValue>(() => ({
     joinCollection,
     joinCollectionMedia,
     joinUser,
@@ -223,7 +223,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     onNotification,
     socketConnected,
     degraded,
-  };
+  }), [joinCollection, joinCollectionMedia, joinUser, joinComment, onLike, onComment, onNotification, socketConnected, degraded]);
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;
 };

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import FrostedButton from '@/components/ui/FrostedButton';
 import { brandApi } from '../../api/BrandApi';
 import { useCollectionUpload } from '@/components/upload/useCollectionUpload';

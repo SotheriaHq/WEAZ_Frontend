@@ -2,7 +2,7 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { toast } from "react-toastify";
+import { toast } from 'sonner';
 import { Eye, EyeOff, User, Building, Scissors } from "lucide-react";
 import AnimatedBackground from "../lib/Animation";
 import { isAxiosError } from "axios";

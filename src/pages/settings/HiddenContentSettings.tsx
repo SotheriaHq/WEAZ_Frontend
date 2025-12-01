@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Trash2, RefreshCcw, EyeOff } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 export const HiddenContentSettings: React.FC = () => {
   const [hiddenCount, setHiddenCount] = useState(0);

@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '@/store';
 import Modal from '@/components/ui/Modal';
 import { Lock, Mail, Building2, ShieldCheck, AlertTriangle } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 const SecuritySettings: React.FC = () => {
   const { profile } = useSelector((state: RootState) => state.user);

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { useRealtime } from '@/realtime';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import {
   fetchNotifications,
   fetchUnreadCount,
@@ -56,13 +56,13 @@ export function useNotificationsBootstrap() {
       dispatch(
         ingestRealtime({
           id: payload.id,
-            type: payload.type,
-            message: payload.message,
-            createdAt: payload.createdAt,
-            isRead: payload.isRead,
-            actor: payload.actor ?? null,
-            payload: payload.payload ?? undefined,
-            targetUrl: payload.payload?.targetUrl ?? undefined,
+          type: payload.type,
+          message: payload.message,
+          createdAt: payload.createdAt,
+          isRead: payload.isRead,
+          actor: payload.actor ?? null,
+          payload: payload.payload ?? undefined,
+          targetUrl: payload.payload?.targetUrl ?? undefined,
         }),
       );
       // Show toast for real-time notification

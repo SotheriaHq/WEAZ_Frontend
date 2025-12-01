@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import { Eye, EyeOff, Mail, Lock, Heart, Camera, ShoppingBag, Users } from 'lucide-react';
 import { isAxiosError } from 'axios';
 import type { AuthTokensResponse, ApiSuccessPayload } from '../types/auth';

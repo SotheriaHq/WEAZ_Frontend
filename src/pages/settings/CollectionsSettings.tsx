@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import SettingsSidebar from '@/components/settings/SettingsSidebar';
 import { ImageWithFallback } from '@/components/ImageWithFallback';
 

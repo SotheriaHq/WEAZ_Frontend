@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 export type UseFilePickerOptions = {
   accept?: string[];

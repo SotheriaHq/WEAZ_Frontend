@@ -5,7 +5,7 @@ import CommentInput from '@/components/ui/CommentInput';
 import { Smile } from 'lucide-react';
 import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
 import CommentItem from '@/components/comments/CommentItem';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 interface Props {
   collectionId: string;

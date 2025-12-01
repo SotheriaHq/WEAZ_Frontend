@@ -3,7 +3,7 @@ import { Share2 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { CommentsApi } from '@/api/CommentsApi';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import LikeButton from '@/components/ui/LikeButton';
 import CommentInput from '@/components/ui/CommentInput';
 import type { MarketItem } from '@/types/market';

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import Modal from '@/components/ui/Modal';
 import { brandApi } from '@/api/BrandApi';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import TagPicker from '@/components/forms/TagPicker';
 import TagsApi from '@/api/TagsApi';
 

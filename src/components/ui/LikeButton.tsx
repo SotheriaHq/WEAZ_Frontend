@@ -7,7 +7,7 @@ import { ReactionsApi } from '@/api/ReactionsApi';
 import { useRealtime } from '@/realtime';
 import LikerListModal from '@/components/engagement/LikerListModal';
 import { OfflineLikes } from '@/lib/offlineLikes';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 type ContentType = 'COLLECTION' | 'COLLECTION_MEDIA';
 

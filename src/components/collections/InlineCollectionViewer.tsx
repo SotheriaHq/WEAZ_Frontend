@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { brandApi } from '@/api/BrandApi';
 import AccessApi, { type AccessState } from '@/api/AccessApi';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import StackedCarousel, { type CarouselMediaItem } from '@/components/collections/StackedCarousel';
 import CollectionMetadata from '@/components/collections/CollectionMetadata';

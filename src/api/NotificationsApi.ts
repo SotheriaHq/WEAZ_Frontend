@@ -29,4 +29,14 @@ export class NotificationsApi {
     const payload = response.data;
     return (payload?.data ?? payload) as { success: boolean; count: number };
   }
+
+  static async getSettings(): Promise<any> {
+    const response = await apiClient.get('/notifications/settings');
+    return response.data?.data ?? response.data;
+  }
+
+  static async updateSettings(settings: any): Promise<any> {
+    const response = await apiClient.patch('/notifications/settings', settings);
+    return response.data?.data ?? response.data;
+  }
 }

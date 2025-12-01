@@ -1,7 +1,7 @@
 import React from 'react';
 import { Smile } from 'lucide-react';
 import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import type { CommentTarget } from '@/types/comments';
 import { CommentsApi } from '@/api/CommentsApi';
 import { useSelector } from 'react-redux';
