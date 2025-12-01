@@ -86,13 +86,25 @@ const Market: React.FC = () => {
   // Backend now handles category filtering
   const filteredItems = useMemo(() => {
     let result = items;
+    
+    // Client-side category filter (fallback if backend doesn't filter)
+    if (selectedCategory !== 'ALL') {
+      result = result.filter((item) => {
+        // Check if any tag matches the category slug or label (case-insensitive)
+        const categoryTerms = [selectedCategory, selectedCategory.replace('_', ' ')];
+        return item.tags.some((tag) => 
+          categoryTerms.some(term => tag.toLowerCase().includes(term.toLowerCase()))
+        );
+      });
+    }
+
     if (selectedTag) {
       result = result.filter((item) =>
         item.tags.some((tag) => tag.toLowerCase() === selectedTag.toLowerCase()),
       );
     }
     return result;
-  }, [items, selectedTag]);
+  }, [items, selectedTag, selectedCategory]);
 
   const handleViewCollection = (collectionId: string) => {
     navigate(`/collections/${collectionId}`);

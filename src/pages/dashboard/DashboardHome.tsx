@@ -58,6 +58,27 @@ const DashboardHome: React.FC = () => {
     );
   }
 
+  // Fallback for 404 or other errors where overview is missing
+  if (!overview && !loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 text-center animate-in fade-in duration-500">
+        <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-full mb-4">
+          <AlertCircle className="w-8 h-8 text-gray-500 dark:text-gray-400" />
+        </div>
+        <h2 className="text-xl font-semibold mb-2">Dashboard Unavailable</h2>
+        <p className="text-gray-500 dark:text-gray-400 max-w-md mb-6">
+          We couldn't load your dashboard data. This might be because your brand profile is still being set up.
+        </p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg hover:opacity-90 transition-opacity"
+        >
+          Refresh Page
+        </button>
+      </div>
+    );
+  }
+
   const kpis = overview?.kpis || { totalSales: 0, totalOrders: 0, avgOrderValue: 0, pendingOrders: 0 };
   const currency = overview?.currency || 'NGN';
   const formatCurrency = (val: number) => {

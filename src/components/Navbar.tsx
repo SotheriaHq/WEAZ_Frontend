@@ -23,18 +23,16 @@ import NotificationsDropdown from '@/components/notifications/NotificationsDropd
 
 
 interface NavbarProps {
-  isCollapsed?: boolean;
-  onToggleSidebar?: () => void;
   minimal?: boolean; // profile pages: hide center controls
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onToggleSidebar, minimal = false }) => {
+export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   // search focus handled inside SearchField
-  const [showTags, setShowTags] = useState(false);
+  // search focus handled inside SearchField
   const [, setScrolled] = useState(false); // removed scroll usage
   const profileMenuRef = useRef(null);
   const notificationsAnchorRef = useRef<HTMLElement | null>(null);
@@ -143,7 +141,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
             <div className="py-2">
               {user.type === 'BRAND' && (
                 <button
-                  onClick={() => { navigate('/dashboard'); setShowProfileMenu(false); }}
+                  onClick={() => { navigate('/studio'); setShowProfileMenu(false); }}
                   className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3"
                 >
                   <LayoutDashboard className="w-4 h-4" />
@@ -414,23 +412,24 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed: _isCollapsed, onTog
         {/* Center Section: Search - Hidden in minimal mode, centered on desktop */}
         {!minimal && (
           <div className="hidden sm:flex flex-1 justify-center max-w-[720px]">
-            <div className="flex items-center w-full">
-              <SearchField placeholder={translate('searchPlaceholder') || 'Search...'} showFilter={false} className="!flex-none w-full" />
-              <button
-                type="button"
-                className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
-                aria-label="Filter"
-              >
-                <Filter className="w-5 h-5 text-primary" />
-              </button>
-              <button
-                type="button"
-                className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
-                aria-label="Toggle tags"
-                onClick={() => setShowTags(prev => !prev)}
-              >
-                <span className="text-xl leading-none filter drop-shadow-sm hover:scale-110 transition-transform block">🏷️</span>
-              </button>
+            <div className="flex items-center w-full gap-2">
+              <div className="flex-1 flex items-center bg-gray-100 dark:bg-gray-900 rounded-full border border-transparent focus-within:border-gray-300 dark:focus-within:border-gray-700 focus-within:bg-white dark:focus-within:bg-black transition-all duration-200">
+                <div className="pl-4">
+                  <SearchIcon className="w-5 h-5 text-gray-500" />
+                </div>
+                <SearchField 
+                  placeholder={translate('searchPlaceholder') || 'Search designs, brands...'} 
+                  showFilter={false} 
+                  className="!flex-none w-full !bg-transparent !border-none !shadow-none focus:!ring-0" 
+                />
+                <button
+                  type="button"
+                  className="p-3 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-r-full transition-colors border-l border-gray-200 dark:border-gray-800"
+                  aria-label="Filter"
+                >
+                  <Filter className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                </button>
+              </div>
             </div>
           </div>
         )}

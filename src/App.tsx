@@ -3,6 +3,7 @@ import React from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import Market from './pages/Market';
+import MarketPlace from './pages/MarketPlace';
 import SettingsHome from './pages/settings/SettingsHome';
 import CollectionsSettings from './pages/settings/CollectionsSettings';
 import SignupPage from './pages/SignUp';
@@ -22,12 +23,7 @@ import CollectionView from './pages/catalog/CollectionView';
 import DropdownDemo from './pages/ui/DropdownDemo';
 import AcceptInvite from './pages/AcceptInvite';
 import ErrorPage from './pages/ErrorPage';
-import { DashboardLayout } from './components/dashboard/DashboardLayout';
-import DashboardHome from './pages/dashboard/DashboardHome';
-import OrderManagement from './pages/dashboard/OrderManagement';
-import AnalyticsPage from './pages/dashboard/AnalyticsPage';
-import FinancePage from './pages/dashboard/FinancePage';
-import SettingsPage from './pages/dashboard/SettingsPage';
+import StudioHome from './pages/studio/StudioHome';
 import { Navigate } from 'react-router-dom';
 
 const router = createBrowserRouter([
@@ -38,6 +34,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Market /> },
       { path: 'market', element: <Market /> },
+      { path: 'market-place', element: <MarketPlace /> },
   // Route brand profile (visitor or owner) to unified Profile component
   { path: 'brands/:id', element: <Profile /> },
       { path: 'collections/:id', element: <CollectionView /> },
@@ -56,21 +53,19 @@ const router = createBrowserRouter([
     ],
   },
   {
-    path: '/dashboard',
+    path: '/studio',
     element: (
-        <RequireBrand>
-          <DashboardLayout />
-        </RequireBrand>
+      <RequireBrand>
+        <Layout>
+          <StudioHome />
+        </Layout>
+      </RequireBrand>
     ),
     errorElement: <ErrorPage />,
-    children: [
-      { index: true, element: <Navigate to="overview" replace /> },
-      { path: 'overview', element: <DashboardHome /> },
-      { path: 'orders', element: <OrderManagement /> },
-      { path: 'analytics', element: <AnalyticsPage /> },
-      { path: 'finance', element: <FinancePage /> },
-      { path: 'settings', element: <SettingsPage /> },
-    ],
+  },
+  {
+    path: '/dashboard',
+    element: <Navigate to="/studio" replace />,
   },
   {
     path: '/profile',

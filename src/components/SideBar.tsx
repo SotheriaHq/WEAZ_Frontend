@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Home, TrendingUp, Grid3X3, Heart, Tag, Trophy, ChevronDown, Shield, Users, BarChart, Settings, UserCheck, Crown, Search, X, Menu, History, Clock, PlaySquare } from 'lucide-react';
+import React from 'react';
+import { Home, TrendingUp, Grid3X3, Heart, Tag, Trophy, Menu, History, Clock, PlaySquare, BarChart, Settings } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -118,7 +118,8 @@ export const Sidebar: React.FC = () => {
   };
 
   const mainLinks = [
-    { icon: Home, label: 'Market', path: '/market' }, // "Home" maps to Market
+    { icon: Home, label: 'Designs', path: '/market' }, // "Home" maps to Market (Designs)
+    { icon: Tag, label: 'Market', path: '/market-place' }, // New Market placeholder
     { icon: PlaySquare, label: 'Shorts', path: '/shorts' }, // Placeholder
     { icon: Grid3X3, label: 'Subscriptions', path: '/subscriptions' }, // Placeholder
   ];
@@ -219,6 +220,15 @@ export const Sidebar: React.FC = () => {
             {/* Settings Link */}
             {user && (
               <div className="space-y-1 mb-3">
+                {user.type === 'BRAND' && (
+                  <SidebarLink
+                    icon={BarChart}
+                    label="Studio"
+                    active={location.pathname.startsWith('/studio')}
+                    onClick={() => handleLinkClick('/studio')}
+                    isRail={isRail}
+                  />
+                )}
                 <SidebarLink
                   icon={Settings}
                   label="Settings"
