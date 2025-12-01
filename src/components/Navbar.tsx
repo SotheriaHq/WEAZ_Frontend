@@ -396,7 +396,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
               className="inline-flex items-center justify-center p-2 mr-1 sm:mr-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               aria-label="Toggle sidebar"
             >
-              <Menu className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+              <span className="text-xl">🍔</span>
             </button>
           )}
 
@@ -411,25 +411,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
 
         {/* Center Section: Search - Hidden in minimal mode, centered on desktop */}
         {!minimal && (
-          <div className="hidden sm:flex flex-1 justify-center max-w-[720px]">
+          <div className="hidden sm:flex flex-1 justify-center px-6">
             <div className="flex items-center w-full gap-2">
-              <div className="flex-1 flex items-center bg-gray-100 dark:bg-gray-900 rounded-full border border-transparent focus-within:border-gray-300 dark:focus-within:border-gray-700 focus-within:bg-white dark:focus-within:bg-black transition-all duration-200">
-                <div className="pl-4">
-                  <SearchIcon className="w-5 h-5 text-gray-500" />
-                </div>
-                <SearchField 
-                  placeholder={translate('searchPlaceholder') || 'Search designs, brands...'} 
-                  showFilter={false} 
-                  className="!flex-none w-full !bg-transparent !border-none !shadow-none focus:!ring-0" 
-                />
-                <button
-                  type="button"
-                  className="p-3 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-r-full transition-colors border-l border-gray-200 dark:border-gray-800"
-                  aria-label="Filter"
-                >
-                  <Filter className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                </button>
-              </div>
+              <SearchField 
+                placeholder={translate('searchPlaceholder') || 'Search designs, brands...'} 
+                showFilter={true} 
+                className="!flex-1" 
+              />
             </div>
           </div>
         )}
@@ -452,7 +440,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                 onClick={() => setShowNotifications((p) => !p)}
                 className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
               >
-                <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <span className="text-xl">🔔</span>
                 {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white px-1">
                     {unreadCount > 99 ? '99+' : unreadCount}

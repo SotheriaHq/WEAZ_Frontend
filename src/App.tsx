@@ -56,9 +56,7 @@ const router = createBrowserRouter([
     path: '/studio',
     element: (
       <RequireBrand>
-        <Layout>
-          <StudioHome />
-        </Layout>
+        <StudioHome />
       </RequireBrand>
     ),
     errorElement: <ErrorPage />,
