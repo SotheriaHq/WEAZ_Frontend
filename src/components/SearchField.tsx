@@ -46,7 +46,7 @@ const SearchField: React.FC<SearchFieldProps> = ({ placeholder = 'Search...', on
             onSearch?.(e.target.value);
           }}
           placeholder={placeholder}
-          className="w-full bg-transparent outline-none border-0 focus:ring-0 text-sm placeholder:text-gray-500"
+          className="w-full bg-transparent outline-none border-0 focus:ring-0 text-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 caret-primary"
         />
         {showFilter && (
           <Dropdown placement="bottom-end">

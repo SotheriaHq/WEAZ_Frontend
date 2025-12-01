@@ -126,13 +126,12 @@ export const Sidebar: React.FC = () => {
   const youLinks = [
     { emoji: '🕒', label: 'History', path: '/history' },
     { emoji: '⏰', label: 'Watch Later', path: '/watch-later' },
-    { emoji: '❤️', label: 'Liked Videos', path: '/liked' },
+    // Removed Liked Videos
   ];
 
   const exploreLinks = [
     { emoji: '📈', label: 'Trending', path: '/trending' },
-    { emoji: '👗', label: 'Fashion', path: '/fashion' },
-    { emoji: '🏆', label: 'Awards', path: '/awards' },
+    // Removed Fashion, Awards
   ];
 
   // Hide Rail in Studio (only show if open/overlay)

@@ -91,10 +91,15 @@ const Market: React.FC = () => {
     if (selectedCategory !== 'ALL') {
       result = result.filter((item) => {
         // Check if any tag matches the category slug or label (case-insensitive)
+        // Also check if the item has a category property that matches
         const categoryTerms = [selectedCategory, selectedCategory.replace('_', ' ')];
-        return item.tags.some((tag) => 
+        const hasMatchingTag = item.tags.some((tag) => 
           categoryTerms.some(term => tag.toLowerCase().includes(term.toLowerCase()))
         );
+        // If item has a category field, check that too (assuming item.category exists or similar)
+        const hasMatchingCategory = (item as any).category === selectedCategory;
+        
+        return hasMatchingTag || hasMatchingCategory;
       });
     }
 
@@ -213,20 +218,25 @@ const Market: React.FC = () => {
           </FrostedButton>
         </section>
       ) : (
-        // Category-specific empty state (show Clear filter only when not ALL)
-        <section className="glass-panel border border-white/40 bg-white/60 px-6 py-16 text-center backdrop-blur-xl dark:border-white/10 dark:bg-[#0f0f0f]/50">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Nothing in this category yet</h2>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-300">Change or clear the category filter, or check back later.</p>
+        // Category-specific empty state (Redesigned)
+        <section className="flex flex-col items-center justify-center py-20 px-4 text-center">
+          <div className="w-24 h-24 mb-6 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center">
+             <span className="text-4xl">🛍️</span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">No items in {selectedCategory.replace('_', ' ')}</h2>
+          <p className="text-gray-500 dark:text-gray-400 max-w-md mb-8">
+            We couldn't find any designs matching this category. Try exploring other categories or check back later for new arrivals.
+          </p>
           <FrostedButton
             variant="primary"
-            size="sm"
-            className="mt-4"
+            size="md"
+            className="px-8"
             onClick={() => {
               setSelectedCategory('ALL');
               setSelectedTag(null);
             }}
           >
-            Clear filter
+            View All Designs
           </FrostedButton>
         </section>
       )}
