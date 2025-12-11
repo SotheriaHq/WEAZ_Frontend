@@ -290,10 +290,16 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[#0a0a0a] text-white font-sans antialiased overflow-x-hidden">
+    <div className="min-h-screen w-full bg-[var(--surface-primary)] text-[var(--text-primary)] font-sans antialiased overflow-x-hidden">
       {/* Background Elements */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-900/20 via-[#0a0a0a] to-[#0a0a0a]"></div>
+        <div
+          className="absolute top-0 left-0 w-full h-full"
+          style={{
+            background:
+              'radial-gradient(ellipse at top right, rgba(var(--brand-primary-rgb),0.25), var(--surface-primary))',
+          }}
+        ></div>
         <div className="auth-particle w-96 h-96 top-[-10%] right-[-5%] opacity-30 animate-pulse-slow absolute"></div>
         <div className="auth-particle w-64 h-64 bottom-[10%] left-[40%] opacity-20 animate-float absolute" style={{ animationDelay: '1s' }}></div>
       </div>
@@ -308,17 +314,17 @@ const LoginPage = () => {
               alt="Fashion Model" 
               className="w-full h-full object-cover opacity-60"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a]/90 via-[#0a0a0a]/40 to-transparent"></div>
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-[color:var(--surface-primary)]/90 via-[color:var(--surface-primary)]/40 to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--surface-primary)] via-transparent to-transparent"></div>
           </div>
 
           {/* Logo */}
           <div className="relative z-10">
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center text-[#0a0a0a] font-serif font-bold text-2xl shadow-[0_0_15px_rgba(212,175,55,0.5)]">
+              <div className="w-10 h-10 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-2xl shadow-[0_0_15px_rgba(212,175,55,0.4)]">
                 T
               </div>
-              <span className="text-2xl font-serif font-bold tracking-wide text-white group-hover:text-[#D4AF37] transition-colors">
+              <span className="text-2xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors">
                 Threadly
               </span>
             </Link>
@@ -326,18 +332,18 @@ const LoginPage = () => {
 
           {/* Quote */}
           <div className="relative z-10 max-w-lg mt-auto mb-12 animate-float">
-            <div className="w-16 h-1 bg-[#D4AF37] mb-6"></div>
-            <h2 className="text-4xl md:text-5xl font-serif font-medium leading-tight text-white mb-6">
+            <div className="w-16 h-1 bg-[var(--brand-accent)] mb-6"></div>
+            <h2 className="text-4xl md:text-5xl font-serif font-medium leading-tight text-[var(--text-primary)] dark:text-white mb-6">
               "Fashion is the armor to survive the reality of everyday life."
             </h2>
-            <p className="text-[#D4AF37]/80 font-medium tracking-widest uppercase text-sm">— Bill Cunningham</p>
+            <p className="text-[var(--brand-accent)]/80 font-medium tracking-widest uppercase text-sm">— Bill Cunningham</p>
           </div>
 
           {/* Footer Links */}
-          <div className="relative z-10 flex gap-6 text-sm text-gray-400">
-            <Link to="/about" className="hover:text-[#D4AF37] transition-colors">About Us</Link>
-            <Link to="/collections" className="hover:text-[#D4AF37] transition-colors">Collection</Link>
-            <Link to="/contact" className="hover:text-[#D4AF37] transition-colors">Contact</Link>
+          <div className="relative z-10 flex gap-6 text-sm text-[var(--text-secondary)] dark:text-gray-400">
+            <Link to="/about" className="hover:text-[var(--brand-accent)] transition-colors">About Us</Link>
+            <Link to="/collections" className="hover:text-[var(--brand-accent)] transition-colors">Collection</Link>
+            <Link to="/contact" className="hover:text-[var(--brand-accent)] transition-colors">Contact</Link>
           </div>
         </div>
 
@@ -345,18 +351,18 @@ const LoginPage = () => {
         <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12 relative z-10">
           {/* Mobile Logo */}
           <div className="lg:hidden absolute top-8 left-8 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#D4AF37] flex items-center justify-center text-[#0a0a0a] font-serif font-bold text-lg">
+            <div className="w-8 h-8 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-lg">
               T
             </div>
-            <span className="text-xl font-serif font-bold tracking-wide text-white">Threadly</span>
+            <span className="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white">Threadly</span>
           </div>
 
           <div className="w-full max-w-md mt-16 lg:mt-0">
             {/* Login Card - Brighter glass panel */}
             <div className="auth-glass-panel rounded-2xl p-8 sm:p-10 w-full">
               <div className="text-center mb-8">
-                <h1 className="text-3xl font-serif font-bold text-white mb-2">Welcome Back</h1>
-                <p className="text-gray-400 text-sm">Enter your details to access your personal wardrobe.</p>
+                <h1 className="text-3xl font-serif font-bold text-[var(--text-primary)] dark:text-white mb-2">Welcome Back</h1>
+                <p className="text-[var(--text-secondary)] dark:text-gray-400 text-sm">Enter your details to access your personal wardrobe.</p>
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

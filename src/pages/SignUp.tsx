@@ -121,20 +121,20 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 // Loading Component
 const LoadingScreen = () => (
-  <div className="fixed inset-0 bg-brand-dark flex items-center justify-center z-50">
+  <div className="fixed inset-0 bg-[var(--surface-primary)] text-[var(--text-primary)] dark:bg-[var(--surface-primary)] flex items-center justify-center z-50">
     <div className="text-center">
       <div className="flex items-center justify-center gap-3 mb-6">
         <div className="w-12 h-12 rounded-full bg-brand-gold flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.5)]">
-          <span className="font-serif text-2xl font-bold text-[#0a0a0a]">T</span>
+          <span className="font-serif text-2xl font-bold text-[var(--surface-primary)]">T</span>
         </div>
-        <span className="text-3xl font-serif font-bold text-white">Threadly</span>
+        <span className="text-3xl font-serif font-bold text-[var(--text-primary)] dark:text-white">Threadly</span>
       </div>
       <div className="flex space-x-2 justify-center mb-4">
-        <div className="w-3 h-3 bg-[#6B21A8] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-        <div className="w-3 h-3 bg-[#D4AF37] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-        <div className="w-3 h-3 bg-[#6B21A8] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+        <div className="w-3 h-3 bg-[var(--brand-primary-strong)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+        <div className="w-3 h-3 bg-[var(--brand-accent)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+        <div className="w-3 h-3 bg-[var(--brand-primary-strong)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
       </div>
-      <p className="text-gray-400 text-lg">Creating your fashion journey...</p>
+      <p className="text-[var(--text-secondary)] dark:text-gray-400 text-lg">Creating your fashion journey...</p>
     </div>
   </div>
 );
@@ -274,10 +274,16 @@ const SignUpPage = () => {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[#0a0a0a] text-white font-sans antialiased overflow-x-hidden">
+    <div className="min-h-screen w-full bg-[var(--surface-primary)] text-[var(--text-primary)] font-sans antialiased overflow-x-hidden">
       {/* Background Elements */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-purple-900/20 via-[#0a0a0a] to-[#0a0a0a]"></div>
+        <div
+          className="absolute top-0 left-0 w-full h-full"
+          style={{
+            background:
+              'radial-gradient(ellipse at top left, rgba(var(--brand-primary-rgb),0.25), var(--surface-primary))',
+          }}
+        ></div>
         <div className="auth-particle w-96 h-96 bottom-[-10%] left-[-5%] opacity-30 animate-pulse-slow absolute"></div>
         <div className="auth-particle w-64 h-64 top-[20%] right-[30%] opacity-20 animate-float absolute" style={{ animationDelay: '2s' }}></div>
       </div>
@@ -286,15 +292,15 @@ const SignUpPage = () => {
         {/* Left Side: Brand & Value Props */}
         <div className="hidden lg:flex lg:w-1/2 relative z-10 flex-col justify-between p-12 overflow-hidden">
           {/* Background Gradient */}
-          <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#6B21A8]/20 via-[#0a0a0a] to-[#0a0a0a]"></div>
+          <div className="absolute inset-0 z-0 bg-gradient-to-br from-[rgba(var(--brand-primary-strong-rgb),0.22)] via-[color:var(--surface-primary)] to-[color:var(--surface-primary)]"></div>
 
           {/* Logo */}
           <div className="relative z-10">
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center text-[#0a0a0a] font-serif font-bold text-2xl shadow-[0_0_15px_rgba(212,175,55,0.5)]">
+              <div className="w-10 h-10 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-2xl shadow-[0_0_15px_rgba(212,175,55,0.4)]">
                 T
               </div>
-              <span className="text-2xl font-serif font-bold tracking-wide text-white group-hover:text-[#D4AF37] transition-colors">
+              <span className="text-2xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors">
                 Threadly
               </span>
             </Link>
@@ -302,53 +308,53 @@ const SignUpPage = () => {
 
           {/* Hero Content */}
           <div className="relative z-10 max-w-lg">
-            <div className="w-16 h-1 bg-[#D4AF37] mb-6"></div>
-            <h2 className="text-4xl md:text-5xl font-serif font-medium leading-tight text-white mb-6">
+            <div className="w-16 h-1 bg-[var(--brand-accent)] mb-6"></div>
+            <h2 className="text-4xl md:text-5xl font-serif font-medium leading-tight text-[var(--text-primary)] dark:text-white mb-6">
               Join the Fashion Revolution
             </h2>
-            <p className="text-gray-400 text-lg mb-12">
+            <p className="text-[var(--text-secondary)] dark:text-gray-300 text-lg mb-12">
               Connect with independent designers, discover unique pieces, and build your personal style collection.
             </p>
 
             {/* Value Props */}
             <div className="space-y-6">
               <div className="flex items-start gap-4 group">
-                <div className="w-12 h-12 rounded-xl bg-[#6B21A8]/20 border border-[#6B21A8]/30 flex items-center justify-center flex-shrink-0 group-hover:bg-[#6B21A8]/30 transition-colors">
-                  <Sparkles className="w-5 h-5 text-[#D4AF37]" />
+                  <div className="w-12 h-12 rounded-xl bg-[rgba(var(--brand-primary-strong-rgb),0.15)] border border-[rgba(var(--brand-primary-strong-rgb),0.28)] flex items-center justify-center flex-shrink-0 group-hover:bg-[rgba(var(--brand-primary-strong-rgb),0.25)] transition-colors">
+                    <Sparkles className="w-5 h-5 text-[var(--brand-accent)]" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-[var(--text-primary)] dark:text-white mb-1">Discover Unique Designs</h3>
+                    <p className="text-[var(--text-secondary)] dark:text-gray-400 text-sm">Access exclusive collections from emerging fashion talents worldwide.</p>
+                  </div>
+                </div>
+
+              <div className="flex items-start gap-4 group">
+                <div className="w-12 h-12 rounded-xl bg-[rgba(var(--brand-primary-strong-rgb),0.15)] border border-[rgba(var(--brand-primary-strong-rgb),0.28)] flex items-center justify-center flex-shrink-0 group-hover:bg-[rgba(var(--brand-primary-strong-rgb),0.25)] transition-colors">
+                  <Heart className="w-5 h-5 text-[var(--brand-accent)]" />
                 </div>
                 <div>
-                  <h3 className="font-medium text-white mb-1">Discover Unique Designs</h3>
-                  <p className="text-gray-500 text-sm">Access exclusive collections from emerging fashion talents worldwide.</p>
+                  <h3 className="font-medium text-[var(--text-primary)] dark:text-white mb-1">Support Independent Designers</h3>
+                  <p className="text-[var(--text-secondary)] dark:text-gray-400 text-sm">Directly connect with and support the creators you love.</p>
                 </div>
               </div>
 
               <div className="flex items-start gap-4 group">
-                <div className="w-12 h-12 rounded-xl bg-[#6B21A8]/20 border border-[#6B21A8]/30 flex items-center justify-center flex-shrink-0 group-hover:bg-[#6B21A8]/30 transition-colors">
-                  <Heart className="w-5 h-5 text-[#D4AF37]" />
+                <div className="w-12 h-12 rounded-xl bg-[rgba(var(--brand-primary-strong-rgb),0.15)] border border-[rgba(var(--brand-primary-strong-rgb),0.28)] flex items-center justify-center flex-shrink-0 group-hover:bg-[rgba(var(--brand-primary-strong-rgb),0.25)] transition-colors">
+                  <Palette className="w-5 h-5 text-[var(--brand-accent)]" />
                 </div>
                 <div>
-                  <h3 className="font-medium text-white mb-1">Support Independent Designers</h3>
-                  <p className="text-gray-500 text-sm">Directly connect with and support the creators you love.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4 group">
-                <div className="w-12 h-12 rounded-xl bg-[#6B21A8]/20 border border-[#6B21A8]/30 flex items-center justify-center flex-shrink-0 group-hover:bg-[#6B21A8]/30 transition-colors">
-                  <Palette className="w-5 h-5 text-[#D4AF37]" />
-                </div>
-                <div>
-                  <h3 className="font-medium text-white mb-1">Curate Your Style</h3>
-                  <p className="text-gray-500 text-sm">Build collections that reflect your unique aesthetic vision.</p>
+                  <h3 className="font-medium text-[var(--text-primary)] dark:text-white mb-1">Curate Your Style</h3>
+                  <p className="text-[var(--text-secondary)] dark:text-gray-400 text-sm">Build collections that reflect your unique aesthetic vision.</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Footer Links */}
-          <div className="relative z-10 flex gap-6 text-sm text-gray-400">
-            <Link to="/about" className="hover:text-[#D4AF37] transition-colors">About Us</Link>
-            <Link to="/collections" className="hover:text-[#D4AF37] transition-colors">Collection</Link>
-            <Link to="/contact" className="hover:text-[#D4AF37] transition-colors">Contact</Link>
+          <div className="relative z-10 flex gap-6 text-sm text-[var(--text-secondary)] dark:text-gray-400">
+            <Link to="/about" className="hover:text-[var(--brand-accent)] transition-colors">About Us</Link>
+            <Link to="/collections" className="hover:text-[var(--brand-accent)] transition-colors">Collection</Link>
+            <Link to="/contact" className="hover:text-[var(--brand-accent)] transition-colors">Contact</Link>
           </div>
         </div>
 
@@ -356,36 +362,24 @@ const SignUpPage = () => {
         <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12 relative z-10">
           {/* Mobile Logo */}
           <div className="lg:hidden absolute top-8 left-8 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#D4AF37] flex items-center justify-center text-[#0a0a0a] font-serif font-bold text-lg">
+            <div className="w-8 h-8 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-lg">
               T
             </div>
-            <span className="text-xl font-serif font-bold tracking-wide text-white">Threadly</span>
+            <span className="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white">Threadly</span>
           </div>
 
           <div className="w-full max-w-md mt-16 lg:mt-0">
             {/* Sign Up Card - Brighter glass panel */}
             <div className="auth-glass-panel rounded-2xl p-8 sm:p-10 w-full">
-              {/* Step Indicator */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-[#6B21A8] flex items-center justify-center text-white text-sm font-medium">1</div>
-                  <div className="w-12 h-0.5 bg-white/10"></div>
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-500 text-sm font-medium">2</div>
-                  <div className="w-12 h-0.5 bg-white/10"></div>
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-500 text-sm font-medium">3</div>
-                </div>
-                <span className="text-xs text-gray-500">Step 1 of 3</span>
-              </div>
-
-              <div className="text-center mb-6">
-                <h1 className="text-3xl font-serif font-bold text-white mb-2">Create Account</h1>
-                <p className="text-gray-400 text-sm">Start your fashion journey with Threadly.</p>
+              <div className="text-center mb-8">
+                <h1 className="text-3xl font-serif font-bold text-[var(--text-primary)] dark:text-white mb-2">Create Account</h1>
+                <p className="text-[var(--text-secondary)] dark:text-gray-400 text-sm">Start your fashion journey with Threadly.</p>
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 {/* User Type Selection */}
                 <div className="space-y-3">
-                  <label className="text-xs font-medium text-gray-300 uppercase tracking-wider ml-1">
+                  <label className="text-xs font-medium text-[var(--text-secondary)] dark:text-gray-300 uppercase tracking-wider ml-1">
                     I am a...
                   </label>
                   <div className="grid grid-cols-2 gap-3">
@@ -396,11 +390,11 @@ const SignUpPage = () => {
                         watchUserType === 'REGULAR' ? 'active' : ''
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-lg bg-[#6B21A8]/20 flex items-center justify-center mb-3">
-                        <ShoppingBag className="w-5 h-5 text-[#D4AF37]" />
+                      <div className="w-10 h-10 rounded-lg bg-[rgba(var(--brand-primary-strong-rgb),0.18)] flex items-center justify-center mb-3">
+                        <ShoppingBag className="w-5 h-5 text-[var(--brand-accent)]" />
                       </div>
-                      <span className="font-medium text-white text-sm">Fashion Lover</span>
-                      <p className="text-xs text-gray-500 mt-1">Discover & collect</p>
+                      <span className="font-medium text-[var(--text-primary)] dark:text-white text-sm">Fashion Lover</span>
+                      <p className="text-xs text-[var(--text-secondary)] dark:text-gray-400 mt-1">Discover & collect</p>
                     </button>
                     <button
                       type="button"
@@ -409,11 +403,11 @@ const SignUpPage = () => {
                         watchUserType === 'BRAND' ? 'active' : ''
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-lg bg-[#6B21A8]/20 flex items-center justify-center mb-3">
-                        <Scissors className="w-5 h-5 text-[#D4AF37]" />
+                      <div className="w-10 h-10 rounded-lg bg-[rgba(var(--brand-primary-strong-rgb),0.18)] flex items-center justify-center mb-3">
+                        <Scissors className="w-5 h-5 text-[var(--brand-accent)]" />
                       </div>
-                      <span className="font-medium text-white text-sm">Fashion Brand</span>
-                      <p className="text-xs text-gray-500 mt-1">Sell & showcase</p>
+                      <span className="font-medium text-[var(--text-primary)] dark:text-white text-sm">Fashion Brand</span>
+                      <p className="text-xs text-[var(--text-secondary)] dark:text-gray-400 mt-1">Sell & showcase</p>
                     </button>
                   </div>
                   {errors.userType && <p className="text-sm text-red-400 ml-1">{errors.userType.message}</p>}

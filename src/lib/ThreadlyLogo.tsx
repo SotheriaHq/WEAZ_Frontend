@@ -40,8 +40,8 @@ const voguelyLogo = ({ size = 40, className = "" }) => {
             <stop offset="100%" stopColor="#D2B48C" />
           </linearGradient>
           <linearGradient id="threadGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#3B82F6" />
-            <stop offset="100%" stopColor="#8B5CF6" />
+            <stop offset="0%" stopColor="var(--brand-primary)" />
+            <stop offset="100%" stopColor="var(--brand-primary-strong)" />
           </linearGradient>
           <linearGradient id="needleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#E5E7EB" />

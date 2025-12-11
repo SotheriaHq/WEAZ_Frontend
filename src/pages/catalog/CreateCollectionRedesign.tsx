@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { 
   FiArrowLeft, FiHelpCircle, FiTrash2, FiStar, FiMove, FiMaximize2,
-  FiChevronDown, FiChevronUp, FiInfo, FiSearch, FiX,
-  FiFile
+  FiChevronDown, FiChevronUp, FiInfo, FiSearch, FiX, FiFile,
+  FiChevronLeft, FiChevronRight, FiZoomIn, FiZoomOut
 } from 'react-icons/fi';
 import { HiOutlineSparkles } from 'react-icons/hi';
 
@@ -63,12 +63,16 @@ const CreateCollectionInner: React.FC = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [coverIndex, setCoverIndex] = useState(0);
   const [showPublishModal, setShowPublishModal] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
+  const [fullscreenZoom, setFullscreenZoom] = useState(1);
   const [expandedSections, setExpandedSections] = useState({
     details: true,
     pricing: false,
     targeting: false,
   });
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [previewAspect, setPreviewAspect] = useState(4 / 3);
 
   // Track original items for deletion in edit mode
   const originalItemIds = useRef<Set<string>>(new Set());
@@ -155,25 +159,59 @@ const CreateCollectionInner: React.FC = () => {
   // Validation
   const isValid = title.trim().length > 0 && files.length > 0 && selectedTags.length > 0;
 
-  // Get current selected file for main preview
-  const selectedFile = useMemo(() => {
-    if (files.length === 0) return null;
-    const item = files[selectedIndex];
+  const resolveMediaWithUrl = useCallback((item?: MediaItem | null) => {
     if (!item) return null;
     let url = item.previewUrl;
     if (!url && item.file) {
       url = URL.createObjectURL(item.file);
     }
-    return { ...item, url };
-  }, [files, selectedIndex]);
+    return url ? { ...item, url } : null;
+  }, []);
+
+  // Get current selected file for main preview
+  const selectedFile = useMemo(() => {
+    if (files.length === 0) return null;
+    return resolveMediaWithUrl(files[selectedIndex]);
+  }, [files, selectedIndex, resolveMediaWithUrl]);
+
+  // Keep preview aspect ratio aligned with the selected asset to avoid layout jumps
+  useEffect(() => {
+    if (!selectedFile?.url) return;
+
+    if (selectedFile.kind === 'video') {
+      const video = document.createElement('video');
+      video.src = selectedFile.url;
+      const handleLoaded = () => {
+        if (video.videoWidth && video.videoHeight) {
+          setPreviewAspect(video.videoWidth / video.videoHeight);
+        }
+      };
+      video.addEventListener('loadedmetadata', handleLoaded);
+      return () => video.removeEventListener('loadedmetadata', handleLoaded);
+    }
+
+    const img = new Image();
+    img.src = selectedFile.url;
+    img.onload = () => {
+      if (img.naturalWidth && img.naturalHeight) {
+        setPreviewAspect(img.naturalWidth / img.naturalHeight);
+      }
+    };
+  }, [selectedFile?.url, selectedFile?.kind]);
 
   // Get cover image URL for modal
   const coverImageUrl = useMemo(() => {
     if (files.length === 0) return undefined;
     const item = files[coverIndex];
     if (!item) return undefined;
-    return item.previewUrl || (item.file ? URL.createObjectURL(item.file) : undefined);
-  }, [files, coverIndex]);
+    const withUrl = resolveMediaWithUrl(item);
+    return withUrl?.url;
+  }, [files, coverIndex, resolveMediaWithUrl]);
+
+  const fullscreenFile = useMemo(() => {
+    if (fullscreenIndex === null) return null;
+    return resolveMediaWithUrl(files[fullscreenIndex]);
+  }, [files, fullscreenIndex, resolveMediaWithUrl]);
 
   // Filter tag suggestions based on search
   const filteredSuggestions = useMemo(() => {
@@ -196,6 +234,62 @@ const CreateCollectionInner: React.FC = () => {
     setCoverIndex(index);
     toast.success('Cover image updated');
   };
+
+  const goToMediaIndex = useCallback(
+    (nextIndex: number) => {
+      if (!files.length) return;
+      const bounded = Math.min(Math.max(nextIndex, 0), files.length - 1);
+      setSelectedIndex(bounded);
+      setFullscreenIndex(bounded);
+      setFullscreenZoom(1);
+    },
+    [files.length]
+  );
+
+  const openFullscreen = useCallback(() => {
+    goToMediaIndex(selectedIndex);
+    setIsFullscreen(true);
+  }, [goToMediaIndex, selectedIndex]);
+
+  const closeFullscreen = useCallback(() => {
+    setIsFullscreen(false);
+    setFullscreenIndex(null);
+    setFullscreenZoom(1);
+  }, []);
+
+  const handleFullscreenPrev = useCallback(() => {
+    goToMediaIndex((fullscreenIndex ?? selectedIndex) - 1);
+  }, [fullscreenIndex, goToMediaIndex, selectedIndex]);
+
+  const handleFullscreenNext = useCallback(() => {
+    goToMediaIndex((fullscreenIndex ?? selectedIndex) + 1);
+  }, [fullscreenIndex, goToMediaIndex, selectedIndex]);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeFullscreen();
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        handleFullscreenNext();
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        handleFullscreenPrev();
+      }
+    };
+
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [closeFullscreen, handleFullscreenNext, handleFullscreenPrev, isFullscreen]);
+
+  useEffect(() => {
+    if (isFullscreen && (fullscreenIndex === null || !files[fullscreenIndex])) {
+      closeFullscreen();
+    }
+  }, [closeFullscreen, files, fullscreenIndex, isFullscreen]);
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -356,9 +450,9 @@ const CreateCollectionInner: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-40 glass-panel-dark border-b border-white/10">
+      <header className="sticky top-0 z-40 glass-panel border-b border-gray-200 dark:border-white/10">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <button
             type="button"
@@ -420,23 +514,37 @@ const CreateCollectionInner: React.FC = () => {
           ) : (
             <div className="space-y-4">
               {/* Main Preview */}
-              <div className="rounded-2xl glass-light border border-white/10 overflow-hidden">
-                <div className="relative bg-black/50 flex items-center justify-center" style={{ minHeight: '400px', maxHeight: '600px' }}>
-                  {selectedFile && (
-                    selectedFile.kind === 'video' ? (
-                      <video
-                        src={selectedFile.url}
-                        controls
-                        className="max-h-[600px] max-w-full object-contain"
-                      />
-                    ) : (
-                      <img
-                        src={selectedFile.url}
-                        alt={selectedFile.file?.name || 'Preview'}
-                        className="max-h-[600px] max-w-full object-contain"
-                      />
-                    )
-                  )}
+              <div className="rounded-2xl glass-light border border-white/10 overflow-hidden bg-gradient-to-b from-[var(--surface-secondary)]/80 to-[var(--surface-primary)] dark:from-gray-900/70 dark:to-gray-950">
+                <div
+                  className="relative w-full h-full flex items-center justify-center"
+                  style={{ aspectRatio: previewAspect || 4 / 3, minHeight: '360px' }}
+                >
+                  <AnimatePresence mode="wait">
+                    {selectedFile && (
+                      <motion.div
+                        key={selectedFile.id || selectedFile.url}
+                        className="w-full h-full flex items-center justify-center"
+                        initial={{ opacity: 0.6, scale: 0.99 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.99 }}
+                        transition={{ duration: 0.25 }}
+                      >
+                        {selectedFile.kind === 'video' ? (
+                          <video
+                            src={selectedFile.url}
+                            controls
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <img
+                            src={selectedFile.url}
+                            alt={selectedFile.file?.name || 'Preview'}
+                            className="w-full h-full object-contain"
+                          />
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {/* Floating Action Bar */}
                   <div className="absolute bottom-0 left-0 right-0 glass-panel-dark border-t border-white/10 px-4 py-3">
@@ -463,8 +571,7 @@ const CreateCollectionInner: React.FC = () => {
                       <ActionButton
                         icon={<FiMaximize2 className="w-4 h-4" />}
                         label="Fullscreen"
-                        onClick={() => {}}
-                        disabled
+                        onClick={openFullscreen}
                       />
                     </div>
                   </div>
@@ -774,15 +881,13 @@ const CreateCollectionInner: React.FC = () => {
         </div>
       </main>
 
-      {/* Sticky Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 z-40 glass-panel-dark border-t border-white/10">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="hidden sm:block">
-            <p className="text-sm text-gray-400">
-              {lastSaved
-                ? `Collection saved locally • Last edit: ${formatTimeAgo(lastSaved)}`
-                : 'Unsaved changes'}
-            </p>
+      {/* Actions Footer - Integrated into flow */}
+      <div className="max-w-5xl mx-auto px-4 pb-12">
+        <div className="glass-panel border border-gray-200 dark:border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {lastSaved
+              ? `Collection saved locally • Last edit: ${formatTimeAgo(lastSaved)}`
+              : 'Unsaved changes'}
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
             <button
@@ -805,8 +910,9 @@ const CreateCollectionInner: React.FC = () => {
             </button>
           </div>
         </div>
-      </footer>
+      </div>
 
+      {/* Pre-Publish Modal */}
       {/* Pre-Publish Modal */}
       <PrePublishConfirmModal
         isOpen={showPublishModal}
@@ -815,6 +921,122 @@ const CreateCollectionInner: React.FC = () => {
         onEdit={() => setShowPublishModal(false)}
         summary={collectionSummary}
       />
+
+      {/* Fullscreen Modal */}
+      <AnimatePresence>
+        {isFullscreen && fullscreenFile && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={closeFullscreen}
+          >
+            <div className="absolute top-4 right-4 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <button
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                onClick={closeFullscreen}
+                aria-label="Close fullscreen"
+              >
+                <FiX className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="relative w-full h-full max-w-6xl flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between gap-3 text-white">
+                <div className="flex items-center gap-2">
+                  <button
+                    className="p-2 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-40"
+                    onClick={handleFullscreenPrev}
+                    disabled={(fullscreenIndex ?? selectedIndex) <= 0}
+                    aria-label="Previous media"
+                  >
+                    <FiChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    className="p-2 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-40"
+                    onClick={handleFullscreenNext}
+                    disabled={(fullscreenIndex ?? selectedIndex) >= files.length - 1}
+                    aria-label="Next media"
+                  >
+                    <FiChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    className="px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm flex items-center gap-1 disabled:opacity-50"
+                    onClick={() => setFullscreenZoom((z) => Math.max(1, +(z - 0.25).toFixed(2)))}
+                    disabled={fullscreenZoom <= 1}
+                  >
+                    <FiZoomOut className="w-4 h-4" />
+                    <span>Zoom out</span>
+                  </button>
+                  <button
+                    className="px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm flex items-center gap-1"
+                    onClick={() => setFullscreenZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
+                  >
+                    <FiZoomIn className="w-4 h-4" />
+                    <span>Zoom in</span>
+                  </button>
+                  <button
+                    className="px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm"
+                    onClick={() => setFullscreenZoom(1)}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              <div className="relative flex-1 min-h-[320px] flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-b from-gray-900/80 to-black border border-white/10 shadow-2xl">
+                <button
+                  className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-40"
+                  onClick={handleFullscreenPrev}
+                  disabled={(fullscreenIndex ?? selectedIndex) <= 0}
+                  aria-label="Previous"
+                >
+                  <FiChevronLeft className="w-5 h-5" />
+                </button>
+
+                {fullscreenFile.kind === 'video' ? (
+                  <video
+                    src={fullscreenFile.url}
+                    controls
+                    className="max-w-full max-h-full object-contain"
+                    style={{ transform: `scale(${fullscreenZoom})`, transition: 'transform 0.2s ease' }}
+                  />
+                ) : (
+                  <img
+                    src={fullscreenFile.url}
+                    alt="Fullscreen preview"
+                    className="max-w-full max-h-full object-contain"
+                    style={{ transform: `scale(${fullscreenZoom})`, transition: 'transform 0.2s ease' }}
+                    onDoubleClick={() => setFullscreenZoom((z) => (z > 1 ? 1 : 2))}
+                  />
+                )}
+
+                <button
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-40"
+                  onClick={handleFullscreenNext}
+                  disabled={(fullscreenIndex ?? selectedIndex) >= files.length - 1}
+                  aria-label="Next"
+                >
+                  <FiChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="text-center text-sm text-white/70">
+                {files.length > 0 && (
+                  <span>
+                    Image {(fullscreenIndex ?? selectedIndex) + 1} of {files.length}
+                    {fullscreenFile.file?.name ? ` • ${fullscreenFile.file.name}` : ''}
+                  </span>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -833,7 +1055,7 @@ const FormSection: React.FC<{
   onToggle: () => void;
   children: React.ReactNode;
 }> = ({ title, icon, isOpen, onToggle, children }) => (
-  <div className="rounded-2xl glass-panel-dark border border-white/10 overflow-hidden">
+  <div className="rounded-2xl glass-panel border border-gray-200 dark:border-white/10 overflow-hidden">
     <button
       type="button"
       onClick={onToggle}
@@ -843,12 +1065,12 @@ const FormSection: React.FC<{
         <span className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center text-lg">
           {icon}
         </span>
-        <span className="text-lg font-semibold text-white">{title}</span>
+        <span className="text-lg font-semibold text-gray-900 dark:text-white">{title}</span>
       </div>
       {isOpen ? (
-        <FiChevronUp className="w-5 h-5 text-gray-400" />
+        <FiChevronUp className="w-5 h-5 text-gray-500 dark:text-gray-400" />
       ) : (
-        <FiChevronDown className="w-5 h-5 text-gray-400" />
+        <FiChevronDown className="w-5 h-5 text-gray-500 dark:text-gray-400" />
       )}
     </button>
     <AnimatePresence>
@@ -882,8 +1104,8 @@ const ActionButton: React.FC<{
     onClick={onClick}
     disabled={disabled}
     className={`
-      flex items-center gap-2 px-4 py-2 rounded-xl glass-light border border-white/10
-      text-white text-sm font-medium transition-all
+      flex items-center gap-2 px-4 py-2 rounded-xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-gray-200 dark:border-white/10
+      text-gray-900 dark:text-white text-sm font-medium transition-all
       ${active ? 'bg-purple-500/20 border-purple-500/50' : 'hover:bg-white/10'}
       ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
     `}
