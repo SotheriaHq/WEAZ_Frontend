@@ -3,7 +3,9 @@ import { useSelector, useDispatch } from 'react-redux';
 import { clearUser, setUser } from '../features/userSlice';
 import { addLocalNotification, resetUnreadCount } from '../features/notificationsSlice';
 import { toggleSidebar } from '../features/uiSlice';
-import type { RootState } from '../store';
+import { openCartDrawer, selectCartTotalQuantity, fetchCart } from '../features/cartSlice';
+import { openWishlistDrawer, fetchWishlist, selectWishlistTotal } from '../features/wishlistSlice';
+import type { RootState, AppDispatch } from '../store';
 // Notifications bootstrap logic moved to useNotificationsBootstrap hook mounted at app root.
 import type { AuthUserDto } from '../types/auth';
 import '../styles/scrollbar-hide.css';
@@ -14,7 +16,7 @@ import getProfileOrHomeUrl from '../lib/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import React from 'react';
-import { User, Settings, TagIcon, Heart, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, Menu, SearchIcon, Bell, Filter, LayoutDashboard } from 'lucide-react';
+import { User, Settings, TagIcon, Heart, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, Menu, SearchIcon, Bell, Filter, LayoutDashboard, ShoppingCart } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
@@ -40,8 +42,18 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const { setLanguage, translate } = useLanguage();
   const { profile: userProfile, isAuthenticated } = useSelector((state: RootState) => state.user);
   const { unreadCount } = useSelector((state: RootState) => state.notifications);
+  const cartQuantity = useSelector(selectCartTotalQuantity);
+  const wishlistTotal = useSelector(selectWishlistTotal);
   const user = isAuthenticated ? userProfile : null;
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
+
+  // Fetch cart and wishlist on mount if authenticated
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      dispatch(fetchCart());
+      dispatch(fetchWishlist({}));
+    }
+  }, [isAuthenticated, dispatch]);
 
   // Hydrate Redux user state from localStorage if missing
   React.useEffect(() => {
@@ -100,6 +112,20 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
 
   // Remove scroll transparency behavior; always solid background
   useEffect(() => { setScrolled(false); }, [location.pathname, theme]);
+
+  // Track scroll position for liquid glass effect
+  const [isScrolled, setIsScrolled] = useState(false);
+  
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Check initial state
+    
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Removed local fetch + realtime subscription; handled globally via useNotificationsBootstrap.
 
@@ -380,7 +406,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
       className={`fixed top-0 left-0 w-full px-4 sm:px-5 h-16 z-50 transition-all duration-300 ease-out
       ${minimal
         ? 'bg-transparent border-b border-transparent'
-        : 'bg-white dark:bg-black border-b border-gray-200 dark:border-white/10'}`}
+        : isScrolled
+          ? 'bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/10 shadow-sm'
+          : 'bg-white dark:bg-black border-b border-gray-200 dark:border-white/10'}`}
+      style={isScrolled && !minimal ? {
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+      } : undefined}
     >
      
       {/* Main Navbar Content */}
@@ -430,6 +462,38 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                <SearchIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
             </button>
           )}
+
+          {/* Wishlist */}
+          {user && (
+            <button
+              type="button"
+              onClick={() => dispatch(openWishlistDrawer())}
+              className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+              aria-label="Wishlist"
+            >
+              <Heart className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+              {wishlistTotal > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white px-1">
+                  {wishlistTotal > 99 ? '99+' : wishlistTotal}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Cart */}
+          <button
+            type="button"
+            onClick={() => dispatch(openCartDrawer())}
+            className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+            aria-label="Cart"
+          >
+            <ShoppingCart className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+            {cartQuantity > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-purple-600 rounded-full flex items-center justify-center text-xs font-bold text-white px-1">
+                {cartQuantity > 99 ? '99+' : cartQuantity}
+              </span>
+            )}
+          </button>
 
           {/* Notifications */}
           {user && (

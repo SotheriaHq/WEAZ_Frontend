@@ -10,7 +10,7 @@ import type { MarketItem } from '@/types/market';
 import { selectCommentCount } from '@/features/engagementSlice';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 
-interface MarketCardProps {
+interface DesignCardProps {
   item: MarketItem;
   onOpenView?: (item: MarketItem) => void;
   onViewCollection?: (collectionId: string) => void;
@@ -18,7 +18,7 @@ interface MarketCardProps {
   className?: string;
 }
 
-export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onViewCollection, onViewBrand, className }) => {
+export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onViewCollection, onViewBrand, className }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
   const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
@@ -307,4 +307,4 @@ export const MarketCard: React.FC<MarketCardProps> = ({ item, onOpenView, onView
   );
 };
 
-export default MarketCard;
+export default DesignCard;

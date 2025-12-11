@@ -4,6 +4,8 @@ import engagementReducer from './features/engagementSlice';
 import notificationsReducer from './features/notificationsSlice';
 import patchesReducer from './features/patchesSlice';
 import uiReducer from './features/uiSlice';
+import cartReducer from './features/cartSlice';
+import wishlistReducer from './features/wishlistSlice';
 
 export const store = configureStore({
   reducer: {
@@ -12,7 +14,17 @@ export const store = configureStore({
     notifications: notificationsReducer,
     patches: patchesReducer,
     ui: uiReducer,
+    cart: cartReducer,
+    wishlist: wishlistReducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        // Ignore Set serialization warnings for wishlist
+        ignoredPaths: ['wishlist.wishlistedIds'],
+        ignoredActions: ['wishlist/fetchWishlist/fulfilled'],
+      },
+    }),
 });
 
 // Infer the `RootState` and `AppDispatch` types from the store itself

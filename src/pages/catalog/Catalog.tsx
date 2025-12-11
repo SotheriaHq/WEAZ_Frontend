@@ -60,31 +60,21 @@ const ProfilePage: React.FC = () => {
   const dispatch = useDispatch();
 
   const [searchQuery, setSearchQuery] = useState('');
-  // 🔧 FIX #1: Initialize from URL params to persist on refresh
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(
-    searchParams.get('collectionId') || null
-  );
   
-  // 🔧 FIX #1: Sync URL params when selectedCollectionId changes
-  useEffect(() => {
-    if (selectedCollectionId) {
-      setSearchParams({ collectionId: selectedCollectionId }, { replace: true });
-    } else {
-      setSearchParams({}, { replace: true });
-    }
-  }, [selectedCollectionId, setSearchParams]);
-  
-  // 🔧 FIX #1: Initialize from URL on mount
+  // State for inline collection viewer
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+
+  // Handle URL params for tab and collection
   useEffect(() => {
     const urlCollectionId = searchParams.get('collectionId');
-    if (urlCollectionId && urlCollectionId !== selectedCollectionId) {
+    if (urlCollectionId) {
       setSelectedCollectionId(urlCollectionId);
     }
     const tab = searchParams.get('tab');
     if (tab && ['Collections', 'Reviews', 'About'].includes(tab)) {
-        setActiveTab(tab as TabType);
+      setActiveTab(tab as TabType);
     }
-  }, []);
+  }, [searchParams]);
 
   const [activeTab, setActiveTab] = useState<TabType>('Collections');
   const [visibilityFilter, setVisibilityFilter] = useState<'Public' | 'Private' | 'Drafts'>('Public');
@@ -744,14 +734,20 @@ const ProfilePage: React.FC = () => {
             }}
           />
 
-          <div className="mt-6">
+          <div className="mt-6 min-h-[420px] motion-safe:transition-opacity motion-safe:duration-200">
             {activeTab === 'Collections' && (
               <div>
                 {selectedCollectionId ? (
                   // Show inline collection viewer
-                    <InlineCollectionViewer
+                  <InlineCollectionViewer
                     collectionId={selectedCollectionId}
-                    onBack={() => setSelectedCollectionId(null)}
+                    onBack={() => {
+                      setSelectedCollectionId(null);
+                      setSearchParams(prev => {
+                        prev.delete('collectionId');
+                        return prev;
+                      });
+                    }}
                     brandName={displayData?.brandName || displayData?.username || 'Brand'}
                     onPriceUpdated={async () => {
                       // Refresh collections to show updated prices on cards
@@ -773,13 +769,6 @@ const ProfilePage: React.FC = () => {
                       {/* Show create controls only for owner */}
                       {isOwner && (
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => navigate('/dashboard')}
-                            className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl font-medium hover:opacity-90 transition-opacity flex items-center gap-2"
-                          >
-                            <span>📊</span>
-                            <span>Dashboard</span>
-                          </button>
                           <AddCollectionDropdown openModal={() => handleOpenAddModal()} />
                         </div>
                       )}
@@ -829,7 +818,13 @@ const ProfilePage: React.FC = () => {
                                   <CollectionCard
                                     key={collection.id}
                                     collection={collection}
-                                    onClick={() => setSelectedCollectionId(collection.id)}
+                                    onClick={() => {
+                                      setSelectedCollectionId(collection.id);
+                                      setSearchParams(prev => {
+                                        prev.set('collectionId', collection.id);
+                                        return prev;
+                                      });
+                                    }}
                                     showActions={false}
                                   />
                                 ))}
@@ -953,7 +948,17 @@ const ProfilePage: React.FC = () => {
                           isDraft={visibilityFilter === 'Drafts'}
                           onEdit={isOwner ? (id) => navigate(`/collections/${id}/edit`) : undefined}
                           onDelete={isOwner ? (id) => setCollectionToDelete(id) : undefined}
-                          onCollectionClick={(id) => visibilityFilter === 'Drafts' ? navigate(`/collections/${id}/edit`) : setSelectedCollectionId(id)}
+                          onCollectionClick={(id) => {
+                            if (visibilityFilter === 'Drafts') {
+                              navigate(`/collections/${id}/edit`);
+                            } else {
+                              setSelectedCollectionId(id);
+                              setSearchParams(prev => {
+                                prev.set('collectionId', id);
+                                return prev;
+                              });
+                            }
+                          }}
                         />
                       ) : (
                         isOwner ? (

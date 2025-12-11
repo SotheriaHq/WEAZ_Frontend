@@ -49,8 +49,8 @@ const UpdatePriceTagsModal: React.FC<Props> = ({ open, onClose, collectionId, cu
       const nextMax = typeof maxPrice === 'string' ? undefined : maxPrice;
 
       const payload = {
-        minPrice: nextMin ?? null,
-        maxPrice: nextMax ?? null,
+        minPrice: nextMin,
+        maxPrice: nextMax,
         tags,
       };
 

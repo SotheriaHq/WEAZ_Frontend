@@ -3,7 +3,7 @@ import { X, Share2, MessageCircle, Plus, CheckCircle2, Smile } from 'lucide-reac
 import type { MarketItem } from '@/types/market';
 import MediaViewer from '@/components/media/MediaViewer';
 import LikeButton from '@/components/ui/LikeButton';
-import MarketCommentsPanel from '@/components/market/MarketCommentsPanel';
+import DesignCommentsPanel from '@/components/designs/DesignCommentsPanel';
 import Tag from '@/components/ui/Tag';
 import { IconButton } from '@/components/ui/FrostedButton';
 import CommentInput from '@/components/ui/CommentInput';
@@ -23,7 +23,7 @@ type Props = {
   onCommentCountChange?: (newCount: number) => void;
 };
 
-const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountChange }) => {
+const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountChange }) => {
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   const [commentCount, setCommentCount] = React.useState<number>(0);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
@@ -125,7 +125,11 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   // (Handled earlier)
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-stretch justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[1000] flex items-stretch justify-center" onClick={onClose}>
+      {/* Unified gradient blur backdrop */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
+      <div className="absolute inset-0 backdrop-blur-xl" />
+      <div className="absolute inset-0 bg-black/40" />
   <div className="relative m-4 grid h-[90vh] w-[95%] max-w-6xl grid-cols-12 gap-0 rounded-2xl bg-white/5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Close button */}
         <button
@@ -228,7 +232,7 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
           {/* Comments Area */}
           <div className="min-h-0 flex-1 pt-3 mt-3 flex flex-col">
-            <MarketCommentsPanel
+            <DesignCommentsPanel
               mediaId={item.id}
               collectionId={item.collectionId}
               contentOwnerId={item.brandId}
@@ -306,5 +310,5 @@ const MarketViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   );
 };
 
-export default MarketViewModal;
+export default DesignViewModal;
 

@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useForm, type FieldErrors } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { X, MapPin } from 'lucide-react';
+import { X, MapPin, ExternalLink } from 'lucide-react';
 import FrostedButton, { IconButton } from '@/components/ui/FrostedButton';
 import type { AuthUserDto } from '../../types/auth';
 import type { BrandProfileDto } from '../../types/profile';
@@ -18,14 +18,19 @@ import {
 } from '../../data/locations';
 
 const urlRegex = /^https?:\/\//i;
+const socialHandleRegex = /^@?[A-Za-z0-9._-]{2,50}$/;
 
-const optionalUrlSchema = z
+const optionalSocialSchema = z
   .string()
   .trim()
   .optional()
   .refine(
-    (value) => !value || value.length === 0 || urlRegex.test(value),
-    { message: 'Enter a valid URL starting with http:// or https://' },
+    (value) =>
+      !value ||
+      value.length === 0 ||
+      urlRegex.test(value) ||
+      socialHandleRegex.test(value),
+    { message: 'Enter a valid URL or username/handle' },
   );
 
 const profileSchema = z.object({
@@ -46,10 +51,10 @@ const profileSchema = z.object({
     .array(z.string())
     .min(1, { message: 'Select at least one tag' })
     .max(6, { message: 'You can select up to six tags' }),
-  socialInstagram: optionalUrlSchema,
-  socialFacebook: optionalUrlSchema,
-  socialTwitter: optionalUrlSchema,
-  socialWebsite: optionalUrlSchema,
+  socialInstagram: optionalSocialSchema,
+  socialFacebook: optionalSocialSchema,
+  socialTwitter: optionalSocialSchema,
+  socialWebsite: optionalSocialSchema,
   phoneNumber: z.string().trim().max(30, { message: 'Phone number is too long' }).optional(),
   businessType: z.string().trim().max(120, { message: 'Business type is too long' }).optional(),
 });
@@ -98,9 +103,43 @@ const getFirstErrorMessage = (errors: unknown): string | null => {
   return null;
 };
 
-const scrubOptionalUrl = (value?: string | null): string | undefined => {
+const ensureHttps = (value?: string | null): string | undefined => {
   const trimmed = value?.trim() ?? '';
-  return trimmed.length > 0 ? trimmed : undefined;
+  if (!trimmed) return undefined;
+  if (urlRegex.test(trimmed)) return trimmed;
+  return `https://${trimmed.replace(/^https?:\/\//i, '')}`;
+};
+
+const normalizeSocialLink = (
+  platform: 'instagram' | 'facebook' | 'twitter' | 'website',
+  value?: string | null,
+): string | undefined => {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return undefined;
+
+  const asUrl = urlRegex.test(trimmed) ? ensureHttps(trimmed) : undefined;
+  if (asUrl) return asUrl;
+
+  const handle = socialHandleRegex.test(trimmed)
+    ? trimmed.replace(/^@/, '')
+    : trimmed;
+
+  if (!handle) return undefined;
+
+  const base =
+    platform === 'instagram'
+      ? 'https://instagram.com'
+      : platform === 'facebook'
+        ? 'https://facebook.com'
+        : platform === 'twitter'
+          ? 'https://x.com'
+          : '';
+
+  if (base) {
+    return `${base}/${handle}`;
+  }
+
+  return ensureHttps(trimmed);
 };
 
 interface EditProfileModalProps {
@@ -191,6 +230,25 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const selectedState = watch('brandState');
   const selectedTags = watch('brandTags') || [];
   const selectedCity = watch('brandCity');
+  const watchInstagram = watch('socialInstagram');
+  const watchFacebook = watch('socialFacebook');
+  const watchTwitter = watch('socialTwitter');
+  const watchWebsite = watch('socialWebsite');
+
+  const socialLinks = useMemo(
+    () => ({
+      instagram: normalizeSocialLink('instagram', watchInstagram),
+      facebook: normalizeSocialLink('facebook', watchFacebook),
+      twitter: normalizeSocialLink('twitter', watchTwitter),
+      website: normalizeSocialLink('website', watchWebsite),
+    }),
+    [watchInstagram, watchFacebook, watchTwitter, watchWebsite],
+  );
+
+  const openLink = (url?: string) => {
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   const focusableFields = useMemo<ReadonlyArray<keyof ProfileFormValues>>(
     () => [
@@ -298,10 +356,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
           brandState: values.brandState ?? '',
           brandCity: values.brandCity ?? '',
           brandTags: values.brandTags,
-          socialInstagram: scrubOptionalUrl(values.socialInstagram),
-          socialFacebook: scrubOptionalUrl(values.socialFacebook),
-          socialTwitter: scrubOptionalUrl(values.socialTwitter),
-          socialWebsite: scrubOptionalUrl(values.socialWebsite),
+          socialInstagram: normalizeSocialLink('instagram', values.socialInstagram),
+          socialFacebook: normalizeSocialLink('facebook', values.socialFacebook),
+          socialTwitter: normalizeSocialLink('twitter', values.socialTwitter),
+          socialWebsite: normalizeSocialLink('website', values.socialWebsite),
           phoneNumber: values.phoneNumber?.trim() ?? '',
           businessType: values.businessType?.trim() ?? '',
         };
@@ -362,7 +420,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 py-8"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 py-8"
       role="dialog"
       aria-modal="true"
       aria-labelledby="edit-profile-title"
@@ -587,11 +645,22 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Instagram
                   </label>
-                  <input
-                    {...register('socialInstagram')}
-                    className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                    placeholder="https://instagram.com/yourbrand"
-                  />
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      {...register('socialInstagram')}
+                      className="w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 pr-11 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
+                      placeholder="@yourbrand or instagram.com/yourbrand"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openLink(socialLinks.instagram)}
+                      disabled={!socialLinks.instagram}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/30 text-gray-800 hover:bg-white/50 disabled:opacity-40 dark:bg-white/5 dark:text-gray-100"
+                      aria-label="Open Instagram link"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                  </div>
                   {errors.socialInstagram && (
                     <p className="mt-1 text-xs text-red-500">{errors.socialInstagram.message}</p>
                   )}
@@ -601,11 +670,22 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Facebook
                   </label>
-                  <input
-                    {...register('socialFacebook')}
-                    className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                    placeholder="https://facebook.com/yourbrand"
-                  />
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      {...register('socialFacebook')}
+                      className="w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 pr-11 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
+                      placeholder="@yourbrand or facebook.com/yourbrand"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openLink(socialLinks.facebook)}
+                      disabled={!socialLinks.facebook}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/30 text-gray-800 hover:bg-white/50 disabled:opacity-40 dark:bg-white/5 dark:text-gray-100"
+                      aria-label="Open Facebook link"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                  </div>
                   {errors.socialFacebook && (
                     <p className="mt-1 text-xs text-red-500">{errors.socialFacebook.message}</p>
                   )}
@@ -615,11 +695,22 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Twitter / X
                   </label>
-                  <input
-                    {...register('socialTwitter')}
-                    className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                    placeholder="https://twitter.com/yourbrand"
-                  />
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      {...register('socialTwitter')}
+                      className="w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 pr-11 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
+                      placeholder="@yourbrand or x.com/yourbrand"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openLink(socialLinks.twitter)}
+                      disabled={!socialLinks.twitter}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/30 text-gray-800 hover:bg-white/50 disabled:opacity-40 dark:bg-white/5 dark:text-gray-100"
+                      aria-label="Open Twitter link"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                  </div>
                   {errors.socialTwitter && (
                     <p className="mt-1 text-xs text-red-500">{errors.socialTwitter.message}</p>
                   )}
@@ -629,11 +720,22 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Website
                   </label>
-                  <input
-                    {...register('socialWebsite')}
-                    className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                    placeholder="https://yourbrand.com"
-                  />
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      {...register('socialWebsite')}
+                      className="w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 pr-11 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
+                      placeholder="yourbrand.com or linktr.ee/brand"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openLink(socialLinks.website)}
+                      disabled={!socialLinks.website}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/30 text-gray-800 hover:bg-white/50 disabled:opacity-40 dark:bg-white/5 dark:text-gray-100"
+                      aria-label="Open website link"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                  </div>
                   {errors.socialWebsite && (
                     <p className="mt-1 text-xs text-red-500">{errors.socialWebsite.message}</p>
                   )}

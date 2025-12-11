@@ -1,10 +1,10 @@
 import React from 'react';
 
-interface MarketSkeletonProps {
+interface DesignSkeletonProps {
   count?: number;
 }
 
-const MarketSkeleton: React.FC<MarketSkeletonProps> = ({ count = 8 }) => {
+const DesignSkeleton: React.FC<DesignSkeletonProps> = ({ count = 8 }) => {
   // Generate random heights to simulate masonry layout
   const getRandomHeight = () => {
     const heights = [320, 380, 420, 480, 520];
@@ -82,4 +82,4 @@ const MarketSkeleton: React.FC<MarketSkeletonProps> = ({ count = 8 }) => {
   );
 };
 
-export default MarketSkeleton;
+export default DesignSkeleton;

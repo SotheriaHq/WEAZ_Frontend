@@ -117,20 +117,20 @@ export const Sidebar: React.FC = () => {
   };
 
   const mainLinks = [
-    { emoji: '👗', label: 'Designs', path: '/market', active: location.pathname === '/market' || location.pathname === '/' }, 
-    { emoji: '🛍️', label: 'Market', path: '/market-place' },
-    ...(user?.type === 'BRAND' ? [{ emoji: '🎬', label: 'Studio', path: '/studio' }] : []),
-    { emoji: '📺', label: 'Subscriptions', path: '/subscriptions' },
+    { emoji: '👗', label: 'Designs', path: '/', active: location.pathname === '/market' || location.pathname === '/' }, 
+    { emoji: '🛍️', label: 'Market', path: '/market-place', active: location.pathname === '/market-place' },
+    ...(user?.type === 'BRAND' ? [{ emoji: '🎬', label: 'Studio', path: '/studio', active: location.pathname === '/studio' }] : []),
+    { emoji: '📺', label: 'Subscriptions', path: '/subscriptions', active: location.pathname === '/subscriptions' },
   ];
 
   const youLinks = [
-    { emoji: '🕒', label: 'History', path: '/history' },
-    { emoji: '⏰', label: 'Watch Later', path: '/watch-later' },
+    { emoji: '🕒', label: 'History', path: '/history', active: location.pathname === '/history' },
+    { emoji: '⏰', label: 'Watch Later', path: '/watch-later', active: location.pathname === '/watch-later' },
     // Removed Liked Videos
   ];
 
   const exploreLinks = [
-    { emoji: '📈', label: 'Trending', path: '/trending' },
+    { emoji: '📈', label: 'Trending', path: '/trending', active: location.pathname === '/trending' },
     // Removed Fashion, Awards
   ];
 

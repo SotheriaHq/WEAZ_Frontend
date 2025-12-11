@@ -1,9 +1,8 @@
 
 import React from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import Market from './pages/Market';
-import MarketPlace from './pages/MarketPlace';
 import SettingsHome from './pages/settings/SettingsHome';
 import CollectionsSettings from './pages/settings/CollectionsSettings';
 import SignupPage from './pages/SignUp';
@@ -16,64 +15,113 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Profile from './pages/catalog/Catalog';
 import { ProfileLayout } from './components/catalog/ProfileLayout';
-import CreateCollectionPage from './pages/catalog/CreateCollection';
+import CreateCollectionPage from './pages/catalog/CreateCollectionRedesign';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
-import CollectionView from './pages/catalog/CollectionView';
+import CollectionViewRedesign from './pages/catalog/CollectionViewRedesign';
 import DropdownDemo from './pages/ui/DropdownDemo';
 import AcceptInvite from './pages/AcceptInvite';
 import ErrorPage from './pages/ErrorPage';
 import StudioHome from './pages/studio/StudioHome';
-import Subscriptions from './pages/Subscriptions';
 import { Navigate } from 'react-router-dom';
+import CartDrawer from './components/designs/CartDrawer';
+import WishlistDrawer from './components/designs/WishlistDrawer';
+import BrandStore from './pages/brand/BrandStore';
+// Placeholder pages for features under development
+import {
+  NotFound,
+  MarketplacePlaceholder,
+  SubscriptionsPlaceholder,
+  HistoryPlaceholder,
+  WatchLaterPlaceholder,
+  TrendingPlaceholder,
+} from './pages/placeholders';
+
+/**
+ * Root layout component that wraps all routes
+ * Contains global overlays like CartDrawer and WishlistDrawer
+ * that need Router context (useNavigate)
+ */
+const RootLayout: React.FC = () => (
+  <>
+    <CartDrawer />
+    <WishlistDrawer />
+    <Outlet />
+  </>
+);
 
 const router = createBrowserRouter([
   {
-    path: '/',
-    element: <Layout />,
+    // Root wrapper that provides Router context to global drawers
+    element: <RootLayout />,
     errorElement: <ErrorPage />,
     children: [
-      { index: true, element: <Market /> },
-      { path: 'settings', element: <SettingsHome /> },
-      { path: 'settings/collections', element: <CollectionsSettings /> },
-    ],
-  },
-  {
-    path: '/studio',
-    element: (
-      <RequireBrand>
-        <StudioHome />
-      </RequireBrand>
-    ),
-    errorElement: <ErrorPage />,
-  },
-  {
-    path: '/dashboard',
-    element: <Navigate to="/studio" replace />,
-  },
-  {
-    path: '/profile',
-    element: <ProfileLayout />,
-    errorElement: <ErrorPage />,
-    children: [
-      { index: true, element: <Profile /> },
       {
-        path: 'collections',
-        element: <RequireBrand />,
+        path: '/',
+        element: <Layout />,
         children: [
-          { path: 'create', element: <CreateCollectionPage /> },
+          { index: true, element: <Market /> },
+          { path: 'market', element: <Market /> },
+          // Placeholder routes - these render inside Layout via Outlet
+          { path: 'market-place', element: <MarketplacePlaceholder /> },
+          { path: 'subscriptions', element: <SubscriptionsPlaceholder /> },
+          { path: 'history', element: <HistoryPlaceholder /> },
+          { path: 'watch-later', element: <WatchLaterPlaceholder /> },
+          { path: 'trending', element: <TrendingPlaceholder /> },
+          { path: 'settings', element: <SettingsHome /> },
+          { path: 'settings/collections', element: <CollectionsSettings /> },
         ],
       },
-      { path: 'success', element: <Success /> },
-      { path: 'settings', element: <SettingsHome /> },
-      { path: 'settings/collections', element: <CollectionsSettings /> },
-    ],
-  },
-  {
-    element: <GuestRoute />,
-    children: [
-      { path: '/signup', element: <SignupPage /> },
-      { path: '/login', element: <LoginPage /> },
+      {
+        path: '/studio',
+        element: (
+          <RequireBrand>
+            <StudioHome />
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/dashboard',
+        element: <Navigate to="/studio" replace />,
+      },
+      {
+        path: '/profile',
+        element: <ProfileLayout />,
+        children: [
+          { index: true, element: <Profile /> },
+          {
+            path: 'collections',
+            element: <RequireBrand />,
+            children: [
+              { path: 'create', element: <CreateCollectionPage /> },
+            ],
+          },
+          { path: 'success', element: <Success /> },
+          { path: 'settings', element: <SettingsHome /> },
+          { path: 'settings/collections', element: <CollectionsSettings /> },
+        ],
+      },
+      {
+        element: <GuestRoute />,
+        children: [
+          { path: '/signup', element: <SignupPage /> },
+          { path: '/login', element: <LoginPage /> },
+        ],
+      },
+      {
+        path: '/store/:brandId',
+        element: <Layout><BrandStore /></Layout>,
+      },
+      {
+        // Standalone collection view page (redesigned)
+        path: '/collections/:id',
+        element: <CollectionViewRedesign />,
+      },
+      // Catch-all 404 route - must be last
+      {
+        path: '*',
+        element: <NotFound />,
+      },
     ],
   },
 ]);
