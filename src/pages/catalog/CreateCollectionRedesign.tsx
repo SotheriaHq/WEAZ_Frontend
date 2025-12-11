@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { 
-  FiArrowLeft, FiHelpCircle, FiTrash2, FiStar, FiMove, FiMaximize2,
+  FiArrowLeft, FiTrash2, FiStar, FiMove, FiMaximize2,
   FiChevronDown, FiChevronUp, FiInfo, FiSearch, FiX, FiFile,
-  FiChevronLeft, FiChevronRight, FiZoomIn, FiZoomOut
+  FiChevronLeft, FiChevronRight, FiZoomIn, FiZoomOut, FiPlus
 } from 'react-icons/fi';
 import { HiOutlineSparkles } from 'react-icons/hi';
 
@@ -72,7 +72,19 @@ const CreateCollectionInner: React.FC = () => {
     targeting: false,
   });
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [previewAspect, setPreviewAspect] = useState(4 / 3);
+  const [showCancelPrompt, setShowCancelPrompt] = useState(false);
+  const [showDraftPreview, setShowDraftPreview] = useState(false);
+  const tagStylePalette = useMemo(
+    () => [
+      'bg-white/30 border border-white/40 text-purple-900 dark:text-white backdrop-blur-md shadow-sm',
+      'bg-gradient-to-r from-purple-500/60 to-blue-500/50 text-white shadow-md',
+      'bg-gradient-to-r from-amber-400/70 to-pink-500/70 text-white shadow-md',
+      'bg-white/20 text-white border border-white/30 backdrop-blur',
+      'bg-gradient-to-r from-emerald-400/70 to-teal-500/70 text-white shadow-md',
+      'bg-gradient-to-r from-indigo-500/70 to-cyan-500/70 text-white shadow-md',
+    ],
+    []
+  );
 
   // Track original items for deletion in edit mode
   const originalItemIds = useRef<Set<string>>(new Set());
@@ -173,31 +185,6 @@ const CreateCollectionInner: React.FC = () => {
     if (files.length === 0) return null;
     return resolveMediaWithUrl(files[selectedIndex]);
   }, [files, selectedIndex, resolveMediaWithUrl]);
-
-  // Keep preview aspect ratio aligned with the selected asset to avoid layout jumps
-  useEffect(() => {
-    if (!selectedFile?.url) return;
-
-    if (selectedFile.kind === 'video') {
-      const video = document.createElement('video');
-      video.src = selectedFile.url;
-      const handleLoaded = () => {
-        if (video.videoWidth && video.videoHeight) {
-          setPreviewAspect(video.videoWidth / video.videoHeight);
-        }
-      };
-      video.addEventListener('loadedmetadata', handleLoaded);
-      return () => video.removeEventListener('loadedmetadata', handleLoaded);
-    }
-
-    const img = new Image();
-    img.src = selectedFile.url;
-    img.onload = () => {
-      if (img.naturalWidth && img.naturalHeight) {
-        setPreviewAspect(img.naturalWidth / img.naturalHeight);
-      }
-    };
-  }, [selectedFile?.url, selectedFile?.kind]);
 
   // Get cover image URL for modal
   const coverImageUrl = useMemo(() => {
@@ -318,12 +305,8 @@ const CreateCollectionInner: React.FC = () => {
   };
 
   const handleSaveDraft = async () => {
-    if (!title.trim()) {
-      toast.error('Please provide a title');
-      return;
-    }
     if (files.length === 0) {
-      toast.error('Please upload at least one file');
+      toast.error('Please upload at least one file to save');
       return;
     }
 
@@ -352,7 +335,7 @@ const CreateCollectionInner: React.FC = () => {
       if (user?.id) {
         await fetchCollections(user.id);
       }
-      navigate('/profile?tab=Drafts');
+      toast.success('Draft saved');
     } catch (error) {
       console.error(error);
       toast.error('Failed to save draft');
@@ -428,9 +411,16 @@ const CreateCollectionInner: React.FC = () => {
     }
   };
 
-  const handleModalClose = () => {
+  const handleModalCloseRequest = () => {
     setShowPublishModal(false);
-    navigate('/profile');
+    setShowCancelPrompt(true);
+  };
+
+  const handleCancelPromptChoice = (action: 'return' | 'cancel') => {
+    setShowCancelPrompt(false);
+    if (action === 'cancel') {
+      navigate('/profile');
+    }
   };
 
   // Build summary for modal
@@ -450,14 +440,14 @@ const CreateCollectionInner: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300">
+    <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-40 glass-panel border-b border-gray-200 dark:border-white/10">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-950/75 backdrop-blur-xl border-b border-gray-200/80 dark:border-white/10 transition-colors">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
           >
             <FiArrowLeft className="w-5 h-5" />
             <span className="hidden sm:inline">Back</span>
@@ -467,18 +457,35 @@ const CreateCollectionInner: React.FC = () => {
             {isEditMode ? 'EDIT YOUR STORY' : 'CREATE YOUR STORY'}
           </h1>
 
-          <button
-            type="button"
-            className="w-9 h-9 rounded-xl glass-light flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-            aria-label="Help"
-          >
-            <FiHelpCircle className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowDraftPreview(true)}
+              className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-white/15 bg-white/80 dark:bg-white/10 text-gray-800 dark:text-white text-sm font-medium hover:border-purple-400/50"
+            >
+              Preview Draft
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={disabled}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-600 text-white text-sm font-semibold shadow-sm hover:bg-purple-500 disabled:opacity-50"
+            >
+              Save Draft
+            </button>
+            <button
+              type="button"
+              className="w-9 h-9 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur flex items-center justify-center text-gray-700 dark:text-gray-100 hover:text-purple-600 dark:hover:text-white transition-colors shadow-sm"
+              aria-label="Help"
+            >
+              <span role="img" aria-hidden="true">❔</span>
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-4 py-6 pb-32">
+      <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 pb-32">
         {/* Upload Progress Banner */}
         <AnimatePresence>
           {isUploading && (
@@ -502,231 +509,252 @@ const CreateCollectionInner: React.FC = () => {
           )}
         </AnimatePresence>
 
-        {/* Media Section */}
-        <section className="mb-8">
-          {files.length === 0 ? (
-            <MediaUploadZone
-              onFilesUpload={mediaStore.addFiles}
-              picker={picker}
-              disabled={disabled}
-              maxFiles={20}
-            />
-          ) : (
-            <div className="space-y-4">
-              {/* Main Preview */}
-              <div className="rounded-2xl glass-light border border-white/10 overflow-hidden bg-gradient-to-b from-[var(--surface-secondary)]/80 to-[var(--surface-primary)] dark:from-gray-900/70 dark:to-gray-950">
-                <div
-                  className="relative w-full h-full flex items-center justify-center"
-                  style={{ aspectRatio: previewAspect || 4 / 3, minHeight: '360px' }}
-                >
-                  <AnimatePresence mode="wait">
-                    {selectedFile && (
-                      <motion.div
-                        key={selectedFile.id || selectedFile.url}
-                        className="w-full h-full flex items-center justify-center"
-                        initial={{ opacity: 0.6, scale: 0.99 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.99 }}
-                        transition={{ duration: 0.25 }}
-                      >
-                        {selectedFile.kind === 'video' ? (
-                          <video
-                            src={selectedFile.url}
-                            controls
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <img
-                            src={selectedFile.url}
-                            alt={selectedFile.file?.name || 'Preview'}
-                            className="w-full h-full object-contain"
-                          />
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+        <div className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-6 items-start mb-8">
+          {/* Media Section */}
+          <section className="h-full">
+            {files.length === 0 ? (
+              <MediaUploadZone
+                onFilesUpload={mediaStore.addFiles}
+                picker={picker}
+                disabled={disabled}
+                maxFiles={20}
+              />
+            ) : (
+              <div className="space-y-4 h-full">
+                {/* Main Preview */}
+                <div className="rounded-2xl glass-light border border-gray-200/80 dark:border-white/10 overflow-hidden bg-gradient-to-b from-white/80 to-gray-50/90 dark:from-gray-900/70 dark:to-gray-950 shadow-sm">
+                  <div
+                    className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black"
+                    style={{
+                      minHeight: '420px',
+                      height: '56vh',
+                      maxHeight: '620px',
+                    }}
+                  >
+                    <AnimatePresence mode="wait">
+                      {selectedFile && (
+                        <motion.div
+                          key={selectedFile.id || selectedFile.url}
+                          className="w-full h-full flex items-center justify-center"
+                          initial={{ opacity: 0.6, scale: 0.99 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.99 }}
+                          transition={{ duration: 0.25 }}
+                        >
+                          {selectedFile.kind === 'video' ? (
+                            <video
+                              src={selectedFile.url}
+                              controls
+                              className="w-full h-full object-contain"
+                              playsInline
+                            />
+                          ) : (
+                            <img
+                              src={selectedFile.url}
+                              alt={selectedFile.file?.name || 'Preview'}
+                              className="w-full h-full object-contain"
+                              loading="lazy"
+                            />
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                  {/* Floating Action Bar */}
-                  <div className="absolute bottom-0 left-0 right-0 glass-panel-dark border-t border-white/10 px-4 py-3">
-                    <div className="flex items-center justify-center gap-2">
-                      <ActionButton
-                        icon={<FiTrash2 className="w-4 h-4" />}
-                        label="Delete"
-                        onClick={() => selectedFile?.id && handleDelete(selectedFile.id)}
-                        disabled={disabled}
-                      />
-                      <ActionButton
-                        icon={<FiStar className={`w-4 h-4 ${coverIndex === selectedIndex ? 'fill-purple-400 text-purple-400' : ''}`} />}
-                        label={coverIndex === selectedIndex ? 'Cover' : 'Set as Cover'}
-                        onClick={() => handleSetCover(selectedIndex)}
-                        disabled={disabled}
-                        active={coverIndex === selectedIndex}
-                      />
-                      <ActionButton
-                        icon={<FiMove className="w-4 h-4" />}
-                        label="Reorder"
-                        onClick={() => {}}
-                        disabled
-                      />
-                      <ActionButton
-                        icon={<FiMaximize2 className="w-4 h-4" />}
-                        label="Fullscreen"
-                        onClick={openFullscreen}
-                      />
+                    {/* Floating Action Bar */}
+                    <div className="absolute bottom-0 left-0 right-0 glass-panel-dark border-t border-white/10 px-4 py-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <ActionButton
+                          icon={<FiTrash2 className="w-4 h-4" />}
+                          label="Delete"
+                          onClick={() => selectedFile?.id && handleDelete(selectedFile.id)}
+                          disabled={disabled}
+                        />
+                        <ActionButton
+                          icon={<FiStar className={`w-4 h-4 ${coverIndex === selectedIndex ? 'fill-purple-400 text-purple-400' : ''}`} />}
+                          label={coverIndex === selectedIndex ? 'Cover' : 'Set as Cover'}
+                          onClick={() => handleSetCover(selectedIndex)}
+                          disabled={disabled}
+                          active={coverIndex === selectedIndex}
+                        />
+                        <ActionButton
+                          icon={<FiMove className="w-4 h-4" />}
+                          label="Reorder"
+                          onClick={() => {}}
+                          disabled
+                        />
+                        <ActionButton
+                          icon={<FiMaximize2 className="w-4 h-4" />}
+                          label="Fullscreen"
+                          onClick={openFullscreen}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
+
+                {/* Thumbnail Strip */}
+                <ThumbnailStrip
+                  items={files}
+                  selectedIndex={selectedIndex}
+                  coverIndex={coverIndex}
+                  onSelect={setSelectedIndex}
+                  onDelete={handleDelete}
+                  onSetCover={handleSetCover}
+                  onAddMore={!isEditMode ? picker.open : undefined}
+                  disabled={disabled}
+                  progressById={perFileProgress}
+                />
+
+                {/* Hidden file input */}
+                <input
+                  ref={picker.inputRef}
+                  type="file"
+                  multiple
+                  onChange={picker.handlers.onInputChange}
+                  className="hidden"
+                  accept="image/*,video/*"
+                  disabled={disabled}
+                />
+
+                {/* Image info */}
+                <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+                  {selectedFile?.kind === 'video' ? 'Video' : 'Image'} {selectedIndex + 1} of {files.length}
+                  {selectedFile?.file?.name && ` • ${selectedFile.file.name}`}
+                  {selectedFile?.file?.size && ` • ${(selectedFile.file.size / (1024 * 1024)).toFixed(1)} MB`}
+                </p>
               </div>
+            )}
+          </section>
 
-              {/* Thumbnail Strip */}
-              <ThumbnailStrip
-                items={files}
-                selectedIndex={selectedIndex}
-                coverIndex={coverIndex}
-                onSelect={setSelectedIndex}
-                onDelete={handleDelete}
-                onSetCover={handleSetCover}
-                onAddMore={!isEditMode ? picker.open : undefined}
-                disabled={disabled}
-                progressById={perFileProgress}
-              />
+          {/* Collection Details */}
+          <div className="h-full">
+            <FormSection
+              title="Collection Details"
+              icon="📝"
+              isOpen={expandedSections.details}
+              onToggle={() => toggleSection('details')}
+              className="h-full flex flex-col"
+            >
+              <div className="space-y-4">
+                <TextField
+                  label="Collection Title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g., Summer Breeze '24"
+                  disabled={disabled}
+                  variant="glass"
+                  required
+                />
 
-              {/* Hidden file input */}
-              <input
-                ref={picker.inputRef}
-                type="file"
-                multiple
-                onChange={picker.handlers.onInputChange}
-                className="hidden"
-                accept="image/*,video/*"
-                disabled={disabled}
-              />
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Tell Your Story
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Inspired by the warm coastal breeze of Lagos..."
+                    rows={4}
+                    disabled={disabled}
+                    className="w-full px-4 py-3 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none"
+                  />
+                  <p className="text-right text-xs text-gray-600 dark:text-gray-400">
+                    {description.length} / 500 characters
+                  </p>
+                </div>
 
-              {/* Image info */}
-              <p className="text-center text-sm text-gray-400">
-                {selectedFile?.kind === 'video' ? 'Video' : 'Image'} {selectedIndex + 1} of {files.length}
-                {selectedFile?.file?.name && ` • ${selectedFile.file.name}`}
-                {selectedFile?.file?.size && ` • ${(selectedFile.file.size / (1024 * 1024)).toFixed(1)} MB`}
-              </p>
-            </div>
-          )}
-        </section>
+                <UniversalSelect
+                  label="Category"
+                  value={categoryId}
+                  onChange={setCategoryId}
+                  options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                  placeholder={loadingCategories ? 'Loading...' : 'Select a category'}
+                  disabled={disabled}
+                />
+
+                {/* Tags Section */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    🏷️ Tags (up to 10)
+                  </label>
+                  
+                  <div className="p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10">
+                    {/* Selected tags */}
+                    {selectedTags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {selectedTags.map((tag, idx) => (
+                          <motion.span
+                            key={tag}
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${tagStylePalette[idx % tagStylePalette.length]}`}
+                          >
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => removeTag(tag)}
+                              className="ml-1 hover:text-purple-200 transition-colors"
+                            >
+                              <FiX className="w-3.5 h-3.5" />
+                            </button>
+                          </motion.span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Search input */}
+                    <div className="relative">
+                      <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <input
+                        type="text"
+                        value={tagSearch}
+                        onChange={(e) => setTagSearch(e.target.value)}
+                        onKeyDown={handleTagInputKeyDown}
+                        placeholder="Search or create a tag..."
+                        disabled={disabled || selectedTags.length >= 10}
+                        className="w-full pl-10 pr-12 py-2.5 rounded-xl glass-light bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => tagSearch.trim() && addTag(tagSearch.trim().toLowerCase().replace(/\s+/g, '-'))}
+                        disabled={disabled || selectedTags.length >= 10 || !tagSearch.trim()}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold flex items-center gap-1 shadow-sm disabled:opacity-50"
+                        aria-label="Add tag"
+                      >
+                        <FiPlus className="w-4 h-4" />
+                        Add
+                      </button>
+                    </div>
+
+                    {/* Popular tags */}
+                    {filteredSuggestions.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Popular Tags:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {filteredSuggestions.map((tag) => (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => addTag(tag)}
+                              disabled={disabled}
+                              className="tag-badge-outline px-3 py-1.5 rounded-full text-sm font-medium"
+                            >
+                              {tag}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </FormSection>
+          </div>
+        </div>
 
         {/* Form Sections */}
         <div className="space-y-4">
-          {/* Collection Details */}
-          <FormSection
-            title="Collection Details"
-            icon="📝"
-            isOpen={expandedSections.details}
-            onToggle={() => toggleSection('details')}
-          >
-            <div className="space-y-4">
-              <TextField
-                label="Collection Title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Summer Breeze '24"
-                disabled={disabled}
-                variant="glass"
-                required
-              />
-
-              <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-300">
-                  Tell Your Story
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Inspired by the warm coastal breeze of Lagos..."
-                  rows={4}
-                  disabled={disabled}
-                  className="w-full px-4 py-3 rounded-xl glass-light border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none"
-                />
-                <p className="text-right text-xs text-gray-500">
-                  {description.length} / 500 characters
-                </p>
-              </div>
-
-              <UniversalSelect
-                label="Category"
-                value={categoryId}
-                onChange={setCategoryId}
-                options={categories.map((c) => ({ value: c.id, label: c.name }))}
-                placeholder={loadingCategories ? 'Loading...' : 'Select a category'}
-                disabled={disabled}
-              />
-
-              {/* Tags Section */}
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-300">
-                  🏷️ Tags (up to 10)
-                </label>
-                
-                <div className="p-4 rounded-xl glass-light border border-white/10">
-                  {/* Selected tags */}
-                  {selectedTags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {selectedTags.map((tag) => (
-                        <motion.span
-                          key={tag}
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0.8, opacity: 0 }}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-purple-600 text-white text-sm font-medium"
-                        >
-                          {tag}
-                          <button
-                            type="button"
-                            onClick={() => removeTag(tag)}
-                            className="ml-1 hover:text-purple-200 transition-colors"
-                          >
-                            <FiX className="w-3.5 h-3.5" />
-                          </button>
-                        </motion.span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Search input */}
-                  <div className="relative">
-                    <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
-                      type="text"
-                      value={tagSearch}
-                      onChange={(e) => setTagSearch(e.target.value)}
-                      onKeyDown={handleTagInputKeyDown}
-                      placeholder="Search or create a tag..."
-                      disabled={disabled || selectedTags.length >= 10}
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-light border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                    />
-                  </div>
-
-                  {/* Popular tags */}
-                  {filteredSuggestions.length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-xs text-gray-400 mb-2">Popular Tags:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {filteredSuggestions.map((tag) => (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => addTag(tag)}
-                            disabled={disabled}
-                            className="tag-badge-outline px-3 py-1.5 rounded-full text-sm font-medium"
-                          >
-                            {tag}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </FormSection>
-
           {/* Pricing & Availability */}
           <FormSection
             title="Pricing & Availability"
@@ -736,70 +764,70 @@ const CreateCollectionInner: React.FC = () => {
           >
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Price Range</label>
-                <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Price Range</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">₦</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₦</span>
                     <input
                       type="number"
                       value={minPrice}
                       onChange={(e) => setMinPrice(e.target.value)}
                       placeholder="15,000"
                       disabled={disabled}
-                      className="w-full pl-8 pr-4 py-3 rounded-xl glass-light border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      className="w-full pl-8 pr-4 py-3 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     />
-                    <span className="absolute -bottom-5 left-0 text-xs text-gray-500">Minimum Price</span>
+                    <span className="absolute -bottom-5 left-0 text-xs text-gray-600 dark:text-gray-400">Minimum Price</span>
                   </div>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">₦</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₦</span>
                     <input
                       type="number"
                       value={maxPrice}
                       onChange={(e) => setMaxPrice(e.target.value)}
                       placeholder="45,000"
                       disabled={disabled}
-                      className="w-full pl-8 pr-4 py-3 rounded-xl glass-light border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      className="w-full pl-8 pr-4 py-3 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     />
-                    <span className="absolute -bottom-5 left-0 text-xs text-gray-500">Maximum Price</span>
+                    <span className="absolute -bottom-5 left-0 text-xs text-gray-600 dark:text-gray-400">Maximum Price</span>
                   </div>
                 </div>
               </div>
 
               {/* Info box */}
-              <div className="mt-8 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-2">
-                <FiInfo className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-blue-300">
+              <div className="mt-8 p-3 rounded-xl bg-blue-50 border border-blue-200 text-gray-800 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-100 flex items-start gap-2">
+                <FiInfo className="w-5 h-5 text-blue-500 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm">
                   Setting a price range helps buyers know what to expect. Leave empty if prices vary significantly.
                 </p>
               </div>
 
               {/* Checkboxes */}
               <div className="space-y-3 mt-4">
-                <label className="flex items-start gap-3 p-4 rounded-xl glass-light border border-white/10 cursor-pointer hover:border-purple-500/30 transition-colors">
+                <label className="flex items-start gap-3 p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 cursor-pointer hover:border-purple-500/30 transition-colors">
                   <input
                     type="checkbox"
                     checked={isAvailableInStore}
                     onChange={(e) => setIsAvailableInStore(e.target.checked)}
                     disabled={disabled}
-                    className="w-5 h-5 mt-0.5 rounded border-gray-600 text-purple-600 focus:ring-purple-500 bg-transparent"
+                    className="w-5 h-5 mt-0.5 rounded border-gray-400 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-transparent"
                   />
                   <div>
-                    <span className="text-white font-medium">Available in Physical Store</span>
-                    <p className="text-sm text-gray-400">Show "Visit Store" option on collection</p>
+                    <span className="text-gray-900 dark:text-white font-medium">Available in Physical Store</span>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Show "Visit Store" option on collection</p>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-3 p-4 rounded-xl glass-light border border-white/10 cursor-pointer hover:border-purple-500/30 transition-colors">
+                <label className="flex items-start gap-3 p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 cursor-pointer hover:border-purple-500/30 transition-colors">
                   <input
                     type="checkbox"
                     checked={isMadeToOrder}
                     onChange={(e) => setIsMadeToOrder(e.target.checked)}
                     disabled={disabled}
-                    className="w-5 h-5 mt-0.5 rounded border-gray-600 text-purple-600 focus:ring-purple-500 bg-transparent"
+                    className="w-5 h-5 mt-0.5 rounded border-gray-400 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-transparent"
                   />
                   <div>
-                    <span className="text-white font-medium">Made to Order</span>
-                    <p className="text-sm text-gray-400">Show "Custom Order" badge on collection</p>
+                    <span className="text-gray-900 dark:text-white font-medium">Made to Order</span>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Show "Custom Order" badge on collection</p>
                   </div>
                 </label>
               </div>
@@ -816,8 +844,8 @@ const CreateCollectionInner: React.FC = () => {
             <div className="space-y-6">
               {/* Target Audience */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-3">Target Audience</label>
-                <div className="flex gap-3">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">Target Audience</label>
+                <div className="flex flex-col sm:flex-row gap-3">
                   {(['EVERYBODY', 'MALE', 'FEMALE'] as const).map((option) => (
                     <button
                       key={option}
@@ -827,8 +855,8 @@ const CreateCollectionInner: React.FC = () => {
                       className={`
                         flex-1 py-3 px-4 rounded-xl border-2 font-medium transition-all
                         ${type === option
-                          ? 'border-purple-500 bg-purple-500/10 text-purple-400'
-                          : 'border-white/10 text-gray-300 hover:border-white/20'
+                          ? 'border-purple-500 bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                          : 'border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-200 dark:hover:border-white/20'
                         }
                       `}
                     >
@@ -840,7 +868,7 @@ const CreateCollectionInner: React.FC = () => {
 
               {/* Visibility */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-3">Who Can See This?</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">Who Can See This?</label>
                 <div className="space-y-3">
                   {([
                     { value: 'PUBLIC', emoji: '🌍', label: 'Public', desc: 'Everyone can see this collection' },
@@ -852,7 +880,7 @@ const CreateCollectionInner: React.FC = () => {
                         flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all
                         ${visibility === option.value
                           ? 'border-purple-500 bg-purple-500/10'
-                          : 'border-white/10 glass-light hover:border-white/20'
+                          : 'border-gray-200 dark:border-white/10 glass-light hover:border-purple-200 dark:hover:border-white/20'
                         }
                       `}
                     >
@@ -867,10 +895,10 @@ const CreateCollectionInner: React.FC = () => {
                       />
                       <span className="text-2xl">{option.emoji}</span>
                       <div>
-                        <span className={`font-medium ${visibility === option.value ? 'text-purple-400' : 'text-white'}`}>
+                        <span className={`font-medium ${visibility === option.value ? 'text-purple-600 dark:text-purple-400' : 'text-gray-900 dark:text-white'}`}>
                           {option.label}
                         </span>
-                        <p className="text-sm text-gray-400">{option.desc}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{option.desc}</p>
                       </div>
                     </label>
                   ))}
@@ -882,7 +910,7 @@ const CreateCollectionInner: React.FC = () => {
       </main>
 
       {/* Actions Footer - Integrated into flow */}
-      <div className="max-w-5xl mx-auto px-4 pb-12">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 pb-12">
         <div className="glass-panel border border-gray-200 dark:border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">
             {lastSaved
@@ -894,10 +922,18 @@ const CreateCollectionInner: React.FC = () => {
               type="button"
               onClick={handleSaveDraft}
               disabled={disabled}
-              className="flex-1 sm:flex-none py-3 px-6 rounded-xl glass-light border border-white/10 text-white font-medium hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 sm:flex-none py-3 px-6 rounded-xl glass-light border border-gray-200/70 dark:border-white/15 text-gray-900 dark:text-white font-medium hover:bg-white/40 dark:hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <FiFile className="w-4 h-4" />
               Save Draft
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={disabled}
+              className="hidden"
+            >
+              Hidden duplicate
             </button>
             <button
               type="button"
@@ -916,11 +952,49 @@ const CreateCollectionInner: React.FC = () => {
       {/* Pre-Publish Modal */}
       <PrePublishConfirmModal
         isOpen={showPublishModal}
-        onClose={handleModalClose}
+        onClose={handleModalCloseRequest}
         onConfirm={handlePublishConfirm}
         onEdit={() => setShowPublishModal(false)}
         summary={collectionSummary}
       />
+
+      {/* Cancel/Exit prompt */}
+      <AnimatePresence>
+        {showCancelPrompt && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          >
+            <div className="w-full max-w-md rounded-2xl glass-panel-dark border border-white/10 p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-600/20 flex items-center justify-center text-purple-200 font-semibold">?</div>
+                <div className="space-y-1">
+                  <p className="text-lg font-semibold text-white">What would you like to do?</p>
+                  <p className="text-sm text-white/70">Return to editing or cancel the entire process.</p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleCancelPromptChoice('return')}
+                  className="flex-1 px-4 py-3 rounded-xl border border-white/15 bg-white/5 text-white font-medium hover:border-purple-300/40"
+                >
+                  Return to creation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCancelPromptChoice('cancel')}
+                  className="flex-1 px-4 py-3 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-400"
+                >
+                  Cancel entire process
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Fullscreen Modal */}
       <AnimatePresence>
@@ -1002,18 +1076,99 @@ const CreateCollectionInner: React.FC = () => {
                   <video
                     src={fullscreenFile.url}
                     controls
-                    className="max-w-full max-h-full object-contain"
+                    className="w-full h-full object-contain"
                     style={{ transform: `scale(${fullscreenZoom})`, transition: 'transform 0.2s ease' }}
                   />
                 ) : (
                   <img
                     src={fullscreenFile.url}
                     alt="Fullscreen preview"
-                    className="max-w-full max-h-full object-contain"
+                    className="w-full h-full object-contain"
                     style={{ transform: `scale(${fullscreenZoom})`, transition: 'transform 0.2s ease' }}
                     onDoubleClick={() => setFullscreenZoom((z) => (z > 1 ? 1 : 2))}
                   />
                 )}
+
+      {/* Draft Preview (read-only) */}
+      <AnimatePresence>
+        {showDraftPreview && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            onClick={() => setShowDraftPreview(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl glass-panel-dark border border-white/10 p-6 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white/60">Draft snapshot</p>
+                  <h3 className="text-xl font-semibold text-white">{title || 'Untitled collection'}</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDraftPreview(false)}
+                  className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
+                  aria-label="Close draft preview"
+                >
+                  <FiX className="w-5 h-5" />
+                </button>
+              </div>
+
+              {selectedFile?.url && (
+                <div className="w-full rounded-xl overflow-hidden bg-black" style={{ minHeight: '280px', maxHeight: '420px' }}>
+                  {selectedFile.kind === 'video' ? (
+                    <video src={selectedFile.url} controls className="w-full h-full object-contain" />
+                  ) : (
+                    <img src={selectedFile.url} alt="Draft cover" className="w-full h-full object-contain" />
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white/90 text-sm">
+                <div className="space-y-2">
+                  <p><span className="text-white/60">Description:</span> {description || '—'}</p>
+                  <p><span className="text-white/60">Category:</span> {selectedCategory?.name || '—'}</p>
+                  <p><span className="text-white/60">Audience:</span> {type}</p>
+                </div>
+                <div className="space-y-2">
+                  <p><span className="text-white/60">Visibility:</span> {visibility}</p>
+                  <p><span className="text-white/60">Price Range:</span> {minPrice || maxPrice ? `${minPrice || '—'} - ${maxPrice || '—'}` : '—'}</p>
+                  <p><span className="text-white/60">Tags:</span> {selectedTags.length ? selectedTags.join(', ') : '—'}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-white/70 text-sm mb-2">Media</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {files.map((file) => {
+                    const withUrl = resolveMediaWithUrl(file);
+                    if (!withUrl) return null;
+                    return (
+                      <div key={withUrl.id} className="rounded-xl overflow-hidden bg-black h-32 flex items-center justify-center">
+                        {withUrl.kind === 'video' ? (
+                          <video src={withUrl.url} className="w-full h-full object-contain" />
+                        ) : (
+                          <img src={withUrl.url} className="w-full h-full object-contain" />
+                        )}
+                      </div>
+                    );
+                  })}
+                  {files.length === 0 && (
+                    <div className="text-white/60 text-sm">No media yet</div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
                 <button
                   className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-40"
@@ -1054,8 +1209,9 @@ const FormSection: React.FC<{
   isOpen: boolean;
   onToggle: () => void;
   children: React.ReactNode;
-}> = ({ title, icon, isOpen, onToggle, children }) => (
-  <div className="rounded-2xl glass-panel border border-gray-200 dark:border-white/10 overflow-hidden">
+  className?: string;
+}> = ({ title, icon, isOpen, onToggle, children, className }) => (
+  <div className={`rounded-2xl glass-panel border border-gray-200 dark:border-white/10 overflow-hidden bg-white/80 dark:bg-gray-900/60 backdrop-blur ${className ?? ''}`}>
     <button
       type="button"
       onClick={onToggle}
@@ -1082,7 +1238,7 @@ const FormSection: React.FC<{
           transition={{ duration: 0.2 }}
           className="overflow-hidden"
         >
-          <div className="px-4 pb-4">{children}</div>
+          <div className="px-4 pb-4 flex-1">{children}</div>
         </motion.div>
       )}
     </AnimatePresence>

@@ -16,7 +16,7 @@ import getProfileOrHomeUrl from '../lib/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import React from 'react';
-import { User, Settings, TagIcon, Heart, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, Menu, SearchIcon, Bell, Filter, LayoutDashboard, ShoppingCart } from 'lucide-react';
+import { User, Settings, TagIcon, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, Menu, SearchIcon, Filter, LayoutDashboard } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
@@ -468,10 +468,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
             <button
               type="button"
               onClick={() => dispatch(openWishlistDrawer())}
-              className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+              className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative text-xl"
               aria-label="Wishlist"
             >
-              <Heart className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+              <span role="img" aria-hidden="true">🤍</span>
               {wishlistTotal > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white px-1">
                   {wishlistTotal > 99 ? '99+' : wishlistTotal}
@@ -484,10 +484,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           <button
             type="button"
             onClick={() => dispatch(openCartDrawer())}
-            className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+            className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative text-xl"
             aria-label="Cart"
           >
-            <ShoppingCart className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+            <span role="img" aria-hidden="true">🛒</span>
             {cartQuantity > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-purple-600 rounded-full flex items-center justify-center text-xs font-bold text-white px-1">
                 {cartQuantity > 99 ? '99+' : cartQuantity}
@@ -533,7 +533,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
               {user ? (
                 <ImageWithFallback
                   src={user.profileImage ?? user.profileImageFile?.s3Url ?? null}
-                  fileId={user.type === 'BRAND' ? (user.profileImageId ?? user.profileImageFile?.id ?? null) : null}
+                  fileId={user.profileImageId ?? user.profileImageFile?.id ?? null}
                   alt={`${user.firstName} ${user.lastName}`}
                   fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
                   className="w-full h-full object-cover"

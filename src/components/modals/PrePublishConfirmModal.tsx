@@ -222,11 +222,11 @@ const ConfirmContent: React.FC<{
 
     {/* Cover image preview */}
     {summary.coverImageUrl && (
-      <div className="relative rounded-2xl overflow-hidden mb-4 aspect-video">
+      <div className="relative rounded-2xl overflow-hidden mb-4 bg-black" style={{ minHeight: '320px', maxHeight: '440px' }}>
         <img 
           src={summary.coverImageUrl} 
           alt={summary.title}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
         />
         {/* Cover badge */}
         <span className="absolute top-3 left-3 px-2 py-1 rounded-full bg-purple-600 text-white text-xs font-medium">
