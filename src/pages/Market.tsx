@@ -330,7 +330,7 @@ const Market: React.FC = () => {
 
   const handleViewBrand = (brandId: string) => {
     if (!brandId) return;
-    navigate(`/brands/${brandId}`);
+    navigate(`/store/${brandId}`);
   };
 
   const handleCommentCountChange = (itemId: string, newCount: number) => {

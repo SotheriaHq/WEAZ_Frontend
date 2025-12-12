@@ -3,8 +3,20 @@ import { useSelector, useDispatch } from 'react-redux';
 import { clearUser, setUser } from '../features/userSlice';
 import { addLocalNotification, resetUnreadCount } from '../features/notificationsSlice';
 import { toggleSidebar } from '../features/uiSlice';
-import { openCartDrawer, selectCartTotalQuantity, fetchCart } from '../features/cartSlice';
-import { openWishlistDrawer, fetchWishlist, selectWishlistTotal } from '../features/wishlistSlice';
+import {
+  openCartDrawer,
+  closeCartDrawer,
+  selectCartTotalQuantity,
+  selectCartIsDrawerOpen,
+  fetchCart,
+} from '../features/cartSlice';
+import {
+  openWishlistDrawer,
+  closeWishlistDrawer,
+  fetchWishlist,
+  selectWishlistTotal,
+  selectWishlistIsDrawerOpen,
+} from '../features/wishlistSlice';
 import type { RootState, AppDispatch } from '../store';
 // Notifications bootstrap logic moved to useNotificationsBootstrap hook mounted at app root.
 import type { AuthUserDto } from '../types/auth';
@@ -16,7 +28,7 @@ import getProfileOrHomeUrl from '../lib/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import React from 'react';
-import { User, Settings, TagIcon, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, Menu, SearchIcon, Filter, LayoutDashboard } from 'lucide-react';
+import { User, Settings, TagIcon, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, Menu, SearchIcon, Filter, LayoutDashboard, Heart } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
@@ -43,7 +55,9 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const { profile: userProfile, isAuthenticated } = useSelector((state: RootState) => state.user);
   const { unreadCount } = useSelector((state: RootState) => state.notifications);
   const cartQuantity = useSelector(selectCartTotalQuantity);
+  const isCartOpen = useSelector(selectCartIsDrawerOpen);
   const wishlistTotal = useSelector(selectWishlistTotal);
+  const isWishlistOpen = useSelector(selectWishlistIsDrawerOpen);
   const user = isAuthenticated ? userProfile : null;
   const dispatch = useDispatch<AppDispatch>();
 
@@ -467,7 +481,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           {user && (
             <button
               type="button"
-              onClick={() => dispatch(openWishlistDrawer())}
+              onClick={() => dispatch(isWishlistOpen ? closeWishlistDrawer() : openWishlistDrawer())}
               className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative text-xl"
               aria-label="Wishlist"
             >
@@ -483,7 +497,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           {/* Cart */}
           <button
             type="button"
-            onClick={() => dispatch(openCartDrawer())}
+            onClick={() => dispatch(isCartOpen ? closeCartDrawer() : openCartDrawer())}
             className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative text-xl"
             aria-label="Cart"
           >

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
 import { useDispatch } from 'react-redux';
 
@@ -51,8 +51,10 @@ const ProfilePage: React.FC = () => {
   const [drafts, setDrafts] = useState<CollectionDto[]>([]);
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
+  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; message?: string }>>({});
 
   const navigate = useNavigate();
+  const location = useLocation();
   // Owner view when no route param or when the param matches the logged-in brand user's id
   const isOwner = Boolean(user?.type === 'BRAND' && (!routeBrandId || routeBrandId === user?.id));
   const isVisitorView = !isOwner && Boolean(routeBrandId);
@@ -177,6 +179,26 @@ const ProfilePage: React.FC = () => {
     // collection type passed from dropdown; modal uses internal defaults for now
     setIsAddOpen(true);
   };
+
+  // Capture navigation state from publish flow to show inline publishing badge on card
+  useEffect(() => {
+    const navState = (location.state as any) || {};
+    if (navState.publishingCollectionId) {
+      const id = String(navState.publishingCollectionId);
+      const startedAt = typeof navState.publishingStartedAt === 'number' ? navState.publishingStartedAt : Date.now();
+      setPublishingStates((prev) => ({
+        ...prev,
+        [id]: {
+          status: 'publishing',
+          startedAt,
+          attempts: 0,
+          message: navState.publishingTitle ? `Publishing "${navState.publishingTitle}"` : 'Publishing your collection',
+        },
+      }));
+      // Clear state so refresh/back does not re-run
+      navigate(`${location.pathname}${location.search}`, { replace: true });
+    }
+  }, [location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
     setHasDismissedSetup(false);
@@ -523,6 +545,117 @@ const ProfilePage: React.FC = () => {
     (c.name || c.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (c.description || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const decoratedCollections = useMemo(() => {
+    return searchAndVisibilityFiltered.map((c) => {
+      const pub = publishingStates[c.id];
+      if (!pub) return c;
+      return {
+        ...c,
+        clientStatus: pub.status === 'publishing' ? 'publishing' : 'publish-failed',
+        clientStatusMessage: pub.message ?? (pub.status === 'publishing' ? 'Publishing...' : 'Publish failed'),
+        clientStatusMeta: { startedAt: pub.startedAt, attempts: pub.attempts, offline: !navigator.onLine },
+      } as CollectionDto;
+    });
+  }, [publishingStates, searchAndVisibilityFiltered]);
+
+  const handleRetryPublishCheck = useCallback(async (collectionId: string) => {
+    if (!collectionId) return;
+    try {
+      setPublishingStates((prev) => ({
+        ...prev,
+        [collectionId]: {
+          status: 'publishing',
+          startedAt: prev[collectionId]?.startedAt ?? Date.now(),
+          attempts: (prev[collectionId]?.attempts ?? 0) + 1,
+          message: 'Checking publish status...',
+        },
+      }));
+      await brandApi.getCollectionDetail(collectionId);
+      if (!isVisitorView && user?.id) {
+        await fetchCollections(user.id);
+      } else if (isVisitorView && routeBrandId) {
+        const cols = await brandApi.getCollections(routeBrandId, { visibility: 'all' });
+        setVisitorCollections(cols ?? []);
+      }
+      setPublishingStates((prev) => {
+        const next = { ...prev };
+        delete next[collectionId];
+        return next;
+      });
+      toast.success('Collection is live');
+    } catch (error) {
+      console.error('Publish status check failed', error);
+      setPublishingStates((prev) => ({
+        ...prev,
+        [collectionId]: {
+          status: 'failed',
+          startedAt: prev[collectionId]?.startedAt ?? Date.now(),
+          attempts: (prev[collectionId]?.attempts ?? 0) + 1,
+          message: 'Publish is still processing. Try again shortly.',
+        },
+      }));
+    }
+  }, [fetchCollections, isVisitorView, routeBrandId, user]);
+
+  // Poll publish status for any pending ids
+  useEffect(() => {
+    const pending = Object.entries(publishingStates).filter(([, state]) => state.status === 'publishing');
+    if (pending.length === 0) return;
+
+    const poll = async () => {
+      const offline = typeof navigator !== 'undefined' && !navigator.onLine;
+      if (offline) {
+        setPublishingStates((prev) => {
+          const next = { ...prev };
+          pending.forEach(([id, state]) => {
+            next[id] = { ...state, message: 'Offline. We will resume when back online.' };
+          });
+          return next;
+        });
+        return;
+      }
+
+      await Promise.all(pending.map(async ([id, state]) => {
+        try {
+          await brandApi.getCollectionDetail(id);
+          if (!isVisitorView && user?.id) {
+            await fetchCollections(user.id);
+          } else if (isVisitorView && routeBrandId) {
+            const cols = await brandApi.getCollections(routeBrandId, { visibility: 'all' });
+            setVisitorCollections(cols ?? []);
+          }
+          setPublishingStates((prev) => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+        } catch (error: any) {
+          const attempts = state.attempts + 1;
+          const tookTooLong = Date.now() - state.startedAt > 90_000;
+          setPublishingStates((prev) => ({
+            ...prev,
+            [id]: {
+              ...state,
+              attempts,
+              status: tookTooLong ? 'failed' : 'publishing',
+              message: tookTooLong
+                ? 'Publishing is taking longer than usual. Retry to check again.'
+                : 'Still processing your collection...'
+            },
+          }));
+        }
+      }));
+    };
+
+    const interval = setInterval(() => {
+      void poll();
+    }, 5000);
+
+    void poll();
+
+    return () => clearInterval(interval);
+  }, [publishingStates, fetchCollections, isVisitorView, routeBrandId, user]);
 
   // Debug: track filtering pipeline when tab or lists change
   useEffect(() => {
@@ -944,7 +1077,7 @@ const ProfilePage: React.FC = () => {
                         <CollectionsSkeleton />
                       ) : searchAndVisibilityFiltered.length > 0 ? (
                         <CollectionsGrid
-                          collections={searchAndVisibilityFiltered}
+                          collections={decoratedCollections}
                           isDraft={visibilityFilter === 'Drafts'}
                           onEdit={isOwner ? (id) => navigate(`/collections/${id}/edit`) : undefined}
                           onDelete={isOwner ? (id) => setCollectionToDelete(id) : undefined}
@@ -959,6 +1092,7 @@ const ProfilePage: React.FC = () => {
                               });
                             }
                           }}
+                          onRetryPublish={handleRetryPublishCheck}
                         />
                       ) : (
                         isOwner ? (

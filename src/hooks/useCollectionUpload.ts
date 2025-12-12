@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   initializeCollectionUploads,
   finalizeCollectionUploads,
@@ -14,66 +14,79 @@ const RETRY_DELAY_MS = 750;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const uploadWithProgress = (entry: PresignEntry, file: File, onProgress: (value: number) => void): Promise<void> =>
-  new Promise((resolve, reject) => {
-    if (!entry.uploadUrl) {
-      return reject(new Error('Missing upload URL for file ' + file.name));
-    }
-    const xhr = new XMLHttpRequest();
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const percent = Math.round((event.loaded / event.total) * 100);
-        onProgress(percent);
-      }
-    };
-    xhr.onerror = () => reject(new Error('File upload failed'));
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress(100);
-        resolve();
-      } else {
-        reject(new Error('File upload failed with status ' + xhr.status));
-      }
-    };
-
-    // Determine upload method: presigned POST if fields exist, else PUT
-    const method = entry.method ?? (entry.uploadFields ? 'POST' : 'PUT');
-    if (method === 'POST') {
-      if (!entry.uploadUrl) {
-        return reject(new Error('Missing upload URL for file ' + file.name));
-      }
-      try {
-        xhr.open('POST', entry.uploadUrl, true);
-      } catch (e) {
-        return reject(new Error(`Invalid upload URL: ${entry.uploadUrl}`));
-      }
-      const form = new FormData();
-      if (entry.uploadFields) {
-        Object.entries(entry.uploadFields).forEach(([key, value]) => {
-          form.append(key, value);
-        });
-      }
-      form.append('file', file, file.name);
-      xhr.send(form);
-    } else {
-      if (!entry.uploadUrl) {
-        return reject(new Error('Missing upload URL for file ' + file.name));
-      }
-      try {
-        xhr.open('PUT', entry.uploadUrl, true);
-      } catch (e) {
-        return reject(new Error(`Invalid upload URL: ${entry.uploadUrl}`));
-      }
-      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-      xhr.send(file);
-    }
-  });
-
 export function useCollectionUpload() {
   const [progress, setProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [perFileProgress, setPerFileProgress] = useState<Record<string, number>>({});
+  const activeRequests = useRef<Set<XMLHttpRequest>>(new Set());
+  const cancelFlag = useRef(false);
+
+  const uploadWithProgress = useCallback(
+    (entry: PresignEntry, file: File, onProgress: (value: number) => void): Promise<void> =>
+      new Promise((resolve, reject) => {
+        if (!entry.uploadUrl) {
+          return reject(new Error('Missing upload URL for file ' + file.name));
+        }
+        if (cancelFlag.current) {
+          return reject(new Error('Upload cancelled'));
+        }
+        const xhr = new XMLHttpRequest();
+        activeRequests.current.add(xhr);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            onProgress(percent);
+          }
+        };
+        xhr.onerror = () => {
+          activeRequests.current.delete(xhr);
+          reject(new Error('File upload failed'));
+        };
+        xhr.onabort = () => {
+          activeRequests.current.delete(xhr);
+          reject(new Error('Upload cancelled'));
+        };
+        xhr.onload = () => {
+          activeRequests.current.delete(xhr);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            onProgress(100);
+            resolve();
+          } else {
+            reject(new Error('File upload failed with status ' + xhr.status));
+          }
+        };
+
+        // Determine upload method: presigned POST if fields exist, else PUT
+        const method = entry.method ?? (entry.uploadFields ? 'POST' : 'PUT');
+        if (method === 'POST') {
+          try {
+            xhr.open('POST', entry.uploadUrl, true);
+          } catch (e) {
+            activeRequests.current.delete(xhr);
+            return reject(new Error(`Invalid upload URL: ${entry.uploadUrl}`));
+          }
+          const form = new FormData();
+          if (entry.uploadFields) {
+            Object.entries(entry.uploadFields).forEach(([key, value]) => {
+              form.append(key, value);
+            });
+          }
+          form.append('file', file, file.name);
+          xhr.send(form);
+        } else {
+          try {
+            xhr.open('PUT', entry.uploadUrl, true);
+          } catch (e) {
+            activeRequests.current.delete(xhr);
+            return reject(new Error(`Invalid upload URL: ${entry.uploadUrl}`));
+          }
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+          xhr.send(file);
+        }
+      }),
+    [],
+  );
 
   const uploadCollection = useCallback(
     async (
@@ -106,6 +119,7 @@ export function useCollectionUpload() {
       setIsUploading(true);
       setProgress(0);
       setError(null);
+        cancelFlag.current = false;
 
       try {
   const filesPayload = items.map((item) => ({
@@ -134,6 +148,9 @@ export function useCollectionUpload() {
         }
         const uploads: PresignEntry[] = Array.isArray(init.uploads) ? init.uploads : ((init as unknown as Record<string, unknown>).uploads as PresignEntry[]) || [];
 
+        // Map local media ids to the remote file ids returned by presign instructions
+        const fileIdMap: Record<string, string> = {};
+
         // Pair each presign entry with its media item
         const queue = uploads.reduce<{ entry: PresignEntry; mediaItem: MediaItem }[]>(
           (
@@ -143,6 +160,7 @@ export function useCollectionUpload() {
           ) => {
             const mediaItem = items.find((it) => it.id === entry.fileId) ?? items[index];
             if (mediaItem) {
+              fileIdMap[mediaItem.id] = entry.fileId;
               accumulator.push({ entry, mediaItem });
             }
             return accumulator;
@@ -192,6 +210,9 @@ export function useCollectionUpload() {
             let attempt = 0;
             while (attempt <= MAX_RETRY_ATTEMPTS) {
               try {
+                if (cancelFlag.current) {
+                  throw new Error('Upload cancelled');
+                }
                 updateFileProgress(mediaItem.id, 0);
                 await uploadWithProgress(entry, file, (value) => updateFileProgress(mediaItem.id, value));
                 const completionId = entry.fileId ?? mediaItem.id;
@@ -228,19 +249,42 @@ export function useCollectionUpload() {
         setPerFileProgress({});
         setProgress(100);
         onProgress?.(100);
-        return finalizeResponse;
+        const asObject =
+          finalizeResponse && typeof finalizeResponse === 'object'
+            ? (finalizeResponse as Record<string, unknown>)
+            : { data: finalizeResponse };
+        return { ...asObject, collectionId, completions, fileIdMap };
       } catch (err) {
         const e = err instanceof Error ? err : new Error('Upload failed');
         setError(e);
         throw e;
       } finally {
+        activeRequests.current.forEach((xhr) => {
+          try {
+            xhr.abort();
+          } catch {}
+        });
+        activeRequests.current.clear();
         setIsUploading(false);
       }
     },
-    [],
+    [uploadWithProgress],
   );
 
-  return { uploadCollection, isUploading, progress, perFileProgress, error } as const;
+  const cancelUploads = useCallback(() => {
+    cancelFlag.current = true;
+    activeRequests.current.forEach((xhr) => {
+      try {
+        xhr.abort();
+      } catch {}
+    });
+    activeRequests.current.clear();
+    setIsUploading(false);
+    setProgress(0);
+    setPerFileProgress({});
+  }, []);
+
+  return { uploadCollection, isUploading, progress, perFileProgress, error, cancelUploads } as const;
 }
 
 export default useCollectionUpload;

@@ -127,7 +127,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   onShare,
 }) => {
   return (
-    <section className="relative w-full h-[70vh] overflow-hidden">
+    <section className="relative w-full h-[70vh] min-h-[360px] overflow-hidden bg-black">
       {/* Cover Image */}
       {coverUrl ? (
         <img 
@@ -142,16 +142,16 @@ const HeroSection: React.FC<HeroSectionProps> = ({
       )}
       
       {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
       
       {/* Floating Header */}
       <div className="absolute top-0 left-0 right-0 z-20 p-4 sm:p-6">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
+        <div className="flex items-center justify-between max-w-7xl mx-auto rounded-2xl bg-white/10 border border-white/15 backdrop-blur-2xl px-4 py-3 shadow-lg shadow-purple-500/20">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-white bg-white/10 border border-white/20 hover:bg-white/20 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="hidden sm:inline text-sm font-medium">Back</span>
@@ -161,7 +161,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onShare}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-white bg-white/10 border border-white/20 hover:bg-white/20 transition-colors"
           >
             <Share2 className="w-4 h-4" />
             <span className="hidden sm:inline text-sm font-medium">Share</span>
@@ -191,8 +191,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             
             <div>
               <h1 
-                className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-1"
-                style={{ textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}
+                className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-1"
+                style={{ textShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
               >
                 {title}
               </h1>
@@ -214,7 +214,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             <motion.div 
               animate={{ y: [0, 8, 0] }}
               transition={{ duration: 1.5, repeat: Infinity }}
-              className="text-white/60 text-sm flex flex-col items-center gap-2"
+              className="text-gray-700 dark:text-white/60 text-sm flex flex-col items-center gap-2"
             >
               <span>Scroll to explore</span>
               <ChevronDown className="w-5 h-5" />
@@ -432,7 +432,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
 }) => {
   return (
     <div className="lg:w-1/3 flex flex-col">
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex flex-col h-full">
+      <div className="bg-white/5 text-white border border-white/10 shadow-2xl rounded-2xl p-6 flex flex-col h-full backdrop-blur-xl">
         {/* Stats Bar */}
         <div className="flex items-center justify-around py-4 border-b border-white/10 mb-6">
           <div className="flex flex-col items-center gap-1">
@@ -445,11 +445,11 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
             />
           </div>
           <div className="flex flex-col items-center gap-1">
-            <MessageCircle className="w-6 h-6 text-indigo-400" />
+            <MessageCircle className="w-6 h-6 text-indigo-300" />
             <span className="text-xs font-semibold text-white">{formatCompactNumber(commentsCount)}</span>
           </div>
           <div className="flex flex-col items-center gap-1">
-            <Eye className="w-6 h-6 text-gray-400" />
+            <Eye className="w-6 h-6 text-white/70" />
             <span className="text-xs font-semibold text-white">{formatCompactNumber(viewsCount)}</span>
           </div>
         </div>
@@ -465,7 +465,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
           />
         </div>
 
-        <button className="text-purple-400 hover:text-purple-300 text-sm font-medium mb-4 text-center">
+        <button className="text-purple-300 hover:text-purple-200 text-sm font-medium mb-4 text-center">
           View all {commentsCount} comments
         </button>
       </div>
@@ -487,18 +487,18 @@ const StorySection: React.FC<StorySectionProps> = ({ description, tags = [] }) =
   if (!description && tags.length === 0) return null;
 
   return (
-    <section className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-gray-900">
+    <section className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-gray-900 text-white">
       <div className="max-w-4xl mx-auto">
         {description && (
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sm:p-8 mb-6">
             <h2 className="font-serif text-2xl sm:text-3xl font-bold text-white mb-4">The Story</h2>
-            <p className={`font-serif italic text-gray-300 text-base sm:text-lg leading-relaxed mb-4 ${!expanded ? 'line-clamp-3' : ''}`}>
+            <p className={`font-serif italic text-gray-200 text-base sm:text-lg leading-relaxed mb-4 ${!expanded ? 'line-clamp-3' : ''}`}>
               {description}
             </p>
             {description.length > 200 && (
               <button 
                 onClick={() => setExpanded(!expanded)}
-                className="text-purple-400 hover:text-purple-300 text-sm font-medium flex items-center gap-2"
+                className="text-purple-300 hover:text-purple-200 text-sm font-medium flex items-center gap-2"
               >
                 <span>{expanded ? 'Read less' : 'Read more'}</span>
                 {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -512,7 +512,7 @@ const StorySection: React.FC<StorySectionProps> = ({ description, tags = [] }) =
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="px-3 py-1.5 bg-purple-500/10 text-purple-400 border border-purple-500/30 rounded-full text-sm hover:bg-purple-500/20 cursor-pointer transition-colors"
+                className="px-3 py-1.5 bg-purple-500/10 text-purple-200 border border-purple-500/30 rounded-full text-sm hover:bg-purple-500/20 cursor-pointer transition-colors"
               >
                 #{tag}
               </span>
@@ -608,36 +608,36 @@ const ShoppingSection: React.FC<ShoppingSectionProps> = ({
   };
 
   return (
-    <section className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-black">
+    <section className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-black text-white">
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sm:p-8">
+        <div className="bg-white/5 border border-white/10 shadow-2xl rounded-2xl p-6 sm:p-8 backdrop-blur-xl">
           {/* Price Display */}
           <div className="mb-6">
             <div className="flex items-baseline gap-3 mb-2">
               {hasSale && salePrice ? (
                 <>
-                  <span className="text-2xl sm:text-3xl font-bold text-green-400">{salePrice}</span>
+                  <span className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">{salePrice}</span>
                   {basePrice && (
-                    <span className="text-lg sm:text-xl text-gray-500 line-through">{basePrice}</span>
+                    <span className="text-lg sm:text-xl text-gray-500 dark:text-gray-400 line-through">{basePrice}</span>
                   )}
                 </>
               ) : basePrice ? (
-                <span className="text-2xl sm:text-3xl font-bold text-white">{basePrice}</span>
+                <span className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{basePrice}</span>
               ) : (
-                <span className="text-lg text-gray-400">Price on request</span>
+                <span className="text-lg text-gray-500 dark:text-gray-400">Price on request</span>
               )}
             </div>
             
             {/* Sale countdown */}
             {hasSale && countdown && (
               <>
-                <div className="flex items-center gap-2 text-orange-400 text-sm mb-3">
+                <div className="flex items-center gap-2 text-orange-500 dark:text-orange-400 text-sm mb-3">
                   <Clock className="w-4 h-4" />
                   <span>Sale ends in {countdown}</span>
                 </div>
-                <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                   <div 
-                    className="bg-gradient-to-r from-purple-500 to-indigo-500 h-full rounded-full transition-all"
+                    className="bg-gradient-to-r from-purple-600 to-indigo-600 h-full rounded-full transition-all dark:from-purple-500 dark:to-indigo-500"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
@@ -661,13 +661,13 @@ const ShoppingSection: React.FC<ShoppingSectionProps> = ({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleWishlist}
-              className={`border-2 border-purple-500 font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors ${
+              className={`border-2 border-purple-600 font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors ${
                 isInWishlist 
-                  ? 'bg-purple-500/20 text-purple-300' 
-                  : 'text-purple-400 hover:bg-purple-500/10'
+                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-200' 
+                  : 'text-purple-200 hover:bg-purple-500/10'
               }`}
             >
-              <Heart className={`w-5 h-5 ${isInWishlist ? 'fill-purple-400' : ''}`} />
+              <Heart className={`w-5 h-5 ${isInWishlist ? 'fill-purple-600 dark:fill-purple-300' : ''}`} />
               <span>{isInWishlist ? 'In Wishlist' : 'Add to Wishlist'}</span>
             </motion.button>
           </div>
@@ -676,145 +676,25 @@ const ShoppingSection: React.FC<ShoppingSectionProps> = ({
           <div className="flex flex-wrap gap-3">
             <button 
               onClick={onContactBrand}
-              className="bg-white/5 border border-white/10 px-4 py-2 rounded-lg text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+              className="bg-white/10 border border-white/15 px-4 py-2 rounded-lg text-sm text-white hover:bg-white/15 transition-colors flex items-center gap-2"
             >
               <MessageCircle className="w-4 h-4" />
               <span>Contact Brand</span>
             </button>
             <button 
               onClick={onVisitStore}
-              className="bg-white/5 border border-white/10 px-4 py-2 rounded-lg text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+              className="bg-white/10 border border-white/15 px-4 py-2 rounded-lg text-sm text-white hover:bg-white/15 transition-colors flex items-center gap-2"
             >
               <Store className="w-4 h-4" />
               <span>Visit Store</span>
             </button>
             <button 
               onClick={onShare}
-              className="bg-white/5 border border-white/10 px-4 py-2 rounded-lg text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+              className="bg-white/10 border border-white/15 px-4 py-2 rounded-lg text-sm text-white hover:bg-white/15 transition-colors flex items-center gap-2"
             >
               <Share2 className="w-4 h-4" />
               <span>Share</span>
             </button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-// ============================================
-// BRAND SECTION
-// ============================================
-interface BrandSectionProps {
-  brand?: {
-    id: string;
-    brandName?: string;
-    logo?: string;
-    logoFileId?: string | null;
-    location?: string;
-    bio?: string;
-    collectionsCount?: number;
-    followersCount?: number;
-    isVerified?: boolean;
-  };
-  username?: string;
-  onFollow: () => void;
-  onViewProfile: () => void;
-}
-
-const BrandSection: React.FC<BrandSectionProps> = ({
-  brand,
-  username,
-  onFollow,
-  onViewProfile,
-}) => {
-  const [isFollowing, setIsFollowing] = useState(false);
-
-  if (!brand) return null;
-
-  const handleFollow = () => {
-    setIsFollowing(!isFollowing);
-    onFollow();
-  };
-
-  return (
-    <section className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-gray-900">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sm:p-8">
-          <h2 className="text-2xl font-bold text-white mb-6">About the Brand</h2>
-          
-          {/* Brand Header */}
-          <div className="flex items-start gap-4 mb-6">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden flex-shrink-0">
-              <ImageWithFallback
-                src={brand.logo}
-                fileId={brand.logoFileId}
-                alt={brand.brandName || 'Brand'}
-                containerClassName="w-full h-full"
-                fallbackName={brand.brandName || 'B'}
-              />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-xl font-bold text-white">{brand.brandName}</h3>
-                {brand.isVerified && (
-                  <CheckCircle className="w-5 h-5 text-purple-400 fill-purple-400" />
-                )}
-              </div>
-              <p className="text-gray-400 text-sm mb-1">@{username}</p>
-              {brand.location && (
-                <p className="text-gray-400 text-sm flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  <span>{brand.location}</span>
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Bio */}
-          {brand.bio && (
-            <p className="text-gray-300 mb-6">{brand.bio}</p>
-          )}
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold text-white mb-1">
-                {brand.collectionsCount || 0}
-              </div>
-              <div className="text-sm text-gray-400">Collections</div>
-            </div>
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold text-white mb-1">
-                {formatCompactNumber(brand.followersCount)}
-              </div>
-              <div className="text-sm text-gray-400">Followers</div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleFollow}
-              className={`font-semibold py-3 px-6 rounded-xl transition-all ${
-                isFollowing
-                  ? 'bg-white/10 border border-white/20 text-white'
-                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25'
-              }`}
-            >
-              {isFollowing ? 'Following' : 'Follow'}
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onViewProfile}
-              className="border-2 border-purple-500 text-purple-400 font-semibold py-3 px-6 rounded-xl hover:bg-purple-500/10 transition-colors flex items-center justify-center gap-2"
-            >
-              <span>View Profile</span>
-              <ChevronRight className="w-4 h-4" />
-            </motion.button>
           </div>
         </div>
       </div>
@@ -1238,7 +1118,7 @@ const CollectionViewRedesign: React.FC = () => {
 
   const handleViewProfile = () => {
     if (detail?.owner?.brand?.id) {
-      navigate(`/brands/${detail.owner.brand.id}`);
+      navigate(`/store/${detail.owner.brand.id}`);
     } else if (detail?.owner?.id) {
       navigate(`/profile/${detail.owner.id}`);
     }
@@ -1250,7 +1130,7 @@ const CollectionViewRedesign: React.FC = () => {
 
   const handleVisitStore = () => {
     if (detail?.owner?.brand?.id) {
-      navigate(`/brands/${detail.owner.brand.id}`);
+      navigate(`/store/${detail.owner.brand.id}`);
     }
   };
 
@@ -1297,7 +1177,7 @@ const CollectionViewRedesign: React.FC = () => {
     (detail.medias?.reduce((sum: number, m: any) => sum + (m?.commentsCount || 0), 0) || 0);
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-black text-white">
       {/* Hero Section */}
       <HeroSection
         coverUrl={coverUrl}
@@ -1360,14 +1240,6 @@ const CollectionViewRedesign: React.FC = () => {
         onContactBrand={handleContactBrand}
         onVisitStore={handleVisitStore}
         onShare={handleShare}
-      />
-
-      {/* Brand Section */}
-      <BrandSection
-        brand={detail.owner?.brand}
-        username={detail.owner?.username}
-        onFollow={handleFollow}
-        onViewProfile={handleViewProfile}
       />
 
       {/* More from Brand */}

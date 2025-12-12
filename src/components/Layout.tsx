@@ -6,6 +6,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { useNotificationsBootstrap } from '@/hooks/useNotifications';
 import { setSidebarMode, closeSidebar, toggleSidebar } from '@/features/uiSlice';
+import GlassBackdrop from './ui/GlassBackdrop';
 
 export const Layout: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -106,13 +107,12 @@ export const Layout: React.FC = () => {
       </main>
 
       {/* Backdrop for OVERLAY mode, Mobile Drawer, or Expanded Rail */}
-      {isSidebarOpen && (sidebarMode === 'OVERLAY' || sidebarMode === 'HIDDEN' || sidebarMode === 'RAIL' || window.innerWidth < 1024) && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30"
-          onClick={() => dispatch(closeSidebar())}
-          aria-hidden="true"
-        />
-      )}
+      <GlassBackdrop
+        isVisible={Boolean(isSidebarOpen && (sidebarMode === 'OVERLAY' || sidebarMode === 'HIDDEN' || sidebarMode === 'RAIL' || window.innerWidth < 1024))}
+        onClick={() => dispatch(closeSidebar())}
+        variant="light"
+        zIndex={40}
+      />
     </div>
   );
 };

@@ -10,28 +10,18 @@ import {
 import { HiOutlineSparkles } from 'react-icons/hi';
 
 // Context & Hooks
+import TextField from '../../components/forms/TextField';
+import UniversalSelect from '@/components/forms/UniversalSelect';
+import MediaUploadZone from '../../components/upload/MediaUploadZone';
+import ThumbnailStrip from '../../components/upload/ThumbnailStrip';
+import useFilePicker from '../../components/upload/useFilePicker';
+import { PrePublishConfirmModal } from '@/components/modals';
+import TagsApi from '@/api/TagsApi';
+import { brandApi } from '@/api/BrandApi';
+import type { MediaItem } from '@/types/media';
 import { MediaProvider, useMediaStore } from '../../hooks/useMediaStore';
 import useCollectionUpload from '../../hooks/useCollectionUpload';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
-import useFilePicker from '../../components/upload/useFilePicker';
-
-// APIs
-import TagsApi from '@/api/TagsApi';
-import { brandApi } from '@/api/BrandApi';
-
-// Components
-import MediaUploadZone from '../../components/upload/MediaUploadZone';
-import ThumbnailStrip from '../../components/upload/ThumbnailStrip';
-import PrePublishConfirmModal from '../../components/modals/PrePublishConfirmModal';
-import TextField from '../../components/forms/TextField';
-// TextAreaField not used - using custom textarea instead
-import UniversalSelect from '@/components/forms/UniversalSelect';
-
-// Types
-import type { MediaItem } from '@/types/media';
-
-// ============================================================================
-// MAIN COMPONENT
 // ============================================================================
 
 const CreateCollectionInner: React.FC = () => {
@@ -89,7 +79,7 @@ const CreateCollectionInner: React.FC = () => {
   // Track original items for deletion in edit mode
   const originalItemIds = useRef<Set<string>>(new Set());
 
-  const { uploadCollection, isUploading, progress, perFileProgress } = useCollectionUpload();
+  const { uploadCollection, isUploading, progress, perFileProgress, cancelUploads } = useCollectionUpload();
   const { user, fetchCollections } = useBrandProfile();
 
   const disabled = isSubmitting || isUploading;
@@ -103,11 +93,11 @@ const CreateCollectionInner: React.FC = () => {
   // Load initial data
   useEffect(() => {
     let mounted = true;
+
     (async () => {
       try {
         const s = await TagsApi.getSuggestions(80);
-        if (!mounted) return;
-        setTagSuggestions(s);
+        if (mounted) setTagSuggestions(s);
 
         const cats = await brandApi.getCategories();
         if (mounted && Array.isArray(cats)) {
@@ -116,7 +106,6 @@ const CreateCollectionInner: React.FC = () => {
           if (!categoryId && mapped.length) setCategoryId(mapped[0].id);
         }
 
-        // Edit mode: fetch collection details
         if (isEditMode && id) {
           const d = await brandApi.getCollectionDetail(id);
           if (mounted && d) {
@@ -149,17 +138,26 @@ const CreateCollectionInner: React.FC = () => {
             }
           }
         }
+      } catch (error) {
+        console.error(error);
       } finally {
         if (mounted) setLoadingCategories(false);
       }
     })();
+
     return () => {
       mounted = false;
     };
-  }, [id, isEditMode]);
+  }, [id, isEditMode, mediaStore]);
 
-  // Keep selected index in bounds
+  // Keep selected/cover indices in range when files change
   useEffect(() => {
+    if (!files.length) {
+      setSelectedIndex(0);
+      setCoverIndex(0);
+      return;
+    }
+
     if (selectedIndex >= files.length) {
       setSelectedIndex(Math.max(0, files.length - 1));
     }
@@ -358,10 +356,22 @@ const CreateCollectionInner: React.FC = () => {
 
   const handlePublishConfirm = async () => {
     setIsSubmitting(true);
+    // Close modal immediately so user can keep browsing and see inline progress
+    setShowPublishModal(false);
     try {
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
       const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
       const finalTags = selectedTags.slice(0, 10);
+
+      const extractCollectionId = (res: any): string | undefined => {
+        if (!res || typeof res !== 'object') return undefined;
+        if (typeof (res as any).collectionId === 'string') return (res as any).collectionId;
+        if (typeof (res as any).id === 'string') return (res as any).id;
+        if ((res as any).data && typeof (res as any).data === 'object' && typeof (res as any).data.id === 'string') return (res as any).data.id;
+        return undefined;
+      };
+
+      const coverLocalId = files[coverIndex]?.id;
 
       if (isEditMode && id) {
         await brandApi.updateCollection(id, {
@@ -374,6 +384,7 @@ const CreateCollectionInner: React.FC = () => {
           categoryId,
           type,
           visibility,
+          coverMediaId: files[coverIndex]?.remoteId || coverLocalId,
         } as any);
 
         const currentIds = new Set(files.map((f) => f.id));
@@ -384,7 +395,7 @@ const CreateCollectionInner: React.FC = () => {
 
         toast.success('Collection updated');
       } else {
-        await uploadCollection(
+        const response = await uploadCollection(
           files,
           title,
           description,
@@ -394,15 +405,39 @@ const CreateCollectionInner: React.FC = () => {
           finalTags,
           { categoryId, type, visibility }
         );
+        const newCollectionId = extractCollectionId(response);
+        const fileIdMap = (response as any)?.fileIdMap as Record<string, string> | undefined;
+        const completions = (response as any)?.completions as Array<{ fileId: string }> | undefined;
+        const coverRemoteId = coverLocalId
+          ? fileIdMap?.[coverLocalId] || completions?.[coverIndex]?.fileId || coverLocalId
+          : undefined;
+
+        if (newCollectionId && coverRemoteId) {
+          await brandApi.updateCollection(newCollectionId, { coverMediaId: coverRemoteId } as any);
+        }
         toast.success('Collection published');
+
+        // Navigate back to profile/catalog with a publishing badge so the user is not blocked on this page
+        navigate(`/profile?tab=Collections`, {
+          state: {
+            publishingCollectionId: newCollectionId,
+            publishingTitle: title,
+            publishingStartedAt: Date.now(),
+          },
+        });
       }
 
       if (user?.id) {
         await fetchCollections(user.id);
       }
-
-      // Modal will handle redirect after success state
+      setShowPublishModal(false);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.toLowerCase().includes('cancelled')) {
+        toast.info('Publish cancelled');
+        setShowPublishModal(false);
+        return;
+      }
       console.error(error);
       toast.error(isEditMode ? 'Failed to update collection' : 'Failed to publish collection');
       throw error; // Re-throw so modal can handle state
@@ -458,21 +493,7 @@ const CreateCollectionInner: React.FC = () => {
           </h1>
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setShowDraftPreview(true)}
-              className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-white/15 bg-white/80 dark:bg-white/10 text-gray-800 dark:text-white text-sm font-medium hover:border-purple-400/50"
-            >
-              Preview Draft
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              disabled={disabled}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-600 text-white text-sm font-semibold shadow-sm hover:bg-purple-500 disabled:opacity-50"
-            >
-              Save Draft
-            </button>
+            {/* Buttons removed as per request */}
             <button
               type="button"
               className="w-9 h-9 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur flex items-center justify-center text-gray-700 dark:text-gray-100 hover:text-purple-600 dark:hover:text-white transition-colors shadow-sm"
@@ -485,7 +506,7 @@ const CreateCollectionInner: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 pb-32">
+      <main className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 py-6 pb-32">
         {/* Upload Progress Banner */}
         <AnimatePresence>
           {isUploading && (
@@ -498,6 +519,16 @@ const CreateCollectionInner: React.FC = () => {
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-8 h-8 rounded-full border-2 border-purple-500/20 border-t-purple-500 animate-spin" />
                 <span className="text-white font-medium">Uploading files... {progress}%</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    cancelUploads();
+                    toast.info('Upload cancelled');
+                  }}
+                  className="ml-auto px-3 py-1 rounded-lg bg-white/10 text-white text-sm hover:bg-white/20"
+                >
+                  Cancel
+                </button>
               </div>
               <div className="h-2 w-full rounded-full bg-purple-900/40">
                 <div
@@ -561,7 +592,7 @@ const CreateCollectionInner: React.FC = () => {
                     </AnimatePresence>
 
                     {/* Floating Action Bar */}
-                    <div className="absolute bottom-0 left-0 right-0 glass-panel-dark border-t border-white/10 px-4 py-3">
+                    <div className="absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/80 to-transparent">
                       <div className="flex items-center justify-center gap-2">
                         <ActionButton
                           icon={<FiTrash2 className="w-4 h-4" />}
@@ -639,7 +670,7 @@ const CreateCollectionInner: React.FC = () => {
                 <TextField
                   label="Collection Title"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
                   placeholder="e.g., Summer Breeze '24"
                   disabled={disabled}
                   variant="glass"
@@ -719,7 +750,7 @@ const CreateCollectionInner: React.FC = () => {
                         type="button"
                         onClick={() => tagSearch.trim() && addTag(tagSearch.trim().toLowerCase().replace(/\s+/g, '-'))}
                         disabled={disabled || selectedTags.length >= 10 || !tagSearch.trim()}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold flex items-center gap-1 shadow-sm disabled:opacity-50"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all disabled:opacity-50 disabled:shadow-none"
                         aria-label="Add tag"
                       >
                         <FiPlus className="w-4 h-4" />
@@ -910,8 +941,8 @@ const CreateCollectionInner: React.FC = () => {
       </main>
 
       {/* Actions Footer - Integrated into flow */}
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 pb-12">
-        <div className="glass-panel border border-gray-200 dark:border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 pb-12">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">
             {lastSaved
               ? `Collection saved locally • Last edit: ${formatTimeAgo(lastSaved)}`

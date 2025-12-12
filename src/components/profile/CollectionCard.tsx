@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MessageCircle, Share2, MoreVertical, Store } from 'lucide-react';
+import { MessageCircle, Share2, MoreVertical, Store, AlertTriangle, Loader2 } from 'lucide-react';
 import LikeButton from '@/components/ui/LikeButton';
 import type { CollectionDto } from '../../types/profile';
 import { formatPrice } from '@/utils/helpers';
@@ -15,6 +15,7 @@ interface CollectionCardProps {
   onDelete?: (id: string) => void;
   showActions?: boolean;
   isDraft?: boolean;
+  onRetryPublish?: (id: string) => void;
 }
 
 const CollectionCard: React.FC<CollectionCardProps> = ({ 
@@ -24,6 +25,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   onDelete,
   showActions = true,
   isDraft = false,
+  onRetryPublish,
 }) => {
   const {
     title,
@@ -44,6 +46,11 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
     brandLogo,
     isAvailableInStore = false,
   } = collection;
+
+  const clientStatus = collection.clientStatus;
+  const isPublishing = clientStatus === 'publishing';
+  const publishFailed = clientStatus === 'publish-failed';
+  const statusMessage = collection.clientStatusMessage || (isPublishing ? 'Publishing...' : publishFailed ? 'Publish failed' : undefined);
 
   const displayItemCount = itemCount || postsCount;
   const [resolvedCover, setResolvedCover] = useState<string | undefined>(coverImage || undefined);
@@ -118,10 +125,36 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
     <>
     <div 
       className="relative group w-full glass-panel overflow-hidden rounded-lg cursor-pointer shadow-md transition-transform duration-200 hover:scale-[1.02]"
-      onClick={onClick}
+      onClick={isPublishing ? undefined : onClick}
     >
       {/* Background Media */}
       <div className="relative w-full overflow-hidden">
+        {(isPublishing || publishFailed) && (
+          <div className="absolute inset-0 z-40 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-white px-4 text-center">
+            {isPublishing ? (
+              <>
+                <Loader2 className="w-6 h-6 animate-spin" />
+                <div className="text-sm font-medium">{statusMessage}</div>
+                <div className="text-xs text-white/70">You can keep browsing; we will finish this in the background.</div>
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="w-6 h-6 text-amber-300" />
+                <div className="text-sm font-semibold">{statusMessage || 'Publish delayed'}</div>
+                <div className="text-xs text-white/70">Tap retry to check again.</div>
+                {onRetryPublish && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onRetryPublish(collection.id); }}
+                    className="px-3 py-1 rounded-lg bg-white/15 border border-white/25 text-xs font-semibold hover:bg-white/20"
+                  >
+                    Retry status
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
         {resolvedCover ? (
           <>
             {!imgLoaded && (

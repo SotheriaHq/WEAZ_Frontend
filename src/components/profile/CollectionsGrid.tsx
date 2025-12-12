@@ -9,6 +9,7 @@ interface CollectionsGridProps {
   onDelete?: (id: string) => void;
   onCollectionClick?: (id: string) => void;
   isDraft?: boolean;
+  onRetryPublish?: (id: string) => void;
 }
 
 const CollectionsGrid: React.FC<CollectionsGridProps> = ({ 
@@ -16,7 +17,8 @@ const CollectionsGrid: React.FC<CollectionsGridProps> = ({
   onEdit, 
   onDelete,
   onCollectionClick,
-  isDraft
+  isDraft,
+  onRetryPublish,
 }) => {
   const breakpointColumns = {
     default: 4,
@@ -45,6 +47,7 @@ const CollectionsGrid: React.FC<CollectionsGridProps> = ({
             onEdit={onEdit} 
             onDelete={onDelete}
             isDraft={isDraft}
+            onRetryPublish={onRetryPublish}
           />
         </div>
       ))}

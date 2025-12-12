@@ -1,8 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FrostedButton } from '@/components/ui/FrostedButton';
-import { Home, Search, ArrowLeft, MapPin } from 'lucide-react';
+import { Home, ArrowLeft, MapPin } from 'lucide-react';
 
 /**
  * NotFound - Premium 404 page with engaging design

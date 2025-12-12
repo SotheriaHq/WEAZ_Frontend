@@ -1,8 +1,7 @@
 import React from 'react';
 import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FrostedButton } from '@/components/ui/FrostedButton';
-import { Home, ArrowLeft, RefreshCcw, AlertTriangle, WifiOff, ServerCrash, ShieldX } from 'lucide-react';
+import { Home, RefreshCcw, AlertTriangle, WifiOff, ServerCrash, ShieldX } from 'lucide-react';
 
 /**
  * ErrorPage - Premium error boundary page

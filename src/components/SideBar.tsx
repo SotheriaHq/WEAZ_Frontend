@@ -88,6 +88,9 @@ export const Sidebar: React.FC = () => {
 
   const showOverlay = isSidebarOpen;
   const showRail = sidebarMode === 'RAIL' && !isSidebarOpen;
+  const slideClasses = showOverlay
+    ? `transform transition-transform duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'}`
+    : '';
 
   // If hidden and not open, render nothing
   if (sidebarMode === 'HIDDEN' && !isSidebarOpen) {
@@ -140,7 +143,7 @@ export const Sidebar: React.FC = () => {
   }
 
   return (
-    <div className={`${positionClass} ${widthClass} bg-white dark:bg-[#000000] flex flex-col transition-all duration-300 ease-out overflow-hidden ${!isRail ? 'border-r border-gray-200 dark:border-white/10' : ''}`}>
+    <div className={`${positionClass} ${widthClass} bg-white dark:bg-[#000000] flex flex-col transition-all duration-300 ease-out overflow-hidden ${!isRail ? 'border-r border-gray-200 dark:border-white/10' : ''} ${slideClasses}`}>
       
       {/* Header (Logo + Hamburger) - Only visible in Drawer/Overlay mode inside the sidebar */}
       {showHeader && (

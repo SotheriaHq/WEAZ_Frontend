@@ -47,10 +47,10 @@ const MediaUploadZone: React.FC<MediaUploadZoneProps> = ({
     >
       <div
         className={`
-          relative rounded-2xl border-2 border-dashed transition-all duration-300 overflow-hidden
+          relative rounded-3xl border-2 border-dashed transition-all duration-500 overflow-hidden group
           ${isDragActive 
-            ? 'upload-zone-active border-purple-500 bg-purple-500/5' 
-            : 'border-white/20 hover:border-purple-500/50 bg-white/[0.02]'
+            ? 'border-purple-500 bg-purple-500/10 scale-[1.02] shadow-2xl shadow-purple-500/20' 
+            : 'border-gray-300/30 dark:border-white/10 hover:border-purple-500/50 hover:bg-purple-500/5 hover:shadow-xl hover:shadow-purple-500/10'
           }
           ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
         `}
@@ -62,24 +62,23 @@ const MediaUploadZone: React.FC<MediaUploadZoneProps> = ({
         }}
       >
         {/* Gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 via-indigo-900/5 to-blue-900/10 pointer-events-none" />
+        <div className={`absolute inset-0 bg-gradient-to-br from-purple-600/5 via-indigo-600/5 to-blue-600/5 transition-opacity duration-500 ${isDragActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
         
         {/* Content */}
-        <div className="relative py-16 px-8 text-center">
+        <div className="relative py-20 px-8 text-center flex flex-col items-center justify-center min-h-[400px]">
           {/* Icon */}
           <motion.div 
-            className="mx-auto mb-6 w-20 h-20 rounded-2xl glass-light flex items-center justify-center"
-            animate={isDragActive ? { scale: 1.1 } : { scale: 1 }}
-            transition={{ duration: 0.2 }}
+            className="mb-8 w-24 h-24 rounded-3xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 flex items-center justify-center shadow-lg backdrop-blur-sm group-hover:scale-110 transition-transform duration-500"
+            animate={isDragActive ? { scale: 1.1, rotate: 5 } : { scale: 1, rotate: 0 }}
           >
-            <FiUpload className={`w-10 h-10 ${isDragActive ? 'text-purple-400' : 'text-gray-400'}`} />
+            <FiUpload className={`w-10 h-10 ${isDragActive ? 'text-purple-400' : 'text-gray-400 group-hover:text-purple-400 transition-colors duration-300'}`} />
           </motion.div>
 
           {/* Main text */}
-          <h3 className="text-xl font-semibold text-white mb-2">
+          <h3 className="text-2xl font-bold text-white mb-3 tracking-tight">
             {isDragActive ? 'Drop your files here' : 'Drag & drop your fashion imagery'}
           </h3>
-          <p className="text-gray-400 mb-6">
+          <p className="text-gray-400 mb-8 text-lg font-light">
             or click to browse from your device
           </p>
 

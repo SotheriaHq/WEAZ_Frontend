@@ -30,6 +30,10 @@ export interface CollectionDto {
   isAvailableInStore?: boolean;
   tags?: string[];
   isLiked?: boolean; // Backend includes this for authenticated users
+  // Client-only status metadata for optimistic publish/progress states
+  clientStatus?: 'publishing' | 'publish-failed';
+  clientStatusMessage?: string;
+  clientStatusMeta?: { startedAt?: number; attempts?: number; offline?: boolean };
 }
 
 // Review Types
