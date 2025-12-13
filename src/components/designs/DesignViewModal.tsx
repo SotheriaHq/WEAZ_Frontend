@@ -67,14 +67,17 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
   React.useEffect(() => {
     if (open) {
-      document.body.classList.add('modal-open');
-    } else {
-      document.body.classList.remove('modal-open');
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      };
     }
-    // Cleanup function to ensure the class is removed when the component unmounts
-    return () => {
-      document.body.classList.remove('modal-open');
-    };
   }, [open]);
 
   // Guard rendering until item is available to avoid null property access.
@@ -142,7 +145,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         </button>
 
         {/* Left: Media - full width with vertical scroll for tall images */}
-        <div className={`col-span-12 ${leftColsSm} ${leftColsMd} rounded-l-2xl bg-black overflow-y-auto`}> 
+        <div className={`col-span-12 ${leftColsSm} ${leftColsMd} rounded-l-2xl bg-black overflow-y-auto overscroll-contain`}> 
           <div className="relative mx-auto w-full">
             <MediaViewer
               media={item.media}
@@ -154,7 +157,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         </div>
 
         {/* Right: Data Area + Comments */}
-  <div className={`col-span-12 flex flex-col p-4 ${rightColsSm} ${rightColsMd} overflow-y-auto modal-scrollbar relative bg-white/60 dark:bg-white/5 backdrop-blur-xl border-l border-white/20 dark:border-white/10 rounded-r-2xl text-gray-900 dark:text-gray-100` }>
+  <div className={`col-span-12 flex flex-col p-4 ${rightColsSm} ${rightColsMd} overflow-y-auto modal-scrollbar relative bg-white/60 dark:bg-white/5 backdrop-blur-xl border-l border-white/20 dark:border-white/10 rounded-r-2xl text-gray-900 dark:text-gray-100 overscroll-contain` }>
           {/* Data Area */}
           <div className="pb-4">
             <div className="mb-3 flex items-center gap-3">

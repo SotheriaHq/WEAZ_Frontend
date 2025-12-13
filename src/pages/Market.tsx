@@ -328,9 +328,22 @@ const Market: React.FC = () => {
     navigate(`/collections/${collectionId}`);
   };
 
-  const handleViewBrand = (brandId: string) => {
+  const handleViewBrand = (brandId: string, item: MarketItem) => {
     if (!brandId) return;
-    navigate(`/store/${brandId}`);
+    navigate(`/store/${brandId}` , {
+      state: {
+        brandPreview: {
+          id: brandId,
+          brandFullName: item.brandName ?? item.username ?? 'Brand',
+          brandCity: undefined,
+          brandCountry: undefined,
+          brandState: undefined,
+          brandTags: item.tags ?? [],
+          profileImage: item.brandLogo ?? undefined,
+          username: item.username ?? undefined,
+        },
+      },
+    });
   };
 
   const handleCommentCountChange = (itemId: string, newCount: number) => {

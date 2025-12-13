@@ -148,6 +148,22 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     }
   }, [selectedColor, product]);
 
+  // Scroll Locking
+  useEffect(() => {
+    if (isOpen) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      };
+    }
+  }, [isOpen]);
+
   if (!product) return null;
 
   const isWishlisted = wishlistedIds.has(product.id);
@@ -316,7 +332,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </button>
 
               {/* Scrollable content */}
-              <div className="flex-1 overflow-y-auto glass-scrollbar pb-20 lg:pb-0">
+              <div className="flex-1 overflow-y-auto glass-scrollbar pb-20 lg:pb-0 overscroll-contain">
                 {/* Main content grid */}
                 <div className="grid lg:grid-cols-2 gap-0">
                   {/* Left - Image Gallery */}

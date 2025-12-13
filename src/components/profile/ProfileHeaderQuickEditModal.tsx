@@ -106,6 +106,22 @@ const ProfileHeaderQuickEditModal: React.FC<ProfileHeaderQuickEditModalProps> = 
     await onSubmit({ ...values, brandTags: selectedTags });
   });
 
+  // Scroll Locking
+  useEffect(() => {
+    if (open) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      };
+    }
+  }, [open]);
+
   if (!open) return null;
 
   return (

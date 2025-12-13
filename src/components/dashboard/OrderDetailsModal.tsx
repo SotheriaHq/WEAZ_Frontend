@@ -29,6 +29,22 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     }
   }, [isOpen, orderId, brandId]);
 
+  // Scroll Locking
+  useEffect(() => {
+    if (isOpen) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      };
+    }
+  }, [isOpen]);
+
   const fetchOrderDetails = async () => {
     setLoading(true);
     try {
@@ -76,7 +92,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 overscroll-contain">
           {loading ? (
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black dark:border-white"></div>

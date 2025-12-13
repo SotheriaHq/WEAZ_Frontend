@@ -14,7 +14,7 @@ interface DesignCardProps {
   item: MarketItem;
   onOpenView?: (item: MarketItem) => void;
   onViewCollection?: (collectionId: string) => void;
-  onViewBrand?: (brandId: string) => void;
+  onViewBrand?: (brandId: string, item: MarketItem) => void;
   className?: string;
 }
 
@@ -218,7 +218,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onViewBrand?.(item.brandId);
+              onViewBrand?.(item.brandId, item);
             }}
             className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 w-fit rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 transition-all"
           >

@@ -31,6 +31,22 @@ const Modal: React.FC<ModalProps> = ({
     full: 'max-w-[95vw]',
   };
 
+  // Scroll Locking
+  React.useEffect(() => {
+    if (open) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      };
+    }
+  }, [open]);
+
   return (
     <AnimatePresence>
       {open && (
