@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   MapPin,
@@ -89,6 +90,7 @@ const COLOR_OPTIONS = [
 const BrandStore: React.FC = () => {
   const { brandId } = useParams<{ brandId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const currentUser = useSelector((s: RootState) => s.user.profile);
 
@@ -97,6 +99,34 @@ const BrandStore: React.FC = () => {
   const [brandLoading, setBrandLoading] = useState(true);
   const [bannerError, setBannerError] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [brandError, setBrandError] = useState(false);
+  const previewBrand = (location.state as { brandPreview?: Partial<BrandProfile> } | undefined)?.brandPreview;
+
+  const buildBrandFromPreview = useCallback(
+    (preview: Partial<BrandProfile>): BrandProfile => ({
+      id: preview.id ?? brandId ?? 'brand',
+      username:
+        preview.username ??
+        (preview.brandFullName ? preview.brandFullName.replace(/\s+/g, '').toLowerCase() : 'brand'),
+      brandFullName: preview.brandFullName ?? preview.username ?? 'Brand',
+      brandDescription: preview.brandDescription ?? '',
+      brandCountry: preview.brandCountry,
+      brandState: preview.brandState,
+      brandCity: preview.brandCity,
+      brandTags: preview.brandTags ?? [],
+      profileImage: preview.profileImage,
+      bannerImage: preview.bannerImage,
+      socialInstagram: preview.socialInstagram,
+      socialTwitter: preview.socialTwitter,
+      socialWebsite: preview.socialWebsite,
+      followersCount: preview.followersCount ?? 0,
+      collectionsCount: preview.collectionsCount ?? 0,
+      ordersCount: preview.ordersCount ?? 0,
+      rating: preview.rating,
+      reviewsCount: preview.reviewsCount,
+    }),
+    [brandId]
+  );
 
   // Products data
   const [products, setProducts] = useState<StoreProduct[]>([]);
@@ -147,6 +177,13 @@ const BrandStore: React.FC = () => {
     setBannerError(false);
   }, [brand?.bannerImage]);
 
+  useEffect(() => {
+    if (previewBrand && !brand) {
+      setBrand(buildBrandFromPreview(previewBrand));
+      setBrandLoading(false);
+    }
+  }, [previewBrand, brand, buildBrandFromPreview]);
+
   // Fetch brand profile
   useEffect(() => {
     if (!brandId) return;
@@ -161,16 +198,20 @@ const BrandStore: React.FC = () => {
           const followRes = await apiClient.get(`/follows/check/${brandId}`);
           setIsFollowing(followRes.data.isFollowing);
         }
+        setBrandError(false);
       } catch (error) {
-        toast.error('Failed to load brand profile');
-        navigate('/');
+        setBrandError(true);
+        toast.error('Failed to load brand profile. Showing preview instead.');
+        if (!brand && previewBrand) {
+          setBrand(buildBrandFromPreview(previewBrand));
+        }
       } finally {
         setBrandLoading(false);
       }
     };
 
     fetchBrand();
-  }, [brandId, isAuth, navigate]);
+  }, [brandId, isAuth, navigate, buildBrandFromPreview, previewBrand, brand]);
 
   // Fetch products
   const fetchProducts = useCallback(async (resetPage = false) => {
@@ -261,7 +302,7 @@ const BrandStore: React.FC = () => {
     return num.toString();
   };
 
-  if (brandLoading) {
+  if (brandLoading && !brand) {
     return (
       <div className="min-h-screen bg-white dark:bg-black">
         {/* Skeleton loader */}
@@ -288,6 +329,11 @@ const BrandStore: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-black">
+      {brandError && (
+        <div className="mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 shadow-sm">
+          Wed a problem loading the full brand profile. Showing available preview information.
+        </div>
+      )}
       {/* Banner */}
       <div className="relative h-48 md:h-64 lg:h-72 overflow-hidden">
         {hasBannerImage ? (

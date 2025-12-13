@@ -34,6 +34,22 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
     })();
   }, [isOpen]);
 
+  // Scroll Locking
+  useEffect(() => {
+    if (isOpen) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      };
+    }
+  }, [isOpen]);
+
   const handleSubmit = async () => {
     if (!title.trim()) {
       toast.error('Please enter a collection title');

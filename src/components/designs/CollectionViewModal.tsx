@@ -1,4 +1,4 @@
-﻿import React from "react";
+﻿import React, { useEffect } from "react";
 import { X, Tag as TagIcon, Eye, Heart, MessageCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { MarketMedia } from "@/types/market";
@@ -25,6 +25,22 @@ type Props = {
 };
 
 const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose, onViewMedia }) => {
+  // Scroll Locking
+  useEffect(() => {
+    if (open) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      };
+    }
+  }, [open]);
+
   // Early return if not open or no collection
   if (!open || !collection) return null;
 
@@ -92,12 +108,12 @@ const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose
                       <span className="flex items-center gap-1">
                         <Eye size={14} /> {mediaCount} items
                       </span>
-                      {collection.likesCount !== undefined && collection.likesCount > 0 && (
+                      {collection.likesCount && collection.likesCount > 0 && (
                         <span className="flex items-center gap-1">
                           <Heart size={14} /> {collection.likesCount}
                         </span>
                       )}
-                      {collection.commentsCount !== undefined && collection.commentsCount > 0 && (
+                      {collection.commentsCount && collection.commentsCount > 0 && (
                         <span className="flex items-center gap-1">
                           <MessageCircle size={14} /> {collection.commentsCount}
                         </span>
@@ -135,7 +151,7 @@ const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose
               </div>
 
               {/* Media Grid */}
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-6 overscroll-contain">
                 {mediaCount === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
@@ -152,12 +168,12 @@ const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {media.map((item) => (
                       <button
-                        key={item.id}
-                        onClick={() => onViewMedia?.(item.id)}
+                        key={item.fileId}
+                        onClick={() => onViewMedia?.(item.fileId)}
                         className="group relative aspect-square rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-900 hover:ring-2 ring-purple-500 transition-all"
                       >
                         <img
-                          src={item.url}
+                          src={item.url || ''}
                           alt=""
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />

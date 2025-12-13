@@ -70,6 +70,22 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
     }
   }, [state, redirectCountdown]);
 
+  // Scroll Locking
+  useEffect(() => {
+    if (isOpen) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      };
+    }
+  }, [isOpen]);
+
   const handlePublish = async () => {
     setState('loading');
     try {
@@ -134,7 +150,7 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
             <div
-              className="relative w-full max-w-[600px] max-h-[90vh] glass-panel-dark rounded-3xl p-6 overflow-y-auto glass-scrollbar"
+              className="relative w-full max-w-[600px] max-h-[90vh] glass-panel-dark rounded-3xl p-6 overflow-y-auto glass-scrollbar overscroll-contain"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Close button */}
