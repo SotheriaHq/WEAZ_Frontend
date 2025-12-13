@@ -95,6 +95,7 @@ const BrandStore: React.FC = () => {
   // Brand data
   const [brand, setBrand] = useState<BrandProfile | null>(null);
   const [brandLoading, setBrandLoading] = useState(true);
+  const [bannerError, setBannerError] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
 
   // Products data
@@ -141,6 +142,10 @@ const BrandStore: React.FC = () => {
     setOnSale(false);
     setActiveTab('all');
   };
+
+  useEffect(() => {
+    setBannerError(false);
+  }, [brand?.bannerImage]);
 
   // Fetch brand profile
   useEffect(() => {
@@ -279,16 +284,18 @@ const BrandStore: React.FC = () => {
   if (!brand) return null;
 
   const isOwnStore = currentUser?.id === brandId;
+  const hasBannerImage = Boolean(brand.bannerImage) && !bannerError;
 
   return (
     <div className="min-h-screen bg-white dark:bg-black">
       {/* Banner */}
       <div className="relative h-48 md:h-64 lg:h-72 overflow-hidden">
-        {brand.bannerImage ? (
+        {hasBannerImage ? (
           <img
             src={brand.bannerImage}
             alt={`${brand.brandFullName} banner`}
             className="w-full h-full object-cover"
+            onError={() => setBannerError(true)}
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-purple-900 via-purple-700 to-purple-500" />

@@ -65,17 +65,19 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   bannerLoading = false,
   avatarHighlight = false,
 }) => {
-  const hasBannerImage = Boolean(profileData.banner);
+  const [bannerFailed, setBannerFailed] = useState(false);
+  const hasBannerImage = Boolean(profileData.banner) && !bannerFailed;
   const bannerLabel =
     (profileData.username ? `@${profileData.username}` : profileData.name || '').trim() || 'Your Brand';
 
   const [isBannerImageLoading, setIsBannerImageLoading] = useState<boolean>(hasBannerImage);
 
   useEffect(() => {
-    setIsBannerImageLoading(hasBannerImage);
-  }, [hasBannerImage]);
+    setBannerFailed(false);
+    setIsBannerImageLoading(Boolean(profileData.banner));
+  }, [profileData.banner]);
 
-  const showBannerLoader = bannerLoading || (hasBannerImage && isBannerImageLoading);
+  const showBannerLoader = bannerLoading || (Boolean(profileData.banner) && !bannerFailed && isBannerImageLoading);
 
   // Split tags into rows of 3 so we always display max 3 tags per row
   const tagRows: string[][] = [];
@@ -93,13 +95,20 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               alt={`${profileData.name} banner blurred`}
               className="absolute inset-0 h-full w-full object-cover opacity-30 blur-2xl"
               aria-hidden
+              onError={() => {
+                setBannerFailed(true);
+                setIsBannerImageLoading(false);
+              }}
             />
             <img
               src={profileData.banner}
               alt={`${profileData.name} banner`}
               className="absolute inset-0 h-full w-full object-cover object-center"
               onLoad={() => setIsBannerImageLoading(false)}
-              onError={() => setIsBannerImageLoading(false)}
+              onError={() => {
+                setBannerFailed(true);
+                setIsBannerImageLoading(false);
+              }}
             />
           </>
         ) : (
