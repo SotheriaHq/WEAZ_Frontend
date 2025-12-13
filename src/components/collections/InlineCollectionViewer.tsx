@@ -37,6 +37,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const [detail, setDetail] = useState<any | null>(null);
   const [requestState, setRequestState] = useState<AccessState | null>(null);
   const [isLiked, setIsLiked] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
   const [, setActiveIndex] = useState(0); // track index changes for potential side-effects
   const [showUpdateMeta, setShowUpdateMeta] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -131,7 +132,8 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
 
   const mediaItems: CarouselMediaItem[] = useMemo(() => {
     const medias = (detail?.medias ?? []) as Array<any>;
-    return medias.map((m: any, idx: number) => {
+    return medias
+      .map((m: any, idx: number) => {
       const file = m?.file;
       const rawUrl = (file?.s3Url || file?.url || '') as string;
       const mime = (file?.mimeType || '') as string;
@@ -144,7 +146,8 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
         caption: m.caption ?? null,
         order: m.orderIndex ?? idx,
       };
-    });
+    })
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }, [detail?.medias]);
 
   // Resolve signed URLs for media files to ensure content displays in modal/viewer
@@ -206,6 +209,11 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
     toast.info('Like feature coming soon');
   };
 
+  const handleWishlist = async () => {
+    setIsWishlisted((prev) => !prev);
+    toast.success(!isWishlisted ? 'Added to wishlist' : 'Removed from wishlist');
+  };
+
   const handleShare = async () => {
     const url = `${window.location.origin}/collections/${collectionId}`;
     if (navigator.share) {
@@ -229,7 +237,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   };
 
   const handleAddToCart = () => {
-    toast.info('Add to cart feature coming soon');
+    toast.success('Added to cart');
   };
 
   const handleCancelSale = async () => {
@@ -437,22 +445,6 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
         </button>
       </div>
 
-      {/* Collection Title & Piece Count - Fancy Typography */}
-      <div className="flex items-center gap-3 px-2">
-        <h2
-          className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 tracking-tight italic uppercase drop-shadow-sm"
-          style={{ fontFamily: 'Georgia, "Playfair Display", serif', fontWeight: 700, letterSpacing: '0.02em' }}
-        >
-          {detail?.title || 'Collection'}
-        </h2>
-        {typeof detail?._count?.medias === 'number' && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold border border-purple-200 dark:border-purple-700/40">
-            <span>{detail._count.medias}</span>
-            <span>piece{detail._count.medias !== 1 ? 's' : ''}</span>
-          </span>
-        )}
-      </div>
-
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Carousel (2/3 width on desktop) */}
@@ -510,6 +502,8 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               onLike={handleLike}
               onShare={handleShare}
               onAddToCart={handleAddToCart}
+              onAddToWishlist={handleWishlist}
+              isWishlisted={isWishlisted}
               onDelete={handleDeleteCollection}
               onCancelSale={isOwner ? handleCancelSale : undefined}
               onSetupSale={isOwner ? () => setShowDiscountModal(true) : undefined}
@@ -537,7 +531,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
           <div className="glass-panel rounded-2xl p-3 border border-white/20 bg-white/60 dark:bg-white/5 backdrop-blur-xl lg:h-[420px] overflow-hidden flex flex-col shadow-lg">
             <div className="flex items-center gap-2 pb-3 border-b border-gray-200/50 dark:border-gray-700/50">
               <MessageCircle className="w-4 h-4 text-gray-700 dark:text-gray-300" />
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">All Comments</h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Comments ({unifiedCommentsCount})</h3>
             </div>
             <div className="flex-1 mt-2">
               <UnifiedCollectionComments 

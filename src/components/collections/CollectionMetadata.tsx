@@ -15,11 +15,13 @@ interface CollectionMetadataProps {
   onLike?: () => void;
   onShare?: () => void;
   onAddToCart?: () => void;
+  onAddToWishlist?: () => void;
   onDelete?: () => void;
   onEdit?: () => void;
   ownerMenu?: React.ReactNode;
   onCancelSale?: () => void;
   onSetupSale?: () => void;
+  isWishlisted?: boolean;
 }
 
 const formatCurrency = (n?: number) => {
@@ -44,11 +46,13 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
   onLike,
   onShare,
   onAddToCart,
+  onAddToWishlist,
   onDelete,
   onEdit,
   ownerMenu,
   onCancelSale,
   onSetupSale,
+  isWishlisted = false,
 }) => {
   // Track received price data
 
@@ -86,8 +90,7 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
   })();
   const saleBand = windowActive ? saleBandRaw : undefined;
 
-  const showStacked = Boolean(saleBand && baseBand);
-  const singleBand = saleBand ?? baseBand;
+  const hasPriceData = Boolean(baseBand || saleBand);
 
 
   // 🔧 FIX #7: Enhanced countdown with color coding and urgency levels
@@ -177,7 +180,7 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
           
           {/* Engagement Stats - Top Position with Icons */}
           {/* 🔧 FIX #6: Responsive gap and text sizing */}
-          <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
+          <div className="flex items-center gap-3 text-xs sm:text-sm flex-wrap">
             {typeof stats?.likes === 'number' && (
               <button
                 onClick={onLike}
@@ -251,7 +254,7 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
       )}
 
       {/* Price Band - Original Price */}
-      {(baseBand || availabilityInStore) && (
+      {(hasPriceData || availabilityInStore) && (
         <div className="rounded-lg px-3 py-2 border border-gray-200 dark:border-white/15 bg-white/70 dark:bg-white/5 backdrop-blur-md shadow-sm flex flex-col gap-1">
           {saleBand ? (
             <div className="text-xs text-gray-500 dark:text-gray-400 line-through decoration-red-500/50 decoration-2" aria-label="Original price">
@@ -319,14 +322,31 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
         </button>
       </div>
 
-      {!isOwner && onAddToCart && (
-        <button
-          onClick={onAddToCart}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold text-sm hover:from-purple-700 hover:to-pink-700 transition shadow-lg shadow-purple-500/30"
-        >
-          <ShoppingCart className="w-4 h-4" />
-          Add to Cart
-        </button>
+      {!isOwner && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {onAddToCart && (
+            <button
+              onClick={onAddToCart}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-sm hover:from-purple-700 hover:to-indigo-700 transition shadow-lg shadow-purple-500/30"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              Add to Cart
+            </button>
+          )}
+          {onAddToWishlist && (
+            <button
+              onClick={onAddToWishlist}
+              className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-semibold transition ${
+                isWishlisted
+                  ? 'border-purple-500 text-purple-600 dark:text-purple-300 bg-purple-500/10'
+                  : 'border-purple-500 text-purple-500 dark:text-purple-300 hover:bg-purple-500/10'
+              }`}
+            >
+              <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-current' : ''}`} />
+              {isWishlisted ? 'In Wishlist' : 'Wishlist'}
+            </button>
+          )}
+        </div>
       )}
 
       {/* Owner-only actions */}

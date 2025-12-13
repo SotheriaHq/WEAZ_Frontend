@@ -4,8 +4,8 @@ import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Share2, Heart, MessageCircle, Eye, 
-  ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
-  ShoppingCart, Store, MapPin, Clock, Play, Star,
+  ChevronDown, ChevronLeft, ChevronRight,
+  ShoppingCart, Store, Clock, Play, Star,
   Lock, CheckCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -420,6 +420,12 @@ interface CommentsPanelProps {
   viewsCount: number;
   ownerId?: string;
   highlightCommentId?: string | null;
+  price?: { min?: number | null; max?: number | null; saleMin?: number | null; saleMax?: number | null; saleEndAt?: string | null };
+  onAddToCart: () => void;
+  onAddToWishlist: () => void;
+  onShare: () => void;
+  onContactBrand: () => void;
+  onVisitStore: () => void;
 }
 
 const CommentsPanel: React.FC<CommentsPanelProps> = ({
@@ -429,7 +435,49 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
   viewsCount,
   ownerId,
   highlightCommentId,
+  price,
+  onAddToCart,
+  onAddToWishlist,
+  onShare,
+  onContactBrand,
+  onVisitStore,
 }) => {
+  const [isWishlisted, setIsWishlisted] = useState(false);
+
+  const hasSale = price?.saleMin != null || price?.saleMax != null;
+  const baseBand = (() => {
+    const min = formatPrice(price?.min);
+    const max = formatPrice(price?.max);
+    if (min && max) return `${min} - ${max}`;
+    if (min) return min;
+    if (max) return max;
+    return null;
+  })();
+  const saleBand = (() => {
+    const min = formatPrice(price?.saleMin);
+    const max = formatPrice(price?.saleMax);
+    if (min && max) return `${min} - ${max}`;
+    if (min) return min;
+    if (max) return max;
+    return null;
+  })();
+
+  const countdown = React.useMemo(() => {
+    if (!price?.saleEndAt) return null;
+    const now = Date.now();
+    const end = new Date(price.saleEndAt).getTime();
+    const diff = end - now;
+    if (diff <= 0) return null;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    return `${days}d ${hours}h`;
+  }, [price?.saleEndAt]);
+
+  const handleWishlist = () => {
+    setIsWishlisted((prev) => !prev);
+    onAddToWishlist();
+  };
+
   return (
     <div className="lg:w-1/3 flex flex-col">
       <div className="bg-white/5 text-white border border-white/10 shadow-2xl rounded-2xl p-6 flex flex-col h-full backdrop-blur-xl">
@@ -454,6 +502,73 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
           </div>
         </div>
 
+        {/* Price & CTAs */}
+        <div className="space-y-3 mb-6">
+          <div className="flex items-baseline gap-3">
+            {hasSale && saleBand ? (
+              <>
+                <span className="text-2xl font-bold text-green-400">{saleBand}</span>
+                {baseBand && <span className="text-lg text-white/60 line-through">{baseBand}</span>}
+              </>
+            ) : (
+              <span className="text-2xl font-bold text-white">{baseBand || 'Price on request'}</span>
+            )}
+          </div>
+          {hasSale && countdown && (
+            <div className="flex items-center gap-2 text-orange-300 text-sm">
+              <Clock className="w-4 h-4" />
+              <span>Sale ends in {countdown}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={onAddToCart}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-shadow"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              <span>Add to Cart</span>
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleWishlist}
+              className={`border-2 border-purple-500 font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors ${
+                isWishlisted ? 'bg-purple-500/20 text-purple-100' : 'text-purple-200 hover:bg-purple-500/10'
+              }`}
+            >
+              <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-purple-300' : ''}`} />
+              <span>{isWishlisted ? 'In Wishlist' : 'Wishlist'}</span>
+            </motion.button>
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-sm">
+            <button
+              onClick={onContactBrand}
+              className="bg-white/10 border border-white/15 px-3 py-2 rounded-lg text-white hover:bg-white/15 transition-colors flex items-center gap-2"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>Contact Brand</span>
+            </button>
+            <button
+              onClick={onVisitStore}
+              className="bg-white/10 border border-white/15 px-3 py-2 rounded-lg text-white hover:bg-white/15 transition-colors flex items-center gap-2"
+            >
+              <Store className="w-4 h-4" />
+              <span>Visit Store</span>
+            </button>
+            <button
+              onClick={onShare}
+              className="bg-white/10 border border-white/15 px-3 py-2 rounded-lg text-white hover:bg-white/15 transition-colors flex items-center gap-2"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>Share</span>
+            </button>
+          </div>
+        </div>
+
         {/* Comments Header */}
         <h3 className="text-lg font-bold text-white mb-4">Comments</h3>
         
@@ -470,235 +585,6 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
         </button>
       </div>
     </div>
-  );
-};
-
-// ============================================
-// STORY SECTION
-// ============================================
-interface StorySectionProps {
-  description?: string | null;
-  tags?: string[];
-}
-
-const StorySection: React.FC<StorySectionProps> = ({ description, tags = [] }) => {
-  const [expanded, setExpanded] = useState(false);
-
-  if (!description && tags.length === 0) return null;
-
-  return (
-    <section className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-gray-900 text-white">
-      <div className="max-w-4xl mx-auto">
-        {description && (
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sm:p-8 mb-6">
-            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-white mb-4">The Story</h2>
-            <p className={`font-serif italic text-gray-200 text-base sm:text-lg leading-relaxed mb-4 ${!expanded ? 'line-clamp-3' : ''}`}>
-              {description}
-            </p>
-            {description.length > 200 && (
-              <button 
-                onClick={() => setExpanded(!expanded)}
-                className="text-purple-300 hover:text-purple-200 text-sm font-medium flex items-center gap-2"
-              >
-                <span>{expanded ? 'Read less' : 'Read more'}</span>
-                {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
-            )}
-          </div>
-        )}
-
-        {tags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className="px-3 py-1.5 bg-purple-500/10 text-purple-200 border border-purple-500/30 rounded-full text-sm hover:bg-purple-500/20 cursor-pointer transition-colors"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-};
-
-// ============================================
-// SHOPPING SECTION
-// ============================================
-interface ShoppingSectionProps {
-  collectionId: string;
-  minPrice?: number | null;
-  maxPrice?: number | null;
-  saleMinPrice?: number | null;
-  saleMaxPrice?: number | null;
-  saleEndAt?: string | null;
-  onAddToCart: () => void;
-  onAddToWishlist: () => void;
-  onContactBrand: () => void;
-  onVisitStore: () => void;
-  onShare: () => void;
-}
-
-const ShoppingSection: React.FC<ShoppingSectionProps> = ({
-  minPrice,
-  maxPrice,
-  saleMinPrice,
-  saleMaxPrice,
-  saleEndAt,
-  onAddToCart,
-  onAddToWishlist,
-  onContactBrand,
-  onVisitStore,
-  onShare,
-}) => {
-  const [countdown, setCountdown] = useState<string | null>(null);
-  const [progress, setProgress] = useState(100);
-  const [isInWishlist, setIsInWishlist] = useState(false);
-
-  // Countdown timer
-  useEffect(() => {
-    if (!saleEndAt) return;
-    
-    const updateCountdown = () => {
-      const now = Date.now();
-      const end = new Date(saleEndAt).getTime();
-      const diff = end - now;
-      
-      if (diff <= 0) {
-        setCountdown(null);
-        return;
-      }
-
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      
-      setCountdown(`${days}d ${hours}h`);
-      setProgress(Math.max(0, Math.min(100, 65))); // Placeholder progress
-    };
-
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 60000);
-    return () => clearInterval(interval);
-  }, [saleEndAt]);
-
-  const hasSale = saleMinPrice != null || saleMaxPrice != null;
-  const basePrice = (() => {
-    const min = formatPrice(minPrice);
-    const max = formatPrice(maxPrice);
-    if (min && max) return `${min} - ${max}`;
-    if (min) return min;
-    if (max) return max;
-    return null;
-  })();
-
-  const salePrice = (() => {
-    const min = formatPrice(saleMinPrice);
-    const max = formatPrice(saleMaxPrice);
-    if (min && max) return `${min} - ${max}`;
-    if (min) return min;
-    if (max) return max;
-    return null;
-  })();
-
-  const handleWishlist = () => {
-    setIsInWishlist(!isInWishlist);
-    onAddToWishlist();
-  };
-
-  return (
-    <section className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-black text-white">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white/5 border border-white/10 shadow-2xl rounded-2xl p-6 sm:p-8 backdrop-blur-xl">
-          {/* Price Display */}
-          <div className="mb-6">
-            <div className="flex items-baseline gap-3 mb-2">
-              {hasSale && salePrice ? (
-                <>
-                  <span className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">{salePrice}</span>
-                  {basePrice && (
-                    <span className="text-lg sm:text-xl text-gray-500 dark:text-gray-400 line-through">{basePrice}</span>
-                  )}
-                </>
-              ) : basePrice ? (
-                <span className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{basePrice}</span>
-              ) : (
-                <span className="text-lg text-gray-500 dark:text-gray-400">Price on request</span>
-              )}
-            </div>
-            
-            {/* Sale countdown */}
-            {hasSale && countdown && (
-              <>
-                <div className="flex items-center gap-2 text-orange-500 dark:text-orange-400 text-sm mb-3">
-                  <Clock className="w-4 h-4" />
-                  <span>Sale ends in {countdown}</span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className="bg-gradient-to-r from-purple-600 to-indigo-600 h-full rounded-full transition-all dark:from-purple-500 dark:to-indigo-500"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onAddToCart}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-shadow"
-            >
-              <ShoppingCart className="w-5 h-5" />
-              <span>Add to Cart</span>
-            </motion.button>
-            
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleWishlist}
-              className={`border-2 border-purple-600 font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors ${
-                isInWishlist 
-                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-200' 
-                  : 'text-purple-200 hover:bg-purple-500/10'
-              }`}
-            >
-              <Heart className={`w-5 h-5 ${isInWishlist ? 'fill-purple-600 dark:fill-purple-300' : ''}`} />
-              <span>{isInWishlist ? 'In Wishlist' : 'Add to Wishlist'}</span>
-            </motion.button>
-          </div>
-
-          {/* Secondary Actions */}
-          <div className="flex flex-wrap gap-3">
-            <button 
-              onClick={onContactBrand}
-              className="bg-white/10 border border-white/15 px-4 py-2 rounded-lg text-sm text-white hover:bg-white/15 transition-colors flex items-center gap-2"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>Contact Brand</span>
-            </button>
-            <button 
-              onClick={onVisitStore}
-              className="bg-white/10 border border-white/15 px-4 py-2 rounded-lg text-sm text-white hover:bg-white/15 transition-colors flex items-center gap-2"
-            >
-              <Store className="w-4 h-4" />
-              <span>Visit Store</span>
-            </button>
-            <button 
-              onClick={onShare}
-              className="bg-white/10 border border-white/15 px-4 py-2 rounded-lg text-sm text-white hover:bg-white/15 transition-colors flex items-center gap-2"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>Share</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
   );
 };
 
@@ -1216,31 +1102,22 @@ const CollectionViewRedesign: React.FC = () => {
               viewsCount={detail._count?.views || 0}
               ownerId={detail.owner?.id}
               highlightCommentId={highlightCommentId}
+              price={{
+                min: detail.minPrice,
+                max: detail.maxPrice,
+                saleMin: detail.saleMinPrice,
+                saleMax: detail.saleMaxPrice,
+                saleEndAt: detail.saleEndAt,
+              }}
+              onAddToCart={handleAddToCart}
+              onAddToWishlist={handleAddToWishlist}
+              onShare={handleShare}
+              onContactBrand={handleContactBrand}
+              onVisitStore={handleVisitStore}
             />
           </div>
         </div>
       </section>
-
-      {/* Story Section */}
-      <StorySection
-        description={detail.description}
-        tags={detail.tags}
-      />
-
-      {/* Shopping Section */}
-      <ShoppingSection
-        collectionId={detail.id}
-        minPrice={detail.minPrice}
-        maxPrice={detail.maxPrice}
-        saleMinPrice={detail.saleMinPrice}
-        saleMaxPrice={detail.saleMaxPrice}
-        saleEndAt={detail.saleEndAt}
-        onAddToCart={handleAddToCart}
-        onAddToWishlist={handleAddToWishlist}
-        onContactBrand={handleContactBrand}
-        onVisitStore={handleVisitStore}
-        onShare={handleShare}
-      />
 
       {/* More from Brand */}
       <div className="bg-black">

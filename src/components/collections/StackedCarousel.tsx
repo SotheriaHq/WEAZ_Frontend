@@ -231,7 +231,7 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
                   }}
                   src={item.url}
                   className="w-full h-full object-contain bg-black"
-                  controls={false}
+                  controls
                   playsInline
                   muted
                   preload="metadata"
