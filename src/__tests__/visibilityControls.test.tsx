@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, act, getAllByRole } from '@testing-library/react';
 import AddCollectionModal from '../components/profile/AddCollectionModal';
 
 // Minimal mock for upload hook used inside modal
@@ -10,9 +10,15 @@ vi.mock('../api/BrandApi', () => ({ brandApi: { getCategories: async () => [{ id
 
 describe('AddCollectionModal visibility controls', () => {
   it('shows cooldown note when Private selected', async () => {
-    const { getByText } = render(<AddCollectionModal isOpen={true} onClose={() => {}} onCreate={() => {}} />);
-    const privateBtn = getByText('Private');
-    fireEvent.click(privateBtn);
+    const { container, getByText } = render(<AddCollectionModal isOpen={true} onClose={() => {}} onCreate={() => {}} />);
+
+    const selects = getAllByRole(container, 'combobox');
+    const visibilitySelect = selects[1];
+
+    await act(async () => {
+      fireEvent.change(visibilitySelect, { target: { value: 'private' } });
+    });
+
     expect(getByText(/wait 72 hours/i)).toBeTruthy();
   });
 });

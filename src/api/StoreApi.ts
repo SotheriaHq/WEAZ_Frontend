@@ -75,6 +75,55 @@ export interface WishlistItem {
   product: Product;
 }
 
+export interface OrderItem {
+  productId: string;
+  name: string;
+  thumbnail?: string | null;
+  price: number;
+  quantity: number;
+  selectedSize?: string | null;
+  selectedColor?: string | null;
+}
+
+export interface Order {
+  id: string;
+  brandId: string;
+  buyerId?: string | null;
+  customerName: string;
+  shippingAddress?: Record<string, any> | null;
+  contactInfo?: Record<string, any> | null;
+  items: OrderItem[];
+  totalAmount: number;
+  currency: string;
+  status: string;
+  paymentStatus: string;
+  createdAt: string;
+  updatedAt: string;
+  brand?: {
+    id: string;
+    name?: string;
+    logo?: string | null;
+    currency?: string;
+  };
+}
+
+export interface CheckoutPayload {
+  customerName?: string;
+  shippingAddress?: Record<string, any>;
+  contactInfo?: Record<string, any>;
+}
+
+export interface CreateProductPayload {
+  collectionId: string;
+  name: string;
+  price: number;
+  totalStock: number;
+  description?: string;
+  salePrice?: number;
+  images?: string[];
+  thumbnail?: string;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;
@@ -167,6 +216,47 @@ export const removeCartItem = async (cartItemId: string): Promise<void> => {
 
 export const clearCart = async (): Promise<void> => {
   await apiClient.delete('/store/cart');
+};
+
+// ============= Checkout & Orders =============
+
+export const checkout = async (payload: CheckoutPayload): Promise<{ orders: Order[] }> => {
+  const res = await apiClient.post('/store/checkout', payload);
+  return extractData<{ orders: Order[] }>(res);
+};
+
+export const getMyOrders = async (page = 1, limit = 20): Promise<{ items: Order[]; total: number; totalPages: number; hasNextPage?: boolean; page: number; limit: number }> => {
+  const params = new URLSearchParams();
+  params.append('page', String(page));
+  params.append('limit', String(limit));
+  const res = await apiClient.get(`/store/orders?${params.toString()}`);
+  return extractData(res);
+};
+
+export const getMyOrder = async (orderId: string): Promise<Order> => {
+  const res = await apiClient.get(`/store/orders/${orderId}`);
+  return extractData<Order>(res);
+};
+
+// ============= Seller Products =============
+
+export const getBrandProductsForOwner = async (brandId: string, limit = 50) => {
+  const res = await apiClient.get(`/brands/${brandId}/products?limit=${limit}`);
+  return extractData<PaginatedResponse<Product>>(res);
+};
+
+export const createProduct = async (payload: CreateProductPayload) => {
+  const res = await apiClient.post('/products', payload);
+  return extractData<Product>(res);
+};
+
+export const updateProduct = async (productId: string, payload: Partial<CreateProductPayload>) => {
+  const res = await apiClient.patch(`/products/${productId}`, payload);
+  return extractData<Product>(res);
+};
+
+export const deleteProduct = async (productId: string) => {
+  await apiClient.delete(`/products/${productId}`);
 };
 
 // ============= Wishlist API =============

@@ -27,6 +27,9 @@ import { Navigate } from 'react-router-dom';
 import CartDrawer from './components/designs/CartDrawer';
 import WishlistDrawer from './components/designs/WishlistDrawer';
 import BrandStore from './pages/brand/BrandStore';
+import CheckoutPage from './pages/checkout/CheckoutPage';
+import MyOrders from './pages/orders/MyOrders';
+import OrderDetail from './pages/orders/OrderDetail';
 // Placeholder pages for features under development
 import {
   NotFound,
@@ -109,6 +112,14 @@ const router = createBrowserRouter([
         ],
       },
       {
+        element: <ProtectedRoute />,
+        children: [
+          { path: '/checkout', element: <Layout><CheckoutPage /></Layout> },
+          { path: '/orders', element: <Layout><MyOrders /></Layout> },
+          { path: '/orders/:orderId', element: <Layout><OrderDetail /></Layout> },
+        ],
+      },
+      {
         path: '/store/:brandId',
         element: <Layout><BrandStore /></Layout>,
       },
@@ -129,10 +140,8 @@ const router = createBrowserRouter([
 const App: React.FC = () => (
   <AuthProvider>
     <ThemeProvider>
-      <>
-        <Toaster position="top-right" richColors closeButton />
-        <RouterProvider router={router} />
-      </>
+      <Toaster position="top-center" richColors closeButton />
+      <RouterProvider router={router} />
     </ThemeProvider>
   </AuthProvider>
 );

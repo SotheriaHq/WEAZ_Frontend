@@ -6,7 +6,23 @@ import { brandApi } from '../../api/BrandApi';
 import { Provider } from 'react-redux';
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import userReducer from '../../features/userSlice';
-import { toast } from 'react-toastify';
+
+vi.mock('../../api/BrandApi', () => ({
+  brandApi: {
+    getDashboardOverview: vi.fn(),
+    getPayouts: vi.fn(),
+    requestPayout: vi.fn(),
+  },
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+import { toast } from 'sonner';
 const rootReducer = combineReducers({
   user: userReducer,
 });

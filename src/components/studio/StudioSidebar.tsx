@@ -12,6 +12,7 @@ const groups = [
     items: [
       { key: 'overview', label: 'Dashboard', path: '/studio?tab=overview', emoji: '📊' },
       { key: 'orders', label: 'Orders', path: '/studio?tab=orders', emoji: '📦' },
+      { key: 'products', label: 'Products', path: '/studio?tab=products', emoji: '🧵' },
       { key: 'analytics', label: 'Analytics', path: '/studio?tab=analytics', emoji: '📈' },
       { key: 'finance', label: 'Finance', path: '/studio?tab=finance', emoji: '💰' },
     ]

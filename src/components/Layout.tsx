@@ -8,7 +8,11 @@ import { useNotificationsBootstrap } from '@/hooks/useNotifications';
 import { setSidebarMode, closeSidebar, toggleSidebar } from '@/features/uiSlice';
 import GlassBackdrop from './ui/GlassBackdrop';
 
-export const Layout: React.FC = () => {
+interface LayoutProps {
+  children?: React.ReactNode;
+}
+
+export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -88,10 +92,7 @@ export const Layout: React.FC = () => {
     <div className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-black">
         
       {/* Navbar */}
-      <Navbar 
-        isCollapsed={sidebarMode === 'RAIL'} 
-        onToggleSidebar={() => dispatch(toggleSidebar())}
-      />
+      <Navbar />
 
       {/* Sidebar */}
       <Sidebar />
@@ -102,7 +103,7 @@ export const Layout: React.FC = () => {
         style={{ marginLeft: mainMarginLeft }}
       >
         <div className="p-0 sm:p-2">
-          <Outlet />
+          {children || <Outlet />}
         </div>
       </main>
 
