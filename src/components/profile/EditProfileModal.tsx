@@ -452,6 +452,47 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white/90">Contact & Business</h3>
               </div>
 
+              {/* Location Fields */}
+              <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Location</label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <UniversalSelect
+                          label=""
+                          value={selectedCountry || ''}
+                          onChange={(val) => {
+                              setValue('brandCountry', val);
+                              setValue('brandState', '');
+                              setValue('brandCity', '');
+                          }}
+                          options={countryOptions}
+                          placeholder={loadingLocations ? "Loading..." : "Select Country"}
+                          disabled={loadingLocations}
+                          className="w-full"
+                      />
+                       <UniversalSelect
+                          label=""
+                          value={selectedState || ''}
+                          onChange={(val) => {
+                              setValue('brandState', val);
+                              setValue('brandCity', '');
+                          }}
+                          options={stateOptions}
+                          placeholder={loadingLocations ? "Loading..." : "State/Province"}
+                          disabled={!selectedCountry || stateOptions.length === 0 || loadingLocations}
+                          className="w-full"
+                      />
+                       <UniversalSelect
+                          label=""
+                          value={watch('brandCity') || ''}
+                          onChange={(val) => setValue('brandCity', val)}
+                          options={cityOptions}
+                          placeholder={loadingLocations ? "Loading..." : "City"}
+                          disabled={!selectedState || cityOptions.length === 0 || loadingLocations}
+                          className="w-full"
+                      />
+                  </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2 z-10">
                   <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Business Type</label>
