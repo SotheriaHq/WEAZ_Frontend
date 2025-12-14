@@ -53,6 +53,20 @@ const RootLayout: React.FC = () => (
   </>
 );
 
+const profileChildren = [
+  { index: true, element: <Profile /> },
+  {
+    path: 'collections',
+    element: <RequireBrand />,
+    children: [
+      { path: 'create', element: <CreateCollectionPage /> },
+    ],
+  },
+  { path: 'success', element: <Success /> },
+  { path: 'settings', element: <SettingsHome /> },
+  { path: 'settings/collections', element: <CollectionsSettings /> },
+];
+
 const router = createBrowserRouter([
   {
     // Root wrapper that provides Router context to global drawers
@@ -90,19 +104,12 @@ const router = createBrowserRouter([
       {
         path: '/profile',
         element: <ProfileLayout />,
-        children: [
-          { index: true, element: <Profile /> },
-          {
-            path: 'collections',
-            element: <RequireBrand />,
-            children: [
-              { path: 'create', element: <CreateCollectionPage /> },
-            ],
-          },
-          { path: 'success', element: <Success /> },
-          { path: 'settings', element: <SettingsHome /> },
-          { path: 'settings/collections', element: <CollectionsSettings /> },
-        ],
+        children: profileChildren,
+      },
+      {
+        path: '/profile/:id',
+        element: <ProfileLayout />,
+        children: profileChildren,
       },
       {
         element: <GuestRoute />,

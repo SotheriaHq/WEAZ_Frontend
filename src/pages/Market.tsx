@@ -330,7 +330,7 @@ const Market: React.FC = () => {
 
   const handleViewBrand = (brandId: string, item: MarketItem) => {
     if (!brandId) return;
-    navigate(`/store/${brandId}` , {
+    navigate(`/profile/${brandId}` , {
       state: {
         brandPreview: {
           id: brandId,

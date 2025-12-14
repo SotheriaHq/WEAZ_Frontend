@@ -1004,7 +1004,7 @@ const CollectionViewRedesign: React.FC = () => {
 
   const handleViewProfile = () => {
     if (detail?.owner?.brand?.id) {
-      navigate(`/store/${detail.owner.brand.id}`);
+      navigate(`/profile/${detail.owner.brand.id}`);
     } else if (detail?.owner?.id) {
       navigate(`/profile/${detail.owner.id}`);
     }
@@ -1016,7 +1016,7 @@ const CollectionViewRedesign: React.FC = () => {
 
   const handleVisitStore = () => {
     if (detail?.owner?.brand?.id) {
-      navigate(`/store/${detail.owner.brand.id}`);
+      navigate(`/profile/${detail.owner.brand.id}`);
     }
   };
 
