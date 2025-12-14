@@ -100,6 +100,7 @@ const BrandStore: React.FC = () => {
   const [bannerError, setBannerError] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [brandError, setBrandError] = useState(false);
+  const [productsError, setProductsError] = useState<string | null>(null);
   const previewBrand = (location.state as { brandPreview?: Partial<BrandProfile> } | undefined)?.brandPreview;
 
   const buildBrandFromPreview = useCallback(
@@ -195,8 +196,13 @@ const BrandStore: React.FC = () => {
         setBrand(response.data);
         // Check follow status
         if (isAuth) {
-          const followRes = await apiClient.get(`/follows/check/${brandId}`);
-          setIsFollowing(followRes.data.isFollowing);
+          try {
+            const followRes = await apiClient.get(`/follows/check/${brandId}`);
+            setIsFollowing(followRes.data.isFollowing);
+          } catch (followErr) {
+            // Non-blocking: log and continue rendering the brand
+            console.warn('Follow status unavailable', followErr);
+          }
         }
         setBrandError(false);
       } catch (error) {
@@ -247,8 +253,11 @@ const BrandStore: React.FC = () => {
 
       setTotal(response.data.total);
       setHasMore(response.data.hasNextPage);
+      setProductsError(null);
     } catch (error) {
-      toast.error('Failed to load products');
+      const message = (error as any)?.response?.data?.message ?? 'Failed to load products';
+      setProductsError(message);
+      toast.error(message);
     } finally {
       setProductsLoading(false);
     }
@@ -331,7 +340,7 @@ const BrandStore: React.FC = () => {
     <div className="min-h-screen bg-white dark:bg-black">
       {brandError && (
         <div className="mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 shadow-sm">
-          Wed a problem loading the full brand profile. Showing available preview information.
+          We had a problem loading the full brand profile. Showing available preview information.
         </div>
       )}
       {/* Banner */}
@@ -418,9 +427,9 @@ const BrandStore: React.FC = () => {
                 </div>
 
                 {/* Tags */}
-                {brand.brandTags.length > 0 && (
+                {(brand.brandTags?.length ?? 0) > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3">
-                    {brand.brandTags.slice(0, 5).map((tag) => (
+                    {brand.brandTags!.slice(0, 5).map((tag) => (
                       <Tag key={tag} label={tag} size="sm" />
                     ))}
                   </div>
@@ -691,6 +700,11 @@ const BrandStore: React.FC = () => {
 
           {/* Product Grid */}
           <main className="flex-1 min-w-0">
+            {productsError && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 shadow-sm">
+                {productsError}
+              </div>
+            )}
             {/* Results count */}
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Showing <strong className="text-gray-900 dark:text-white">{products.length}</strong> of{' '}
