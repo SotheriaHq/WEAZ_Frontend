@@ -1,0 +1,122 @@
+/**
+ * Notification Routing - Centralized Navigation Logic
+ * 
+ * All notification-related routing decisions are made here.
+ * This ensures consistent navigation behavior across the app.
+ */
+
+import { NotificationRegistry, NotificationTypes } from '@/types/notificationTypes';
+import type { NormalizedNotification } from './notificationAdapter';
+
+/**
+ * Determine the route for navigating to an actor's profile
+ */
+export function determineActorRoute(actorId: string): string {
+    return `/brands/${actorId}`;
+}
+
+/**
+ * Determine the route for navigating to notification target content
+ * Uses the registry pattern with fallback to legacy targetUrl
+ */
+export function determineNotificationRoute(notification: NormalizedNotification): string {
+    const { type, target, subTargetId, targetUrl, actor, payload } = notification;
+
+    // Fallback URL if nothing else works
+    const fallbackUrl = targetUrl || '/notifications';
+
+    // Try registry-based routing first
+    const config = NotificationRegistry[type as keyof typeof NotificationRegistry];
+    if (config?.routePattern) {
+        const targetObj = target ? { type: target.type, id: target.id } : undefined;
+        const route = config.routePattern(targetObj, subTargetId || undefined, actor?.id || undefined);
+        if (route) return route;
+    }
+
+    // Fallback: type-specific routing for edge cases
+    switch (type) {
+        case NotificationTypes.LIKE:
+            if (target?.type === 'COLLECTION') {
+                return `/collections/${target.id}`;
+            }
+            if (target?.type === 'POST') {
+                return `/posts/${target.id}`;
+            }
+            return fallbackUrl;
+
+        case NotificationTypes.COMMENT:
+            if (target?.type === 'COLLECTION' && subTargetId) {
+                return `/collections/${target.id}#comment-${subTargetId}`;
+            }
+            if (target?.type === 'COLLECTION') {
+                return `/collections/${target.id}`;
+            }
+            if (target?.type === 'POST' && subTargetId) {
+                return `/posts/${target.id}#comment-${subTargetId}`;
+            }
+            return fallbackUrl;
+
+        case NotificationTypes.FOLLOW:
+            return actor?.id ? `/brands/${actor.id}` : fallbackUrl;
+
+        case NotificationTypes.LOGIN:
+        case NotificationTypes.LOGOUT:
+        case NotificationTypes.LOGOUT_ALL:
+            return '/settings'; // Changed from /settings/security which doesn't exist
+
+        case NotificationTypes.PRIVATE_ACCESS_APPROVED:
+        case NotificationTypes.CONTRIBUTION_ACCEPTED:
+            return target?.id ? `/collections/${target.id}` : fallbackUrl;
+
+        case NotificationTypes.PRIVATE_ACCESS_REQUESTED:
+        case NotificationTypes.PRIVATE_ACCESS_REJECTED:
+        case NotificationTypes.PRIVATE_ACCESS_REVOKED:
+            return fallbackUrl;
+
+        case NotificationTypes.BRAND_PATCH_REQUEST:
+        case NotificationTypes.BRAND_PATCH_ACCEPTED:
+        case NotificationTypes.BRAND_PATCH_REJECTED:
+            return '/patches';
+
+        case NotificationTypes.ORDER_PLACED:
+        case NotificationTypes.ORDER_STATUS_UPDATED:
+            const orderId = (payload as Record<string, unknown>)?.orderId;
+            return orderId ? `/orders/${orderId}` : '/orders';
+
+        default:
+            return fallbackUrl;
+    }
+}
+
+/**
+ * Check if a notification has a navigable target
+ */
+export function hasNavigableTarget(notification: NormalizedNotification): boolean {
+    const route = determineNotificationRoute(notification);
+    return route !== '/notifications';
+}
+
+/**
+ * Check if clicking the notification should close the dropdown
+ * (Most notifications should close, but some might show inline actions)
+ */
+export function shouldCloseOnClick(_notification: NormalizedNotification): boolean {
+    // For now, all notifications close the dropdown
+    // Future: access request notifications might have inline approve/reject
+    return true;
+}
+
+/**
+ * Build the hash fragment for deep-linking to comments
+ */
+export function buildCommentHash(subTargetId: string): string {
+    return `#comment-${subTargetId}`;
+}
+
+/**
+ * Parse a comment ID from a URL hash
+ */
+export function parseCommentHash(hash: string): string | null {
+    const match = hash.match(/^#comment-(.+)$/);
+    return match ? match[1] : null;
+}

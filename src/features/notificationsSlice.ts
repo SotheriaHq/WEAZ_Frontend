@@ -13,11 +13,18 @@ interface RemoteNotificationActor {
 export interface RemoteNotification {
   id: string;
   type: string;
+  version?: 1 | 2; // Schema version: 1 = legacy, 2 = structured
   message: string;
   createdAt: string;
   isRead: boolean;
   actor?: RemoteNotificationActor | null;
-  payload?: any;
+  target?: {
+    type: 'POST' | 'COLLECTION' | 'COLLECTION_MEDIA' | 'USER' | 'SYSTEM';
+    id: string;
+    preview?: string;
+  } | null;
+  subTargetId?: string | null; // For deep linking (e.g., comment ID)
+  payload?: Record<string, unknown>;
   targetUrl?: string;
 }
 

@@ -1,0 +1,389 @@
+/**
+ * NotificationItem CSS - Premium styling with visual hierarchy
+ * 
+ * Features:
+ * - Read/unread states
+ * - Hover feedback per click zone
+ * - Dark mode support
+ * - Touch targets (44px min)
+ * - Skeleton loading
+ * - Accessibility focus states
+ */
+
+/* Notification Item Base */
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-left: 3px solid transparent;
+  list-style: none;
+  min-height: 44px;
+  /* Touch target */
+}
+
+/* Read/Unread States */
+.notification-item.unread {
+  background: linear-gradient(135deg,
+      rgba(139, 92, 246, 0.08) 0%,
+      rgba(168, 85, 247, 0.04) 100%);
+  border-left-color: #8b5cf6;
+}
+
+.notification-item.read {
+  background: transparent;
+  opacity: 0.85;
+}
+
+/* Hover States */
+.notification-item:hover {
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.notification-item.read:hover {
+  opacity: 1;
+}
+
+/* Active/Touch feedback */
+.notification-item:active {
+  background: rgba(139, 92, 246, 0.12);
+}
+
+/* Avatar Section */
+.avatar-section {
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-section.clickable:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+}
+
+.avatar-section.clickable:active {
+  transform: scale(0.95);
+}
+
+.avatar-section.non-clickable {
+  cursor: default;
+}
+
+/* Content Section */
+.content-section {
+  flex: 1;
+  min-width: 0;
+  /* Allow text truncation */
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.notification-header {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+/* Username */
+.username {
+  font-weight: 600;
+  color: #8b5cf6;
+  cursor: pointer;
+  transition: text-decoration 0.15s ease;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.username:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.username:focus {
+  text-decoration: underline;
+  outline: none;
+}
+
+.username.system {
+  color: #6b7280;
+  cursor: default;
+}
+
+.username.system:hover {
+  text-decoration: none;
+}
+
+/* Action Text */
+.action-text {
+  font-weight: 400;
+  color: #374151;
+  /* Darker gray for better contrast in light mode */
+}
+
+/* Target Preview */
+.target-preview {
+  font-weight: 600;
+  color: #111827;
+  /* Darkest gray for target emphasis in light mode */
+}
+
+/* Preview Text */
+.preview-text {
+  font-size: 0.8125rem;
+  color: #374151;
+  /* Better contrast in light mode */
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Timestamp */
+.timestamp {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: #6b7280;
+  /* Slightly darker timestamp for visibility */
+  margin-top: 0.125rem;
+}
+
+/* Icon Section */
+.icon-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  padding-left: 0.5rem;
+}
+
+/* Dark Mode */
+.dark .notification-item.unread {
+  background: linear-gradient(135deg,
+      rgba(139, 92, 246, 0.15) 0%,
+      rgba(168, 85, 247, 0.08) 100%);
+}
+
+.dark .notification-item:hover {
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.dark .username {
+  color: #a78bfa;
+}
+
+.dark .username.system {
+  color: #9ca3af;
+}
+
+.dark .action-text {
+  color: #e5e7eb;
+  /* Much lighter for dark mode - was #9ca3af */
+}
+
+.dark .target-preview {
+  color: #f9fafb;
+  /* Near white for target emphasis in dark mode */
+}
+
+.dark .preview-text {
+  color: #d1d5db;
+  /* Lighter for better dark mode contrast - was #9ca3af */
+}
+
+.dark .timestamp {
+  color: #9ca3af;
+  /* Slightly lighter timestamp in dark mode */
+}
+
+/* Accessibility - Focus States */
+.notification-item:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: -2px;
+}
+
+.avatar-section:focus-visible,
+.username:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Screen Reader Only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ========================================
+   Empty, Loading & Error States
+   ======================================== */
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.empty-state h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 0.25rem;
+}
+
+.dark .empty-state h3 {
+  color: #e5e7eb;
+}
+
+.empty-state p {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Loading State - Skeletons */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+}
+
+.notification-skeleton {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  animation: skeleton-pulse 1.5s infinite;
+}
+
+.skeleton-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(139, 92, 246, 0.1);
+  flex-shrink: 0;
+}
+
+.skeleton-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.skeleton-line {
+  height: 0.75rem;
+  background: rgba(139, 92, 246, 0.1);
+  border-radius: 4px;
+}
+
+.skeleton-line.short {
+  width: 40%;
+}
+
+.skeleton-line.long {
+  width: 80%;
+}
+
+.skeleton-line.tiny {
+  width: 25%;
+}
+
+.dark .skeleton-avatar,
+.dark .skeleton-line {
+  background: rgba(139, 92, 246, 0.15);
+}
+
+@keyframes skeleton-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Error State */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.error-icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.error-state p {
+  font-size: 0.875rem;
+  color: #ef4444;
+  margin: 0 0 1rem;
+}
+
+.retry-button {
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.retry-button:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+/* ========================================
+   Deep-Link Highlight Animation
+   ======================================== */
+
+.highlight-flash {
+  animation: flash-highlight 3s ease-out;
+}
+
+@keyframes flash-highlight {
+
+  0%,
+  10% {
+    background-color: rgba(139, 92, 246, 0.25);
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
