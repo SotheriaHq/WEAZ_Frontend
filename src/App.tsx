@@ -60,6 +60,7 @@ const profileChildren = [
     element: <RequireBrand />,
     children: [
       { path: 'create', element: <CreateCollectionPage /> },
+      { path: 'edit/:id', element: <CreateCollectionPage /> },
     ],
   },
   { path: 'success', element: <Success /> },

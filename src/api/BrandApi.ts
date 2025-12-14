@@ -469,6 +469,54 @@ export const brandApi = {
     }
   },
 
+  // =====================
+  // Stores (basic CRUD)
+  // Frontend helpers for managing brand stores. Backend endpoints may vary.
+  // =====================
+  async getStores(brandId?: string): Promise<any[]> {
+    try {
+      const url = brandId ? `/stores?brandId=${encodeURIComponent(brandId)}` : `/stores`;
+      const response = await apiClient.get(url);
+      const payload = response.data;
+      const items = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+      return items;
+    } catch (error) {
+      console.error('Error fetching stores:', error);
+      return [];
+    }
+  },
+
+  async createStore(data: { name: string; description?: string; website?: string; ownerId?: string }) {
+    try {
+      const payload = { ...data };
+      const response = await apiClient.post('/stores', payload);
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error creating store:', error);
+      return null;
+    }
+  },
+
+  async updateStore(storeId: string, data: Partial<{ name: string; description?: string; website?: string }>) {
+    try {
+      const response = await apiClient.patch(`/stores/${storeId}`, data);
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error updating store:', error);
+      return null;
+    }
+  },
+
+  async deleteStore(storeId: string) {
+    try {
+      const response = await apiClient.delete(`/stores/${storeId}`);
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error deleting store:', error);
+      return null;
+    }
+  },
+
   // Update collection
   async updateCollection(collectionId: string, data: Partial<CollectionDto>): Promise<CollectionDto | null> {
     try {

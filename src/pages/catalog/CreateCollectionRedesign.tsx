@@ -8,6 +8,7 @@ import {
   FiChevronLeft, FiChevronRight, FiZoomIn, FiZoomOut, FiPlus
 } from 'react-icons/fi';
 import { HiOutlineSparkles } from 'react-icons/hi';
+import CreateStoreModal from '@/components/profile/CreateStoreModal';
 
 // Context & Hooks
 import TextField from '../../components/forms/TextField';
@@ -64,6 +65,8 @@ const CreateCollectionInner: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [showCancelPrompt, setShowCancelPrompt] = useState(false);
   const [showDraftPreview, setShowDraftPreview] = useState(false);
+  const [showCreateStoreModal, setShowCreateStoreModal] = useState(false);
+  const [showSaveDraftConfirm, setShowSaveDraftConfirm] = useState(false);
   const tagStylePalette = useMemo(
     () => [
       'bg-white/30 border border-white/40 text-purple-900 dark:text-white backdrop-blur-md shadow-sm',
@@ -91,6 +94,9 @@ const CreateCollectionInner: React.FC = () => {
   });
 
   // Load initial data
+  // Load initial data (tags, categories, and collection when editing)
+  // Note: do not include `mediaStore` (unstable) or setters in deps to avoid rerunning
+  // this effect and spamming APIs; run only on mount or when edit id changes.
   useEffect(() => {
     let mounted = true;
 
@@ -134,6 +140,7 @@ const CreateCollectionInner: React.FC = () => {
                   };
                 })
               );
+              // set media items into the global media store
               mediaStore.set(items);
             }
           }
@@ -148,7 +155,7 @@ const CreateCollectionInner: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [id, isEditMode, mediaStore]);
+  }, [id, isEditMode]);
 
   // Keep selected/cover indices in range when files change
   useEffect(() => {
@@ -303,20 +310,25 @@ const CreateCollectionInner: React.FC = () => {
   };
 
   const handleSaveDraft = async () => {
+    // Drafts require only media selection; auto-fill other fields for backend validation
     if (files.length === 0) {
       toast.error('Please upload at least one file to save');
       return;
     }
+    setShowSaveDraftConfirm(true);
+  };
 
+  const executeSaveDraft = async () => {
     setIsSubmitting(true);
     try {
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
       const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
-      const finalTags = selectedTags.slice(0, 10);
+      const draftTitle = title.trim() || 'Untitled Draft';
+      const finalTags = (selectedTags.length ? selectedTags : ['draft']).slice(0, 10);
 
       await uploadCollection(
         files,
-        title,
+        draftTitle,
         description,
         parsedMinPrice,
         parsedMaxPrice,
@@ -327,18 +339,20 @@ const CreateCollectionInner: React.FC = () => {
         false // shouldPublish = false
       );
 
-      toast.success('Saved to drafts');
       setLastSaved(new Date());
 
       if (user?.id) {
         await fetchCollections(user.id);
       }
+
       toast.success('Draft saved');
+      navigate('/profile?tab=Collections');
     } catch (error) {
       console.error(error);
       toast.error('Failed to save draft');
     } finally {
       setIsSubmitting(false);
+      setShowSaveDraftConfirm(false);
     }
   };
 
@@ -501,9 +515,46 @@ const CreateCollectionInner: React.FC = () => {
             >
               <span role="img" aria-hidden="true">❔</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setShowCreateStoreModal(true)}
+              className="ml-2 px-3 py-1 rounded-lg bg-gradient-to-r from-green-400 to-emerald-500 text-white text-sm shadow-sm"
+            >
+              Create Store
+            </button>
           </div>
         </div>
       </header>
+
+      <CreateStoreModal open={showCreateStoreModal} onClose={() => setShowCreateStoreModal(false)} />
+      {/* Save Draft Confirmation */}
+      {showSaveDraftConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowSaveDraftConfirm(false)} />
+          <div className="relative z-10 w-[420px] bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-6">
+            <h3 className="text-lg font-semibold mb-2">Save as Draft?</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              Your media will be uploaded and saved as a draft. You can continue editing later.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 rounded-lg border"
+                onClick={() => setShowSaveDraftConfirm(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-purple-600 text-white disabled:opacity-50"
+                onClick={executeSaveDraft}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Saving…' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 py-6 pb-32">

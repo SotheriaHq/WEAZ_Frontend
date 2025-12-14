@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -82,6 +82,13 @@ export const Sidebar: React.FC = () => {
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
   const { translate } = useLanguage();
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1920));
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   
   const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
   const { profile: user } = useSelector((state: RootState) => state.user);
@@ -97,8 +104,8 @@ export const Sidebar: React.FC = () => {
     return null;
   }
   
-  // If mobile and closed, render nothing
-  if (window.innerWidth < 1024 && !isSidebarOpen) {
+  // If mobile and closed, render nothing; uses tracked viewport width so it re-renders on resize
+  if (viewportWidth < 1024 && !isSidebarOpen) {
       return null; 
   }
 

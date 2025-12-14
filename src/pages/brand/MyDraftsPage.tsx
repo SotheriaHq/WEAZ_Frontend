@@ -32,7 +32,8 @@ const MyDraftsPage: React.FC = () => {
     setLoading(true);
     try {
       const response = await brandApi.getMyDraftCollections();
-      setDrafts(response);
+      const cleaned = (response || []).filter((d) => d && d.id && ((d.title && d.title.trim().length) || d.coverImage || (d.itemCount ?? 0) > 0));
+      setDrafts(cleaned);
     } catch (error: any) {
       toast.error(error?.response?.data?.message ?? 'Failed to load draft collections');
     } finally {
@@ -58,7 +59,9 @@ const MyDraftsPage: React.FC = () => {
       toast.success('Draft deleted successfully');
       setDrafts((prev) => prev.filter((d) => d.id !== id));
     } catch (error: any) {
+      // If backend cannot delete (already missing records), remove locally to avoid broken cards
       toast.error(error?.response?.data?.message ?? 'Failed to delete draft');
+      setDrafts((prev) => prev.filter((d) => d.id !== id));
     } finally {
       setDeleting(null);
       setConfirmOpen(false);
@@ -167,11 +170,11 @@ const MyDraftsPage: React.FC = () => {
                   {/* Actions */}
                   <div className="flex gap-2">
                     <button
-                      onClick={() => navigate(`/collections/${draft.id}`)}
+                      onClick={() => navigate(`/profile/collections/edit/${draft.id}`)}
                       className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <Eye className="h-4 w-4" />
-                      View
+                      Continue Creation
                     </button>
                     <button
                       onClick={() => handleDelete(draft.id, draft.title)}

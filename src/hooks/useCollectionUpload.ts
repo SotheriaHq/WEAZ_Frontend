@@ -112,7 +112,8 @@ export function useCollectionUpload() {
             .map((tag) => tag.slice(0, 50))
         : [];
 
-      if (normalizedTags.length === 0) {
+      // Allow saving drafts without tags when shouldPublish is false.
+      if (shouldPublish && normalizedTags.length === 0) {
         throw new Error('Add at least one tag to describe this collection.');
       }
 
