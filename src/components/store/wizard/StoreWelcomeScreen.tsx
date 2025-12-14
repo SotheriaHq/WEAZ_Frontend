@@ -4,6 +4,9 @@ import { Store, Shirt, Layers, FileCheck, Camera, Plus } from 'lucide-react';
 interface StoreWelcomeScreenProps {
   onGetStarted: () => void;
   onResumeDraft?: () => void;
+  onStartFresh?: () => void;
+  hasDraft?: boolean;
+  hasLiveStore?: boolean;
 }
 
 const requirementItems = [
@@ -22,6 +25,9 @@ const requirementItems = [
 const StoreWelcomeScreen: React.FC<StoreWelcomeScreenProps> = ({
   onGetStarted,
   onResumeDraft,
+  onStartFresh,
+  hasDraft,
+  hasLiveStore,
 }) => {
   return (
     <main className="flex min-h-[calc(100vh-4rem)] w-full items-center justify-center relative overflow-hidden p-4 sm:p-6">
@@ -98,35 +104,69 @@ const StoreWelcomeScreen: React.FC<StoreWelcomeScreenProps> = ({
 
         {/* Actions */}
         <div className="space-y-4">
-          <button
-            onClick={onGetStarted}
-            className="w-full group relative overflow-hidden rounded-xl 
-              bg-gradient-to-r from-purple-600 to-purple-700 
-              px-8 py-4 
-              transition-all duration-300 
-              hover:brightness-110 hover:shadow-lg hover:shadow-purple-500/25
-              focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-[#0f0f0f]"
-          >
-            <div className="flex items-center justify-center gap-2">
-              <span className="font-semibold text-white text-lg tracking-wide">Get Started</span>
-              <svg className="w-5 h-5 text-white group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-            </div>
-          </button>
-
-          {onResumeDraft && (
-            <div className="text-center">
+          {/* If user has a draft, show Continue as primary, else show Get Started */}
+          {hasDraft ? (
+            <>
+              {/* Continue from Draft - Primary CTA */}
               <button
                 onClick={onResumeDraft}
-                className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-500 hover:text-purple-600 dark:hover:text-white transition-colors duration-300 py-2"
+                className="w-full group relative overflow-hidden rounded-xl 
+                  bg-gradient-to-r from-purple-600 to-purple-700 
+                  px-8 py-4 
+                  transition-all duration-300 
+                  hover:brightness-110 hover:shadow-lg hover:shadow-purple-500/25
+                  focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-[#0f0f0f]"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>Resume previous draft</span>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="font-semibold text-white text-lg tracking-wide">Continue from Draft</span>
+                  <svg className="w-5 h-5 text-white group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </div>
               </button>
-            </div>
+
+              {/* Delete draft option */}
+              {onStartFresh && (
+                <div className="flex items-center justify-center">
+                  <button
+                    onClick={onStartFresh}
+                    className="inline-flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-rose-500 dark:hover:text-rose-300 transition-colors duration-300 py-2 text-sm"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>Delete draft & start fresh</span>
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Get Started - Primary CTA (only when no draft) */}
+              <button
+                onClick={onGetStarted}
+                disabled={hasLiveStore}
+                className={`w-full group relative overflow-hidden rounded-xl 
+                  px-8 py-4 
+                  transition-all duration-300 
+                  focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-[#0f0f0f]
+                  ${hasLiveStore 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:brightness-110 hover:shadow-lg hover:shadow-purple-500/25'
+                  }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <span className="font-semibold text-white text-lg tracking-wide">
+                    {hasLiveStore ? 'Store Already Exists' : 'Get Started'}
+                  </span>
+                  {!hasLiveStore && (
+                    <svg className="w-5 h-5 text-white group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                  )}
+                </div>
+              </button>
+            </>
           )}
         </div>
       </div>

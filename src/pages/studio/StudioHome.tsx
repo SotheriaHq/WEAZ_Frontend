@@ -8,11 +8,13 @@ import OrderManagement from '@/pages/dashboard/OrderManagement';
 import AnalyticsPage from '@/pages/dashboard/AnalyticsPage';
 import FinancePage from '@/pages/dashboard/FinancePage';
 import ProductsPage from '@/pages/dashboard/ProductsPage';
+import CustomersPage from '@/pages/dashboard/CustomersPage';
 
 const sections: Record<string, React.ReactNode> = {
   overview: <DashboardHome />,
-  orders: <OrderManagement />,
   products: <ProductsPage />,
+  orders: <OrderManagement />,
+  customers: <CustomersPage />,
   analytics: <AnalyticsPage />,
   finance: <FinancePage />,
 };

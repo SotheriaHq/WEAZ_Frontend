@@ -308,6 +308,34 @@ export interface BrandStoreInfo {
   isFollowing: boolean;
 }
 
+// ============= Store Drafts =============
+
+export interface StoreDraftData {
+  name?: string;
+  slug?: string;
+  categories?: string[];
+  tagline?: string;
+  description?: string;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  logoFileId?: string | null;
+  bannerFileId?: string | null;
+}
+
+export interface StoreDraftResponse {
+  hasDraft: boolean;
+  hasBrand?: boolean;
+  hasLiveStore?: boolean;
+  draft?: {
+    id: string;
+    data: StoreDraftData;
+    step?: number;
+    status?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+}
+
 interface RawBrandData {
   id: string;
   brandName?: string;
@@ -361,6 +389,29 @@ export const getBrandStoreInfo = async (brandId: string): Promise<BrandStoreInfo
   };
 };
 
+// Store drafts
+export const saveStoreDraft = async (
+  payload: StoreDraftData & { step?: number }
+): Promise<StoreDraftResponse> => {
+  const res = await apiClient.post('/store/draft', payload);
+  return extractData<StoreDraftResponse>(res);
+};
+
+export const getStoreDraft = async (): Promise<StoreDraftResponse> => {
+  const res = await apiClient.get('/store/draft');
+  return extractData<StoreDraftResponse>(res);
+};
+
+export const getStoreDraftStatus = async (): Promise<StoreDraftResponse> => {
+  const res = await apiClient.get('/store/draft/status');
+  return extractData<StoreDraftResponse>(res);
+};
+
+export const clearStoreDraft = async (): Promise<{ success: boolean }> => {
+  const res = await apiClient.delete('/store/draft');
+  return extractData<{ success: boolean }>(res);
+};
+
 export default {
   getProducts,
   getProductById,
@@ -375,4 +426,8 @@ export default {
   removeFromWishlist,
   isInWishlist,
   getBrandStoreInfo,
+  saveStoreDraft,
+  getStoreDraft,
+  getStoreDraftStatus,
+  clearStoreDraft,
 };

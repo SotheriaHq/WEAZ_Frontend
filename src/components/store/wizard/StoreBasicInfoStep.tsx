@@ -7,8 +7,11 @@ interface StoreBasicInfoStepProps {
   data: StoreWizardData;
   onChange: (updates: Partial<StoreWizardData>) => void;
   onBack: () => void;
-  onSaveDraft: () => void;
-  onContinue: () => void;
+  onSaveDraft: () => Promise<void> | void;
+  onContinue: () => Promise<void> | void;
+  isSavingDraft: boolean;
+  isLoadingDraft: boolean;
+  lastSavedAt?: Date | null;
 }
 
 const CATEGORIES = [
@@ -37,9 +40,14 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
   onBack,
   onSaveDraft,
   onContinue,
+  isSavingDraft,
+  isLoadingDraft,
+  lastSavedAt,
 }) => {
   const [slugStatus, setSlugStatus] = useState<SlugStatus>('idle');
   const [slugCheckTimeout, setSlugCheckTimeout] = useState<NodeJS.Timeout | null>(null);
+  const logoSrc = data.logoPreview || data.logoUrl || null;
+  const bannerSrc = data.bannerPreview || data.bannerUrl || null;
 
   // Generate slug from name
   const generateSlug = (name: string) => {
@@ -135,6 +143,16 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
     data.description.length >= 100 &&
     data.description.length <= 500 &&
     slugStatus === 'available';
+
+  const handleSaveDraftClick = async () => {
+    await onSaveDraft();
+  };
+
+  const handleContinueClick = async () => {
+    await onContinue();
+  };
+
+  const isBusy = isSavingDraft || isLoadingDraft;
 
   return (
     <div className="flex flex-col lg:flex-row min-h-[calc(100vh-4rem)]">
@@ -295,8 +313,8 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                   <p className="text-sm text-gray-500 mb-2">Logo (min 400x400px)</p>
                   <div className="flex items-center gap-4">
                     <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-[#1a1a1a] border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center overflow-hidden">
-                      {data.logoPreview ? (
-                        <img src={data.logoPreview} alt="Logo preview" className="w-full h-full object-cover" />
+                      {logoSrc ? (
+                        <img src={logoSrc} alt="Logo preview" className="w-full h-full object-cover" />
                       ) : (
                         <Image className="w-8 h-8 text-gray-400" />
                       )}
@@ -319,8 +337,8 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                 <div>
                   <p className="text-sm text-gray-500 mb-2">Banner (min 1200x400px)</p>
                   <label className="block bg-gray-50 dark:bg-[#1a1a1a] border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center cursor-pointer transition-all hover:border-purple-500/50 hover:bg-purple-50/50 dark:hover:bg-purple-500/5 overflow-hidden">
-                    {data.bannerPreview ? (
-                      <img src={data.bannerPreview} alt="Banner preview" className="w-full h-32 object-cover rounded-lg" />
+                    {bannerSrc ? (
+                      <img src={bannerSrc} alt="Banner preview" className="w-full h-32 object-cover rounded-lg" />
                     ) : (
                       <>
                         <CloudUpload className="w-8 h-8 text-purple-500 mx-auto mb-2" />
@@ -369,21 +387,27 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
               <div className="flex items-center gap-4">
                 <button
                   type="button"
-                  onClick={onSaveDraft}
+                  onClick={handleSaveDraftClick}
                   className="text-gray-500 hover:text-purple-600 transition-colors text-sm"
+                  disabled={isBusy}
                 >
+                  {isSavingDraft && <Loader2 className="w-4 h-4 mr-2 inline animate-spin" />}
                   Save as Draft
                 </button>
                 <button
                   type="button"
-                  onClick={onContinue}
-                  disabled={!isValid}
+                  onClick={handleContinueClick}
+                  disabled={!isValid || isBusy}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
                 >
+                  {isSavingDraft && <Loader2 className="w-4 h-4 animate-spin" />}
                   Continue
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
+              {lastSavedAt && (
+                <p className="text-xs text-gray-500 mt-3">Last saved {lastSavedAt.toLocaleTimeString()}</p>
+              )}
             </div>
           </div>
         </div>

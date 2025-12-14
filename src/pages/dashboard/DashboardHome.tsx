@@ -3,33 +3,44 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
 import { 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  AreaChart,
-  Area
-} from 'recharts';
-import { 
   TrendingUp, 
+  TrendingDown,
+  ShoppingCart,
   ShoppingBag, 
   AlertCircle, 
-  DollarSign, 
-  Package
+  DollarSign,
+  Eye,
+  UserPlus,
+  Shirt,
+  Star,
+  Percent,
+  Wallet,
+  Plus,
+  Layers,
+  Wand2,
+  Ticket,
+  ExternalLink,
+  Settings,
+  Bell,
+  AlertTriangle,
+  Camera,
+  CreditCard,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+/**
+ * Dashboard Home (Screen 2.1)
+ * Glassmorphism design with metrics grid, quick actions, activity feed
+ */
 const DashboardHome: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
   const [overview, setOverview] = useState<any>(null);
-  const [analytics, setAnalytics] = useState<any>(null);
+  const [, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<'7d' | '30d' | 'ytd'>('30d');
 
   useEffect(() => {
     const fetchData = async () => {
-      // If no user ID, we can still show dummy data for demo purposes
       setLoading(true);
       try {
         if (user?.id) {
@@ -43,36 +54,39 @@ const DashboardHome: React.FC = () => {
           throw new Error('No user ID');
         }
       } catch (error) {
-        console.warn('Failed to fetch dashboard data, using dummy data', error);
-        // Fallback to dummy data
+        console.warn('Failed to fetch dashboard data, using demo data', error);
+        // Demo/empty state data
         setOverview({
           kpis: {
-            totalSales: 1250000,
-            totalOrders: 45,
-            avgOrderValue: 27500,
-            pendingOrders: 3
+            totalRevenue: 0,
+            totalOrders: 0,
+            conversionRate: 0,
+            avgOrderValue: 0,
+            storeViews: 0,
+            followers: 0,
+            activeProducts: 0,
+            reviewScore: 0,
+            reviewCount: 0,
           },
           currency: 'NGN',
-          actionRequired: [
-            { message: '3 orders need shipping', link: '/studio?tab=orders' },
-            { message: 'Low stock on "Urban Tee"', link: '/studio?tab=products' }
-          ],
-          recentOrders: [
-            { id: 'ORD-7782', customerName: 'Alice Johnson', totalAmount: 45000, status: 'PENDING' },
-            { id: 'ORD-7781', customerName: 'Michael Smith', totalAmount: 22500, status: 'COMPLETED' },
-            { id: 'ORD-7780', customerName: 'Sarah Williams', totalAmount: 67000, status: 'COMPLETED' }
-          ]
+          store: {
+            name: user?.brandFullName || 'Your Store',
+            slug: user?.username || 'your-store',
+            logoUrl: null,
+            isLive: false,
+          },
+          actionRequired: [],
+          recentActivity: [],
+          recentOrders: [],
+          storeHealth: {
+            score: 0,
+            responseTime: 0,
+            inventory: 0,
+            reviews: 0,
+          }
         });
         setAnalytics({
-          salesChart: [
-            { date: '2023-11-01', amount: 150000 },
-            { date: '2023-11-05', amount: 280000 },
-            { date: '2023-11-10', amount: 190000 },
-            { date: '2023-11-15', amount: 450000 },
-            { date: '2023-11-20', amount: 320000 },
-            { date: '2023-11-25', amount: 580000 },
-            { date: '2023-11-30', amount: 410000 }
-          ]
+          salesChart: []
         });
       } finally {
         setLoading(false);
@@ -84,177 +98,286 @@ const DashboardHome: React.FC = () => {
   if (loading && !overview) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
       </div>
     );
   }
 
-  const kpis = overview?.kpis || { totalSales: 0, totalOrders: 0, avgOrderValue: 0, pendingOrders: 0 };
-  const currency = overview?.currency || 'NGN';
+  const kpis = overview?.kpis || {};
+  const store = overview?.store || {};
+  const storeHealth = overview?.storeHealth || { score: 0, responseTime: 0, inventory: 0, reviews: 0 };
+  const actionRequired = overview?.actionRequired || [];
+  const recentActivity = overview?.recentActivity || [];
+
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(val);
+    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(val);
+  };
+
+  const formatNumber = (val: number) => {
+    if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
+    if (val >= 1000) return `${(val / 1000).toFixed(1)}K`;
+    return val.toString();
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Welcome back, {user?.brandFullName || user?.username} 👋
-          </p>
-        </div>
-        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg self-start">
-          {(['7d', '30d', 'ytd'] as const).map((r) => (
-            <button
-              key={r}
-              onClick={() => setRange(r)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                range === r 
-                  ? 'bg-white dark:bg-gray-800 shadow-sm text-black dark:text-white' 
-                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              {r === '7d' ? '7 Days' : r === '30d' ? '30 Days' : 'Year'}
+      {/* Store Header Card */}
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
+        <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-white/10 flex items-center justify-center overflow-hidden">
+              {store.logoUrl ? (
+                <img src={store.logoUrl} alt={store.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">
+                  {store.name?.charAt(0) || 'S'}
+                </div>
+              )}
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                {store.name || 'Your Store'}
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1.5 ${
+                  store.isLive 
+                    ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/20'
+                    : 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${store.isLive ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                  {store.isLive ? 'LIVE' : 'DRAFT'}
+                </span>
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                threadly.com/{store.slug || 'your-store'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <a href="#" className="px-4 py-2 bg-white/50 dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2">
+              <ExternalLink className="w-4 h-4" />
+              View Store
+            </a>
+            <button className="w-10 h-10 bg-white/50 dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+              <Settings className="w-5 h-5" />
             </button>
-          ))}
-        </div>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard 
-          title="Total Sales" 
-          value={formatCurrency(kpis.totalSales)} 
-          icon={<DollarSign className="w-5 h-5 text-green-600" />}
-          trend="+12.5%" 
-          trendUp={true}
-        />
-        <KpiCard 
-          title="Total Orders" 
-          value={kpis.totalOrders.toString()} 
-          icon={<ShoppingBag className="w-5 h-5 text-blue-600" />}
-          trend="+5.2%" 
-          trendUp={true}
-        />
-        <KpiCard 
-          title="Avg. Order Value" 
-          value={formatCurrency(kpis.avgOrderValue)} 
-          icon={<TrendingUp className="w-5 h-5 text-purple-600" />}
-          trend="-2.1%" 
-          trendUp={false}
-        />
-        <KpiCard 
-          title="Pending Orders" 
-          value={kpis.pendingOrders.toString()} 
-          icon={<Package className="w-5 h-5 text-orange-600" />}
-          alert={kpis.pendingOrders > 0}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Sales Chart */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-900/50 rounded-2xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
-          <h3 className="text-lg font-semibold mb-6">Sales Overview</h3>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={analytics?.salesChart || []}>
-                <defs>
-                  <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#000000" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#000000" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                <XAxis 
-                  dataKey="date" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 12, fill: '#6B7280' }}
-                  tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 12, fill: '#6B7280' }}
-                  tickFormatter={(val) => `${val / 1000}k`}
-                />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="amount" 
-                  stroke="#000000" 
-                  strokeWidth={2}
-                  fillOpacity={1} 
-                  fill="url(#colorSales)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <button className="w-10 h-10 bg-white/50 dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors relative">
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-gray-900" />
+            </button>
           </div>
         </div>
+      </div>
 
-        {/* Action Required & Recent Orders */}
-        <div className="space-y-6">
-          {/* Action Required */}
-          {overview?.actionRequired?.length > 0 && (
-            <div className="bg-white dark:bg-gray-900/50 rounded-2xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-red-500" />
-                Action Required
-              </h3>
-              <div className="space-y-3">
-                {overview.actionRequired.map((action: any, idx: number) => (
-                  <div key={idx} className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900/10 rounded-xl">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-red-900 dark:text-red-200">{action.message}</p>
-                      <Link to={action.link} className="text-xs text-red-600 dark:text-red-400 hover:underline mt-1 inline-block">
-                        View Details &rarr;
-                      </Link>
-                    </div>
-                  </div>
-                ))}
+      {/* Metrics Section */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Overview</h2>
+          <select
+            value={range}
+            onChange={(e) => setRange(e.target.value as any)}
+            className="bg-white/50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-xs text-gray-600 dark:text-gray-300 px-3 py-1.5 focus:outline-none focus:border-purple-500"
+          >
+            <option value="30d">Last 30 Days</option>
+            <option value="7d">This Week</option>
+            <option value="ytd">Today</option>
+          </select>
+        </div>
+
+        {/* Metrics Grid - 8 cards in 2 rows */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard
+            title="Total Revenue"
+            value={formatCurrency(kpis.totalRevenue || 0)}
+            icon={<DollarSign className="w-4 h-4" />}
+            iconBg="bg-green-500/10"
+            iconColor="text-green-500"
+            trend="+12%"
+            trendUp
+          />
+          <MetricCard
+            title="Orders"
+            value={(kpis.totalOrders || 0).toString()}
+            icon={<ShoppingCart className="w-4 h-4" />}
+            iconBg="bg-blue-500/10"
+            iconColor="text-blue-500"
+            subtitle="Avg. 5.2/day"
+          />
+          <MetricCard
+            title="Conversion Rate"
+            value={`${kpis.conversionRate || 0}%`}
+            icon={<Percent className="w-4 h-4" />}
+            iconBg="bg-purple-500/10"
+            iconColor="text-purple-500"
+            trend="-0.4%"
+            trendUp={false}
+          />
+          <MetricCard
+            title="Avg Order Value"
+            value={formatCurrency(kpis.avgOrderValue || 0)}
+            icon={<Wallet className="w-4 h-4" />}
+            iconBg="bg-orange-500/10"
+            iconColor="text-orange-500"
+            trend="+5%"
+            trendUp
+          />
+          <MetricCard
+            title="Store Views"
+            value={formatNumber(kpis.storeViews || 0)}
+            icon={<Eye className="w-4 h-4" />}
+            iconBg="bg-pink-500/10"
+            iconColor="text-pink-500"
+            subtitle="Unique visitors"
+          />
+          <MetricCard
+            title="Followers"
+            value={formatNumber(kpis.followers || 0)}
+            icon={<UserPlus className="w-4 h-4" />}
+            iconBg="bg-indigo-500/10"
+            iconColor="text-indigo-500"
+            trend="+89 this week"
+            trendUp
+          />
+          <MetricCard
+            title="Active Products"
+            value={(kpis.activeProducts || 0).toString()}
+            icon={<Shirt className="w-4 h-4" />}
+            iconBg="bg-teal-500/10"
+            iconColor="text-teal-500"
+            subtitle={kpis.activeProducts > 0 ? "3 low stock" : "Add products"}
+          />
+          <MetricCard
+            title="Reviews"
+            value={kpis.reviewScore ? `${kpis.reviewScore} / 5.0` : "0"}
+            icon={<Star className="w-4 h-4" />}
+            iconBg="bg-yellow-500/10"
+            iconColor="text-yellow-500"
+            subtitle={kpis.reviewCount ? `Based on ${kpis.reviewCount} reviews` : "No reviews yet"}
+          />
+        </div>
+      </section>
+
+      {/* Quick Actions */}
+      <section>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <QuickActionButton
+            icon={<Plus className="w-5 h-5" />}
+            label="Add Product"
+            baseColor="bg-purple-500/20 text-purple-500"
+            hoverColor="hover:bg-purple-500/10 hover:border-purple-500/30"
+          />
+          <QuickActionButton
+            icon={<Layers className="w-5 h-5" />}
+            label="Create Collection"
+            baseColor="bg-blue-500/20 text-blue-500"
+            hoverColor="hover:bg-blue-500/10 hover:border-blue-500/30"
+          />
+          <QuickActionButton
+            icon={<Wand2 className="w-5 h-5" />}
+            label="Style a Look"
+            baseColor="bg-pink-500/20 text-pink-500"
+            hoverColor="hover:bg-pink-500/10 hover:border-pink-500/30"
+          />
+          <QuickActionButton
+            icon={<Ticket className="w-5 h-5" />}
+            label="Create Promo"
+            baseColor="bg-green-500/20 text-green-500"
+            hoverColor="hover:bg-green-500/10 hover:border-green-500/30"
+          />
+        </div>
+      </section>
+
+      {/* Split Layout: Activity & Alerts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Activity Feed */}
+        <div className="lg:col-span-2 bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-200 dark:border-white/10 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h2>
+            <Link to="/studio?tab=orders" className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300">
+              View All
+            </Link>
+          </div>
+
+          {recentActivity.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
+                <ShoppingBag className="w-8 h-8 text-gray-400" />
               </div>
+              <h3 className="text-gray-900 dark:text-white font-medium mb-1">No activity yet</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Orders, followers, and reviews will appear here
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {recentActivity.map((item: any, idx: number) => (
+                <ActivityItem key={idx} {...item} />
+              ))}
             </div>
           )}
+        </div>
 
-          {/* Recent Orders */}
-          <div className="bg-white dark:bg-gray-900/50 rounded-2xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
+        {/* Right Column */}
+        <div className="space-y-6">
+          {/* Action Required */}
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-200 dark:border-white/10 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <Bell className="w-5 h-5 text-purple-500" />
+              Action Required
+            </h2>
+            
+            {actionRequired.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No pending actions 🎉
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {actionRequired.map((action: any, idx: number) => (
+                  <AlertItem key={idx} {...action} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Store Health */}
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-200 dark:border-white/10 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Recent Orders</h3>
-              <Link to="/dashboard/orders" className="text-sm text-gray-500 hover:text-black dark:hover:text-white">
-                View All
-              </Link>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Store Health</h2>
+              <a href="#" className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300">
+                Improve Score
+              </a>
             </div>
-            <div className="space-y-4">
-              {overview?.recentOrders?.map((order: any) => (
-                <div key={order.id} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-xl transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                      <Package className="w-5 h-5 text-gray-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{order.customerName}</p>
-                      <p className="text-xs text-gray-500">#{order.id.slice(0, 8)}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold">{formatCurrency(Number(order.totalAmount))}</p>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                      order.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
-                      order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {order.status}
-                    </span>
-                  </div>
+
+            <div className="flex items-center gap-6">
+              {/* Circular Progress */}
+              <div className="relative w-24 h-24 flex-shrink-0">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle cx="48" cy="48" r="40" stroke="rgba(128,128,128,0.1)" strokeWidth="8" fill="none" />
+                  <circle 
+                    cx="48" cy="48" r="40" 
+                    stroke={storeHealth.score >= 70 ? '#10b981' : storeHealth.score >= 40 ? '#f59e0b' : '#ef4444'} 
+                    strokeWidth="8" fill="none"
+                    strokeDasharray="251.2"
+                    strokeDashoffset={251.2 - (251.2 * (storeHealth.score || 0) / 100)}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center flex-col">
+                  <span className="text-2xl font-bold text-gray-900 dark:text-white">{storeHealth.score || 0}</span>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase">
+                    {storeHealth.score >= 70 ? 'Good' : storeHealth.score >= 40 ? 'Fair' : 'Low'}
+                  </span>
                 </div>
-              ))}
-              {(!overview?.recentOrders || overview.recentOrders.length === 0) && (
-                <p className="text-sm text-gray-500 text-center py-4">No recent orders</p>
-              )}
+              </div>
+
+              {/* Progress Bars */}
+              <div className="flex-1 space-y-3">
+                <HealthBar label="Response Time" value={storeHealth.responseTime || 0} color="green" />
+                <HealthBar label="Inventory" value={storeHealth.inventory || 0} color="yellow" />
+                <HealthBar label="Reviews" value={storeHealth.reviews || 0} color="blue" />
+              </div>
             </div>
           </div>
         </div>
@@ -263,32 +386,136 @@ const DashboardHome: React.FC = () => {
   );
 };
 
-const KpiCard: React.FC<{ 
-  title: string; 
-  value: string; 
-  icon: React.ReactNode; 
-  trend?: string; 
+// Metric Card Component
+const MetricCard: React.FC<{
+  title: string;
+  value: string;
+  icon: React.ReactNode;
+  iconBg: string;
+  iconColor: string;
+  trend?: string;
   trendUp?: boolean;
-  alert?: boolean;
-}> = ({ title, value, icon, trend, trendUp, alert }) => (
-  <div className={`bg-white dark:bg-gray-900/50 p-6 rounded-2xl border ${alert ? 'border-red-200 dark:border-red-900/30 ring-2 ring-red-50 dark:ring-red-900/10' : 'border-gray-100 dark:border-gray-800'} shadow-sm transition-all hover:shadow-md`}>
-    <div className="flex items-center justify-between mb-4">
-      <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">{title}</span>
-      <div className={`p-2 rounded-lg ${alert ? 'bg-red-100 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-800'}`}>
+  subtitle?: string;
+}> = ({ title, value, icon, iconBg, iconColor, trend, trendUp, subtitle }) => (
+  <div className="bg-white dark:bg-[#1a1a1a] p-5 rounded-xl border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 transition-all hover:-translate-y-0.5 cursor-pointer shadow-sm">
+    <div className="flex justify-between items-start mb-2">
+      <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
+      <div className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center ${iconColor}`}>
         {icon}
       </div>
     </div>
-    <div className="flex items-end justify-between">
-      <h3 className="text-2xl font-bold tracking-tight">{value}</h3>
-      {trend && (
-        <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-          trendUp ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-        }`}>
-          {trend}
-        </span>
-      )}
-    </div>
+    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{value}</h3>
+    {trend && (
+      <p className={`text-xs flex items-center gap-1 ${trendUp ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+        {trendUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+        {trend}
+        <span className="text-gray-400 dark:text-gray-500 ml-1">vs last month</span>
+      </p>
+    )}
+    {subtitle && <p className="text-xs text-gray-400 dark:text-gray-500">{subtitle}</p>}
   </div>
 );
+
+// Quick Action Button
+const QuickActionButton: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  baseColor: string;
+  hoverColor: string;
+}> = ({ icon, label, baseColor, hoverColor }) => (
+  <button className={`group bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 p-4 rounded-xl flex flex-col items-center justify-center gap-3 transition-all hover:-translate-y-0.5 ${hoverColor}`}>
+    <div className={`w-10 h-10 rounded-full ${baseColor} flex items-center justify-center transition-colors group-hover:scale-110`}>
+      {icon}
+    </div>
+    <span className="text-sm font-medium text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white">
+      {label}
+    </span>
+  </button>
+);
+
+// Activity Item
+const ActivityItem: React.FC<{
+  type: 'order' | 'follower' | 'stock' | 'review';
+  title: string;
+  description: string;
+  time: string;
+  action?: string;
+}> = ({ type, title, description, time, action }) => {
+  const iconMap = {
+    order: { icon: <ShoppingCart className="w-4 h-4" />, bg: 'bg-green-500/20', color: 'text-green-500' },
+    follower: { icon: <UserPlus className="w-4 h-4" />, bg: 'bg-indigo-500/20', color: 'text-indigo-500' },
+    stock: { icon: <AlertTriangle className="w-4 h-4" />, bg: 'bg-orange-500/20', color: 'text-orange-500' },
+    review: { icon: <Star className="w-4 h-4" />, bg: 'bg-yellow-500/20', color: 'text-yellow-500' },
+  };
+
+  const { icon, bg, color } = iconMap[type] || iconMap.order;
+
+  return (
+    <div className="flex gap-4 items-start p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+      <div className={`w-10 h-10 rounded-full ${bg} ${color} flex items-center justify-center flex-shrink-0`}>
+        {icon}
+      </div>
+      <div className="flex-1">
+        <div className="flex justify-between items-start">
+          <p className="text-sm text-gray-900 dark:text-white font-medium">{title}</p>
+          <span className="text-xs text-gray-400 dark:text-gray-500">{time}</span>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>
+        {action && (
+          <button className="mt-2 text-xs bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 px-2 py-1 rounded text-gray-700 dark:text-white transition-colors">
+            {action}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Alert Item
+const AlertItem: React.FC<{
+  type: 'error' | 'warning' | 'info';
+  title: string;
+  description: string;
+}> = ({ type, title, description }) => {
+  const styles = {
+    error: { bg: 'bg-red-500/10', border: 'border-red-500/20', icon: <AlertCircle className="w-4 h-4" />, color: 'text-red-500' },
+    warning: { bg: 'bg-orange-500/10', border: 'border-orange-500/20', icon: <Camera className="w-4 h-4" />, color: 'text-orange-500' },
+    info: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: <CreditCard className="w-4 h-4" />, color: 'text-blue-500' },
+  };
+
+  const { bg, border, icon, color } = styles[type];
+
+  return (
+    <div className={`${bg} border ${border} rounded-lg p-3 flex gap-3 items-start`}>
+      <span className={`${color} mt-0.5`}>{icon}</span>
+      <div>
+        <p className="text-sm text-gray-900 dark:text-white font-medium">{title}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{description}</p>
+      </div>
+    </div>
+  );
+};
+
+// Health Bar
+const HealthBar: React.FC<{ label: string; value: number; color: 'green' | 'yellow' | 'blue' }> = ({ label, value, color }) => {
+  const colors = {
+    green: 'bg-green-500 text-green-500',
+    yellow: 'bg-yellow-500 text-yellow-500',
+    blue: 'bg-blue-500 text-blue-500',
+  };
+  const [bgColor, textColor] = colors[color].split(' ');
+
+  return (
+    <div>
+      <div className="flex justify-between text-xs mb-1">
+        <span className="text-gray-500 dark:text-gray-400">{label}</span>
+        <span className={textColor}>{value}%</span>
+      </div>
+      <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-1.5">
+        <div className={`${bgColor} h-1.5 rounded-full`} style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  );
+};
 
 export default DashboardHome;
