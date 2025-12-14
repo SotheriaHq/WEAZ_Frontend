@@ -43,6 +43,7 @@ export interface AuthUserDto {
   bannerImageId: string | null;
   bannerImageFile: AuthProfileImageFileDto | null;
   isEmailVerified: boolean;
+  storeId: string | null;
   isActive: string;
   createdAt: string;
   updatedAt: string;

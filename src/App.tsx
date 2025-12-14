@@ -39,6 +39,7 @@ import {
   WatchLaterPlaceholder,
   TrendingPlaceholder,
 } from './pages/placeholders';
+import StoreCreationWizard from './pages/store/StoreCreationWizard';
 
 /**
  * Root layout component that wraps all routes
@@ -130,6 +131,17 @@ const router = createBrowserRouter([
       {
         path: '/store/:brandId',
         element: <Layout><BrandStore /></Layout>,
+      },
+      {
+        // Store creation wizard - brand users only, wrapped in Layout for navbar/sidebar
+        path: '/store/create',
+        element: (
+          <RequireBrand>
+            <Layout>
+              <StoreCreationWizard />
+            </Layout>
+          </RequireBrand>
+        ),
       },
       {
         // Standalone collection view page (redesigned)

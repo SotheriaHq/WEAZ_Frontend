@@ -130,7 +130,7 @@ const ProfileHeaderQuickEditModal: React.FC<ProfileHeaderQuickEditModalProps> = 
         <div className="fixed inset-0 z-[100] transition-opacity">
              {/* Glow Effect behind modal placement - optional ambient lighting */}
             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[500px] w-[500px] mx-auto bg-purple-500/20 dark:bg-purple-900/40 blur-[100px] rounded-full opacity-50 pointer-events-none"></div>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose}></div>
+            <div className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={onClose}></div>
         </div>
 
         {/* Main Modal Container - Floating Pane */}

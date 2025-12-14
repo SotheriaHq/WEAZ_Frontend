@@ -825,6 +825,7 @@ const ProfilePage: React.FC = () => {
           tags: viewDisplayData.hashtags || [],
         }}
         canEdit={isOwner}
+        storeId={user?.storeId}
         onEditProfile={() => setIsHeaderQuickEditOpen(true)}
         onShareProfile={handleShareProfile}
         onEditAvatar={handleTriggerAvatarUpload}
