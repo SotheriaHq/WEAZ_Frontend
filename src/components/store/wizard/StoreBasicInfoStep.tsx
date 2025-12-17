@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Check, X, Loader2, CloudUpload, Image } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, X, Loader2 } from 'lucide-react';
 import type { StoreWizardData } from '@/pages/store/StoreCreationWizard';
 import StoreLivePreview from './StoreLivePreview';
 
@@ -11,7 +11,6 @@ interface StoreBasicInfoStepProps {
   onContinue: () => Promise<void> | void;
   isSavingDraft: boolean;
   isLoadingDraft: boolean;
-  lastSavedAt?: Date | null;
 }
 
 const CATEGORIES = [
@@ -42,12 +41,9 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
   onContinue,
   isSavingDraft,
   isLoadingDraft,
-  lastSavedAt,
 }) => {
   const [slugStatus, setSlugStatus] = useState<SlugStatus>('idle');
   const [slugCheckTimeout, setSlugCheckTimeout] = useState<NodeJS.Timeout | null>(null);
-  const logoSrc = data.logoPreview || data.logoUrl || null;
-  const bannerSrc = data.bannerPreview || data.bannerUrl || null;
 
   // Generate slug from name
   const generateSlug = (name: string) => {
@@ -62,7 +58,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
     onChange({ name: value, slug: generateSlug(value) });
   };
 
-  // Check slug availability (simulated for now)
+  // Check slug availability (simulated for now - always available in demo)
   const checkSlugAvailability = useCallback((slug: string) => {
     if (!slug) {
       setSlugStatus('idle');
@@ -76,12 +72,11 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
       clearTimeout(slugCheckTimeout);
     }
 
-    // Simulate API call with debounce
+    // Simulate API call with debounce - always available for demo
     const timeout = setTimeout(() => {
-      // Simulated: most slugs are available
-      const isAvailable = Math.random() > 0.3;
-      setSlugStatus(isAvailable ? 'available' : 'unavailable');
-    }, 1000);
+      // TODO: Replace with actual API call when backend is ready
+      setSlugStatus('available');
+    }, 800);
 
     setSlugCheckTimeout(timeout);
   }, [slugCheckTimeout]);
@@ -95,35 +90,6 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
       if (slugCheckTimeout) clearTimeout(slugCheckTimeout);
     };
   }, [data.slug]);
-
-  // Handle file uploads
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        onChange({
-          logoFile: file,
-          logoPreview: event.target?.result as string,
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        onChange({
-          bannerFile: file,
-          bannerPreview: event.target?.result as string,
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   // Toggle category selection
   const toggleCategory = (value: string) => {
@@ -239,12 +205,12 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                         onClick={() => toggleCategory(cat.value)}
                         disabled={isDisabled}
                         className={`
-                          px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border
+                          px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 backdrop-blur-sm
                           ${isSelected
-                            ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-500/20'
+                            ? 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/40 shadow-lg shadow-purple-500/10'
                             : isDisabled
-                              ? 'bg-gray-100 dark:bg-gray-800/50 text-gray-400 dark:text-gray-600 border-gray-200 dark:border-gray-700 cursor-not-allowed'
-                              : 'bg-white dark:bg-white/5 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-500/10'
+                              ? 'bg-gray-100/50 dark:bg-gray-800/30 text-gray-400 dark:text-gray-600 border border-gray-200/50 dark:border-gray-700/50 cursor-not-allowed'
+                              : 'bg-white/60 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/50 dark:border-white/10 hover:border-purple-400/50 dark:hover:border-purple-500/30 hover:bg-purple-50/50 dark:hover:bg-purple-500/10'
                           }
                         `}
                       >
@@ -301,60 +267,6 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                   <span className="text-xs text-gray-500">{data.description.length}/500</span>
                 </div>
               </div>
-
-              {/* Media Uploads */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-4 text-gray-700 dark:text-white">
-                  Store Media
-                </label>
-
-                {/* Logo Upload */}
-                <div className="mb-4">
-                  <p className="text-sm text-gray-500 mb-2">Logo (min 400x400px)</p>
-                  <div className="flex items-center gap-4">
-                    <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-[#1a1a1a] border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center overflow-hidden">
-                      {logoSrc ? (
-                        <img src={logoSrc} alt="Logo preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <Image className="w-8 h-8 text-gray-400" />
-                      )}
-                    </div>
-                    <label className="flex-1 bg-gray-50 dark:bg-[#1a1a1a] border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center cursor-pointer transition-all hover:border-purple-500/50 hover:bg-purple-50/50 dark:hover:bg-purple-500/5">
-                      <CloudUpload className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Click to upload or drag and drop</p>
-                      <p className="text-xs text-gray-400 mt-1">PNG, JPG (min 400x400px)</p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleLogoUpload}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* Banner Upload */}
-                <div>
-                  <p className="text-sm text-gray-500 mb-2">Banner (min 1200x400px)</p>
-                  <label className="block bg-gray-50 dark:bg-[#1a1a1a] border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center cursor-pointer transition-all hover:border-purple-500/50 hover:bg-purple-50/50 dark:hover:bg-purple-500/5 overflow-hidden">
-                    {bannerSrc ? (
-                      <img src={bannerSrc} alt="Banner preview" className="w-full h-32 object-cover rounded-lg" />
-                    ) : (
-                      <>
-                        <CloudUpload className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Click to upload or drag and drop</p>
-                        <p className="text-xs text-gray-400 mt-1">PNG, JPG (min 1200x400px)</p>
-                      </>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleBannerUpload}
-                    />
-                  </label>
-                </div>
-              </div>
             </form>
           </div>
 
@@ -388,26 +300,22 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                 <button
                   type="button"
                   onClick={handleSaveDraftClick}
-                  className="text-gray-500 hover:text-purple-600 transition-colors text-sm"
+                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
                   disabled={isBusy}
                 >
-                  {isSavingDraft && <Loader2 className="w-4 h-4 mr-2 inline animate-spin" />}
+                  {isSavingDraft && <Loader2 className="w-4 h-4 animate-spin" />}
                   Save as Draft
                 </button>
                 <button
                   type="button"
                   onClick={handleContinueClick}
-                  disabled={!isValid || isBusy}
+                  disabled={!isValid || isLoadingDraft}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
                 >
-                  {isSavingDraft && <Loader2 className="w-4 h-4 animate-spin" />}
                   Continue
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
-              {lastSavedAt && (
-                <p className="text-xs text-gray-500 mt-3">Last saved {lastSavedAt.toLocaleTimeString()}</p>
-              )}
             </div>
           </div>
         </div>

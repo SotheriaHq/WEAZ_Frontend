@@ -36,28 +36,21 @@ const StoreLivePreview: React.FC<StoreLivePreviewProps> = ({ data }) => {
 
       {/* Preview Card */}
       <div className="rounded-2xl overflow-hidden bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-gray-200/50 dark:border-purple-500/10">
-        {/* Banner */}
+        {/* Banner - Will use brand's existing banner */}
         <div className="h-40 bg-gradient-to-r from-purple-500/20 to-purple-700/20 relative overflow-hidden">
-          {data.bannerPreview ? (
-            <img src={data.bannerPreview} alt="Banner preview" className="w-full h-full object-cover" />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-12 h-12 rounded-lg bg-gray-200/50 dark:bg-white/10 flex items-center justify-center">
-                <Store className="w-6 h-6 text-gray-400" />
-              </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-lg bg-gray-200/50 dark:bg-white/10 flex items-center justify-center">
+              <Store className="w-6 h-6 text-gray-400" />
             </div>
-          )}
+            <p className="text-xs text-gray-400 ml-2">Brand banner will be used</p>
+          </div>
         </div>
 
         {/* Store Info */}
         <div className="p-6 relative">
-          {/* Logo */}
+          {/* Logo - Will use brand's existing profile image */}
           <div className="w-24 h-24 rounded-full bg-white dark:bg-[#0f0f0f] border-4 border-gray-100 dark:border-[#1a1a1a] absolute -top-12 left-6 flex items-center justify-center overflow-hidden shadow-lg">
-            {data.logoPreview ? (
-              <img src={data.logoPreview} alt="Logo preview" className="w-full h-full object-cover" />
-            ) : (
-              <Store className="w-8 h-8 text-gray-400" />
-            )}
+            <Store className="w-8 h-8 text-gray-400" />
           </div>
 
           <div className="mt-14">

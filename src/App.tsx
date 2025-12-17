@@ -23,6 +23,8 @@ import DropdownDemo from './pages/ui/DropdownDemo';
 import AcceptInvite from './pages/AcceptInvite';
 import ErrorPage from './pages/ErrorPage';
 import StudioHome from './pages/studio/StudioHome';
+import ProductManagement from './pages/studio/products/ProductManagement';
+import EditProduct from './pages/studio/products/EditProduct';
 import { Navigate } from 'react-router-dom';
 import CartDrawer from './components/designs/CartDrawer';
 import WishlistDrawer from './components/designs/WishlistDrawer';
@@ -96,6 +98,30 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <StudioHome />
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/products',
+        element: (
+          <RequireBrand>
+            <ProductManagement />
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/products/create',
+        element: (
+          <RequireBrand>
+            <EditProduct />
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/products/edit/:id',
+        element: (
+          <RequireBrand>
+            <EditProduct />
           </RequireBrand>
         ),
       },

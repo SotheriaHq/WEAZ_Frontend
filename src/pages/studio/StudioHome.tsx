@@ -7,12 +7,12 @@ import DashboardHome from '@/pages/dashboard/DashboardHome';
 import OrderManagement from '@/pages/dashboard/OrderManagement';
 import AnalyticsPage from '@/pages/dashboard/AnalyticsPage';
 import FinancePage from '@/pages/dashboard/FinancePage';
-import ProductsPage from '@/pages/dashboard/ProductsPage';
+import ProductManagement from '@/pages/studio/products/ProductManagement';
 import CustomersPage from '@/pages/dashboard/CustomersPage';
 
 const sections: Record<string, React.ReactNode> = {
   overview: <DashboardHome />,
-  products: <ProductsPage />,
+  products: <ProductManagement />,
   orders: <OrderManagement />,
   customers: <CustomersPage />,
   analytics: <AnalyticsPage />,

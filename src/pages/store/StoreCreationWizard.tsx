@@ -11,7 +11,6 @@ import CreateLookModal from '@/components/store/wizard/CreateLookModal';
 import StoreMediaReviewStep from '@/components/store/wizard/StoreMediaReviewStep';
 import StoreReviewStep from '@/components/store/wizard/StoreReviewStep';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { brandApi } from '@/api/BrandApi';
 import { getStoreDraftStatus, saveStoreDraft, clearStoreDraft, type StoreDraftData } from '@/api/StoreApi';
 
 // Catalog types for wizard
@@ -65,14 +64,6 @@ export interface StoreWizardData {
   categories: string[]; // Changed to array for multi-select (max 3)
   tagline: string;
   description: string;
-  logoFile: File | null;
-  logoPreview: string | null;
-  bannerFile: File | null;
-  bannerPreview: string | null;
-  logoFileId: string | null;
-  logoUrl: string | null;
-  bannerFileId: string | null;
-  bannerUrl: string | null;
 
   // Step 2: Social & Verification
   instagram: string;
@@ -114,14 +105,6 @@ const initialData: StoreWizardData = {
   categories: [],
   tagline: '',
   description: '',
-  logoFile: null,
-  logoPreview: null,
-  bannerFile: null,
-  bannerPreview: null,
-  logoFileId: null,
-  logoUrl: null,
-  bannerFileId: null,
-  bannerUrl: null,
 
   // Step 2
   instagram: '',
@@ -171,7 +154,6 @@ const StoreCreationWizard: React.FC = () => {
   const [hasLiveStore, setHasLiveStore] = useState<boolean>(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
   const [isLookModalOpen, setIsLookModalOpen] = useState(false);
   const [showDeleteDraftConfirm, setShowDeleteDraftConfirm] = useState(false);
@@ -199,17 +181,8 @@ const StoreCreationWizard: React.FC = () => {
           setWizardData((prev) => ({
             ...prev,
             ...data,
-            logoPreview: (data.logoUrl as string | null) ?? prev.logoPreview,
-            bannerPreview: (data.bannerUrl as string | null) ?? prev.bannerPreview,
-            logoUrl: (data.logoUrl as string | null) ?? prev.logoUrl,
-            bannerUrl: (data.bannerUrl as string | null) ?? prev.bannerUrl,
-            logoFileId: (data.logoFileId as string | null) ?? prev.logoFileId,
-            bannerFileId: (data.bannerFileId as string | null) ?? prev.bannerFileId,
           }));
           setHasDraft(true);
-          if (response.draft?.updatedAt) {
-            setLastSavedAt(new Date(response.draft.updatedAt));
-          }
           if (!isCancelled) {
             setIsLoadingDraft(false);
           }
@@ -223,10 +196,6 @@ const StoreCreationWizard: React.FC = () => {
         setWizardData((prev) => ({
           ...prev,
           ...localDraft,
-          logoPreview: (localDraft.logoUrl as string | null) ?? prev.logoPreview,
-          bannerPreview: (localDraft.bannerUrl as string | null) ?? prev.bannerPreview,
-          logoUrl: (localDraft.logoUrl as string | null) ?? prev.logoUrl,
-          bannerUrl: (localDraft.bannerUrl as string | null) ?? prev.bannerUrl,
         } as StoreWizardData));
         setHasDraft(true);
       }
@@ -265,7 +234,6 @@ const StoreCreationWizard: React.FC = () => {
       localStorage.removeItem('store-draft');
       setWizardData(initialData);
       setHasDraft(false);
-      setLastSavedAt(null);
       toast.success('Draft deleted. Start fresh.');
       setCurrentStep('basic-info');
     } catch (error) {
@@ -302,58 +270,24 @@ const StoreCreationWizard: React.FC = () => {
   const handleSaveDraft = useCallback(async () => {
     setIsSavingDraft(true);
     try {
-      let logoUrl = wizardData.logoUrl;
-      let bannerUrl = wizardData.bannerUrl;
-      let logoFileId = wizardData.logoFileId;
-      let bannerFileId = wizardData.bannerFileId;
-
-      if (wizardData.logoFile) {
-        const uploadedLogo = await brandApi.uploadLogo('self', wizardData.logoFile);
-        if (uploadedLogo?.url) {
-          logoUrl = uploadedLogo.url;
-          logoFileId = uploadedLogo.id;
-        }
-      }
-
-      if (wizardData.bannerFile) {
-        const uploadedBanner = await brandApi.uploadBanner('self', wizardData.bannerFile);
-        if (uploadedBanner?.url) {
-          bannerUrl = uploadedBanner.url;
-          bannerFileId = uploadedBanner.id;
-        }
-      }
-
       const payload: StoreDraftData & { step: number } = {
         name: wizardData.name,
         slug: wizardData.slug,
         categories: wizardData.categories,
         tagline: wizardData.tagline,
         description: wizardData.description,
-        logoUrl,
-        bannerUrl,
-        logoFileId,
-        bannerFileId,
         step: currentStep === 'welcome' ? 0 : 1,
       };
 
-      const response = await saveStoreDraft(payload);
+      await saveStoreDraft(payload);
 
       setWizardData((prev) => ({
         ...prev,
         ...payload,
-        logoPreview: logoUrl ?? prev.logoPreview,
-        bannerPreview: bannerUrl ?? prev.bannerPreview,
-        logoFile: null,
-        bannerFile: null,
-        logoUrl: logoUrl ?? null,
-        bannerUrl: bannerUrl ?? null,
-        logoFileId: logoFileId ?? null,
-        bannerFileId: bannerFileId ?? null,
       }));
 
       localStorage.setItem('store-draft', JSON.stringify(payload));
       setHasDraft(true);
-      setLastSavedAt(response?.draft?.updatedAt ? new Date(response.draft.updatedAt) : new Date());
       toast.success('Draft saved');
     } catch (error) {
       console.error('Failed to save store draft', error);
@@ -367,9 +301,8 @@ const StoreCreationWizard: React.FC = () => {
     setWizardData(prev => ({ ...prev, ...updates }));
   }, []);
 
-  const handleContinue = useCallback(async () => {
-    await handleSaveDraft();
-    // Navigate to next step
+  const handleContinue = useCallback(() => {
+    // Navigate to next step without saving draft or showing toast
     switch (currentStep) {
       case 'basic-info':
         setCurrentStep('social');
@@ -390,7 +323,7 @@ const StoreCreationWizard: React.FC = () => {
         // Final submit handled separately
         break;
     }
-  }, [handleSaveDraft, currentStep]);
+  }, [currentStep]);
 
   const handleSkipSocial = useCallback(() => {
     setCurrentStep('policies');
@@ -463,7 +396,6 @@ const StoreCreationWizard: React.FC = () => {
           onContinue={handleContinue}
           isSavingDraft={isSavingDraft}
           isLoadingDraft={isLoadingDraft}
-          lastSavedAt={lastSavedAt}
         />
       )}
 

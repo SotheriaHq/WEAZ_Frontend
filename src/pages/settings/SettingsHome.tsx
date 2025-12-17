@@ -91,7 +91,7 @@ const SettingsHome: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f]">
+    <div className="min-h-screen">
       {/* Local settings sidebar with its own panel */}
       <SettingsSidebar active={active} onSelect={setActive} />
 
