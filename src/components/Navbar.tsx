@@ -163,7 +163,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
             <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center space-x-3">
                 <ImageWithFallback
-                  src={user.profileImage ?? null}
+                  src={user.profileImage ?? user.profileImageFile?.s3Url ?? null}
+                  fileId={user.profileImageId ?? user.profileImageFile?.id ?? null}
                   alt={`${user.firstName} ${user.lastName}`}
                   fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
                   className="w-10 h-10"

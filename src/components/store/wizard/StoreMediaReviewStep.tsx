@@ -13,7 +13,7 @@ import {
   ChevronRight,
   RotateCw,
 } from 'lucide-react';
-import type { StoreWizardData, MediaItem } from '@/pages/store/StoreCreationWizard';
+import type { StoreWizardData, MediaItem } from '@/types/storeWizard';
 
 interface StoreMediaReviewStepProps {
   data: StoreWizardData;

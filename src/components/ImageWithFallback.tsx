@@ -31,8 +31,54 @@ const roundClass = (rounded: ImageWithFallbackProps['rounded']) => {
   }
 };
 
-// Simple in-memory cache for signed URLs to prevent flickering on navigation
-const urlCache: Record<string, string> = {};
+// Session-storage backed cache for signed URLs to prevent flickering on navigation
+const CACHE_KEY = 'threadly_signed_url_cache';
+const CACHE_EXPIRY_MS = 3 * 60 * 1000; // 3 minutes (less than signed URL TTL)
+
+interface CacheEntry {
+  url: string;
+  expiresAt: number;
+}
+
+const getCache = (): Record<string, CacheEntry> => {
+  try {
+    const cached = sessionStorage.getItem(CACHE_KEY);
+    return cached ? JSON.parse(cached) : {};
+  } catch {
+    return {};
+  }
+};
+
+const setCache = (cache: Record<string, CacheEntry>) => {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // SessionStorage might be full or unavailable
+  }
+};
+
+const getCachedUrl = (fileId: string): string | null => {
+  const cache = getCache();
+  const entry = cache[fileId];
+  if (entry && entry.expiresAt > Date.now()) {
+    return entry.url;
+  }
+  // Clean up expired entry
+  if (entry) {
+    delete cache[fileId];
+    setCache(cache);
+  }
+  return null;
+};
+
+const setCachedUrl = (fileId: string, url: string) => {
+  const cache = getCache();
+  cache[fileId] = {
+    url,
+    expiresAt: Date.now() + CACHE_EXPIRY_MS,
+  };
+  setCache(cache);
+};
 
 export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   src,
@@ -47,16 +93,16 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
 }) => {
   const [resolved, setResolved] = useState<string | null>(() => {
     if (src) return src;
-    if (fileId && urlCache[fileId]) return urlCache[fileId];
+    if (fileId) {
+      const cached = getCachedUrl(fileId);
+      if (cached) return cached;
+    }
     return null;
   });
   const [hadError, setHadError] = useState(false);
   const [loaded, setLoaded] = useState(() => {
     // If we have a value initially, assume it might be loaded (browser cache) 
-    // or we want to show it immediately. 
-    // But for smooth transition, we usually wait for onLoad.
-    // However, if it's from our cache, we can try to show it.
-    return !!(src || (fileId && urlCache[fileId]));
+    return !!(src || (fileId && getCachedUrl(fileId)));
   });
 
   useEffect(() => {
@@ -65,31 +111,32 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       // If src/fileId changed, reset error
       setHadError(false);
 
-      // Optimization: If src is already a signed URL, use it.
+      // Optimization: If src is already a signed URL (has query params), use it directly
       if (src && (src.includes('?') || !src.includes('s3'))) {
-          setResolved(src);
-          if (src !== resolved) setLoaded(false);
-          return;
+        setResolved(src);
+        return;
       }
 
       if (fileId) {
         // Check cache first
-        if (urlCache[fileId]) {
-            setResolved(urlCache[fileId]);
-            // Don't reset loaded here, keep previous state or let it be true
-            if (!resolved) setLoaded(true); 
-        } else {
-            setLoaded(false);
+        const cachedUrl = getCachedUrl(fileId);
+        if (cachedUrl) {
+          setResolved(cachedUrl);
+          setLoaded(true);
+          return; // Use cached URL, no need to fetch
         }
 
+        // No cached URL, need to fetch
+        setLoaded(false);
+
         try {
-            const url = await brandApi.getSignedFileUrl(fileId);
-            if (mounted && url) {
-                urlCache[fileId] = url;
-                setResolved(url);
-            }
+          const url = await brandApi.getSignedFileUrl(fileId);
+          if (mounted && url) {
+            setCachedUrl(fileId, url);
+            setResolved(url);
+          }
         } catch (e) {
-            if (mounted) setHadError(true);
+          if (mounted) setHadError(true);
         }
       } else {
         setResolved(src ?? null);
@@ -97,15 +144,12 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       }
     };
     
-    // Only run if inputs actually changed
-    if (src !== resolved && (!fileId || urlCache[fileId] !== resolved)) {
-        void run();
-    }
+    void run();
     
     return () => {
       mounted = false;
     };
-  }, [fileId, src]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fileId, src]);
 
   const showFallback = hadError || !resolved;
 

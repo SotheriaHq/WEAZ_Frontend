@@ -11,93 +11,16 @@ import CreateLookModal from '@/components/store/wizard/CreateLookModal';
 import StoreMediaReviewStep from '@/components/store/wizard/StoreMediaReviewStep';
 import StoreReviewStep from '@/components/store/wizard/StoreReviewStep';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { getStoreDraftStatus, saveStoreDraft, clearStoreDraft, type StoreDraftData } from '@/api/StoreApi';
+import {
+  getStoreDraftStatus,
+  saveStoreDraft,
+  clearStoreDraft,
+  getStoreWizardPrefill,
+  type StoreDraftData,
+  type StoreWizardPrefillResponse,
+} from '@/api/StoreApi';
 
-// Catalog types for wizard
-export interface WizardProduct {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  description?: string;
-}
-
-export interface WizardCollection {
-  id: string;
-  name: string;
-  description?: string;
-  coverImage: string;
-  type: 'standard' | 'seasonal' | 'limited' | 'capsule';
-  productIds: string[];
-  featured: boolean;
-  status: 'active' | 'inactive';
-  launchDate?: string;
-  quantityCap?: number;
-}
-
-export interface WizardLook {
-  id: string;
-  name: string;
-  description?: string;
-  image: string;
-  styledBy: string;
-  productIds: string[];
-  hotspots: { x: number; y: number; productId: string }[];
-  featured: boolean;
-  allowSizeSwap: boolean;
-  discount: number; // percentage
-}
-
-export interface MediaItem {
-  id: string;
-  url: string;
-  name: string;
-  resolution: string;
-  status: 'passed' | 'failed' | 'warning';
-  issues?: { type: string; message: string }[];
-}
-
-export interface StoreWizardData {
-  // Step 1: Basic Info
-  name: string;
-  slug: string;
-  categories: string[]; // Changed to array for multi-select (max 3)
-  tagline: string;
-  description: string;
-
-  // Step 2: Social & Verification
-  instagram: string;
-  tiktok: string;
-  twitter: string;
-  website: string;
-  domainVerificationStatus: 'unverified' | 'pending' | 'verified';
-  domainVerificationToken: string;
-
-  // Step 3: Policies
-  shippingRegions: string[];
-  processingTime: string;
-  shippingMethods: string[];
-  freeShippingThreshold: number | null;
-  returnsAccepted: boolean;
-  returnWindow: string;
-  returnConditions: string[];
-  refundMethod: string;
-  sizeChartFile: File | null;
-  sizeChartUrl: string | null;
-  responseTimeSla: string;
-  contactEmail: string;
-
-  // Step 4: Catalog
-  products: WizardProduct[];
-  collections: WizardCollection[];
-  looks: WizardLook[];
-  catalogActiveTab: 'collections' | 'looks';
-
-  // Step 5: Media
-  mediaItems: MediaItem[];
-  termsAccepted: boolean;
-}
-
+import type { StoreWizardData, WizardCollection, WizardLook } from '@/types/storeWizard';
 const initialData: StoreWizardData = {
   // Step 1
   name: '',
@@ -105,26 +28,26 @@ const initialData: StoreWizardData = {
   categories: [],
   tagline: '',
   description: '',
-
+  
   // Step 2
   instagram: '',
   tiktok: '',
   twitter: '',
   website: '',
-  domainVerificationStatus: 'unverified',
-  domainVerificationToken: '',
-
+  tags: [],
+  domainVerificationStatus: 'optional',
+  
   // Step 3
-  shippingRegions: [],
-  processingTime: '',
-  shippingMethods: [],
-  freeShippingThreshold: null,
+  shippingMethod: 'standard',
+  shippingRates: [],
   returnsAccepted: true,
   returnWindow: '14',
   returnConditions: [],
   refundMethod: 'original',
   sizeChartFile: null,
   sizeChartUrl: null,
+  sizeChartPresetKey: null,
+  sizeChartSystem: null,
   responseTimeSla: '24h',
   contactEmail: '',
 
@@ -140,6 +63,16 @@ const initialData: StoreWizardData = {
 };
 
 type WizardStep = 'welcome' | 'basic-info' | 'social' | 'policies' | 'catalog' | 'media' | 'review';
+
+const WIZARD_STEPS: { id: WizardStep; label: string; description: string }[] = [
+  { id: 'welcome', label: 'Welcome', description: 'Preview requirements' },
+  { id: 'basic-info', label: 'Basics', description: 'Name, slug, category' },
+  { id: 'social', label: 'Socials', description: 'Handles & trust' },
+  { id: 'policies', label: 'Policies', description: 'Shipping, returns, size' },
+  { id: 'catalog', label: 'Catalog', description: 'Products & collections' },
+  { id: 'media', label: 'Media', description: 'Quality check' },
+  { id: 'review', label: 'Review', description: 'Submit for approval' },
+];
 
 /**
  * Store Creation Wizard
@@ -157,6 +90,10 @@ const StoreCreationWizard: React.FC = () => {
   const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
   const [isLookModalOpen, setIsLookModalOpen] = useState(false);
   const [showDeleteDraftConfirm, setShowDeleteDraftConfirm] = useState(false);
+  const [systemCategories, setSystemCategories] = useState<StoreWizardPrefillResponse['system']['categories']>([]);
+  const resolvedStepIndex = WIZARD_STEPS.findIndex((step) => step.id === currentStep);
+  const currentStepIndex = resolvedStepIndex === -1 ? 0 : resolvedStepIndex;
+  void currentStepIndex;
 
   useEffect(() => {
     let isCancelled = false;
@@ -170,36 +107,59 @@ const StoreCreationWizard: React.FC = () => {
         localDraft = null;
       }
 
+      let nextData: StoreWizardData = initialData;
+
+      // 1) Server draft (authoritative)
       try {
         const response = await getStoreDraftStatus();
         if (!isCancelled) {
           setHasLiveStore(Boolean(response?.hasLiveStore));
         }
 
-        if (!isCancelled && response?.hasDraft && response.draft?.data) {
-          const data = response.draft.data;
-          setWizardData((prev) => ({
-            ...prev,
-            ...data,
-          }));
-          setHasDraft(true);
-          if (!isCancelled) {
-            setIsLoadingDraft(false);
-          }
-          return;
+        if (response?.hasDraft && response.draft?.data) {
+          nextData = { ...nextData, ...(response.draft.data as any) };
+          if (!isCancelled) setHasDraft(true);
+        } else if (localDraft) {
+          // 2) Local draft fallback
+          nextData = { ...nextData, ...(localDraft as any) };
+          if (!isCancelled) setHasDraft(true);
         }
       } catch (error) {
         console.error('Failed to load store draft from server', error);
+        if (localDraft) {
+          nextData = { ...nextData, ...(localDraft as any) };
+          if (!isCancelled) setHasDraft(true);
+        }
       }
 
-      if (!isCancelled && localDraft) {
-        setWizardData((prev) => ({
-          ...prev,
-          ...localDraft,
-        } as StoreWizardData));
-        setHasDraft(true);
+      // 3) Prefill from canonical brand/profile data
+      try {
+        const prefill = await getStoreWizardPrefill();
+        if (!isCancelled && prefill) {
+          setSystemCategories(prefill.system?.categories ?? []);
+
+          nextData = {
+            ...nextData,
+            // enforce canonical identity
+            name: prefill.brand.storeName || nextData.name,
+            slug: prefill.brand.slug || nextData.slug,
+
+            // fill empty fields only
+            contactEmail: nextData.contactEmail || prefill.brand.contactEmail || '',
+            description: nextData.description || prefill.brand.description || '',
+            instagram: nextData.instagram || prefill.brand.instagram || '',
+            twitter: nextData.twitter || prefill.brand.twitter || '',
+            website: nextData.website || prefill.brand.website || '',
+            tagline: nextData.tagline || prefill.brand.tagline || '',
+            tags: nextData.tags?.length ? nextData.tags : (prefill.brand.tags || []),
+          };
+        }
+      } catch (error) {
+        console.error('Failed to prefill wizard data', error);
       }
+
       if (!isCancelled) {
+        setWizardData(nextData);
         setIsLoadingDraft(false);
       }
     };
@@ -212,7 +172,7 @@ const StoreCreationWizard: React.FC = () => {
 
   const handleGetStarted = useCallback(() => {
     if (hasLiveStore) {
-      toast.error('You already have a store. Store creation is disabled.');
+      toast.error('User can only have one store at a time.');
       navigate('/profile');
       return;
     }
@@ -234,7 +194,7 @@ const StoreCreationWizard: React.FC = () => {
       localStorage.removeItem('store-draft');
       setWizardData(initialData);
       setHasDraft(false);
-      toast.success('Draft deleted. Start fresh.');
+      toast.success('Draft deleted. Intiate a new store creation.');
       setCurrentStep('basic-info');
     } catch (error) {
       console.error('Failed to clear store draft', error);
@@ -276,6 +236,12 @@ const StoreCreationWizard: React.FC = () => {
         categories: wizardData.categories,
         tagline: wizardData.tagline,
         description: wizardData.description,
+        instagram: wizardData.instagram,
+        tiktok: wizardData.tiktok,
+        twitter: wizardData.twitter,
+        website: wizardData.website,
+        contactEmail: wizardData.contactEmail,
+        tags: wizardData.tags,
         step: currentStep === 'welcome' ? 0 : 1,
       };
 
@@ -347,9 +313,10 @@ const StoreCreationWizard: React.FC = () => {
   }, []);
 
   const handleOpenAddProduct = useCallback(() => {
-    // TODO: Open add product modal/flow
-    toast.info('Add Product flow coming soon!');
-  }, []);
+    navigate('/studio/products/create', {
+      state: { from: '/store/create', source: 'store-wizard' },
+    });
+  }, [navigate]);
 
   // Look modal handlers
   const handleOpenCreateLook = useCallback(() => {
@@ -391,6 +358,7 @@ const StoreCreationWizard: React.FC = () => {
         <StoreBasicInfoStep
           data={wizardData}
           onChange={handleBasicInfoChange}
+          availableCategories={systemCategories}
           onBack={handleBack}
           onSaveDraft={handleSaveDraft}
           onContinue={handleContinue}

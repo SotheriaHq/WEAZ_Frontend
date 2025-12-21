@@ -1,6 +1,6 @@
 import React from 'react';
 import { Store, Tag, Info } from 'lucide-react';
-import type { StoreWizardData } from '@/pages/store/StoreCreationWizard';
+import type { StoreWizardData } from '@/types/storeWizard';
 
 interface StoreLivePreviewProps {
   data: StoreWizardData;

@@ -319,6 +319,9 @@ const CreateCollectionInner: React.FC = () => {
   };
 
   const executeSaveDraft = async () => {
+    // Guard: prevent double submission
+    if (isSubmitting) return;
+    
     setIsSubmitting(true);
     try {
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
@@ -345,8 +348,9 @@ const CreateCollectionInner: React.FC = () => {
         await fetchCollections(user.id);
       }
 
-      toast.success('Draft saved');
-      navigate('/profile?tab=Collections');
+      toast.success('Draft saved successfully!');
+      // Navigate to profile with Drafts visibility filter selected
+      navigate('/profile?tab=Collections&visibility=Drafts');
     } catch (error) {
       console.error(error);
       toast.error('Failed to save draft');
@@ -490,43 +494,40 @@ const CreateCollectionInner: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300">
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-950/75 backdrop-blur-xl border-b border-gray-200/80 dark:border-white/10 transition-colors">
+      {/* Sticky Header - Vibrant Gradient Design */}
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-purple-600/95 via-fuchsia-600/95 to-indigo-600/95 backdrop-blur-xl border-b border-white/20 shadow-lg">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
+            className="flex items-center gap-2 text-white/90 hover:text-white transition-colors group"
           >
-            <FiArrowLeft className="w-5 h-5" />
-            <span className="hidden sm:inline">Back</span>
+            <FiArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <span className="hidden sm:inline font-medium">Back</span>
           </button>
 
-          <h1 className="text-xl sm:text-2xl font-serif font-bold title-gradient">
-            {isEditMode ? 'EDIT YOUR STORY' : 'CREATE YOUR STORY'}
-          </h1>
+          <div className="flex items-center gap-3">
+            <HiOutlineSparkles className="w-6 h-6 text-amber-300 animate-pulse" />
+            <h1 className="text-xl sm:text-2xl font-bold text-white drop-shadow-lg">
+              {isEditMode ? '✨ Edit Your Story' : '✨ Create Your Story'}
+            </h1>
+          </div>
 
           <div className="flex items-center gap-3">
-            {/* Buttons removed as per request */}
             <button
               type="button"
-              className="w-9 h-9 rounded-xl bg-white/90 dark:bg-white/10 backdrop-blur flex items-center justify-center text-gray-700 dark:text-gray-100 hover:text-purple-600 dark:hover:text-white transition-colors shadow-sm"
+              className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white hover:bg-white/30 transition-colors shadow-sm"
               aria-label="Help"
             >
               <span role="img" aria-hidden="true">❔</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setShowCreateStoreModal(true)}
-              className="ml-2 px-3 py-1 rounded-lg bg-gradient-to-r from-green-400 to-emerald-500 text-white text-sm shadow-sm"
-            >
-              Create Store
-            </button>
           </div>
         </div>
+        {/* Subtle animated gradient line */}
+        <div className="h-1 w-full bg-gradient-to-r from-amber-400 via-pink-500 to-purple-600 animate-gradient-x" />
       </header>
 
-      <CreateStoreModal open={showCreateStoreModal} onClose={() => setShowCreateStoreModal(false)} />
+      {/* CreateStoreModal removed as per request */}
       {/* Save Draft Confirmation */}
       {showSaveDraftConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">

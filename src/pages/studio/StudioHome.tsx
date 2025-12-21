@@ -28,7 +28,7 @@ const StudioHome: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#000000]">
+    <div className="min-h-screen bg-gradient-to-br from-[#faf8ff] via-[#f5f0ff] to-[#ede9f7] dark:from-[#0f0f0f] dark:via-[#0a0a0a] dark:to-[#000000]">
       {/* Navbar */}
       <Navbar minimal={false} />
       

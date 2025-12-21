@@ -316,11 +316,68 @@ export interface StoreDraftData {
   categories?: string[];
   tagline?: string;
   description?: string;
+  instagram?: string;
+  tiktok?: string;
+  twitter?: string;
+  website?: string;
+  contactEmail?: string;
+  tags?: string[];
   logoUrl?: string | null;
   bannerUrl?: string | null;
   logoFileId?: string | null;
   bannerFileId?: string | null;
 }
+
+export interface StoreWizardPrefillResponse {
+  brand: {
+    storeName: string;
+    slug: string;
+    contactEmail: string;
+    description: string;
+    instagram: string;
+    twitter: string;
+    website: string;
+    tags: string[];
+    tagline: string;
+  };
+  system: {
+    categories: Array<{ id: string; slug: string; name: string }>;
+    tags: string[];
+  };
+  flags: {
+    isEmailVerified: boolean;
+    hasLiveStore: boolean;
+  };
+}
+
+export interface StoreGeneralSettingsResponse {
+  storeName: string;
+  slug: string;
+  description: string;
+  contactEmail: string;
+  isEmailVerified: boolean;
+  hasLiveStore: boolean;
+  storeNameLastChangedAt: string | null;
+  storeNameNextAllowedAt: string | null;
+}
+
+export const getStoreWizardPrefill = async (): Promise<StoreWizardPrefillResponse> => {
+  const res = await apiClient.get('/store/wizard/prefill');
+  return extractData<StoreWizardPrefillResponse>(res);
+};
+
+export const getStoreGeneralSettings = async (): Promise<StoreGeneralSettingsResponse> => {
+  const res = await apiClient.get('/store/settings/general');
+  return extractData<StoreGeneralSettingsResponse>(res);
+};
+
+export const updateStoreName = async (payload: {
+  newName: string;
+  currentPassword: string;
+}): Promise<StoreGeneralSettingsResponse> => {
+  const res = await apiClient.patch('/store/settings/name', payload);
+  return extractData<StoreGeneralSettingsResponse>(res);
+};
 
 export interface StoreDraftResponse {
   hasDraft: boolean;
@@ -430,4 +487,7 @@ export default {
   getStoreDraft,
   getStoreDraftStatus,
   clearStoreDraft,
+  getStoreWizardPrefill,
+  getStoreGeneralSettings,
+  updateStoreName,
 };

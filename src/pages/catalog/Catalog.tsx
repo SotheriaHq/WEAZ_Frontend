@@ -28,6 +28,8 @@ import ImageCropModal from '../../components/upload/ImageCropModal';
 import type { BrandProfileDto, CollectionDto } from '../../types/profile';
 import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedFileUrl';
 
+import ComingSoon from '../placeholders/ComingSoon';
+
 type TabType = 'Collections' | 'Reviews' | 'About' | 'Drafts';
 // CollectionType removed — dropdown opens modal directly
 
@@ -40,16 +42,20 @@ const ProfilePage: React.FC = () => {
     brandProfileLoading,
     collections,
     collectionsLoading,
+    collectionsError,
     reviews,
     reviewsLoading,
+    reviewsError,
     displayData,
     fetchCollections,
     fetchReviews,
     fetchBrandProfile,
+    brandProfileError,
   } = useBrandProfile();
   
   const [drafts, setDrafts] = useState<CollectionDto[]>([]);
   const [draftsLoading, setDraftsLoading] = useState(false);
+  const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
   const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; message?: string }>>({});
 
@@ -66,7 +72,7 @@ const ProfilePage: React.FC = () => {
   // State for inline collection viewer
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
 
-  // Handle URL params for tab and collection
+  // Handle URL params for tab, collection, and visibility filter
   useEffect(() => {
     const urlCollectionId = searchParams.get('collectionId');
     if (urlCollectionId) {
@@ -75,6 +81,11 @@ const ProfilePage: React.FC = () => {
     const tab = searchParams.get('tab');
     if (tab && ['Collections', 'Reviews', 'About'].includes(tab)) {
       setActiveTab(tab as TabType);
+    }
+    // Handle visibility filter from URL (e.g., after draft save redirect)
+    const visibility = searchParams.get('visibility');
+    if (visibility && ['Public', 'Private', 'Drafts'].includes(visibility)) {
+      setVisibilityFilter(visibility as 'Public' | 'Private' | 'Drafts');
     }
   }, [searchParams]);
 
@@ -221,12 +232,23 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     if (visibilityFilter === 'Drafts' && isOwner) {
       setDraftsLoading(true);
+      setDraftsError(null);
       brandApi.getMyDraftCollections()
         .then(items => {
-          setDrafts(items);
+          // Deduplicate by ID to prevent showing duplicate draft cards
+          const uniqueDrafts = items.reduce((acc, draft) => {
+            if (!acc.some(d => d.id === draft.id)) {
+              acc.push(draft);
+            }
+            return acc;
+          }, [] as typeof items);
+          setDrafts(uniqueDrafts);
           setDraftsInitialized(true);
         })
-        .catch(err => console.error(err))
+        .catch(err => {
+          console.error(err);
+          setDraftsError('Unable to connect to server. Please check your connection.');
+        })
         .finally(() => setDraftsLoading(false));
     }
   }, [visibilityFilter, isOwner]);
@@ -492,12 +514,14 @@ const ProfilePage: React.FC = () => {
   const [visitorProfile, setVisitorProfile] = useState<BrandProfileDto | null>(null);
   const [visitorCollections, setVisitorCollections] = useState<CollectionDto[]>([]);
   const [visitorLoading, setVisitorLoading] = useState(false);
+  const [visitorError, setVisitorError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
     const run = async () => {
       if (!isVisitorView || !routeBrandId) return;
       setVisitorLoading(true);
+      setVisitorError(null);
       try {
         const [p, cols] = await Promise.all([
           brandApi.getBrandProfile(routeBrandId),
@@ -506,6 +530,8 @@ const ProfilePage: React.FC = () => {
         if (!mounted) return;
         setVisitorProfile(p ?? null);
         setVisitorCollections(cols ?? []);
+      } catch (e) {
+        if (mounted) setVisitorError('Failed to load profile data');
       } finally {
         if (mounted) setVisitorLoading(false);
       }
@@ -1074,17 +1100,30 @@ const ProfilePage: React.FC = () => {
                         );
                       })()
                     ) : (
-                      (isOwner ? (visibilityFilter === 'Drafts' ? (draftsLoading || !draftsInitialized) : collectionsLoading) : visitorLoading) ? (
+                      (isOwner ? (visibilityFilter === 'Drafts' ? !!draftsError : !!collectionsError) : !!visitorError) ? (
+                        <div className="relative h-[60vh] min-h-[400px] w-full rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800">
+                          <ComingSoon
+                            title="Connection Issue"
+                            description="We couldn't connect to the server to load your collections. Please check your internet connection."
+                            emoji="🔌"
+                            showNotify={false}
+                            backPath="#"
+                            variant="default"
+                            minHeight="min-h-full"
+                            className="bg-gray-50 dark:bg-[#0a0a0a]"
+                          />
+                        </div>
+                      ) : (isOwner ? (visibilityFilter === 'Drafts' ? (draftsLoading || !draftsInitialized) : collectionsLoading) : visitorLoading) ? (
                         <CollectionsSkeleton />
                       ) : searchAndVisibilityFiltered.length > 0 ? (
                         <CollectionsGrid
                           collections={decoratedCollections}
                           isDraft={visibilityFilter === 'Drafts'}
-                          onEdit={isOwner ? (id) => navigate(`/collections/${id}/edit`) : undefined}
+                          onEdit={isOwner ? (id) => navigate(`/profile/collections/edit/${id}`) : undefined}
                           onDelete={isOwner ? (id) => setCollectionToDelete(id) : undefined}
                           onCollectionClick={(id) => {
                             if (visibilityFilter === 'Drafts') {
-                              navigate(`/collections/${id}/edit`);
+                              navigate(`/profile/collections/edit/${id}`);
                             } else {
                               setSelectedCollectionId(id);
                               setSearchParams(prev => {
@@ -1115,11 +1154,41 @@ const ProfilePage: React.FC = () => {
             )}
 
             {activeTab === 'Reviews' && (
-              <ReviewsTab />
+              reviewsError ? (
+                <div className="relative h-[60vh] min-h-[400px] w-full rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800">
+                  <ComingSoon
+                    title="Reviews Unavailable"
+                    description="We couldn't connect to the server to load reviews."
+                    emoji="💬"
+                    showNotify={false}
+                    backPath="#"
+                    variant="default"
+                    minHeight="min-h-full"
+                    className="bg-gray-50 dark:bg-[#0a0a0a]"
+                  />
+                </div>
+              ) : (
+                <ReviewsTab />
+              )
             )}
 
             {activeTab === 'About' && (
-              <AboutTab brandData={brandData} />
+              brandProfileError ? (
+                <div className="relative h-[60vh] min-h-[400px] w-full rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800">
+                  <ComingSoon
+                    title="Profile Unavailable"
+                    description="We couldn't load the profile information."
+                    emoji="📋"
+                    showNotify={false}
+                    backPath="#"
+                    variant="default"
+                    minHeight="min-h-full"
+                    className="bg-gray-50 dark:bg-[#0a0a0a]"
+                  />
+                </div>
+              ) : (
+                <AboutTab brandData={brandData} />
+              )
             )}
           </div>
         </div>

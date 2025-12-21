@@ -13,7 +13,7 @@ import {
   FolderPlus,
   Check,
 } from 'lucide-react';
-import type { StoreWizardData, WizardProduct, WizardCollection } from '@/pages/store/StoreCreationWizard';
+import type { StoreWizardData, WizardProduct, WizardCollection } from '@/types/storeWizard';
 
 interface StoreCatalogStepProps {
   data: StoreWizardData;

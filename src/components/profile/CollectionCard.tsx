@@ -222,13 +222,16 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
                 <MoreVertical className="w-4 h-4" />
               </DropdownTrigger>
               <DropdownMenu className="glass-menu-soft">
-                {onEdit && (
+                {/* For drafts: only show Delete. For published: show Edit, Delete, Manage Access */}
+                {!isDraft && onEdit && (
                   <DropdownItem onClick={() => onEdit(collection.id)}>Edit</DropdownItem>
                 )}
                 {onDelete && (
                   <DropdownItem onClick={() => onDelete(collection.id)}>Delete</DropdownItem>
                 )}
-                <DropdownItem onClick={() => setAccessOpen(true)}>Manage Access</DropdownItem>
+                {!isDraft && (
+                  <DropdownItem onClick={() => setAccessOpen(true)}>Manage Access</DropdownItem>
+                )}
               </DropdownMenu>
             </Dropdown>
           </div>
@@ -302,24 +305,44 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
             </div>
           )}
 
-          {/* Footer row with comment input placeholder (left) and compact View pill (right) */}
+          {/* Footer row - hide comment input for drafts, show completion status instead */}
           <div className="flex items-center gap-2">
-            {/* Comment input placeholder area */}
-            <div className="flex-1 min-w-0">
-              <input
-                type="text"
-                placeholder="Add a comment..."
-                className="w-full rounded-md bg-white/10 text-white placeholder-white/60 border border-white/20 backdrop-blur-sm px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-white/40"
-                onClick={(e) => e.stopPropagation()}
-                readOnly
-              />
-            </div>
-            <button
-              className="shrink-0 px-3 py-1 rounded-md bg-white/10 border border-white/20 text-white text-[11px] font-medium backdrop-blur-sm hover:bg-white/15 transition"
-              onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-            >
-              {isDraft ? 'Continue Creation' : 'View'}
-            </button>
+            {isDraft ? (
+              /* Draft completion indicator */
+              <>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-500/20 border border-amber-400/30 backdrop-blur-sm">
+                    <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                    <span className="text-[10px] font-medium text-amber-200">Draft • {displayItemCount} media uploaded</span>
+                  </div>
+                </div>
+                <button
+                  className="shrink-0 px-3 py-1.5 rounded-md bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[11px] font-medium hover:from-purple-600 hover:to-indigo-600 transition-all shadow-md"
+                  onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+                >
+                  Continue Creation
+                </button>
+              </>
+            ) : (
+              /* Normal collection footer with comment input */
+              <>
+                <div className="flex-1 min-w-0">
+                  <input
+                    type="text"
+                    placeholder="Add a comment..."
+                    className="w-full rounded-md bg-white/10 text-white placeholder-white/60 border border-white/20 backdrop-blur-sm px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-white/40"
+                    onClick={(e) => e.stopPropagation()}
+                    readOnly
+                  />
+                </div>
+                <button
+                  className="shrink-0 px-3 py-1 rounded-md bg-white/10 border border-white/20 text-white text-[11px] font-medium backdrop-blur-sm hover:bg-white/15 transition"
+                  onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+                >
+                  View
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -13,7 +13,7 @@ const NotFound: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] relative overflow-hidden flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-[#faf8ff] via-[#f5f0ff] to-[#ede9f7] dark:from-[#0f0f0f] dark:via-[#0a0a0a] dark:to-[#000000] relative overflow-hidden flex items-center justify-center">
       {/* Animated Background */}
       <div className="absolute inset-0">
         {/* Lost in space gradient */}
@@ -30,7 +30,7 @@ const NotFound: React.FC = () => {
         {[...Array(20)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-1 h-1 bg-white rounded-full"
+            className="absolute w-1 h-1 bg-gray-400 dark:bg-white rounded-full"
             style={{
               top: `${Math.random() * 100}%`,
               left: `${Math.random() * 100}%`,
@@ -71,7 +71,7 @@ const NotFound: React.FC = () => {
             </motion.span>
             
             {/* 404 Number */}
-            <h1 className="text-[150px] md:text-[200px] font-black text-transparent bg-clip-text bg-gradient-to-b from-white/80 to-white/20 leading-none select-none">
+            <h1 className="text-[150px] md:text-[200px] font-black text-transparent bg-clip-text bg-gradient-to-b from-gray-800/80 to-gray-500/50 dark:from-white/80 dark:to-white/20 leading-none select-none">
               404
             </h1>
             
@@ -92,33 +92,33 @@ const NotFound: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.6 }}
         >
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-4">
             Page Not Found
           </h2>
-          <p className="text-gray-400 mb-2 text-lg">
+          <p className="text-gray-600 dark:text-gray-400 mb-2 text-lg">
             Looks like you've wandered into uncharted territory! 🗺️
           </p>
-          <p className="text-gray-500 mb-8 text-sm">
+          <p className="text-gray-500 dark:text-gray-500 mb-8 text-sm">
             The page you're looking for doesn't exist or has been moved.
           </p>
         </motion.div>
 
         {/* Helpful info card */}
         <motion.div
-          className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 mb-8"
+          className="bg-white/50 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl p-6 mb-8"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.4 }}
         >
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-purple-400" />
+              <MapPin className="w-5 h-5 text-purple-500 dark:text-purple-400" />
             </div>
             <div className="text-left">
-              <h3 className="text-white font-medium">Lost? Here's what you can do:</h3>
+              <h3 className="text-gray-900 dark:text-white font-medium">Lost? Here's what you can do:</h3>
             </div>
           </div>
-          <ul className="text-left text-gray-400 text-sm space-y-2">
+          <ul className="text-left text-gray-600 dark:text-gray-400 text-sm space-y-2">
             <li className="flex items-center gap-2">
               <span className="text-green-400">✓</span>
               Check if the URL is spelled correctly
@@ -143,14 +143,14 @@ const NotFound: React.FC = () => {
         >
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 px-6 py-3 rounded-full bg-white text-gray-900 font-medium hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+            className="flex items-center gap-2 px-6 py-3 rounded-full bg-purple-600 text-white font-medium hover:bg-purple-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
             <Home className="w-5 h-5" />
             Go Home
           </button>
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-6 py-3 rounded-full bg-white/10 border border-white/20 text-white font-medium hover:bg-white/20 transition-all"
+            className="flex items-center gap-2 px-6 py-3 rounded-full bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/20 text-gray-900 dark:text-white font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-all"
           >
             <ArrowLeft className="w-5 h-5" />
             Go Back

@@ -12,7 +12,7 @@ import {
   GripVertical,
   Eye,
 } from 'lucide-react';
-import type { WizardProduct, WizardCollection } from '@/pages/store/StoreCreationWizard';
+import type { WizardProduct, WizardCollection } from '@/types/storeWizard';
 
 interface CreateCollectionModalProps {
   isOpen: boolean;

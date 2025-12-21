@@ -913,3 +913,23 @@ html:not(.dark) .input-glass:focus {
 .inner-shadow {
   box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
 }
+
+/* Animated gradient for headers */
+@keyframes gradient-x {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 3s ease infinite;
+}

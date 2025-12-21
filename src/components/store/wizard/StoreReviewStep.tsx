@@ -11,7 +11,7 @@ import {
   Globe,
   ExternalLink,
 } from 'lucide-react';
-import type { StoreWizardData } from '@/pages/store/StoreCreationWizard';
+import type { StoreWizardData } from '@/types/storeWizard';
 
 interface StoreReviewStepProps {
   data: StoreWizardData;

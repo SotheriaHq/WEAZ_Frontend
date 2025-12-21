@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -11,7 +11,7 @@ import {
   Check,
   X,
 } from 'lucide-react';
-import type { StoreWizardData } from '@/pages/store/StoreCreationWizard';
+import type { StoreWizardData } from '@/types/storeWizard';
 
 interface StorePoliciesStepProps {
   data: StoreWizardData;
@@ -21,14 +21,17 @@ interface StorePoliciesStepProps {
   isSaving?: boolean;
 }
 
-// Shipping regions
-const SHIPPING_REGIONS = [
-  { value: 'nigeria', label: 'Nigeria' },
-  { value: 'ghana', label: 'Ghana' },
-  { value: 'kenya', label: 'Kenya' },
-  { value: 'south-africa', label: 'South Africa' },
-  { value: 'other-africa', label: 'Other Africa' },
-  { value: 'international', label: 'International' },
+// Shipping regions with flags (Africa-first)
+const SHIPPING_COUNTRIES = [
+  { value: 'nigeria', label: 'Nigeria', flag: '🇳🇬', accent: 'from-emerald-500/20 to-emerald-600/20' },
+  { value: 'ghana', label: 'Ghana', flag: '🇬🇭', accent: 'from-amber-500/20 to-red-500/20' },
+  { value: 'kenya', label: 'Kenya', flag: '🇰🇪', accent: 'from-green-500/20 to-red-500/20' },
+  { value: 'south-africa', label: 'South Africa', flag: '🇿🇦', accent: 'from-cyan-500/20 to-emerald-500/20' },
+  { value: 'rwanda', label: 'Rwanda', flag: '🇷🇼', accent: 'from-yellow-500/20 to-blue-500/20' },
+  { value: 'egypt', label: 'Egypt', flag: '🇪🇬', accent: 'from-red-500/20 to-gray-500/20' },
+  { value: 'uk', label: 'United Kingdom', flag: '🇬🇧', accent: 'from-blue-500/20 to-red-500/20' },
+  { value: 'us', label: 'United States', flag: '🇺🇸', accent: 'from-blue-500/20 to-indigo-500/20' },
+  { value: 'international', label: 'International', flag: '🌍', accent: 'from-purple-500/20 to-blue-500/20' },
 ];
 
 // Processing times
@@ -60,6 +63,45 @@ const RETURN_CONDITIONS = [
   { value: 'original-packaging', label: 'Original packaging required' },
   { value: 'receipt', label: 'Receipt/proof of purchase' },
   { value: 'undamaged', label: 'Undamaged condition' },
+];
+
+const SIZE_CHARTS = [
+  {
+    id: 'africa-west-south',
+    title: 'West/South Africa (NG/ZA)',
+    description: 'Ready-to-wear cuts commonly used by Lagos/Johannesburg ateliers',
+    rows: [
+      { size: 'XS', bust: '32-33 in / 81-84 cm', waist: '25-26 in / 64-66 cm', hip: '35-36 in / 89-92 cm' },
+      { size: 'S', bust: '34-35 in / 86-89 cm', waist: '27-28 in / 69-71 cm', hip: '37-38 in / 94-97 cm' },
+      { size: 'M', bust: '36-37 in / 91-94 cm', waist: '29-30 in / 74-76 cm', hip: '39-40 in / 99-102 cm' },
+      { size: 'L', bust: '38-40 in / 97-102 cm', waist: '31-33 in / 79-84 cm', hip: '41-43 in / 104-109 cm' },
+      { size: 'XL', bust: '41-43 in / 104-109 cm', waist: '34-36 in / 86-91 cm', hip: '44-46 in / 112-117 cm' },
+    ],
+  },
+  {
+    id: 'uk-eu',
+    title: 'UK/EU Conversion',
+    description: 'UK numeric sizes mapped to EU; works for shoppers in London, Berlin, Paris',
+    rows: [
+      { size: 'UK 6 / EU 34', bust: '32-33 in / 81-84 cm', waist: '25-26 in / 64-66 cm', hip: '35-36 in / 89-92 cm' },
+      { size: 'UK 8 / EU 36', bust: '34-35 in / 86-89 cm', waist: '27-28 in / 69-71 cm', hip: '37-38 in / 94-97 cm' },
+      { size: 'UK 10 / EU 38', bust: '36-37 in / 91-94 cm', waist: '29-30 in / 74-76 cm', hip: '39-40 in / 99-102 cm' },
+      { size: 'UK 12 / EU 40', bust: '38-40 in / 97-102 cm', waist: '31-33 in / 79-84 cm', hip: '41-43 in / 104-109 cm' },
+      { size: 'UK 14 / EU 42', bust: '41-43 in / 104-109 cm', waist: '34-36 in / 86-91 cm', hip: '44-46 in / 112-117 cm' },
+    ],
+  },
+  {
+    id: 'us',
+    title: 'US Contemporary',
+    description: 'Clean US alpha-to-numeric mapping for international buyers',
+    rows: [
+      { size: 'US 0-2 / XS', bust: '32-33 in / 81-84 cm', waist: '25-26 in / 64-66 cm', hip: '35-36 in / 89-92 cm' },
+      { size: 'US 4-6 / S', bust: '34-35 in / 86-89 cm', waist: '27-28 in / 69-71 cm', hip: '37-38 in / 94-97 cm' },
+      { size: 'US 8 / M', bust: '36-37 in / 91-94 cm', waist: '29-30 in / 74-76 cm', hip: '39-40 in / 99-102 cm' },
+      { size: 'US 10 / L', bust: '38-40 in / 97-102 cm', waist: '31-33 in / 79-84 cm', hip: '41-43 in / 104-109 cm' },
+      { size: 'US 12-14 / XL', bust: '41-43 in / 104-109 cm', waist: '34-36 in / 86-91 cm', hip: '44-46 in / 112-117 cm' },
+    ],
+  },
 ];
 
 // Refund methods
@@ -101,6 +143,8 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
   onContinue,
   isSaving = false,
 }) => {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   // Toggle region selection
   const toggleRegion = useCallback(
     (region: string) => {
@@ -158,12 +202,18 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
           onChange({
             sizeChartFile: file,
             sizeChartUrl: event.target?.result as string,
+            sizeChartPresetKey: null,
+            sizeChartSystem: 'custom',
           });
         };
         reader.readAsDataURL(file);
       }
     },
     [onChange]
+  );
+
+  const selectedPreset = SIZE_CHARTS.find(
+    (chart) => chart.id === data.sizeChartPresetKey
   );
 
   return (
@@ -234,25 +284,40 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Shipping Regions
                     </label>
-                    <div className="flex flex-wrap gap-2">
-                      {SHIPPING_REGIONS.map((region) => {
-                        const isSelected = data.shippingRegions.includes(
-                          region.value
-                        );
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {SHIPPING_COUNTRIES.map((region) => {
+                        const isSelected = data.shippingRegions.includes(region.value);
+                        const isAfrican = ['nigeria', 'ghana', 'kenya', 'south-africa', 'rwanda', 'egypt'].includes(region.value);
                         return (
                           <button
                             key={region.value}
                             onClick={() => toggleRegion(region.value)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                            className={`flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all duration-200 bg-gradient-to-r ${region.accent} ${
                               isSelected
-                                ? 'bg-purple-600 text-white border-purple-600'
-                                : 'bg-white dark:bg-white/5 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-purple-400'
+                                ? 'border-purple-500/50 shadow-lg shadow-purple-500/10'
+                                : 'border-gray-200 dark:border-white/10 hover:border-purple-400/60'
                             }`}
                           >
-                            {isSelected && (
-                              <Check className="w-3 h-3 inline mr-1" />
-                            )}
-                            {region.label}
+                            <div className="flex items-center gap-3">
+                              <span className="text-xl" aria-hidden="true">{region.flag}</span>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                  {region.label}
+                                </span>
+                                <span className="text-[11px] text-gray-600 dark:text-gray-400">
+                                  {isAfrican ? 'Africa-first lane' : 'Secondary lane'}
+                                </span>
+                              </div>
+                            </div>
+                            <div
+                              className={`w-6 h-6 rounded-full border flex items-center justify-center ${
+                                isSelected
+                                  ? 'bg-purple-600 text-white border-purple-600'
+                                  : 'bg-white/70 dark:bg-gray-800 text-gray-400 border-gray-300 dark:border-gray-700'
+                              }`}
+                            >
+                              {isSelected && <Check className="w-3 h-3" />}
+                            </div>
                           </button>
                         );
                       })}
@@ -459,44 +524,149 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                         Size Chart
                       </h3>
                       <p className="text-xs text-gray-500">
-                        Optional but recommended
+                        Tap a preset or upload your own
                       </p>
                     </div>
                   </div>
 
-                  {data.sizeChartUrl ? (
-                    <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-white/10">
-                      <img
-                        src={data.sizeChartUrl}
-                        alt="Size chart preview"
-                        className="w-full h-32 object-contain bg-white dark:bg-black/20"
-                      />
-                      <button
-                        onClick={() =>
-                          onChange({ sizeChartFile: null, sizeChartUrl: null })
-                        }
-                        className="absolute top-2 right-2 p-1.5 rounded-full bg-red-500/90 text-white hover:bg-red-600 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* Preset cards */}
+                    <div className="space-y-3">
+                      {SIZE_CHARTS.map((chart, index) => {
+                        const isActive = data.sizeChartPresetKey === chart.id;
+                        const isAfrica = chart.id === 'africa-west-south';
+                        return (
+                          <button
+                            key={chart.id}
+                            onClick={() =>
+                              onChange({
+                                sizeChartPresetKey: chart.id,
+                                sizeChartSystem: chart.id,
+                                sizeChartFile: null,
+                                sizeChartUrl: null,
+                              })
+                            }
+                            className={`w-full text-left rounded-xl border px-4 py-3 transition-all duration-200 bg-white dark:bg-black/20 hover:border-purple-400/60 hover:shadow-md ${
+                              isActive
+                                ? 'border-purple-500/60 shadow-purple-500/15 shadow-lg'
+                                : 'border-gray-200 dark:border-white/10'
+                            } ${isAfrica ? 'ring-1 ring-emerald-400/40' : ''}`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                    {chart.title}
+                                  </span>
+                                  {isAfrica && (
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-400/30">
+                                      Recommended
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {chart.description}
+                                </p>
+                              </div>
+                              <div
+                                className={`w-7 h-7 rounded-full flex items-center justify-center border ${
+                                  isActive
+                                    ? 'bg-purple-600 text-white border-purple-600'
+                                    : 'border-gray-300 dark:border-gray-600 text-gray-400'
+                                }`}
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </div>
+                            </div>
+                            <div className="mt-2 flex items-center gap-2 text-[11px] text-gray-500">
+                              <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                              <span>{index === 0 ? 'Africa-first sizing lane' : 'Mapped for cross-border shoppers'}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                      <div className="text-xs text-gray-500 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-purple-600 hover:text-purple-700 font-medium inline-flex items-center gap-1"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          Or upload custom image
+                        </button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleSizeChartUpload}
+                        />
+                      </div>
                     </div>
-                  ) : (
-                    <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg cursor-pointer hover:border-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-500/5 transition-all">
-                      <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        Upload size chart image
-                      </span>
-                      <span className="text-xs text-gray-400 mt-1">
-                        PNG, JPG up to 2MB
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleSizeChartUpload}
-                      />
-                    </label>
-                  )}
+
+                    {/* Preview */}
+                    <div className="rounded-xl border border-dashed border-gray-300 dark:border-white/10 bg-white dark:bg-black/10 p-4 h-full">
+                      {data.sizeChartUrl ? (
+                        <div className="relative">
+                          <div className="text-xs text-gray-500 mb-2 flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-full bg-gray-200/60 dark:bg-white/10 text-gray-700 dark:text-gray-200 border border-gray-300/60 dark:border-white/10">Custom upload</span>
+                            <span>Preview</span>
+                          </div>
+                          <img
+                            src={data.sizeChartUrl}
+                            alt="Size chart preview"
+                            className="w-full h-40 object-contain bg-white dark:bg-black/30 rounded-lg border border-gray-200 dark:border-white/10"
+                          />
+                          <button
+                            onClick={() =>
+                              onChange({ sizeChartFile: null, sizeChartUrl: null })
+                            }
+                            className="absolute top-2 right-2 p-1.5 rounded-full bg-red-500/90 text-white hover:bg-red-600 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : selectedPreset ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span className="px-2 py-0.5 rounded-full bg-purple-600/10 text-purple-700 dark:text-purple-200 border border-purple-500/20">
+                                {selectedPreset.title}
+                              </span>
+                              <span className="text-gray-600 dark:text-gray-400">Preview</span>
+                            </div>
+                          </div>
+                          <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
+                            <table className="min-w-full text-xs text-left text-gray-700 dark:text-gray-200">
+                              <thead className="bg-gray-100 dark:bg-white/5 text-[11px] uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                                <tr>
+                                  <th className="px-3 py-2">Size</th>
+                                  <th className="px-3 py-2">Bust</th>
+                                  <th className="px-3 py-2">Waist</th>
+                                  <th className="px-3 py-2">Hip</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {selectedPreset.rows.map((row) => (
+                                  <tr key={row.size} className="odd:bg-white even:bg-gray-50 dark:odd:bg-black/30 dark:even:bg-black/20">
+                                    <td className="px-3 py-2 font-medium">{row.size}</td>
+                                    <td className="px-3 py-2">{row.bust}</td>
+                                    <td className="px-3 py-2">{row.waist}</td>
+                                    <td className="px-3 py-2">{row.hip}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-full min-h-[180px] flex flex-col items-center justify-center text-center text-sm text-gray-500 gap-2">
+                          <Sparkles className="w-6 h-6 text-purple-500" />
+                          <p>Select a preset to preview or upload a custom chart.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Customer Contact Card */}

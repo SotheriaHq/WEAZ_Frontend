@@ -1,11 +1,12 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Check, X, Loader2 } from 'lucide-react';
-import type { StoreWizardData } from '@/pages/store/StoreCreationWizard';
+import React from 'react';
+import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
+import type { StoreWizardData } from '@/types/storeWizard';
 import StoreLivePreview from './StoreLivePreview';
 
 interface StoreBasicInfoStepProps {
   data: StoreWizardData;
   onChange: (updates: Partial<StoreWizardData>) => void;
+  availableCategories?: Array<{ id: string; slug: string; name: string }>;
   onBack: () => void;
   onSaveDraft: () => Promise<void> | void;
   onContinue: () => Promise<void> | void;
@@ -13,7 +14,9 @@ interface StoreBasicInfoStepProps {
   isLoadingDraft: boolean;
 }
 
-const CATEGORIES = [
+const MAX_CATEGORIES = 3;
+
+const FALLBACK_CATEGORIES = [
   { value: 'african', label: 'African Fashion' },
   { value: 'western', label: 'Western Fashion' },
   { value: 'streetwear', label: 'Streetwear' },
@@ -24,10 +27,6 @@ const CATEGORIES = [
   { value: 'modest', label: 'Modest Fashion' },
 ];
 
-const MAX_CATEGORIES = 3;
-
-type SlugStatus = 'idle' | 'checking' | 'available' | 'unavailable';
-
 /**
  * Store Basic Info Step (Screen 1.2)
  * Step 1 of 6: Basic store information with live preview
@@ -36,60 +35,16 @@ type SlugStatus = 'idle' | 'checking' | 'available' | 'unavailable';
 const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
   data,
   onChange,
+  availableCategories,
   onBack,
   onSaveDraft,
   onContinue,
   isSavingDraft,
   isLoadingDraft,
 }) => {
-  const [slugStatus, setSlugStatus] = useState<SlugStatus>('idle');
-  const [slugCheckTimeout, setSlugCheckTimeout] = useState<NodeJS.Timeout | null>(null);
-
-  // Generate slug from name
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  };
-
-  // Auto-generate slug when name changes
-  const handleNameChange = (value: string) => {
-    onChange({ name: value, slug: generateSlug(value) });
-  };
-
-  // Check slug availability (simulated for now - always available in demo)
-  const checkSlugAvailability = useCallback((slug: string) => {
-    if (!slug) {
-      setSlugStatus('idle');
-      return;
-    }
-
-    setSlugStatus('checking');
-
-    // Clear previous timeout
-    if (slugCheckTimeout) {
-      clearTimeout(slugCheckTimeout);
-    }
-
-    // Simulate API call with debounce - always available for demo
-    const timeout = setTimeout(() => {
-      // TODO: Replace with actual API call when backend is ready
-      setSlugStatus('available');
-    }, 800);
-
-    setSlugCheckTimeout(timeout);
-  }, [slugCheckTimeout]);
-
-  // Check slug when it changes
-  useEffect(() => {
-    if (data.slug) {
-      checkSlugAvailability(data.slug);
-    }
-    return () => {
-      if (slugCheckTimeout) clearTimeout(slugCheckTimeout);
-    };
-  }, [data.slug]);
+  const categories = availableCategories?.length
+    ? availableCategories.map((c) => ({ value: c.slug, label: c.name }))
+    : FALLBACK_CATEGORIES;
 
   // Toggle category selection
   const toggleCategory = (value: string) => {
@@ -107,8 +62,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
     data.categories.length > 0 &&
     data.tagline.trim() &&
     data.description.length >= 100 &&
-    data.description.length <= 500 &&
-    slugStatus === 'available';
+    data.description.length <= 500;
 
   const handleSaveDraftClick = async () => {
     await onSaveDraft();
@@ -156,10 +110,13 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                   type="text"
                   maxLength={50}
                   value={data.name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 transition-colors"
-                  placeholder="Enter your store name"
+                  disabled
+                  className="w-full bg-white/60 dark:bg-white/5 border border-gray-300/70 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none transition-colors opacity-90"
+                  placeholder="Store name is pulled from your brand profile"
                 />
+                <p className="text-xs text-gray-500 mt-2">
+                  Store name is locked during creation.
+                </p>
                 <div className="flex justify-end mt-1">
                   <span className="text-xs text-gray-500">{data.name.length}/50</span>
                 </div>
@@ -175,16 +132,14 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                   <input
                     type="text"
                     value={data.slug}
-                    onChange={(e) => onChange({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
-                    className="flex-1 bg-transparent py-3 pr-12 text-gray-900 dark:text-white focus:outline-none"
-                    placeholder="your-store"
+                    disabled
+                    className="flex-1 bg-transparent py-3 pr-4 text-gray-900 dark:text-white focus:outline-none opacity-90"
+                    placeholder="username"
                   />
-                  <div className="pr-4">
-                    {slugStatus === 'checking' && <Loader2 className="w-5 h-5 text-gray-500 animate-spin" />}
-                    {slugStatus === 'available' && <Check className="w-5 h-5 text-green-500" />}
-                    {slugStatus === 'unavailable' && <X className="w-5 h-5 text-red-500" />}
-                  </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Store slug is locked to your username during creation.
+                </p>
               </div>
 
               {/* Categories - Multi-select chips (max 3) */}
@@ -194,7 +149,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                   <span className="text-xs font-normal text-gray-500 dark:text-gray-400 ml-2">(Select up to {MAX_CATEGORIES})</span>
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {CATEGORIES.map((cat) => {
+                  {categories.map((cat) => {
                     const isSelected = data.categories.includes(cat.value);
                     const isDisabled = !isSelected && data.categories.length >= MAX_CATEGORIES;
                     

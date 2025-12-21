@@ -9,7 +9,7 @@ import {
   GripVertical,
   Save,
 } from 'lucide-react';
-import type { WizardProduct, WizardLook } from '@/pages/store/StoreCreationWizard';
+import type { WizardProduct, WizardLook } from '@/types/storeWizard';
 
 interface CreateLookModalProps {
   isOpen: boolean;

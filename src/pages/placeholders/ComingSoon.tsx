@@ -20,6 +20,10 @@ interface ComingSoonProps {
   backPath?: string;
   /** Theme variant */
   variant?: 'default' | 'marketplace' | 'social' | 'creator';
+  /** Custom className for the root container */
+  className?: string;
+  /** Minimum height override (default: min-h-screen) */
+  minHeight?: string;
 }
 
 /**
@@ -37,6 +41,8 @@ const ComingSoon: React.FC<ComingSoonProps> = ({
   showNotify = true,
   backPath = '/',
   variant = 'default',
+  className = '',
+  minHeight = 'min-h-screen',
 }) => {
   const navigate = useNavigate();
 
@@ -77,9 +83,12 @@ const ComingSoon: React.FC<ComingSoonProps> = ({
   };
 
   const config = variantConfig[variant];
+  // Determine if we should show the back button.
+  // If embedded (e.g. backPath is empty string or '#'), hide it? 
+  // Or just always show unless explicit hide prop? For now, keep as is.
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] relative overflow-hidden transition-colors duration-300">
+    <div className={`${minHeight} relative overflow-hidden transition-colors duration-300 ${className}`}>
       {/* Animated Background */}
       <div className="absolute inset-0">
         {/* Gradient orbs - Dark Theme */}
@@ -136,8 +145,9 @@ const ComingSoon: React.FC<ComingSoonProps> = ({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-12">
+      <div className={`relative z-10 ${minHeight} flex flex-col items-center justify-center px-4 py-12`}>
         {/* Back button */}
+        {backPath !== '#' && (
         <motion.div
           className="absolute top-6 left-6"
           initial={{ opacity: 0, x: -20 }}
@@ -152,6 +162,7 @@ const ComingSoon: React.FC<ComingSoonProps> = ({
             <span className="text-sm">Back</span>
           </button>
         </motion.div>
+        )}
 
         {/* Main content */}
         <motion.div

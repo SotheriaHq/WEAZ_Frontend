@@ -3,16 +3,14 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  ChevronDown,
-  Copy,
   Globe,
   Info,
+  Loader2,
   Share2,
-  Shield,
-  Zap,
   X,
 } from 'lucide-react';
-import type { StoreWizardData } from '@/pages/store/StoreCreationWizard';
+import { toast } from 'sonner';
+import type { StoreWizardData } from '@/types/storeWizard';
 
 interface StoreSocialStepProps {
   data: StoreWizardData;
@@ -23,7 +21,6 @@ interface StoreSocialStepProps {
   isSaving?: boolean;
 }
 
-// Social platform configs
 const SOCIAL_PLATFORMS = [
   {
     id: 'instagram',
@@ -63,7 +60,6 @@ const SOCIAL_PLATFORMS = [
   },
 ];
 
-// Username validation patterns
 const validateUsername = (platform: string, value: string): boolean => {
   if (!value) return true;
   const cleanValue = value.startsWith('@') ? value.slice(1) : value;
@@ -85,10 +81,6 @@ const validateWebsite = (url: string): boolean => {
   }
 };
 
-/**
- * Store Social & Verification Step (Screen 1.3)
- * Step 2 of 6: Connect social profiles and verify domain
- */
 const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
   data,
   onChange,
@@ -97,83 +89,111 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
   onContinue,
   isSaving = false,
 }) => {
-  const [domainExpanded, setDomainExpanded] = useState(false);
-  const [copiedToken, setCopiedToken] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<Record<string, { status: 'idle' | 'checking' | 'valid' | 'error'; message?: string }>>({
+    instagram: { status: 'idle' },
+    tiktok: { status: 'idle' },
+    twitter: { status: 'idle' },
+  });
 
-  // Check if any social is connected
   const hasSocialConnected = Boolean(
     data.instagram || data.tiktok || data.twitter || data.website
   );
+  const hasVerifiedHandle = Object.values(verificationStatus).some((state) => state.status === 'valid');
 
-  // Handle social input change
   const handleSocialChange = useCallback(
     (platform: string, value: string) => {
       const cleanValue = value.startsWith('@') ? value.slice(1) : value;
       onChange({ [platform]: cleanValue } as Partial<StoreWizardData>);
+      setVerificationStatus((prev) => ({
+        ...prev,
+        [platform]: { status: 'idle' },
+      }));
     },
     [onChange]
   );
 
-  // Copy verification token
-  const handleCopyToken = useCallback(() => {
-    const token = data.domainVerificationToken || 'threadly-verification=demo12345';
-    navigator.clipboard.writeText(token);
-    setCopiedToken(true);
-    setTimeout(() => setCopiedToken(false), 2000);
-  }, [data.domainVerificationToken]);
+  const verifySocialHandle = useCallback(
+    async (platform: 'instagram' | 'tiktok' | 'twitter', label: string) => {
+      const rawValue = (data[platform] as string) || '';
+      const cleanValue = rawValue.startsWith('@') ? rawValue.slice(1) : rawValue;
 
-  // Generate demo token if not present
-  const verificationToken =
-    data.domainVerificationToken || 'threadly-verification=demo12345';
+      if (!cleanValue) {
+        setVerificationStatus((prev) => ({
+          ...prev,
+          [platform]: { status: 'error', message: 'Add a handle to verify.' },
+        }));
+        toast.warning(`Add your ${label} handle to verify`);
+        return;
+      }
+
+      if (!validateUsername(platform, cleanValue)) {
+        setVerificationStatus((prev) => ({
+          ...prev,
+          [platform]: { status: 'error', message: 'Handle format looks off.' },
+        }));
+        return;
+      }
+
+      setVerificationStatus((prev) => ({
+        ...prev,
+        [platform]: { status: 'checking' },
+      }));
+
+      try {
+        const provider = platform === 'twitter' ? 'twitter' : platform;
+        const response = await fetch(`https://unavatar.io/${provider}/${cleanValue}`, {
+          method: 'HEAD',
+        });
+
+        if (!response.ok) {
+          throw new Error('not-found');
+        }
+
+        onChange({ [platform]: cleanValue } as Partial<StoreWizardData>);
+        setVerificationStatus((prev) => ({
+          ...prev,
+          [platform]: { status: 'valid' },
+        }));
+        toast.success(`${label} connected`);
+      } catch (error) {
+        setVerificationStatus((prev) => ({
+          ...prev,
+          [platform]: {
+            status: 'error',
+            message: 'Handle could not be verified. Check spelling or try again.',
+          },
+        }));
+        toast.warning(`We could not verify ${label}. Please confirm the handle.`);
+      }
+    },
+    [data, onChange]
+  );
+
+  const websiteIsValid = validateWebsite(data.website);
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
-      {/* Main Content - Centered Card */}
       <div className="flex-1 flex items-start justify-center p-6 lg:p-12 overflow-y-auto">
-        <div className="w-full max-w-[700px]">
-          {/* Glass Card Container */}
+        <div className="w-full max-w-[720px]">
           <div className="rounded-2xl overflow-hidden bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-gray-200/50 dark:border-purple-500/10 shadow-xl">
-            {/* Step Progress Header */}
-            <div className="px-8 pt-8 pb-4 border-b border-gray-200/50 dark:border-white/5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center text-purple-600 dark:text-purple-400 text-sm font-bold border border-purple-500/30">
-                    2
-                  </div>
-                  <span className="text-gray-900 dark:text-white font-medium">
-                    Social & Verification
-                  </span>
-                </div>
-                <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">
-                  Step 2 of 6
-                </span>
-              </div>
-              {/* Progress Bar */}
-              <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-purple-600 to-blue-500 w-1/3 rounded-full transition-all duration-500" />
-              </div>
-            </div>
-
-            {/* Content Area */}
             <div className="p-8 space-y-8">
-              {/* Header Text */}
               <div className="text-center space-y-2">
                 <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
                   Connect Your Socials
                 </h1>
                 <p className="text-gray-600 dark:text-gray-400 text-sm md:text-base">
-                  Help customers find and trust your brand by linking your active
-                  profiles.
+                  Help customers find and trust your brand by linking active profiles.
                 </p>
               </div>
 
-              {/* Social Links Section */}
               <div className="space-y-4">
-                {/* Social Platform Cards */}
                 {SOCIAL_PLATFORMS.map((platform) => {
                   const value = data[platform.id as keyof StoreWizardData] as string;
+                  const status = verificationStatus[platform.id] || { status: 'idle' };
                   const isConnected = Boolean(value);
                   const isValid = validateUsername(platform.id, value);
+                  const isChecking = status.status === 'checking';
+                  const isVerified = status.status === 'valid';
 
                   return (
                     <div
@@ -191,8 +211,14 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                             <span className="text-gray-900 dark:text-white font-medium flex items-center gap-2">
                               {platform.name}
                               {isConnected && (
-                                <span className="text-[10px] bg-green-500/20 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded border border-green-500/20">
-                                  Connected
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                                    isVerified
+                                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+                                      : 'bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/20'
+                                  }`}
+                                >
+                                  {isVerified ? 'Verified' : 'Connected'}
                                 </span>
                               )}
                             </span>
@@ -225,7 +251,13 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                           </div>
                           {isConnected ? (
                             <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-600 dark:text-green-400 border border-green-500/20">
+                              <div
+                                className={`w-8 h-8 rounded-full flex items-center justify-center border ${
+                                  isVerified
+                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                                    : 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30'
+                                }`}
+                              >
                                 <Check className="w-4 h-4" />
                               </div>
                               <button
@@ -237,19 +269,32 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                             </div>
                           ) : (
                             <button
-                              onClick={() => {}}
-                              className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 text-sm font-medium text-gray-700 dark:text-white transition-colors"
+                              onClick={() =>
+                                verifySocialHandle(
+                                  platform.id as 'instagram' | 'tiktok' | 'twitter',
+                                  platform.name
+                                )
+                              }
+                              disabled={isChecking}
+                              className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 text-sm font-medium text-gray-700 dark:text-white transition-colors inline-flex items-center gap-2 disabled:opacity-60"
                             >
-                              Connect
+                              {isChecking && <Loader2 className="w-4 h-4 animate-spin" />}
+                              {isChecking ? 'Checking' : 'Connect'}
                             </button>
                           )}
                         </div>
+                        {(!isValid || status.status === 'error') && (
+                          <p className="text-xs text-red-500 mt-1">
+                            {!isValid
+                              ? 'Handle format is not allowed for this platform.'
+                              : status.message}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );
                 })}
 
-                {/* Website Input */}
                 <div className="group rounded-xl border border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] transition-all hover:bg-gray-100/50 dark:hover:bg-white/[0.04] p-4">
                   <div className="flex flex-col md:flex-row md:items-center gap-4">
                     <div className="flex items-center gap-4 min-w-[140px]">
@@ -279,7 +324,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                         onChange={(e) => onChange({ website: e.target.value })}
                         placeholder="https://yourstore.com"
                         className={`w-full bg-white dark:bg-black/30 border ${
-                          data.website && !validateWebsite(data.website)
+                          data.website && !websiteIsValid
                             ? 'border-red-500'
                             : 'border-gray-300 dark:border-white/10'
                         } rounded-lg py-2 px-4 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-all`}
@@ -292,131 +337,33 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                           <X className="w-4 h-4" />
                         </button>
                       ) : (
-                        <button className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 text-sm font-medium text-gray-700 dark:text-white transition-colors">
-                          Add
-                        </button>
+                        <div className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm font-medium text-gray-700 dark:text-white flex items-center">
+                          Optional
+                        </div>
                       )}
                     </div>
                   </div>
+                  {data.website && !websiteIsValid && (
+                    <p className="text-xs text-red-500 mt-2">Enter a valid URL that starts with http:// or https://</p>
+                  )}
                 </div>
               </div>
 
-              {/* Domain Verification Accordion */}
-              <div className="rounded-xl border border-gray-200/50 dark:border-white/10 bg-gradient-to-b from-gray-50/50 dark:from-white/[0.05] to-transparent overflow-hidden transition-all duration-300">
-                <button
-                  onClick={() => setDomainExpanded(!domainExpanded)}
-                  className="w-full flex items-center justify-between p-5 hover:bg-gray-100/50 dark:hover:bg-white/[0.02] transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-purple-600/10 flex items-center justify-center text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                      <Shield className="w-5 h-5" />
-                    </div>
-                    <div className="text-left">
-                      <h3 className="text-gray-900 dark:text-white font-medium text-sm md:text-base">
-                        Verify Your Domain
-                      </h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Add a TXT record to earn a Verified Brand badge
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="hidden md:inline-block px-2 py-1 rounded text-[10px] font-medium bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 border border-yellow-500/20">
-                      {data.domainVerificationStatus === 'verified'
-                        ? 'VERIFIED'
-                        : data.domainVerificationStatus === 'pending'
-                        ? 'PENDING'
-                        : 'OPTIONAL'}
-                    </span>
-                    <ChevronDown
-                      className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${
-                        domainExpanded ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </div>
-                </button>
-
-                {domainExpanded && (
-                  <div className="border-t border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-black/20">
-                    <div className="p-5 space-y-4">
-                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 flex gap-3">
-                        <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-blue-700 dark:text-blue-200/80">
-                          Add the following TXT record to your DNS configuration
-                          to verify ownership of{' '}
-                          <span className="text-gray-900 dark:text-white font-medium">
-                            {data.website
-                              ? new URL(data.website).hostname
-                              : 'your domain'}
-                          </span>
-                          .
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-xs text-gray-500 uppercase font-semibold tracking-wider">
-                            Type
-                          </label>
-                          <div className="bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg p-3 text-sm text-gray-700 dark:text-gray-300 font-mono">
-                            TXT
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs text-gray-500 uppercase font-semibold tracking-wider">
-                            Host
-                          </label>
-                          <div className="bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg p-3 text-sm text-gray-700 dark:text-gray-300 font-mono">
-                            @
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-xs text-gray-500 uppercase font-semibold tracking-wider">
-                          Value
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            readOnly
-                            value={verificationToken}
-                            className="w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg p-3 pr-12 text-sm text-gray-700 dark:text-gray-300 font-mono"
-                          />
-                          <button
-                            onClick={handleCopyToken}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-                            title="Copy"
-                          >
-                            {copiedToken ? (
-                              <Check className="w-4 h-4 text-green-500" />
-                            ) : (
-                              <Copy className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2">
-                        <button className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-                          Verify Later
-                        </button>
-                        <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-purple-500/20">
-                          Check Status
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <div className="rounded-xl border border-blue-200/60 dark:border-blue-500/20 bg-blue-50/60 dark:bg-blue-500/5 p-4 flex gap-3 items-start">
+                <div className="w-10 h-10 rounded-lg bg-blue-600/10 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                  <Info className="w-5 h-5" />
+                </div>
+                <div className="space-y-1 text-sm text-blue-900 dark:text-blue-100/80">
+                  <p>We verify handles using free public avatar lookups (unavatar.io) before marking them as connected.</p>
+                  <p className="text-xs text-blue-700/80 dark:text-blue-200/70">No DNS/domain steps needed—just add active socials.</p>
+                </div>
               </div>
 
-              {/* Trust Badges Preview */}
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Potential Trust Badges
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Social Connected Badge */}
                   <div
                     className={`flex flex-col items-center justify-center p-3 rounded-xl text-center gap-2 transition-all ${
                       hasSocialConnected
@@ -444,42 +391,51 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                     </span>
                   </div>
 
-                  {/* Verified Domain Badge */}
                   <div
                     className={`flex flex-col items-center justify-center p-3 rounded-xl text-center gap-2 transition-all ${
-                      data.domainVerificationStatus === 'verified'
-                        ? 'bg-purple-600/5 border border-purple-500/20'
+                      hasVerifiedHandle
+                        ? 'bg-emerald-500/5 border border-emerald-500/20'
                         : 'bg-gray-100/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 opacity-60'
                     }`}
                   >
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        data.domainVerificationStatus === 'verified'
-                          ? 'bg-purple-600/20 text-purple-600 dark:text-purple-400'
+                        hasVerifiedHandle
+                          ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                           : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
                       }`}
                     >
                       <Check className="w-4 h-4" />
                     </div>
                     <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                      Verified Domain
+                      Handles Verified
                     </span>
                   </div>
 
-                  {/* Fast Responder Badge */}
-                  <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-gray-100/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 text-center gap-2 opacity-60">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-gray-400 dark:text-gray-500">
-                      <Zap className="w-4 h-4" />
+                  <div
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl text-center gap-2 transition-all ${
+                      data.website
+                        ? 'bg-blue-500/5 border border-blue-500/20'
+                        : 'bg-gray-100/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 opacity-60'
+                    }`}
+                  >
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        data.website
+                          ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
+                          : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
+                      }`}
+                    >
+                      <Globe className="w-4 h-4" />
                     </div>
                     <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                      Fast Responder
+                      Website Added
                     </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Footer Actions */}
             <div className="p-6 border-t border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-black/20 flex flex-col-reverse sm:flex-row items-center justify-between gap-4">
               <button
                 onClick={onSkip}
