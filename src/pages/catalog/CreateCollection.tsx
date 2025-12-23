@@ -380,7 +380,7 @@ const CreateCollectionInner: React.FC = () => {
       <div className="flex gap-3">
         <FrostedButton 
           type="button" 
-          variant="secondary" 
+          variant="outline" 
           size="lg" 
           className="flex-1" 
           disabled={disabled} 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import type { StoreWizardData } from '@/types/storeWizard';
 import StoreLivePreview from './StoreLivePreview';
 
@@ -8,9 +8,8 @@ interface StoreBasicInfoStepProps {
   onChange: (updates: Partial<StoreWizardData>) => void;
   availableCategories?: Array<{ id: string; slug: string; name: string }>;
   onBack: () => void;
-  onSaveDraft: () => Promise<void> | void;
   onContinue: () => Promise<void> | void;
-  isSavingDraft: boolean;
+  saveState: 'idle' | 'saving' | 'saved' | 'error';
   isLoadingDraft: boolean;
 }
 
@@ -37,9 +36,8 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
   onChange,
   availableCategories,
   onBack,
-  onSaveDraft,
   onContinue,
-  isSavingDraft,
+  saveState,
   isLoadingDraft,
 }) => {
   const categories = availableCategories?.length
@@ -64,21 +62,42 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
     data.description.length >= 100 &&
     data.description.length <= 500;
 
-  const handleSaveDraftClick = async () => {
-    await onSaveDraft();
-  };
-
   const handleContinueClick = async () => {
     await onContinue();
   };
-
-  const isBusy = isSavingDraft || isLoadingDraft;
 
   return (
     <div className="flex flex-col lg:flex-row min-h-[calc(100vh-4rem)]">
       {/* Left Side - Form Section (60%) */}
       <div className="w-full lg:w-[60%] p-6 lg:p-12 overflow-y-auto">
         <div className="max-w-2xl mx-auto">
+          {/* Auto-save indicator */}
+          <div className="flex justify-end mb-4">
+            <div className="inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300 bg-white/60 dark:bg-white/5 border border-gray-200/50 dark:border-white/10 backdrop-blur-sm rounded-full px-3 py-1.5">
+              {saveState === 'saving' ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving…</span>
+                </>
+              ) : saveState === 'saved' ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                  <span>Saved</span>
+                </>
+              ) : saveState === 'error' ? (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Save issue</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-gray-400" />
+                  <span>Updates automatically</span>
+                </>
+              )}
+            </div>
+          </div>
+
           {/* Slim Step Indicator Bar - Rounded edges, thin */}
           <div className="mb-8 p-3 bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-full border border-purple-200/30 dark:border-purple-500/20 shadow-sm inline-flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-purple-700 flex items-center justify-center text-white text-sm font-bold shadow-lg">
@@ -252,15 +271,6 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                 Back
               </button>
               <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={handleSaveDraftClick}
-                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm font-medium inline-flex items-center gap-2"
-                  disabled={isBusy}
-                >
-                  {isSavingDraft && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Save as Draft
-                </button>
                 <button
                   type="button"
                   onClick={handleContinueClick}

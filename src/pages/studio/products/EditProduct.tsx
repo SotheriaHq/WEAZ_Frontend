@@ -21,11 +21,10 @@ import {
   X,
   MoreHorizontal
 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const EditProduct: React.FC = () => {
   const navigate = useNavigate();
-  const { id } = useParams(); // Potentially used for fetching data
 
   // State
   const [productTitle, setProductTitle] = useState('Premium Cotton Oversized Tee');

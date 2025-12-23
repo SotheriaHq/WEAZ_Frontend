@@ -962,7 +962,6 @@ const ProfilePage: React.FC = () => {
                         const hasUnapproved = privateStates.some(s => s.state !== 'APPROVED');
                         const hasPending = privateStates.some(s => s.state === 'PENDING');
                         const hasRevoked = privateStates.some(s => s.state === 'REVOKED');
-                        const hasNone = privateStates.some(s => s.state === 'NONE');
 
                         // If user has approved access, show those collections using regular collection cards
                         if (approvedCollections.length > 0) {

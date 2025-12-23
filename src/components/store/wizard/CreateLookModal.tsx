@@ -6,7 +6,6 @@ import {
   Wand2,
   MousePointer,
   Plus,
-  GripVertical,
   Save,
 } from 'lucide-react';
 import type { WizardProduct, WizardLook } from '@/types/storeWizard';
@@ -43,7 +42,7 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [featured, setFeatured] = useState(true);
   const [allowSizeSwap, setAllowSizeSwap] = useState(true);
-  const [discount, setDiscount] = useState(10);
+  const [discount] = useState(10);
 
   // Get tagged products from hotspots
   const taggedProducts = useMemo(() => {

@@ -75,6 +75,10 @@ export interface StoreWizardData {
   tagline: string;
   description: string;
 
+  // Optional previews (UI only)
+  logoPreview?: string | null;
+  bannerPreview?: string | null;
+
   // Step 2
   instagram: string;
   tiktok: string;
@@ -84,6 +88,10 @@ export interface StoreWizardData {
   domainVerificationStatus: DomainVerificationStatus;
 
   // Step 3
+  shippingRegions: string[];
+  processingTime: string;
+  shippingMethods: string[];
+  freeShippingThreshold: number | null;
   shippingMethod: string;
   shippingRates: unknown[];
   returnsAccepted: boolean;

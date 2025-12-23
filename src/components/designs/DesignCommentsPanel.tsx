@@ -24,7 +24,7 @@ type Props = {
   currentUserId?: string; // viewer id
 };
 
-const DesignCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className, onCountChange, onCommentAdded, onCommentRemoved, showComposer = true, contentOwnerId, currentUserId }) => {
+const DesignCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className, onCommentAdded, onCommentRemoved, showComposer = true, contentOwnerId, currentUserId }) => {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const dispatch = useDispatch();
   const [items, setItems] = React.useState<CommentV2Dto[]>([]);

@@ -1,6 +1,5 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React from 'react';
 import {
-  ArrowLeft,
   ArrowRight,
   AlertTriangle,
   Check,
@@ -72,7 +71,6 @@ const REQUIREMENTS = [
  */
 const StoreMediaReviewStep: React.FC<StoreMediaReviewStepProps> = ({
   data,
-  onChange,
   onBack,
   onContinue,
   isSaving = false,

@@ -7,7 +7,7 @@ import CollectionsSkeleton from '../profile/CollectionsSkeleton';
 import Profile from '../../pages/catalog/Catalog';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '@/context/AuthContext';
-import { toggleSidebar, closeSidebar } from '@/features/uiSlice';
+import { closeSidebar } from '@/features/uiSlice';
 import type { AppDispatch, RootState } from '@/store';
 import { useLocation, Navigate, Outlet, useParams } from 'react-router-dom';
 
@@ -34,7 +34,7 @@ export const ProfileLayout: React.FC = () => {
       return (
           <div className="min-h-screen bg-gradient-to-br from-[#faf8ff] via-[#f5f0ff] to-[#ede9f7] dark:from-[#0f0f0f] dark:via-[#0a0a0a] dark:to-[#000000] text-gray-900 dark:text-white">
             <Sidebar />
-            <Navbar isCollapsed={isRail} onToggleSidebar={() => dispatch(toggleSidebar())} />
+            <Navbar />
             <main
               className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out"
               style={{ marginLeft: mainMarginLeft }}
@@ -60,6 +60,11 @@ export const ProfileLayout: React.FC = () => {
     if (!user) {
       return <Navigate to="/login" replace state={{ from: location.pathname }} />;
     }
+
+    // New onboarding: brand accounts without a store must complete essentials first.
+    if (user.type === 'BRAND' && !user.storeId) {
+      return <Navigate to="/store/essentials" replace />;
+    }
   }
 
   return (
@@ -67,7 +72,7 @@ export const ProfileLayout: React.FC = () => {
         className="min-h-screen bg-gradient-to-br from-[#faf8ff] via-[#f5f0ff] to-[#ede9f7] dark:from-[#0f0f0f] dark:via-[#0a0a0a] dark:to-[#000000] text-gray-900 dark:text-white"
       >
         <Sidebar />
-        <Navbar isCollapsed={isRail} onToggleSidebar={() => dispatch(toggleSidebar())} />
+        <Navbar />
         <main 
           className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out"
           style={{ marginLeft: mainMarginLeft }}

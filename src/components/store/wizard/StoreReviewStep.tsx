@@ -5,11 +5,9 @@ import {
   CheckCheck,
   ChevronDown,
   Send,
-  Save,
   Link,
   Instagram,
   Globe,
-  ExternalLink,
 } from 'lucide-react';
 import type { StoreWizardData } from '@/types/storeWizard';
 
@@ -18,7 +16,6 @@ interface StoreReviewStepProps {
   onChange: (updates: Partial<StoreWizardData>) => void;
   onBack: () => void;
   onSubmit: () => void;
-  onSaveDraft: () => void;
   isSaving?: boolean;
 }
 
@@ -43,7 +40,6 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
   onChange,
   onBack,
   onSubmit,
-  onSaveDraft,
   isSaving = false,
 }) => {
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
@@ -397,14 +393,6 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                   Your store will go live after moderation review (usually within
                   24 hours)
                 </p>
-
-                <button
-                  onClick={onSaveDraft}
-                  className="w-full py-3 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-white font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-[#1e1e1e] transition-colors flex items-center justify-center gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  Save & Continue Later
-                </button>
 
                 <button className="w-full py-3 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-white font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-[#1e1e1e] transition-colors flex items-center justify-center gap-2">
                   <Link className="w-4 h-4" />

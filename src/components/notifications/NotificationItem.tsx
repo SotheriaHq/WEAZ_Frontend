@@ -14,7 +14,7 @@ import React, { useCallback } from 'react';
 import { NotificationAvatar } from './NotificationAvatar';
 import { NotificationIcon } from './NotificationIcon';
 import { getActionText, getAriaAction } from '@/types/notificationTypes';
-import { hasValidActor, getActorDisplayName, isSystemNotification } from '@/utils/notificationAdapter';
+import { hasValidActor, getActorDisplayName } from '@/utils/notificationAdapter';
 import type { NormalizedNotification } from '@/utils/notificationAdapter';
 import { trackOnce, createTelemetryEvent } from '@/utils/notificationTelemetry';
 import './NotificationItem.css';
@@ -47,7 +47,6 @@ export const NotificationItem = React.memo<NotificationItemProps>(
     const displayName = getActorDisplayName(notification);
     const actionText = getActionText(type);
     const ariaAction = getAriaAction(type);
-    const isSystem = isSystemNotification(notification);
     const hasActor = hasValidActor(notification);
 
     // Memoized mark-read handler

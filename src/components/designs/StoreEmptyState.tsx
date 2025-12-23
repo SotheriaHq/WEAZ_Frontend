@@ -3,7 +3,7 @@ import { Package, ShoppingBag, Search, Sparkles, Store, Heart } from 'lucide-rea
 import { FrostedButton } from '@/components/ui/FrostedButton';
 import { useNavigate } from 'react-router-dom';
 
-type EmptyStateType = 
+export type EmptyStateType = 
   | 'no-products'           // Brand has no products yet
   | 'no-results'            // Filters returned nothing
   | 'brand-not-found'       // Brand doesn't exist

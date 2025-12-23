@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { brandApi } from '@/api/BrandApi';
-import { X, Package, Truck, CheckCircle, XCircle, Clock, MapPin, Phone, Mail } from 'lucide-react';
+import { X, Package, Truck, CheckCircle, XCircle, MapPin, Phone, Mail } from 'lucide-react';
 
 interface OrderDetailsModalProps {
   isOpen: boolean;

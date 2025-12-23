@@ -1,26 +1,16 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import StoreWelcomeScreen from '@/components/store/wizard/StoreWelcomeScreen';
 import StoreBasicInfoStep from '@/components/store/wizard/StoreBasicInfoStep';
-import StoreSocialStep from '@/components/store/wizard/StoreSocialStep';
-import StorePoliciesStep from '@/components/store/wizard/StorePoliciesStep';
-import StoreCatalogStep from '@/components/store/wizard/StoreCatalogStep';
-import CreateCollectionModal from '@/components/store/wizard/CreateCollectionModal';
-import CreateLookModal from '@/components/store/wizard/CreateLookModal';
-import StoreMediaReviewStep from '@/components/store/wizard/StoreMediaReviewStep';
-import StoreReviewStep from '@/components/store/wizard/StoreReviewStep';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import {
   getStoreDraftStatus,
   saveStoreDraft,
-  clearStoreDraft,
   getStoreWizardPrefill,
   type StoreDraftData,
   type StoreWizardPrefillResponse,
 } from '@/api/StoreApi';
 
-import type { StoreWizardData, WizardCollection, WizardLook } from '@/types/storeWizard';
+import type { StoreWizardData } from '@/types/storeWizard';
 const initialData: StoreWizardData = {
   // Step 1
   name: '',
@@ -28,6 +18,8 @@ const initialData: StoreWizardData = {
   categories: [],
   tagline: '',
   description: '',
+  logoPreview: null,
+  bannerPreview: null,
   
   // Step 2
   instagram: '',
@@ -38,6 +30,10 @@ const initialData: StoreWizardData = {
   domainVerificationStatus: 'optional',
   
   // Step 3
+  shippingRegions: [],
+  processingTime: '',
+  shippingMethods: [],
+  freeShippingThreshold: null,
   shippingMethod: 'standard',
   shippingRates: [],
   returnsAccepted: true,
@@ -62,17 +58,17 @@ const initialData: StoreWizardData = {
   termsAccepted: false,
 };
 
-type WizardStep = 'welcome' | 'basic-info' | 'social' | 'policies' | 'catalog' | 'media' | 'review';
+// Only Step 1 is currently implemented in the UI.
+type WizardStep = 'basic-info';
 
-const WIZARD_STEPS: { id: WizardStep; label: string; description: string }[] = [
-  { id: 'welcome', label: 'Welcome', description: 'Preview requirements' },
-  { id: 'basic-info', label: 'Basics', description: 'Name, slug, category' },
-  { id: 'social', label: 'Socials', description: 'Handles & trust' },
-  { id: 'policies', label: 'Policies', description: 'Shipping, returns, size' },
-  { id: 'catalog', label: 'Catalog', description: 'Products & collections' },
-  { id: 'media', label: 'Media', description: 'Quality check' },
-  { id: 'review', label: 'Review', description: 'Submit for approval' },
-];
+type WizardSaveState = 'idle' | 'saving' | 'saved' | 'error';
+
+const LOCAL_PROGRESS_KEY = 'store-progress';
+
+const stepToNumber = (step: WizardStep): number => {
+  void step;
+  return 1;
+};
 
 /**
  * Store Creation Wizard
@@ -81,25 +77,63 @@ const WIZARD_STEPS: { id: WizardStep; label: string; description: string }[] = [
  */
 const StoreCreationWizard: React.FC = () => {
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState<WizardStep>('welcome');
+  const [currentStep] = useState<WizardStep>('basic-info');
   const [wizardData, setWizardData] = useState<StoreWizardData>(initialData);
-  const [hasDraft, setHasDraft] = useState<boolean>(false);
   const [hasLiveStore, setHasLiveStore] = useState<boolean>(false);
-  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [saveState, setSaveState] = useState<WizardSaveState>('idle');
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
-  const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
-  const [isLookModalOpen, setIsLookModalOpen] = useState(false);
-  const [showDeleteDraftConfirm, setShowDeleteDraftConfirm] = useState(false);
   const [systemCategories, setSystemCategories] = useState<StoreWizardPrefillResponse['system']['categories']>([]);
-  const resolvedStepIndex = WIZARD_STEPS.findIndex((step) => step.id === currentStep);
-  const currentStepIndex = resolvedStepIndex === -1 ? 0 : resolvedStepIndex;
-  void currentStepIndex;
+  const lastSavedPayloadRef = useRef<string>('');
+  const saveTimerRef = useRef<number | null>(null);
+  const intervalRef = useRef<number | null>(null);
+
+  const buildSavePayload = useCallback(
+    (stepOverride?: WizardStep) => {
+      const step = stepOverride ?? currentStep;
+      const payload: StoreDraftData & { step: number } = {
+        name: wizardData.name,
+        slug: wizardData.slug,
+        categories: wizardData.categories,
+        tagline: wizardData.tagline,
+        description: wizardData.description,
+        instagram: wizardData.instagram,
+        tiktok: wizardData.tiktok,
+        twitter: wizardData.twitter,
+        website: wizardData.website,
+        contactEmail: wizardData.contactEmail,
+        tags: wizardData.tags,
+        step: stepToNumber(step),
+      };
+      return payload;
+    },
+    [currentStep, wizardData]
+  );
+
+  const persistProgress = useCallback(
+    async (reason?: string) => {
+      const payload = buildSavePayload();
+      const serialized = JSON.stringify(payload);
+      if (serialized === lastSavedPayloadRef.current) return;
+
+      setSaveState('saving');
+      try {
+        await saveStoreDraft(payload);
+        lastSavedPayloadRef.current = serialized;
+        localStorage.setItem(LOCAL_PROGRESS_KEY, serialized);
+        setSaveState('saved');
+      } catch (error) {
+        console.error('Failed to save store progress', { reason, error });
+        setSaveState('error');
+      }
+    },
+    [buildSavePayload]
+  );
 
   useEffect(() => {
     let isCancelled = false;
     const hydrateDraft = async () => {
       setIsLoadingDraft(true);
-      const localDraftRaw = localStorage.getItem('store-draft');
+      const localDraftRaw = localStorage.getItem(LOCAL_PROGRESS_KEY) ?? localStorage.getItem('store-draft');
       let localDraft: Partial<StoreDraftData> | null = null;
       try {
         localDraft = localDraftRaw ? JSON.parse(localDraftRaw) : null;
@@ -118,17 +152,14 @@ const StoreCreationWizard: React.FC = () => {
 
         if (response?.hasDraft && response.draft?.data) {
           nextData = { ...nextData, ...(response.draft.data as any) };
-          if (!isCancelled) setHasDraft(true);
         } else if (localDraft) {
           // 2) Local draft fallback
           nextData = { ...nextData, ...(localDraft as any) };
-          if (!isCancelled) setHasDraft(true);
         }
       } catch (error) {
         console.error('Failed to load store draft from server', error);
         if (localDraft) {
           nextData = { ...nextData, ...(localDraft as any) };
-          if (!isCancelled) setHasDraft(true);
         }
       }
 
@@ -160,6 +191,28 @@ const StoreCreationWizard: React.FC = () => {
 
       if (!isCancelled) {
         setWizardData(nextData);
+        try {
+          const initialPayload = {
+            ...buildSavePayload('basic-info'),
+            ...{
+              name: nextData.name,
+              slug: nextData.slug,
+              categories: nextData.categories,
+              tagline: nextData.tagline,
+              description: nextData.description,
+              instagram: nextData.instagram,
+              tiktok: nextData.tiktok,
+              twitter: nextData.twitter,
+              website: nextData.website,
+              contactEmail: nextData.contactEmail,
+              tags: nextData.tags,
+              step: stepToNumber(currentStep),
+            },
+          };
+          lastSavedPayloadRef.current = JSON.stringify(initialPayload);
+        } catch {
+          // ignore
+        }
         setIsLoadingDraft(false);
       }
     };
@@ -170,282 +223,90 @@ const StoreCreationWizard: React.FC = () => {
     };
   }, []);
 
-  const handleGetStarted = useCallback(() => {
+  useEffect(() => {
     if (hasLiveStore) {
       toast.error('User can only have one store at a time.');
       navigate('/profile');
-      return;
     }
-    setCurrentStep('basic-info');
   }, [hasLiveStore, navigate]);
 
-  const handleResumeDraft = useCallback(() => {
-    setCurrentStep('basic-info');
-  }, []);
+  // Auto-save: debounce on changes + periodic save
+  useEffect(() => {
+    if (isLoadingDraft) return;
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      void persistProgress('debounced');
+    }, 900);
+    return () => {
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    };
+  }, [
+    wizardData.name,
+    wizardData.slug,
+    wizardData.categories,
+    wizardData.tagline,
+    wizardData.description,
+    wizardData.instagram,
+    wizardData.tiktok,
+    wizardData.twitter,
+    wizardData.website,
+    wizardData.contactEmail,
+    wizardData.tags,
+    currentStep,
+    isLoadingDraft,
+    persistProgress,
+  ]);
 
-  const handleStartFresh = useCallback(() => {
-    setShowDeleteDraftConfirm(true);
-  }, []);
+  useEffect(() => {
+    if (intervalRef.current) window.clearInterval(intervalRef.current);
+    intervalRef.current = window.setInterval(() => {
+      void persistProgress('interval');
+    }, 30_000);
+    return () => {
+      if (intervalRef.current) window.clearInterval(intervalRef.current);
+    };
+  }, [persistProgress]);
 
-  const handleConfirmDeleteDraft = useCallback(async () => {
-    setShowDeleteDraftConfirm(false);
-    try {
-      await clearStoreDraft();
-      localStorage.removeItem('store-draft');
-      setWizardData(initialData);
-      setHasDraft(false);
-      toast.success('Draft deleted. Intiate a new store creation.');
-      setCurrentStep('basic-info');
-    } catch (error) {
-      console.error('Failed to clear store draft', error);
-      toast.error('Could not delete draft right now.');
-    }
-  }, []);
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        void persistProgress('visibility-hidden');
+      }
+    };
+
+    window.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [persistProgress]);
 
   const handleBack = useCallback(() => {
-    switch (currentStep) {
-      case 'basic-info':
-        setCurrentStep('welcome');
-        break;
-      case 'social':
-        setCurrentStep('basic-info');
-        break;
-      case 'policies':
-        setCurrentStep('social');
-        break;
-      case 'catalog':
-        setCurrentStep('policies');
-        break;
-      case 'media':
-        setCurrentStep('catalog');
-        break;
-      case 'review':
-        setCurrentStep('media');
-        break;
-      default:
-        navigate('/profile');
-    }
+    void currentStep;
+    navigate('/profile');
   }, [currentStep, navigate]);
-
-  const handleSaveDraft = useCallback(async () => {
-    setIsSavingDraft(true);
-    try {
-      const payload: StoreDraftData & { step: number } = {
-        name: wizardData.name,
-        slug: wizardData.slug,
-        categories: wizardData.categories,
-        tagline: wizardData.tagline,
-        description: wizardData.description,
-        instagram: wizardData.instagram,
-        tiktok: wizardData.tiktok,
-        twitter: wizardData.twitter,
-        website: wizardData.website,
-        contactEmail: wizardData.contactEmail,
-        tags: wizardData.tags,
-        step: currentStep === 'welcome' ? 0 : 1,
-      };
-
-      await saveStoreDraft(payload);
-
-      setWizardData((prev) => ({
-        ...prev,
-        ...payload,
-      }));
-
-      localStorage.setItem('store-draft', JSON.stringify(payload));
-      setHasDraft(true);
-      toast.success('Draft saved');
-    } catch (error) {
-      console.error('Failed to save store draft', error);
-      toast.error('Unable to save draft right now');
-    } finally {
-      setIsSavingDraft(false);
-    }
-  }, [wizardData, currentStep]);
 
   const handleBasicInfoChange = useCallback((updates: Partial<StoreWizardData>) => {
     setWizardData(prev => ({ ...prev, ...updates }));
   }, []);
 
   const handleContinue = useCallback(() => {
-    // Navigate to next step without saving draft or showing toast
-    switch (currentStep) {
-      case 'basic-info':
-        setCurrentStep('social');
-        break;
-      case 'social':
-        setCurrentStep('policies');
-        break;
-      case 'policies':
-        setCurrentStep('catalog');
-        break;
-      case 'catalog':
-        setCurrentStep('media');
-        break;
-      case 'media':
-        setCurrentStep('review');
-        break;
-      case 'review':
-        // Final submit handled separately
-        break;
-    }
+    void currentStep;
+    toast.message('Next step is coming soon. Your updates save automatically.');
   }, [currentStep]);
-
-  const handleSkipSocial = useCallback(() => {
-    setCurrentStep('policies');
-  }, []);
-
-  // Catalog step handlers
-  const handleOpenCreateCollection = useCallback(() => {
-    setIsCollectionModalOpen(true);
-  }, []);
-
-  const handleCloseCreateCollection = useCallback(() => {
-    setIsCollectionModalOpen(false);
-  }, []);
-
-  const handleSaveCollection = useCallback((collection: WizardCollection) => {
-    setWizardData((prev) => ({
-      ...prev,
-      collections: [...prev.collections, collection],
-    }));
-    setIsCollectionModalOpen(false);
-  }, []);
-
-  const handleOpenAddProduct = useCallback(() => {
-    navigate('/studio/products/create', {
-      state: { from: '/store/create', source: 'store-wizard' },
-    });
-  }, [navigate]);
-
-  // Look modal handlers
-  const handleOpenCreateLook = useCallback(() => {
-    setIsLookModalOpen(true);
-  }, []);
-
-  const handleCloseCreateLook = useCallback(() => {
-    setIsLookModalOpen(false);
-  }, []);
-
-  const handleSaveLook = useCallback((look: WizardLook) => {
-    setWizardData((prev) => ({
-      ...prev,
-      looks: [...prev.looks, look],
-    }));
-    setIsLookModalOpen(false);
-  }, []);
-
-  // Final submit handler
-  const handleSubmitStore = useCallback(async () => {
-    toast.success('Store submitted for review!');
-    // TODO: Implement actual submission
-    navigate('/profile');
-  }, [navigate]);
 
   return (
     <div className="transition-colors">
-      {currentStep === 'welcome' && (
-        <StoreWelcomeScreen
-          onGetStarted={handleGetStarted}
-          onResumeDraft={hasDraft ? handleResumeDraft : undefined}
-          onStartFresh={hasDraft ? handleStartFresh : undefined}
-          hasDraft={hasDraft}
-          hasLiveStore={hasLiveStore}
-        />
-      )}
-
       {currentStep === 'basic-info' && (
         <StoreBasicInfoStep
           data={wizardData}
           onChange={handleBasicInfoChange}
           availableCategories={systemCategories}
           onBack={handleBack}
-          onSaveDraft={handleSaveDraft}
           onContinue={handleContinue}
-          isSavingDraft={isSavingDraft}
+          saveState={saveState}
           isLoadingDraft={isLoadingDraft}
         />
       )}
-
-      {currentStep === 'social' && (
-        <StoreSocialStep
-          data={wizardData}
-          onChange={handleBasicInfoChange}
-          onBack={handleBack}
-          onSkip={handleSkipSocial}
-          onContinue={handleContinue}
-          isSaving={isSavingDraft}
-        />
-      )}
-
-      {currentStep === 'policies' && (
-        <StorePoliciesStep
-          data={wizardData}
-          onChange={handleBasicInfoChange}
-          onBack={handleBack}
-          onContinue={handleContinue}
-          isSaving={isSavingDraft}
-        />
-      )}
-
-      {currentStep === 'catalog' && (
-        <>
-          <StoreCatalogStep
-            data={wizardData}
-            onChange={handleBasicInfoChange}
-            onBack={handleBack}
-            onContinue={handleContinue}
-            onOpenCreateCollection={handleOpenCreateCollection}
-            onOpenAddProduct={handleOpenAddProduct}
-            isSaving={isSavingDraft}
-          />
-          <CreateCollectionModal
-            isOpen={isCollectionModalOpen}
-            onClose={handleCloseCreateCollection}
-            onSave={handleSaveCollection}
-            availableProducts={wizardData.products}
-          />
-          <CreateLookModal
-            isOpen={isLookModalOpen}
-            onClose={handleCloseCreateLook}
-            onSave={handleSaveLook}
-            availableProducts={wizardData.products}
-          />
-        </>
-      )}
-
-      {currentStep === 'media' && (
-        <StoreMediaReviewStep
-          data={wizardData}
-          onChange={handleBasicInfoChange}
-          onBack={handleBack}
-          onContinue={handleContinue}
-          isSaving={isSavingDraft}
-        />
-      )}
-
-      {currentStep === 'review' && (
-        <StoreReviewStep
-          data={wizardData}
-          onChange={handleBasicInfoChange}
-          onBack={handleBack}
-          onSubmit={handleSubmitStore}
-          onSaveDraft={handleSaveDraft}
-          isSaving={isSavingDraft}
-        />
-      )}
-
-      {/* Delete Draft Confirmation Dialog */}
-      <ConfirmDialog
-        open={showDeleteDraftConfirm}
-        title="Delete Draft?"
-        message="This will permanently delete your saved draft and you'll start from scratch. This action cannot be undone."
-        confirmText="Delete Draft"
-        cancelText="Keep Draft"
-        isDestructive
-        onConfirm={handleConfirmDeleteDraft}
-        onCancel={() => setShowDeleteDraftConfirm(false)}
-      />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import Modal from '@/components/ui/Modal';
 import { Lock, Mail, Building2, ShieldCheck, AlertTriangle } from 'lucide-react';
@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 const SecuritySettings: React.FC = () => {
   const { profile } = useSelector((state: RootState) => state.user);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = React.useState(false);
-  const [pendingAction, setPendingAction] = React.useState<'update_profile' | 'update_password' | null>(null);
   
   // Form States
   const [brandName, setBrandName] = React.useState(profile?.brandFullName || '');
@@ -25,7 +24,6 @@ const SecuritySettings: React.FC = () => {
 
   const handleProfileUpdate = (e: React.FormEvent) => {
     e.preventDefault();
-    setPendingAction('update_profile');
     setIsPasswordModalOpen(true);
   };
 
@@ -35,7 +33,6 @@ const SecuritySettings: React.FC = () => {
       toast.error("New passwords do not match");
       return;
     }
-    setPendingAction('update_password');
     setIsPasswordModalOpen(true);
   };
 

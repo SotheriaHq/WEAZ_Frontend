@@ -14,7 +14,9 @@ test('dashboard flow', async ({ page }) => {
     try {
         await expect(page.getByLabel('Email Address')).toBeVisible({ timeout: 10000 });
     } catch (e) {
-        const bodyText = await page.evaluate(() => document.body.innerText);
+        const bodyText = await page.evaluate(
+            () => (globalThis as any).document?.body?.innerText ?? ''
+        );
         console.log('Email input not found. Body text:', bodyText);
         if (bodyText.includes('Oops!')) {
             console.log('Error Page detected!');

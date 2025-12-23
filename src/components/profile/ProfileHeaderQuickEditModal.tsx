@@ -53,7 +53,6 @@ const ProfileHeaderQuickEditModal: React.FC<ProfileHeaderQuickEditModalProps> = 
   const {
     register,
     handleSubmit,
-    formState: { errors },
     reset,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),

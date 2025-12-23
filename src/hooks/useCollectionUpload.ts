@@ -105,6 +105,12 @@ export function useCollectionUpload() {
         throw new Error('No files to upload');
       }
 
+      for (const item of items) {
+        if (!item.file) {
+          throw new Error('One or more selected items are missing a file. Please reselect and try again.');
+        }
+      }
+
       const normalizedTags = Array.isArray(tags)
         ? tags
             .map((tag) => tag.trim())
@@ -120,14 +126,17 @@ export function useCollectionUpload() {
       setIsUploading(true);
       setProgress(0);
       setError(null);
-        cancelFlag.current = false;
+      cancelFlag.current = false;
 
       try {
-  const filesPayload = items.map((item) => ({
-          name: item.file.name,
-          type: item.file.type,
-          size: item.file.size,
-        }));
+        const filesPayload = items.map((item) => {
+          const file = item.file!;
+          return {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+          };
+        });
 
         // Initialize upload session
         // Initialize upload session (fallback to id if collectionId missing)
@@ -207,7 +216,7 @@ export function useCollectionUpload() {
               return;
             }
             const { entry, mediaItem } = next;
-            const file = mediaItem.file;
+            const file = mediaItem.file!;
             let attempt = 0;
             while (attempt <= MAX_RETRY_ATTEMPTS) {
               try {

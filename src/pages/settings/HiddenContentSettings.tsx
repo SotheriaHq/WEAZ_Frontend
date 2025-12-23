@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, RefreshCcw, EyeOff } from 'lucide-react';
+import { RefreshCcw, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const HiddenContentSettings: React.FC = () => {

@@ -11,8 +11,7 @@ import {
   Copy, 
   ChevronLeft, 
   ChevronRight, 
-  Box,
-  MoreHorizontal
+  Box
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 

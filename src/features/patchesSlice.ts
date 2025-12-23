@@ -1,5 +1,4 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import type { PayloadAction } from '@reduxjs/toolkit';
 import { brandApi } from '../api/BrandApi';
 import type { RootState } from '../store';
 
@@ -91,7 +90,7 @@ const patchesSlice = createSlice({
             })
             // Respond
             .addCase(respondToPatch.fulfilled, (state, action) => {
-                const { patchId, action: responseAction } = action.payload;
+                const { patchId } = action.payload;
                 // Remove from pending
                 state.pending = state.pending.filter((p) => p.id !== patchId);
                 // If accepted, we might want to reload active, or optimistically add it if we had full patch data

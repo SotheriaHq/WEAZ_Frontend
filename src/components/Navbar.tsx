@@ -28,7 +28,7 @@ import getProfileOrHomeUrl from '../lib/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import React from 'react';
-import { User, Settings, TagIcon, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, Menu, SearchIcon, Filter, LayoutDashboard, Heart } from 'lucide-react';
+import { User, Settings, TagIcon, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, SearchIcon, LayoutDashboard, Heart } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';

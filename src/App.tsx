@@ -19,8 +19,6 @@ import CreateCollectionPage from './pages/catalog/CreateCollectionRedesign';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
 import CollectionViewRedesign from './pages/catalog/CollectionViewRedesign';
-import DropdownDemo from './pages/ui/DropdownDemo';
-import AcceptInvite from './pages/AcceptInvite';
 import ErrorPage from './pages/ErrorPage';
 import StudioHome from './pages/studio/StudioHome';
 import ProductManagement from './pages/studio/products/ProductManagement';
@@ -42,6 +40,7 @@ import {
   TrendingPlaceholder,
 } from './pages/placeholders';
 import StoreCreationWizard from './pages/store/StoreCreationWizard';
+import StoreEssentials from './pages/store/StoreEssentials';
 
 /**
  * Root layout component that wraps all routes
@@ -157,6 +156,15 @@ const router = createBrowserRouter([
       {
         path: '/store/:brandId',
         element: <Layout><BrandStore /></Layout>,
+      },
+      {
+        // Store essentials capture - brand users only, standalone (no Layout)
+        path: '/store/essentials',
+        element: (
+          <RequireBrand>
+            <StoreEssentials />
+          </RequireBrand>
+        ),
       },
       {
         // Store creation wizard - brand users only, wrapped in Layout for navbar/sidebar

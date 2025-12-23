@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Sharper typography rendering */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+}
+
 /* Unified Dark Theme - YouTube-style consistency */
 @layer base {
   :root {

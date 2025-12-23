@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Heart, ShoppingCart, Minus, Plus, Star, ChevronRight, AlertTriangle, Check, Share2,
-  ChevronDown, Truck, Ruler, Package, Sparkles, Link2, Copy
+  ChevronDown, Truck, Ruler, Package, Sparkles, Copy
 } from 'lucide-react';
 import { FaInstagram, FaWhatsapp } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';

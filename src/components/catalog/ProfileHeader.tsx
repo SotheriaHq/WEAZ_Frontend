@@ -243,9 +243,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
           {/* 🔧 FIX #4: Reduced bottom margin from mb-16 to mb-6 */}
           <div className="flex gap-2 self-end sm:self-end mb-24 ">
-            {canEdit && (
-              <StoreAccessButton hasStore={!!storeId} storeId={storeId} />
-            )}
+            {canEdit && storeId ? <StoreAccessButton hasStore={true} storeId={storeId} /> : null}
             {canEdit ? (
               <ActionButton
                 Icon={FiEdit2}

@@ -8,7 +8,6 @@ import {
   FiChevronLeft, FiChevronRight, FiZoomIn, FiZoomOut, FiPlus
 } from 'react-icons/fi';
 import { HiOutlineSparkles } from 'react-icons/hi';
-import CreateStoreModal from '@/components/profile/CreateStoreModal';
 
 // Context & Hooks
 import TextField from '../../components/forms/TextField';
@@ -65,7 +64,6 @@ const CreateCollectionInner: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [showCancelPrompt, setShowCancelPrompt] = useState(false);
   const [showDraftPreview, setShowDraftPreview] = useState(false);
-  const [showCreateStoreModal, setShowCreateStoreModal] = useState(false);
   const [showSaveDraftConfirm, setShowSaveDraftConfirm] = useState(false);
   const tagStylePalette = useMemo(
     () => [

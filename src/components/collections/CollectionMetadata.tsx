@@ -51,7 +51,6 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
   onEdit,
   ownerMenu,
   onCancelSale,
-  onSetupSale,
   isWishlisted = false,
 }) => {
   // Track received price data

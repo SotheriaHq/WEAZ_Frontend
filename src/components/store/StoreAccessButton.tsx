@@ -10,7 +10,7 @@ interface StoreAccessButtonProps {
 
 /**
  * Store Access Button - displays on Brand profile
- * - No store: "Create Your Store" → /store/create
+ * - No store: "Create Your Store" → /store/essentials
  * - Has store: "🏪 Store" → /store/:id
  */
 const StoreAccessButton: React.FC<StoreAccessButtonProps> = ({
@@ -24,7 +24,7 @@ const StoreAccessButton: React.FC<StoreAccessButtonProps> = ({
     if (hasStore && storeId) {
       navigate(`/store/${storeId}`);
     } else {
-      navigate('/store/create');
+      navigate('/store/essentials');
     }
   };
 

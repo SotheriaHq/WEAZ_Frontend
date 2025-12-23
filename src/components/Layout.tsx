@@ -1,11 +1,11 @@
 import React, { useEffect } from 'react';
 import { Sidebar } from './SideBar';
 import { Navbar } from './Navbar';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { useNotificationsBootstrap } from '@/hooks/useNotifications';
-import { setSidebarMode, closeSidebar, toggleSidebar } from '@/features/uiSlice';
+import { setSidebarMode, closeSidebar } from '@/features/uiSlice';
 import GlassBackdrop from './ui/GlassBackdrop';
 
 interface LayoutProps {
@@ -15,10 +15,8 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
-  const navigate = useNavigate();
   
   const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
-  const user = useSelector((s: RootState) => s.user.profile);
 
   // Mount global notifications bootstrap once.
   useNotificationsBootstrap();

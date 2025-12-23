@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Mail, Lock, User, ShoppingBag, Scissors, Sparkles, Heart, Palette } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, ShoppingBag, Scissors, Sparkles, Heart, Palette, Check, ArrowRight } from 'lucide-react';
 import { isAxiosError } from 'axios';
 import type { AuthTokensResponse, ApiSuccessPayload } from '../types/auth';
 import { unwrapApiResponse } from '../types/auth';
@@ -125,16 +125,16 @@ const LoadingScreen = () => (
     <div className="text-center">
       <div className="flex items-center justify-center gap-3 mb-6">
         <div className="w-12 h-12 rounded-full bg-brand-gold flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.5)]">
-          <span className="font-serif text-2xl font-bold text-[var(--surface-primary)]">T</span>
+          <span className="text-2xl font-bold tracking-tight text-[var(--surface-primary)]">T</span>
         </div>
-        <span className="text-3xl font-serif font-bold text-[var(--text-primary)] dark:text-white">Threadly</span>
+        <span className="text-3xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white">Threadly</span>
       </div>
       <div className="flex space-x-2 justify-center mb-4">
         <div className="w-3 h-3 bg-[var(--brand-primary-strong)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
         <div className="w-3 h-3 bg-[var(--brand-accent)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
         <div className="w-3 h-3 bg-[var(--brand-primary-strong)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
       </div>
-      <p className="text-[var(--text-secondary)] dark:text-gray-400 text-lg">Creating your fashion journey...</p>
+      <p className="text-[var(--text-secondary)] text-lg">Creating your fashion journey...</p>
     </div>
   </div>
 );
@@ -165,7 +165,7 @@ const SignUpPage = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, dirtyFields },
     reset,
     setError,
     setValue,
@@ -221,7 +221,7 @@ const SignUpPage = () => {
 
       await celebrateSignupOnce(user.id);
 
-      const redirectPath = user.type === 'BRAND' ? '/profile' : '/';
+      const redirectPath = user.type === 'BRAND' ? '/store/essentials' : '/';
       navigate(redirectPath, { replace: true });
       setIsRedirecting(true);
       reset();
@@ -286,6 +286,11 @@ const SignUpPage = () => {
         ></div>
         <div className="auth-particle w-96 h-96 bottom-[-10%] left-[-5%] opacity-30 animate-pulse-slow absolute"></div>
         <div className="auth-particle w-64 h-64 top-[20%] right-[30%] opacity-20 animate-float absolute" style={{ animationDelay: '2s' }}></div>
+        
+        {/* New Decorative Shapes */}
+        <div className="auth-floating-shape shape-diamond w-24 h-24 top-[15%] left-[10%] opacity-20 animate-float" style={{ animationDelay: '1s' }}></div>
+        <div className="auth-floating-shape shape-circle w-32 h-32 bottom-[20%] right-[10%] opacity-10 animate-float" style={{ animationDelay: '3s' }}></div>
+        <div className="auth-floating-shape shape-diamond w-16 h-16 top-[40%] left-[45%] opacity-10 animate-float" style={{ animationDelay: '4s' }}></div>
       </div>
 
       <div className="flex flex-col lg:flex-row min-h-screen w-full relative">
@@ -365,87 +370,139 @@ const SignUpPage = () => {
             <div className="w-8 h-8 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-lg">
               T
             </div>
-            <span className="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white">Threadly</span>
+            <span className="text-xl font-bold tracking-tight text-[var(--text-primary)]">Threadly</span>
           </div>
 
           <div className="w-full max-w-md mt-16 lg:mt-0">
             {/* Sign Up Card - Brighter glass panel */}
             <div className="auth-glass-panel rounded-2xl p-8 sm:p-10 w-full">
               <div className="text-center mb-8">
-                <h1 className="text-3xl font-serif font-bold text-[var(--text-primary)] dark:text-white mb-2">Create Account</h1>
-                <p className="text-[var(--text-secondary)] dark:text-gray-400 text-sm">Start your fashion journey with Threadly.</p>
+                <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)] mb-2">Create Account</h1>
+                <p className="text-[var(--text-secondary)] text-sm">Start your fashion journey with Threadly.</p>
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 {/* User Type Selection */}
                 <div className="space-y-3">
-                  <label className="text-xs font-medium text-[var(--text-secondary)] dark:text-gray-300 uppercase tracking-wider ml-1">
+                  <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider ml-1">
                     I am a...
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setValue('userType', 'REGULAR', { shouldValidate: true })}
-                      className={`auth-selection-card p-4 rounded-xl text-left transition-all ${
+                      className={`auth-selection-card p-4 rounded-xl text-left transition-all relative group ${
                         watchUserType === 'REGULAR' ? 'active' : ''
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-lg bg-[rgba(var(--brand-primary-strong-rgb),0.18)] flex items-center justify-center mb-3">
-                        <ShoppingBag className="w-5 h-5 text-[var(--brand-accent)]" />
+                      <div className="w-10 h-10 rounded-lg bg-[rgba(var(--brand-primary-strong-rgb),0.18)] flex items-center justify-center mb-3 selection-icon">
+                        <ShoppingBag className="w-5 h-5" />
                       </div>
-                      <span className="font-medium text-[var(--text-primary)] dark:text-white text-sm">Fashion Lover</span>
-                      <p className="text-xs text-[var(--text-secondary)] dark:text-gray-400 mt-1">Discover & collect</p>
+                      <span className="font-medium text-[var(--text-primary)] dark:text-white text-sm block mb-1">Fashion Lover</span>
+                      <p className="text-xs text-[var(--text-secondary)] mb-3">Discover & collect</p>
+                      
+                      {/* Feature List */}
+                      <ul className="space-y-1.5">
+                        {['Exclusive drops', 'Follow designers', 'Create wishlists'].map((feat, i) => (
+                           <li key={i} className="flex items-center gap-1.5 text-[0.65rem] text-[var(--text-primary)]/80">
+                             <span className="feature-list-check"><Check className="w-2.5 h-2.5" /></span>
+                             {feat}
+                           </li>
+                        ))}
+                      </ul>
                     </button>
+
                     <button
                       type="button"
                       onClick={() => setValue('userType', 'BRAND', { shouldValidate: true })}
-                      className={`auth-selection-card p-4 rounded-xl text-left transition-all ${
+                      className={`auth-selection-card p-4 rounded-xl text-left transition-all relative group ${
                         watchUserType === 'BRAND' ? 'active' : ''
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-lg bg-[rgba(var(--brand-primary-strong-rgb),0.18)] flex items-center justify-center mb-3">
-                        <Scissors className="w-5 h-5 text-[var(--brand-accent)]" />
+                      {/* Badge */}
+                      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                         {watchUserType === 'BRAND' && <div className="popular-badge">Popular Choice</div>}
                       </div>
-                      <span className="font-medium text-[var(--text-primary)] dark:text-white text-sm">Fashion Brand</span>
-                      <p className="text-xs text-[var(--text-secondary)] dark:text-gray-400 mt-1">Sell & showcase</p>
+
+                      <div className="w-10 h-10 rounded-lg bg-[rgba(var(--brand-primary-strong-rgb),0.18)] flex items-center justify-center mb-3 selection-icon relative">
+                        <Scissors className="w-5 h-5" />
+                        {watchUserType === 'BRAND' && (
+                          <Sparkles className="absolute -top-2 -right-2 w-4 h-4 text-[var(--brand-gold)] animate-pulse" />
+                        )}
+                      </div>
+                      <span className="font-medium text-[var(--text-primary)] text-sm block mb-1">Fashion Brand</span>
+                      <p className="text-xs text-[var(--text-secondary)] mb-3">Sell & showcase</p>
+
+                      {/* Feature List */}
+                      <ul className="space-y-1.5">
+                        {['Your own store', 'Analytics dashboard', 'Direct community'].map((feat, i) => (
+                           <li key={i} className="flex items-center gap-1.5 text-[0.65rem] text-[var(--text-primary)]/80">
+                             <span className="feature-list-check"><Check className="w-2.5 h-2.5" /></span>
+                             {feat}
+                           </li>
+                        ))}
+                      </ul>
                     </button>
                   </div>
+                  
+                  {/* Progress Teaser */}
+                  {watchUserType === 'BRAND' && (
+                    <div className="animate-fade-in-up mt-2 p-3 rounded-lg bg-[rgba(var(--brand-gold-rgb),0.1)] border border-[rgba(var(--brand-gold-rgb),0.2)] flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-[var(--brand-gold)] text-black flex items-center justify-center">
+                        <ArrowRight className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-[var(--brand-gold)] uppercase tracking-wide">Next Step</p>
+                        <p className="text-xs text-[var(--text-primary)]/80">Set up your store & customize your brand profile</p>
+                      </div>
+                    </div>
+                  )}
                   {errors.userType && <p className="text-sm text-red-400 ml-1">{errors.userType.message}</p>}
                 </div>
 
                 {/* Full Name */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-300 uppercase tracking-wider ml-1">
+                    <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider ml-1">
                       First Name
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <User className="h-4 w-4 text-gray-500" />
+                        <User className="h-4 w-4 text-[var(--text-secondary)]" />
                       </div>
                       <input
                         type="text"
                         {...register('firstName')}
                         placeholder="John"
-                        className="auth-input w-full rounded-xl py-3.5 pl-11 pr-4 text-sm"
+                        className={`auth-input w-full rounded-xl py-3.5 pl-11 pr-10 text-sm ${
+                            errors.firstName ? 'error animate-shake' : ''
+                        } ${!errors.firstName && dirtyFields.firstName ? 'success' : ''}`}
                       />
+                       <div className={`absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none input-check-icon ${!errors.firstName && dirtyFields.firstName ? 'visible' : ''}`}>
+                          <Check className="h-4 w-4" />
+                       </div>
                     </div>
                     {errors.firstName && <p className="text-sm text-red-400 ml-1">{errors.firstName.message}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-300 uppercase tracking-wider ml-1">
+                    <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider ml-1">
                       Last Name
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <User className="h-4 w-4 text-gray-500" />
+                        <User className="h-4 w-4 text-[var(--text-secondary)]" />
                       </div>
                       <input
                         type="text"
                         {...register('lastName')}
                         placeholder="Doe"
-                        className="auth-input w-full rounded-xl py-3.5 pl-11 pr-4 text-sm"
+                        className={`auth-input w-full rounded-xl py-3.5 pl-11 pr-10 text-sm ${
+                            errors.lastName ? 'error animate-shake' : ''
+                        } ${!errors.lastName && dirtyFields.lastName ? 'success' : ''}`}
                       />
+                       <div className={`absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none input-check-icon ${!errors.lastName && dirtyFields.lastName ? 'visible' : ''}`}>
+                          <Check className="h-4 w-4" />
+                       </div>
                     </div>
                     {errors.lastName && <p className="text-sm text-red-400 ml-1">{errors.lastName.message}</p>}
                   </div>
@@ -454,12 +511,12 @@ const SignUpPage = () => {
                 {/* Brand Full Name - Only for Brand accounts */}
                 {watchUserType === 'BRAND' && (
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-300 uppercase tracking-wider ml-1">
+                    <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider ml-1">
                       Brand Full Name
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Scissors className="h-4 w-4 text-gray-500" />
+                        <Scissors className="h-4 w-4 text-[var(--text-secondary)]" />
                       </div>
                       <input
                         type="text"
@@ -485,8 +542,13 @@ const SignUpPage = () => {
                       type="email"
                       {...register('email')}
                       placeholder="name@example.com"
-                      className="auth-input w-full rounded-xl py-3.5 pl-11 pr-4 text-sm"
+                      className={`auth-input w-full rounded-xl py-3.5 pl-11 pr-10 text-sm ${
+                        errors.email ? 'error animate-shake' : ''
+                      } ${!errors.email && dirtyFields.email ? 'success' : ''}`}
                     />
+                    <div className={`absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none input-check-icon ${!errors.email && dirtyFields.email ? 'visible' : ''}`}>
+                       <Check className="h-4 w-4" />
+                    </div>
                   </div>
                   {errors.email && <p className="text-sm text-red-400 ml-1">{errors.email.message}</p>}
                 </div>
@@ -504,7 +566,9 @@ const SignUpPage = () => {
                       type={showPassword ? 'text' : 'password'}
                       {...register('password')}
                       placeholder="••••••••"
-                      className="auth-input w-full rounded-xl py-3.5 pl-11 pr-12 text-sm"
+                      className={`auth-input w-full rounded-xl py-3.5 pl-11 pr-12 text-sm ${
+                        errors.password ? 'error animate-shake' : ''
+                      }`}
                     />
                     <button
                       type="button"
@@ -551,7 +615,9 @@ const SignUpPage = () => {
                       type={showConfirmPassword ? 'text' : 'password'}
                       {...register('confirmPassword')}
                       placeholder="••••••••"
-                      className="auth-input w-full rounded-xl py-3.5 pl-11 pr-12 text-sm"
+                      className={`auth-input w-full rounded-xl py-3.5 pl-11 pr-12 text-sm ${
+                        errors.confirmPassword ? 'error animate-shake' : ''
+                      }`}
                     />
                     <button
                       type="button"

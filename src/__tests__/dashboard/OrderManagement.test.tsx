@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AuthUserDto } from '../../types/auth';
@@ -33,6 +32,7 @@ const createTestStore = (initialState: { user: UserState }) => {
 
 const mockUser: AuthUserDto = {
   id: 'user-123',
+  storeId: null,
   email: 'brand@example.com',
   username: 'brand_demo',
   firstName: 'Demo',

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { RefreshCcw, WifiOff, ServerCrash, SearchX, Sparkles, TrendingUp, Palette, Clock } from 'lucide-react';
+import { RefreshCcw, WifiOff, ServerCrash, SearchX, Sparkles, TrendingUp, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Masonry from 'react-masonry-css';
 import marketApi from '@/api/MarketApi';
@@ -9,7 +9,6 @@ import type { MarketItem } from '@/types/market';
 import DesignCard from '@/components/designs/DesignCard';
 import DesignSkeleton from '@/components/designs/DesignSkeleton';
 // Category chips live directly on page; tag chips removed for now
-import { FrostedButton } from '@/components/ui/FrostedButton';
 import DesignViewModal from '@/components/designs/DesignViewModal';
 import { setEngagementState } from '@/features/engagementSlice';
 

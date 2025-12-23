@@ -6,7 +6,7 @@ import {
   ArrowLeft, Share2, Heart, MessageCircle, Eye, 
   ChevronDown, ChevronLeft, ChevronRight,
   ShoppingCart, Store, Clock, Play, Star,
-  Lock, CheckCircle
+  Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
@@ -995,18 +995,6 @@ const CollectionViewRedesign: React.FC = () => {
       }
     } catch {
       toast.error('Failed to set cover');
-    }
-  };
-
-  const handleFollow = () => {
-    toast.info('Follow feature coming soon');
-  };
-
-  const handleViewProfile = () => {
-    if (detail?.owner?.brand?.id) {
-      navigate(`/profile/${detail.owner.brand.id}`);
-    } else if (detail?.owner?.id) {
-      navigate(`/profile/${detail.owner.id}`);
     }
   };
 

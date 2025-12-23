@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import type { RootState } from '@/store';
+import type { RootState, AppDispatch } from '@/store';
 import { checkout } from '@/api/StoreApi';
 import { fetchCart, clearCart } from '@/features/cartSlice';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
 const CheckoutPage: React.FC = () => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const cart = useSelector((s: RootState) => s.cart);
   const user = useSelector((s: RootState) => s.user.profile);

@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useLanguage } from '../context/LanguageContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../store';
@@ -81,7 +80,6 @@ export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
-  const { translate } = useLanguage();
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1920));
 
   useEffect(() => {
@@ -94,7 +92,6 @@ export const Sidebar: React.FC = () => {
   const { profile: user } = useSelector((state: RootState) => state.user);
 
   const showOverlay = isSidebarOpen;
-  const showRail = sidebarMode === 'RAIL' && !isSidebarOpen;
   const slideClasses = showOverlay
     ? `transform transition-transform duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'}`
     : '';
