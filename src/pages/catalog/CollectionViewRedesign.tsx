@@ -15,6 +15,7 @@ import AccessApi, { type AccessState } from '@/api/AccessApi';
 import LikeButton from '@/components/ui/LikeButton';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UnifiedCollectionComments from '@/components/collections/UnifiedCollectionComments';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 // ============================================
 // TYPES
@@ -127,16 +128,18 @@ const HeroSection: React.FC<HeroSectionProps> = ({
   onShare,
 }) => {
   return (
-    <section className="relative w-full h-[70vh] min-h-[360px] overflow-hidden bg-black">
+    <section className="relative w-full">
       {/* Cover Image */}
       {coverUrl ? (
-        <img 
-          src={coverUrl} 
-          alt={title} 
-          className="w-full h-full object-cover"
+        <MediaRenderer
+          kind="image"
+          src={coverUrl}
+          alt={title}
+          maxHeightClassName="max-h-[70vh]"
+          className="w-full"
         />
       ) : (
-        <div className="w-full h-full bg-gradient-to-br from-purple-900 via-indigo-900 to-black flex items-center justify-center">
+        <div className="w-full h-[70vh] min-h-[360px] bg-gradient-to-br from-purple-900 via-indigo-900 to-black flex items-center justify-center">
           <span className="text-8xl font-bold text-white/20">{title.charAt(0)}</span>
         </div>
       )}
@@ -294,25 +297,32 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                 transition={{ duration: 0.3 }}
                 className="w-full"
               >
-                {currentItem?.type === 'video' ? (
-                  <video
-                    ref={videoRef}
-                    src={currentItem.url}
-                    className="w-full rounded-2xl shadow-2xl"
-                    style={{ maxHeight: '80vh', objectFit: 'contain' }}
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                  />
-                ) : (
-                  <img
-                    src={currentItem?.url}
-                    alt={currentItem?.caption || 'Collection Item'}
-                    className="w-full rounded-2xl shadow-2xl"
-                    style={{ maxHeight: '80vh', objectFit: 'contain' }}
-                  />
-                )}
+                {currentItem ? (
+                  currentItem.type === 'video' ? (
+                    <MediaRenderer
+                      kind="video"
+                      src={currentItem.url}
+                      videoRef={videoRef}
+                      controls={false}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      maxHeightClassName="max-h-[80vh]"
+                      className="w-full rounded-2xl shadow-2xl"
+                      mediaClassName="rounded-2xl"
+                    />
+                  ) : (
+                    <MediaRenderer
+                      kind="image"
+                      src={currentItem.url}
+                      alt={currentItem.caption || 'Collection Item'}
+                      maxHeightClassName="max-h-[80vh]"
+                      className="w-full rounded-2xl shadow-2xl"
+                      mediaClassName="rounded-2xl"
+                    />
+                  )
+                ) : null}
               </motion.div>
             </AnimatePresence>
 
@@ -369,7 +379,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
               <button
                 key={item.id}
                 onClick={() => onIndexChange(idx)}
-                className={`flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden relative border-2 transition-all ${
+                className={`flex-shrink-0 rounded-xl relative border-2 transition-all ${
                   isSelected 
                     ? 'border-purple-500 shadow-lg shadow-purple-500/30' 
                     : 'border-transparent hover:border-purple-400/50'
@@ -377,20 +387,31 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
               >
                 {item.type === 'video' ? (
                   <>
-                    <video
+                    <MediaRenderer
+                      kind="video"
                       src={item.url}
-                      className="w-full h-full object-cover"
+                      controls={false}
                       muted
+                      playsInline
+                      preload="metadata"
+                      maxHeightClassName="max-h-20"
+                      maxWidthClassName="max-w-20"
+                      className="rounded-xl"
+                      mediaClassName="rounded-xl"
                     />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                       <Play className="w-6 h-6 text-white" />
                     </div>
                   </>
                 ) : (
-                  <img
+                  <MediaRenderer
+                    kind="image"
                     src={item.url}
                     alt={`Thumbnail ${idx + 1}`}
-                    className="w-full h-full object-cover"
+                    maxHeightClassName="max-h-20"
+                    maxWidthClassName="max-w-20"
+                    className="rounded-xl"
+                    mediaClassName="rounded-xl"
                   />
                 )}
                 
@@ -618,15 +639,17 @@ const RelatedCollectionCard: React.FC<RelatedCollectionCardProps> = ({ collectio
       className="flex-shrink-0 w-64 cursor-pointer"
     >
       <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden">
-        <div className="h-64 overflow-hidden">
+        <div>
           {resolvedCover ? (
-            <img 
-              src={resolvedCover} 
-              alt={collection.title} 
-              className="w-full h-full object-cover"
+            <MediaRenderer
+              kind="image"
+              src={resolvedCover}
+              alt={collection.title}
+              maxHeightClassName="max-h-64"
+              className="w-full"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-purple-900/50 to-indigo-900/50 flex items-center justify-center">
+            <div className="w-full h-64 bg-gradient-to-br from-purple-900/50 to-indigo-900/50 flex items-center justify-center">
               <span className="text-4xl font-bold text-white/20">{collection.title.charAt(0)}</span>
             </div>
           )}

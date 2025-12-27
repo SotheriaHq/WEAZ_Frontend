@@ -55,7 +55,7 @@ const SecuritySettings: React.FC = () => {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (error) {
+    } catch {
       toast.error("Incorrect password or update failed");
     }
   };

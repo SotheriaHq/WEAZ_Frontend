@@ -21,7 +21,7 @@ export const TagsApi = {
         .map((t) => (typeof t?.name === 'string' ? t.name.trim() : ''))
         .filter(Boolean);
       if (names.length) return Array.from(new Set(names));
-    } catch (e) {
+    } catch {
       // ignore, fallback below
     }
     try {

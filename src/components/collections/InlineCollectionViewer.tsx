@@ -223,7 +223,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
           text: detail?.description || 'Check out this collection',
           url,
         });
-      } catch (err) {
+      } catch {
         // User cancelled
       }
     } else {

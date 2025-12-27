@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import DefaultAvatar from '../DefaultAvatar';
 import { FiFeather } from 'react-icons/fi';
 import VLoader from '../loaders/VLoader';
+import MediaRenderer from '../media/MediaRenderer';
 
 interface AvatarCardProps {
   src?: string | null;
@@ -17,9 +18,9 @@ interface AvatarCardProps {
 }
 
 const sizeMap: Record<'sm' | 'md' | 'lg', string> = {
-  sm: 'w-20 h-20',  
-  md: 'w-28 h-28',
-  lg: 'w-48 h-48',
+  sm: 'max-w-20 max-h-20',
+  md: 'max-w-28 max-h-28',
+  lg: 'max-w-48 max-h-48',
 };
 
 const AvatarCard: React.FC<AvatarCardProps> = ({
@@ -54,17 +55,19 @@ const AvatarCard: React.FC<AvatarCardProps> = ({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg ${sizeMap[size]} ${className} ${clickable ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-00' : ''}`}
+      className={`relative rounded-lg ${sizeMap[size]} ${className} ${clickable ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-00' : ''}`}
       onClick={onClick}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}
       onKeyDown={handleKeyDown}
     >
       {showImage ? (
-        <img
+        <MediaRenderer
+          kind="image"
           src={src as string}
           alt={alt}
-          className="h-full w-full object-contain bg-slate-900"
+          maxHeightClassName={sizeMap[size].split(' ').find((c) => c.startsWith('max-h-')) || 'max-h-28'}
+          maxWidthClassName={sizeMap[size].split(' ').find((c) => c.startsWith('max-w-')) || 'max-w-28'}
           onLoad={() => setIsImageLoading(false)}
           onError={() => {
             setErrored(true);

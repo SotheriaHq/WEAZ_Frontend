@@ -41,6 +41,7 @@ import {
 } from './pages/placeholders';
 import StoreCreationWizard from './pages/store/StoreCreationWizard';
 import StoreEssentials from './pages/store/StoreEssentials';
+import { GlobalModalRouter } from './components/modals/GlobalModalRouter';
 
 /**
  * Root layout component that wraps all routes
@@ -51,6 +52,7 @@ const RootLayout: React.FC = () => (
   <>
     <CartDrawer />
     <WishlistDrawer />
+    <GlobalModalRouter />
     <Outlet />
   </>
 );
@@ -162,7 +164,9 @@ const router = createBrowserRouter([
         path: '/store/essentials',
         element: (
           <RequireBrand>
-            <StoreEssentials />
+            <Layout>
+              <StoreEssentials />
+            </Layout>
           </RequireBrand>
         ),
       },
@@ -193,7 +197,7 @@ const router = createBrowserRouter([
 
 const App: React.FC = () => (
   <AuthProvider>
-    <ThemeProvider>
+    <ThemeProvider defaultTheme="light">
       <Toaster position="top-center" richColors closeButton />
       <RouterProvider router={router} />
     </ThemeProvider>

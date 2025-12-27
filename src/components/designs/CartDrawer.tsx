@@ -18,6 +18,7 @@ import { FrostedButton } from '@/components/ui/FrostedButton';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 // Promo code type
 interface PromoCode {
@@ -260,15 +261,19 @@ const CartDrawer: React.FC = () => {
                         </button>
 
                         {/* Thumbnail */}
-                        <div className="w-20 h-24 flex-shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
+                        <div className="max-w-20 max-h-24 flex-shrink-0 rounded-xl overflow-y-auto">
                           {item.product.thumbnail ? (
-                            <img
+                            <MediaRenderer
+                              kind="image"
                               src={item.product.thumbnail}
                               alt={item.product.name}
-                              className="w-full h-full object-cover"
+                              maxHeightClassName="max-h-24"
+                              maxWidthClassName="max-w-20"
+                              className="rounded-xl"
+                              mediaClassName="rounded-xl"
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                            <div className="w-20 h-24 flex items-center justify-center text-gray-400 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
                               <ShoppingBag size={24} />
                             </div>
                           )}

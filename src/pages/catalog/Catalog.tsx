@@ -13,7 +13,6 @@ import SearchField from '../../components/SearchField';
 import EmptyState from '../../components/EmptyState';
 import AddCollectionDropdown from '../../components/profile/AddCollectionDropdown';
 import ProfileHeaderSkeleton from '../../components/profile/ProfileHeaderSkeleton';
-import EditProfileModal from '../../components/profile/EditProfileModal';
 import AboutTab from '../../components/profile/tabs/AboutTab';
 import ReviewsTab from '../../components/profile/tabs/ReviewsTab';
 import InlineCollectionViewer from '../../components/collections/InlineCollectionViewer';
@@ -27,6 +26,8 @@ import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQ
 import ImageCropModal from '../../components/upload/ImageCropModal';
 import type { BrandProfileDto, CollectionDto } from '../../types/profile';
 import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedFileUrl';
+import { getStoreDraftStatus, type StoreDraftResponse } from '../../api/StoreApi';
+import FrostedButton from '@/components/ui/FrostedButton';
 
 import ComingSoon from '../placeholders/ComingSoon';
 
@@ -95,9 +96,9 @@ const ProfilePage: React.FC = () => {
   const [pendingAccessConfirm, setPendingAccessConfirm] = useState<string | null>(null);
   const [collectionToDelete, setCollectionToDelete] = useState<string | null>(null);
   // collectionType state removed; modal is opened with the selected type via handler
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [hasDismissedSetup, setHasDismissedSetup] = useState(false);
-  const [openedFromPrompt, setOpenedFromPrompt] = useState(false);
+  const [storeDraftStatus, setStoreDraftStatus] = useState<StoreDraftResponse | null>(null);
+  const [storeDraftStatusLoading, setStoreDraftStatusLoading] = useState(false);
+  const [hasDismissedStoreSetup, setHasDismissedStoreSetup] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
@@ -211,10 +212,13 @@ const ProfilePage: React.FC = () => {
     }
   }, [location.pathname, location.search, location.state, navigate]);
 
-  useEffect(() => {
-    setHasDismissedSetup(false);
-    setOpenedFromPrompt(false);
-  }, [user?.id]);
+  const isEditModalOpen = searchParams.get('modal') === 'brand-setup';
+  const hasDismissedSetup = useMemo(() => {
+    const DISMISS_KEY = 'threadly.brandProfileSetup.dismissedUntil';
+    const dismissedUntilRaw = localStorage.getItem(DISMISS_KEY);
+    const dismissedUntil = dismissedUntilRaw ? Number(dismissedUntilRaw) : 0;
+    return Boolean(dismissedUntil && dismissedUntil > Date.now());
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'Reviews') {
@@ -273,6 +277,60 @@ const ProfilePage: React.FC = () => {
   }, [isOwner, user, brandProfile]);
 
   useEffect(() => {
+    const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
+    if (!isOwner || user?.type !== 'BRAND') {
+      setStoreDraftStatus(null);
+      setHasDismissedStoreSetup(false);
+      return;
+    }
+
+    const dismissedUntilRaw = localStorage.getItem(DISMISS_KEY);
+    const dismissedUntil = dismissedUntilRaw ? Number(dismissedUntilRaw) : 0;
+    setHasDismissedStoreSetup(Boolean(dismissedUntil && dismissedUntil > Date.now()));
+
+    let cancelled = false;
+    setStoreDraftStatusLoading(true);
+    getStoreDraftStatus()
+      .then((status) => {
+        if (!cancelled) setStoreDraftStatus(status);
+      })
+      .catch(() => {
+        if (!cancelled) setStoreDraftStatus(null);
+      })
+      .finally(() => {
+        if (!cancelled) setStoreDraftStatusLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwner, user?.type]);
+
+  const showStoreSetupNudge = useMemo(() => {
+    if (!isOwner || user?.type !== 'BRAND') return false;
+    if (hasDismissedStoreSetup) return false;
+    if (storeDraftStatusLoading) return false;
+    // Encourage setup until the store is marked live/open.
+    if (!storeDraftStatus) return false;
+    return storeDraftStatus.hasLiveStore === false;
+  }, [hasDismissedStoreSetup, isOwner, storeDraftStatus, storeDraftStatusLoading, user?.type]);
+
+  const showStoreSetupChip = useMemo(() => {
+    if (!isOwner || user?.type !== 'BRAND') return false;
+    if (!hasDismissedStoreSetup) return false;
+    if (storeDraftStatusLoading) return false;
+    if (!storeDraftStatus) return false;
+    return storeDraftStatus.hasLiveStore === false;
+  }, [hasDismissedStoreSetup, isOwner, storeDraftStatus, storeDraftStatusLoading, user?.type]);
+
+  const dismissStoreSetupNudge = useCallback(() => {
+    const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
+    const until = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
+    localStorage.setItem(DISMISS_KEY, String(until));
+    setHasDismissedStoreSetup(true);
+  }, []);
+
+  useEffect(() => {
     if (
       isOwner &&
       !brandProfileLoading &&
@@ -280,8 +338,10 @@ const ProfilePage: React.FC = () => {
       !hasDismissedSetup &&
       !isEditModalOpen
     ) {
-      setOpenedFromPrompt(true);
-      setIsEditModalOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.set('modal', 'brand-setup');
+      next.set('modalOrigin', 'prompt');
+      setSearchParams(next);
     }
   }, [
     isOwner,
@@ -289,28 +349,19 @@ const ProfilePage: React.FC = () => {
     requiresProfileSetup,
     hasDismissedSetup,
     isEditModalOpen,
+    searchParams,
+    setSearchParams,
   ]);
 
   const handleOpenEditModal = (openedByPrompt = false) => {
-    setOpenedFromPrompt(openedByPrompt);
-    setIsEditModalOpen(true);
-  };
-
-  const handleDismissModal = () => {
-    setIsEditModalOpen(false);
-    if (openedFromPrompt) {
-      setHasDismissedSetup(true);
+    const next = new URLSearchParams(searchParams);
+    next.set('modal', 'brand-setup');
+    if (openedByPrompt) {
+      next.set('modalOrigin', 'prompt');
+    } else {
+      next.delete('modalOrigin');
     }
-    setOpenedFromPrompt(false);
-  };
-
-  const handleProfileSaved = async (updatedUser: AuthUserDto) => {
-    dispatch(setUser(updatedUser));
-    setHasDismissedSetup(true);
-    setIsEditModalOpen(false);
-    setOpenedFromPrompt(false);
-    await fetchBrandProfile(updatedUser.id);
-    setAvatarHighlight(false);
+    setSearchParams(next);
   };
 
   const ensureDescriptionFallback = (): string => {
@@ -530,7 +581,7 @@ const ProfilePage: React.FC = () => {
         if (!mounted) return;
         setVisitorProfile(p ?? null);
         setVisitorCollections(cols ?? []);
-      } catch (e) {
+      } catch {
         if (mounted) setVisitorError('Failed to load profile data');
       } finally {
         if (mounted) setVisitorLoading(false);
@@ -555,7 +606,10 @@ const ProfilePage: React.FC = () => {
     return () => { mounted = false; };
   }, [isVisitorView, routeBrandId]);
 
-  const activeCollections = (isVisitorView ? visitorCollections : collections) || [];
+  const activeCollections = useMemo(
+    () => (isVisitorView ? visitorCollections : collections) ?? [],
+    [isVisitorView, visitorCollections, collections]
+  );
   
   // Filter logic updated to handle Drafts
   let displayCollections: CollectionDto[] = [];
@@ -656,7 +710,7 @@ const ProfilePage: React.FC = () => {
             delete next[id];
             return next;
           });
-        } catch (error: any) {
+        } catch {
           const attempts = state.attempts + 1;
           const tookTooLong = Date.now() - state.startedAt > 90_000;
           setPublishingStates((prev) => ({
@@ -841,6 +895,40 @@ const ProfilePage: React.FC = () => {
           />
         </>
       )}
+      {showStoreSetupNudge ? (
+        <div className="fixed bottom-24 right-4 sm:right-6 z-[60] w-[min(92vw,380px)]">
+          <div className="glass-menu-soft px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Finish setting up your store
+              </p>
+              <p className="text-xs text-gray-700/80 dark:text-white/70 mt-0.5">
+                Add categories, a tagline, and your Instagram. You can do it later.
+              </p>
+            </div>
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <FrostedButton size="sm" variant="primary" onClick={() => navigate('/store/essentials')}>
+                Set up
+              </FrostedButton>
+              <FrostedButton size="sm" variant="ghost" onClick={dismissStoreSetupNudge}>
+                Not now
+              </FrostedButton>
+            </div>
+          </div>
+        </div>
+      ) : showStoreSetupChip ? (
+        <div className="fixed bottom-24 right-4 sm:right-6 z-[60]">
+          <button
+            type="button"
+            onClick={() => navigate('/store/essentials')}
+            className="glass-chip chip-sm chip-purple inline-flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/10 transition"
+            aria-label="Continue store setup"
+          >
+            <span className="font-semibold">Continue store setup</span>
+          </button>
+        </div>
+      ) : null}
+
       <ProfileHeader
         profileData={{
           name: viewDisplayData.brandName,
@@ -1283,17 +1371,6 @@ const ProfilePage: React.FC = () => {
         }}
       />
 
-      {isOwner && (
-        <EditProfileModal
-          isOpen={isEditModalOpen}
-          user={user!}
-          brandProfile={brandProfile}
-          showSkip={openedFromPrompt}
-          onSkip={handleDismissModal}
-          onClose={handleDismissModal}
-          onSaved={handleProfileSaved}
-        />
-      )}
     </div>
   );
 };

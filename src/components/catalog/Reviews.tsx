@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { Star, MessageCircle, Heart, CheckCircle } from 'lucide-react';
 import type { ReviewDto, ReviewsResponse } from '../../types/profile'; // Import the specific DTO type
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 // We will use the ReviewsResponse structure for the props
 interface ReviewsProps {
@@ -203,10 +204,14 @@ const Reviews: React.FC<ReviewsProps> = ({
               <div className="flex items-center gap-4">
                 {/* Larger User Avatar */}
                 {review.userImage && (
-                  <img
+                  <MediaRenderer
+                    kind="image"
                     src={review.userImage}
                     alt={review.userName}
-                    className="w-14 h-14 rounded-full object-cover border-4 border-purple-500/20"
+                    maxHeightClassName="max-h-14"
+                    maxWidthClassName="max-w-14"
+                    className="rounded-full border-4 border-purple-500/20"
+                    mediaClassName="rounded-full"
                   />
                 )}
                 <div>
@@ -236,12 +241,20 @@ const Reviews: React.FC<ReviewsProps> = ({
             {review.images && review.images.length > 0 && (
               <div className="flex gap-4 mb-4">
                 {review.images.map((img: string, idx: number) => (
-                  <img
+                  <div
                     key={idx}
-                    src={img}
-                    alt={`Review image ${idx + 1}`}
-                    className="w-28 h-28 object-cover rounded-xl shadow-lg border-2 border-gray-100 dark:border-gray-700 hover:scale-[1.02] transition-transform duration-300 cursor-pointer"
-                  />
+                    className="rounded-xl shadow-lg border-2 border-gray-100 dark:border-gray-700 hover:scale-[1.02] transition-transform duration-300 cursor-pointer"
+                  >
+                    <MediaRenderer
+                      kind="image"
+                      src={img}
+                      alt={`Review image ${idx + 1}`}
+                      maxHeightClassName="max-h-28"
+                      maxWidthClassName="max-w-28"
+                      className="rounded-xl"
+                      mediaClassName="rounded-xl"
+                    />
+                  </div>
                 ))}
               </div>
             )}

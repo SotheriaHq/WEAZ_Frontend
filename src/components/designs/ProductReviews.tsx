@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Star, ThumbsUp, ChevronDown, Filter, Image as ImageIcon, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 // Types
 export interface ReviewUser {
@@ -286,11 +287,17 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({
               {/* Avatar */}
               <div className="flex-shrink-0">
                 {review.user.avatar ? (
-                  <img
-                    src={review.user.avatar}
-                    alt={review.user.username}
-                    className="w-12 h-12 rounded-full object-cover ring-2 ring-white dark:ring-gray-800"
-                  />
+                  <div className="max-h-12 max-w-12 overflow-y-auto rounded-full ring-2 ring-white dark:ring-gray-800">
+                    <MediaRenderer
+                      kind="image"
+                      src={review.user.avatar}
+                      alt={review.user.username}
+                      maxHeightClassName="max-h-12"
+                      maxWidthClassName="max-w-12"
+                      className="rounded-full"
+                      mediaClassName="rounded-full"
+                    />
+                  </div>
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold">
                     {getInitials(review.user.username)}
@@ -355,9 +362,17 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({
                     onClick={() => {
                       setExpandedImage(img);
                     }}
-                    className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden ring-2 ring-transparent hover:ring-purple-500 transition-all"
+                    className="flex-shrink-0 rounded-lg overflow-y-auto ring-2 ring-transparent hover:ring-purple-500 transition-all"
                   >
-                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <MediaRenderer
+                      kind="image"
+                      src={img}
+                      alt=""
+                      maxHeightClassName="max-h-20"
+                      maxWidthClassName="max-w-20"
+                      className="rounded-lg"
+                      mediaClassName="rounded-lg"
+                    />
                   </button>
                 ))}
               </div>

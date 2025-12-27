@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
@@ -20,11 +20,7 @@ const FinancePage: React.FC = () => {
   const [requesting, setRequesting] = useState(false);
   const [availableBalance, setAvailableBalance] = useState(0); // Mocked for now, should come from API
 
-  useEffect(() => {
-    fetchData();
-  }, [user?.id]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
     try {
@@ -44,7 +40,11 @@ const FinancePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
 
   const handleRequestPayout = async () => {
     if (!user?.id) return;
@@ -57,7 +57,7 @@ const FinancePage: React.FC = () => {
     try {
       await brandApi.requestPayout(user.id, availableBalance);
       toast.success('Payout requested successfully');
-      fetchData();
+      void fetchData();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to request payout');
     } finally {

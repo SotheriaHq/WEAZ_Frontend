@@ -23,6 +23,11 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const emojiPickerRef = React.useRef<HTMLDivElement>(null);
+
+  const busyRef = React.useRef(false);
+  const cursorRef = React.useRef<string | null>(null);
+  React.useEffect(() => { busyRef.current = busy; }, [busy]);
+  React.useEffect(() => { cursorRef.current = cursor; }, [cursor]);
   
   // 🔧 FIX #3: Add state for reply functionality
   const me = React.useMemo(() => {
@@ -35,11 +40,16 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
     }
   }, []);
 
-  const load = async (reset = false) => {
-    if (busy) return;
+  const load = React.useCallback(async (reset = false) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
-      const res = await CommentsApi.listUnifiedForCollection(collectionId, reset ? undefined : cursor ?? undefined, 20);
+      const res = await CommentsApi.listUnifiedForCollection(
+        collectionId,
+        reset ? undefined : cursorRef.current ?? undefined,
+        20
+      );
       if (reset) setItems(res.items); else setItems((prev) => [...prev, ...res.items]);
       setHasNext(res.hasNextPage);
       setCursor(res.endCursor);
@@ -48,10 +58,16 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
       toast.error(e?.response?.data?.message ?? 'Failed to load comments');
     } finally {
       setBusy(false);
+      busyRef.current = false;
     }
-  };
+  }, [collectionId]);
 
-  React.useEffect(() => { setItems([]); setCursor(null); setHasNext(false); void load(true); }, [collectionId]);
+  React.useEffect(() => {
+    setItems([]);
+    setCursor(null);
+    setHasNext(false);
+    void load(true);
+  }, [collectionId, load]);
 
   // Scroll to highlighted comment when items load
   React.useEffect(() => {

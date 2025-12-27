@@ -5,6 +5,7 @@ import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { toast } from 'sonner';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 export interface StoreProduct {
   id: string;
@@ -54,6 +55,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
   
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(initialWishlisted);
   const [wishlistLoading, setWishlistLoading] = useState(false);
@@ -131,6 +133,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     ? product.images[1] 
     : product.thumbnail || product.images[0];
 
+  const resolvedImage = imgError ? '/placeholder-product.png' : displayImage;
+
   return (
     <article
       className={`group relative flex flex-col overflow-hidden rounded-xl bg-white/5 dark:bg-white/[0.03] backdrop-blur-sm border border-white/10 dark:border-white/5 transition-all duration-300 hover:border-purple-500/30 hover:shadow-[0_8px_30px_rgba(147,51,234,0.15)] cursor-pointer ${className ?? ''}`}
@@ -139,22 +143,21 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Image Container */}
-      <div className="relative aspect-[3/4] overflow-hidden bg-gray-100 dark:bg-gray-900">
-        {/* Loading skeleton */}
+      <div className="relative overflow-y-auto">
         {!imgLoaded && (
           <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-purple-100/20 via-white/10 to-gray-200/20 dark:from-purple-900/20 dark:via-gray-800/20 dark:to-gray-900/40" />
         )}
-        
-        {/* Product image */}
-        <img
-          src={displayImage}
+
+        <MediaRenderer
+          kind="image"
+          src={resolvedImage}
           alt={product.name}
-          className={`w-full h-full object-cover transition-all duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'} ${isHovered ? 'scale-105' : 'scale-100'}`}
-          loading="lazy"
+          maxHeightClassName="max-h-80"
+          className={`mx-auto transition-opacity duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
           onLoad={() => setImgLoaded(true)}
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = '/placeholder-product.png';
+          onError={() => {
+            setImgError(true);
+            setImgLoaded(true);
           }}
         />
 

@@ -13,6 +13,7 @@ import {
   RotateCw,
 } from 'lucide-react';
 import type { StoreWizardData, MediaItem } from '@/types/storeWizard';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface StoreMediaReviewStepProps {
   data: StoreWizardData;
@@ -69,18 +70,13 @@ const REQUIREMENTS = [
  * Store Media Review Step (Screen 1.9)
  * Step 5 of 6: Review uploaded media against quality standards
  */
-const StoreMediaReviewStep: React.FC<StoreMediaReviewStepProps> = ({
-  data,
-  onBack,
-  onContinue,
-  isSaving = false,
-}) => {
-  // Use mock data if no media items
-  const mediaItems = data.mediaItems.length > 0 ? data.mediaItems : MOCK_MEDIA;
+const StoreMediaReviewStep: React.FC<StoreMediaReviewStepProps> = (props) => {
+  const { data, onBack, onContinue, isSaving = false } = props;
 
-  // Count issues
+  const mediaItems = data.mediaItems && data.mediaItems.length > 0 ? data.mediaItems : MOCK_MEDIA;
   const failedCount = mediaItems.filter((m) => m.status === 'failed').length;
   const warningCount = mediaItems.filter((m) => m.status === 'warning').length;
+
   const issueCount = failedCount + warningCount;
   const allPassed = issueCount === 0;
 
@@ -164,11 +160,14 @@ const StoreMediaReviewStep: React.FC<StoreMediaReviewStepProps> = ({
               }`}
             >
               {/* Image */}
-              <div className="relative h-64 w-full bg-gray-100 dark:bg-gray-900">
-                <img
+              <div className="relative w-full">
+                <MediaRenderer
+                  kind="image"
                   src={item.url}
                   alt={item.name}
-                  className={`w-full h-full object-cover transition-opacity ${
+                  maxHeightClassName="max-h-64"
+                  className="w-full"
+                  mediaClassName={`transition-opacity ${
                     item.status === 'failed' ? 'opacity-80' : 'opacity-90 group-hover:opacity-100'
                   }`}
                 />

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import DefaultAvatar from './DefaultAvatar';
 import { brandApi } from '@/api/BrandApi';
+import MediaRenderer from './media/MediaRenderer';
 
 interface ImageWithFallbackProps {
   src?: string | null;
@@ -88,7 +89,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   containerClassName,
   rounded = 'md',
   fallbackName,
-  draggable = false,
+  draggable: _draggable = false,
   onClick,
 }) => {
   const [resolved, setResolved] = useState<string | null>(() => {
@@ -135,7 +136,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
             setCachedUrl(fileId, url);
             setResolved(url);
           }
-        } catch (e) {
+        } catch {
           if (mounted) setHadError(true);
         }
       } else {
@@ -154,17 +155,20 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const showFallback = hadError || !resolved;
 
   return (
-    <div className={`overflow-hidden ${roundClass(rounded)} ${containerClassName ?? ''}`} onClick={onClick}>
+    <div className={`${roundClass(rounded)}`} onClick={onClick}>
       {showFallback ? (
         <DefaultAvatar name={fallbackName ?? alt} className={`w-full h-full ${roundClass(rounded)}`} />
       ) : (
-        <img
-          src={resolved ?? undefined}
+        <MediaRenderer
+          kind="image"
+          src={resolved ?? ''}
           alt={alt}
-          draggable={draggable}
           onError={() => setHadError(true)}
           onLoad={() => setLoaded(true)}
-          className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${className ?? ''}`}
+          className={containerClassName}
+          mediaClassName={`transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${className ?? ''}`}
+          maxHeightClassName="max-h-[70vh]"
+          maxWidthClassName="max-w-full"
         />
       )}
     </div>

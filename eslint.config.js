@@ -4,6 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import { globalIgnores } from 'eslint/config'
+import noRawMediaElements from './eslint-rules/no-raw-media-elements.js'
 
 export default tseslint.config([
   globalIgnores(['dist']),
@@ -15,6 +16,13 @@ export default tseslint.config([
       reactHooks.configs['recommended-latest'],
       reactRefresh.configs.vite,
     ],
+    plugins: {
+      threadly: {
+        rules: {
+          'no-raw-media-elements': noRawMediaElements,
+        },
+      },
+    },
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
@@ -29,6 +37,17 @@ export default tseslint.config([
       'react-refresh/only-export-components': 'off',
       '@typescript-eslint/ban-ts-comment': 'off',
       'react-hooks/exhaustive-deps': 'warn',
+      // Global invariant: forbid raw <img>/<video> (use MediaRenderer).
+      'threadly/no-raw-media-elements': [
+        'error',
+        {
+          // Temporary allowlist for legacy/decorative usage. Tighten over time.
+          allowFiles: [
+            'src/pages/Login.tsx',
+            'src/pages/SignUp.tsx',
+          ],
+        },
+      ],
     },
   },
 ])

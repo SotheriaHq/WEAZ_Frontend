@@ -14,6 +14,7 @@ import TextField from '../../components/forms/TextField';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import MediaUploadZone from '../../components/upload/MediaUploadZone';
 import ThumbnailStrip from '../../components/upload/ThumbnailStrip';
+import MediaRenderer from '../../components/media/MediaRenderer';
 import useFilePicker from '../../components/upload/useFilePicker';
 import { PrePublishConfirmModal } from '@/components/modals';
 import TagsApi from '@/api/TagsApi';
@@ -107,7 +108,7 @@ const CreateCollectionInner: React.FC = () => {
         if (mounted && Array.isArray(cats)) {
           const mapped = cats.map((c) => ({ id: c.id, slug: c.slug, name: c.name }));
           setCategories(mapped);
-          if (!categoryId && mapped.length) setCategoryId(mapped[0].id);
+          if (mapped.length) setCategoryId((prev) => prev || mapped[0].id);
         }
 
         if (isEditMode && id) {
@@ -153,7 +154,7 @@ const CreateCollectionInner: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [id, isEditMode]);
+  }, [id, isEditMode, mediaStore]);
 
   // Keep selected/cover indices in range when files change
   useEffect(() => {
@@ -491,38 +492,28 @@ const CreateCollectionInner: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300">
-      {/* Sticky Header - Vibrant Gradient Design */}
-      <header className="sticky top-0 z-40 bg-gradient-to-r from-purple-600/95 via-fuchsia-600/95 to-indigo-600/95 backdrop-blur-xl border-b border-white/20 shadow-lg">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-transparent text-[var(--text-primary)] transition-colors duration-300">
+      {/* Sticky Header - aligned with app shell */}
+      <header className="sticky top-0 z-40 glass-menu-soft border-b border-white/20 dark:border-white/10">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-white/90 hover:text-white transition-colors group"
+            className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors group"
           >
             <FiArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
             <span className="hidden sm:inline font-medium">Back</span>
           </button>
 
-          <div className="flex items-center gap-3">
-            <HiOutlineSparkles className="w-6 h-6 text-amber-300 animate-pulse" />
-            <h1 className="text-xl sm:text-2xl font-bold text-white drop-shadow-lg">
-              {isEditMode ? '✨ Edit Your Story' : '✨ Create Your Story'}
+          <div className="flex items-center gap-2">
+            <HiOutlineSparkles className="w-5 h-5 text-purple-500" />
+            <h1 className="text-lg sm:text-xl font-semibold">
+              {isEditMode ? 'Edit Collection' : 'Create Collection'}
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white hover:bg-white/30 transition-colors shadow-sm"
-              aria-label="Help"
-            >
-              <span role="img" aria-hidden="true">❔</span>
-            </button>
-          </div>
+          <div className="w-9" aria-hidden="true" />
         </div>
-        {/* Subtle animated gradient line */}
-        <div className="h-1 w-full bg-gradient-to-r from-amber-400 via-pink-500 to-purple-600 animate-gradient-x" />
       </header>
 
       {/* CreateStoreModal removed as per request */}
@@ -602,41 +593,27 @@ const CreateCollectionInner: React.FC = () => {
               />
             ) : (
               <div className="space-y-4 h-full">
-                {/* Main Preview */}
-                <div className="rounded-2xl glass-light border border-gray-200/80 dark:border-white/10 overflow-hidden bg-gradient-to-b from-white/80 to-gray-50/90 dark:from-gray-900/70 dark:to-gray-950 shadow-sm">
+                {/* Main Preview - NO background; media defines layout */}
+                <div className="relative rounded-2xl border border-gray-200/80 dark:border-white/10 overflow-hidden shadow-sm">
                   <div
-                    className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black"
-                    style={{
-                      minHeight: '420px',
-                      height: '56vh',
-                      maxHeight: '620px',
-                    }}
+                    className="relative w-full flex justify-center overflow-y-auto"
                   >
                     <AnimatePresence mode="wait">
                       {selectedFile && (
                         <motion.div
                           key={selectedFile.id || selectedFile.url}
-                          className="w-full h-full flex items-center justify-center"
+                          className="w-fit max-w-full"
                           initial={{ opacity: 0.6, scale: 0.99 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.99 }}
                           transition={{ duration: 0.25 }}
                         >
-                          {selectedFile.kind === 'video' ? (
-                            <video
-                              src={selectedFile.url}
-                              controls
-                              className="w-full h-full object-contain"
-                              playsInline
-                            />
-                          ) : (
-                            <img
-                              src={selectedFile.url}
-                              alt={selectedFile.file?.name || 'Preview'}
-                              className="w-full h-full object-contain"
-                              loading="lazy"
-                            />
-                          )}
+                          <MediaRenderer
+                            kind={selectedFile.kind === 'video' ? 'video' : 'image'}
+                            src={selectedFile.url}
+                            alt={selectedFile.file?.name || 'Preview'}
+                            maxHeightClassName="max-h-[620px]"
+                          />
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -1143,7 +1120,7 @@ const CreateCollectionInner: React.FC = () => {
                 </div>
               </div>
 
-              <div className="relative flex-1 min-h-[320px] flex items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-b from-gray-900/80 to-black border border-white/10 shadow-2xl">
+              <div className="relative flex-1 min-h-[320px] flex items-center justify-center overflow-auto rounded-2xl border border-white/10">
                 <button
                   className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-40"
                   onClick={handleFullscreenPrev}
@@ -1153,22 +1130,15 @@ const CreateCollectionInner: React.FC = () => {
                   <FiChevronLeft className="w-5 h-5" />
                 </button>
 
-                {fullscreenFile.kind === 'video' ? (
-                  <video
-                    src={fullscreenFile.url}
-                    controls
-                    className="w-full h-full object-contain"
-                    style={{ transform: `scale(${fullscreenZoom})`, transition: 'transform 0.2s ease' }}
-                  />
-                ) : (
-                  <img
+                <div style={{ transform: `scale(${fullscreenZoom})`, transition: 'transform 0.2s ease' }}>
+                  <MediaRenderer
+                    kind={fullscreenFile.kind === 'video' ? 'video' : 'image'}
                     src={fullscreenFile.url}
                     alt="Fullscreen preview"
-                    className="w-full h-full object-contain"
-                    style={{ transform: `scale(${fullscreenZoom})`, transition: 'transform 0.2s ease' }}
-                    onDoubleClick={() => setFullscreenZoom((z) => (z > 1 ? 1 : 2))}
+                    maxHeightClassName="max-h-[80vh]"
+                    className="rounded-none"
                   />
-                )}
+                </div>
 
       {/* Draft Preview (read-only) */}
       <AnimatePresence>
@@ -1203,12 +1173,13 @@ const CreateCollectionInner: React.FC = () => {
               </div>
 
               {selectedFile?.url && (
-                <div className="w-full rounded-xl overflow-hidden bg-black" style={{ minHeight: '280px', maxHeight: '420px' }}>
-                  {selectedFile.kind === 'video' ? (
-                    <video src={selectedFile.url} controls className="w-full h-full object-contain" />
-                  ) : (
-                    <img src={selectedFile.url} alt="Draft cover" className="w-full h-full object-contain" />
-                  )}
+                <div className="w-full rounded-xl overflow-hidden">
+                  <MediaRenderer
+                    kind={selectedFile.kind === 'video' ? 'video' : 'image'}
+                    src={selectedFile.url}
+                    alt="Draft cover"
+                    maxHeightClassName="max-h-[420px]"
+                  />
                 </div>
               )}
 
@@ -1232,12 +1203,14 @@ const CreateCollectionInner: React.FC = () => {
                     const withUrl = resolveMediaWithUrl(file);
                     if (!withUrl) return null;
                     return (
-                      <div key={withUrl.id} className="rounded-xl overflow-hidden bg-black h-32 flex items-center justify-center">
-                        {withUrl.kind === 'video' ? (
-                          <video src={withUrl.url} className="w-full h-full object-contain" />
-                        ) : (
-                          <img src={withUrl.url} className="w-full h-full object-contain" />
-                        )}
+                      <div key={withUrl.id} className="rounded-xl overflow-hidden flex items-center justify-center">
+                        <MediaRenderer
+                          kind={withUrl.kind === 'video' ? 'video' : 'image'}
+                          src={withUrl.url}
+                          alt=""
+                          maxHeightClassName="max-h-32"
+                          maxWidthClassName="max-w-[240px]"
+                        />
                       </div>
                     );
                   })}

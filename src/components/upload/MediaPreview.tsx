@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import type { MediaItem, MediaItemKind } from '../../types/media';
 import { FiX, FiPlay } from 'react-icons/fi';
+import MediaRenderer from '../media/MediaRenderer';
 
 interface MediaPreviewProps {
   items: MediaItem[];
@@ -75,12 +76,12 @@ const MediaPreview: React.FC<MediaPreviewProps> = ({ items, onDeleteItem, onAddM
 
   return (
     <div className="w-full">
-      <div className="mb-4 rounded-lg bg-black/5 dark:bg-gray-900/50 dark:border-gray-700 overflow-hidden relative flex items-center justify-center" style={{ height: '500px' }}>
-        {isVideo ? (
-          <video src={selected.url} controls className="max-h-full max-w-full object-contain" />
-        ) : (
-          <img src={selected.url} alt={selected.file?.name || 'Preview'} className="max-h-full max-w-full object-contain" />
-        )}
+      <div className="mb-4 rounded-lg overflow-hidden relative flex items-center justify-center">
+        <MediaRenderer
+          kind={isVideo ? 'video' : 'image'}
+          src={selected.url}
+          alt={selected.file?.name || 'Preview'}
+        />
       </div>
 
       <div className="flex space-x-3 overflow-x-auto py-2 scrollbar-hide">
@@ -101,11 +102,17 @@ const MediaPreview: React.FC<MediaPreviewProps> = ({ items, onDeleteItem, onAddM
                 if (!disabled) setSelectedIndex(idx);
               }}
             >
-              {isItemVideo ? (
-                 <video src={pf.url} className="h-full w-full object-cover pointer-events-none" />
-              ) : (
-                 <img src={pf.url} alt={pf.file?.name || 'Thumbnail'} className="h-full w-full object-cover" />
-              )}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <MediaRenderer
+                  kind={isItemVideo ? 'video' : 'image'}
+                  src={pf.url}
+                  alt={pf.file?.name || 'Thumbnail'}
+                  controls={false}
+                  muted
+                  maxHeightClassName="max-h-28"
+                  maxWidthClassName="max-w-28"
+                />
+              </div>
               
               {isItemVideo && <FiPlay className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white/80 w-8 h-8" />}
               

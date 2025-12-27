@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Package } from 'lucide-react';
+import MediaRenderer from '../media/MediaRenderer';
 
 interface BrandHeaderProps {
   brandName: string;
@@ -46,11 +47,15 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
 
         {/* Brand Avatar - Square */}
         {brandAvatar && (
-          <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-md">
-            <img
+          <div className="flex-shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 shadow-md">
+            <MediaRenderer
+              kind="image"
               src={brandAvatar}
               alt={brandName}
-              className="w-full h-full object-cover"
+              maxHeightClassName="max-h-16"
+              maxWidthClassName="max-w-16"
+              className="rounded-lg"
+              mediaClassName="rounded-lg"
             />
           </div>
         )}

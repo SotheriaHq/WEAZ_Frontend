@@ -15,6 +15,7 @@ import type { RootState } from '@/store';
 import { toast } from 'sonner';
 import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
 import { useCountdown } from '@/hooks/useCountdown';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 type Props = {
   open: boolean;
@@ -161,15 +162,25 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           {/* Data Area */}
           <div className="pb-4">
             <div className="mb-3 flex items-center gap-3">
-              <div className="h-10 w-10 overflow-hidden rounded-full bg-gradient-to-br from-primary to-purple-500 text-white">
-                {item.brandLogo ? (
-                  <img src={item.brandLogo} alt={brandLabel} className="h-full w-full object-cover" />
-                ) : (
+              {item.brandLogo ? (
+                <div className="max-h-10 max-w-10 overflow-y-auto rounded-full text-white">
+                  <MediaRenderer
+                    kind="image"
+                    src={item.brandLogo}
+                    alt={brandLabel}
+                    maxHeightClassName="max-h-10"
+                    maxWidthClassName="max-w-10"
+                    className="rounded-full"
+                    mediaClassName="rounded-full"
+                  />
+                </div>
+              ) : (
+                <div className="h-10 w-10 overflow-hidden rounded-full bg-gradient-to-br from-primary to-purple-500 text-white">
                   <div className="flex h-full w-full items-center justify-center text-sm font-bold">
                     {(brandLabel.charAt(0) || 'B').toUpperCase()}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold">{brandLabel}</div>
                 {item.username && item.brandName !== item.username && (

@@ -9,6 +9,7 @@ import {
   Save,
 } from 'lucide-react';
 import type { WizardProduct, WizardLook } from '@/types/storeWizard';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface CreateLookModalProps {
   isOpen: boolean;
@@ -168,14 +169,17 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
           {/* Image Area */}
           <div
             onClick={lookImage ? handleImageClick : undefined}
-            className="relative w-full aspect-[3/4] bg-gray-200 dark:bg-slate-800 rounded-xl overflow-hidden border border-gray-300 dark:border-white/5 shadow-inner cursor-crosshair group"
+            className="relative w-fit max-w-full max-h-[60vh] overflow-y-auto bg-gray-200 dark:bg-slate-800 rounded-xl border border-gray-300 dark:border-white/5 shadow-inner cursor-crosshair group"
           >
             {lookImage ? (
               <>
-                <img
+                <MediaRenderer
+                  kind="image"
                   src={lookImage}
                   alt="Look"
-                  className="w-full h-full object-cover"
+                  maxHeightClassName="max-h-[60vh]"
+                  className="rounded-xl"
+                  mediaClassName="rounded-xl"
                 />
                 {/* Hotspots */}
                 {hotspots.map((hotspot) => {
@@ -327,11 +331,15 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
                       key={product.id}
                       className="flex items-center gap-4 p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200/50 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/10 transition-all"
                     >
-                      <div className="w-12 h-12 rounded-lg bg-gray-200 dark:bg-slate-800 overflow-hidden flex-shrink-0">
-                        <img
+                      <div className="max-h-12 max-w-12 rounded-lg overflow-y-auto flex-shrink-0">
+                        <MediaRenderer
+                          kind="image"
                           src={product.image}
                           alt={product.name}
-                          className="w-full h-full object-cover"
+                          maxHeightClassName="max-h-12"
+                          maxWidthClassName="max-w-12"
+                          className="rounded-lg"
+                          mediaClassName="rounded-lg"
                         />
                       </div>
                       <div className="flex-1 min-w-0">

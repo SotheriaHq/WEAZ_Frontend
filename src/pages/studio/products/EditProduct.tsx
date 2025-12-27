@@ -22,6 +22,7 @@ import {
   MoreHorizontal
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 const EditProduct: React.FC = () => {
   const navigate = useNavigate();
@@ -101,8 +102,15 @@ const EditProduct: React.FC = () => {
               </div>
 
               {/* Main Image */}
-              <div className="relative aspect-[4/5] w-full rounded-lg overflow-hidden mb-3 group border border-white/5">
-                <img src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Main Product" className="w-full h-full object-cover" />
+              <div className="relative w-full rounded-lg mb-3 group border border-white/5">
+                <MediaRenderer
+                  kind="image"
+                  src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+                  alt="Main Product"
+                  maxHeightClassName="max-h-[60vh]"
+                  className="w-full rounded-lg"
+                  mediaClassName="rounded-lg"
+                />
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                   <button className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-colors"><Crop className="w-4 h-4" /></button>
                   <button className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-colors"><ArrowLeftRight className="w-4 h-4" /></button>
@@ -117,8 +125,15 @@ const EditProduct: React.FC = () => {
                   "https://images.unsplash.com/photo-1576566588028-4147f3842f27?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
                   "https://images.unsplash.com/photo-1503341455253-b2e72333dbdb?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
                 ].map((src, i) => (
-                  <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-white/5 group cursor-move">
-                    <img src={src} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt={`Gallery ${i}`} />
+                  <div key={i} className="relative rounded-lg border border-white/5 group cursor-move">
+                    <MediaRenderer
+                      kind="image"
+                      src={src}
+                      alt={`Gallery ${i}`}
+                      maxHeightClassName="max-h-24"
+                      className="w-full rounded-lg"
+                      mediaClassName="rounded-lg opacity-80 group-hover:opacity-100 transition-opacity"
+                    />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <GripVertical className="w-4 h-4 text-white/70" />
                     </div>
@@ -302,8 +317,16 @@ const EditProduct: React.FC = () => {
                       <tr key={variant.size} className="hover:bg-white/5 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded bg-gray-800 border border-white/10 overflow-hidden">
-                              <img src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" className="w-full h-full object-cover" alt="" />
+                            <div className="rounded bg-gray-800 border border-white/10">
+                              <MediaRenderer
+                                kind="image"
+                                src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80"
+                                alt=""
+                                maxHeightClassName="max-h-8"
+                                maxWidthClassName="max-w-8"
+                                className="rounded"
+                                mediaClassName="rounded"
+                              />
                             </div>
                             <span className="text-white">Black / {variant.size}</span>
                           </div>

@@ -152,7 +152,7 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
     // Update every second to ensure smooth progress bar and seconds countdown
     const id = window.setInterval(calc, 1000);
     return () => window.clearInterval(id);
-  }, [saleBand, price?.saleEndAt, price?.saleStartAt]);
+  }, [saleBand, price?.saleEndAt, price?.saleStartAt, onCancelSale]);
 
   return (
     <div className="space-y-3">

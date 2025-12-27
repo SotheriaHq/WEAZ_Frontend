@@ -6,6 +6,7 @@ import { getTagColor } from '@/utils/tagColors';
 import AvatarCard from '../profile/AvatarCard';
 import VLoader from '../loaders/VLoader';
 import StoreAccessButton from '../store/StoreAccessButton';
+import MediaRenderer from '../media/MediaRenderer';
 
 const DummyQRCode = () => (
   <svg viewBox="0 0 100 100" className="h-full w-full object-cover text-gray-800 dark:text-white">
@@ -90,34 +91,25 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
   return (
     <div className="w-full">
-      <div className="relative h-64 overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950">
+      <div className="relative rounded-3xl">
         {hasBannerImage ? (
           <>
-            <img
-              src={profileData.banner}
-              alt={`${profileData.name} banner blurred`}
-              className="absolute inset-0 h-full w-full object-cover opacity-30 blur-2xl"
-              aria-hidden
-              onError={() => {
-                setBannerFailed(true);
-                setIsBannerImageLoading(false);
-              }}
-            />
-            <img
-              src={profileData.banner}
-              alt={`${profileData.name} banner`}
-              className="absolute inset-0 h-full w-full object-cover object-center"
-              onLoad={() => setIsBannerImageLoading(false)}
-              onError={() => {
-                setBannerFailed(true);
-                setIsBannerImageLoading(false);
-              }}
-            />
+            <div className="flex items-center justify-center">
+              <MediaRenderer
+                kind="image"
+                src={profileData.banner}
+                alt={`${profileData.name} banner`}
+                maxHeightClassName="max-h-64"
+                onLoad={() => setIsBannerImageLoading(false)}
+                onError={() => {
+                  setBannerFailed(true);
+                  setIsBannerImageLoading(false);
+                }}
+              />
+            </div>
           </>
         ) : (
-          <div className="absolute inset-0">
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950" />
-            <div className="absolute inset-0 flex items-center justify-center p-6">
+          <div className="h-64 rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex items-center justify-center p-6">
               <div className="max-w-3xl w-full rounded-3xl border border-white/15 bg-white/10 backdrop-blur-md shadow-2xl px-6 py-4 text-center">
                 <div className="text-white/80 text-sm sm:text-base font-semibold tracking-wide">
                   {bannerLabel}
@@ -126,7 +118,6 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                   Showcase your brand story and visuals
                 </div>
               </div>
-            </div>
           </div>
         )}
 
@@ -135,8 +126,6 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             <VLoader size={72} />
           </div>
         )}
-
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/15 pointer-events-none" />
 
         {/* Keep QR at top-right */}
         <div className="absolute top-4 right-4 z-30">

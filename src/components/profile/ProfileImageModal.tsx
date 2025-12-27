@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiX } from 'react-icons/fi';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface ProfileImageModalProps {
   open: boolean;
@@ -21,8 +22,15 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({ open, src, alt = 
       >
         <FiX className="h-5 w-5" />
       </button>
-      <figure className="relative max-h-[90vh] max-w-3xl overflow-hidden rounded-3xl bg-black/20 shadow-2xl">
-        <img src={src} alt={alt} className="max-h-[90vh] w-full object-contain" />
+      <figure className="relative max-h-[90vh] max-w-3xl overflow-y-auto rounded-3xl shadow-2xl">
+        <MediaRenderer
+          kind="image"
+          src={src}
+          alt={alt}
+          maxHeightClassName="max-h-[90vh]"
+          className="rounded-3xl"
+          mediaClassName="rounded-3xl"
+        />
         <figcaption className="absolute inset-x-0 bottom-0 bg-black/60 px-4 py-2 text-center text-sm font-medium text-white">
           {alt}
         </figcaption>

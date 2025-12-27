@@ -1,5 +1,3 @@
-
-/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { unwrapApiResponse } from '../types/auth';

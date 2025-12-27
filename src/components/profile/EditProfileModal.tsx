@@ -9,6 +9,7 @@ import { brandApi, type UpdateBrandProfilePayload } from '../../api/BrandApi';
 import { toast } from 'sonner';
 import { locationService, type CountryOption, type StateOption } from '../../services/LocationService';
 import UniversalSelect from '../forms/UniversalSelect';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 // ----------------------------------------------------------------------------
 // Zod Schemas & Helpers
@@ -296,7 +297,17 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const countryOptions = useMemo(() => countries.map(c => ({
     value: c.name,
     label: c.name,
-    icon: <img src={c.flagImage} alt={c.name} className="w-5 h-auto rounded-sm object-cover" loading="lazy" />,
+    icon: (
+      <MediaRenderer
+        kind="image"
+        src={c.flagImage}
+        alt={c.name}
+        maxHeightClassName="max-h-5"
+        maxWidthClassName="max-w-8"
+        className="rounded-sm"
+        mediaClassName="rounded-sm"
+      />
+    ),
   })), [countries]);
 
   const stateOptions = useMemo(() => states.map(s => ({

@@ -9,6 +9,7 @@ import CommentInput from '@/components/ui/CommentInput';
 import type { MarketItem } from '@/types/market';
 import { selectCommentCount } from '@/features/engagementSlice';
 import { useRealtime } from '@/realtime/RealtimeProvider';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface DesignCardProps {
   item: MarketItem;
@@ -89,29 +90,28 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
       {/* Full Image Background */}
       <div className="relative w-full overflow-hidden">
         {isVideo ? (
-          <video
-            preload="metadata"
-            className="block w-full"
+          <MediaRenderer
+            kind="video"
+            src={item.media.url ?? ''}
             poster={item.media.previewUrl ?? undefined}
-            style={{ minHeight: '280px' }}
-          >
-            <source src={item.media.url ?? undefined} />
-          </video>
+            controls={false}
+            maxHeightClassName="max-h-[70vh]"
+            className="w-fit"
+          />
         ) : (
           <>
             {!imgLoaded && (
               <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-purple-100/40 via-white/40 to-white/20 dark:from-purple-900/20 dark:via-purple-900/10 dark:to-gray-900/40" />
             )}
-            <img
-              src={item.media.url ?? undefined}
+            <MediaRenderer
+              kind="image"
+              src={item.media.url ?? ''}
               alt={item.collectionTitle}
-              className={`block w-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-              style={{ minHeight: '280px' }}
-              loading="lazy"
+              maxHeightClassName="max-h-[70vh]"
+              className={`transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
               onLoad={() => setImgLoaded(true)}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
+              onError={() => {
+                setImgLoaded(true);
               }}
             />
           </>
@@ -222,24 +222,25 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
             }}
             className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 w-fit rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 transition-all"
           >
-            <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/60 bg-gradient-to-br from-primary to-purple-500 shadow-md">
-              {item.brandLogo ? (
-                <img
+            {item.brandLogo ? (
+              <div className="relative flex max-h-8 max-w-8 flex-shrink-0 items-center justify-center overflow-y-auto rounded-full border-2 border-white/60 shadow-md">
+                <MediaRenderer
+                  kind="image"
                   src={item.brandLogo}
                   alt={item.brandName ?? item.username ?? 'Brand'}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
+                  maxHeightClassName="max-h-8"
+                  maxWidthClassName="max-w-8"
+                  className="rounded-full"
+                  mediaClassName="rounded-full"
                 />
-              ) : (
+              </div>
+            ) : (
+              <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/60 bg-gradient-to-br from-primary to-purple-500 shadow-md">
                 <span className="text-xs font-bold text-white">
                   {(item.brandName ?? item.username ?? 'B').charAt(0).toUpperCase()}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
             <div className="flex-1 min-w-0 text-left">
               {/* 🔧 FIX #5: Responsive font sizing, removed truncate, allow wrapping with line-clamp */}
               <p 

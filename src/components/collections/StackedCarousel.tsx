@@ -1,3 +1,4 @@
+import MediaRenderer from '../media/MediaRenderer';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
 
@@ -211,30 +212,30 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
         {items.map((item, index) => (
           <div
             key={item.id}
-            className="absolute w-full max-w-[95%] sm:max-w-[85%] lg:max-w-[75%] h-[90%] rounded-2xl overflow-hidden shadow-2xl"
+            className="absolute w-full max-w-[95%] sm:max-w-[85%] lg:max-w-[75%] max-h-[70vh] rounded-2xl shadow-2xl"
             style={getItemStyle(index)}
           >
-            <div className="relative w-full h-full flex items-center justify-center">
+            <div className="relative w-full flex items-center justify-center overflow-y-auto">
               {item.type === 'image' ? (
-                <img
+                <MediaRenderer
+                  kind="image"
                   src={item.url}
                   alt={item.caption ?? 'Collection media'}
-                  className="w-full h-full object-contain select-none bg-black"
-                  draggable={false}
-                  loading="lazy"
+                  maxHeightClassName="max-h-[70vh]"
+                  maxWidthClassName="max-w-full"
                 />
               ) : (
-                <video
-                  ref={(el) => {
+                <MediaRenderer
+                  kind="video"
+                  src={item.url}
+                  controls
+                  muted
+                  maxHeightClassName="max-h-[70vh]"
+                  maxWidthClassName="max-w-full"
+                  videoRef={(el) => {
                     if (el) videoRefs.current.set(item.id, el);
                     else videoRefs.current.delete(item.id);
                   }}
-                  src={item.url}
-                  className="w-full h-full object-contain bg-black"
-                  controls
-                  playsInline
-                  muted
-                  preload="metadata"
                 />
               )}
               {isOwner && index === activeIndex && (

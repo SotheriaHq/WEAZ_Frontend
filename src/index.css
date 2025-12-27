@@ -179,6 +179,23 @@ html {
   .bg-theme-muted {
     background-color: var(--surface-muted);
   }
+
+  /*
+    Global media invariant utilities
+    - Media defines layout; containers only cap size and allow scroll.
+    - Do NOT apply backgrounds/padding/object-fit boxing around media surfaces.
+  */
+  .media-frame {
+    @apply w-fit max-w-full overflow-y-auto;
+  }
+
+  .media-frame-cap {
+    @apply max-h-[70vh];
+  }
+
+  .media-intrinsic {
+    @apply block w-auto h-auto max-w-full;
+  }
 }
 
 /* Smooth theme transitions for key elements */

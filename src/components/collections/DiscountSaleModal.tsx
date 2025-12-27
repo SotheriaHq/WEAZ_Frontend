@@ -66,7 +66,7 @@ const DiscountSaleModal: React.FC<Props> = ({ open, onClose, collectionId, curre
       } else {
         toast.error('Failed to initiate sale');
       }
-    } catch (e) {
+    } catch {
       toast.error('Failed to initiate sale');
     } finally {
       setSaving(false);

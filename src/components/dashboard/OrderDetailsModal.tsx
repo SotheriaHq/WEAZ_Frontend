@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { brandApi } from '@/api/BrandApi';
 import { X, Package, Truck, CheckCircle, XCircle, MapPin, Phone, Mail } from 'lucide-react';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface OrderDetailsModalProps {
   isOpen: boolean;
@@ -21,13 +22,25 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
+  const fetchOrderDetails = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await brandApi.getOrderDetail(brandId, orderId);
+      setOrder(data);
+    } catch (error) {
+      console.error('Failed to fetch order details', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [brandId, orderId]);
+
   useEffect(() => {
     if (isOpen && orderId && brandId) {
-      fetchOrderDetails();
+      void fetchOrderDetails();
     } else {
       setOrder(null);
     }
-  }, [isOpen, orderId, brandId]);
+  }, [isOpen, orderId, brandId, fetchOrderDetails]);
 
   // Scroll Locking
   useEffect(() => {
@@ -44,18 +57,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       };
     }
   }, [isOpen]);
-
-  const fetchOrderDetails = async () => {
-    setLoading(true);
-    try {
-      const data = await brandApi.getOrderDetail(brandId, orderId);
-      setOrder(data);
-    } catch (error) {
-      console.error('Failed to fetch order details', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleStatusUpdate = async (newStatus: string) => {
     setUpdating(true);
@@ -191,7 +192,15 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
                                 {item.image ? (
-                                  <img src={item.image} alt={item.productName} className="w-full h-full object-cover rounded-lg" />
+                                  <MediaRenderer
+                                    kind="image"
+                                    src={item.image}
+                                    alt={item.productName}
+                                    maxHeightClassName="max-h-10"
+                                    maxWidthClassName="max-w-10"
+                                    className="rounded-lg"
+                                    mediaClassName="rounded-lg"
+                                  />
                                 ) : (
                                   <Package className="w-5 h-5 text-gray-400" />
                                 )}

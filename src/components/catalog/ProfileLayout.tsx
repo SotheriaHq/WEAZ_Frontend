@@ -61,10 +61,7 @@ export const ProfileLayout: React.FC = () => {
       return <Navigate to="/login" replace state={{ from: location.pathname }} />;
     }
 
-    // New onboarding: brand accounts without a store must complete essentials first.
-    if (user.type === 'BRAND' && !user.storeId) {
-      return <Navigate to="/store/essentials" replace />;
-    }
+    // Store onboarding is encouraged/deferrable (no hard redirect).
   }
 
   return (

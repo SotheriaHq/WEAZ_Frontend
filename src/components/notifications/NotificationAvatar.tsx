@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import MediaRenderer from '../media/MediaRenderer';
 
 interface NotificationAvatarProps {
   actor: {
@@ -19,9 +20,9 @@ interface NotificationAvatarProps {
 }
 
 const sizeClasses = {
-  sm: 'w-8 h-8 text-xs',
-  md: 'w-9 h-9 text-sm',
-  lg: 'w-11 h-11 text-base',
+  sm: 'max-w-8 max-h-8 text-xs',
+  md: 'max-w-9 max-h-9 text-sm',
+  lg: 'max-w-11 max-h-11 text-base',
 };
 
 export const NotificationAvatar = React.memo<NotificationAvatarProps>(
@@ -43,11 +44,14 @@ export const NotificationAvatar = React.memo<NotificationAvatarProps>(
     return (
       <div className="relative shrink-0">
         {actor?.profileImage ? (
-          <img 
-            src={actor.profileImage} 
+          <MediaRenderer
+            kind="image"
+            src={actor.profileImage}
             alt={displayName}
-            className={`${sizeClass} rounded-full object-cover border border-gray-200 dark:border-gray-700 shadow-sm transition-transform duration-150`}
-            loading="lazy"
+            maxHeightClassName={sizeClass.split(' ').find((c) => c.startsWith('max-h-')) || 'max-h-9'}
+            maxWidthClassName={sizeClass.split(' ').find((c) => c.startsWith('max-w-')) || 'max-w-9'}
+            className={`rounded-full border border-gray-200 dark:border-gray-700 shadow-sm transition-transform duration-150`}
+            mediaClassName="rounded-full"
           />
         ) : (
           <div 

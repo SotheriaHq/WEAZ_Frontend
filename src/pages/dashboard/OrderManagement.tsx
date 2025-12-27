@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
@@ -26,7 +26,7 @@ const OrderManagement: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<any>(null); // For detail view (modal/drawer)
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
     try {
@@ -45,14 +45,14 @@ const OrderManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, searchQuery, statusFilter, user?.id]);
 
   useEffect(() => {
     const debounce = setTimeout(() => {
-      fetchOrders();
+      void fetchOrders();
     }, 300);
     return () => clearTimeout(debounce);
-  }, [user?.id, page, statusFilter, searchQuery]);
+  }, [fetchOrders]);
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setStatusFilter(e.target.value);

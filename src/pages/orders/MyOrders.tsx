@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyOrders, type Order } from '@/api/StoreApi';
 import { toast } from 'sonner';
@@ -35,7 +35,7 @@ const MyOrders: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     setLoading(true);
     try {
       const res = await getMyOrders(page, 10);
@@ -47,11 +47,11 @@ const MyOrders: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page]);
 
   useEffect(() => {
-    loadOrders();
-  }, [page]);
+    void loadOrders();
+  }, [loadOrders]);
 
   return (
     <div className="max-w-5xl mx-auto py-10 px-4 space-y-6">

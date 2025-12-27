@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiCheck, FiChevronDown, FiChevronUp, FiAlertCircle, FiExternalLink } from 'react-icons/fi';
 import { HiOutlineSparkles } from 'react-icons/hi';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface CollectionSummary {
   title: string;
@@ -91,7 +92,7 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
     try {
       await onConfirm();
       setState('success');
-    } catch (error) {
+    } catch {
       setState('confirm');
       // Error toast is handled by parent
     }
@@ -238,11 +239,14 @@ const ConfirmContent: React.FC<{
 
     {/* Cover image preview */}
     {summary.coverImageUrl && (
-      <div className="relative rounded-2xl overflow-hidden mb-4 bg-black w-full">
-        <img 
-          src={summary.coverImageUrl} 
+      <div className="relative rounded-2xl overflow-y-auto mb-4 w-full">
+        <MediaRenderer
+          kind="image"
+          src={summary.coverImageUrl}
           alt={summary.title}
-          className="w-full h-auto object-cover"
+          maxHeightClassName="max-h-[60vh]"
+          className="rounded-2xl"
+          mediaClassName="rounded-2xl"
         />
         {/* Cover badge */}
         <span className="absolute top-3 left-3 px-2 py-1 rounded-full bg-purple-600 text-white text-xs font-medium">

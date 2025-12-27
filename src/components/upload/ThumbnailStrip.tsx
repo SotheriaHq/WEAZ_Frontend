@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiPlay, FiStar, FiPlus } from 'react-icons/fi';
 import type { MediaItem, MediaItemKind } from '../../types/media';
+import MediaRenderer from '../media/MediaRenderer';
 
 interface ThumbnailStripProps {
   items: MediaItem[];
@@ -81,8 +82,8 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
   }, [previewFiles]);
 
   useEffect(() => {
+    const map = urlMap.current;
     return () => {
-      const map = urlMap.current;
       for (const url of map.values()) {
         if (url.startsWith('blob:')) URL.revokeObjectURL(url);
       }
@@ -113,7 +114,7 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.2 }}
                 className={`
-                  relative flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden
+                  relative flex-shrink-0 rounded-xl overflow-hidden
                   border-2 transition-all duration-200 group
                   ${isSelected 
                     ? 'thumbnail-selected border-transparent scale-105' 
@@ -125,19 +126,16 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
                   if (!disabled && !isUploading) onSelect(idx);
                 }}
               >
-                {/* Thumbnail image/video */}
-                {isVideo ? (
-                  <video 
-                    src={pf.url} 
-                    className="w-full h-full object-cover pointer-events-none" 
-                  />
-                ) : (
-                  <img 
-                    src={pf.url} 
-                    alt={pf.file?.name || `Thumbnail ${idx + 1}`} 
-                    className="w-full h-full object-cover" 
-                  />
-                )}
+                {/* Thumbnail image/video (intrinsic size; capped height with internal scroll) */}
+                <MediaRenderer
+                  kind={isVideo ? 'video' : 'image'}
+                  src={pf.url}
+                  alt={pf.file?.name || `Thumbnail ${idx + 1}`}
+                  maxHeightClassName="max-h-24"
+                  maxWidthClassName="max-w-[240px]"
+                  controls={false}
+                  muted
+                />
 
                 {/* Cover badge */}
                 {isCover && (

@@ -10,6 +10,7 @@ import {
   Globe,
 } from 'lucide-react';
 import type { StoreWizardData } from '@/types/storeWizard';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface StoreReviewStepProps {
   data: StoreWizardData;
@@ -116,28 +117,35 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
             {/* Store Preview Card */}
             <div className="bg-white dark:bg-[#1e1e1e]/50 backdrop-blur-sm border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
               {/* Banner */}
-              <div className="h-48 bg-gradient-to-br from-purple-600/20 via-pink-500/20 to-orange-500/20 relative">
-                {data.bannerPreview && (
-                  <img
-                    src={data.bannerPreview}
-                    alt="Banner"
-                    className="absolute inset-0 w-full h-full object-cover opacity-30"
-                  />
-                )}
-              </div>
+              {data.bannerPreview ? (
+                <MediaRenderer
+                  kind="image"
+                  src={data.bannerPreview}
+                  alt="Banner"
+                  maxHeightClassName="max-h-48"
+                  className="w-full"
+                  mediaClassName="opacity-30"
+                />
+              ) : (
+                <div className="h-48 bg-gradient-to-br from-purple-600/20 via-pink-500/20 to-orange-500/20" />
+              )}
 
               {/* Store Header */}
               <div className="p-6 -mt-16 relative">
                 <div className="flex items-start gap-4">
-                  <div className="w-24 h-24 bg-white dark:bg-[#1e1e1e] border-4 border-white dark:border-[#0f0f0f] rounded-2xl overflow-hidden flex-shrink-0">
+                  <div className="bg-white dark:bg-[#1e1e1e] border-4 border-white dark:border-[#0f0f0f] rounded-2xl flex-shrink-0">
                     {data.logoPreview ? (
-                      <img
+                      <MediaRenderer
+                        kind="image"
                         src={data.logoPreview}
                         alt="Logo"
-                        className="w-full h-full object-cover"
+                        maxHeightClassName="max-h-24"
+                        maxWidthClassName="max-w-24"
+                        className="rounded-2xl"
+                        mediaClassName="rounded-2xl"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-gray-400">
+                      <div className="w-24 h-24 bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-gray-400 rounded-2xl">
                         Logo
                       </div>
                     )}
@@ -302,12 +310,15 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                   {data.products.slice(0, 4).map((product) => (
                     <div
                       key={product.id}
-                      className="aspect-square bg-gray-100 dark:bg-[#1a1a1a] rounded-lg overflow-hidden"
+                      className="rounded-lg border border-gray-200 dark:border-white/10"
                     >
-                      <img
+                      <MediaRenderer
+                        kind="image"
                         src={product.image}
                         alt={product.name}
-                        className="w-full h-full object-cover"
+                        maxHeightClassName="max-h-24"
+                        className="rounded-lg"
+                        mediaClassName="rounded-lg"
                       />
                     </div>
                   ))}

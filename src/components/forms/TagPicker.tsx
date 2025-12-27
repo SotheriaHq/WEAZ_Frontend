@@ -95,7 +95,6 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
     const validation = validateTag(normalized);
     if (!validation.valid) {
       setQuery('');
-      // eslint-disable-next-line no-alert
       alert(validation.error || 'Invalid tag format');
       return;
     }

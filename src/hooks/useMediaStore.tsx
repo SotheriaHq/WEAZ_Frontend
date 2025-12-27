@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, useEffect, useRef, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import type { MediaItem, MediaItemKind } from '../types/media';

@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import type { StoreWizardData } from '@/types/storeWizard';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface StorePoliciesStepProps {
   data: StoreWizardData;
@@ -612,10 +613,13 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                             <span className="px-2 py-0.5 rounded-full bg-gray-200/60 dark:bg-white/10 text-gray-700 dark:text-gray-200 border border-gray-300/60 dark:border-white/10">Custom upload</span>
                             <span>Preview</span>
                           </div>
-                          <img
+                          <MediaRenderer
+                            kind="image"
                             src={data.sizeChartUrl}
                             alt="Size chart preview"
-                            className="w-full h-40 object-contain bg-white dark:bg-black/30 rounded-lg border border-gray-200 dark:border-white/10"
+                            maxHeightClassName="max-h-40"
+                            className="rounded-lg border border-gray-200 dark:border-white/10"
+                            mediaClassName="rounded-lg"
                           />
                           <button
                             onClick={() =>

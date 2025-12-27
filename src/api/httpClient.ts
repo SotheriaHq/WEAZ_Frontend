@@ -11,6 +11,8 @@ import { env } from '../config/env';
 
 const TOKEN_STORAGE_KEY = env.tokenStorageKey;
 
+let authExpired = false;
+
 const getHeaders = (config: AxiosRequestConfig): AxiosHeaders => {
   if (!config.headers) {
     const headers = new AxiosHeaders();
@@ -48,6 +50,7 @@ export const persistAccessToken = (token: string) => {
   if (typeof window === 'undefined') {
     return;
   }
+  authExpired = false;
   window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
 };
 
@@ -64,6 +67,9 @@ const refreshClient: AxiosInstance = axios.create(env.api.defaultConfig);
 let refreshPromise: Promise<string | null> | null = null;
 
 export const refreshAccessToken = async (): Promise<string | null> => {
+  if (authExpired) {
+    return null;
+  }
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
@@ -77,6 +83,7 @@ export const refreshAccessToken = async (): Promise<string | null> => {
         }
         return token;
       } catch {
+        authExpired = true;
         dropStoredAccessToken();
         try {
           // Broadcast a global auth-expired signal for UI to react (toast, redirect, etc.)
@@ -117,7 +124,12 @@ apiClient.interceptors.response.use(
     const status = response.status;
     const originalRequest = config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/login')) {
+    if (
+      status === 401 &&
+      !authExpired &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/login')
+    ) {
       originalRequest._retry = true;
 
       try {

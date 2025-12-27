@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import AccessApi from '@/api/AccessApi';
 import FrostedButton from '@/components/ui/FrostedButton';
 
@@ -19,7 +19,7 @@ const ManageAccessModal: React.FC<Props> = ({ open, collectionId, onClose }) => 
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [p, a] = await Promise.all([
@@ -31,11 +31,11 @@ const ManageAccessModal: React.FC<Props> = ({ open, collectionId, onClose }) => 
     } finally {
       setLoading(false);
     }
-  };
+  }, [collectionId]);
 
   useEffect(() => {
     if (open) void load();
-  }, [open]);
+  }, [open, load]);
 
   const handleApprove = async (userId: string) => {
     setBusy(true);

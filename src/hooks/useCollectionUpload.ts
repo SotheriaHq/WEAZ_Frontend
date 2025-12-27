@@ -62,7 +62,7 @@ export function useCollectionUpload() {
         if (method === 'POST') {
           try {
             xhr.open('POST', entry.uploadUrl, true);
-          } catch (e) {
+          } catch {
             activeRequests.current.delete(xhr);
             return reject(new Error(`Invalid upload URL: ${entry.uploadUrl}`));
           }
@@ -77,7 +77,7 @@ export function useCollectionUpload() {
         } else {
           try {
             xhr.open('PUT', entry.uploadUrl, true);
-          } catch (e) {
+          } catch {
             activeRequests.current.delete(xhr);
             return reject(new Error(`Invalid upload URL: ${entry.uploadUrl}`));
           }

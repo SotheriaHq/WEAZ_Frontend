@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 // Types
 export interface ProductDetailData {
@@ -133,7 +134,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       setSelectedSize(null);
       setQuantity(1);
     }
-  }, [product?.id]);
+  }, [product]);
 
   // Update main image when color changes (if colorImages available)
   useEffect(() => {
@@ -338,11 +339,14 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   {/* Left - Image Gallery */}
                   <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 p-6">
                     {/* Main image */}
-                    <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg">
-                      <img
-                        src={product.images[selectedImage] || product.thumbnail}
+                    <div className="relative rounded-2xl overflow-y-auto shadow-lg">
+                      <MediaRenderer
+                        kind="image"
+                        src={product.images[selectedImage] || product.thumbnail || ''}
                         alt={product.name}
-                        className="w-full h-full object-cover"
+                        maxHeightClassName="max-h-[60vh]"
+                        className="rounded-2xl"
+                        mediaClassName="rounded-2xl"
                       />
                       
                       {/* Sale badge */}
@@ -372,13 +376,21 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           <button
                             key={i}
                             onClick={() => setSelectedImage(i)}
-                            className={`flex-shrink-0 w-16 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                            className={`flex-shrink-0 rounded-lg overflow-y-auto border-2 transition-all ${
                               selectedImage === i
                                 ? 'border-purple-500 ring-2 ring-purple-500/30'
                                 : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
                             }`}
                           >
-                            <img src={img} alt="" className="w-full h-full object-cover" />
+                            <MediaRenderer
+                              kind="image"
+                              src={img}
+                              alt=""
+                              maxHeightClassName="max-h-20"
+                              maxWidthClassName="max-w-16"
+                              className="rounded-lg"
+                              mediaClassName="rounded-lg"
+                            />
                           </button>
                         ))}
                       </div>
@@ -813,11 +825,14 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           onClick={() => onViewProduct?.(relProd)}
                           className="text-left group"
                         >
-                          <div className="aspect-[3/4] rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-900 mb-2 group-hover:ring-2 ring-purple-500 transition-all">
-                            <img
-                              src={relProd.thumbnail || relProd.images[0]}
+                          <div className="rounded-xl overflow-y-auto mb-2 group-hover:ring-2 ring-purple-500 transition-all">
+                            <MediaRenderer
+                              kind="image"
+                              src={relProd.thumbnail || relProd.images[0] || ''}
                               alt={relProd.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              maxHeightClassName="max-h-48"
+                              className="rounded-xl"
+                              mediaClassName="rounded-xl"
                             />
                           </div>
                           <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">

@@ -62,7 +62,7 @@ const UpdatePriceTagsModal: React.FC<Props> = ({ open, onClose, collectionId, cu
       } else {
         toast.error('Failed to update collection');
       }
-    } catch (e) {
+    } catch {
       toast.error('Failed to update collection');
     } finally {
       setSaving(false);

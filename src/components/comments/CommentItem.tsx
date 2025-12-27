@@ -7,6 +7,7 @@ import { CommentsApi } from '@/api/CommentsApi';
 import { toast } from 'sonner';
 import { useRealtime } from '@/realtime';
 import CommentInput from '@/components/ui/CommentInput';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 type Props = {
   comment: CommentV2Dto;
@@ -91,9 +92,17 @@ const CommentItem: React.FC<Props> = ({ comment, onLike, onReply, onDelete, curr
 
   return (
     <div className="flex gap-2 py-0.5">
-      <div className="h-8 w-8 rounded-full overflow-hidden bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+      <div className="max-h-8 max-w-8 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold">
         {comment.user?.profileImage ? (
-          <img src={comment.user.profileImage} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <MediaRenderer
+            kind="image"
+            src={comment.user.profileImage}
+            alt={comment.user?.username ?? 'User'}
+            maxHeightClassName="max-h-8"
+            maxWidthClassName="max-w-8"
+            className="rounded-full"
+            mediaClassName="rounded-full"
+          />
         ) : (
           <span>{(comment.user?.username ?? 'U').charAt(0).toUpperCase()}</span>
         )}

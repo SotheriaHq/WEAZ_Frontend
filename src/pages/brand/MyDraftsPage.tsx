@@ -8,6 +8,7 @@ import { brandApi } from '@/api/BrandApi';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Trash2, Eye } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface DraftCollection {
   id: string;
@@ -115,12 +116,13 @@ const MyDraftsPage: React.FC = () => {
               >
                 {/* Cover Image */}
                 {draft.coverImage && (
-                  <div className="relative h-48 bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/20 dark:to-blue-900/20">
-                    <img
+                  <div className="relative">
+                    <MediaRenderer
+                      kind="image"
                       src={draft.coverImage}
                       alt={draft.title}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
+                      maxHeightClassName="max-h-48"
+                      className="w-full"
                     />
                     <div className="absolute top-3 right-3">
                       <span className="px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-full">

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
+import MediaRenderer from '@/components/media/MediaRenderer';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -93,7 +94,7 @@ const DashboardHome: React.FC = () => {
       }
     };
     fetchData();
-  }, [user?.id, range]);
+  }, [user?.id, user?.brandFullName, user?.username, range]);
 
   if (loading && !overview) {
     return (
@@ -125,9 +126,17 @@ const DashboardHome: React.FC = () => {
       <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
         <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-white/10 flex items-center justify-center overflow-hidden">
+            <div className="max-w-12 max-h-12 rounded-xl border border-gray-200 dark:border-white/10 flex items-center justify-center">
               {store.logoUrl ? (
-                <img src={store.logoUrl} alt={store.name} className="w-full h-full object-cover" />
+                <MediaRenderer
+                  kind="image"
+                  src={store.logoUrl}
+                  alt={store.name}
+                  maxHeightClassName="max-h-12"
+                  maxWidthClassName="max-w-12"
+                  className="rounded-xl"
+                  mediaClassName="rounded-xl"
+                />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">
                   {store.name?.charAt(0) || 'S'}

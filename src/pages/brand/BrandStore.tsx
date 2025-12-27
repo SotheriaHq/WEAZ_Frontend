@@ -29,6 +29,7 @@ import StoreEmptyState from '@/components/designs/StoreEmptyState';
 import { FrostedButton } from '@/components/ui/FrostedButton';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { Tag } from '@/components/ui/Tag';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface BrandProfile {
   id: string;
@@ -132,7 +133,7 @@ const BrandStore: React.FC = () => {
   // Products data
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const [_page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [total, setTotal] = useState(0);
 
@@ -205,7 +206,7 @@ const BrandStore: React.FC = () => {
           }
         }
         setBrandError(false);
-      } catch (error) {
+      } catch {
         setBrandError(true);
         toast.error('Failed to load brand profile. Showing preview instead.');
         if (!brand && previewBrand) {
@@ -220,10 +221,11 @@ const BrandStore: React.FC = () => {
   }, [brandId, isAuth, navigate, buildBrandFromPreview, previewBrand, brand]);
 
   // Fetch products
-  const fetchProducts = useCallback(async (resetPage = false) => {
+  const fetchProducts = useCallback(async (opts?: { resetPage?: boolean; page?: number }) => {
     if (!brandId) return;
 
-    const currentPage = resetPage ? 1 : page;
+    const resetPage = Boolean(opts?.resetPage);
+    const currentPage = resetPage ? 1 : (opts?.page ?? 1);
     setProductsLoading(true);
 
     try {
@@ -261,11 +263,11 @@ const BrandStore: React.FC = () => {
     } finally {
       setProductsLoading(false);
     }
-  }, [brandId, page, search, sortBy, gender, minPrice, maxPrice, selectedSizes, selectedColors, onSale, activeTab]);
+  }, [brandId, search, sortBy, gender, minPrice, maxPrice, selectedSizes, selectedColors, onSale, activeTab]);
 
   useEffect(() => {
-    fetchProducts(true);
-  }, [sortBy, gender, minPrice, maxPrice, selectedSizes, selectedColors, onSale, activeTab, search]);
+    void fetchProducts({ resetPage: true });
+  }, [fetchProducts]);
 
   const handleFollow = async () => {
     if (!isAuth) {
@@ -283,14 +285,17 @@ const BrandStore: React.FC = () => {
         setIsFollowing(true);
         toast.success('Following');
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to update follow status');
     }
   };
 
   const handleLoadMore = () => {
-    setPage((prev) => prev + 1);
-    fetchProducts();
+    setPage((prev) => {
+      const next = prev + 1;
+      void fetchProducts({ page: next });
+      return next;
+    });
   };
 
   const toggleSize = (size: string) => {
@@ -344,16 +349,18 @@ const BrandStore: React.FC = () => {
         </div>
       )}
       {/* Banner */}
-      <div className="relative h-48 md:h-64 lg:h-72 overflow-hidden">
+      <div className="relative">
         {hasBannerImage ? (
-          <img
-            src={brand.bannerImage}
+          <MediaRenderer
+            kind="image"
+            src={brand.bannerImage!}
             alt={`${brand.brandFullName} banner`}
-            className="w-full h-full object-cover"
+            maxHeightClassName="max-h-48 md:max-h-64 lg:max-h-72"
+            className="w-full"
             onError={() => setBannerError(true)}
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-purple-900 via-purple-700 to-purple-500" />
+          <div className="h-48 md:h-64 lg:h-72 w-full bg-gradient-to-br from-purple-900 via-purple-700 to-purple-500" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
       </div>

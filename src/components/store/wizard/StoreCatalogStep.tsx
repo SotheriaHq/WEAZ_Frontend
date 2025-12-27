@@ -14,6 +14,7 @@ import {
   Check,
 } from 'lucide-react';
 import type { StoreWizardData, WizardCollection } from '@/types/storeWizard';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface StoreCatalogStepProps {
   data: StoreWizardData;
@@ -273,13 +274,13 @@ const StoreCatalogStep: React.FC<StoreCatalogStepProps> = ({
                   key={product.id}
                   className="relative group bg-white dark:bg-white/[0.03] border border-gray-200/50 dark:border-white/5 rounded-2xl overflow-hidden"
                 >
-                  <div className="aspect-square">
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                  <MediaRenderer
+                    kind="image"
+                    src={product.image}
+                    alt={product.name}
+                    maxHeightClassName="max-h-64"
+                    className="mx-auto"
+                  />
                   <div className="p-4">
                     <h3 className="font-medium text-gray-900 dark:text-white truncate">
                       {product.name}
@@ -353,12 +354,14 @@ const StoreCatalogStep: React.FC<StoreCatalogStepProps> = ({
                     key={collection.id}
                     className="relative group bg-white dark:bg-white/[0.03] border border-gray-200/50 dark:border-white/5 rounded-2xl overflow-hidden"
                   >
-                    <div className="aspect-video bg-gradient-to-br from-purple-600/20 to-blue-600/20 flex items-center justify-center">
+                    <div className="relative overflow-y-auto bg-gradient-to-br from-purple-600/20 to-blue-600/20 flex items-center justify-center">
                       {collection.coverImage ? (
-                        <img
+                        <MediaRenderer
+                          kind="image"
                           src={collection.coverImage}
                           alt={collection.name}
-                          className="w-full h-full object-cover"
+                          maxHeightClassName="max-h-40"
+                          className="mx-auto"
                         />
                       ) : (
                         <Layers className="w-12 h-12 text-purple-500/50" />

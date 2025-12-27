@@ -67,7 +67,7 @@ const CreateCollectionInner: React.FC = () => {
         if (mounted && Array.isArray(cats)) {
           const mapped = cats.map((c) => ({ id: c.id, slug: c.slug, name: c.name }));
           setCategories(mapped);
-          if (!categoryId && mapped.length) setCategoryId(mapped[0].id);
+          if (mapped.length) setCategoryId((prev) => prev || mapped[0].id);
         }
         
         // If edit mode, fetch collection details
@@ -111,7 +111,7 @@ const CreateCollectionInner: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [id, isEditMode]);
+  }, [id, isEditMode, mediaStore]);
 
   const isValid = title.trim().length > 0 && files.length > 0 && selectedTags.length > 0;
 

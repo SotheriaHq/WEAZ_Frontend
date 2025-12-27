@@ -67,6 +67,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
   const pendingJoins = useRef<Set<string>>(new Set());
   const [socketConnected, setSocketConnected] = useState(false);
   const failureCountRef = useRef(0);
+  const degradedRef = useRef(false);
   const [degraded, setDegraded] = useState(false);
 
   // Establish socket
@@ -81,20 +82,26 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
       reconnectionDelay: 500,
     });
     socketRef.current = s;
-  s.on('connect', () => setSocketConnected(true));
+    s.on('connect', () => setSocketConnected(true));
     s.on('disconnect', () => setSocketConnected(false));
 
     const onConnErr = () => {
       failureCountRef.current += 1;
-      if (failureCountRef.current >= 5 && !degraded) {
+      if (failureCountRef.current >= 5 && !degradedRef.current) {
+        degradedRef.current = true;
         setDegraded(true);
         try { (s.io as any).opts.reconnection = false; } catch {}
       }
     };
-  s.on('reconnect_error', onConnErr);
+    s.on('reconnect_error', onConnErr);
     s.on('reconnect_failed', onConnErr);
     s.on('error', onConnErr);
-  s.on('connect', () => { failureCountRef.current = 0; setDegraded(false); window.dispatchEvent(new CustomEvent('ws:restored')); });
+    s.on('connect', () => {
+      failureCountRef.current = 0;
+      degradedRef.current = false;
+      setDegraded(false);
+      window.dispatchEvent(new CustomEvent('ws:restored'));
+    });
     return () => {
       s.off('reconnect_error', onConnErr);
       s.off('reconnect_failed', onConnErr);

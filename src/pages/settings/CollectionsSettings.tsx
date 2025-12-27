@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
@@ -61,7 +61,7 @@ const CollectionsSettings: React.FC = () => {
     return () => clearTimeout(h);
   }, [search]);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!brandId) return;
     
     setLoading(true);
@@ -104,10 +104,10 @@ const CollectionsSettings: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [brandId, isBrand, tab, debouncedSearch, page, pageSize]);
 
   useEffect(() => { setPage(1); }, [tab]);
-  useEffect(() => { void refresh(); }, [brandId, tab, debouncedSearch, page, pageSize]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   const items = useMemo(() => {
     if (isBrand) {

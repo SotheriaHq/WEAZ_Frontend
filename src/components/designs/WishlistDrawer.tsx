@@ -15,6 +15,7 @@ import {
 } from '@/features/wishlistSlice';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 /**
  * WishlistDrawer Component
@@ -260,14 +261,16 @@ const WishlistDrawer: React.FC = () => {
 
                             {/* Image */}
                             <div
-                              className="aspect-square overflow-hidden cursor-pointer"
+                              className="relative overflow-y-auto cursor-pointer"
                               onClick={() => handleViewProduct(product.id)}
                             >
                               {product.thumbnail ? (
-                                <img
+                                <MediaRenderer
+                                  kind="image"
                                   src={product.thumbnail}
                                   alt={product.name}
-                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                  maxHeightClassName="max-h-48"
+                                  className="rounded-none"
                                 />
                               ) : (
                                 <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center">

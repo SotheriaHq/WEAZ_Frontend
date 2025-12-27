@@ -13,6 +13,7 @@ import {
   Eye,
 } from 'lucide-react';
 import type { WizardProduct, WizardCollection } from '@/types/storeWizard';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface CreateCollectionModalProps {
   isOpen: boolean;
@@ -206,7 +207,7 @@ const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
                 coverImage
                   ? 'border-gray-200 dark:border-zinc-700'
                   : 'border-gray-300 dark:border-zinc-700/50'
-              } ${coverImage ? 'h-48' : 'h-40'}`}
+              } ${coverImage ? '' : 'min-h-40'}`}
             >
               <input
                 id="cover-upload"
@@ -227,11 +228,13 @@ const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="relative h-full">
-                  <img
+                <div className="relative">
+                  <MediaRenderer
+                    kind="image"
                     src={coverImage}
                     alt="Cover preview"
-                    className="w-full h-full object-cover"
+                    maxHeightClassName="max-h-48"
+                    className="mx-auto"
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span className="text-white text-sm font-medium">
@@ -390,13 +393,13 @@ const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
                         : 'bg-gray-50 dark:bg-zinc-800/30 hover:bg-gray-100 dark:hover:bg-zinc-800/50'
                     }`}
                   >
-                    <div className="aspect-square">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
+                    <MediaRenderer
+                      kind="image"
+                      src={product.image}
+                      alt={product.name}
+                      maxHeightClassName="max-h-32"
+                      className="mx-auto"
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-3">
                       <p className="text-xs font-medium text-white truncate">
                         {product.name}
@@ -438,10 +441,14 @@ const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
                       className="flex items-center gap-3 bg-white dark:bg-zinc-800/50 rounded-lg p-3 cursor-move hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
                     >
                       <GripVertical className="w-4 h-4 text-gray-400 dark:text-zinc-600" />
-                      <img
+                      <MediaRenderer
+                        kind="image"
                         src={product.image}
                         alt={product.name}
-                        className="w-10 h-10 rounded-lg object-cover"
+                        maxHeightClassName="max-h-10"
+                        maxWidthClassName="max-w-10"
+                        className="rounded-lg"
+                        mediaClassName="rounded-lg"
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">

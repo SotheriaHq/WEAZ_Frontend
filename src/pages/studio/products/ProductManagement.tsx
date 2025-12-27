@@ -14,6 +14,7 @@ import {
   Box
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 // Define types matches the user's mockup data structure
 interface Product {
@@ -240,7 +241,15 @@ const ProductManagement: React.FC = () => {
                     {/* Product Info */}
                     <td className="p-4">
                       <div className="flex items-center gap-4">
-                        <img src={product.image} alt={product.name} className="w-16 h-16 rounded-lg object-cover border border-gray-200 dark:border-white/10" />
+                        <MediaRenderer
+                          kind="image"
+                          src={product.image}
+                          alt={product.name}
+                          maxHeightClassName="max-h-16"
+                          maxWidthClassName="max-w-16"
+                          className="rounded-lg border border-gray-200 dark:border-white/10"
+                          mediaClassName="rounded-lg"
+                        />
                         <div>
                           <div className="font-semibold text-gray-900 dark:text-white mb-1">{product.name}</div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">{product.sku}</div>

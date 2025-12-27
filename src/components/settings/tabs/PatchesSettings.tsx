@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../../../store';
 import { fetchPatches, respondToPatch } from '../../../features/patchesSlice';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 const PatchesSettings: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -98,8 +99,20 @@ const PatchesSettings: React.FC = () => {
                   {pending.map((patch) => (
                     <div key={patch.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-white/10">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
-                           {patch.partner.profileImage && <img src={patch.partner.profileImage} alt="" className="w-full h-full object-cover" />}
+                        <div className="max-h-10 max-w-10 rounded-full overflow-y-auto">
+                          {patch.partner.profileImage ? (
+                            <MediaRenderer
+                              kind="image"
+                              src={patch.partner.profileImage}
+                              alt=""
+                              maxHeightClassName="max-h-10"
+                              maxWidthClassName="max-w-10"
+                              className="rounded-full"
+                              mediaClassName="rounded-full"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800" />
+                          )}
                         </div>
                         <div>
                           <h3 className="font-medium text-gray-900 dark:text-white">{patch.partner.brandFullName || patch.partner.username}</h3>
@@ -127,8 +140,20 @@ const PatchesSettings: React.FC = () => {
                   {active.map((patch) => (
                     <div key={patch.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-white/10">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
-                            {patch.partner.profileImage && <img src={patch.partner.profileImage} alt="" className="w-full h-full object-cover" />}
+                        <div className="max-h-10 max-w-10 rounded-full overflow-y-auto">
+                          {patch.partner.profileImage ? (
+                            <MediaRenderer
+                              kind="image"
+                              src={patch.partner.profileImage}
+                              alt=""
+                              maxHeightClassName="max-h-10"
+                              maxWidthClassName="max-w-10"
+                              className="rounded-full"
+                              mediaClassName="rounded-full"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800" />
+                          )}
                         </div>
                         <div>
                           <h3 className="font-medium text-gray-900 dark:text-white">{patch.partner.brandFullName || patch.partner.username}</h3>
@@ -149,8 +174,20 @@ const PatchesSettings: React.FC = () => {
                   {history.map((patch) => (
                     <div key={patch.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-white/10 opacity-75">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
-                            {patch.partner.profileImage && <img src={patch.partner.profileImage} alt="" className="w-full h-full object-cover" />}
+                        <div className="max-h-10 max-w-10 rounded-full overflow-y-auto">
+                          {patch.partner.profileImage ? (
+                            <MediaRenderer
+                              kind="image"
+                              src={patch.partner.profileImage}
+                              alt=""
+                              maxHeightClassName="max-h-10"
+                              maxWidthClassName="max-w-10"
+                              className="rounded-full"
+                              mediaClassName="rounded-full"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800" />
+                          )}
                         </div>
                         <div>
                           <h3 className="font-medium text-gray-900 dark:text-white">{patch.partner.brandFullName || patch.partner.username}</h3>

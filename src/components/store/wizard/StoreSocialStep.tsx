@@ -155,7 +155,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
           [platform]: { status: 'valid' },
         }));
         toast.success(`${label} connected`);
-      } catch (error) {
+      } catch {
         setVerificationStatus((prev) => ({
           ...prev,
           [platform]: {

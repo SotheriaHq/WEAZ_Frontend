@@ -193,21 +193,18 @@ const StoreCreationWizard: React.FC = () => {
         setWizardData(nextData);
         try {
           const initialPayload = {
-            ...buildSavePayload('basic-info'),
-            ...{
-              name: nextData.name,
-              slug: nextData.slug,
-              categories: nextData.categories,
-              tagline: nextData.tagline,
-              description: nextData.description,
-              instagram: nextData.instagram,
-              tiktok: nextData.tiktok,
-              twitter: nextData.twitter,
-              website: nextData.website,
-              contactEmail: nextData.contactEmail,
-              tags: nextData.tags,
-              step: stepToNumber(currentStep),
-            },
+            name: nextData.name,
+            slug: nextData.slug,
+            categories: nextData.categories,
+            tagline: nextData.tagline,
+            description: nextData.description,
+            instagram: nextData.instagram,
+            tiktok: nextData.tiktok,
+            twitter: nextData.twitter,
+            website: nextData.website,
+            contactEmail: nextData.contactEmail,
+            tags: nextData.tags,
+            step: stepToNumber('basic-info'),
           };
           lastSavedPayloadRef.current = JSON.stringify(initialPayload);
         } catch {

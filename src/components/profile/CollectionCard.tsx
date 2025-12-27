@@ -7,6 +7,7 @@ import { brandApi } from '@/api/BrandApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@/components/ui/Dropdown';
 import ManageAccessModal from './ManageAccessModal';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface CollectionCardProps {
   collection: CollectionDto;
@@ -166,24 +167,27 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
               const isVideo = resolvedCover.match(/\.(mp4|webm|mov|m4v)($|\?)/i);
               if (isVideo) {
                 return (
-                  <video
+                  <MediaRenderer
+                    kind="video"
                     src={resolvedCover}
-                    className={`block w-full object-cover transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-                    style={{ minHeight: '320px' }}
+                    controls={false}
                     autoPlay
                     muted
                     loop
                     playsInline
+                    maxHeightClassName="max-h-[320px]"
+                    className={`w-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
                     onLoadedData={() => setImgLoaded(true)}
                   />
                 );
               }
               return (
-                <img 
-                  src={resolvedCover} 
-                  alt={title} 
-                  className={`block w-full object-cover transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-                  style={{ minHeight: '320px' }}
+                <MediaRenderer
+                  kind="image"
+                  src={resolvedCover}
+                  alt={title}
+                  maxHeightClassName="max-h-[320px]"
+                  className={`w-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
                   onLoad={() => setImgLoaded(true)}
                 />
               );

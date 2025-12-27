@@ -3,6 +3,7 @@ import { X, Tag as TagIcon, Eye, Heart, MessageCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { MarketMedia } from "@/types/market";
 import { formatPrice } from "@/utils/helpers";
+import MediaRenderer from "@/components/media/MediaRenderer";
 
 // Minimal shape derived from backend /collections/:id
 type CollectionDetail = {
@@ -170,12 +171,15 @@ const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose
                       <button
                         key={item.fileId}
                         onClick={() => onViewMedia?.(item.fileId)}
-                        className="group relative aspect-square rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-900 hover:ring-2 ring-purple-500 transition-all"
+                        className="group relative rounded-2xl overflow-y-auto hover:ring-2 ring-purple-500 transition-all"
                       >
-                        <img
+                        <MediaRenderer
+                          kind="image"
                           src={item.url || ''}
                           alt=""
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          maxHeightClassName="max-h-48"
+                          className="rounded-2xl"
+                          mediaClassName="rounded-2xl"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                       </button>

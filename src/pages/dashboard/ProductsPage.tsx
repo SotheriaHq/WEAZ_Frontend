@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import {
@@ -24,23 +24,23 @@ const ProductsPage: React.FC = () => {
     description: '',
   });
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
     try {
       const res = await getBrandProductsForOwner(user.id, 100);
       const items = (res as any)?.items || (res as any)?.data || [];
       setProducts(items);
-    } catch (error) {
+    } catch {
       toast.error('Failed to load products');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
-    loadProducts();
-  }, [user?.id]);
+    void loadProducts();
+  }, [loadProducts]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +48,7 @@ const ProductsPage: React.FC = () => {
       await createProduct(form);
       toast.success('Product created');
       setForm({ collectionId: '', name: '', price: 0, totalStock: 0, description: '' });
-      loadProducts();
+      void loadProducts();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to create product');
     }
@@ -58,7 +58,7 @@ const ProductsPage: React.FC = () => {
     try {
       await updateProduct(productId, changes);
       toast.success('Product updated');
-      loadProducts();
+      void loadProducts();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Update failed');
     }
@@ -69,7 +69,7 @@ const ProductsPage: React.FC = () => {
     try {
       await deleteProduct(productId);
       toast.success('Product deleted');
-      loadProducts();
+      void loadProducts();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Delete failed');
     }
