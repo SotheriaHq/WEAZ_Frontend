@@ -22,6 +22,9 @@ export interface MediaRendererProps {
   /** Constrain width only; avoids huge wide media breaking layouts. */
   maxWidthClassName?: string;
 
+  /** Opt-in vertical scrolling for very tall media (default: false). */
+  allowScroll?: boolean;
+
   /** Video options (ignored for images). */
   controls?: boolean;
   autoPlay?: boolean;
@@ -56,6 +59,7 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
   mediaClassName,
   maxHeightClassName = 'max-h-[70vh]',
   maxWidthClassName = 'max-w-full',
+  allowScroll = false,
   controls = true,
   autoPlay = false,
   playsInline = true,
@@ -69,7 +73,13 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
   imgRef,
   videoRef,
 }) => {
-  const frameClassName = cn('media-frame media-frame-cap', maxHeightClassName, maxWidthClassName, className);
+  const frameClassName = cn(
+    'media-frame media-frame-cap',
+    allowScroll ? 'media-frame-scroll' : undefined,
+    maxHeightClassName,
+    maxWidthClassName,
+    className
+  );
   const elementClassName = cn('media-intrinsic', mediaClassName);
 
   if (kind === 'video') {

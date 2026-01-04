@@ -186,7 +186,11 @@ html {
     - Do NOT apply backgrounds/padding/object-fit boxing around media surfaces.
   */
   .media-frame {
-    @apply w-fit max-w-full overflow-y-auto;
+    @apply w-fit max-w-full overflow-hidden;
+  }
+
+  .media-frame-scroll {
+    @apply overflow-y-auto;
   }
 
   .media-frame-cap {

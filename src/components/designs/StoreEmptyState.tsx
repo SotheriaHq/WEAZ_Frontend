@@ -5,9 +5,11 @@ import { useNavigate } from 'react-router-dom';
 
 export type EmptyStateType = 
   | 'no-products'           // Brand has no products yet
+  | 'no-collections'        // Brand has no collections yet
   | 'no-results'            // Filters returned nothing
   | 'brand-not-found'       // Brand doesn't exist
   | 'store-setup'           // Brand needs to set up store (owner view)
+  | 'store-not-setup'       // Owner store is not configured/live yet
   | 'coming-soon'           // Store is being prepared
   | 'empty-cart'            // Cart is empty
   | 'empty-wishlist';       // Wishlist is empty
@@ -34,6 +36,13 @@ const EMPTY_STATES: Record<EmptyStateType, {
     description: 'This store is just getting started. Check back soon for amazing fashion pieces!',
     actionLabel: 'Explore Other Stores',
   },
+  'no-collections': {
+    icon: <Package size={48} className="text-purple-400" />,
+    emoji: '🧵',
+    title: 'No collections yet',
+    description: 'This brand hasn\'t published any collections yet. Check back soon!',
+    actionLabel: 'Go to Marketplace',
+  },
   'no-results': {
     icon: <Search size={48} className="text-gray-400" />,
     emoji: '🔍',
@@ -54,6 +63,13 @@ const EMPTY_STATES: Record<EmptyStateType, {
     title: 'Set up your store',
     description: 'Your store is ready to go! Add your first products and start selling your amazing fashion pieces.',
     actionLabel: 'Add Your First Product',
+  },
+  'store-not-setup': {
+    icon: <Store size={48} className="text-purple-500" />,
+    emoji: '✨',
+    title: 'Finish your store setup',
+    description: 'Complete your store setup to publish your store and start selling.',
+    actionLabel: 'Continue store setup',
   },
   'coming-soon': {
     icon: <ShoppingBag size={48} className="text-purple-400" />,
@@ -127,6 +143,9 @@ const StoreEmptyState: React.FC<StoreEmptyStateProps> = ({
         break;
       case 'brand-not-found':
         navigate('/market');
+        break;
+      case 'store-not-setup':
+        navigate('/store/essentials');
         break;
       case 'store-setup':
         navigate('/profile/collections/create');

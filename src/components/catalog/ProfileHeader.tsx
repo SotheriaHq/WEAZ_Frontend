@@ -27,7 +27,7 @@ interface ProfileHeaderProps {
     tags: string[];
   };
   canEdit?: boolean;
-  storeId?: string | null;
+  brandId?: string | null;
   onEditProfile?: () => void;
   onShareProfile?: () => void;
   onEditAvatar?: () => void;
@@ -59,7 +59,7 @@ const ActionButton: React.FC<{
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   profileData,
   canEdit = false,
-  storeId,
+  brandId,
   onEditProfile,
   onShareProfile,
   onEditAvatar,
@@ -93,21 +93,20 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     <div className="w-full">
       <div className="relative rounded-3xl">
         {hasBannerImage ? (
-          <>
-            <div className="flex items-center justify-center">
-              <MediaRenderer
-                kind="image"
-                src={profileData.banner}
-                alt={`${profileData.name} banner`}
-                maxHeightClassName="max-h-64"
-                onLoad={() => setIsBannerImageLoading(false)}
-                onError={() => {
-                  setBannerFailed(true);
-                  setIsBannerImageLoading(false);
-                }}
-              />
-            </div>
-          </>
+          <MediaRenderer
+            kind="image"
+            src={profileData.banner}
+            alt={`${profileData.name} banner`}
+            className="w-full h-64 rounded-3xl overflow-hidden"
+            maxHeightClassName="max-h-64"
+            maxWidthClassName="max-w-full"
+            mediaClassName="w-full h-full object-cover"
+            onLoad={() => setIsBannerImageLoading(false)}
+            onError={() => {
+              setBannerFailed(true);
+              setIsBannerImageLoading(false);
+            }}
+          />
         ) : (
           <div className="h-64 rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex items-center justify-center p-6">
               <div className="max-w-3xl w-full rounded-3xl border border-white/15 bg-white/10 backdrop-blur-md shadow-2xl px-6 py-4 text-center">
@@ -231,8 +230,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </div>
 
           {/* 🔧 FIX #4: Reduced bottom margin from mb-16 to mb-6 */}
-          <div className="flex gap-2 self-end sm:self-end mb-24 ">
-            {canEdit && storeId ? <StoreAccessButton hasStore={true} storeId={storeId} /> : null}
+          <div className="flex gap-2 self-end sm:self-end mb-6">
+            {canEdit ? <StoreAccessButton brandId={brandId ?? null} /> : null}
             {canEdit ? (
               <ActionButton
                 Icon={FiEdit2}

@@ -30,6 +30,10 @@ import { FrostedButton } from '@/components/ui/FrostedButton';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { Tag } from '@/components/ui/Tag';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import StoreSetupRequiredGate from '@/components/store/StoreSetupRequiredGate';
+import { getStoreStatus, type StoreStatusResponse } from '@/api/StoreApi';
+import { brandApi } from '@/api/BrandApi';
+import type { CollectionDto } from '@/types/profile';
 
 interface BrandProfile {
   id: string;
@@ -102,6 +106,9 @@ const BrandStore: React.FC = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [brandError, setBrandError] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
+  const [storeNotSetup, setStoreNotSetup] = useState(false);
+  const [storeStatus, setStoreStatus] = useState<StoreStatusResponse | null>(null);
+  const [storeStatusLoading, setStoreStatusLoading] = useState(false);
   const previewBrand = (location.state as { brandPreview?: Partial<BrandProfile> } | undefined)?.brandPreview;
 
   const buildBrandFromPreview = useCallback(
@@ -137,6 +144,10 @@ const BrandStore: React.FC = () => {
   const [hasMore, setHasMore] = useState(false);
   const [total, setTotal] = useState(0);
 
+  // Collections
+  const [collections, setCollections] = useState<CollectionDto[]>([]);
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
+
   // Filters
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch] = useState('');
@@ -149,8 +160,11 @@ const BrandStore: React.FC = () => {
   const [onSale, setOnSale] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Active tab
-  const [activeTab, setActiveTab] = useState('all');
+  // Sections
+  const [activeSection, setActiveSection] = useState<'products' | 'collections' | 'about' | 'reviews'>('products');
+
+  // Product chips (quick presets)
+  const [productChip, setProductChip] = useState<'all' | 'new' | 'sale'>('all');
 
   // Check if any filters are active
   const hasActiveFilters = Boolean(
@@ -172,8 +186,18 @@ const BrandStore: React.FC = () => {
     setSelectedSizes([]);
     setSelectedColors([]);
     setOnSale(false);
-    setActiveTab('all');
+    setProductChip('all');
   };
+
+  // Keep chip UI reasonably in sync with core filters
+  useEffect(() => {
+    if (onSale && productChip !== 'sale') setProductChip('sale');
+    if (!onSale && productChip === 'sale') setProductChip('all');
+  }, [onSale, productChip]);
+
+  useEffect(() => {
+    if (productChip === 'new' && sortBy !== 'newest') setProductChip('all');
+  }, [sortBy, productChip]);
 
   useEffect(() => {
     setBannerError(false);
@@ -242,28 +266,43 @@ const BrandStore: React.FC = () => {
       if (selectedSizes.length) params.sizes = selectedSizes.join(',');
       if (selectedColors.length) params.colors = selectedColors.join(',');
       if (onSale) params.onSale = 'true';
-      if (activeTab === 'sale') params.onSale = 'true';
 
-      const response = await apiClient.get<ProductsResponse>(`/brands/${brandId}/products`, { params });
+      const response = await apiClient.get<Partial<ProductsResponse>>(`/brands/${brandId}/products`, { params });
+
+      const items = Array.isArray(response.data?.items) ? response.data.items : [];
+      const totalCount = typeof response.data?.total === 'number' ? response.data.total : items.length;
+      const hasNextPage = Boolean(response.data?.hasNextPage);
 
       if (resetPage) {
-        setProducts(response.data.items);
+        setProducts(items);
         setPage(1);
       } else {
-        setProducts((prev) => (currentPage === 1 ? response.data.items : [...prev, ...response.data.items]));
+        setProducts((prev) => (currentPage === 1 ? items : [...prev, ...items]));
       }
 
-      setTotal(response.data.total);
-      setHasMore(response.data.hasNextPage);
+      setTotal(totalCount);
+      setHasMore(hasNextPage);
       setProductsError(null);
+      setStoreNotSetup(false);
     } catch (error) {
       const message = (error as any)?.response?.data?.message ?? 'Failed to load products';
-      setProductsError(message);
-      toast.error(message);
+      if (typeof message === 'string' && message.toLowerCase().includes('store is closed')) {
+        setStoreNotSetup(true);
+        setProductsError(null);
+        setProducts([]);
+        setTotal(0);
+        setHasMore(false);
+      } else {
+        setProductsError(message);
+        toast.error(message);
+        setProducts([]);
+        setTotal(0);
+        setHasMore(false);
+      }
     } finally {
       setProductsLoading(false);
     }
-  }, [brandId, search, sortBy, gender, minPrice, maxPrice, selectedSizes, selectedColors, onSale, activeTab]);
+  }, [brandId, search, sortBy, gender, minPrice, maxPrice, selectedSizes, selectedColors, onSale]);
 
   useEffect(() => {
     void fetchProducts({ resetPage: true });
@@ -310,11 +349,66 @@ const BrandStore: React.FC = () => {
     );
   };
 
-  const formatNumber = (num: number) => {
+  const formatNumber = (value: unknown) => {
+    if (value === null || value === undefined) return '0';
+
+    let num: number;
+    try {
+      if (typeof value === 'number') num = value;
+      else if (typeof value === 'bigint') num = Number(value);
+      else if (typeof value === 'string') num = Number(value.replace(/,/g, '').trim());
+      else if (typeof value === 'boolean') num = value ? 1 : 0;
+      else num = Number(value);
+    } catch {
+      return '0';
+    }
+
+    if (!Number.isFinite(num)) return '0';
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-    return num.toString();
+    return String(num);
   };
+
+  const isOwnStore = currentUser?.id === brandId;
+
+  // Collections: best-effort (backend may require auth; BrandApi returns [] on error)
+  useEffect(() => {
+    if (!brandId) return;
+
+    const run = async () => {
+      setCollectionsLoading(true);
+      try {
+        const visibility = isOwnStore ? 'all' : 'public';
+        const items = await brandApi.getCollections(brandId, { visibility });
+        setCollections(items);
+      } finally {
+        setCollectionsLoading(false);
+      }
+    };
+
+    void run();
+  }, [brandId, isOwnStore]);
+
+  // Fetch store status for brand owners, to gate access until setup is complete.
+  useEffect(() => {
+    if (!isOwnStore) return;
+    if (!currentUser || currentUser.type !== 'BRAND') return;
+
+    const run = async () => {
+      setStoreStatusLoading(true);
+      try {
+        const status = await getStoreStatus();
+        setStoreStatus(status);
+      } catch {
+        // Non-blocking: store status is brand-only. If it fails, the store page can still render.
+        setStoreStatus(null);
+      } finally {
+        setStoreStatusLoading(false);
+      }
+    };
+
+    void run();
+  }, [isOwnStore, currentUser]);
 
   if (brandLoading && !brand) {
     return (
@@ -336,13 +430,33 @@ const BrandStore: React.FC = () => {
     );
   }
 
-  if (!brand) return null;
-
-  const isOwnStore = currentUser?.id === brandId;
+  if (!brand) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <StoreEmptyState type="brand-not-found" />
+        </div>
+      </div>
+    );
+  }
   const hasBannerImage = Boolean(brand.bannerImage) && !bannerError;
+
+  const shouldShowSetupGate =
+    isOwnStore &&
+    currentUser?.type === 'BRAND' &&
+    Boolean(storeStatus) &&
+    storeStatus?.isSetupComplete === false;
 
   return (
     <div className="min-h-screen bg-white dark:bg-black">
+      <StoreSetupRequiredGate
+        open={shouldShowSetupGate && !storeStatusLoading}
+        missingFields={storeStatus?.missingFields ?? []}
+        tagsSelectedCount={storeStatus?.profile?.tags?.length ?? 0}
+        onGoBack={() => navigate(-1)}
+        onCompleteSetup={() => navigate('/store/essentials')}
+      />
+
       {brandError && (
         <div className="mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 shadow-sm">
           We had a problem loading the full brand profile. Showing available preview information.
@@ -446,7 +560,7 @@ const BrandStore: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-6 mt-4 text-sm text-gray-600 dark:text-gray-400">
                   <span className="flex items-center gap-1.5">
                     <Users size={16} />
-                    <strong className="text-gray-900 dark:text-white">{formatNumber(brand.followersCount)}</strong> Followers
+                    <strong className="text-gray-900 dark:text-white">{formatNumber(brand.followersCount ?? 0)}</strong> Followers
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Package size={16} />
@@ -456,13 +570,13 @@ const BrandStore: React.FC = () => {
                     <span className="flex items-center gap-1.5">
                       <Star size={16} className="text-yellow-500" />
                       <strong className="text-gray-900 dark:text-white">{brand.rating.toFixed(1)}</strong>
-                      {brand.reviewsCount && <span>({formatNumber(brand.reviewsCount)} reviews)</span>}
+                      {brand.reviewsCount && <span>({formatNumber(brand.reviewsCount ?? 0)} reviews)</span>}
                     </span>
                   )}
                   {brand.ordersCount && (
                     <span className="flex items-center gap-1.5">
                       <ShoppingBag size={16} />
-                      <strong className="text-gray-900 dark:text-white">{formatNumber(brand.ordersCount)}</strong> Orders
+                      <strong className="text-gray-900 dark:text-white">{formatNumber(brand.ordersCount ?? 0)}</strong> Orders
                     </span>
                   )}
                 </div>
@@ -507,255 +621,470 @@ const BrandStore: React.FC = () => {
 
         {/* Navigation Tabs & Controls */}
         <div className="sticky top-16 z-30 -mx-4 px-4 py-3 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-gray-200 dark:border-white/10">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            {/* Tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
-              {['all', 'collections', 'new', 'sale'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${
-                    activeTab === tab
-                      ? 'bg-purple-600 text-white'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  {tab === 'all' ? 'All Products' : tab === 'new' ? 'New Arrivals' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              {/* Main Tabs */}
+              <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
+                {(
+                  [
+                    { key: 'products', label: 'Products' },
+                    { key: 'collections', label: 'Collections' },
+                    { key: 'about', label: 'About' },
+                    { key: 'reviews', label: 'Reviews' },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveSection(tab.key)}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${
+                      activeSection === tab.key
+                        ? 'bg-purple-600 text-white'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Controls (Products only) */}
+              {activeSection === 'products' && (
+                <div className="flex items-center gap-3">
+                  {/* Search */}
+                  <div className="relative">
+                    <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search products..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="pl-10 pr-4 py-2 w-48 lg:w-64 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+
+                  {/* Filter Toggle */}
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                      showFilters
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-purple-500'
+                    }`}
+                  >
+                    <Filter size={16} />
+                    Filters
+                  </button>
+
+                  {/* View Toggle */}
+                  <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      className={`p-2 ${viewMode === 'grid' ? 'bg-purple-600 text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                    >
+                      <Grid3X3 size={18} />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`p-2 ${viewMode === 'list' ? 'bg-purple-600 text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                    >
+                      <List size={18} />
+                    </button>
+                  </div>
+
+                  {/* Sort */}
+                  <div className="relative">
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="appearance-none pl-4 pr-10 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      {SORT_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Controls */}
-            <div className="flex items-center gap-3">
-              {/* Search */}
-              <div className="relative">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-48 lg:w-64 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
+            {/* Product chips */}
+            {activeSection === 'products' && (
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+                {(
+                  [
+                    { key: 'all', label: 'All' },
+                    { key: 'new', label: 'New' },
+                    { key: 'sale', label: 'Sale' },
+                  ] as const
+                ).map((chip) => (
+                  <button
+                    key={chip.key}
+                    onClick={() => {
+                      setProductChip(chip.key);
+                      if (chip.key === 'all') {
+                        setOnSale(false);
+                      }
+                      if (chip.key === 'new') {
+                        setOnSale(false);
+                        setSortBy('newest');
+                      }
+                      if (chip.key === 'sale') {
+                        setOnSale(true);
+                      }
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                      productChip === chip.key
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white/60 dark:bg-white/5 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:border-purple-500/50'
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
               </div>
-
-              {/* Filter Toggle */}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                  showFilters
-                    ? 'bg-purple-600 text-white border-purple-600'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-purple-500'
-                }`}
-              >
-                <Filter size={16} />
-                Filters
-              </button>
-
-              {/* View Toggle */}
-              <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 ${viewMode === 'grid' ? 'bg-purple-600 text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                >
-                  <Grid3X3 size={18} />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 ${viewMode === 'list' ? 'bg-purple-600 text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                >
-                  <List size={18} />
-                </button>
-              </div>
-
-              {/* Sort */}
-              <div className="relative">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="appearance-none pl-4 pr-10 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  {SORT_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex gap-6 py-6">
-          {/* Filter Sidebar */}
-          {showFilters && (
-            <aside className="hidden lg:block w-64 flex-shrink-0">
-              <div className="sticky top-36 glass-panel bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl rounded-xl p-5 border border-white/20 dark:border-white/10">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-gray-900 dark:text-white">Filters</h3>
-                  <button
-                    onClick={clearFilters}
-                    className="text-sm text-purple-600 hover:text-purple-700"
-                  >
-                    Clear All
-                  </button>
-                </div>
-
-                {/* Gender */}
-                <div className="mb-6">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Gender</h4>
-                  <div className="space-y-2">
-                    {GENDER_OPTIONS.map((opt) => (
-                      <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="gender"
-                          value={opt.value}
-                          checked={gender === opt.value}
-                          onChange={(e) => setGender(e.target.value)}
-                          className="w-4 h-4 text-purple-600"
-                        />
-                        <span className="text-sm text-gray-600 dark:text-gray-400">{opt.label}</span>
-                      </label>
-                    ))}
+        {activeSection === 'products' && (
+          <div className="flex gap-6 py-6">
+            {/* Filter Sidebar */}
+            {showFilters && (
+              <aside className="hidden lg:block w-64 flex-shrink-0">
+                <div className="sticky top-36 glass-panel bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl rounded-xl p-5 border border-white/20 dark:border-white/10">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Filters</h3>
+                    <button onClick={clearFilters} className="text-sm text-purple-600 hover:text-purple-700">
+                      Clear All
+                    </button>
                   </div>
-                </div>
 
-                {/* Price Range */}
-                <div className="mb-6">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Price Range</h4>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      placeholder="₦0"
-                      value={minPrice || ''}
-                      onChange={(e) => setMinPrice(e.target.value ? Number(e.target.value) : undefined)}
-                      className="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
-                    />
-                    <span className="text-gray-400">-</span>
-                    <input
-                      type="number"
-                      placeholder="₦500,000"
-                      value={maxPrice || ''}
-                      onChange={(e) => setMaxPrice(e.target.value ? Number(e.target.value) : undefined)}
-                      className="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
-                    />
+                  {/* Gender */}
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Gender</h4>
+                    <div className="space-y-2">
+                      {GENDER_OPTIONS.map((opt) => (
+                        <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="gender"
+                            value={opt.value}
+                            checked={gender === opt.value}
+                            onChange={(e) => setGender(e.target.value)}
+                            className="w-4 h-4 text-purple-600"
+                          />
+                          <span className="text-sm text-gray-600 dark:text-gray-400">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Sizes */}
-                <div className="mb-6">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Size</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {SIZE_OPTIONS.map((size) => (
-                      <button
-                        key={size}
-                        onClick={() => toggleSize(size)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                          selectedSizes.includes(size)
-                            ? 'bg-purple-600 text-white border-purple-600'
-                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-purple-500'
-                        }`}
-                      >
-                        {size}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Colors */}
-                <div className="mb-6">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Color</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {COLOR_OPTIONS.map((color) => (
-                      <button
-                        key={color.name}
-                        onClick={() => toggleColor(color.name)}
-                        className={`w-8 h-8 rounded-full border-2 transition-all ${
-                          selectedColors.includes(color.name)
-                            ? 'border-purple-600 scale-110'
-                            : 'border-gray-300 dark:border-gray-600 hover:scale-105'
-                        }`}
-                        style={{ backgroundColor: color.hex }}
-                        title={color.name}
+                  {/* Price Range */}
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Price Range</h4>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        placeholder="₦0"
+                        value={minPrice || ''}
+                        onChange={(e) => setMinPrice(e.target.value ? Number(e.target.value) : undefined)}
+                        className="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
                       />
+                      <span className="text-gray-400">-</span>
+                      <input
+                        type="number"
+                        placeholder="₦500,000"
+                        value={maxPrice || ''}
+                        onChange={(e) => setMaxPrice(e.target.value ? Number(e.target.value) : undefined)}
+                        className="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sizes */}
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Size</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {SIZE_OPTIONS.map((size) => (
+                        <button
+                          key={size}
+                          onClick={() => toggleSize(size)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                            selectedSizes.includes(size)
+                              ? 'bg-purple-600 text-white border-purple-600'
+                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-purple-500'
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Colors */}
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Color</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {COLOR_OPTIONS.map((color) => (
+                        <button
+                          key={color.name}
+                          onClick={() => toggleColor(color.name)}
+                          className={`w-8 h-8 rounded-full border-2 transition-all ${
+                            selectedColors.includes(color.name)
+                              ? 'border-purple-600 scale-110'
+                              : 'border-gray-300 dark:border-gray-600 hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: color.hex }}
+                          title={color.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* On Sale */}
+                  <div className="mb-6">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={onSale}
+                        onChange={(e) => setOnSale(e.target.checked)}
+                        className="w-5 h-5 rounded text-purple-600"
+                      />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">On Sale</span>
+                    </label>
+                  </div>
+
+                  <FrostedButton variant="primary" className="w-full" onClick={() => fetchProducts(true)}>
+                    Apply Filters
+                  </FrostedButton>
+                </div>
+              </aside>
+            )}
+
+            {/* Product Grid */}
+            <main className="flex-1 min-w-0">
+              {productsError && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 shadow-sm">
+                  {productsError}
+                </div>
+              )}
+
+              {storeNotSetup ? (
+                <StoreEmptyState
+                  type={isOwnStore ? 'store-not-setup' : 'coming-soon'}
+                  brandName={brand?.brandFullName}
+                  isOwner={isOwnStore}
+                />
+              ) : (
+                <>
+                  {/* Featured Collections (best-effort) */}
+                  {!collectionsLoading && collections.length > 0 && (
+                    <section className="mb-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Featured Collections</h2>
+                        <button
+                          onClick={() => setActiveSection('collections')}
+                          className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
+                        >
+                          View all
+                        </button>
+                      </div>
+                      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+                        {collections.slice(0, 3).map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => navigate(`/collections/${c.id}`)}
+                            className="text-left rounded-2xl overflow-hidden border border-white/10 bg-white/5 dark:bg-white/[0.03] backdrop-blur-sm hover:border-purple-500/30 transition-colors"
+                          >
+                            <div className="relative h-28 bg-gradient-to-br from-purple-900/40 via-purple-700/20 to-black/20">
+                              {c.coverImage ? (
+                                <MediaRenderer kind="image" src={c.coverImage} alt={c.title || c.name} maxHeightClassName="max-h-28" className="w-full h-28 object-cover" />
+                              ) : (
+                                <div className="w-full h-28" />
+                              )}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                            </div>
+                            <div className="p-4">
+                              <div className="font-semibold text-gray-900 dark:text-white line-clamp-1">{c.title || c.name}</div>
+                              {c.description && (
+                                <div className="mt-1 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{c.description}</div>
+                              )}
+                              <div className="mt-3 text-xs text-gray-600 dark:text-gray-400 flex items-center gap-3">
+                                <span className="flex items-center gap-1"><Package size={14} />{c.itemCount ?? 0}</span>
+                                <span className="flex items-center gap-1"><Star size={14} />{formatNumber(c.likesCount ?? 0)}</span>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Results count */}
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Showing <strong className="text-gray-900 dark:text-white">{products.length}</strong> of{' '}
+                    <strong className="text-gray-900 dark:text-white">{total}</strong> products
+                  </p>
+
+                  {productsLoading && products.length === 0 ? (
+                    <ProductCardSkeleton count={8} viewMode={viewMode} />
+                  ) : products.length === 0 ? (
+                    <StoreEmptyState
+                      type={hasActiveFilters ? 'no-results' : 'no-products'}
+                      brandName={brand?.brandFullName}
+                      isOwner={isOwnStore}
+                      onClearFilters={clearFilters}
+                      onAction={hasActiveFilters ? clearFilters : undefined}
+                    />
+                  ) : (
+                    <>
+                      <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-1'}`}>
+                        {products.map((product) => (
+                          <StoreProductCard
+                            key={product.id}
+                            product={product}
+                            onViewProduct={(p) => navigate(`/products/${p.id}`)}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Load More */}
+                      {hasMore && (
+                        <div className="flex justify-center mt-8">
+                          <FrostedButton variant="ghost" onClick={handleLoadMore} disabled={productsLoading}>
+                            {productsLoading ? 'Loading...' : 'Load More Products'}
+                          </FrostedButton>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+            </main>
+          </div>
+        )}
+
+        {activeSection === 'collections' && (
+          <div className="py-6">
+            {collectionsLoading ? (
+              <div className="text-sm text-gray-600 dark:text-gray-400">Loading collections…</div>
+            ) : collections.length === 0 ? (
+              <StoreEmptyState type="no-collections" brandName={brand?.brandFullName} isOwner={isOwnStore} />
+            ) : (
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                {collections.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => navigate(`/collections/${c.id}`)}
+                    className="text-left rounded-2xl overflow-hidden border border-white/10 bg-white/5 dark:bg-white/[0.03] backdrop-blur-sm hover:border-purple-500/30 transition-colors"
+                  >
+                    <div className="relative h-36 bg-gradient-to-br from-purple-900/40 via-purple-700/20 to-black/20">
+                      {c.coverImage ? (
+                        <MediaRenderer kind="image" src={c.coverImage} alt={c.title || c.name} maxHeightClassName="max-h-36" className="w-full h-36 object-cover" />
+                      ) : (
+                        <div className="w-full h-36" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                    </div>
+                    <div className="p-5">
+                      <div className="font-semibold text-gray-900 dark:text-white line-clamp-1">{c.title || c.name}</div>
+                      {c.description && (
+                        <div className="mt-1 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{c.description}</div>
+                      )}
+                      <div className="mt-3 text-xs text-gray-600 dark:text-gray-400 flex items-center gap-4">
+                        <span className="flex items-center gap-1"><Package size={14} />{c.itemCount ?? 0}</span>
+                        <span className="flex items-center gap-1"><Star size={14} />{formatNumber(c.likesCount ?? 0)}</span>
+                        <span className="flex items-center gap-1"><MessageCircle size={14} />{formatNumber(c.commentsCount ?? 0)}</span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeSection === 'about' && (
+          <div className="py-6">
+            <div className="glass-panel bg-white/80 dark:bg-gray-950/70 backdrop-blur-xl rounded-2xl p-6 border border-white/20 dark:border-white/10">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">About</h2>
+              {brand.brandDescription ? (
+                <p className="mt-3 text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">{brand.brandDescription}</p>
+              ) : (
+                <p className="mt-3 text-gray-600 dark:text-gray-400">No brand description yet.</p>
+              )}
+
+              {(brand.brandCity || brand.brandCountry) && (
+                <div className="mt-5 flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                  <MapPin size={16} />
+                  <span>{[brand.brandCity, brand.brandState, brand.brandCountry].filter(Boolean).join(', ')}</span>
+                </div>
+              )}
+
+              {(brand.brandTags?.length ?? 0) > 0 && (
+                <div className="mt-5">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white mb-2">Tags</div>
+                  <div className="flex flex-wrap gap-2">
+                    {brand.brandTags.slice(0, 12).map((tag) => (
+                      <Tag key={tag} label={tag} size="sm" />
                     ))}
                   </div>
                 </div>
+              )}
 
-                {/* On Sale */}
-                <div className="mb-6">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={onSale}
-                      onChange={(e) => setOnSale(e.target.checked)}
-                      className="w-5 h-5 rounded text-purple-600"
-                    />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">On Sale</span>
-                  </label>
-                </div>
-
-                <FrostedButton variant="primary" className="w-full" onClick={() => fetchProducts(true)}>
-                  Apply Filters
-                </FrostedButton>
-              </div>
-            </aside>
-          )}
-
-          {/* Product Grid */}
-          <main className="flex-1 min-w-0">
-            {productsError && (
-              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 shadow-sm">
-                {productsError}
-              </div>
-            )}
-            {/* Results count */}
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Showing <strong className="text-gray-900 dark:text-white">{products.length}</strong> of{' '}
-              <strong className="text-gray-900 dark:text-white">{total}</strong> products
-            </p>
-
-            {productsLoading && products.length === 0 ? (
-              <ProductCardSkeleton count={8} viewMode={viewMode} />
-            ) : products.length === 0 ? (
-              <StoreEmptyState
-                type={hasActiveFilters ? 'no-results' : 'no-products'}
-                brandName={brand?.brandFullName}
-                isOwner={isOwnStore}
-                onClearFilters={clearFilters}
-                onAction={hasActiveFilters ? clearFilters : undefined}
-              />
-            ) : (
-              <>
-                <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-1'}`}>
-                  {products.map((product) => (
-                    <StoreProductCard
-                      key={product.id}
-                      product={product}
-                      onViewProduct={(p) => navigate(`/products/${p.id}`)}
-                    />
-                  ))}
-                </div>
-
-                {/* Load More */}
-                {hasMore && (
-                  <div className="flex justify-center mt-8">
-                    <FrostedButton
-                      variant="ghost"
-                      onClick={handleLoadMore}
-                      disabled={productsLoading}
-                    >
-                      {productsLoading ? 'Loading...' : 'Load More Products'}
-                    </FrostedButton>
-                  </div>
+              <div className="mt-6 flex items-center gap-3">
+                {brand.socialInstagram && (
+                  <a
+                    href={`https://instagram.com/${brand.socialInstagram}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                  >
+                    <Instagram size={18} />
+                  </a>
                 )}
-              </>
-            )}
-          </main>
-        </div>
+                {brand.socialTwitter && (
+                  <a
+                    href={`https://twitter.com/${brand.socialTwitter}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                  >
+                    <Twitter size={18} />
+                  </a>
+                )}
+                {brand.socialWebsite && (
+                  <a
+                    href={brand.socialWebsite}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                  >
+                    <Globe size={18} />
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'reviews' && (
+          <div className="py-6">
+            <div className="glass-panel bg-white/80 dark:bg-gray-950/70 backdrop-blur-xl rounded-2xl p-6 border border-white/20 dark:border-white/10">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Reviews</h2>
+              <div className="mt-3 flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                <Star size={18} className="text-yellow-500" />
+                <span className="font-semibold">{brand.rating ? brand.rating.toFixed(1) : '—'}</span>
+                <span className="text-gray-600 dark:text-gray-400">({formatNumber(brand.reviewsCount ?? 0)} reviews)</span>
+              </div>
+              <p className="mt-4 text-gray-600 dark:text-gray-400">Reviews will appear here.</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Mobile Filter Drawer */}

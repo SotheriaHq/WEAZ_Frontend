@@ -308,24 +308,39 @@ export interface BrandStoreInfo {
   isFollowing: boolean;
 }
 
-// ============= Store Drafts =============
+// ============= Store Status & Setup =============
 
-export interface StoreDraftData {
-  name?: string;
-  slug?: string;
-  categories?: string[];
-  tagline?: string;
+export interface StoreStatusResponse {
+  brandId: string;
+  isStoreOpen: boolean;
+  isSetupComplete: boolean;
+  missingFields: string[];
+  profile: {
+    name: string;
+    description?: string | null;
+    tagline?: string | null;
+    logo?: string | null;
+    banner?: string | null;
+    tags: string[];
+    contactEmail?: string | null;
+    socialInstagram?: string | null;
+    socialTwitter?: string | null;
+    socialTiktok?: string | null;
+    socialWebsite?: string | null;
+  };
+}
+
+export interface StoreProfileUpdateData {
   description?: string;
-  instagram?: string;
-  tiktok?: string;
-  twitter?: string;
-  website?: string;
-  contactEmail?: string;
+  tagline?: string;
+  logo?: string;
+  banner?: string;
   tags?: string[];
-  logoUrl?: string | null;
-  bannerUrl?: string | null;
-  logoFileId?: string | null;
-  bannerFileId?: string | null;
+  contactEmail?: string;
+  socialInstagram?: string;
+  socialTwitter?: string;
+  socialTiktok?: string;
+  socialWebsite?: string;
 }
 
 export interface StoreWizardPrefillResponse {
@@ -351,12 +366,19 @@ export interface StoreWizardPrefillResponse {
 }
 
 export interface StoreGeneralSettingsResponse {
+  brandId?: string;
   storeName: string;
   slug: string;
   description: string;
+  tagline: string;
+  logo: string;
+  banner: string;
+  tags: string[];
   contactEmail: string;
   isEmailVerified: boolean;
-  hasLiveStore: boolean;
+  isStoreOpen: boolean;
+  isSetupComplete: boolean;
+  missingFields: string[];
   storeNameLastChangedAt: string | null;
   storeNameNextAllowedAt: string | null;
 }
@@ -379,19 +401,20 @@ export const updateStoreName = async (payload: {
   return extractData<StoreGeneralSettingsResponse>(res);
 };
 
-export interface StoreDraftResponse {
-  hasDraft: boolean;
-  hasBrand?: boolean;
-  hasLiveStore?: boolean;
-  draft?: {
-    id: string;
-    data: StoreDraftData;
-    step?: number;
-    status?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  };
-}
+export const getStoreStatus = async (): Promise<StoreStatusResponse> => {
+  const res = await apiClient.get('/store/status');
+  return extractData<StoreStatusResponse>(res);
+};
+
+export const openStore = async (): Promise<{ success: boolean; message: string; brandId: string }> => {
+  const res = await apiClient.post('/store/open');
+  return extractData<{ success: boolean; message: string; brandId: string }>(res);
+};
+
+export const updateStoreProfile = async (data: StoreProfileUpdateData): Promise<StoreStatusResponse> => {
+  const res = await apiClient.patch('/store/profile', data);
+  return extractData<StoreStatusResponse>(res);
+};
 
 interface RawBrandData {
   id: string;
@@ -446,29 +469,6 @@ export const getBrandStoreInfo = async (brandId: string): Promise<BrandStoreInfo
   };
 };
 
-// Store drafts
-export const saveStoreDraft = async (
-  payload: StoreDraftData & { step?: number }
-): Promise<StoreDraftResponse> => {
-  const res = await apiClient.post('/store/draft', payload);
-  return extractData<StoreDraftResponse>(res);
-};
-
-export const getStoreDraft = async (): Promise<StoreDraftResponse> => {
-  const res = await apiClient.get('/store/draft');
-  return extractData<StoreDraftResponse>(res);
-};
-
-export const getStoreDraftStatus = async (): Promise<StoreDraftResponse> => {
-  const res = await apiClient.get('/store/draft/status');
-  return extractData<StoreDraftResponse>(res);
-};
-
-export const clearStoreDraft = async (): Promise<{ success: boolean }> => {
-  const res = await apiClient.delete('/store/draft');
-  return extractData<{ success: boolean }>(res);
-};
-
 export default {
   getProducts,
   getProductById,
@@ -483,11 +483,10 @@ export default {
   removeFromWishlist,
   isInWishlist,
   getBrandStoreInfo,
-  saveStoreDraft,
-  getStoreDraft,
-  getStoreDraftStatus,
-  clearStoreDraft,
   getStoreWizardPrefill,
   getStoreGeneralSettings,
   updateStoreName,
+  getStoreStatus,
+  openStore,
+  updateStoreProfile,
 };

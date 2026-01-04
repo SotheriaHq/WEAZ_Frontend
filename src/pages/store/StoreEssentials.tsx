@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { ArrowRight, Sparkles, Store, Instagram, CheckCircle2, Circle, Star } from 'lucide-react';
 import type { RootState } from '@/store';
-import { getStoreWizardPrefill, saveStoreDraft } from '@/api/StoreApi';
+import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
 
 const MAX_CATEGORIES = 3;
 const LOCAL_PROGRESS_KEY = 'store-progress';
@@ -133,15 +133,19 @@ const StoreEssentials: React.FC = () => {
     async (skipCategories: boolean) => {
       const cleanInstagram = normalizeInstagramHandle(instagram);
       const payload = {
-        categories: skipCategories ? [] : selected,
+        tags: skipCategories ? [] : selected,
         tagline: tagline.trim(),
-        instagram: cleanInstagram,
-        step: 1,
+        socialInstagram: cleanInstagram,
       };
 
       try {
-        await saveStoreDraft(payload);
-        localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(payload));
+        await updateStoreProfile(payload);
+        localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify({
+          categories: skipCategories ? [] : selected,
+          tagline: tagline.trim(),
+          instagram: cleanInstagram,
+          step: 1,
+        }));
       } catch (error) {
         console.error('Failed to save store essentials', error);
         // Don’t block onboarding on transient failures.

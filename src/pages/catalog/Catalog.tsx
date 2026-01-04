@@ -26,7 +26,7 @@ import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQ
 import ImageCropModal from '../../components/upload/ImageCropModal';
 import type { BrandProfileDto, CollectionDto } from '../../types/profile';
 import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedFileUrl';
-import { getStoreDraftStatus, type StoreDraftResponse } from '../../api/StoreApi';
+import { getStoreStatus, type StoreStatusResponse } from '../../api/StoreApi';
 import FrostedButton from '@/components/ui/FrostedButton';
 
 import ComingSoon from '../placeholders/ComingSoon';
@@ -96,8 +96,8 @@ const ProfilePage: React.FC = () => {
   const [pendingAccessConfirm, setPendingAccessConfirm] = useState<string | null>(null);
   const [collectionToDelete, setCollectionToDelete] = useState<string | null>(null);
   // collectionType state removed; modal is opened with the selected type via handler
-  const [storeDraftStatus, setStoreDraftStatus] = useState<StoreDraftResponse | null>(null);
-  const [storeDraftStatusLoading, setStoreDraftStatusLoading] = useState(false);
+  const [storeStatus, setStoreStatus] = useState<StoreStatusResponse | null>(null);
+  const [storeStatusLoading, setStoreStatusLoading] = useState(false);
   const [hasDismissedStoreSetup, setHasDismissedStoreSetup] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
@@ -279,7 +279,7 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
     if (!isOwner || user?.type !== 'BRAND') {
-      setStoreDraftStatus(null);
+      setStoreStatus(null);
       setHasDismissedStoreSetup(false);
       return;
     }
@@ -289,16 +289,16 @@ const ProfilePage: React.FC = () => {
     setHasDismissedStoreSetup(Boolean(dismissedUntil && dismissedUntil > Date.now()));
 
     let cancelled = false;
-    setStoreDraftStatusLoading(true);
-    getStoreDraftStatus()
+    setStoreStatusLoading(true);
+    getStoreStatus()
       .then((status) => {
-        if (!cancelled) setStoreDraftStatus(status);
+        if (!cancelled) setStoreStatus(status);
       })
       .catch(() => {
-        if (!cancelled) setStoreDraftStatus(null);
+        if (!cancelled) setStoreStatus(null);
       })
       .finally(() => {
-        if (!cancelled) setStoreDraftStatusLoading(false);
+        if (!cancelled) setStoreStatusLoading(false);
       });
 
     return () => {
@@ -309,19 +309,19 @@ const ProfilePage: React.FC = () => {
   const showStoreSetupNudge = useMemo(() => {
     if (!isOwner || user?.type !== 'BRAND') return false;
     if (hasDismissedStoreSetup) return false;
-    if (storeDraftStatusLoading) return false;
+    if (storeStatusLoading) return false;
     // Encourage setup until the store is marked live/open.
-    if (!storeDraftStatus) return false;
-    return storeDraftStatus.hasLiveStore === false;
-  }, [hasDismissedStoreSetup, isOwner, storeDraftStatus, storeDraftStatusLoading, user?.type]);
+    if (!storeStatus) return false;
+    return storeStatus.isStoreOpen === false;
+  }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading, user?.type]);
 
   const showStoreSetupChip = useMemo(() => {
     if (!isOwner || user?.type !== 'BRAND') return false;
     if (!hasDismissedStoreSetup) return false;
-    if (storeDraftStatusLoading) return false;
-    if (!storeDraftStatus) return false;
-    return storeDraftStatus.hasLiveStore === false;
-  }, [hasDismissedStoreSetup, isOwner, storeDraftStatus, storeDraftStatusLoading, user?.type]);
+    if (storeStatusLoading) return false;
+    if (!storeStatus) return false;
+    return storeStatus.isStoreOpen === false;
+  }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading, user?.type]);
 
   const dismissStoreSetupNudge = useCallback(() => {
     const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
@@ -921,7 +921,7 @@ const ProfilePage: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/store/essentials')}
-            className="glass-chip chip-sm chip-purple inline-flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/10 transition"
+            className="glass-chip chip-sm chip-purple inline-flex items-center gap-2 shadow-xl ring-1 ring-purple-300/40 hover:bg-black/5 dark:hover:bg-white/10 transition"
             aria-label="Continue store setup"
           >
             <span className="font-semibold">Continue store setup</span>
@@ -939,7 +939,7 @@ const ProfilePage: React.FC = () => {
           tags: viewDisplayData.hashtags || [],
         }}
         canEdit={isOwner}
-        storeId={user?.storeId}
+        brandId={user?.id}
         onEditProfile={() => setIsHeaderQuickEditOpen(true)}
         onShareProfile={handleShareProfile}
         onEditAvatar={handleTriggerAvatarUpload}

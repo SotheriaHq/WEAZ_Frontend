@@ -138,10 +138,21 @@ export const wishlistSlice = createSlice({
       })
       .addCase(fetchWishlist.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.items = action.payload.items;
-        state.total = action.payload.total;
+        const payload: any = action.payload;
+        const items: WishlistItem[] = Array.isArray(payload?.items)
+          ? payload.items
+          : Array.isArray(payload)
+            ? payload
+            : [];
+
+        state.items = items;
+        state.total = typeof payload?.total === 'number' ? payload.total : items.length;
         // Rebuild wishlisted IDs set
-        state.wishlistedIds = new Set(action.payload.items.map((item: WishlistItem) => item.product.id));
+        state.wishlistedIds = new Set(
+          items
+            .map((item) => item?.product?.id)
+            .filter((id): id is string => typeof id === 'string')
+        );
       })
       .addCase(fetchWishlist.rejected, (state, action) => {
         state.isLoading = false;

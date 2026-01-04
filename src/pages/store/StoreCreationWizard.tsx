@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import StoreBasicInfoStep from '@/components/store/wizard/StoreBasicInfoStep';
 import {
-  getStoreDraftStatus,
-  saveStoreDraft,
+  getStoreStatus,
+  updateStoreProfile,
   getStoreWizardPrefill,
-  type StoreDraftData,
+  type StoreProfileUpdateData,
   type StoreWizardPrefillResponse,
 } from '@/api/StoreApi';
 
@@ -88,25 +88,20 @@ const StoreCreationWizard: React.FC = () => {
   const intervalRef = useRef<number | null>(null);
 
   const buildSavePayload = useCallback(
-    (stepOverride?: WizardStep) => {
-      const step = stepOverride ?? currentStep;
-      const payload: StoreDraftData & { step: number } = {
-        name: wizardData.name,
-        slug: wizardData.slug,
-        categories: wizardData.categories,
+    () => {
+      const payload: StoreProfileUpdateData = {
         tagline: wizardData.tagline,
         description: wizardData.description,
-        instagram: wizardData.instagram,
-        tiktok: wizardData.tiktok,
-        twitter: wizardData.twitter,
-        website: wizardData.website,
+        socialInstagram: wizardData.instagram,
+        socialTiktok: wizardData.tiktok,
+        socialTwitter: wizardData.twitter,
+        socialWebsite: wizardData.website,
         contactEmail: wizardData.contactEmail,
         tags: wizardData.tags,
-        step: stepToNumber(step),
       };
       return payload;
     },
-    [currentStep, wizardData]
+    [wizardData]
   );
 
   const persistProgress = useCallback(
@@ -117,16 +112,20 @@ const StoreCreationWizard: React.FC = () => {
 
       setSaveState('saving');
       try {
-        await saveStoreDraft(payload);
+        await updateStoreProfile(payload);
         lastSavedPayloadRef.current = serialized;
-        localStorage.setItem(LOCAL_PROGRESS_KEY, serialized);
+        // Save local copy for fallback recovery
+        localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify({
+          ...wizardData,
+          step: stepToNumber(currentStep),
+        }));
         setSaveState('saved');
       } catch (error) {
         console.error('Failed to save store progress', { reason, error });
         setSaveState('error');
       }
     },
-    [buildSavePayload]
+    [buildSavePayload, currentStep, wizardData]
   );
 
   useEffect(() => {
@@ -134,7 +133,7 @@ const StoreCreationWizard: React.FC = () => {
     const hydrateDraft = async () => {
       setIsLoadingDraft(true);
       const localDraftRaw = localStorage.getItem(LOCAL_PROGRESS_KEY) ?? localStorage.getItem('store-draft');
-      let localDraft: Partial<StoreDraftData> | null = null;
+      let localDraft: Record<string, unknown> | null = null;
       try {
         localDraft = localDraftRaw ? JSON.parse(localDraftRaw) : null;
       } catch {
@@ -143,23 +142,35 @@ const StoreCreationWizard: React.FC = () => {
 
       let nextData: StoreWizardData = initialData;
 
-      // 1) Server draft (authoritative)
+      // 1) Server store status (authoritative)
       try {
-        const response = await getStoreDraftStatus();
+        const response = await getStoreStatus();
         if (!isCancelled) {
-          setHasLiveStore(Boolean(response?.hasLiveStore));
+          setHasLiveStore(Boolean(response?.isStoreOpen));
         }
 
-        if (response?.hasDraft && response.draft?.data) {
-          nextData = { ...nextData, ...(response.draft.data as any) };
+        // Hydrate from server profile
+        if (response?.profile) {
+          nextData = {
+            ...nextData,
+            name: response.profile.name || nextData.name,
+            description: response.profile.description || nextData.description,
+            tagline: response.profile.tagline || nextData.tagline,
+            tags: response.profile.tags?.length ? response.profile.tags : nextData.tags,
+            contactEmail: response.profile.contactEmail || nextData.contactEmail,
+            instagram: response.profile.socialInstagram || nextData.instagram,
+            twitter: response.profile.socialTwitter || nextData.twitter,
+            tiktok: response.profile.socialTiktok || nextData.tiktok,
+            website: response.profile.socialWebsite || nextData.website,
+          };
         } else if (localDraft) {
           // 2) Local draft fallback
-          nextData = { ...nextData, ...(localDraft as any) };
+          nextData = { ...nextData, ...(localDraft as Partial<StoreWizardData>) };
         }
       } catch (error) {
-        console.error('Failed to load store draft from server', error);
+        console.error('Failed to load store status from server', error);
         if (localDraft) {
-          nextData = { ...nextData, ...(localDraft as any) };
+          nextData = { ...nextData, ...(localDraft as Partial<StoreWizardData>) };
         }
       }
 
