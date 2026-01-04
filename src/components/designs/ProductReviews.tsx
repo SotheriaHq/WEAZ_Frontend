@@ -287,7 +287,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({
               {/* Avatar */}
               <div className="flex-shrink-0">
                 {review.user.avatar ? (
-                  <div className="max-h-12 max-w-12 overflow-y-auto rounded-full ring-2 ring-white dark:ring-gray-800">
+                  <div className="max-h-12 max-w-12 overflow-hidden rounded-full ring-2 ring-white dark:ring-gray-800">
                     <MediaRenderer
                       kind="image"
                       src={review.user.avatar}
@@ -362,7 +362,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({
                     onClick={() => {
                       setExpandedImage(img);
                     }}
-                    className="flex-shrink-0 rounded-lg overflow-y-auto ring-2 ring-transparent hover:ring-purple-500 transition-all"
+                    className="flex-shrink-0 rounded-lg overflow-hidden ring-2 ring-transparent hover:ring-purple-500 transition-all"
                   >
                     <MediaRenderer
                       kind="image"

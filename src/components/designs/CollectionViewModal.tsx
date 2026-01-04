@@ -171,7 +171,7 @@ const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose
                       <button
                         key={item.fileId}
                         onClick={() => onViewMedia?.(item.fileId)}
-                        className="group relative rounded-2xl overflow-y-auto hover:ring-2 ring-purple-500 transition-all"
+                        className="group relative rounded-2xl overflow-hidden hover:ring-2 ring-purple-500 transition-all"
                       >
                         <MediaRenderer
                           kind="image"

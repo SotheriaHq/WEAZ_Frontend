@@ -387,7 +387,21 @@ const Market: React.FC = () => {
       <div className="relative min-h-[240px]">
       <div className={`transition-opacity duration-300 ${(!loading && (refreshing || isPending)) ? 'opacity-60' : 'opacity-100'}`}>
       {loading && !hasLoadedOnce ? (
-        <DesignSkeleton />
+        <Masonry
+          breakpointCols={{
+            default: 3,
+            1920: 5,
+            1536: 4,
+            1280: 3,
+            1024: 3,
+            768: 2,
+            640: 1,
+          }}
+          className="flex -ml-6 w-auto"
+          columnClassName="pl-6 space-y-6 bg-clip-padding"
+        >
+          <DesignSkeleton />
+        </Masonry>
       ) : error ? (
         // Smart error state - detects error type for appropriate messaging
         <StateDisplay

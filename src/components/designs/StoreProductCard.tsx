@@ -143,7 +143,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Image Container */}
-      <div className="relative overflow-y-auto">
+      <div className="relative overflow-hidden">
         {!imgLoaded && (
           <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-purple-100/20 via-white/10 to-gray-200/20 dark:from-purple-900/20 dark:via-gray-800/20 dark:to-gray-900/40" />
         )}

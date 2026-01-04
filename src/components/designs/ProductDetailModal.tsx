@@ -339,7 +339,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   {/* Left - Image Gallery */}
                   <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 p-6">
                     {/* Main image */}
-                    <div className="relative rounded-2xl overflow-y-auto shadow-lg">
+                    <div className="relative rounded-2xl overflow-hidden shadow-lg">
                       <MediaRenderer
                         kind="image"
                         src={product.images[selectedImage] || product.thumbnail || ''}
@@ -376,7 +376,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           <button
                             key={i}
                             onClick={() => setSelectedImage(i)}
-                            className={`flex-shrink-0 rounded-lg overflow-y-auto border-2 transition-all ${
+                            className={`flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
                               selectedImage === i
                                 ? 'border-purple-500 ring-2 ring-purple-500/30'
                                 : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'

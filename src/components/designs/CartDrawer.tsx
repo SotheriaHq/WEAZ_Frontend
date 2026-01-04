@@ -261,7 +261,7 @@ const CartDrawer: React.FC = () => {
                         </button>
 
                         {/* Thumbnail */}
-                        <div className="max-w-20 max-h-24 flex-shrink-0 rounded-xl overflow-y-auto">
+                        <div className="max-w-20 max-h-24 flex-shrink-0 rounded-xl overflow-hidden">
                           {item.product.thumbnail ? (
                             <MediaRenderer
                               kind="image"

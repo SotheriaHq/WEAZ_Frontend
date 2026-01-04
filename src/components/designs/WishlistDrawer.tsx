@@ -259,9 +259,8 @@ const WishlistDrawer: React.FC = () => {
                               </div>
                             )}
 
-                            {/* Image */}
                             <div
-                              className="relative overflow-y-auto cursor-pointer"
+                              className="relative overflow-hidden cursor-pointer"
                               onClick={() => handleViewProduct(product.id)}
                             >
                               {product.thumbnail ? (

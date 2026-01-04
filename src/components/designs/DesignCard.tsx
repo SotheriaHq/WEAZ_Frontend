@@ -223,7 +223,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
             className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 w-fit rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 transition-all"
           >
             {item.brandLogo ? (
-              <div className="relative flex max-h-8 max-w-8 flex-shrink-0 items-center justify-center overflow-y-auto rounded-full border-2 border-white/60 shadow-md">
+              <div className="relative flex max-h-8 max-w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/60 shadow-md">
                 <MediaRenderer
                   kind="image"
                   src={item.brandLogo}

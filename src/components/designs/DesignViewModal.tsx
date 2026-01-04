@@ -163,7 +163,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           <div className="pb-4">
             <div className="mb-3 flex items-center gap-3">
               {item.brandLogo ? (
-                <div className="max-h-10 max-w-10 overflow-y-auto rounded-full text-white">
+                <div className="max-h-10 max-w-10 overflow-hidden rounded-full text-white">
                   <MediaRenderer
                     kind="image"
                     src={item.brandLogo}
