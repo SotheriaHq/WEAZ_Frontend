@@ -16,6 +16,7 @@ import {
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
 
 /**
  * WishlistDrawer Component
@@ -143,33 +144,37 @@ const WishlistDrawer: React.FC = () => {
   }
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop with gradient blur - matches CartDrawer */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50"
-            onClick={handleClose}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
-            <div className="absolute inset-0 backdrop-blur-xl" />
-            <div className="absolute inset-0 bg-black/40" />
-          </motion.div>
+    <OverlayPortal>
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            {/* Backdrop with gradient blur - matches CartDrawer */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-layer-overlay"
+              onClick={handleClose}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
+              <div className="absolute inset-0 backdrop-blur-xl" />
+              <div className="absolute inset-0 bg-black/40" />
+            </motion.div>
 
-          {/* Drawer Panel */}
-          <motion.div
-            variants={drawerVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="fixed right-0 top-0 bottom-0 w-full max-w-md z-50 flex flex-col"
-          >
-            {/* Glass panel */}
-            <div className="h-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl shadow-2xl border-l border-white/20 dark:border-white/10 flex flex-col">
+            {/* Drawer Panel */}
+            <motion.div
+              variants={drawerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="fixed right-0 top-0 bottom-0 z-layer-drawer w-full max-w-md flex flex-col"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Wishlist"
+            >
+              {/* Glass panel */}
+              <div className="h-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl shadow-2xl border-l border-white/20 dark:border-white/10 flex flex-col">
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-3">
@@ -388,10 +393,11 @@ const WishlistDrawer: React.FC = () => {
                 </motion.div>
               )}
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </OverlayPortal>
   );
 };
 

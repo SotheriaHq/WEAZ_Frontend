@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import {
   X,
   Upload,
@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import type { WizardProduct, WizardCollection } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface CreateCollectionModalProps {
   isOpen: boolean;
@@ -40,6 +42,14 @@ const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
   onSave,
   availableProducts,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap({
+    active: isOpen,
+    containerRef: dialogRef,
+    onEscape: onClose,
+  });
+
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -141,15 +151,16 @@ const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <OverlayPortal>
+      <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-label="Create collection">
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 z-layer-overlay bg-black/70 backdrop-blur-sm"
+          onClick={onClose}
+        />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-2xl bg-white dark:bg-zinc-900/80 backdrop-blur-xl border border-gray-200/50 dark:border-zinc-800/50 rounded-2xl shadow-2xl overflow-hidden">
+        {/* Modal */}
+        <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-2xl bg-white dark:bg-zinc-900/80 backdrop-blur-xl border border-gray-200/50 dark:border-zinc-800/50 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-zinc-800/50 px-6 py-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -558,7 +569,8 @@ const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </OverlayPortal>
   );
 };
 

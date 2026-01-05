@@ -418,7 +418,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
 
   return (
     <nav
-      className={`fixed top-0 left-0 w-full px-4 sm:px-5 h-16 z-50 transition-all duration-300 ease-out
+      className={`fixed top-0 left-0 w-full px-4 sm:px-5 h-16 z-layer-nav transition-all duration-300 ease-out
       ${minimal
         ? 'bg-transparent border-b border-transparent'
         : isScrolled
@@ -512,14 +512,16 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
 
           {/* Notifications */}
           {user && (
-            <div className="relative hidden sm:block">
+            <div className="relative">
               <button
                 type="button"
                 ref={(el) => { (notificationsAnchorRef as any).current = el; }}
                 onClick={() => setShowNotifications((p) => !p)}
                 className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+                aria-haspopup="dialog"
+                aria-expanded={showNotifications}
               >
-                <span className="text-xl">🔔</span>
+                <span aria-hidden="true" className="text-lg">🔔</span>
                 {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white px-1">
                     {unreadCount > 99 ? '99+' : unreadCount}

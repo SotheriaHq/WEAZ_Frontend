@@ -2,6 +2,8 @@ import React from 'react';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import { OverlayPortal } from './OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 export interface ModalProps {
   open: boolean;
@@ -23,6 +25,14 @@ const Modal: React.FC<ModalProps> = ({
   className,
   glassBackdrop = true,
 }) => {
+  const panelRef = React.useRef<HTMLDivElement | null>(null);
+
+  useFocusTrap({
+    active: open,
+    containerRef: panelRef,
+    onEscape: onClose,
+  });
+
   const sizeClasses = {
     sm: 'max-w-md',
     md: 'max-w-2xl',
@@ -50,67 +60,73 @@ const Modal: React.FC<ModalProps> = ({
   return (
     <AnimatePresence>
       {open && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50"
-            onClick={onClose}
-          >
-            {glassBackdrop ? (
-              <>
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
-                <div className="absolute inset-0 backdrop-blur-xl" />
-                <div className="absolute inset-0 bg-black/40" />
-              </>
-            ) : (
-              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-            )}
-          </motion.div>
-
-          {/* Modal Panel */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            onClick={onClose}
-          >
-            <div
-              className={clsx(
-                'relative w-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden',
-                sizeClasses[size],
-                className
-              )}
-              onClick={(e) => e.stopPropagation()}
+        <OverlayPortal>
+          <div className="fixed inset-0 z-layer-modal" aria-hidden={false}>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0"
+              onClick={onClose}
             >
-              {/* Header */}
-              {title && (
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                    {title}
-                  </h2>
-                  <button
-                    onClick={onClose}
-                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    aria-label="Close modal"
-                  >
-                    <X size={20} className="text-gray-500 dark:text-gray-400" />
-                  </button>
-                </div>
+              {glassBackdrop ? (
+                <>
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
+                  <div className="absolute inset-0 backdrop-blur-xl" />
+                  <div className="absolute inset-0 bg-black/40" />
+                </>
+              ) : (
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
               )}
+            </motion.div>
 
-              {/* Content */}
-              <div className="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-                {children}
+            {/* Modal Panel */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="absolute inset-0 flex items-center justify-center p-4"
+              onClick={onClose}
+            >
+              <div
+                ref={panelRef}
+                role="dialog"
+                aria-modal="true"
+                tabIndex={-1}
+                className={clsx(
+                  'relative w-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden outline-none',
+                  sizeClasses[size],
+                  className
+                )}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                {title && (
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {title}
+                    </h2>
+                    <button
+                      onClick={onClose}
+                      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      aria-label="Close modal"
+                    >
+                      <X size={20} className="text-gray-500 dark:text-gray-400" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Content */}
+                <div className="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+                  {children}
+                </div>
               </div>
-            </div>
-          </motion.div>
-        </>
+            </motion.div>
+          </div>
+        </OverlayPortal>
       )}
     </AnimatePresence>
   );

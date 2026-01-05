@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import {
   X,
   Upload,
@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import type { WizardProduct, WizardLook } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface CreateLookModalProps {
   isOpen: boolean;
@@ -35,6 +37,14 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
   onSave,
   availableProducts,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap({
+    active: isOpen,
+    containerRef: dialogRef,
+    onEscape: onClose,
+  });
+
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -142,19 +152,21 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <OverlayPortal>
+      <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-label="Create look">
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 z-layer-overlay bg-black/70 backdrop-blur-sm"
+          onClick={onClose}
+        />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-5xl bg-white/95 dark:bg-slate-900/80 backdrop-blur-xl border border-gray-200/50 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
+        {/* Modal */}
+        <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-5xl bg-white/95 dark:bg-slate-900/80 backdrop-blur-xl border border-gray-200/50 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-50 w-10 h-10 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-gray-400 hover:text-white transition-colors"
+          className="absolute top-4 right-4 z-20 w-10 h-10 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-gray-400 hover:text-white transition-colors"
+          aria-label="Close"
         >
           <X className="w-5 h-5" />
         </button>
@@ -487,7 +499,8 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </OverlayPortal>
   );
 };
 

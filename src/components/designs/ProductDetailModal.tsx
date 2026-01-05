@@ -12,6 +12,8 @@ import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 // Types
 export interface ProductDetailData {
@@ -114,6 +116,13 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // Share menu state
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap({
+    containerRef: dialogRef,
+    active: isOpen,
+    onEscape: onClose,
+  });
 
   // Close share menu when clicking outside
   useEffect(() => {
@@ -298,32 +307,36 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50"
-            onClick={onClose}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
-            <div className="absolute inset-0 backdrop-blur-xl" />
-            <div className="absolute inset-0 bg-black/40" />
-          </motion.div>
+    <OverlayPortal>
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-layer-overlay"
+              onClick={onClose}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
+              <div className="absolute inset-0 backdrop-blur-xl" />
+              <div className="absolute inset-0 bg-black/40" />
+            </motion.div>
 
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed inset-4 md:inset-8 lg:inset-12 z-50 flex items-center justify-center"
-          >
-            <div className="w-full max-w-6xl max-h-full bg-white dark:bg-gray-950 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed inset-4 md:inset-8 lg:inset-12 z-layer-modal flex items-center justify-center"
+              role="dialog"
+              aria-modal="true"
+              aria-label={product?.name ?? 'Product details'}
+            >
+              <div ref={dialogRef} tabIndex={-1} className="w-full max-w-6xl max-h-full bg-white dark:bg-gray-950 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
               {/* Close button */}
               <button
                 onClick={onClose}
@@ -882,10 +895,11 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
               </div>
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </OverlayPortal>
   );
 };
 

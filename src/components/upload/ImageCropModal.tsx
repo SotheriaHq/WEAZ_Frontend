@@ -4,6 +4,8 @@ import 'react-easy-crop/react-easy-crop.css';
 import Button from '../Button';
 import VLoader from '../loaders/VLoader';
 import { cropImageFromFile } from '../../utils/cropImage';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface ImageCropModalProps {
   open: boolean;
@@ -39,6 +41,15 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
 
   const objectUrlRef = useRef<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap({
+    containerRef: dialogRef,
+    active: open,
+    onEscape: () => {
+      if (!isProcessing) onClose();
+    },
+  });
 
   useEffect(() => {
     if (!file) {
@@ -59,17 +70,6 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
       }
     };
   }, [file]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isProcessing) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [open, isProcessing, onClose]);
 
   const showModal = open && file && imageSrc;
 
@@ -108,8 +108,14 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
   if (!showModal) return null;
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl glass-panel p-4">
+    <OverlayPortal>
+      <div
+        className="fixed inset-0 z-layer-modal flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
+        <div ref={dialogRef} tabIndex={-1} className="w-full max-w-2xl glass-panel p-4">
         <header className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
           <div className="flex items-center gap-2">
@@ -226,8 +232,9 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
             </div>
           </div>
         </div>
+        </div>
       </div>
-    </div>
+    </OverlayPortal>
   );
 };
 

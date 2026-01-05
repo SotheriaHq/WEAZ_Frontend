@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiX, FiCheck, FiChevronDown, FiChevronUp, FiAlertCircle, FiExternalLink } from 'react-icons/fi';
-import { HiOutlineSparkles } from 'react-icons/hi';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface CollectionSummary {
   title: string;
@@ -52,6 +52,8 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState(5);
 
+  const panelRef = React.useRef<HTMLDivElement | null>(null);
+
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -86,6 +88,13 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
       };
     }
   }, [isOpen]);
+
+  useFocusTrap({
+    active: isOpen,
+    containerRef: panelRef,
+    onEscape: state === 'confirm' ? onClose : undefined,
+    initialFocusSelector: '[data-initial-focus="true"]',
+  });
 
   const handlePublish = async () => {
     setState('loading');
@@ -126,77 +135,116 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50"
-            onClick={state === 'confirm' ? onClose : undefined}
-          >
-            {/* Gradient blur backdrop */}
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
-            <div className="absolute inset-0 backdrop-blur-xl" />
-            <div className="absolute inset-0 bg-black/40" />
-          </motion.div>
-
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          >
-            <div
-              className="relative w-full max-w-[600px] max-h-[90vh] glass-panel-dark rounded-3xl p-6 overflow-y-auto glass-scrollbar overscroll-contain"
-              onClick={(e) => e.stopPropagation()}
+        <OverlayPortal>
+          <div className="fixed inset-0 z-layer-modal" aria-hidden={false}>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0"
+              onClick={state === 'confirm' ? onClose : undefined}
+              aria-hidden="true"
             >
-              {/* Close button */}
-              {state === 'confirm' && (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="absolute top-4 right-4 w-9 h-9 rounded-full glass-light flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-                  aria-label="Close"
-                >
-                  <FiX className="w-5 h-5" />
-                </button>
-              )}
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
+              <div className="absolute inset-0 backdrop-blur-xl" />
+              <div className="absolute inset-0 bg-black/40" />
+            </motion.div>
 
-              {/* Content based on state */}
-              <AnimatePresence mode="wait">
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="absolute inset-0 flex items-center justify-center p-4"
+            >
+              <div
+                ref={panelRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Review before publishing"
+                tabIndex={-1}
+                className="relative flex w-full max-w-[600px] max-h-[90vh] flex-col overflow-hidden rounded-3xl glass-panel-dark outline-none"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header (always visible) */}
+                <div className="shrink-0 border-b border-white/10 px-6 py-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-2xl font-bold text-white font-serif">Review Your Collection</h2>
+                      <p className="text-sm text-gray-400 mt-1">Please review before publishing</p>
+                    </div>
+
+                    {state === 'confirm' && (
+                      <button
+                        type="button"
+                        data-initial-focus="true"
+                        onClick={onClose}
+                        className="w-9 h-9 rounded-full glass-light flex items-center justify-center text-gray-200 hover:text-white transition-colors"
+                        aria-label="Close"
+                      >
+                        ✖️
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Body (only scroll container) */}
+                <div className="min-h-0 flex-1 overflow-y-auto glass-scrollbar overscroll-contain px-6 py-5">
+                  <AnimatePresence mode="wait">
+                    {state === 'confirm' && (
+                      <ConfirmContent
+                        key="confirm"
+                        summary={summary}
+                        truncatedDescription={truncatedDescription}
+                        descriptionExpanded={descriptionExpanded}
+                        setDescriptionExpanded={setDescriptionExpanded}
+                        formatPrice={formatPrice}
+                        visibilityLabel={visibilityLabel}
+                        audienceLabel={audienceLabel}
+                      />
+                    )}
+
+                    {state === 'loading' && <LoadingContent key="loading" />}
+
+                    {state === 'success' && (
+                      <SuccessContent
+                        key="success"
+                        title={summary.title}
+                        redirectCountdown={redirectCountdown}
+                        onClose={onClose}
+                      />
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* Footer (confirm actions always visible) */}
                 {state === 'confirm' && (
-                  <ConfirmContent
-                    key="confirm"
-                    summary={summary}
-                    truncatedDescription={truncatedDescription}
-                    descriptionExpanded={descriptionExpanded}
-                    setDescriptionExpanded={setDescriptionExpanded}
-                    formatPrice={formatPrice}
-                    visibilityLabel={visibilityLabel}
-                    audienceLabel={audienceLabel}
-                    onEdit={onEdit}
-                    onPublish={handlePublish}
-                  />
+                  <div className="shrink-0 border-t border-white/10 px-6 py-5">
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={onEdit}
+                        className="flex-1 py-3 px-4 rounded-xl glass-light border border-white/10 text-white font-medium hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
+                      >
+                        ← Edit Collection
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePublish}
+                        className="flex-1 py-3 px-4 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                      >
+                        ✨ Publish Now
+                      </button>
+                    </div>
+                  </div>
                 )}
-
-                {state === 'loading' && <LoadingContent key="loading" />}
-
-                {state === 'success' && (
-                  <SuccessContent
-                    key="success"
-                    title={summary.title}
-                    redirectCountdown={redirectCountdown}
-                    onClose={onClose}
-                  />
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        </>
+              </div>
+            </motion.div>
+          </div>
+        </OverlayPortal>
       )}
     </AnimatePresence>
   );
@@ -213,8 +261,6 @@ const ConfirmContent: React.FC<{
   formatPrice: (p: number) => string;
   visibilityLabel: Record<string, string>;
   audienceLabel: Record<string, string>;
-  onEdit: () => void;
-  onPublish: () => void;
 }> = ({
   summary,
   truncatedDescription,
@@ -223,20 +269,12 @@ const ConfirmContent: React.FC<{
   formatPrice,
   visibilityLabel,
   audienceLabel,
-  onEdit,
-  onPublish,
 }) => (
   <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
     exit={{ opacity: 0 }}
   >
-    {/* Header */}
-    <div className="mb-6">
-      <h2 className="text-2xl font-bold text-white font-serif">Review Your Collection</h2>
-      <p className="text-sm text-gray-400 mt-1">Please review before publishing</p>
-    </div>
-
     {/* Cover image preview */}
     {summary.coverImageUrl && (
       <div className="relative rounded-2xl overflow-y-auto mb-4 w-full">
@@ -341,11 +379,11 @@ const ConfirmContent: React.FC<{
           >
             {descriptionExpanded ? (
               <>
-                Show less <FiChevronUp className="w-4 h-4" />
+                Show less <span aria-hidden="true">⬆️</span>
               </>
             ) : (
               <>
-                Read more <FiChevronDown className="w-4 h-4" />
+                Read more <span aria-hidden="true">⬇️</span>
               </>
             )}
           </button>
@@ -356,31 +394,12 @@ const ConfirmContent: React.FC<{
     {/* Tip box */}
     {summary.tags.length < 3 && (
       <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
-        <FiAlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+        <span className="text-amber-300 flex-shrink-0 mt-0.5" aria-hidden="true">⚠️</span>
         <p className="text-sm text-amber-300">
           💡 Tip: Adding more tags can help your collection get discovered
         </p>
       </div>
     )}
-
-    {/* Action buttons */}
-    <div className="flex gap-3 mt-6">
-      <button
-        type="button"
-        onClick={onEdit}
-        className="flex-1 py-3 px-4 rounded-xl glass-light border border-white/10 text-white font-medium hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
-      >
-        ← Edit Collection
-      </button>
-      <button
-        type="button"
-        onClick={onPublish}
-        className="flex-1 py-3 px-4 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-      >
-        <HiOutlineSparkles className="w-5 h-5" />
-        Publish Now
-      </button>
-    </div>
   </motion.div>
 );
 
@@ -445,7 +464,7 @@ const SuccessContent: React.FC<{
         animate={{ scale: 1, rotate: 0 }}
         transition={{ delay: 0.3, duration: 0.4, ease: [0.175, 0.885, 0.32, 1.275] }}
       >
-        <FiCheck className="w-10 h-10 text-white" strokeWidth={3} />
+          <span className="text-4xl" aria-hidden="true">✅</span>
       </motion.div>
     </motion.div>
 
@@ -463,8 +482,7 @@ const SuccessContent: React.FC<{
         onClick={onClose}
         className="flex-1 py-3 px-4 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2"
       >
-        <FiExternalLink className="w-4 h-4" />
-        View Collection
+        🔗 View Collection
       </button>
       <button
         type="button"

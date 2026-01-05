@@ -110,7 +110,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         isVisible={Boolean(isSidebarOpen && (sidebarMode === 'OVERLAY' || sidebarMode === 'HIDDEN' || sidebarMode === 'RAIL' || window.innerWidth < 1024))}
         onClick={() => dispatch(closeSidebar())}
         variant="light"
-        zIndex={40}
+        layer="overlay"
       />
     </div>
   );

@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { MarketMedia } from "@/types/market";
 import { formatPrice } from "@/utils/helpers";
 import MediaRenderer from "@/components/media/MediaRenderer";
+import { OverlayPortal } from "@/components/ui/OverlayPortal";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 // Minimal shape derived from backend /collections/:id
 type CollectionDetail = {
@@ -26,6 +28,14 @@ type Props = {
 };
 
 const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose, onViewMedia }) => {
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+
+  useFocusTrap({
+    containerRef: dialogRef,
+    active: open,
+    onEscape: onClose,
+  });
+
   // Scroll Locking
   useEffect(() => {
     if (open) {
@@ -58,34 +68,40 @@ const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose
   })();
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Backdrop with unified gradient blur */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50"
-            onClick={onClose}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
-            <div className="absolute inset-0 backdrop-blur-xl" />
-            <div className="absolute inset-0 bg-black/40" />
-          </motion.div>
-
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed inset-4 md:inset-8 lg:inset-12 z-50 flex items-center justify-center"
-          >
-            <div 
-              className="w-full max-w-4xl max-h-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden flex flex-col"
-              onClick={(e) => e.stopPropagation()}
+    <OverlayPortal>
+      <AnimatePresence>
+        {open && (
+          <>
+            {/* Backdrop with unified gradient blur */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-layer-overlay"
+              onClick={onClose}
             >
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
+              <div className="absolute inset-0 backdrop-blur-xl" />
+              <div className="absolute inset-0 bg-black/40" />
+            </motion.div>
+
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed inset-4 md:inset-8 lg:inset-12 z-layer-modal flex items-center justify-center"
+              role="dialog"
+              aria-modal="true"
+              aria-label={title}
+            >
+              <div
+                ref={dialogRef}
+                tabIndex={-1}
+                className="w-full max-w-4xl max-h-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
               {/* Header */}
               <div className="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex-1 min-w-0">
@@ -188,10 +204,11 @@ const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose
                 )}
               </div>
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </OverlayPortal>
   );
 };
 

@@ -110,7 +110,9 @@ export const Sidebar: React.FC = () => {
   const isRail = !showOverlay; // If not overlay, it's rail (assuming not hidden/mobile-closed)
   
   const widthClass = isRail ? 'w-[72px]' : 'w-[240px]';
-  const positionClass = !isRail ? 'fixed left-0 top-0 h-full z-[51] shadow-xl' : `fixed left-0 top-16 h-[calc(100vh-64px)] z-20`;
+  const positionClass = !isRail
+    ? 'fixed left-0 top-0 h-full z-layer-drawer shadow-xl'
+    : 'fixed left-0 top-[var(--app-header-height)] h-[calc(100vh-var(--app-header-height))] z-layer-sidebar';
   
   // Header is needed if it's Overlay (to cover Navbar)
   const isOverlay = showOverlay;

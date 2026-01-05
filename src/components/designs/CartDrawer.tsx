@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
 
 // Promo code type
 interface PromoCode {
@@ -172,35 +173,39 @@ const CartDrawer: React.FC = () => {
   }
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop with gradient blur - matching the design */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50"
-            onClick={() => dispatch(closeCartDrawer())}
-          >
-            {/* Multi-layer gradient blur background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
-            <div className="absolute inset-0 bg-gradient-to-tr from-violet-600/20 via-transparent to-cyan-600/20" />
-            <div className="absolute inset-0 backdrop-blur-xl" />
-            <div className="absolute inset-0 bg-black/30" />
-          </motion.div>
+    <OverlayPortal>
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            {/* Backdrop with gradient blur - matching the design */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-layer-overlay"
+              onClick={() => dispatch(closeCartDrawer())}
+            >
+              {/* Multi-layer gradient blur background */}
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
+              <div className="absolute inset-0 bg-gradient-to-tr from-violet-600/20 via-transparent to-cyan-600/20" />
+              <div className="absolute inset-0 backdrop-blur-xl" />
+              <div className="absolute inset-0 bg-black/30" />
+            </motion.div>
 
-          {/* Drawer */}
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed right-0 top-0 bottom-0 w-full max-w-md z-50 flex flex-col"
-          >
-            {/* Glass panel */}
-            <div className="h-full bg-white/98 dark:bg-gray-950/98 backdrop-blur-2xl border-l border-white/30 dark:border-white/10 shadow-2xl flex flex-col">
+            {/* Drawer */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed right-0 top-0 bottom-0 z-layer-drawer w-full max-w-md flex flex-col"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Cart"
+            >
+              {/* Glass panel */}
+              <div className="h-full bg-white/98 dark:bg-gray-950/98 backdrop-blur-2xl border-l border-white/30 dark:border-white/10 shadow-2xl flex flex-col">
               {/* Header */}
               <div className="flex items-center justify-between p-5 border-b border-gray-200/60 dark:border-gray-800/60">
                 <div className="flex items-center gap-3">
@@ -470,10 +475,11 @@ const CartDrawer: React.FC = () => {
                 </div>
               )}
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </OverlayPortal>
   );
 };
 

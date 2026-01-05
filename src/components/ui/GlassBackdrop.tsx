@@ -1,14 +1,15 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { OverlayPortal } from './OverlayPortal';
 
 interface GlassBackdropProps {
   isVisible: boolean;
   onClick?: () => void;
   children?: React.ReactNode;
   className?: string;
-  zIndex?: number;
   /** Use lighter variant for non-modal overlays like sidebars */
   variant?: 'default' | 'light' | 'dark';
+  layer?: 'overlay' | 'drawer' | 'modal';
 }
 
 /**
@@ -30,8 +31,8 @@ const GlassBackdrop: React.FC<GlassBackdropProps> = ({
   onClick,
   children,
   className = '',
-  zIndex = 50,
   variant = 'default',
+  layer = 'overlay',
 }) => {
   const gradientStyles = {
     default: {
@@ -50,35 +51,31 @@ const GlassBackdrop: React.FC<GlassBackdropProps> = ({
 
   const styles = gradientStyles[variant];
 
+  const layerClass =
+    layer === 'modal' ? 'z-layer-modal' : layer === 'drawer' ? 'z-layer-drawer' : 'z-layer-overlay';
+
   return (
     <AnimatePresence>
       {isVisible && (
-        <>
-          {/* Backdrop layers */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className={`fixed inset-0 ${className}`}
-            style={{ zIndex }}
-            onClick={onClick}
-          >
-            {/* Gradient layer */}
-            <div className={`absolute inset-0 bg-gradient-to-br ${styles.gradient}`} />
-            {/* Blur layer */}
-            <div className="absolute inset-0 backdrop-blur-xl" />
-            {/* Dark overlay */}
-            <div className={`absolute inset-0 ${styles.overlay}`} />
-          </motion.div>
+        <OverlayPortal>
+          <div className={`fixed inset-0 ${layerClass}`}>
+            {/* Backdrop layers */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className={`absolute inset-0 ${className}`}
+              onClick={onClick}
+            >
+              <div className={`absolute inset-0 bg-gradient-to-br ${styles.gradient}`} />
+              <div className="absolute inset-0 backdrop-blur-xl" />
+              <div className={`absolute inset-0 ${styles.overlay}`} />
+            </motion.div>
 
-          {/* Content - rendered above backdrop */}
-          {children && (
-            <div className="fixed inset-0" style={{ zIndex: zIndex + 1 }}>
-              {children}
-            </div>
-          )}
-        </>
+            {children && <div className="absolute inset-0">{children}</div>}
+          </div>
+        </OverlayPortal>
       )}
     </AnimatePresence>
   );

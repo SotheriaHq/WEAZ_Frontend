@@ -40,6 +40,20 @@ html {
     --dark-border: rgba(255, 255, 255, 0.1);
     --dark-glass-bg: rgba(255, 255, 255, 0.05);
     --dark-glass-light: rgba(255, 255, 255, 0.08);
+
+    /* Layout tokens */
+    --app-header-height: 64px;
+
+    /* Z-layer system (see fthreadly/docs/LAYOUT_ARCHITECTURE.md) */
+    --z-base: 0;
+    --z-nav: 100;
+    --z-sidebar: 200;
+    --z-overlay: 900;
+    --z-dropdown: 1000;
+    --z-drawer: 1100;
+    --z-modal: 1200;
+    --z-tooltip: 1300;
+    --z-toast: 1400;
   }
 
   .dark {
@@ -50,6 +64,18 @@ html {
     --text-secondary: #cbd5e1;
     --border-strong: rgba(255, 255, 255, 0.08);
   }
+}
+
+@layer utilities {
+  .z-layer-base { z-index: var(--z-base); }
+  .z-layer-nav { z-index: var(--z-nav); }
+  .z-layer-sidebar { z-index: var(--z-sidebar); }
+  .z-layer-overlay { z-index: var(--z-overlay); }
+  .z-layer-dropdown { z-index: var(--z-dropdown); }
+  .z-layer-drawer { z-index: var(--z-drawer); }
+  .z-layer-modal { z-index: var(--z-modal); }
+  .z-layer-tooltip { z-index: var(--z-tooltip); }
+  .z-layer-toast { z-index: var(--z-toast); }
 }
 
 /* Frosted-glass (glassmorphism) design tokens */

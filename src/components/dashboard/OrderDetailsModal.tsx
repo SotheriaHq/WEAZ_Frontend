@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { brandApi } from '@/api/BrandApi';
 import { X, Package, Truck, CheckCircle, XCircle, MapPin, Phone, Mail } from 'lucide-react';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface OrderDetailsModalProps {
   isOpen: boolean;
@@ -21,6 +23,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap({
+    active: isOpen,
+    containerRef: dialogRef,
+    onEscape: onClose,
+  });
 
   const fetchOrderDetails = useCallback(async () => {
     setLoading(true);
@@ -78,8 +87,10 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+    <OverlayPortal>
+      <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 animate-in fade-in duration-200" role="dialog" aria-modal="true" aria-label="Order details">
+        <div className="fixed inset-0 z-layer-overlay bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div ref={dialogRef} tabIndex={-1} className="bg-white dark:bg-gray-900 relative w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
         <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50/50 dark:bg-gray-800/50">
@@ -87,7 +98,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             <h2 className="text-lg font-bold">Order Details</h2>
             <p className="text-sm text-gray-500">#{orderId.slice(0, 8)}</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -237,8 +248,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             <div className="text-center py-12 text-gray-500">Order not found</div>
           )}
         </div>
+        </div>
       </div>
-    </div>
+    </OverlayPortal>
   );
 };
 

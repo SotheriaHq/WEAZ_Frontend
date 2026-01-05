@@ -1,10 +1,12 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { BRAND_TAG_OPTIONS } from '../../data/brandTags';
 import { IconButton } from '@/components/ui/FrostedButton';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 // ----------------------------------------------------------------------------
 // Zod Schema
@@ -50,6 +52,14 @@ const ProfileHeaderQuickEditModal: React.FC<ProfileHeaderQuickEditModalProps> = 
   onOpenFullEditor,
   saving = false,
 }) => {
+    const dialogRef = useRef<HTMLDivElement>(null);
+
+    useFocusTrap({
+        active: open,
+        containerRef: dialogRef,
+        onEscape: onClose,
+    });
+
   const {
     register,
     handleSubmit,
@@ -124,17 +134,18 @@ const ProfileHeaderQuickEditModal: React.FC<ProfileHeaderQuickEditModalProps> = 
   if (!open) return null;
 
   return (
-    <>
-        {/* Background Overlay */}
-        <div className="fixed inset-0 z-[100] transition-opacity">
-             {/* Glow Effect behind modal placement - optional ambient lighting */}
-            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[500px] w-[500px] mx-auto bg-purple-500/20 dark:bg-purple-900/40 blur-[100px] rounded-full opacity-50 pointer-events-none"></div>
-            <div className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={onClose}></div>
-        </div>
+        <OverlayPortal>
+            <>
+                {/* Background Overlay */}
+                <div className="fixed inset-0 z-layer-overlay transition-opacity">
+                    {/* Glow Effect behind modal placement - optional ambient lighting */}
+                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[500px] w-[500px] mx-auto bg-purple-500/20 dark:bg-purple-900/40 blur-[100px] rounded-full opacity-50 pointer-events-none" />
+                    <div className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={onClose} />
+                </div>
 
-        {/* Main Modal Container - Floating Pane */}
-        <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 sm:p-6 pointer-events-none">
-            <div className="relative w-full max-w-2xl bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col pointer-events-auto">
+                {/* Main Modal Container - Floating Pane */}
+                <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-label="Quick edit">
+                    <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-2xl bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                 
                 {/* Header / Drag Handle area */}
                 <div className="px-6 py-4 border-b border-gray-200 dark:border-white/5 flex justify-between items-center bg-white/50 dark:bg-white/5">
@@ -326,9 +337,10 @@ const ProfileHeaderQuickEditModal: React.FC<ProfileHeaderQuickEditModalProps> = 
                     </div>
                 </form>
 
-            </div>
-        </div>
-    </>
+                                </div>
+                            </div>
+                        </>
+                </OverlayPortal>
   );
 };
 

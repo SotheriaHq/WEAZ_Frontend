@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import { locationService, type CountryOption, type StateOption } from '../../services/LocationService';
 import UniversalSelect from '../forms/UniversalSelect';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 // ----------------------------------------------------------------------------
 // Zod Schemas & Helpers
@@ -320,20 +322,27 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     label: c
   })), [cities]);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap({
+    active: isOpen,
+    containerRef: dialogRef,
+    onEscape: onClose,
+  });
+
   if (!isOpen) return null;
 
   return (
-    <>
-      {/* Background Overlay */}
-      <div className="fixed inset-0 z-[100]">
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
-      </div>
+    <OverlayPortal>
+      <>
+        {/* Background Overlay */}
+        <div className="fixed inset-0 z-layer-overlay">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+        </div>
 
-      {/* Main Modal Container */}
-      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 sm:p-6 pointer-events-none">
-        
-        {/* Modal Content - pointer-events-auto needed because parent has pointer-events-none */}
-        <div className="w-full max-w-2xl bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up pointer-events-auto">
+        {/* Main Modal Container */}
+        <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-label="Brand setup">
+          <div ref={dialogRef} tabIndex={-1} className="w-full max-w-2xl bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
           
           {/* Header */}
           <div className="sticky top-0 z-20 bg-white/50 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-white/5 px-6 py-5 flex justify-between items-center">
@@ -578,9 +587,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </button>
           </div>
 
+          </div>
         </div>
-      </div>
-    </>
+      </>
+    </OverlayPortal>
   );
 };
 

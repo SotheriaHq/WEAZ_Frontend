@@ -16,6 +16,8 @@ import { toast } from 'sonner';
 import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
 import { useCountdown } from '@/hooks/useCountdown';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 type Props = {
   open: boolean;
@@ -33,6 +35,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const [commentPosted, setCommentPosted] = React.useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const currentUserId = useSelector((s: RootState) => s.user.profile?.id);
+  const dialogRef = React.useRef<HTMLDivElement>(null);
   
   // Calculate sale end time for countdown (always call hook)
   const saleEndTime = React.useMemo(() => {
@@ -47,6 +50,12 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   
   const { label: countdownLabel, expired } = useCountdown(saleEndTime);
 
+  useFocusTrap({
+    containerRef: dialogRef,
+    active: open,
+    onEscape: onClose,
+  });
+
   // Sync comment count when item changes
   React.useEffect(() => {
     if (item) {
@@ -58,13 +67,6 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     setCommentText((prevText) => prevText + emojiData.emoji);
     setShowEmojiPicker(false);
   }
-
-  React.useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
 
   React.useEffect(() => {
     if (open) {
@@ -129,12 +131,24 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   // (Handled earlier)
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-stretch justify-center" onClick={onClose}>
-      {/* Unified gradient blur backdrop */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
-      <div className="absolute inset-0 backdrop-blur-xl" />
-      <div className="absolute inset-0 bg-black/40" />
-  <div className="relative m-4 grid h-[90vh] w-[95%] max-w-6xl grid-cols-12 gap-0 rounded-2xl bg-white/5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <OverlayPortal>
+      <div
+        className="fixed inset-0 z-layer-modal flex items-stretch justify-center"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Design details"
+      >
+        {/* Unified gradient blur backdrop */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
+        <div className="absolute inset-0 backdrop-blur-xl" />
+        <div className="absolute inset-0 bg-black/40" />
+        <div
+          ref={dialogRef}
+          tabIndex={-1}
+          className="relative m-4 grid h-[90vh] w-[95%] max-w-6xl grid-cols-12 gap-0 rounded-2xl bg-white/5 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Close button */}
         <button
           type="button"
@@ -158,7 +172,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         </div>
 
         {/* Right: Data Area + Comments */}
-  <div className={`col-span-12 flex flex-col p-4 ${rightColsSm} ${rightColsMd} overflow-y-auto modal-scrollbar relative bg-white/60 dark:bg-white/5 backdrop-blur-xl border-l border-white/20 dark:border-white/10 rounded-r-2xl text-gray-900 dark:text-gray-100 overscroll-contain` }>
+      <div className={`col-span-12 flex flex-col p-4 ${rightColsSm} ${rightColsMd} overflow-y-auto modal-scrollbar relative bg-white/60 dark:bg-white/5 backdrop-blur-xl border-l border-white/20 dark:border-white/10 rounded-r-2xl text-gray-900 dark:text-gray-100 overscroll-contain` }>
           {/* Data Area */}
           <div className="pb-4">
             <div className="mb-3 flex items-center gap-3">
@@ -282,6 +296,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                 type="button"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+                aria-label="Toggle emoji picker"
               >
                 <Smile size={18} />
               </button>
@@ -320,7 +335,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         </div>
 
       </div>
-    </div>
+      </div>
+    </OverlayPortal>
   );
 };
 

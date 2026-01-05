@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, LogIn, UserPlus, ShoppingBag, Heart, Sparkles, Lock } from 'lucide-react';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface AuthRequiredPromptProps {
   /** Whether the prompt is visible */
@@ -30,6 +32,13 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
   feature = 'default',
 }) => {
   const navigate = useNavigate();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap({
+    containerRef: dialogRef,
+    active: isOpen,
+    onEscape: onClose,
+  });
 
   // Feature-specific content
   const featureContent: Record<string, { icon: React.ReactNode; title: string; description: string; emoji: string }> = {
@@ -82,44 +91,52 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50"
-            onClick={onClose}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
-            <div className="absolute inset-0 backdrop-blur-xl" />
-            <div className="absolute inset-0 bg-black/40" />
-          </motion.div>
+        <OverlayPortal>
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-layer-overlay"
+              onClick={onClose}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
+              <div className="absolute inset-0 backdrop-blur-xl" />
+              <div className="absolute inset-0 bg-black/40" />
+            </motion.div>
 
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="relative w-full max-w-md bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden">
-              {/* Gradient accent top */}
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500" />
-              
-              {/* Close button */}
-              <button
-                onClick={onClose}
-                className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors z-10"
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="fixed inset-0 z-layer-modal flex items-center justify-center p-4"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-label={displayTitle}
+            >
+              <div
+                ref={dialogRef}
+                tabIndex={-1}
+                className="relative w-full max-w-md bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden"
               >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
+                {/* Gradient accent top */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500" />
+                
+                {/* Close button */}
+                <button
+                  onClick={onClose}
+                  className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors z-10"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
 
-              {/* Content */}
-              <div className="p-8 pt-10 text-center">
+                {/* Content */}
+                <div className="p-8 pt-10 text-center">
                 {/* Icon with glow */}
                 <motion.div
                   className="relative inline-block mb-6"
@@ -193,10 +210,11 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
                 <p className="mt-6 text-xs text-gray-500 dark:text-gray-500">
                   By continuing, you agree to our Terms of Service and Privacy Policy
                 </p>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        </>
+            </motion.div>
+          </>
+        </OverlayPortal>
       )}
     </AnimatePresence>
   );

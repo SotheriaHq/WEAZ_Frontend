@@ -858,7 +858,11 @@ const BrandStore: React.FC = () => {
                     </label>
                   </div>
 
-                  <FrostedButton variant="primary" className="w-full" onClick={() => fetchProducts(true)}>
+                  <FrostedButton
+                    variant="primary"
+                    className="w-full"
+                    onClick={() => fetchProducts({ resetPage: true })}
+                  >
                     Apply Filters
                   </FrostedButton>
                 </div>
@@ -1195,7 +1199,14 @@ const BrandStore: React.FC = () => {
                 <FrostedButton variant="ghost" className="flex-1" onClick={clearFilters}>
                   Clear
                 </FrostedButton>
-                <FrostedButton variant="primary" className="flex-1" onClick={() => { fetchProducts(true); setShowFilters(false); }}>
+                <FrostedButton
+                  variant="primary"
+                  className="flex-1"
+                  onClick={() => {
+                    fetchProducts({ resetPage: true });
+                    setShowFilters(false);
+                  }}
+                >
                   Apply
                 </FrostedButton>
               </div>
