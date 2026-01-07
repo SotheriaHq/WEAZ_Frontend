@@ -369,7 +369,13 @@ const BrandStore: React.FC = () => {
     return String(num);
   };
 
-  const isOwnStore = currentUser?.id === brandId;
+  // Canonical store route param is Brand.id (exposed as `storeId` on the auth profile).
+  // Keep backward compatibility with older links that used the brand owner's User.id.
+  const isOwnStore = Boolean(
+    currentUser?.type === 'BRAND' &&
+      brandId &&
+      (currentUser.storeId === brandId || currentUser.id === brandId)
+  );
 
   // Collections: best-effort (backend may require auth; BrandApi returns [] on error)
   useEffect(() => {

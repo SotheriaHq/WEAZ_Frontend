@@ -78,8 +78,8 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col justify-center">
-      {/* Main Form Container - Centered */}
+    <div className="min-h-[calc(100vh-4rem)]">
+      {/* Main Form Container */}
       <div className="mx-auto w-full max-w-4xl p-6 lg:p-12">
         <div className="mx-auto max-w-2xl">
           {/* Auto-save indicator */}

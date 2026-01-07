@@ -939,7 +939,7 @@ const ProfilePage: React.FC = () => {
           tags: viewDisplayData.hashtags || [],
         }}
         canEdit={isOwner}
-        brandId={user?.id}
+        brandId={user?.storeId}
         onEditProfile={() => setIsHeaderQuickEditOpen(true)}
         onShareProfile={handleShareProfile}
         onEditAvatar={handleTriggerAvatarUpload}

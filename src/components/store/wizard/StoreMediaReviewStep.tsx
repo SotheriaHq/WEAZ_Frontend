@@ -11,7 +11,6 @@ import {
   ZoomIn,
   Lightbulb,
   ChevronRight,
-  RotateCw,
   ImageOff,
   Loader2,
 } from 'lucide-react';
@@ -59,7 +58,7 @@ const StoreMediaReviewStep: React.FC<StoreMediaReviewStepProps> = ({
   const [deferredIssues, setDeferredIssues] = useState(false);
 
   // Build media items from actual product images
-  const mediaItems = useMemo(() => {
+  const mediaItems: MediaItem[] = useMemo(() => {
     if (!data.products || data.products.length === 0) {
       return [];
     }
@@ -70,7 +69,7 @@ const StoreMediaReviewStep: React.FC<StoreMediaReviewStepProps> = ({
       url: product.image,
       name: product.name || `Product ${index + 1}`,
       resolution: '1200 x 1600px', // Placeholder - would be computed from actual image
-      status: 'passed' as const,
+      status: 'passed',
       issues: [],
     }));
   }, [data.products]);

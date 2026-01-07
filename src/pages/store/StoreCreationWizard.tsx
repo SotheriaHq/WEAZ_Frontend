@@ -356,7 +356,18 @@ const StoreCreationWizard: React.FC = () => {
       navigate('/store/my');
     } catch (error) {
       console.error('Failed to publish store', error);
-      toast.error('Failed to publish store. Please try again.');
+      const missingFields: string[] | undefined =
+        // Common Nest error shape: { message, missingFields }
+        (error as any)?.response?.data?.missingFields ??
+        // Wrapped API shape: { data: { missingFields } }
+        (error as any)?.response?.data?.data?.missingFields;
+
+      if (Array.isArray(missingFields) && missingFields.length > 0) {
+        toast.error(`Store setup incomplete: ${missingFields.join(', ')}`);
+        navigate('/store/essentials', { replace: true });
+      } else {
+        toast.error('Failed to publish store. Please try again.');
+      }
       setSaveState('error');
     }
   }, [persistProgress, navigate]);
