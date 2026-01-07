@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -10,6 +10,7 @@ import {
   Sparkles,
   Check,
   X,
+  ChevronDown,
 } from 'lucide-react';
 import type { StoreWizardData } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
@@ -135,7 +136,7 @@ const RECOMMENDED_DEFAULTS: Partial<StoreWizardData> = {
 
 /**
  * Store Policies Step (Screen 1.4)
- * Step 3 of 6: Configure shipping, returns, and contact policies
+ * Step 3 of 4: Configure shipping, returns, and contact policies
  */
 const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
   data,
@@ -145,6 +146,18 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
   isSaving = false,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  
+  // Accordion state for collapsible sections
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    shipping: true,
+    returns: true,
+    sizeChart: false, // Collapsed by default - less clutter
+    contact: true,
+  });
+  
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   // Toggle region selection
   const toggleRegion = useCallback(
@@ -236,7 +249,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                   </span>
                 </div>
                 <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">
-                  Step 3 of 6
+                  Step 3 of 4
                 </span>
               </div>
               {/* Progress Bar */}
@@ -514,23 +527,31 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                   )}
                 </div>
 
-                {/* Size Chart Card */}
+                {/* Size Chart Card - Collapsible */}
                 <div className="rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 p-6 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center text-green-600 dark:text-green-400">
-                      <Ruler className="w-5 h-5" />
+                  <button
+                    type="button"
+                    onClick={() => toggleSection('sizeChart')}
+                    className="w-full flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center text-green-600 dark:text-green-400">
+                        <Ruler className="w-5 h-5" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          Size Chart
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          {data.sizeChartPresetKey ? `Using ${data.sizeChartPresetKey}` : 'Tap to configure'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        Size Chart
-                      </h3>
-                      <p className="text-xs text-gray-500">
-                        Tap a preset or upload your own
-                      </p>
-                    </div>
-                  </div>
+                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${expandedSections.sizeChart ? 'rotate-180' : ''}`} />
+                  </button>
 
-                  <div className="grid md:grid-cols-2 gap-4">
+                  {expandedSections.sizeChart && (
+                  <div className="grid md:grid-cols-2 gap-4 mt-4">
                     {/* Preset cards */}
                     <div className="space-y-3">
                       {SIZE_CHARTS.map((chart, index) => {
@@ -671,6 +692,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       )}
                     </div>
                   </div>
+                  )}
                 </div>
 
                 {/* Customer Contact Card */}
@@ -744,7 +766,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
               <div className="mb-6">
                 <div className="flex justify-between text-sm mb-2">
                   <span className="text-gray-500">Progress</span>
-                  <span className="text-purple-600 font-medium">Step 3 of 6</span>
+                  <span className="text-purple-600 font-medium">Step 3 of 4</span>
                 </div>
                 <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
                   <div

@@ -41,6 +41,7 @@ import {
 } from './pages/placeholders';
 import StoreCreationWizard from './pages/store/StoreCreationWizard';
 import StoreEssentials from './pages/store/StoreEssentials';
+import MyStore from './pages/store/MyStore';
 import { GlobalModalRouter } from './components/modals/GlobalModalRouter';
 
 /**
@@ -106,7 +107,9 @@ const router = createBrowserRouter([
         path: '/studio/products',
         element: (
           <RequireBrand>
-            <ProductManagement />
+            <Layout>
+              <ProductManagement />
+            </Layout>
           </RequireBrand>
         ),
       },
@@ -114,7 +117,9 @@ const router = createBrowserRouter([
         path: '/studio/products/create',
         element: (
           <RequireBrand>
-            <EditProduct />
+            <Layout>
+              <EditProduct />
+            </Layout>
           </RequireBrand>
         ),
       },
@@ -122,7 +127,9 @@ const router = createBrowserRouter([
         path: '/studio/products/edit/:id',
         element: (
           <RequireBrand>
-            <EditProduct />
+            <Layout>
+              <EditProduct />
+            </Layout>
           </RequireBrand>
         ),
       },
@@ -180,6 +187,22 @@ const router = createBrowserRouter([
             </Layout>
           </RequireBrand>
         ),
+      },
+      {
+        // Owner's store view - brand users only
+        path: '/store/my',
+        element: (
+          <RequireBrand>
+            <Layout>
+              <MyStore />
+            </Layout>
+          </RequireBrand>
+        ),
+      },
+      {
+        // Redirect /store/dashboard to /store/my
+        path: '/store/dashboard',
+        element: <Navigate to="/store/my" replace />,
       },
       {
         // Standalone collection view page (redesigned)

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -11,7 +11,6 @@ import {
   X,
   Palette,
   FolderPlus,
-  Check,
 } from 'lucide-react';
 import type { StoreWizardData, WizardCollection } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
@@ -72,17 +71,8 @@ const StoreCatalogStep: React.FC<StoreCatalogStepProps> = ({
   const collectionsCount = data.collections.length;
   const productsComplete = productsCount >= MIN_PRODUCTS;
   const collectionsComplete = collectionsCount >= MIN_COLLECTIONS;
+  // Check if requirements are met (for informational purposes only)
   const requirementsMet = productsComplete && collectionsComplete;
-
-  // Calculate progress percentage
-  const progress = useMemo(() => {
-    let total = 0;
-    // Products contribute 50%
-    total += Math.min((productsCount / MIN_PRODUCTS) * 50, 50);
-    // Collections contribute 50%
-    total += Math.min((collectionsCount / MIN_COLLECTIONS) * 50, 50);
-    return Math.round(total);
-  }, [productsCount, collectionsCount]);
 
   // Handle tab change
   const handleTabChange = useCallback(
@@ -148,109 +138,29 @@ const StoreCatalogStep: React.FC<StoreCatalogStepProps> = ({
             </div>
           </div>
 
-          {/* Requirements Banner */}
-          <div className="bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-gray-200/50 dark:border-purple-500/10 rounded-2xl p-6 sm:p-8 mb-8">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-              <div className="flex-1">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                  Requirements to Continue
-                </h2>
-                <div className="space-y-3">
-                  {/* Products requirement */}
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                        productsComplete
-                          ? 'border-green-500 bg-green-500/10'
-                          : 'border-red-500'
-                      }`}
-                    >
-                      {productsComplete ? (
-                        <Check className="w-3 h-3 text-green-500" />
-                      ) : (
-                        <X className="w-3 h-3 text-red-500" />
-                      )}
-                    </div>
-                    <span className="text-gray-700 dark:text-gray-300">
-                      Add 3+ hero products
-                    </span>
-                    <span
-                      className={`ml-auto font-semibold ${
-                        productsComplete ? 'text-green-500' : 'text-red-500'
-                      }`}
-                    >
-                      {productsCount}/{MIN_PRODUCTS}
-                    </span>
+          {/* Optional Progress Banner - Compact */}
+          {(productsCount > 0 || collectionsCount > 0) && (
+            <div className="bg-purple-50/50 dark:bg-purple-500/5 border border-purple-200/50 dark:border-purple-500/10 rounded-xl p-4 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Products:</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">{productsCount}</span>
                   </div>
-
-                  {/* Collections requirement */}
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                        collectionsComplete
-                          ? 'border-green-500 bg-green-500/10'
-                          : 'border-red-500'
-                      }`}
-                    >
-                      {collectionsComplete ? (
-                        <Check className="w-3 h-3 text-green-500" />
-                      ) : (
-                        <X className="w-3 h-3 text-red-500" />
-                      )}
-                    </div>
-                    <span className="text-gray-700 dark:text-gray-300">
-                      Create 1 collection or look
-                    </span>
-                    <span
-                      className={`ml-auto font-semibold ${
-                        collectionsComplete ? 'text-green-500' : 'text-red-500'
-                      }`}
-                    >
-                      {collectionsCount}/{MIN_COLLECTIONS}
-                    </span>
+                  <div className="w-px h-4 bg-gray-300 dark:bg-gray-700" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Collections:</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">{collectionsCount}</span>
                   </div>
                 </div>
-              </div>
-
-              {/* Progress Ring */}
-              <div className="flex items-center justify-center">
-                <div className="relative w-24 h-24 sm:w-32 sm:h-32">
-                  <svg
-                    className="transform -rotate-90 w-24 h-24 sm:w-32 sm:h-32"
-                    viewBox="0 0 100 100"
-                  >
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="44"
-                      stroke="currentColor"
-                      strokeWidth="8"
-                      fill="none"
-                      className="text-gray-200 dark:text-gray-800"
-                    />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="44"
-                      stroke={progress === 100 ? '#22c55e' : '#ef4444'}
-                      strokeWidth="8"
-                      fill="none"
-                      strokeDasharray={276.46}
-                      strokeDashoffset={276.46 - (276.46 * progress) / 100}
-                      strokeLinecap="round"
-                      className="transition-all duration-500"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center flex-col">
-                    <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                      {progress}%
-                    </div>
-                    <div className="text-xs text-gray-500">Complete</div>
-                  </div>
-                </div>
+                {requirementsMet && (
+                  <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">
+                    ✓ Ready
+                  </span>
+                )}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Products Section */}
           <div className="mb-8">
@@ -299,22 +209,18 @@ const StoreCatalogStep: React.FC<StoreCatalogStepProps> = ({
                 </div>
               ))}
 
-              {/* Empty Product Cards (show remaining slots) */}
-              {Array.from({ length: Math.max(0, MIN_PRODUCTS - productsCount) }).map(
-                (_, i) => (
-                  <div
-                    key={`empty-${i}`}
-                    onClick={onOpenAddProduct}
-                    className="bg-gray-50/50 dark:bg-white/[0.02] border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-2xl p-8 flex flex-col items-center justify-center min-h-[280px] hover:border-purple-500/50 transition-all duration-200 cursor-pointer group"
-                  >
-                    <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-all duration-200">
-                      <Plus className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <p className="text-gray-500 dark:text-gray-400 font-medium">
-                      Add Product
-                    </p>
+              {/* Empty state - show only when no products */}
+              {productsCount === 0 && (
+                <div
+                  onClick={onOpenAddProduct}
+                  className="col-span-full bg-gray-50/50 dark:bg-white/[0.02] border border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-purple-500/50 transition-all group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center mb-3 group-hover:bg-purple-500/20 transition-all">
+                    <Plus className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                   </div>
-                )
+                  <p className="text-gray-900 dark:text-white font-medium mb-1">No products yet</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Click to add your first product</p>
+                </div>
               )}
             </div>
           </div>
@@ -480,8 +386,8 @@ const StoreCatalogStep: React.FC<StoreCatalogStepProps> = ({
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
               {!requirementsMet && (
-                <p className="text-sm text-red-500 text-center sm:text-right">
-                  Complete requirements above to continue
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center sm:text-right">
+                  You can add products later from your dashboard
                 </p>
               )}
               <div className="flex gap-3">
@@ -494,14 +400,10 @@ const StoreCatalogStep: React.FC<StoreCatalogStepProps> = ({
                 </button>
                 <button
                   onClick={onContinue}
-                  disabled={!requirementsMet || isSaving}
-                  className={`px-8 py-3 rounded-xl font-semibold transition-colors inline-flex items-center gap-2 ${
-                    requirementsMet
-                      ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                      : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
-                  }`}
+                  disabled={isSaving}
+                  className="px-8 py-3 rounded-xl font-semibold transition-colors inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white"
                 >
-                  Continue
+                  {requirementsMet ? 'Continue' : 'Skip for Now'}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>

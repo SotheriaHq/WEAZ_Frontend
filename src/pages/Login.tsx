@@ -350,12 +350,12 @@ const LoginPage = () => {
         {/* Right Side: Login Form */}
         <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12 relative z-10">
           {/* Mobile Logo */}
-          <div className="lg:hidden absolute top-8 left-8 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-lg">
+          <Link to="/" className="lg:hidden absolute top-8 left-8 flex items-center gap-3 group">
+            <div className="w-8 h-8 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-lg shadow-[0_0_12px_rgba(212,175,55,0.4)] group-hover:shadow-[0_0_20px_rgba(212,175,55,0.6)] transition-shadow">
               T
             </div>
-            <span className="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white">Threadly</span>
-          </div>
+            <span className="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors">Threadly</span>
+          </Link>
 
           <div className="w-full max-w-md mt-16 lg:mt-0">
             {/* Login Card - Brighter glass panel */}

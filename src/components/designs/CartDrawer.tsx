@@ -52,9 +52,9 @@ const CartDrawer: React.FC = () => {
   const navigate = useNavigate();
 
   const isOpen = useSelector(selectCartIsDrawerOpen);
-  const items = useSelector(selectCartItems);
-  const subtotal = useSelector(selectCartSubtotal);
-  const totalQuantity = useSelector(selectCartTotalQuantity);
+  const items = useSelector(selectCartItems) || []; // Defensive: default to empty array
+  const subtotal = useSelector(selectCartSubtotal) || 0;
+  const totalQuantity = useSelector(selectCartTotalQuantity) || 0;
   const currency = useSelector(selectCartCurrency);
   const isLoading = useSelector(selectCartIsLoading);
   const user = useSelector((state: RootState) => state.user.profile);

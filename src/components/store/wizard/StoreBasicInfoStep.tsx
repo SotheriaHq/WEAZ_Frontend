@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import type { StoreWizardData } from '@/types/storeWizard';
-import StoreLivePreview from './StoreLivePreview';
+
 
 interface StoreBasicInfoStepProps {
   data: StoreWizardData;
@@ -53,24 +53,35 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
     }
   };
 
-  // Form validation
-  const isValid =
-    data.name.trim() &&
-    data.slug.trim() &&
-    data.categories.length > 0 &&
-    data.tagline.trim() &&
-    data.description.length >= 100 &&
-    data.description.length <= 500;
+  // Validation check with detailed feedback
+  const nameValid = data.name.trim().length > 0;
+  const slugValid = data.slug.trim().length > 0;
+  const categoriesValid = data.categories.length > 0;
+  const taglineValid = data.tagline.trim().length > 0;
+  const descriptionValid = data.description.length >= 100 && data.description.length <= 500;
+
+  const isValid = nameValid && slugValid && categoriesValid && taglineValid && descriptionValid;
 
   const handleContinueClick = async () => {
+    if (!isValid) {
+      // Show what's missing
+      const missing: string[] = [];
+      if (!nameValid) missing.push('Store Name');
+      if (!slugValid) missing.push('Store Slug');
+      if (!categoriesValid) missing.push('At least 1 category');
+      if (!taglineValid) missing.push('Tagline');
+      if (!descriptionValid) missing.push('Description (100-500 chars)');
+      console.warn('Form invalid. Missing:', missing.join(', '));
+      return;
+    }
     await onContinue();
   };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-[calc(100vh-4rem)]">
-      {/* Left Side - Form Section (60%) */}
-      <div className="w-full lg:w-[60%] p-6 lg:p-12 overflow-y-auto">
-        <div className="max-w-2xl mx-auto">
+    <div className="flex min-h-[calc(100vh-4rem)] flex-col justify-center">
+      {/* Main Form Container - Centered */}
+      <div className="mx-auto w-full max-w-4xl p-6 lg:p-12">
+        <div className="mx-auto max-w-2xl">
           {/* Auto-save indicator */}
           <div className="flex justify-end mb-4">
             <div className="inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300 bg-white/60 dark:bg-white/5 border border-gray-200/50 dark:border-white/10 backdrop-blur-sm rounded-full px-3 py-1.5">
@@ -109,7 +120,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
             </div>
           </div>
           
-          {/* Header with sharper text */}
+          {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl lg:text-4xl font-bold mb-3 text-gray-900 dark:text-white tracking-tight">
               Create Your Store
@@ -117,52 +128,44 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
             <p className="text-gray-600 dark:text-gray-300 font-medium">Tell us about your brand. This information will be visible to shoppers.</p>
           </div>
 
-          {/* Form Container */}
-          <div className="rounded-2xl p-6 lg:p-8 mb-6 bg-gray-50/80 dark:bg-white/[0.03] backdrop-blur-xl border border-gray-200/50 dark:border-purple-500/10">
-            <form onSubmit={(e) => e.preventDefault()}>
-              {/* Store Name */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">
-                  Store Name <span className="text-red-500">*</span>
-                </label>
+          {/* Form Fields - No container, spread across page */}
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-6 mb-8">
+            {/* Store Name - Locked */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">
+                Store Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                maxLength={50}
+                value={data.name}
+                disabled
+                className="w-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-700 dark:text-gray-300 cursor-not-allowed"
+                placeholder="Pulled from your profile"
+              />
+              <p className="text-xs text-gray-400 mt-1">Locked from your profile</p>
+            </div>
+
+            {/* Store Slug - Locked */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">
+                Store Slug <span className="text-red-500">*</span>
+              </label>
+              <div className="flex items-center bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                <span className="px-4 text-gray-500 text-sm">threadly.com/store/</span>
                 <input
                   type="text"
-                  maxLength={50}
-                  value={data.name}
+                  value={data.slug}
                   disabled
-                  className="w-full bg-white/60 dark:bg-white/5 border border-gray-300/70 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none transition-colors opacity-90"
-                  placeholder="Store name is pulled from your brand profile"
+                  className="flex-1 bg-transparent py-3 pr-4 text-gray-700 dark:text-gray-300 cursor-not-allowed"
+                  placeholder="username"
                 />
-                <p className="text-xs text-gray-500 mt-2">
-                  Store name is locked during creation.
-                </p>
-                <div className="flex justify-end mt-1">
-                  <span className="text-xs text-gray-500">{data.name.length}/50</span>
-                </div>
               </div>
+              <p className="text-xs text-gray-400 mt-1">Locked from your username</p>
+            </div>
 
-              {/* Store Slug */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">
-                  Store Slug <span className="text-red-500">*</span>
-                </label>
-                <div className="flex items-center bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden focus-within:border-purple-500 transition-colors">
-                  <span className="px-4 text-gray-500 text-sm">threadly.com/store/</span>
-                  <input
-                    type="text"
-                    value={data.slug}
-                    disabled
-                    className="flex-1 bg-transparent py-3 pr-4 text-gray-900 dark:text-white focus:outline-none opacity-90"
-                    placeholder="username"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Store slug is locked to your username during creation.
-                </p>
-              </div>
-
-              {/* Categories - Multi-select chips (max 3) */}
-              <div className="mb-6">
+            {/* Categories */}
+            <div>
                 <label className="block text-sm font-semibold mb-2 text-gray-800 dark:text-white">
                   Categories <span className="text-red-500">*</span>
                   <span className="text-xs font-normal text-gray-500 dark:text-gray-400 ml-2">(Select up to {MAX_CATEGORIES})</span>
@@ -199,55 +202,54 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                     {data.categories.length} of {MAX_CATEGORIES} selected
                   </p>
                 )}
-              </div>
+            </div>
 
-              {/* Tagline */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">
-                  Tagline <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  maxLength={100}
-                  value={data.tagline}
-                  onChange={(e) => onChange({ tagline: e.target.value })}
-                  className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 transition-colors"
-                  placeholder="Your brand in one line"
-                />
-                <div className="flex justify-between mt-1">
-                  <span className="text-xs text-gray-500">Your brand in one line</span>
-                  <span className="text-xs text-gray-500">{data.tagline.length}/100</span>
-                </div>
+            {/* Tagline */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">
+                Tagline <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                maxLength={100}
+                value={data.tagline}
+                onChange={(e) => onChange({ tagline: e.target.value })}
+                className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 transition-colors"
+                placeholder="Your brand in one line"
+              />
+              <div className="flex justify-between mt-1">
+                <span className="text-xs text-gray-500">Your brand in one line</span>
+                <span className="text-xs text-gray-500">{data.tagline.length}/100</span>
               </div>
+            </div>
 
-              {/* Description */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">
-                  Description <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  rows={4}
-                  minLength={100}
-                  maxLength={500}
-                  value={data.description}
-                  onChange={(e) => onChange({ description: e.target.value })}
-                  className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 transition-colors resize-none"
-                  placeholder="Tell customers about your store..."
-                />
-                <div className="flex justify-between mt-1">
-                  <span className={`text-xs ${data.description.length < 100 ? 'text-amber-500' : 'text-gray-500'}`}>
-                    Minimum 100 characters
-                  </span>
-                  <span className="text-xs text-gray-500">{data.description.length}/500</span>
-                </div>
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">
+                Description <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                rows={4}
+                minLength={100}
+                maxLength={500}
+                value={data.description}
+                onChange={(e) => onChange({ description: e.target.value })}
+                className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 transition-colors resize-none"
+                placeholder="Tell customers about your store..."
+              />
+              <div className="flex justify-between mt-1">
+                <span className={`text-xs ${data.description.length < 100 ? 'text-amber-500' : 'text-gray-500'}`}>
+                  Minimum 100 characters
+                </span>
+                <span className="text-xs text-gray-500">{data.description.length}/500</span>
               </div>
-            </form>
-          </div>
+            </div>
+          </form>
 
-          {/* Footer Actions */}
-          <div className="rounded-2xl p-6 bg-gray-50/80 dark:bg-white/[0.03] backdrop-blur-xl border border-gray-200/50 dark:border-purple-500/10">
+          {/* Footer Actions - No container */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
             {/* Progress Bar */}
-            <div className="mb-6">
+            <div className="mb-4">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-500">Progress</span>
                 <span className="text-purple-600 font-medium">Step 1 of 6</span>
@@ -284,11 +286,6 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Right Side - Live Preview (40%) - Transparent to inherit Layout gradient */}
-      <div className="w-full lg:w-[40%] p-6 lg:p-12 lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] overflow-y-auto border-l border-gray-200/30 dark:border-white/5">
-        <StoreLivePreview data={data} />
       </div>
     </div>
   );
