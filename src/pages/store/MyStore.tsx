@@ -83,6 +83,12 @@ const MyStore: React.FC = () => {
           products: [], // TODO: Fetch products from product API
         });
       } catch (err) {
+        const status = (err as any)?.response?.status;
+        if (status === 404) {
+          // No store exists yet for this brand
+          navigate('/store/create', { replace: true });
+          return;
+        }
         console.error('Failed to load store data:', err);
         setError('Failed to load store data');
         toast.error('Failed to load store data');

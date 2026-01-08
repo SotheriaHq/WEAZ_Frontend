@@ -27,7 +27,7 @@ interface ProfileHeaderProps {
     tags: string[];
   };
   canEdit?: boolean;
-  brandId?: string | null;
+  hasStore?: boolean;
   onEditProfile?: () => void;
   onShareProfile?: () => void;
   onEditAvatar?: () => void;
@@ -59,7 +59,7 @@ const ActionButton: React.FC<{
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   profileData,
   canEdit = false,
-  brandId,
+  hasStore = false,
   onEditProfile,
   onShareProfile,
   onEditAvatar,
@@ -231,7 +231,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
           {/* 🔧 FIX #4: Reduced bottom margin from mb-16 to mb-6 */}
           <div className="flex gap-2 self-end sm:self-end mb-6">
-            {canEdit ? <StoreAccessButton brandId={brandId ?? null} /> : null}
+            {canEdit ? <StoreAccessButton hasStore={hasStore} /> : null}
             {canEdit ? (
               <ActionButton
                 Icon={FiEdit2}

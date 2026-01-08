@@ -3,32 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { Store } from 'lucide-react';
 
 interface StoreAccessButtonProps {
-  brandId?: string | null;
+  hasStore?: boolean;
   className?: string;
 }
 
 /**
  * Store Access Button - displays on Brand profile
- * - No store: "Create Your Store" → /store/essentials
- * - Has store: "🏪 Store" → /store/:id
+ * - No store: "Create Your Store" → /store/create
+ * - Has store: "🏪 Store" → /store/my
  */
 const StoreAccessButton: React.FC<StoreAccessButtonProps> = ({
-  brandId,
+  hasStore = false,
   className = '',
 }) => {
   const navigate = useNavigate();
 
   const handleClick = () => {
-    if (brandId) {
-      navigate(`/store/${brandId}`);
-      return;
-    }
-
-    // Fallback: if we don't know the brandId, send the user to setup.
-    navigate('/store/essentials');
+    navigate(hasStore ? '/store/my' : '/store/create');
   };
-
-  const hasStore = Boolean(brandId);
 
   return (
     <button
