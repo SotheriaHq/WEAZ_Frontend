@@ -151,7 +151,7 @@ const StoreEssentials: React.FC = () => {
         // Don’t block onboarding on transient failures.
       }
 
-      navigate('/store/create', { replace: true });
+      navigate('/studio/store/setup', { replace: true });
     },
     [instagram, navigate, selected, tagline]
   );

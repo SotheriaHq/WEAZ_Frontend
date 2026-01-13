@@ -10,8 +10,8 @@ const groups = [
   {
     title: 'Studio',
     items: [
-      { key: 'overview', label: 'Dashboard', path: '/studio?tab=overview', emoji: '📊' },
-      { key: 'products', label: 'Products', path: '/studio?tab=products', emoji: '🧵' },
+      { key: 'overview', label: 'Dashboard', path: '/studio', emoji: '📊' },
+      { key: 'store', label: 'Store', path: '/studio/store', emoji: '🛍️' },
       { key: 'orders', label: 'Orders', path: '/studio?tab=orders', emoji: '📦' },
       { key: 'customers', label: 'Customers', path: '/studio?tab=customers', emoji: '👥' },
       { key: 'analytics', label: 'Analytics', path: '/studio?tab=analytics', emoji: '📈' },
@@ -29,7 +29,7 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
   };
 
   return (
-    <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[200px] bg-white dark:bg-[#0a0a0a] z-20 overflow-y-auto scrollbar-hide border-r border-gray-200 dark:border-gray-800">
+    <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[200px] z-20 overflow-y-auto scrollbar-hide border-r border-purple-200/30 dark:border-white/10 bg-gradient-to-b from-[#faf8ff]/90 to-[#f5f0ff]/80 dark:from-[#0f0f0f]/95 dark:to-[#0a0a0a]/90 backdrop-blur-xl">
       <div className="py-4 px-2">
         <div className="px-3 mb-4">
           <h2 className="text-sm font-bold text-black dark:text-white uppercase tracking-wider">Studio</h2>

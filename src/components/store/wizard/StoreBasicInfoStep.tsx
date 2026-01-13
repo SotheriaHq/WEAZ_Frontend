@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import type { StoreWizardData } from '@/types/storeWizard';
 
 
@@ -14,6 +15,8 @@ interface StoreBasicInfoStepProps {
 }
 
 const MAX_CATEGORIES = 3;
+const MAX_TAGLINE_LEN = 100;
+const MAX_DESCRIPTION_LEN = 500;
 
 const FALLBACK_CATEGORIES = [
   { value: 'african', label: 'African Fashion' },
@@ -58,7 +61,8 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
   const slugValid = data.slug.trim().length > 0;
   const categoriesValid = data.categories.length > 0;
   const taglineValid = data.tagline.trim().length > 0;
-  const descriptionValid = data.description.length >= 100 && data.description.length <= 500;
+  const descriptionLen = data.description.length;
+  const descriptionValid = descriptionLen >= 100 && descriptionLen <= MAX_DESCRIPTION_LEN;
 
   const isValid = nameValid && slugValid && categoriesValid && taglineValid && descriptionValid;
 
@@ -71,7 +75,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
       if (!categoriesValid) missing.push('At least 1 category');
       if (!taglineValid) missing.push('Tagline');
       if (!descriptionValid) missing.push('Description (100-500 chars)');
-      console.warn('Form invalid. Missing:', missing.join(', '));
+      toast.error(`Please complete: ${missing.join(', ')}`);
       return;
     }
     await onContinue();
@@ -213,13 +217,13 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                 type="text"
                 maxLength={100}
                 value={data.tagline}
-                onChange={(e) => onChange({ tagline: e.target.value })}
+                onChange={(e) => onChange({ tagline: e.target.value.slice(0, MAX_TAGLINE_LEN) })}
                 className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 transition-colors"
                 placeholder="Your brand in one line"
               />
               <div className="flex justify-between mt-1">
                 <span className="text-xs text-gray-500">Your brand in one line</span>
-                <span className="text-xs text-gray-500">{data.tagline.length}/100</span>
+                <span className="text-xs text-gray-500">{data.tagline.length}/{MAX_TAGLINE_LEN}</span>
               </div>
             </div>
 
@@ -231,17 +235,17 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
               <textarea
                 rows={4}
                 minLength={100}
-                maxLength={500}
+                maxLength={MAX_DESCRIPTION_LEN}
                 value={data.description}
-                onChange={(e) => onChange({ description: e.target.value })}
+                onChange={(e) => onChange({ description: e.target.value.slice(0, MAX_DESCRIPTION_LEN) })}
                 className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 transition-colors resize-none"
                 placeholder="Tell customers about your store..."
               />
               <div className="flex justify-between mt-1">
-                <span className={`text-xs ${data.description.length < 100 ? 'text-amber-500' : 'text-gray-500'}`}>
-                  Minimum 100 characters
+                <span className={`text-xs ${descriptionLen < 100 ? 'text-amber-500' : 'text-gray-500'}`}>
+                  100–{MAX_DESCRIPTION_LEN} characters
                 </span>
-                <span className="text-xs text-gray-500">{data.description.length}/500</span>
+                <span className="text-xs text-gray-500">{descriptionLen}/{MAX_DESCRIPTION_LEN}</span>
               </div>
             </div>
           </form>
@@ -276,7 +280,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                 <button
                   type="button"
                   onClick={handleContinueClick}
-                  disabled={!isValid || isLoadingDraft}
+                  disabled={isLoadingDraft}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
                 >
                   Continue

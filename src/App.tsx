@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Outlet, Navigate, useParams } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import Market from './pages/Market';
 import SettingsHome from './pages/settings/SettingsHome';
@@ -21,12 +21,10 @@ import { Toaster } from 'sonner';
 import CollectionViewRedesign from './pages/catalog/CollectionViewRedesign';
 import ErrorPage from './pages/ErrorPage';
 import StudioHome from './pages/studio/StudioHome';
-import ProductManagement from './pages/studio/products/ProductManagement';
 import EditProduct from './pages/studio/products/EditProduct';
-import { Navigate } from 'react-router-dom';
 import CartDrawer from './components/designs/CartDrawer';
 import WishlistDrawer from './components/designs/WishlistDrawer';
-import BrandStore from './pages/brand/BrandStore';
+import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
 import CheckoutPage from './pages/checkout/CheckoutPage';
 import MyOrders from './pages/orders/MyOrders';
 import OrderDetail from './pages/orders/OrderDetail';
@@ -39,10 +37,11 @@ import {
   WatchLaterPlaceholder,
   TrendingPlaceholder,
 } from './pages/placeholders';
-import StoreCreationWizard from './pages/store/StoreCreationWizard';
-import StoreEssentials from './pages/store/StoreEssentials';
-import MyStore from './pages/store/MyStore';
 import { GlobalModalRouter } from './components/modals/GlobalModalRouter';
+import ShopSetupWizardPage from './pages/studio/shop/ShopSetupWizardPage';
+import ShopSetupEssentialsPage from './pages/studio/shop/ShopSetupEssentialsPage';
+import StudioScaffold from './components/studio/StudioScaffold';
+import StoreManagement from './pages/studio/store/StoreManagement';
 
 /**
  * Root layout component that wraps all routes
@@ -57,6 +56,11 @@ const RootLayout: React.FC = () => (
     <Outlet />
   </>
 );
+
+const LegacyProductEditRedirect: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={id ? `/studio/store/products/${id}/edit` : '/studio/store'} replace />;
+};
 
 const profileChildren = [
   { index: true, element: <Profile /> },
@@ -104,34 +108,70 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: '/studio/products',
+        path: '/studio/store',
         element: (
           <RequireBrand>
-            <Layout>
-              <ProductManagement />
-            </Layout>
+            <StudioScaffold active="store" onSelect={() => {}}>
+              <StoreManagement />
+            </StudioScaffold>
           </RequireBrand>
         ),
+      },
+      {
+        path: '/studio/store/products/new',
+        element: (
+          <RequireBrand>
+            <StudioScaffold active="store" onSelect={() => {}}>
+              <EditProduct />
+            </StudioScaffold>
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/store/products/:id/edit',
+        element: (
+          <RequireBrand>
+            <StudioScaffold active="store" onSelect={() => {}}>
+              <EditProduct />
+            </StudioScaffold>
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/shop/setup',
+        element: <Navigate to="/studio/store/setup" replace />,
+      },
+      {
+        path: '/studio/shop/essentials',
+        element: <Navigate to="/studio/store/essentials" replace />,
+      },
+      {
+        path: '/studio/store/setup',
+        element: (
+          <RequireBrand>
+            <ShopSetupWizardPage />
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/store/essentials',
+        element: (
+          <RequireBrand>
+            <ShopSetupEssentialsPage />
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/products',
+        element: <Navigate to="/studio/store" replace />,
       },
       {
         path: '/studio/products/create',
-        element: (
-          <RequireBrand>
-            <Layout>
-              <EditProduct />
-            </Layout>
-          </RequireBrand>
-        ),
+        element: <Navigate to="/studio/store/products/new" replace />,
       },
       {
         path: '/studio/products/edit/:id',
-        element: (
-          <RequireBrand>
-            <Layout>
-              <EditProduct />
-            </Layout>
-          </RequireBrand>
-        ),
+        element: <LegacyProductEditRedirect />,
       },
       {
         path: '/dashboard',
@@ -164,45 +204,27 @@ const router = createBrowserRouter([
       },
       {
         path: '/store/:brandId',
-        element: <Layout><BrandStore /></Layout>,
+        element: <LegacyStoreRedirect />,
       },
       {
-        // Store essentials capture - brand users only, standalone (no Layout)
+        // Legacy store essentials route (moved into Studio)
         path: '/store/essentials',
-        element: (
-          <RequireBrand>
-            <Layout>
-              <StoreEssentials />
-            </Layout>
-          </RequireBrand>
-        ),
+        element: <Navigate to="/studio/store/essentials" replace />,
       },
       {
-        // Store creation wizard - brand users only, wrapped in Layout for navbar/sidebar
+        // Legacy store wizard route (moved into Studio)
         path: '/store/create',
-        element: (
-          <RequireBrand>
-            <Layout>
-              <StoreCreationWizard />
-            </Layout>
-          </RequireBrand>
-        ),
+        element: <Navigate to="/studio/store/setup" replace />,
       },
       {
-        // Owner's store view - brand users only
+        // Legacy owner's store view (moved into Studio)
         path: '/store/my',
-        element: (
-          <RequireBrand>
-            <Layout>
-              <MyStore />
-            </Layout>
-          </RequireBrand>
-        ),
+        element: <Navigate to="/studio/store" replace />,
       },
       {
-        // Redirect /store/dashboard to /store/my
+        // Redirect /store/dashboard to Studio shop
         path: '/store/dashboard',
-        element: <Navigate to="/store/my" replace />,
+        element: <Navigate to="/studio/store" replace />,
       },
       {
         // Standalone collection view page (redesigned)

@@ -23,14 +23,14 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  if (!open) return null;
-
   const panelRef = useRef<HTMLDivElement | null>(null);
   useFocusTrap({
     active: open,
     containerRef: panelRef,
     onEscape: onCancel,
   });
+
+  if (!open) return null;
 
   return (
     <OverlayPortal>

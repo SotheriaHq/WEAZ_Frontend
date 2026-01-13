@@ -11,19 +11,18 @@ interface ProfileImageModalProps {
 }
 
 const ProfileImageModal: React.FC<ProfileImageModalProps> = ({ open, src, alt = 'Profile image', onClose }) => {
-  if (!open || !src) return null;
-
+  const isVisible = Boolean(open && src);
   const panelRef = React.useRef<HTMLDivElement | null>(null);
 
   useFocusTrap({
-    active: open,
+    active: isVisible,
     containerRef: panelRef,
     onEscape: onClose,
     initialFocusSelector: '[data-initial-focus="true"]',
   });
 
   React.useEffect(() => {
-    if (!open) return;
+    if (!isVisible) return;
     const originalBodyOverflow = document.body.style.overflow;
     const originalHtmlOverflow = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -32,7 +31,9 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({ open, src, alt = 
       document.body.style.overflow = originalBodyOverflow;
       document.documentElement.style.overflow = originalHtmlOverflow;
     };
-  }, [open]);
+  }, [isVisible]);
+
+  if (!open || !src) return null;
 
   return (
     <OverlayPortal>

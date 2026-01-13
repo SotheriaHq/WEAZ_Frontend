@@ -19,8 +19,6 @@ const CreateStoreModal: React.FC<Props> = ({ open, onClose }) => {
 
   const panelRef = React.useRef<HTMLDivElement | null>(null);
 
-  if (!open) return null;
-
   useFocusTrap({
     active: open,
     containerRef: panelRef,
@@ -39,6 +37,8 @@ const CreateStoreModal: React.FC<Props> = ({ open, onClose }) => {
       document.documentElement.style.overflow = originalHtmlOverflow;
     };
   }, [open]);
+
+  if (!open) return null;
 
   const handleCreate = async () => {
     if (!name.trim()) {

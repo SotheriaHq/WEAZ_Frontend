@@ -55,7 +55,11 @@ export const userSlice = createSlice({
   initialState,
   reducers: {
     setUser: (state, action: PayloadAction<AuthUserDto>) => {
-      const normalized = normalizeUser(action.payload);
+      // Some endpoints return partial user objects (e.g. profile update flows).
+      // Merge with existing profile first so we don't accidentally null-out or
+      // lose critical fields like `type` and `role`.
+      const merged = state.profile ? ({ ...state.profile, ...action.payload } as AuthUserDto) : action.payload;
+      const normalized = normalizeUser(merged);
       state.profile = normalized;
       state.isAuthenticated = true;
       if (typeof window !== 'undefined') {

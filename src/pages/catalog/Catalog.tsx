@@ -28,10 +28,11 @@ import type { BrandProfileDto, CollectionDto } from '../../types/profile';
 import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedFileUrl';
 import { getStoreStatus, type StoreStatusResponse } from '../../api/StoreApi';
 import FrostedButton from '@/components/ui/FrostedButton';
+import CatalogShopTab from '@/components/catalog/CatalogShopTab';
 
 import ComingSoon from '../placeholders/ComingSoon';
 
-type TabType = 'Collections' | 'Reviews' | 'About' | 'Drafts';
+type TabType = 'Collections' | 'Store' | 'Reviews' | 'About' | 'Drafts';
 // CollectionType removed — dropdown opens modal directly
 
 const ProfilePage: React.FC = () => {
@@ -80,8 +81,8 @@ const ProfilePage: React.FC = () => {
       setSelectedCollectionId(urlCollectionId);
     }
     const tab = searchParams.get('tab');
-    if (tab && ['Collections', 'Reviews', 'About'].includes(tab)) {
-      setActiveTab(tab as TabType);
+    if (tab && ['Collections', 'Shop', 'Store', 'Reviews', 'About'].includes(tab)) {
+      setActiveTab((tab === 'Shop' ? 'Store' : tab) as TabType);
     }
     // Handle visibility filter from URL (e.g., after draft save redirect)
     const visibility = searchParams.get('visibility');
@@ -195,6 +196,7 @@ const ProfilePage: React.FC = () => {
   // Capture navigation state from publish flow to show inline publishing badge on card
   useEffect(() => {
     const navState = (location.state as any) || {};
+    const navToast = navState.toast as { type?: 'success' | 'info' | 'warning' | 'error'; message?: string } | undefined;
     if (navState.publishingCollectionId) {
       const id = String(navState.publishingCollectionId);
       const startedAt = typeof navState.publishingStartedAt === 'number' ? navState.publishingStartedAt : Date.now();
@@ -209,13 +211,26 @@ const ProfilePage: React.FC = () => {
       }));
       // Clear state so refresh/back does not re-run
       navigate(`${location.pathname}${location.search}`, { replace: true });
+      return;
+    }
+
+    if (navToast?.message) {
+      const message = String(navToast.message);
+      const type = navToast.type ?? 'info';
+      if (type === 'success') toast.success(message);
+      else if (type === 'warning') toast.warning(message);
+      else if (type === 'error') toast.error(message);
+      else toast.info(message);
+      navigate(`${location.pathname}${location.search}`, { replace: true });
     }
   }, [location.pathname, location.search, location.state, navigate]);
 
   const isEditModalOpen = searchParams.get('modal') === 'brand-setup';
-  const hasDismissedSetup = useMemo(() => {
+
+  const getHasDismissedBrandSetup = useCallback(() => {
     const DISMISS_KEY = 'threadly.brandProfileSetup.dismissedUntil';
-    const dismissedUntilRaw = localStorage.getItem(DISMISS_KEY);
+    if (typeof window === 'undefined') return false;
+    const dismissedUntilRaw = window.localStorage.getItem(DISMISS_KEY);
     const dismissedUntil = dismissedUntilRaw ? Number(dismissedUntilRaw) : 0;
     return Boolean(dismissedUntil && dismissedUntil > Date.now());
   }, []);
@@ -331,6 +346,7 @@ const ProfilePage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const hasDismissedSetup = getHasDismissedBrandSetup();
     if (
       isOwner &&
       !brandProfileLoading &&
@@ -347,7 +363,7 @@ const ProfilePage: React.FC = () => {
     isOwner,
     brandProfileLoading,
     requiresProfileSetup,
-    hasDismissedSetup,
+    getHasDismissedBrandSetup,
     isEditModalOpen,
     searchParams,
     setSearchParams,
@@ -590,6 +606,18 @@ const ProfilePage: React.FC = () => {
     void run();
     return () => { mounted = false; };
   }, [isVisitorView, routeBrandId]);
+
+  const viewIsStoreOpen = useMemo(() => {
+    if (isVisitorView) return Boolean(visitorProfile?.isStoreOpen);
+    return Boolean(storeStatus?.isStoreOpen);
+  }, [isVisitorView, visitorProfile?.isStoreOpen, storeStatus?.isStoreOpen]);
+
+  const shopBrandId = routeBrandId ?? user?.id ?? '';
+  const ownerHasStoreProfile = useMemo(() => {
+    if (!isOwner) return undefined;
+    if (storeStatusLoading) return undefined;
+    return Boolean(storeStatus?.profile);
+  }, [isOwner, storeStatus?.profile, storeStatusLoading]);
 
   // Visitor: fetch private access states for Private view
   const [privateStates, setPrivateStates] = useState<Array<{ collectionId: string; title: string; coverUrl?: string | null; coverFileId?: string | null; itemCount?: number; state: 'APPROVED' | 'PENDING' | 'REVOKED' | 'NONE' }>>([]);
@@ -907,7 +935,7 @@ const ProfilePage: React.FC = () => {
               </p>
             </div>
             <div className="mt-3 flex items-center justify-end gap-2">
-              <FrostedButton size="sm" variant="primary" onClick={() => navigate('/store/essentials')}>
+              <FrostedButton size="sm" variant="primary" onClick={() => navigate('/studio/store/essentials')}>
                 Set up
               </FrostedButton>
               <FrostedButton size="sm" variant="ghost" onClick={dismissStoreSetupNudge}>
@@ -920,7 +948,7 @@ const ProfilePage: React.FC = () => {
         <div className="fixed bottom-24 right-4 sm:right-6 z-[60]">
           <button
             type="button"
-            onClick={() => navigate('/store/essentials')}
+            onClick={() => navigate('/studio/store/essentials')}
             className="glass-chip chip-sm chip-purple inline-flex items-center gap-2 shadow-xl ring-1 ring-purple-300/40 hover:bg-black/5 dark:hover:bg-white/10 transition"
             aria-label="Continue store setup"
           >
@@ -939,7 +967,6 @@ const ProfilePage: React.FC = () => {
           tags: viewDisplayData.hashtags || [],
         }}
         canEdit={isOwner}
-        hasStore={Boolean(storeStatus)}
         onEditProfile={() => setIsHeaderQuickEditOpen(true)}
         onShareProfile={handleShareProfile}
         onEditAvatar={handleTriggerAvatarUpload}
@@ -971,7 +998,9 @@ const ProfilePage: React.FC = () => {
       <div className="w-full px-4 sm:px-6 pb-12">
         <div className="mt-6">
           <Tabs
-            tabs={isOwner ? ["Collections", "Reviews", "About"] : ["Collections", "Reviews", "About"]}
+            tabs={(() => {
+              return ['Collections', 'Store', 'Reviews', 'About'];
+            })()}
             activeTab={activeTab}
             onTabChange={(tab) => {
                 setActiveTab(tab as TabType);
@@ -983,6 +1012,15 @@ const ProfilePage: React.FC = () => {
           />
 
           <div className="mt-6 min-h-[420px] motion-safe:transition-opacity motion-safe:duration-200">
+            {activeTab === 'Store' && shopBrandId ? (
+              <CatalogShopTab
+                brandId={shopBrandId}
+                isStoreOpen={viewIsStoreOpen}
+                isOwner={isOwner}
+                ownerHasStoreProfile={ownerHasStoreProfile}
+              />
+            ) : null}
+
             {activeTab === 'Collections' && (
               <div>
                 {selectedCollectionId ? (

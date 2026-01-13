@@ -69,7 +69,7 @@ const StoreSetupRequiredGate: React.FC<StoreSetupRequiredGateProps> = ({
       onCompleteSetup();
       return;
     }
-    navigate('/store/essentials');
+    navigate('/studio/store/essentials');
   }, [onCompleteSetup, navigate]);
 
   useFocusTrap({

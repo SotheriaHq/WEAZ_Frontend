@@ -10,6 +10,7 @@ export type EmptyStateType =
   | 'brand-not-found'       // Brand doesn't exist
   | 'store-setup'           // Brand needs to set up store (owner view)
   | 'store-not-setup'       // Owner store is not configured/live yet
+  | 'store-not-open-yet'     // Visitor view: store exists but is not open
   | 'coming-soon'           // Store is being prepared
   | 'empty-cart'            // Cart is empty
   | 'empty-wishlist';       // Wishlist is empty
@@ -70,6 +71,13 @@ const EMPTY_STATES: Record<EmptyStateType, {
     title: 'Finish your store setup',
     description: 'Complete your store setup to publish your store and start selling.',
     actionLabel: 'Continue store setup',
+  },
+  'store-not-open-yet': {
+    icon: <Store size={48} className="text-purple-500" />,
+    emoji: '⏳',
+    title: 'Store not open yet',
+    description: 'This store is still being set up. Check back soon for new arrivals.',
+    actionLabel: undefined,
   },
   'coming-soon': {
     icon: <ShoppingBag size={48} className="text-purple-400" />,
@@ -145,10 +153,10 @@ const StoreEmptyState: React.FC<StoreEmptyStateProps> = ({
         navigate('/market');
         break;
       case 'store-not-setup':
-        navigate('/store/essentials');
+        navigate('/studio/store/essentials');
         break;
       case 'store-setup':
-        navigate('/profile/collections/create');
+        navigate('/studio/store/products/new');
         break;
       case 'no-products':
       case 'coming-soon':
@@ -160,7 +168,7 @@ const StoreEmptyState: React.FC<StoreEmptyStateProps> = ({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+    <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-in fade-in duration-500">
       {/* Icon with emoji badge */}
       <div className="relative mb-6">
         <div className="w-28 h-28 rounded-full bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center">

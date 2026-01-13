@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   ExternalLink,
   Camera,
-  Upload,
   Bolt
 } from 'lucide-react';
 
@@ -165,42 +164,24 @@ const StoreGeneralSettings: React.FC = () => {
         </h2>
 
         <div className="space-y-8">
-          {/* Logo & Banner Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Logo */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Store Logo</label>
-              <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors group cursor-pointer">
-                <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-800 mb-3 relative shadow-lg">
-                  <div className="w-full h-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white text-3xl font-bold">
-                    U
-                  </div>
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Camera className="w-6 h-6 text-white" />
-                  </div>
-                </div>
-                <button className="text-xs text-purple-600 dark:text-purple-400 font-medium hover:text-purple-700 dark:hover:text-purple-300">
-                  Change Logo
-                </button>
-                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">Rec: 400×400px PNG</p>
+          {/* Store images are profile-derived (read-only here) */}
+          <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-5">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 h-9 w-9 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-300 flex items-center justify-center">
+                <Camera className="w-5 h-5" />
               </div>
-            </div>
-
-            {/* Banner */}
-            <div className="md:col-span-2 space-y-3">
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Store Banner</label>
-              <div className="relative h-44 rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 group cursor-pointer bg-gradient-to-r from-purple-500/20 to-indigo-500/20">
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <Upload className="w-8 h-8 text-gray-400 dark:text-gray-500 mb-2" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Click to upload banner</p>
-                </div>
-                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium backdrop-blur-md border border-white/20 transition-all">
-                    <Upload className="w-4 h-4 inline mr-2" />
-                    Change Banner
-                  </button>
-                  <p className="text-xs text-gray-300 mt-2">Recommended: 1500×500px JPG</p>
-                </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Store banner & logo</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Your store uses your brand profile banner and profile photo. To keep things consistent, images can’t be changed from store settings.
+                </p>
+                <a
+                  href="/profile/settings"
+                  className="inline-flex items-center gap-2 mt-3 text-sm font-medium text-purple-600 dark:text-purple-400 hover:underline"
+                >
+                  Update images in Profile Settings
+                  <ExternalLink className="w-4 h-4" />
+                </a>
               </div>
             </div>
           </div>

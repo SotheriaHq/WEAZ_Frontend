@@ -108,7 +108,6 @@ export const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
     const ctx = useContext(DropdownContext);
     const open = ctx?.open ?? false;
     const placement = ctx?.placement ?? 'bottom-end';
-    if (!open) return null;
 
     const menuRef = ctx?.menuRef;
     const triggerRef = ctx?.triggerRef;
@@ -120,6 +119,7 @@ export const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
     });
 
     useLayoutEffect(() => {
+      if (!open) return;
       const triggerEl = triggerRef?.current;
       if (!triggerEl) return;
 
@@ -155,7 +155,9 @@ export const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
         window.removeEventListener('scroll', update, true);
         window.removeEventListener('resize', update);
       };
-    }, [placement, menuRef, triggerRef]);
+    }, [open, placement, menuRef, triggerRef]);
+
+    if (!open) return null;
 
     return (
       <OverlayPortal>

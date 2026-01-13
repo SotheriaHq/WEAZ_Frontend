@@ -15,6 +15,8 @@ export function useFocusTrap(opts: {
   useEffect(() => {
     if (!active) return;
 
+    const restoreTargetSnapshot = restoreFocusTo?.current;
+
     const container = containerRef.current;
     if (!container) return;
 
@@ -73,7 +75,7 @@ export function useFocusTrap(opts: {
 
     return () => {
       document.removeEventListener('keydown', onKeyDown);
-      const restoreTarget = restoreFocusTo?.current ?? previouslyFocused;
+      const restoreTarget = restoreTargetSnapshot ?? previouslyFocused;
       restoreTarget?.focus?.();
     };
   }, [active, containerRef, onEscape, initialFocusSelector, restoreFocusTo]);

@@ -1,5 +1,6 @@
 import { apiClient } from './httpClient';
 import type { AxiosResponse } from 'axios';
+import { createIdempotencyKey } from './idempotency';
 
 // Helper to extract data from axios response
 const extractData = <T>(res: AxiosResponse): T => {
@@ -140,8 +141,10 @@ export interface GetProductsParams {
   gender?: string;
   search?: string;
   sort?: 'newest' | 'price_asc' | 'price_desc' | 'popular';
+  sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'popular';
   isFeatured?: boolean;
   isOnSale?: boolean;
+  onSale?: boolean;
   page?: number;
   limit?: number;
 }
@@ -149,7 +152,7 @@ export interface GetProductsParams {
 // ============= Products API =============
 
 export const getProducts = async (params: GetProductsParams): Promise<PaginatedResponse<Product>> => {
-  const { brandId, sizes, colors, tags, ...rest } = params;
+  const { brandId, sizes, colors, tags, sort, sortBy, isOnSale, onSale, ...rest } = params;
   
   const queryParams = new URLSearchParams();
   
@@ -158,6 +161,12 @@ export const getProducts = async (params: GetProductsParams): Promise<PaginatedR
       queryParams.append(key, String(value));
     }
   });
+
+  // Backend uses sortBy/onSale naming
+  const resolvedSortBy = sortBy ?? sort;
+  if (resolvedSortBy) queryParams.append('sortBy', String(resolvedSortBy));
+  const resolvedOnSale = onSale ?? isOnSale;
+  if (typeof resolvedOnSale === 'boolean') queryParams.append('onSale', String(resolvedOnSale));
   
   // Handle array params
   if (sizes?.length) {
@@ -221,7 +230,9 @@ export const clearCart = async (): Promise<void> => {
 // ============= Checkout & Orders =============
 
 export const checkout = async (payload: CheckoutPayload): Promise<{ orders: Order[] }> => {
-  const res = await apiClient.post('/store/checkout', payload);
+  const res = await apiClient.post('/store/checkout', payload, {
+    headers: { 'Idempotency-Key': createIdempotencyKey() },
+  });
   return extractData<{ orders: Order[] }>(res);
 };
 

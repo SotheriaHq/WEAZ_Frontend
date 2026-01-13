@@ -5,7 +5,6 @@ import { IconButton } from '@/components/ui/FrostedButton';
 import { getTagColor } from '@/utils/tagColors';
 import AvatarCard from '../profile/AvatarCard';
 import VLoader from '../loaders/VLoader';
-import StoreAccessButton from '../store/StoreAccessButton';
 import MediaRenderer from '../media/MediaRenderer';
 
 const DummyQRCode = () => (
@@ -27,7 +26,6 @@ interface ProfileHeaderProps {
     tags: string[];
   };
   canEdit?: boolean;
-  hasStore?: boolean;
   onEditProfile?: () => void;
   onShareProfile?: () => void;
   onEditAvatar?: () => void;
@@ -59,7 +57,6 @@ const ActionButton: React.FC<{
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   profileData,
   canEdit = false,
-  hasStore = false,
   onEditProfile,
   onShareProfile,
   onEditAvatar,
@@ -231,7 +228,6 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
           {/* 🔧 FIX #4: Reduced bottom margin from mb-16 to mb-6 */}
           <div className="flex gap-2 self-end sm:self-end mb-6">
-            {canEdit ? <StoreAccessButton hasStore={hasStore} /> : null}
             {canEdit ? (
               <ActionButton
                 Icon={FiEdit2}

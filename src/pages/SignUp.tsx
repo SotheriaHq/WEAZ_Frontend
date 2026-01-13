@@ -221,8 +221,13 @@ const SignUpPage = () => {
 
       await celebrateSignupOnce(user.id);
 
-      const redirectPath = user.type === 'BRAND' ? '/profile' : '/';
-      navigate(redirectPath, { replace: true });
+      if (user.type === 'BRAND') {
+        // Ensure the post-signup prompt shows even if previously dismissed.
+        localStorage.removeItem('threadly.brandProfileSetup.dismissedUntil');
+        navigate('/profile?modal=brand-setup&modalOrigin=prompt', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
       setIsRedirecting(true);
       reset();
     } catch (error: unknown) {

@@ -88,6 +88,38 @@ type WizardSaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 const LOCAL_PROGRESS_KEY = 'store-progress';
 
+const MAX_STORE_DESCRIPTION_LEN = 500;
+const MAX_STORE_TAGLINE_LEN = 100;
+const MAX_STORE_CONTACT_EMAIL_LEN = 254;
+const MAX_STORE_SOCIAL_HANDLE_LEN = 60;
+const MAX_STORE_WEBSITE_LEN = 200;
+const MAX_STORE_CATEGORIES = 3;
+
+const sanitizeWizardData = (data: StoreWizardData): StoreWizardData => {
+  const safeString = (value: unknown, maxLen: number): string => {
+    if (typeof value !== 'string') return '';
+    return value.slice(0, maxLen);
+  };
+
+  const safeStringArray = (value: unknown): string[] => {
+    if (!Array.isArray(value)) return [];
+    return value.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  };
+
+  return {
+    ...data,
+    description: safeString(data.description, MAX_STORE_DESCRIPTION_LEN),
+    tagline: safeString(data.tagline, MAX_STORE_TAGLINE_LEN),
+    contactEmail: safeString(data.contactEmail, MAX_STORE_CONTACT_EMAIL_LEN),
+    instagram: safeString(data.instagram, MAX_STORE_SOCIAL_HANDLE_LEN),
+    twitter: safeString(data.twitter, MAX_STORE_SOCIAL_HANDLE_LEN),
+    tiktok: safeString(data.tiktok, MAX_STORE_SOCIAL_HANDLE_LEN),
+    website: safeString(data.website, MAX_STORE_WEBSITE_LEN),
+    categories: safeStringArray(data.categories).slice(0, MAX_STORE_CATEGORIES),
+    tags: safeStringArray(data.tags),
+  };
+};
+
 const stepToNumber = (step: WizardStep): number => {
   return STEP_ORDER.indexOf(step) + 1;
 };
@@ -240,8 +272,9 @@ const StoreCreationWizard: React.FC = () => {
       }
 
       if (!isCancelled) {
-        setWizardData(nextData);
-        console.log('[StoreWizard] Hydrated data:', nextData);
+        const sanitized = sanitizeWizardData(nextData);
+        setWizardData(sanitized);
+        console.log('[StoreWizard] Hydrated data:', sanitized);
         console.log('[StoreWizard] Local draft step:', localDraft?.step);
         
         // Restore step from local draft (clamped to valid range)
@@ -364,7 +397,7 @@ const StoreCreationWizard: React.FC = () => {
 
       if (Array.isArray(missingFields) && missingFields.length > 0) {
         toast.error(`Store setup incomplete: ${missingFields.join(', ')}`);
-        navigate('/store/essentials', { replace: true });
+        navigate('/studio/store/essentials', { replace: true });
       } else {
         toast.error('Failed to publish store. Please try again.');
       }

@@ -27,13 +27,14 @@ import {
   Camera,
   CreditCard,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 /**
  * Dashboard Home (Screen 2.1)
  * Glassmorphism design with metrics grid, quick actions, activity feed
  */
 const DashboardHome: React.FC = () => {
+  const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
   const [overview, setOverview] = useState<any>(null);
   const [, setAnalytics] = useState<any>(null);
@@ -71,7 +72,7 @@ const DashboardHome: React.FC = () => {
           },
           currency: 'NGN',
           store: {
-            name: user?.brandFullName || 'Your Store',
+            name: user?.brandFullName || 'Store',
             slug: user?.username || 'your-store',
             logoUrl: null,
             isLive: false,
@@ -145,7 +146,7 @@ const DashboardHome: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                {store.name || 'Your Store'}
+                {store.name || user?.brandFullName || 'Store'}
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1.5 ${
                   store.isLive 
                     ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/20'
@@ -274,6 +275,7 @@ const DashboardHome: React.FC = () => {
             label="Add Product"
             baseColor="bg-purple-500/20 text-purple-500"
             hoverColor="hover:bg-purple-500/10 hover:border-purple-500/30"
+            onClick={() => navigate('/studio/store/products/new')}
           />
           <QuickActionButton
             icon={<Layers className="w-5 h-5" />}
@@ -431,8 +433,13 @@ const QuickActionButton: React.FC<{
   label: string;
   baseColor: string;
   hoverColor: string;
-}> = ({ icon, label, baseColor, hoverColor }) => (
-  <button className={`group bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 p-4 rounded-xl flex flex-col items-center justify-center gap-3 transition-all hover:-translate-y-0.5 ${hoverColor}`}>
+  onClick?: () => void;
+}> = ({ icon, label, baseColor, hoverColor, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`group bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 p-4 rounded-xl flex flex-col items-center justify-center gap-3 transition-all hover:-translate-y-0.5 ${hoverColor}`}
+  >
     <div className={`w-10 h-10 rounded-full ${baseColor} flex items-center justify-center transition-colors group-hover:scale-110`}>
       {icon}
     </div>

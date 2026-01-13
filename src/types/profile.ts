@@ -66,6 +66,7 @@ export interface BrandProfileDto {
   id: string;
   brandFullName: string;
   description: string | null;
+  isStoreOpen?: boolean;
   country: string | null;
   state: string | null;
   city: string | null;

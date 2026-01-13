@@ -149,7 +149,15 @@ export const Sidebar: React.FC = () => {
   }
 
   return (
-    <div className={`${positionClass} ${widthClass} bg-gradient-to-b from-[#faf8ff]/90 to-[#f5f0ff]/80 dark:from-[#0f0f0f]/95 dark:to-[#0a0a0a]/90 backdrop-blur-xl flex flex-col transition-all duration-300 ease-out overflow-hidden ${!isRail ? 'border-r border-purple-200/30 dark:border-white/10' : ''} ${slideClasses}`}>
+    <>
+      {isOverlay && (
+        <div
+          className="fixed inset-0 z-layer-overlay bg-black/40 backdrop-blur-sm"
+          onClick={() => dispatch(closeSidebar())}
+          aria-hidden
+        />
+      )}
+      <div className={`${positionClass} ${widthClass} bg-gradient-to-b from-[#faf8ff]/90 to-[#f5f0ff]/80 dark:from-[#0f0f0f]/95 dark:to-[#0a0a0a]/90 backdrop-blur-xl flex flex-col transition-all duration-300 ease-out overflow-hidden ${!isRail ? 'border-r border-purple-200/30 dark:border-white/10' : ''} ${slideClasses}`}>
       
       {/* Header (Logo + Hamburger) - Only visible in Drawer/Overlay mode inside the sidebar */}
       {showHeader && (
@@ -244,6 +252,7 @@ export const Sidebar: React.FC = () => {
         )}
       </div>
     </div>
+    </>
   );
 };
 

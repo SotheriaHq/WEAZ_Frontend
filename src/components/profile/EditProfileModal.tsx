@@ -128,6 +128,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   isOpen,
   user,
   brandProfile,
+  showSkip,
+  onSkip,
   onClose,
   onSaved,
 }) => {
@@ -350,29 +352,40 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
         {/* Main Modal Container */}
         <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-label="Brand setup">
-          <div ref={dialogRef} tabIndex={-1} className="w-full max-w-4xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in border border-gray-200 dark:border-gray-800">
-          
-          {/* Header */}
-          <div className="sticky top-0 z-20 bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-700 px-8 py-6 flex justify-between items-center shadow-md">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight text-white drop-shadow-md">Brand Setup</h2>
-              <p className="text-sm text-purple-100 mt-1 opacity-90 font-medium">Create your brand identity & story</p>
-            </div>
-            <button 
-              onClick={onClose}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all duration-200 group backdrop-blur-sm"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 group-hover:rotate-90 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+          <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-4xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in border border-gray-200 dark:border-gray-800">
 
           {/* Scrollable Content */}
           <form 
             onSubmit={handleSubmit(onSubmit, onInvalid)}
-            className="overflow-y-auto custom-scrollbar p-8 space-y-10 overscroll-contain bg-gray-50/50 dark:bg-black/20"
+            className="overflow-y-auto custom-scrollbar p-8 space-y-10 overscroll-contain"
           >
+
+            {/* Modal Title + Close (inside body, no separate header) */}
+            <div className="flex items-start justify-between gap-6">
+              <div className="min-w-0">
+                <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Brand Setup</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Create your brand identity & story</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {showSkip && onSkip && (
+                  <button
+                    type="button"
+                    onClick={onSkip}
+                    className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition"
+                  >
+                    Skip
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10 transition"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
             
             {/* Section: Identity */}
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
@@ -592,27 +605,27 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
             {/* Hidden Submit for Enter Key */}
             <button type="submit" className="hidden" />
+
+            {/* Actions (inside body, no separate footer) */}
+            <div className="flex justify-end gap-4 pt-2">
+              <button 
+                type="button"
+                onClick={onClose}
+                className="px-6 py-3 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition"
+              >
+                Cancel
+              </button>
+              <button 
+                type="button"
+                onClick={() => handleSubmit(onSubmit, onInvalid)()}
+                disabled={isSubmitting}
+                className="px-8 py-3 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg shadow-purple-500/20 transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                {isSubmitting ? 'Saving Profile...' : 'Save & Continue'}
+              </button>
+            </div>
             
           </form>
-
-          {/* Footer Actions */}
-          <div className="p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-end space-x-4">
-            <button 
-              type="button"
-              onClick={onClose}
-              className="px-6 py-3 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
-            >
-              Cancel
-            </button>
-            <button 
-              onClick={() => handleSubmit(onSubmit, onInvalid)()}
-              disabled={isSubmitting}
-              className="px-8 py-3 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg shadow-purple-500/20 transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-            >
-              {isSubmitting ? 'Saving Profile...' : 'Save & Continue'}
-            </button>
-          </div>
-
           </div>
         </div>
       </>
