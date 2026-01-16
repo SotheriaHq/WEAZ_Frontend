@@ -1,5 +1,6 @@
 import { apiClient } from './httpClient';
 import { createIdempotencyKey } from './idempotency';
+import { unwrapApiResponse } from '../types/auth';
 
 // =====================
 // Types
@@ -307,14 +308,15 @@ export const productApi = {
     ): Promise<ProductListResponse> {
         try {
             const response = await apiClient.get<Partial<ProductListResponse>>(`/brands/${brandId}/products`, { params });
-            const items = Array.isArray(response.data?.items) ? response.data.items : [];
+            const payload = unwrapApiResponse<Partial<ProductListResponse>>(response.data);
+            const items = Array.isArray(payload?.items) ? payload.items : [];
             return {
                 items,
-                total: response.data?.total ?? items.length,
-                page: response.data?.page ?? 1,
-                limit: response.data?.limit ?? 20,
-                totalPages: response.data?.totalPages ?? 1,
-                hasNextPage: response.data?.hasNextPage ?? false,
+                total: payload?.total ?? items.length,
+                page: payload?.page ?? 1,
+                limit: payload?.limit ?? 20,
+                totalPages: payload?.totalPages ?? 1,
+                hasNextPage: payload?.hasNextPage ?? false,
             };
         } catch (error) {
             console.error('Failed to fetch brand products', error);

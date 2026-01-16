@@ -18,6 +18,7 @@ import { brandApi } from '@/api/BrandApi';
 import { productApi } from '@/api/ProductApi';
 import { toast } from 'sonner';
 import Input from '@/components/ui/Input';
+import { unwrapApiResponse } from '@/types/auth';
 
 type StudioStatus = 'ACTIVE' | 'DRAFT';
 
@@ -158,13 +159,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
         }));
         setCollections(mappedCollections);
 
-        const items = Array.isArray(productsRes.data?.items)
-          ? (productsRes.data.items as BackendProduct[])
+        const productsPayload = unwrapApiResponse<Partial<ProductsResponse>>(productsRes.data);
+        const items = Array.isArray(productsPayload?.items)
+          ? (productsPayload.items as BackendProduct[])
           : [];
         setProducts(items);
-        setTotal(typeof productsRes.data?.total === 'number' ? productsRes.data.total : items.length);
+        setTotal(typeof productsPayload?.total === 'number' ? productsPayload.total : items.length);
 
-        const nextCursor = productsRes.data?.nextCursor;
+        const nextCursor = productsPayload?.nextCursor;
         if (typeof nextCursor === 'string' && nextCursor.length > 0) {
           setCursorByPage((prev) => ({ ...prev, [page + 1]: nextCursor }));
         }
@@ -205,13 +207,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
       },
     });
 
-    const items = Array.isArray(productsRes.data?.items)
-      ? (productsRes.data.items as BackendProduct[])
+    const productsPayload = unwrapApiResponse<Partial<ProductsResponse>>(productsRes.data);
+    const items = Array.isArray(productsPayload?.items)
+      ? (productsPayload.items as BackendProduct[])
       : [];
     setProducts(items);
-    setTotal(typeof productsRes.data?.total === 'number' ? productsRes.data.total : items.length);
+    setTotal(typeof productsPayload?.total === 'number' ? productsPayload.total : items.length);
 
-    const nextCursor = productsRes.data?.nextCursor;
+    const nextCursor = productsPayload?.nextCursor;
     if (typeof nextCursor === 'string' && nextCursor.length > 0) {
       setCursorByPage((prev) => ({ ...prev, [page + 1]: nextCursor }));
     }

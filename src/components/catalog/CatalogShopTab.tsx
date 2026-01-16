@@ -6,6 +6,7 @@ import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreP
 import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
 import StoreEmptyState from '@/components/designs/StoreEmptyState';
 import { useNavigate } from 'react-router-dom';
+import { unwrapApiResponse } from '@/types/auth';
 
 interface ProductsResponse {
   items: StoreProduct[];
@@ -82,10 +83,11 @@ export default function CatalogShopTab({
         if (onSale) params.onSale = 'true';
 
         const response = await apiClient.get<Partial<ProductsResponse>>(`/brands/${brandId}/products`, { params });
-        const items = Array.isArray(response.data?.items) ? response.data.items : [];
-        const totalCount = typeof response.data?.total === 'number' ? response.data.total : items.length;
-        const hasNextPage = Boolean(response.data?.hasNextPage);
-        const responseNextCursor = response.data?.nextCursor;
+        const payload = unwrapApiResponse<Partial<ProductsResponse>>(response.data);
+        const items = Array.isArray(payload?.items) ? payload.items : [];
+        const totalCount = typeof payload?.total === 'number' ? payload.total : items.length;
+        const hasNextPage = Boolean(payload?.hasNextPage);
+        const responseNextCursor = payload?.nextCursor;
 
         setProducts((prev) => (resetPage || currentPage === 1 ? items : [...prev, ...items]));
         setTotal(totalCount);
