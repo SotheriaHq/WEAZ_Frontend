@@ -42,17 +42,18 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     const baseClasses = `
       ${fullWidth ? 'w-full' : ''}
       px-4 py-3 text-sm
-      bg-gray-50 dark:bg-zinc-900/50
+      bg-white dark:bg-zinc-900/60
       border rounded-xl
       text-gray-900 dark:text-white
       placeholder-gray-400 dark:placeholder-zinc-500
-      focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500
+      shadow-sm
+      focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500
       transition-all duration-200
       resize-none
       ${
         error
           ? 'border-red-500 dark:border-red-500 focus:ring-red-500/50 focus:border-red-500'
-          : 'border-gray-200 dark:border-zinc-700/50'
+          : 'border-gray-300/80 dark:border-zinc-700/60'
       }
       ${
         disabled
@@ -68,7 +69,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       <div className={`${fullWidth ? 'w-full' : ''} ${className}`}>
         {/* Label */}
         {label && (
-          <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
+          <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-300 mb-2">
             {label}
             {required && <span className="text-purple-500 ml-1">*</span>}
           </label>

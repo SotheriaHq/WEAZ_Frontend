@@ -7,6 +7,12 @@ export interface MediaRendererProps {
   kind: MediaKind;
   src: string;
 
+  /**
+   * How the media should fit inside its container.
+   * Default is `contain` to ensure media is always fully visible (no cropping).
+   */
+  fit?: 'contain' | 'cover';
+
   /** Required for images that convey information. Use "" for decorative. */
   alt?: string;
 
@@ -47,13 +53,14 @@ export interface MediaRendererProps {
 /**
  * MediaRenderer (global invariant)
  *
- * - Media defines layout (intrinsic aspect ratio; no object-fit boxing).
- * - Container may only cap dimensions (max-*) and allow vertical scrolling.
- * - No backgrounds/padding/letterboxing/cropping should be applied around the media.
+ * - Media should always be fully visible by default (no cropping).
+ * - Container may cap dimensions (max-*) and optionally allow vertical scrolling.
+ * - Cropping is only allowed via an explicit `fit="cover"` opt-in.
  */
 export const MediaRenderer: React.FC<MediaRendererProps> = ({
   kind,
   src,
+  fit = 'contain',
   alt,
   className,
   mediaClassName,
@@ -73,14 +80,26 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
   imgRef,
   videoRef,
 }) => {
+  // For 'contain' mode: use intrinsic sizing with max constraints - no cropping
+  // For 'cover' mode: fill container and crop overflow (avatars, banners)
+  const isCover = fit === 'cover';
+
   const frameClassName = cn(
-    'media-frame media-frame-cap',
+    isCover ? undefined : 'media-frame',
     allowScroll ? 'media-frame-scroll' : undefined,
-    maxHeightClassName,
-    maxWidthClassName,
+    allowScroll ? maxHeightClassName : undefined,
+    allowScroll ? maxWidthClassName : undefined,
     className
   );
-  const elementClassName = cn('media-intrinsic', mediaClassName);
+  
+  // For contain: use intrinsic sizing classes that scale proportionally
+  // For cover: use object-cover with full dimensions
+  const elementClassName = cn(
+    isCover ? 'w-full h-full object-cover' : 'media-intrinsic',
+    !isCover && maxHeightClassName,
+    !isCover && maxWidthClassName,
+    mediaClassName
+  );
 
   if (kind === 'video') {
     return (

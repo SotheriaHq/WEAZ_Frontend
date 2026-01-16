@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { ArrowRight, Sparkles, Store, Instagram, CheckCircle2, Circle, Star } from 'lucide-react';
 import type { RootState } from '@/store';
 import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
+import Input from '@/components/ui/Input';
 
 const MAX_CATEGORIES = 3;
 const LOCAL_PROGRESS_KEY = 'store-progress';
@@ -151,7 +152,7 @@ const StoreEssentials: React.FC = () => {
         // Don’t block onboarding on transient failures.
       }
 
-      navigate('/studio/store/setup', { replace: true });
+      navigate('/studio/store', { replace: true });
     },
     [instagram, navigate, selected, tagline]
   );
@@ -234,47 +235,39 @@ const StoreEssentials: React.FC = () => {
 
               {/* Tagline */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Store Tagline <span className="text-gray-400 font-normal">(Optional)</span>
-                </label>
                 <div className="relative">
-                  <input
-                    type="text"
+                  <Input
+                    label="Store Tagline"
+                    helperText="This appears below your store name"
                     maxLength={100}
                     value={tagline}
                     disabled={isLoading}
                     onChange={(e) => setTagline(e.target.value)}
                     placeholder="Your brand in one line..."
-                    className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all duration-200 disabled:opacity-70"
+                    charCount={tagline.length}
+                    maxCharCount={100}
                   />
-                  <span className="absolute right-3 top-3 text-xs text-gray-400">{tagline.length}/100</span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">This appears below your store name</p>
               </div>
 
               {/* Instagram */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Instagram Handle <span className="text-gray-400 font-normal">(Optional)</span>
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-semibold text-gray-700">Instagram Handle</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                     <Star className="w-3 h-3 mr-1" />
                     Recommended for verification
                   </span>
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-3 text-gray-500 font-medium">@</span>
-                  <input
-                    type="text"
-                    value={instagram}
-                    disabled={isLoading}
-                    onChange={(e) => setInstagram(e.target.value)}
-                    placeholder="username"
-                    className="w-full pl-9 pr-10 py-3 bg-white/60 backdrop-blur-sm border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all duration-200 disabled:opacity-70"
-                  />
-                  <div className="absolute right-3 top-3 text-pink-500">
-                    {normalizeInstagramHandle(instagram) ? <Instagram className="w-5 h-5" /> : null}
-                  </div>
                 </div>
+                <Input
+                  label=""
+                  value={instagram}
+                  disabled={isLoading}
+                  onChange={(e) => setInstagram(e.target.value)}
+                  placeholder="username"
+                  startIcon={<span className="text-gray-500 font-medium">@</span>}
+                  endIcon={normalizeInstagramHandle(instagram) ? <Instagram className="w-4 h-4 text-pink-500" /> : null}
+                />
                 <p className="text-xs text-gray-500 mt-1">Connect for trust badge & cross-promotion</p>
               </div>
             </div>
@@ -311,7 +304,7 @@ const StoreEssentials: React.FC = () => {
             </div>
 
             {/* Readiness */}
-            <div className="mt-6 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-gray-200">
+            <div className="mt-6 p-4 bg-transparent rounded-xl border border-gray-200/70 dark:border-white/10">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-green-500" />

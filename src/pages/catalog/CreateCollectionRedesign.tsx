@@ -493,29 +493,6 @@ const CreateCollectionInner: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-transparent text-[var(--text-primary)] transition-colors duration-300">
-      {/* Sticky Header - aligned with app shell */}
-      <header className="sticky top-0 z-40 glass-menu-soft border-b border-white/20 dark:border-white/10">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors group"
-          >
-            <FiArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span className="hidden sm:inline font-medium">Back</span>
-          </button>
-
-          <div className="flex items-center gap-2">
-            <HiOutlineSparkles className="w-5 h-5 text-purple-500" />
-            <h1 className="text-lg sm:text-xl font-semibold">
-              {isEditMode ? 'Edit Collection' : 'Create Collection'}
-            </h1>
-          </div>
-
-          <div className="w-9" aria-hidden="true" />
-        </div>
-      </header>
-
       {/* CreateStoreModal removed as per request */}
       {/* Save Draft Confirmation */}
       {showSaveDraftConfirm && (
@@ -548,6 +525,25 @@ const CreateCollectionInner: React.FC = () => {
 
       {/* Main Content */}
       <main className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 py-6 pb-32">
+        <div className="mb-6 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors group"
+          >
+            <FiArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <span className="hidden sm:inline font-medium">Back</span>
+          </button>
+
+          <div className="flex items-center gap-2">
+            <HiOutlineSparkles className="w-5 h-5 text-purple-500" />
+            <h1 className="text-lg sm:text-xl font-semibold">
+              {isEditMode ? 'Edit Collection' : 'Create Collection'}
+            </h1>
+          </div>
+
+          <div className="w-9" aria-hidden="true" />
+        </div>
         {/* Upload Progress Banner */}
         <AnimatePresence>
           {isUploading && (
@@ -594,9 +590,9 @@ const CreateCollectionInner: React.FC = () => {
             ) : (
               <div className="space-y-4 h-full">
                 {/* Main Preview - NO background; media defines layout */}
-                <div className="relative rounded-2xl border border-gray-200/80 dark:border-white/10 overflow-hidden shadow-sm">
+                <div className="relative rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-sm">
                   <div
-                    className="relative w-full flex justify-center overflow-y-auto"
+                    className="relative w-full flex justify-center"
                   >
                     <AnimatePresence mode="wait">
                       {selectedFile && (
@@ -1173,7 +1169,7 @@ const CreateCollectionInner: React.FC = () => {
               </div>
 
               {selectedFile?.url && (
-                <div className="w-full rounded-xl overflow-hidden">
+                <div className="w-full rounded-xl">
                   <MediaRenderer
                     kind={selectedFile.kind === 'video' ? 'video' : 'image'}
                     src={selectedFile.url}
@@ -1203,7 +1199,7 @@ const CreateCollectionInner: React.FC = () => {
                     const withUrl = resolveMediaWithUrl(file);
                     if (!withUrl) return null;
                     return (
-                      <div key={withUrl.id} className="rounded-xl overflow-hidden flex items-center justify-center">
+                      <div key={withUrl.id} className="rounded-xl flex items-center justify-center">
                         <MediaRenderer
                           kind={withUrl.kind === 'video' ? 'video' : 'image'}
                           src={withUrl.url}

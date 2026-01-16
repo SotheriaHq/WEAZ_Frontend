@@ -7,6 +7,8 @@ interface ImageWithFallbackProps {
   src?: string | null;
   fileId?: string | null;
   alt: string;
+  /** How the image should fit inside its container. Default: contain (no cropping). */
+  fit?: 'contain' | 'cover';
   className?: string;
   containerClassName?: string;
   rounded?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
@@ -85,6 +87,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   src,
   fileId,
   alt,
+  fit = 'contain',
   className,
   containerClassName,
   rounded = 'md',
@@ -163,6 +166,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           kind="image"
           src={resolved ?? ''}
           alt={alt}
+          fit={fit}
           onError={() => setHadError(true)}
           onLoad={() => setLoaded(true)}
           className={containerClassName}

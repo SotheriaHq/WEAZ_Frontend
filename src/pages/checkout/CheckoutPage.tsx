@@ -5,6 +5,8 @@ import { checkout } from '@/api/StoreApi';
 import { fetchCart, clearCart } from '@/features/cartSlice';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import Input from '@/components/ui/Input';
+import Textarea from '@/components/ui/Textarea';
 
 const CheckoutPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -55,37 +57,28 @@ const CheckoutPage: React.FC = () => {
           <p className="text-sm text-gray-500">Confirm your details and place your order.</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 space-y-4 shadow-sm">
-          <div>
-            <label className="text-sm text-gray-600">Full name</label>
-            <input
-              className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Jane Doe"
-              required
-            />
-          </div>
-          <div>
-            <label className="text-sm text-gray-600">Shipping address</label>
-            <textarea
-              className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2"
-              rows={3}
-              value={shippingAddress}
-              onChange={(e) => setShippingAddress(e.target.value)}
-              placeholder="Street, city, state"
-              required
-            />
-          </div>
-          <div>
-            <label className="text-sm text-gray-600">Contact info</label>
-            <input
-              className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2"
-              value={contactInfo}
-              onChange={(e) => setContactInfo(e.target.value)}
-              placeholder="Phone or email"
-            />
-          </div>
+        <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-6 space-y-4">
+          <Input
+            label="Full name"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="Jane Doe"
+            required
+          />
+          <Textarea
+            label="Shipping address"
+            rows={3}
+            value={shippingAddress}
+            onChange={(e) => setShippingAddress(e.target.value)}
+            placeholder="Street, city, state"
+            required
+          />
+          <Input
+            label="Contact info"
+            value={contactInfo}
+            onChange={(e) => setContactInfo(e.target.value)}
+            placeholder="Phone or email"
+          />
         </div>
 
         <button
@@ -97,7 +90,7 @@ const CheckoutPage: React.FC = () => {
         </button>
       </form>
 
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 space-y-4 shadow-sm">
+      <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-6 space-y-4">
         <h3 className="text-lg font-semibold">Order summary</h3>
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {cart.items.map((item) => (

@@ -139,7 +139,7 @@ export default function CatalogShopTab({
           <StoreEmptyState
             type="store-not-setup"
             isOwner
-            onAction={() => navigate('/studio/store/setup')}
+            onAction={() => navigate('/studio/store')}
           />
         );
       }

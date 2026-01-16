@@ -144,6 +144,11 @@ const StoreEmptyState: React.FC<StoreEmptyStateProps> = ({
       return;
     }
 
+    if (isOwner && (type === 'no-products' || type === 'store-setup')) {
+      navigate('/studio/store/products/new');
+      return;
+    }
+
     // Default actions
     switch (type) {
       case 'no-results':
@@ -153,10 +158,7 @@ const StoreEmptyState: React.FC<StoreEmptyStateProps> = ({
         navigate('/market');
         break;
       case 'store-not-setup':
-        navigate('/studio/store/essentials');
-        break;
-      case 'store-setup':
-        navigate('/studio/store/products/new');
+        navigate('/studio/store');
         break;
       case 'no-products':
       case 'coming-soon':

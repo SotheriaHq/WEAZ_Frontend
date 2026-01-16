@@ -94,6 +94,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             kind="image"
             src={profileData.banner}
             alt={`${profileData.name} banner`}
+            fit="cover"
             className="w-full h-64 rounded-3xl overflow-hidden"
             maxHeightClassName="max-h-64"
             maxWidthClassName="max-w-full"

@@ -280,6 +280,7 @@ const CollectionsSettings: React.FC = () => {
                       fileId={profileImageFileId}
                       alt={displayName}
                       fallbackName={fallbackName}
+                      fit="cover"
                       className="w-full h-full object-cover"
                       containerClassName="w-full h-full"
                       rounded="md"

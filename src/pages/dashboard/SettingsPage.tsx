@@ -16,6 +16,8 @@ import {
   Briefcase
 } from 'lucide-react';
 import { toast } from 'sonner';
+import Input from '@/components/ui/Input';
+import Textarea from '@/components/ui/Textarea';
 
 interface SettingsForm {
   brandFullName: string;
@@ -94,145 +96,100 @@ const SettingsPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Basic Info */}
         <div className="md:col-span-2 space-y-6">
-          <div className="bg-white dark:bg-gray-900/50 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-6">
+          <div className="bg-transparent p-6 rounded-xl border border-gray-200/70 dark:border-white/10 space-y-6">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <User className="w-5 h-5 text-gray-400" />
               Basic Information
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Brand Name</label>
-                <input 
-                  {...register('brandFullName')}
-                  className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
-                  placeholder="e.g. Threadly Fashion"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Business Type</label>
-                <div className="relative">
-                  <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input 
-                    {...register('businessType')}
-                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
-                    placeholder="e.g. Fashion Retailer"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-              <textarea 
-                {...register('brandDescription')}
-                rows={4}
-                className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all resize-none"
-                placeholder="Tell us about your brand..."
+              <Input
+                label="Brand Name"
+                placeholder="e.g. Threadly Fashion"
+                {...register('brandFullName')}
+              />
+              <Input
+                label="Business Type"
+                placeholder="e.g. Fashion Retailer"
+                startIcon={<Briefcase className="w-4 h-4" />}
+                {...register('businessType')}
               />
             </div>
+
+            <Textarea
+              label="Description"
+              rows={4}
+              placeholder="Tell us about your brand..."
+              {...register('brandDescription')}
+            />
           </div>
 
-          <div className="bg-white dark:bg-gray-900/50 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-6">
+          <div className="bg-transparent p-6 rounded-xl border border-gray-200/70 dark:border-white/10 space-y-6">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <MapPin className="w-5 h-5 text-gray-400" />
               Location & Contact
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Country</label>
-                <input 
-                  {...register('brandCountry')}
-                  className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
-                  placeholder="Nigeria"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">State</label>
-                <input 
-                  {...register('brandState')}
-                  className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
-                  placeholder="Lagos"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">City</label>
-                <input 
-                  {...register('brandCity')}
-                  className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
-                  placeholder="Ikeja"
-                />
-              </div>
+              <Input
+                label="Country"
+                placeholder="Nigeria"
+                {...register('brandCountry')}
+              />
+              <Input
+                label="State"
+                placeholder="Lagos"
+                {...register('brandState')}
+              />
+              <Input
+                label="City"
+                placeholder="Ikeja"
+                {...register('brandCity')}
+              />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Phone Number</label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input 
-                  {...register('phoneNumber')}
-                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
-                  placeholder="+234..."
-                />
-              </div>
-            </div>
+            <Input
+              label="Phone Number"
+              placeholder="+234..."
+              startIcon={<Phone className="w-4 h-4" />}
+              {...register('phoneNumber')}
+            />
           </div>
         </div>
 
         {/* Social Links */}
         <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-900/50 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-6 sticky top-24">
+          <div className="bg-transparent p-6 rounded-xl border border-gray-200/70 dark:border-white/10 space-y-6 sticky top-24">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <Globe className="w-5 h-5 text-gray-400" />
               Social Media
             </h3>
             
             <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Instagram</label>
-                <div className="relative">
-                  <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input 
-                    {...register('socialInstagram')}
-                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
-                    placeholder="@username"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Facebook</label>
-                <div className="relative">
-                  <Facebook className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input 
-                    {...register('socialFacebook')}
-                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
-                    placeholder="Page Name"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Twitter / X</label>
-                <div className="relative">
-                  <Twitter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input 
-                    {...register('socialTwitter')}
-                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
-                    placeholder="@username"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Website</label>
-                <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input 
-                    {...register('socialWebsite')}
-                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
-                    placeholder="https://..."
-                  />
-                </div>
-              </div>
+              <Input
+                label="Instagram"
+                placeholder="@username"
+                startIcon={<Instagram className="w-4 h-4" />}
+                {...register('socialInstagram')}
+              />
+              <Input
+                label="Facebook"
+                placeholder="Page Name"
+                startIcon={<Facebook className="w-4 h-4" />}
+                {...register('socialFacebook')}
+              />
+              <Input
+                label="Twitter / X"
+                placeholder="@handle"
+                startIcon={<Twitter className="w-4 h-4" />}
+                {...register('socialTwitter')}
+              />
+              <Input
+                label="Website"
+                placeholder="https://..."
+                startIcon={<Globe className="w-4 h-4" />}
+                {...register('socialWebsite')}
+              />
             </div>
           </div>
         </div>

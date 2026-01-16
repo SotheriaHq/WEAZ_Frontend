@@ -187,6 +187,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                 src={ownerAvatar}
                 fileId={ownerAvatarFileId}
                 alt={ownerName || 'Brand'}
+                fit="cover"
                 containerClassName="w-full h-full"
                 fallbackName={ownerName || 'B'}
               />

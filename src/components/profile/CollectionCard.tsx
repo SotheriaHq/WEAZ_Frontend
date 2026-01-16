@@ -264,6 +264,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
                 src={brandLogo}
                 fileId={collection.brandLogoFileId}
                 alt={brandName || username || 'Brand'}
+                fit="cover"
                 containerClassName="w-full h-full"
                 rounded="sm"
                 fallbackName={brandName || username || 'B'}

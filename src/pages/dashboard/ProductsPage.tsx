@@ -11,6 +11,8 @@ import {
 } from '@/api/StoreApi';
 import { toast } from 'sonner';
 import { Plus, Trash2 } from 'lucide-react';
+import Input from '@/components/ui/Input';
+import Textarea from '@/components/ui/Textarea';
 
 const ProductsPage: React.FC = () => {
   const user = useSelector((s: RootState) => s.user.profile);
@@ -84,56 +86,42 @@ const ProductsPage: React.FC = () => {
         </div>
       </div>
 
-      <form onSubmit={handleCreate} className="bg-white dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-4 shadow-sm">
-        <div>
-          <label className="text-sm text-gray-600">Collection ID</label>
-          <input
-            className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2"
-            value={form.collectionId}
-            onChange={(e) => setForm({ ...form, collectionId: e.target.value })}
-            required
-          />
-        </div>
-        <div>
-          <label className="text-sm text-gray-600">Product name</label>
-          <input
-            className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-          />
-        </div>
-        <div>
-          <label className="text-sm text-gray-600">Price (NGN)</label>
-          <input
-            type="number"
-            min="0"
-            className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2"
-            value={form.price}
-            onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
-            required
-          />
-        </div>
-        <div>
-          <label className="text-sm text-gray-600">Total stock</label>
-          <input
-            type="number"
-            min="0"
-            className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2"
-            value={form.totalStock}
-            onChange={(e) => setForm({ ...form, totalStock: Number(e.target.value) })}
-            required
-          />
-        </div>
-        <div className="md:col-span-2">
-          <label className="text-sm text-gray-600">Description</label>
-          <textarea
-            className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2"
-            rows={2}
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-          />
-        </div>
+      <form onSubmit={handleCreate} className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          label="Collection ID"
+          value={form.collectionId}
+          onChange={(e) => setForm({ ...form, collectionId: e.target.value })}
+          required
+        />
+        <Input
+          label="Product name"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          required
+        />
+        <Input
+          label="Price (NGN)"
+          type="number"
+          min={0}
+          value={form.price}
+          onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+          required
+        />
+        <Input
+          label="Total stock"
+          type="number"
+          min={0}
+          value={form.totalStock}
+          onChange={(e) => setForm({ ...form, totalStock: Number(e.target.value) })}
+          required
+        />
+        <Textarea
+          label="Description"
+          className="md:col-span-2"
+          rows={2}
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+        />
         <button
           type="submit"
           className="md:col-span-2 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black text-white"
@@ -143,8 +131,8 @@ const ProductsPage: React.FC = () => {
         </button>
       </form>
 
-      <div className="bg-white dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-100 dark:border-gray-800 font-medium">Inventory</div>
+      <div className="bg-transparent rounded-xl border border-gray-200/70 dark:border-white/10 overflow-hidden">
+        <div className="p-4 border-b border-gray-200/70 dark:border-white/10 font-medium">Inventory</div>
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {loading ? (
             <div className="p-6 text-center text-gray-500">Loading products...</div>

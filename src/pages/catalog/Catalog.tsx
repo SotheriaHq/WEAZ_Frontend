@@ -935,7 +935,7 @@ const ProfilePage: React.FC = () => {
               </p>
             </div>
             <div className="mt-3 flex items-center justify-end gap-2">
-              <FrostedButton size="sm" variant="primary" onClick={() => navigate('/studio/store/essentials')}>
+              <FrostedButton size="sm" variant="primary" onClick={() => navigate('/studio/store')}>
                 Set up
               </FrostedButton>
               <FrostedButton size="sm" variant="ghost" onClick={dismissStoreSetupNudge}>
@@ -948,7 +948,7 @@ const ProfilePage: React.FC = () => {
         <div className="fixed bottom-24 right-4 sm:right-6 z-[60]">
           <button
             type="button"
-            onClick={() => navigate('/studio/store/essentials')}
+            onClick={() => navigate('/studio/store')}
             className="glass-chip chip-sm chip-purple inline-flex items-center gap-2 shadow-xl ring-1 ring-purple-300/40 hover:bg-black/5 dark:hover:bg-white/10 transition"
             aria-label="Continue store setup"
           >

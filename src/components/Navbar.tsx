@@ -167,6 +167,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                   fileId={user.profileImageId ?? user.profileImageFile?.id ?? null}
                   alt={`${user.firstName} ${user.lastName}`}
                   fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
+                  fit="cover"
                   className="w-10 h-10"
                   containerClassName="w-10 h-10"
                   rounded="full"
@@ -553,6 +554,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                   fileId={user.profileImageId ?? user.profileImageFile?.id ?? null}
                   alt={`${user.firstName} ${user.lastName}`}
                   fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
+                  fit="cover"
                   className="w-full h-full object-cover"
                   containerClassName="w-full h-full"
                   rounded="full"

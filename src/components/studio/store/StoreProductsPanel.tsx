@@ -1,16 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Search,
-  List,
-  Grid,
-  Plus,
-  Archive,
-  Edit,
-  Trash2,
-  Copy,
+  Box,
   ChevronLeft,
   ChevronRight,
-  Box,
+  Copy,
+  GripVertical,
+  Search,
+  Star,
+  Trash2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MediaRenderer from '@/components/media/MediaRenderer';
@@ -20,6 +17,7 @@ import { apiClient } from '@/api/httpClient';
 import { brandApi } from '@/api/BrandApi';
 import { productApi } from '@/api/ProductApi';
 import { toast } from 'sonner';
+import Input from '@/components/ui/Input';
 
 type StudioStatus = 'ACTIVE' | 'DRAFT';
 
@@ -30,6 +28,7 @@ interface BackendProduct {
   salePrice?: number | null;
   totalStock: number;
   isActive: boolean;
+  isFeatured?: boolean;
   thumbnail?: string | null;
   images?: string[];
   collectionId?: string;
@@ -51,11 +50,14 @@ interface CollectionOption {
   name: string;
 }
 
-const StoreProductsPanel: React.FC = () => {
+interface StoreProductsPanelProps {
+  layoutMode?: boolean;
+}
+
+const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = false }) => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
 
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'draft'>('all');
   const [filterCollection, setFilterCollection] = useState<'all' | string>('all');
   const [filterStock, setFilterStock] = useState('all');
@@ -80,23 +82,6 @@ const StoreProductsPanel: React.FC = () => {
     } else {
       setSelectedProducts([...selectedProducts, id]);
     }
-  };
-
-  const selectAll = () => {
-    const allIds = filteredProducts.map((p) => p.id);
-    if (selectedProducts.length === allIds.length) {
-      setSelectedProducts([]);
-    } else {
-      setSelectedProducts(allIds);
-    }
-  };
-
-  const getStatusColor = (status: StudioStatus) => {
-    const colors = {
-      ACTIVE: 'bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30',
-      DRAFT: 'bg-gray-500/20 text-gray-600 dark:text-gray-400 border-gray-500/30',
-    };
-    return colors[status] || colors.DRAFT;
   };
 
   const showBulkActions = selectedProducts.length > 0;
@@ -277,6 +262,21 @@ const StoreProductsPanel: React.FC = () => {
     }
   };
 
+  const handleUnpublishSelected = async () => {
+    if (!selectedProducts.length) return;
+    setSaving(true);
+    try {
+      await Promise.all(selectedProducts.map((id) => productApi.updateProduct(id, { status: 'DRAFT' as any })));
+      toast.success('Products unpublished');
+      await refresh();
+      setSelectedProducts([]);
+    } catch {
+      toast.error('Failed to unpublish selected products');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDeleteSelected = async () => {
     if (!selectedProducts.length) return;
     if (!window.confirm('Delete selected products? This cannot be undone.')) return;
@@ -295,345 +295,170 @@ const StoreProductsPanel: React.FC = () => {
 
   return (
     <div className="animate-in fade-in duration-500">
-      {/* Action Bar */}
-      <div className="mb-6 backdrop-blur-xl bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-4 shadow-xl">
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products by name or ID..."
-                className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-xl pl-12 pr-4 py-3 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
-              />
-            </div>
+      <div className="mb-6 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Products</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Manage your catalog and draft inventory.</p>
           </div>
-
-          {/* Filters */}
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'draft')}
-              className="bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all cursor-pointer"
+              className="rounded-lg border border-gray-200 dark:border-white/10 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm"
             >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
+              <option value="all">All Products</option>
+              <option value="active">Published</option>
               <option value="draft">Draft</option>
             </select>
-
-            <select
-              value={filterCollection}
-              onChange={(e) => setFilterCollection(e.target.value)}
-              className="bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all cursor-pointer"
-            >
-              <option value="all">All Collections</option>
-              {collections.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filterStock}
-              onChange={(e) => setFilterStock(e.target.value)}
-              className="bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all cursor-pointer"
-            >
-              <option value="all">All Stock</option>
-              <option value="in_stock">In Stock</option>
-              <option value="low_stock">Low Stock</option>
-              <option value="out_of_stock">Out of Stock</option>
-            </select>
-
-            <div className="flex bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setViewMode('list')}
-                className={`px-4 py-3 transition-all ${viewMode === 'list' ? 'bg-purple-600 text-white' : 'text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
-              >
-                <List className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                className={`px-4 py-3 transition-all border-l border-gray-200 dark:border-white/10 ${viewMode === 'grid' ? 'bg-purple-600 text-white' : 'text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
-              >
-                <Grid className="w-4 h-4" />
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navigate('/studio/store/products/new')}
-              className="bg-gradient-to-r from-purple-600 to-purple-800 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/30 transition-all flex items-center gap-2 whitespace-nowrap"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Add Product</span>
-            </button>
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search products..."
+              inputSize="sm"
+              startIcon={<Search className="h-4 w-4" />}
+              className="w-64"
+            />
           </div>
         </div>
 
-        {showBulkActions && (
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10 flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-top-2">
-            <span className="text-gray-600 dark:text-gray-300">{selectedProducts.length} selected</span>
-            <button
-              type="button"
-              onClick={handleArchiveSelected}
-              disabled={saving}
-              className="bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-all text-sm flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <Archive className="w-4 h-4" /> Archive Selected
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteSelected}
-              disabled={saving}
-              className="bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 px-4 py-2 rounded-lg hover:bg-red-500/20 transition-all text-sm flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <Trash2 className="w-4 h-4" /> Delete
-            </button>
-          </div>
-        )}
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <select
+            value={filterCollection}
+            onChange={(e) => setFilterCollection(e.target.value)}
+            className="rounded-lg border border-gray-200 dark:border-white/10 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm"
+          >
+            <option value="all">All Collections</option>
+            {collections.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filterStock}
+            onChange={(e) => setFilterStock(e.target.value)}
+            className="rounded-lg border border-gray-200 dark:border-white/10 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm"
+          >
+            <option value="all">All Stock</option>
+            <option value="in_stock">In Stock</option>
+            <option value="low_stock">Low Stock</option>
+            <option value="out_of_stock">Out of Stock</option>
+          </select>
+        </div>
       </div>
 
       {/* Products */}
-      <div className="backdrop-blur-xl bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden">
-        {viewMode === 'list' ? (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
-                  <th className="text-left p-4 w-12">
-                    <input
-                      type="checkbox"
-                      onChange={selectAll}
-                      checked={filteredProducts.length > 0 && selectedProducts.length === filteredProducts.length}
-                      className="w-5 h-5 rounded border-gray-300 dark:border-white/20 bg-gray-100 dark:bg-[#1a1a1a] text-purple-600 focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
-                    />
-                  </th>
-                  <th className="text-left p-4 text-gray-500 dark:text-gray-400 font-semibold text-sm uppercase tracking-wider">Product</th>
-                  <th className="text-left p-4 text-gray-500 dark:text-gray-400 font-semibold text-sm uppercase tracking-wider hidden md:table-cell">Collection</th>
-                  <th className="text-left p-4 text-gray-500 dark:text-gray-400 font-semibold text-sm uppercase tracking-wider">Price</th>
-                  <th className="text-left p-4 text-gray-500 dark:text-gray-400 font-semibold text-sm uppercase tracking-wider hidden lg:table-cell">Stock</th>
-                  <th className="text-left p-4 text-gray-500 dark:text-gray-400 font-semibold text-sm uppercase tracking-wider">Status</th>
-                  <th className="text-right p-4 text-gray-500 dark:text-gray-400 font-semibold text-sm uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.map((product) => {
-                  const status: StudioStatus = product.isActive ? 'ACTIVE' : 'DRAFT';
-                  const collectionLabel =
-                    product.collection?.title ||
-                    collections.find((c) => c.id === product.collectionId)?.name ||
-                    '—';
+      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
+        <div className="p-4 sm:p-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filteredProducts.map((product) => {
+              const status: StudioStatus = product.isActive ? 'ACTIVE' : 'DRAFT';
+              const collectionLabel =
+                product.collection?.title ||
+                collections.find((c) => c.id === product.collectionId)?.name ||
+                '—';
 
-                  return (
-                    <tr
-                      key={product.id}
-                      className={`border-b border-gray-200 dark:border-white/5 hover:bg-purple-50 dark:hover:bg-purple-500/5 transition-all cursor-pointer group ${
-                        selectedProducts.includes(product.id)
-                          ? 'border-l-4 border-l-purple-600 bg-purple-50/50 dark:bg-purple-500/10'
-                          : ''
-                      }`}
-                    >
-                      <td className="p-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedProducts.includes(product.id)}
-                          onChange={() => toggleSelect(product.id)}
-                          className="w-5 h-5 rounded border-gray-300 dark:border-white/20 bg-gray-100 dark:bg-[#1a1a1a] text-purple-600 focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
-                        />
-                      </td>
-
-                      <td className="p-4">
-                        <div className="flex items-center gap-4">
-                          {product.thumbnail || product.images?.[0] ? (
-                            <MediaRenderer
-                              kind="image"
-                              src={(product.thumbnail || product.images?.[0]) as string}
-                              alt={product.name}
-                              maxHeightClassName="max-h-16"
-                              maxWidthClassName="max-w-16"
-                              className="rounded-lg border border-gray-200 dark:border-white/10"
-                              mediaClassName="rounded-lg"
-                            />
-                          ) : (
-                            <div className="h-16 w-16 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5 flex items-center justify-center">
-                              <Box className="w-6 h-6 text-gray-400" />
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-semibold text-gray-900 dark:text-white mb-1">{product.name}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{product.id}</div>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="p-4 text-gray-600 dark:text-gray-300 hidden md:table-cell">{collectionLabel}</td>
-
-                      <td className="p-4">
-                        <div className="font-semibold text-gray-900 dark:text-white">${product.price.toFixed(2)}</div>
-                        {typeof product.salePrice === 'number' && product.salePrice > 0 && (
-                          <div className="text-sm text-gray-500 dark:text-gray-400">Sale ${product.salePrice.toFixed(2)}</div>
-                        )}
-                      </td>
-
-                      <td className="p-4 hidden lg:table-cell">
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-900 dark:text-white font-medium">{product.totalStock ?? 0}</span>
-                          {(product.totalStock ?? 0) > 0 && (product.totalStock ?? 0) <= 5 && (
-                            <span className="px-2 py-1 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 text-xs rounded-full border border-orange-200 dark:border-orange-500/30">Low</span>
-                          )}
-                          {(product.totalStock ?? 0) === 0 && (
-                            <span className="px-2 py-1 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-xs rounded-full border border-red-200 dark:border-red-500/30">Out</span>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="p-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold border inline-block ${getStatusColor(status)}`}>
-                          {status}
-                        </span>
-                      </td>
-
-                      <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/studio/store/products/${product.id}/edit`)}
-                            disabled={saving}
-                            className="p-2 text-gray-500 dark:text-gray-300 hover:text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-500/10 rounded-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDuplicate(product.id)}
-                            disabled={saving}
-                            className="p-2 text-gray-500 dark:text-gray-300 hover:text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-400/10 rounded-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(product.id)}
-                            disabled={saving}
-                            className="p-2 text-gray-500 dark:text-gray-300 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10 rounded-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="p-4 sm:p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredProducts.map((product) => {
-                const status: StudioStatus = product.isActive ? 'ACTIVE' : 'DRAFT';
-                const collectionLabel =
-                  product.collection?.title ||
-                  collections.find((c) => c.id === product.collectionId)?.name ||
-                  '—';
-
-                return (
-                  <div
-                    key={product.id}
-                    className={`bg-white/60 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-4 shadow-sm transition-all ${
-                      selectedProducts.includes(product.id)
-                        ? 'ring-2 ring-purple-500/30'
-                        : 'hover:bg-purple-50 dark:hover:bg-purple-500/5'
-                    }`}
+              return (
+                <div
+                  key={product.id}
+                  className={`group relative overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white shadow-sm transition-all ${
+                    selectedProducts.includes(product.id)
+                      ? 'ring-2 ring-purple-500/30'
+                      : 'hover:shadow-lg'
+                  } ${layoutMode ? 'cursor-move' : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedProducts.includes(product.id)}
+                    onChange={() => toggleSelect(product.id)}
+                    className="absolute left-4 top-4 z-10 h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500/30"
+                  />
+                  <button
+                    type="button"
+                    className={`absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-white shadow ${product.isFeatured ? 'bg-yellow-400' : 'bg-gray-300'}`}
+                    aria-label="Featured"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedProducts.includes(product.id)}
-                        onChange={() => toggleSelect(product.id)}
-                        className="mt-1 w-5 h-5 rounded border-gray-300 dark:border-white/20 bg-gray-100 dark:bg-[#1a1a1a] text-purple-600 focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
+                    <Star className="h-4 w-4" />
+                  </button>
+                  {layoutMode && (
+                    <div className="absolute bottom-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-gray-600 shadow">
+                      <GripVertical className="h-4 w-4" />
+                    </div>
+                  )}
+
+                  <div className="relative">
+                    {product.thumbnail || product.images?.[0] ? (
+                      <MediaRenderer
+                        kind="image"
+                        src={(product.thumbnail || product.images?.[0]) as string}
+                        alt={product.name}
+                        className="h-full w-full"
+                        mediaClassName="h-72 w-full object-cover"
                       />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          {product.thumbnail || product.images?.[0] ? (
-                            <MediaRenderer
-                              kind="image"
-                              src={(product.thumbnail || product.images?.[0]) as string}
-                              alt={product.name}
-                              maxHeightClassName="max-h-16"
-                              maxWidthClassName="max-w-16"
-                              className="rounded-lg border border-gray-200 dark:border-white/10"
-                              mediaClassName="rounded-lg"
-                            />
-                          ) : (
-                            <div className="h-16 w-16 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5 flex items-center justify-center">
-                              <Box className="w-6 h-6 text-gray-400" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <div className="font-semibold text-gray-900 dark:text-white truncate">{product.name}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400 truncate">{collectionLabel}</div>
-                          </div>
-                        </div>
+                    ) : (
+                      <div className="flex h-72 w-full items-center justify-center bg-gray-100">
+                        <Box className="h-8 w-8 text-gray-400" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/studio/store/products/${product.id}/edit`)}
+                        className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-purple-700"
+                      >
+                        ✏️ Edit Product
+                      </button>
+                    </div>
+                  </div>
 
-                        <div className="mt-3 flex items-center justify-between">
-                          <div>
-                            <div className="font-semibold text-gray-900 dark:text-white">${product.price.toFixed(2)}</div>
-                            {typeof product.salePrice === 'number' && product.salePrice > 0 && (
-                              <div className="text-sm text-gray-500 dark:text-gray-400">Sale ${product.salePrice.toFixed(2)}</div>
-                            )}
-                          </div>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold border inline-block ${getStatusColor(status)}`}>
-                            {status}
-                          </span>
-                        </div>
-
-                        <div className="mt-3 flex items-center justify-between">
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Stock:{' '}
-                            <span className="text-gray-900 dark:text-white font-semibold">{product.totalStock ?? 0}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/studio/store/products/${product.id}/edit`)}
-                              disabled={saving}
-                              className="p-2 text-gray-500 dark:text-gray-300 hover:text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-500/10 rounded-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDuplicate(product.id)}
-                              disabled={saving}
-                              className="p-2 text-gray-500 dark:text-gray-300 hover:text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-400/10 rounded-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                              <Copy className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(product.id)}
-                              disabled={saving}
-                              className="p-2 text-gray-500 dark:text-gray-300 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-400/10 rounded-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
+                  <div className="space-y-3 p-4">
+                    <div className="flex items-center justify-between">
+                      {product.isFeatured ? (
+                        <span className="rounded-full bg-purple-50 px-2 py-1 text-xs font-semibold text-purple-700">Featured</span>
+                      ) : (
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${status === 'DRAFT' ? 'bg-yellow-50 text-yellow-700' : 'bg-green-50 text-green-700'}`}>
+                          {status === 'DRAFT' ? 'Draft' : 'Published'}
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-500">Stock: {product.totalStock ?? 0}</span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">{product.name}</h3>
+                      <p className="text-xs text-gray-500 line-clamp-1">{collectionLabel}</p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-base font-bold text-gray-900">₦{product.price.toFixed(2)}</div>
+                        {typeof product.salePrice === 'number' && product.salePrice > 0 && (
+                          <div className="text-xs text-gray-500">Sale ₦{product.salePrice.toFixed(2)}</div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleDuplicate(product.id)}
+                          disabled={saving}
+                          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-60"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(product.id)}
+                          disabled={saving}
+                          className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
-        )}
+        </div>
 
         {/* Pagination */}
         <div className="border-t border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 p-4">
@@ -720,10 +545,34 @@ const StoreProductsPanel: React.FC = () => {
               onClick={() => navigate('/studio/store/products/new')}
               className="bg-gradient-to-r from-purple-600 to-purple-800 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/30 transition-all inline-flex items-center gap-2"
             >
-              <Plus className="w-4 h-4" />
               Add Your First Product
             </button>
           </div>
+        </div>
+      )}
+
+      {showBulkActions && (
+        <div className="fixed bottom-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-full bg-purple-600 px-6 py-3 text-sm font-semibold text-white shadow-2xl">
+          <span>{selectedProducts.length} selected</span>
+          <div className="h-5 w-px bg-white/30" />
+          <button
+            type="button"
+            onClick={() => {
+              if (selectedProducts[0]) navigate(`/studio/store/products/${selectedProducts[0]}/edit`);
+            }}
+            className="hover:text-purple-200"
+          >
+            ✏️ Edit selected
+          </button>
+          <button type="button" onClick={handleDeleteSelected} className="hover:text-purple-200">
+            🗑️ Delete
+          </button>
+          <button type="button" onClick={handleArchiveSelected} className="hover:text-purple-200">
+            📦 Archive
+          </button>
+          <button type="button" onClick={handleUnpublishSelected} className="hover:text-purple-200">
+            📥 Unpublish
+          </button>
         </div>
       )}
     </div>

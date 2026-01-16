@@ -76,17 +76,43 @@ html {
   .z-layer-modal { z-index: var(--z-modal); }
   .z-layer-tooltip { z-index: var(--z-tooltip); }
   .z-layer-toast { z-index: var(--z-toast); }
+
+  /* Threadly styled scrollbars (uses theme tokens) */
+  .scrollbar-threadly {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--brand-primary-rgb), 0.35) transparent;
+  }
+
+  .scrollbar-threadly::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+  }
+
+  .scrollbar-threadly::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-threadly::-webkit-scrollbar-thumb {
+    background-color: rgba(var(--brand-primary-rgb), 0.30);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .scrollbar-threadly::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(var(--brand-primary-rgb), 0.45);
+  }
 }
 
 /* Frosted-glass (glassmorphism) design tokens */
 @layer components {
   .glass-panel {
-    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-xl rounded-2xl;
+    @apply bg-transparent border border-gray-200/70 dark:border-white/10 rounded-2xl;
   }
 
   .dark .glass-panel {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: var(--dark-border);
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.1);
   }
 
   .glass-menu {
@@ -207,12 +233,17 @@ html {
   }
 
   /*
-    Global media invariant utilities
-    - Media defines layout; containers only cap size and allow scroll.
-    - Do NOT apply backgrounds/padding/object-fit boxing around media surfaces.
+    Global media rendering invariant
+    - Uploaded media must always be fully visible by default (no cropping).
+    - Use `MediaRenderer`/`ImageWithFallback` for rendering images/videos.
+    - Containers shrink-wrap the media; max-* classes cap size.
+    - NEVER use overflow-hidden on media frames as it clips content.
+    - Cropping is only allowed via explicit opt-in (e.g. `fit="cover"`) for avatar/banner-style UI.
   */
   .media-frame {
-    @apply w-fit max-w-full overflow-hidden;
+    /* Shrink-wrap container: width fits content, maxes at full width */
+    @apply w-fit max-w-full;
+    /* NO overflow-hidden - media must be fully visible */
   }
 
   .media-frame-scroll {
@@ -224,7 +255,9 @@ html {
   }
 
   .media-intrinsic {
+    /* Image/video scales to fit within max constraints while maintaining aspect ratio */
     @apply block w-auto h-auto max-w-full;
+    /* height determined by max-h-* passed to MediaRenderer */
   }
 }
 
@@ -340,8 +373,7 @@ body.modal-open {
 
 /* Collection Creation Page - Design System Classes */
 .glass-panel-dark {
-  background: rgba(15, 15, 15, 0.95);
-  backdrop-filter: blur(24px);
+  background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
