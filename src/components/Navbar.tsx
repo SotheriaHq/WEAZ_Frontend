@@ -229,7 +229,11 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
             <div className="py-2 border-t border-gray-200 dark:border-gray-700">
               <div className="relative">
                 <button
-                  onClick={() => setShowThemeDropdown(!showThemeDropdown)}
+                  onClick={() => {
+                    setShowLanguageDropdown(false);
+                    setShowNotifications(false);
+                    setShowThemeDropdown(!showThemeDropdown);
+                  }}
                   className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-between"
                 >
                   <div className="flex items-center space-x-3">
@@ -258,7 +262,11 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
 
               <div className="relative">
                 <button
-                  onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                  onClick={() => {
+                    setShowThemeDropdown(false);
+                    setShowNotifications(false);
+                    setShowLanguageDropdown(!showLanguageDropdown);
+                  }}
                   className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-between"
                 >
                   <div className="flex items-center space-x-3">
@@ -329,7 +337,11 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
             <div className="py-2 border-t border-gray-200 dark:border-gray-700">
               <div className="relative">
                 <button
-                  onClick={() => setShowThemeDropdown(!showThemeDropdown)}
+                  onClick={() => {
+                    setShowLanguageDropdown(false);
+                    setShowNotifications(false);
+                    setShowThemeDropdown(!showThemeDropdown);
+                  }}
                   className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-between"
                 >
                   <div className="flex items-center space-x-3">
@@ -358,7 +370,11 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
 
               <div className="relative">
                 <button
-                  onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                  onClick={() => {
+                    setShowThemeDropdown(false);
+                    setShowNotifications(false);
+                    setShowLanguageDropdown(!showLanguageDropdown);
+                  }}
                   className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-between"
                 >
                   <div className="flex items-center space-x-3">
@@ -517,7 +533,12 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
               <button
                 type="button"
                 ref={(el) => { (notificationsAnchorRef as any).current = el; }}
-                onClick={() => setShowNotifications((p) => !p)}
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  setShowThemeDropdown(false);
+                  setShowLanguageDropdown(false);
+                  setShowNotifications((p) => !p);
+                }}
                 className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
                 aria-haspopup="dialog"
                 aria-expanded={showNotifications}
@@ -544,7 +565,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           <div className="relative">
             <button
               type="button"
-              onClick={(e) => { e.preventDefault(); setShowProfileMenu((prev) => !prev); }}
+              onClick={(e) => {
+                e.preventDefault();
+                setShowNotifications(false);
+                setShowThemeDropdown(false);
+                setShowLanguageDropdown(false);
+                setShowProfileMenu((prev) => !prev);
+              }}
               className="w-8 h-8 rounded-full flex items-center justify-center hover:ring-2 hover:ring-primary/20 transition-all duration-200 overflow-hidden"
               aria-label="Profile menu"
             >

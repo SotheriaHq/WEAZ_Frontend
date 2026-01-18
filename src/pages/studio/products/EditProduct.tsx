@@ -12,7 +12,7 @@ import {
   X,
   Loader2
 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 
@@ -24,6 +24,7 @@ import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
 import Tag from '@/components/ui/Tag';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -159,10 +160,15 @@ const formatCurrency = (amount: number, currency = 'NGN'): string => {
 const EditProduct: React.FC = () => {
   const navigate = useNavigate();
   const { id: productId } = useParams<{ id: string }>();
+  const location = useLocation();
   const user = useSelector((state: RootState) => state.user.profile);
 
   const isEditMode = Boolean(productId);
   const pageTitle = isEditMode ? 'Edit Product' : 'Create Product';
+  const includeDeleted = useMemo(
+    () => new URLSearchParams(location.search).get('includeDeleted') === 'true',
+    [location.search],
+  );
 
   const shippingRegionOptions = useMemo(() => {
     const all = [
@@ -215,6 +221,7 @@ const EditProduct: React.FC = () => {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
   const [tagInput, setTagInput] = useState('');
+  const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
   
   // Media state (simplified - using URLs for display)
   const [mediaUrls, setMediaUrls] = useState<Array<{ id: string; url: string; isPrimary?: boolean }>>([]);
@@ -261,12 +268,18 @@ const EditProduct: React.FC = () => {
   // Data Loading
   // =====================
 
-  // Load collections (required by backend as `collectionId`)
+  // Load collections (optional for products; standalone products are allowed)
   useEffect(() => {
     let mounted = true;
     const loadCollections = async () => {
       try {
-        if (!user?.id) return;
+        if (!user?.id) {
+          if (mounted) {
+            setCategories([]);
+            setCategoriesLoading(false);
+          }
+          return;
+        }
         const collections = await brandApi.getCollections(user.id, { visibility: 'all' });
         if (!mounted) return;
         const mapped: Category[] = (collections || []).map((c: any) => ({
@@ -296,7 +309,7 @@ const EditProduct: React.FC = () => {
     const loadProduct = async () => {
       try {
         setLoading(true);
-        const product = await productApi.getProduct(productId);
+        const product = await productApi.getProduct(productId, includeDeleted ? { includeDeleted: true } : undefined);
         if (!product || !mounted) return;
 
         setForm({
@@ -418,33 +431,67 @@ const EditProduct: React.FC = () => {
   // =====================
 
   const handleSave = useCallback(async (asDraft = false) => {
-    // Validation
-    if (!form.title.trim()) {
-      toast.error('Please enter a product title');
-      return;
-    }
-    if (form.price <= 0) {
-      toast.error('Please enter a valid price');
-      return;
-    }
-    if (form.onSale && form.compareAtPrice > 0 && form.compareAtPrice >= form.price) {
-      toast.error('Sale price must be less than the price');
-      return;
-    }
-    if (form.variants.length > 0) {
-      if (hasDuplicateVariants) {
-        toast.error('Please remove duplicate variant options (same size/color)');
+    const hasDraftContent = Boolean(
+      form.title.trim() ||
+        form.description.trim() ||
+        form.categoryId ||
+        form.tags.length > 0 ||
+        form.price > 0 ||
+        form.compareAtPrice > 0 ||
+        form.costPerItem > 0 ||
+        form.sku.trim() ||
+        form.materials.trim() ||
+        form.careInstructions.trim() ||
+        form.stock > 0 ||
+        form.variants.length > 0 ||
+        mediaUrls.length > 0 ||
+        pendingMediaFiles.length > 0
+    );
+
+    if (asDraft) {
+      if (!hasDraftContent) {
+        toast.error('Add at least one detail to save a draft');
         return;
       }
-      const invalid = form.variants.find((v) => Number.isNaN(Number(v.stock)) || v.stock < 0);
-      if (invalid) {
-        toast.error('Variant stock must be 0 or greater');
+      if (form.variants.length > 0) {
+        const invalid = form.variants.find((v) => Number.isNaN(Number(v.stock)) || v.stock < 0);
+        if (invalid) {
+          toast.error('Variant stock must be 0 or greater');
+          return;
+        }
+      } else if (form.trackInventory && (Number.isNaN(Number(form.stock)) || form.stock < 0)) {
+        toast.error('Stock must be 0 or greater');
         return;
       }
     } else {
-      if (form.trackInventory && (Number.isNaN(Number(form.stock)) || form.stock < 0)) {
-        toast.error('Stock must be 0 or greater');
+      // Validation for published products
+      if (!form.title.trim()) {
+        toast.error('Please enter a product title');
         return;
+      }
+      if (form.price <= 0) {
+        toast.error('Please enter a valid price');
+        return;
+      }
+      if (form.onSale && form.compareAtPrice > 0 && form.compareAtPrice >= form.price) {
+        toast.error('Sale price must be less than the price');
+        return;
+      }
+      if (form.variants.length > 0) {
+        if (hasDuplicateVariants) {
+          toast.error('Please remove duplicate variant options (same size/color)');
+          return;
+        }
+        const invalid = form.variants.find((v) => Number.isNaN(Number(v.stock)) || v.stock < 0);
+        if (invalid) {
+          toast.error('Variant stock must be 0 or greater');
+          return;
+        }
+      } else {
+        if (form.trackInventory && (Number.isNaN(Number(form.stock)) || form.stock < 0)) {
+          toast.error('Stock must be 0 or greater');
+          return;
+        }
       }
     }
 
@@ -453,12 +500,12 @@ const EditProduct: React.FC = () => {
       const ensuredSku = form.sku?.trim() || buildBaseSku({ brandInitials: brandInitialsFromProfile(user), title: form.title });
 
       const payload: ProductCreateDto = {
-        title: form.title.trim(),
+        title: asDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
         description: form.description.trim() || undefined,
         categoryId: form.categoryId || undefined,
         tags: form.tags,
-        price: form.price,
-        compareAtPrice: form.onSale ? form.compareAtPrice : undefined,
+        price: asDraft ? (form.price > 0 ? form.price : 0) : form.price,
+        compareAtPrice: form.onSale && form.compareAtPrice > 0 ? form.compareAtPrice : undefined,
         costPerItem: form.costPerItem || undefined,
         currency: form.currency,
         sku: ensuredSku,
@@ -524,7 +571,7 @@ const EditProduct: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [form, hasDuplicateVariants, isEditMode, navigate, pendingMediaFiles, productId, variantTotalStock]);
+  }, [form, hasDuplicateVariants, isEditMode, mediaUrls.length, navigate, pendingMediaFiles, productId, variantTotalStock]);
 
   // Auto-generate SKU (product + variants). Users shouldn't type SKUs manually.
   useEffect(() => {
@@ -676,7 +723,8 @@ const EditProduct: React.FC = () => {
   }, [productId, navigate]);
 
   const handleDiscard = useCallback(() => {
-    if (hasChanges && !window.confirm('You have unsaved changes. Are you sure you want to discard them?')) {
+    if (hasChanges) {
+      setShowDiscardPrompt(true);
       return;
     }
     navigate(-1);
@@ -862,24 +910,32 @@ const EditProduct: React.FC = () => {
                     onChange={(e) => updateForm('categoryId', e.target.value)}
                     disabled={categoriesLoading}
                   >
-                    <option value="">Select collection</option>
+                    <option value="">No collection (standalone)</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </Select>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      {categoriesLoading
+                        ? 'Loading collections…'
+                        : categories.length
+                          ? 'Choose a collection or keep this product standalone.'
+                          : 'No collections yet. This product can stay standalone.'}
+                    </p>
+                    {!categoriesLoading && categories.length === 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/profile/collections/create')}
+                        className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 transition-colors"
+                      >
+                        Create collection
+                      </button>
+                    ) : null}
+                  </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">Tags</label>
-                    <div className="bg-white dark:bg-zinc-900/60 border border-gray-300/80 dark:border-zinc-700/60 rounded-xl px-3 py-2 min-h-[46px] flex flex-wrap gap-2 items-center shadow-sm">
-                      {form.tags.map((tag) => (
-                        <Tag
-                          key={tag}
-                          label={tag}
-                          color="purple"
-                          size="xs"
-                          rightIcon={<X className="w-3 h-3 cursor-pointer" onClick={() => handleRemoveTag(tag)} />}
-                          className="gap-1"
-                        />
-                      ))}
+                    <div className="bg-white dark:bg-zinc-900/60 border border-gray-300/80 dark:border-zinc-700/60 rounded-xl px-3 py-2 min-h-[46px] flex items-center gap-2 shadow-sm">
                       <input 
                         type="text" 
                         value={tagInput}
@@ -896,6 +952,20 @@ const EditProduct: React.FC = () => {
                         Add
                       </button>
                     </div>
+                    {form.tags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {form.tags.map((tag) => (
+                          <Tag
+                            key={tag}
+                            label={tag}
+                            color="purple"
+                            size="xs"
+                            rightIcon={<X className="w-3 h-3 cursor-pointer" onClick={() => handleRemoveTag(tag)} />}
+                            className="gap-1"
+                          />
+                        ))}
+                      </div>
+                    )}
                     <p className="text-[11px] text-gray-500 mt-1">Add one tag at a time. Use Enter or the Add button.</p>
                   </div>
                 </div>
@@ -1291,6 +1361,28 @@ const EditProduct: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      <ConfirmDialog
+        open={showDiscardPrompt}
+        title="Discard changes?"
+        message="You have unsaved changes. You can save as a draft or discard your edits."
+        confirmText="Discard Changes"
+        cancelText={!isEditMode ? 'Save Draft' : 'Keep Editing'}
+        isDestructive
+        onCancel={() => {
+          if (!isEditMode) {
+            setShowDiscardPrompt(false);
+            void handleSave(true);
+            return;
+          }
+          setShowDiscardPrompt(false);
+        }}
+        onConfirm={() => {
+          setShowDiscardPrompt(false);
+          setHasChanges(false);
+          navigate(-1);
+        }}
+      />
 
     </div>
   );

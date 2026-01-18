@@ -349,7 +349,7 @@ const CreateCollectionInner: React.FC = () => {
 
       toast.success('Draft saved successfully!');
       // Navigate to profile with Drafts visibility filter selected
-      navigate('/profile?tab=Collections&visibility=Drafts');
+      navigate('/profile?tab=Content&visibility=Drafts');
     } catch (error) {
       console.error(error);
       toast.error('Failed to save draft');
@@ -435,7 +435,7 @@ const CreateCollectionInner: React.FC = () => {
         toast.success('Collection published');
 
         // Navigate back to profile/catalog with a publishing badge so the user is not blocked on this page
-        navigate(`/profile?tab=Collections`, {
+        navigate(`/profile?tab=Content`, {
           state: {
             publishingCollectionId: newCollectionId,
             publishingTitle: title,

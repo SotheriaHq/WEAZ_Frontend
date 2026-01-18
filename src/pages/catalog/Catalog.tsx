@@ -32,7 +32,7 @@ import CatalogShopTab from '@/components/catalog/CatalogShopTab';
 
 import ComingSoon from '../placeholders/ComingSoon';
 
-type TabType = 'Collections' | 'Store' | 'Reviews' | 'About' | 'Drafts';
+type TabType = 'Content' | 'Store' | 'Reviews' | 'About' | 'Drafts';
 // CollectionType removed — dropdown opens modal directly
 
 const ProfilePage: React.FC = () => {
@@ -81,8 +81,9 @@ const ProfilePage: React.FC = () => {
       setSelectedCollectionId(urlCollectionId);
     }
     const tab = searchParams.get('tab');
-    if (tab && ['Collections', 'Shop', 'Store', 'Reviews', 'About'].includes(tab)) {
-      setActiveTab((tab === 'Shop' ? 'Store' : tab) as TabType);
+    if (tab && ['Collections', 'Content', 'Shop', 'Store', 'Reviews', 'About'].includes(tab)) {
+      const normalized = tab === 'Collections' ? 'Content' : tab === 'Shop' ? 'Store' : tab;
+      setActiveTab(normalized as TabType);
     }
     // Handle visibility filter from URL (e.g., after draft save redirect)
     const visibility = searchParams.get('visibility');
@@ -91,7 +92,7 @@ const ProfilePage: React.FC = () => {
     }
   }, [searchParams]);
 
-  const [activeTab, setActiveTab] = useState<TabType>('Collections');
+  const [activeTab, setActiveTab] = useState<TabType>('Content');
   const [visibilityFilter, setVisibilityFilter] = useState<'Public' | 'Private' | 'Drafts'>('Public');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [pendingAccessConfirm, setPendingAccessConfirm] = useState<string | null>(null);
@@ -649,7 +650,12 @@ const ProfilePage: React.FC = () => {
     );
   }
 
-  const searchAndVisibilityFiltered = displayCollections.filter(c =>
+  const filteredDisplayCollections = displayCollections.filter((c) => {
+    const title = String(c.name || c.title || '').trim();
+    return !(c.isAvailableInStore && title === 'Store Products');
+  });
+
+  const searchAndVisibilityFiltered = filteredDisplayCollections.filter(c =>
     (c.name || c.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (c.description || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -999,14 +1005,14 @@ const ProfilePage: React.FC = () => {
         <div className="mt-6">
           <Tabs
             tabs={(() => {
-              return ['Collections', 'Store', 'Reviews', 'About'];
+              return ['Content', 'Store', 'Reviews', 'About'];
             })()}
             activeTab={activeTab}
             onTabChange={(tab) => {
                 setActiveTab(tab as TabType);
                 setSearchParams(prev => {
-                    prev.set('tab', tab);
-                    return prev;
+                  prev.set('tab', tab);
+                  return prev;
                 });
             }}
           />
@@ -1021,7 +1027,7 @@ const ProfilePage: React.FC = () => {
               />
             ) : null}
 
-            {activeTab === 'Collections' && (
+            {activeTab === 'Content' && (
               <div>
                 {selectedCollectionId ? (
                   // Show inline collection viewer
@@ -1050,7 +1056,7 @@ const ProfilePage: React.FC = () => {
                   <>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                       <div className="flex-1 w-full sm:w-auto">
-                        <SearchField placeholder="Search collections..." onSearch={setSearchQuery} />
+                        <SearchField placeholder="Search content..." onSearch={setSearchQuery} />
                       </div>
                       {/* Show create controls only for owner */}
                       {isOwner && (

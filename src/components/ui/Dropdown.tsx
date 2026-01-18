@@ -1,6 +1,7 @@
-import React, { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { clsx } from 'clsx';
 import { OverlayPortal } from './OverlayPortal';
+import { useDropdownManagerOptional } from '@/context/DropdownManagerContext';
 
 type Placement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end';
 
@@ -10,6 +11,7 @@ interface DropdownProps {
   onOpenChange?: (open: boolean) => void;
   placement?: Placement;
   className?: string;
+  menuId?: string;
 }
 
 interface DropdownContextValue {
@@ -29,10 +31,22 @@ export const Dropdown: React.FC<DropdownProps> = ({
   onOpenChange,
   placement = 'bottom-end',
   className,
+  menuId,
 }) => {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
-  const open = controlledOpen ?? uncontrolledOpen;
-  const setOpen = onOpenChange ?? setUncontrolledOpen;
+  const dropdownManager = useDropdownManagerOptional();
+  const generatedId = useId();
+  const resolvedId = menuId ?? generatedId;
+  const managerOpen = dropdownManager ? dropdownManager.openId === resolvedId : undefined;
+  const open = controlledOpen ?? managerOpen ?? uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (dropdownManager) {
+      dropdownManager.setOpenId(next ? resolvedId : null);
+    } else {
+      setUncontrolledOpen(next);
+    }
+    onOpenChange?.(next);
+  };
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);

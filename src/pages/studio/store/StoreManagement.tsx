@@ -82,7 +82,16 @@ export default function StoreManagement() {
         }
 
         if (s?.isStoreOpen === false && s?.isSetupComplete === false) {
-          navigate('/studio/store/essentials', { replace: true });
+          let hasEssentials = false;
+          try {
+            const raw = localStorage.getItem('store-progress');
+            const parsed = raw ? JSON.parse(raw) : null;
+            hasEssentials = Boolean(parsed?.essentialsComplete);
+          } catch {
+            hasEssentials = false;
+          }
+
+          navigate(hasEssentials ? '/studio/store/setup' : '/studio/store/essentials', { replace: true });
         }
       } catch (e) {
         const code = (e as any)?.response?.status;

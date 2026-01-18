@@ -39,6 +39,7 @@ const StoreEssentials: React.FC = () => {
   const [selected, setSelected] = useState<string[]>([]);
   const [tagline, setTagline] = useState('');
   const [instagram, setInstagram] = useState('');
+  const [description, setDescription] = useState('');
 
   const brandName = useMemo(() => {
     const fromUser = user?.brandFullName?.trim();
@@ -67,6 +68,7 @@ const StoreEssentials: React.FC = () => {
         // Best-effort prefill for quick-start
         if (prefill.brand?.tagline) setTagline(prefill.brand.tagline);
         if (prefill.brand?.instagram) setInstagram(prefill.brand.instagram);
+        if (prefill.brand?.description) setDescription(prefill.brand.description);
       } catch (error) {
         // If this fails, still render with empty lists; wizard will have fallback categories.
         console.error('Failed to load store essentials prefill', error);
@@ -136,6 +138,7 @@ const StoreEssentials: React.FC = () => {
       const payload = {
         tags: skipCategories ? [] : selected,
         tagline: tagline.trim(),
+        description: description.trim(),
         socialInstagram: cleanInstagram,
       };
 
@@ -145,16 +148,18 @@ const StoreEssentials: React.FC = () => {
           categories: skipCategories ? [] : selected,
           tagline: tagline.trim(),
           instagram: cleanInstagram,
+          description: description.trim(),
           step: 1,
+          essentialsComplete: true,
         }));
       } catch (error) {
         console.error('Failed to save store essentials', error);
         // Don’t block onboarding on transient failures.
       }
 
-      navigate('/studio/store', { replace: true });
+      navigate('/studio/store/setup', { replace: true });
     },
-    [instagram, navigate, selected, tagline]
+    [description, instagram, navigate, selected, tagline]
   );
 
   const selectedLabels = useMemo(() => {
@@ -201,33 +206,42 @@ const StoreEssentials: React.FC = () => {
                 </label>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
-                  {categories.map((cat) => {
-                    const isSelected = selected.includes(cat.value);
-                    const isDisabled = !isSelected && selected.length >= MAX_CATEGORIES;
-                    const emoji = getCategoryEmoji(cat.label) ?? getCategoryEmoji(cat.value);
+                  {isLoading ? (
+                    Array.from({ length: 4 }).map((_, index) => (
+                      <div
+                        key={`cat-skeleton-${index}`}
+                        className="h-[68px] rounded-xl bg-white/60 border border-gray-200 animate-pulse"
+                      />
+                    ))
+                  ) : (
+                    categories.map((cat) => {
+                      const isSelected = selected.includes(cat.value);
+                      const isDisabled = !isSelected && selected.length >= MAX_CATEGORIES;
+                      const emoji = getCategoryEmoji(cat.label) ?? getCategoryEmoji(cat.value);
 
-                    return (
-                      <button
-                        key={cat.value}
-                        type="button"
-                        onClick={() => toggleCategory(cat.value)}
-                        disabled={isDisabled || isLoading}
-                        className={
-                          'rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border-2 ' +
-                          (isSelected
-                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white border-purple-600 shadow-lg'
-                            : isDisabled
-                              ? 'bg-white/60 text-gray-400 border-gray-200 cursor-not-allowed'
-                              : 'bg-white/60 backdrop-blur-sm border-gray-200 text-gray-700 hover:border-purple-300 hover:bg-purple-50/50')
-                        }
-                      >
-                        <div className="flex flex-col items-center gap-1">
-                          {emoji ? <span className="text-xl">{emoji}</span> : null}
-                          <span className="text-center leading-tight">{cat.label}</span>
-                        </div>
-                      </button>
-                    );
-                  })}
+                      return (
+                        <button
+                          key={cat.value}
+                          type="button"
+                          onClick={() => toggleCategory(cat.value)}
+                          disabled={isDisabled || isLoading}
+                          className={
+                            'rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border-2 ' +
+                            (isSelected
+                              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white border-purple-600 shadow-lg'
+                              : isDisabled
+                                ? 'bg-white/60 text-gray-400 border-gray-200 cursor-not-allowed'
+                                : 'bg-white/60 backdrop-blur-sm border-gray-200 text-gray-700 hover:border-purple-300 hover:bg-purple-50/50')
+                          }
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            {emoji ? <span className="text-xl">{emoji}</span> : null}
+                            <span className="text-center leading-tight">{cat.label}</span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
 
                 <p className="text-sm text-gray-500">{selected.length} of {MAX_CATEGORIES} selected</p>

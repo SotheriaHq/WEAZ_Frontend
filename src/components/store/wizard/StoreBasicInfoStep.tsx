@@ -62,7 +62,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
   const categoriesValid = data.categories.length > 0;
   const taglineValid = data.tagline.trim().length > 0;
   const descriptionLen = data.description.length;
-  const descriptionValid = descriptionLen >= 100 && descriptionLen <= MAX_DESCRIPTION_LEN;
+  const descriptionValid = data.description.trim().length > 0;
 
   const isValid = nameValid && slugValid && categoriesValid && taglineValid && descriptionValid;
 
@@ -74,7 +74,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
       if (!slugValid) missing.push('Store Slug');
       if (!categoriesValid) missing.push('At least 1 category');
       if (!taglineValid) missing.push('Tagline');
-      if (!descriptionValid) missing.push('Description (100-500 chars)');
+      if (!descriptionValid) missing.push('About Us (from your profile)');
       toast.error(`Please complete: ${missing.join(', ')}`);
       return;
     }
@@ -234,16 +234,15 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
               </label>
               <textarea
                 rows={4}
-                minLength={100}
                 maxLength={MAX_DESCRIPTION_LEN}
                 value={data.description}
-                onChange={(e) => onChange({ description: e.target.value.slice(0, MAX_DESCRIPTION_LEN) })}
-                className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 transition-colors resize-none"
-                placeholder="Tell customers about your store..."
+                readOnly
+                className="w-full bg-gray-100 dark:bg-white/5 border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-800 dark:text-gray-300 focus:outline-none resize-none"
+                placeholder="Pulled from your profile About Us"
               />
               <div className="flex justify-between mt-1">
-                <span className={`text-xs ${descriptionLen < 100 ? 'text-amber-500' : 'text-gray-500'}`}>
-                  100–{MAX_DESCRIPTION_LEN} characters
+                <span className={`text-xs ${descriptionValid ? 'text-gray-500' : 'text-amber-500'}`}>
+                  {descriptionValid ? 'Pulled from your profile About Us' : 'Add About Us in your profile to continue'}
                 </span>
                 <span className="text-xs text-gray-500">{descriptionLen}/{MAX_DESCRIPTION_LEN}</span>
               </div>

@@ -14,7 +14,14 @@ export default {
         'light-gray': '#f0f2f5',
         primary: '#9333EA',
       },
-    
+      keyframes: {
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' },
+        },
+      },
+      animation: {
+        shimmer: 'shimmer 1.5s infinite',
+      },
     },
   },
   plugins: [],

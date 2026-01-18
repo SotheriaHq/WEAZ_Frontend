@@ -13,6 +13,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import GuestRoute from './components/GuestRoute';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { DropdownManagerProvider } from './context/DropdownManagerContext';
 import Profile from './pages/catalog/Catalog';
 import { ProfileLayout } from './components/catalog/ProfileLayout';
 import CreateCollectionPage from './pages/catalog/CreateCollectionRedesign';
@@ -243,8 +244,10 @@ const router = createBrowserRouter([
 const App: React.FC = () => (
   <AuthProvider>
     <ThemeProvider defaultTheme="light">
-      <Toaster position="top-center" richColors closeButton />
-      <RouterProvider router={router} />
+      <DropdownManagerProvider>
+        <Toaster position="top-center" richColors closeButton />
+        <RouterProvider router={router} />
+      </DropdownManagerProvider>
     </ThemeProvider>
   </AuthProvider>
 );

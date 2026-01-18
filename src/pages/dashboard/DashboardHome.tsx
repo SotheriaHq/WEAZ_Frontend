@@ -21,8 +21,6 @@ import {
   Wand2,
   Ticket,
   ExternalLink,
-  Settings,
-  Bell,
   AlertTriangle,
   Camera,
   CreditCard,
@@ -107,6 +105,7 @@ const DashboardHome: React.FC = () => {
 
   const kpis = overview?.kpis || {};
   const store = overview?.store || {};
+  const resolvedIsLive = store?.isLive ?? user?.isStoreOpen ?? false;
   const storeHealth = overview?.storeHealth || { score: 0, responseTime: 0, inventory: 0, reviews: 0 };
   const actionRequired = overview?.actionRequired || [];
   const recentActivity = overview?.recentActivity || [];
@@ -148,12 +147,12 @@ const DashboardHome: React.FC = () => {
               <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
                 {store.name || user?.brandFullName || 'Store'}
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1.5 ${
-                  store.isLive 
+                  resolvedIsLive 
                     ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/20'
                     : 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20'
                 }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${store.isLive ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                  {store.isLive ? 'LIVE' : 'DRAFT'}
+                  <span className={`w-1.5 h-1.5 rounded-full ${resolvedIsLive ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                  {resolvedIsLive ? 'LIVE' : 'DRAFT'}
                 </span>
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -163,16 +162,13 @@ const DashboardHome: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <a href="#" className="px-4 py-2 bg-white/50 dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/studio/store')}
+              className="px-4 py-2 bg-white/50 dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2"
+            >
               <ExternalLink className="w-4 h-4" />
               View Store
-            </a>
-            <button className="w-10 h-10 bg-white/50 dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
-              <Settings className="w-5 h-5" />
-            </button>
-            <button className="w-10 h-10 bg-white/50 dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-gray-900" />
             </button>
           </div>
         </div>

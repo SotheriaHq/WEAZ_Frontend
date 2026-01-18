@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import Button from './Button';
+import { useDropdownManagerOptional } from '@/context/DropdownManagerContext';
 
 type DropdownOption = { label: string; onClick: () => void };
 
@@ -15,11 +16,18 @@ interface DropdownProps {
 const Dropdown: React.FC<DropdownProps> = ({ buttonLabel, options, variant = 'primary', className = '', hideCaret = false, buttonClassName = '' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
+  const dropdownId = useId();
+  const dropdownManager = useDropdownManagerOptional();
+  const open = dropdownManager ? dropdownManager.openId === dropdownId : isOpen;
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setIsOpen(false);
+        if (dropdownManager) {
+          dropdownManager.setOpenId(null);
+        } else {
+          setIsOpen(false);
+        }
       }
     };
 
@@ -29,14 +37,22 @@ const Dropdown: React.FC<DropdownProps> = ({ buttonLabel, options, variant = 'pr
 
   const toggle = (e?: React.MouseEvent) => {
     e?.preventDefault();
-    setIsOpen((s) => !s);
+    if (dropdownManager) {
+      dropdownManager.setOpenId(open ? null : dropdownId);
+    } else {
+      setIsOpen((s) => !s);
+    }
   };
 
   const handleOption = (fn: () => void) => {
     try {
       fn();
     } finally {
-      setIsOpen(false);
+      if (dropdownManager) {
+        dropdownManager.setOpenId(null);
+      } else {
+        setIsOpen(false);
+      }
     }
   };
 
@@ -46,7 +62,7 @@ const Dropdown: React.FC<DropdownProps> = ({ buttonLabel, options, variant = 'pr
         variant={variant}
         onClick={toggle}
         aria-haspopup="true"
-        aria-expanded={isOpen}
+        aria-expanded={open}
         className={buttonClassName}
       >
         {buttonLabel}
@@ -57,7 +73,7 @@ const Dropdown: React.FC<DropdownProps> = ({ buttonLabel, options, variant = 'pr
         )}
       </Button>
 
-      {isOpen && (
+      {open && (
         <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-50">
           <div className="py-1">
             {options.map((opt, idx) => (

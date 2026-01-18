@@ -286,6 +286,8 @@ const StoreCreationWizard: React.FC = () => {
             setCurrentStep(restoredStep);
             toast.info(`Resuming from Step ${clampedStepIndex + 1}`);
           }
+        } else if (localDraft && (localDraft as any).essentialsComplete) {
+          setCurrentStep('social');
         }
         
         setIsLoadingDraft(false);

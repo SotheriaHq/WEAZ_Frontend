@@ -186,6 +186,9 @@ export interface ProductDto {
     effectivePrice?: number;
     createdAt?: string;
     updatedAt?: string;
+    deletedAt?: string | null;
+    archivedAt?: string | null;
+    archiveExpiresAt?: string | null;
     brandId?: string;
     brand?: {
         id: string;
@@ -220,9 +223,11 @@ export const productApi = {
     /**
      * Get a single product by ID
      */
-    async getProduct(productId: string): Promise<ProductDto | null> {
+    async getProduct(productId: string, options?: { includeDeleted?: boolean }): Promise<ProductDto | null> {
         try {
-            const response = await apiClient.get<{ status: string; data: ProductDto }>(`/products/${productId}`);
+            const response = await apiClient.get<{ status: string; data: ProductDto }>(`/products/${productId}` , {
+                params: options?.includeDeleted ? { includeDeleted: true } : undefined,
+            });
             return response.data?.data ?? response.data as unknown as ProductDto ?? null;
         } catch (error) {
             console.error('Failed to fetch product', error);
@@ -273,10 +278,91 @@ export const productApi = {
     },
 
     /**
-     * Archive a product (soft delete)
+     * Permanently delete a product (hard delete)
+     */
+    async permanentlyDeleteProduct(productId: string): Promise<void> {
+        try {
+            await apiClient.delete(`/products/${productId}/permanent`);
+        } catch (error) {
+            console.error('Failed to permanently delete product', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Restore a soft-deleted product
+     */
+    async restoreProduct(productId: string): Promise<ProductDto> {
+        try {
+            const response = await apiClient.post<{ status: string; data: ProductDto }>(`/products/${productId}/restore`);
+            return response.data?.data ?? response.data as unknown as ProductDto;
+        } catch (error) {
+            console.error('Failed to restore product', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get delete impact for a product
+     * Returns info about active orders, carts, wishlists, etc.
+     */
+    async getDeleteImpact(productId: string): Promise<{
+        productName: string;
+        hasActiveOrders: boolean;
+        activeOrdersCount: number;
+        inCarts: number;
+        inWishlists: number;
+        totalViews: number;
+        totalLikes: number;
+        canDelete: boolean;
+        mustArchiveReason?: string;
+    }> {
+        try {
+            const response = await apiClient.get(`/products/${productId}/delete-impact`);
+            return unwrapApiResponse(response.data);
+        } catch (error) {
+            console.error('Failed to get delete impact', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Archive a product (sets archivedAt, 60-day auto-delete)
      */
     async archiveProduct(productId: string): Promise<ProductDto> {
-        return this.updateProduct(productId, { status: 'ARCHIVED' });
+        try {
+            const response = await apiClient.post<{ status: string; data: ProductDto }>(`/products/${productId}/archive`);
+            return response.data?.data ?? response.data as unknown as ProductDto;
+        } catch (error) {
+            console.error('Failed to archive product', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Unarchive/restore a product
+     */
+    async unarchiveProduct(productId: string): Promise<ProductDto> {
+        try {
+            const response = await apiClient.post<{ status: string; data: ProductDto }>(`/products/${productId}/unarchive`);
+            return response.data?.data ?? response.data as unknown as ProductDto;
+        } catch (error) {
+            console.error('Failed to unarchive product', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Toggle product featured status
+     */
+    async toggleFeatured(productId: string): Promise<ProductDto> {
+        try {
+            const response = await apiClient.post<{ status: string; data: ProductDto }>(`/products/${productId}/toggle-featured`);
+            return response.data?.data ?? response.data as unknown as ProductDto;
+        } catch (error) {
+            console.error('Failed to toggle featured', error);
+            throw error;
+        }
     },
 
     /**
