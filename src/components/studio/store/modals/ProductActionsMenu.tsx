@@ -196,13 +196,7 @@ export const getDefaultProductActions = (product: {
             variant: 'warning' as const,
           },
         ]),
-    {
-      id: 'delete',
-      label: 'Delete',
-      emoji: '🗑️',
-      description: 'Remove permanently (30-day undo)',
-      variant: 'danger',
-    },
+    // Note: Edit and Delete removed from menu - they're always visible as buttons on the card
   ];
 };
 

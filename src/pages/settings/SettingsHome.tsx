@@ -95,8 +95,8 @@ const SettingsHome: React.FC = () => {
       {/* Local settings sidebar with its own panel */}
       <SettingsSidebar active={active} onSelect={setActive} />
 
-      {/* Content area shifts for the settings sidebar + global collapsed rail */}
-      <div className="min-h-screen pb-10 px-4 md:pl-[300px] pt-6">
+      {/* Content area shifts for the settings sidebar only (global sidebar is hidden) */}
+      <div className="min-h-screen pb-10 px-4 md:pl-[248px] pt-6">
         <div className="max-w-4xl mx-auto">
           {sections[active]}
         </div>

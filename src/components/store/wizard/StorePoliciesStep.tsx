@@ -348,7 +348,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       onChange={(e) =>
                         onChange({ processingTime: e.target.value })
                       }
-                      className="w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
+                      className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
                     >
                       <option value="">Select processing time</option>
                       {PROCESSING_TIMES.map((time) => (
@@ -454,7 +454,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           onChange={(e) =>
                             onChange({ returnWindow: e.target.value })
                           }
-                          className="w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
+                          className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
                         >
                           {RETURN_WINDOWS.filter((w) => w.value !== 'none').map(
                             (window) => (
@@ -508,7 +508,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           onChange={(e) =>
                             onChange({ refundMethod: e.target.value })
                           }
-                          className="w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
+                          className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
                         >
                           {REFUND_METHODS.map((method) => (
                             <option key={method.value} value={method.value}>
@@ -716,7 +716,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       onChange={(e) =>
                         onChange({ responseTimeSla: e.target.value })
                       }
-                      className="w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
+                      className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
                     >
                       {RESPONSE_SLAS.map((sla) => (
                         <option key={sla.value} value={sla.value}>

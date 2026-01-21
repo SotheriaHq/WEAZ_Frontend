@@ -308,7 +308,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               {product.isOutOfStock
                 ? 'Out of Stock'
                 : product.sizes.length > 0
-                  ? 'Select Options'
+                  ? 'Quick View'
                   : 'Add to Bag'
               }
             </button>
@@ -349,48 +349,28 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       </div>
 
       {/* Product Info */}
-      <div className="flex flex-col gap-2 p-4">
+      <div className="flex flex-col gap-1.5 p-3">
         {/* Product Name */}
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2 leading-snug min-h-[2.5rem]">
+        <h3 className="text-xs font-semibold text-gray-900 dark:text-white line-clamp-2 leading-snug min-h-[2rem]">
           {product.name}
         </h3>
 
         {/* Price Section */}
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className={`text-lg font-bold ${product.isOnSale ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white'}`}>
+          <span className={`text-sm font-bold ${product.isOnSale ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white'}`}>
             {formatPrice(product.effectivePrice, product.brand.currency)}
           </span>
           {product.isOnSale && product.salePrice && (
-            <span className="text-sm text-gray-400 dark:text-gray-500 line-through">
+            <span className="text-xs text-gray-400 dark:text-gray-500 line-through">
               {formatPrice(product.price, product.brand.currency)}
             </span>
           )}
         </div>
 
-        {/* Quick Add (always visible for customers) */}
-        {!isOwnerView && (
-          <button
-            onClick={handleQuickAddToCart}
-            disabled={cartLoading || product.isOutOfStock}
-            className={`mt-1 w-full py-2.5 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200 ${
-              product.isOutOfStock
-                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                : 'bg-purple-600 text-white hover:bg-purple-700 active:scale-[0.98]'
-            } ${cartLoading ? 'opacity-70 cursor-wait' : ''}`}
-          >
-            <ShoppingBag size={16} />
-            {product.isOutOfStock
-              ? 'Out of Stock'
-              : product.sizes.length > 0
-                ? 'Select Options'
-                : 'Add to Bag'}
-          </button>
-        )}
-
-        {/* Available Sizes */}
+        {/* Available Sizes - only show if has sizes */}
         {sizesText && !isOwnerView && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-            Sizes: {sizesText}
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+            {sizesText}
           </p>
         )}
 

@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   Camera,
   CreditCard,
+  Bell,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -105,7 +106,8 @@ const DashboardHome: React.FC = () => {
 
   const kpis = overview?.kpis || {};
   const store = overview?.store || {};
-  const resolvedIsLive = store?.isLive ?? user?.isStoreOpen ?? false;
+  // Resolve store live status: prioritize isSetupComplete, then isLive, then isStoreOpen
+  const resolvedIsLive = store?.isLive === true || user?.isStoreOpen === true;
   const storeHealth = overview?.storeHealth || { score: 0, responseTime: 0, inventory: 0, reviews: 0 };
   const actionRequired = overview?.actionRequired || [];
   const recentActivity = overview?.recentActivity || [];
@@ -164,7 +166,7 @@ const DashboardHome: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => navigate('/studio/store')}
+              onClick={() => user?.id ? navigate(`/brands/${user.id}`) : navigate('/studio/store')}
               className="px-4 py-2 bg-white/50 dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
@@ -181,7 +183,7 @@ const DashboardHome: React.FC = () => {
           <select
             value={range}
             onChange={(e) => setRange(e.target.value as any)}
-            className="bg-white/50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-xs text-gray-600 dark:text-gray-300 px-3 py-1.5 focus:outline-none focus:border-purple-500"
+            className="select-threadly bg-white/50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-xs text-gray-600 dark:text-gray-300 px-3 py-1.5 focus:outline-none focus:border-purple-500"
           >
             <option value="30d">Last 30 Days</option>
             <option value="7d">This Week</option>

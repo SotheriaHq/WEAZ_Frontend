@@ -111,7 +111,7 @@ const OrderManagement: React.FC = () => {
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-gray-500" />
           <select 
-            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white text-sm"
+            className="select-threadly px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white text-sm"
             value={statusFilter}
             onChange={handleStatusChange}
           >

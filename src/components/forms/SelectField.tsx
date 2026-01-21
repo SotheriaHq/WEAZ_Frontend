@@ -24,7 +24,7 @@ const SelectField = forwardRef<HTMLSelectElement, Props>(({ label, helperText, e
       <div className="flex items-center">
         <select
           ref={ref}
-          className={`flex-1 block w-full rounded-md border px-3 py-2 focus:outline-none ${variantStyle} ${error ? 'border-red-500' : ''}`}
+          className={`select-threadly flex-1 block w-full rounded-md border px-3 py-2 focus:outline-none ${variantStyle} ${error ? 'border-red-500' : ''}`}
           {...rest}
         >
           {children}

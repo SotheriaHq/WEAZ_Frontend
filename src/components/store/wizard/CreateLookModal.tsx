@@ -296,7 +296,7 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
                     <select
                       value={styledBy}
                       onChange={(e) => setStyledBy(e.target.value)}
-                      className="w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all appearance-none cursor-pointer text-gray-900 dark:text-white"
+                      className="select-threadly w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all cursor-pointer text-gray-900 dark:text-white"
                     >
                       <option>Threadly Official</option>
                       <option>Brand Owner</option>

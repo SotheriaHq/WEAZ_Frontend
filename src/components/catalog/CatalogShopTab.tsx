@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, ChevronDown } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { Search } from 'lucide-react';
+import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
@@ -50,6 +51,8 @@ export default function CatalogShopTab({
   const [onSale, setOnSale] = useState(false);
   const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
   const [maxPrice, setMaxPrice] = useState<number | undefined>(undefined);
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [isPending, startTransition] = useTransition();
 
   const normalizedMinPrice = useMemo(() => {
     if (minPrice === undefined) return undefined;
@@ -154,16 +157,53 @@ export default function CatalogShopTab({
     return <div className="w-full">{storeClosedPlaceholder}</div>;
   }
 
+  // Category chips configuration
+  const CATEGORY_CHIPS = [
+    { slug: 'ALL', label: 'All', border: 'border-slate-300/80 dark:border-slate-400/60', bgActive: 'bg-slate-500/20 backdrop-blur-md', hoverBg: 'hover:bg-slate-500/10' },
+    { slug: 'NEW', label: 'New Arrivals', border: 'border-purple-300/80 dark:border-purple-400/60', bgActive: 'bg-purple-500/20 backdrop-blur-md', hoverBg: 'hover:bg-purple-500/10' },
+    { slug: 'TRENDING', label: '🔥 Trending', border: 'border-orange-300/80 dark:border-orange-400/60', bgActive: 'bg-orange-500/20 backdrop-blur-md', hoverBg: 'hover:bg-orange-500/10' },
+    { slug: 'SALE', label: '💰 Sale', border: 'border-rose-300/80 dark:border-rose-400/60', bgActive: 'bg-rose-500/20 backdrop-blur-md', hoverBg: 'hover:bg-rose-500/10' },
+  ];
+
   return (
     <div className="w-full">
+      {/* Category Filter Chips */}
+      <div className="flex w-full gap-2 overflow-x-auto no-scrollbar mb-4">
+        {CATEGORY_CHIPS.map((cat) => {
+          const active = selectedCategory === cat.slug;
+          return (
+            <button
+              type="button"
+              key={cat.slug}
+              onClick={() => startTransition(() => {
+                setSelectedCategory(cat.slug);
+                if (cat.slug === 'SALE') setOnSale(true);
+                else if (selectedCategory === 'SALE') setOnSale(false);
+              })}
+              className={
+                `shrink-0 inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 border-2 ` +
+                `${cat.border} text-gray-900 dark:text-white ` +
+                (active
+                  ? `${cat.bgActive} shadow-lg ring-2 ring-purple-500/20`
+                  : `bg-transparent ${cat.hoverBg} shadow-md backdrop-blur-sm`) +
+                (isPending ? ' opacity-60' : '')
+              }
+            >
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Search and Filters Row */}
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="relative w-full md:max-w-md">
+        <div className="relative w-full md:max-w-sm">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search products..."
-            className="w-full bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl pl-12 pr-4 py-3 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+            className="w-full bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl pl-12 pr-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
           />
         </div>
 
@@ -178,20 +218,12 @@ export default function CatalogShopTab({
             On sale
           </label>
 
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="appearance-none bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl pl-4 pr-10 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all cursor-pointer"
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-          </div>
+          <FilterDropdown
+            value={sortBy}
+            onChange={setSortBy}
+            options={SORT_OPTIONS}
+            placeholder="Sort by"
+          />
 
           <div className="flex items-center gap-2">
             <input
@@ -230,7 +262,7 @@ export default function CatalogShopTab({
         <StoreEmptyState type="no-products" isOwner={isOwner} />
       ) : null}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {loading
           ? Array.from({ length: 8 }).map((_, idx) => <ProductCardSkeleton key={idx} />)
           : products.map((p) => <StoreProductCard key={p.id} product={p} />)}

@@ -181,6 +181,30 @@ html {
     @apply text-[15px] px-4 py-2.5;
   }
 
+  /* Threadly select styling (native select enhancements) */
+  .select-threadly {
+    @apply appearance-none pr-10;
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(107,114,128,0.9)' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19 9-7 7-7-7'/%3E%3C/svg%3E");
+  }
+
+  .dark .select-threadly {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(229,231,235,0.85)' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19 9-7 7-7-7'/%3E%3C/svg%3E");
+  }
+
+  /* Native option styling for dark/light dropdowns */
+  .select-threadly option {
+    background-color: #ffffff;
+    color: #0f172a;
+  }
+
+  .dark .select-threadly option {
+    background-color: #0f1117;
+    color: #f8fafc;
+  }
+
   /* Tag sizes */
   .chip-xs {
     @apply text-[11px] px-2 py-0.5;

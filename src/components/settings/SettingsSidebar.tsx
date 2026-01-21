@@ -54,7 +54,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
   const isBrandActive = brandItems.some((item) => active === item.key);
 
   return (
-    <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[240px] z-20 overflow-y-auto scrollbar-hide border-r border-gray-200 dark:border-white/5">
+    <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[240px] z-20 overflow-y-auto scrollbar-hide border-r border-gray-200 dark:border-white/5 bg-white dark:bg-zinc-900">
       <div className="py-4">
         <h2 className="px-4 text-xl font-semibold text-gray-900 dark:text-white mb-4">Settings</h2>
         

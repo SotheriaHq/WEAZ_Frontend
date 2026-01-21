@@ -7,6 +7,8 @@ import { brandApi } from '@/api/BrandApi';
 import { productApi } from '@/api/ProductApi';
 import { toast } from 'sonner';
 import Input from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { unwrapApiResponse } from '@/types/auth';
 import { useDropdownManager } from '@/context/DropdownManagerContext';
 import {
@@ -19,6 +21,7 @@ import {
   PermanentDeleteProductModal,
 } from './modals';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import StoreEmptyState, { type EmptyStateType } from '@/components/designs/StoreEmptyState';
 
 type StudioStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'DELETED';
 
@@ -379,68 +382,72 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <div className="inline-flex rounded-xl overflow-hidden border border-gray-200 dark:border-white/10">
+        {/* Status Tabs - Prominent segmented control */}
+        <div className="mt-5 flex flex-wrap items-center gap-4">
+          <div className="inline-flex rounded-xl overflow-hidden border border-gray-200/80 dark:border-white/10 bg-gray-50/50 dark:bg-black/20 p-1 shadow-sm">
             {(
               [
-                { value: 'all', label: 'All' },
-                { value: 'active', label: 'Published' },
-                { value: 'draft', label: 'Draft' },
-                { value: 'archived', label: 'Archived' },
-                { value: 'deleted', label: 'Deleted' },
+                { value: 'all', label: 'All', icon: '📦' },
+                { value: 'active', label: 'Published', icon: '✨' },
+                { value: 'draft', label: 'Drafts', icon: '📝' },
+                { value: 'archived', label: 'Archived', icon: '📁' },
+                { value: 'deleted', label: 'Deleted', icon: '🗑️' },
               ] as const
             ).map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => setFilterStatus(opt.value)}
-                className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center gap-2 ${
                   filterStatus === opt.value
-                    ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white'
-                    : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md shadow-purple-500/30 transform scale-[1.02]'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/5'
                 }`}
               >
+                <span className="hidden sm:inline">{opt.icon}</span>
                 {opt.label}
               </button>
             ))}
           </div>
         </div>
+
+        {/* Filter dropdowns - premium styled matching profile dropdown */}
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <select
+          <FilterDropdown
             value={filterCollection}
-            onChange={(e) => setFilterCollection(e.target.value)}
+            onChange={setFilterCollection}
             disabled={collectionsLoading}
-            className="rounded-lg border border-gray-200 dark:border-white/10 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm disabled:opacity-60"
-          >
-            <option value="all">All Content</option>
-            {collections.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <select
+            options={[
+              { value: 'all', label: 'All Collections' },
+              ...collections.map(c => ({ value: c.id, label: c.name }))
+            ]}
+          />
+          <FilterDropdown
             value={filterStock}
-            onChange={(e) => setFilterStock(e.target.value)}
-            className="rounded-lg border border-gray-200 dark:border-white/10 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm"
-          >
-            <option value="all">All Stock</option>
-            <option value="in_stock">In Stock</option>
-            <option value="low_stock">Low Stock</option>
-            <option value="out_of_stock">Out of Stock</option>
-          </select>
+            onChange={setFilterStock}
+            options={[
+              { value: 'all', label: 'All Stock' },
+              { value: 'in_stock', label: 'In Stock' },
+              { value: 'low_stock', label: 'Low Stock' },
+              { value: 'out_of_stock', label: 'Out of Stock' },
+            ]}
+          />
         </div>
       </div>
 
-      {/* Products */}
+      {/* Products - with CSS containment for smooth tab transitions */}
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
         <div className="p-4 sm:p-6">
           <div
             ref={listRef}
-            style={listMinHeight ? { minHeight: listMinHeight } : undefined}
-            className={`transition-opacity duration-200 ${loading ? 'opacity-60' : 'opacity-100'}`}
+            style={{ 
+              minHeight: listMinHeight || 'auto',
+              contain: 'layout style',
+              willChange: 'contents',
+            }}
+            className={`transition-opacity duration-300 ease-out ${loading ? 'opacity-50' : 'opacity-100'}`}
           >
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 transition-all duration-300">
             {filteredProducts.map((product) => {
               const collectionLabel =
                 product.collection?.title ||
@@ -492,14 +499,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
                           dropdownManager.openId === menuId ? null : menuId,
                         );
                       }}
-                      className={`flex h-7 w-7 items-center justify-center transition-all duration-200 ${
+                      className={`flex h-7 w-7 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm shadow-sm transition-all duration-200 ${
                         dropdownManager.openId === `product-menu-${product.id}`
-                          ? 'text-purple-600'
-                          : 'text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200'
+                          ? 'text-white bg-purple-600/80'
+                          : 'text-white hover:bg-black/60'
                       }`}
                       title="Actions"
                     >
-                      <span className="text-lg">⋯</span>
+                      <span className="text-lg font-bold">⋯</span>
                     </button>
                     
                     {/* Actions dropdown menu */}
@@ -520,19 +527,19 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
                     )}
                   </div>
 
-                  {/* Quick action icons on hover */}
+                  {/* Quick action icons - always visible */}
                   {!product.deletedAt && (
-                    <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                    <div className="absolute bottom-3 right-3 z-30 flex items-center gap-2">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          void handleProductAction('duplicate', product);
+                          void handleProductAction('edit', product);
                         }}
-                        title="Duplicate product"
-                        className="h-8 w-8 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-lg flex items-center justify-center text-sm"
+                        title="Edit product"
+                        className="h-9 w-9 rounded-full bg-black/50 backdrop-blur-sm shadow-lg flex items-center justify-center text-white hover:bg-purple-600 hover:scale-110 transition-all duration-200"
                       >
-                        📋
+                        <span className="text-sm">✏️</span>
                       </button>
                       <button
                         type="button"
@@ -541,9 +548,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
                           void handleProductAction('delete', product);
                         }}
                         title="Delete product"
-                        className="h-8 w-8 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-lg flex items-center justify-center text-sm"
+                        className="h-9 w-9 rounded-full bg-black/50 backdrop-blur-sm shadow-lg flex items-center justify-center text-white hover:bg-red-500 hover:scale-110 transition-all duration-200"
                       >
-                        🗑️
+                        <span className="text-sm">🗑️</span>
                       </button>
                     </div>
                   )}
@@ -694,7 +701,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
                   setPage(1);
                   setLimit(Number.isFinite(next) ? next : 25);
                 }}
-                className="bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
+                className="select-threadly bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -754,24 +761,27 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
         </div>
       </div>
 
-      {!loading && products.length === 0 && (
-        <div className="backdrop-blur-xl bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl shadow-xl p-12 text-center mt-6">
-          <div className="max-w-md mx-auto">
-            <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-purple-500/20 to-purple-700/20 rounded-full flex items-center justify-center border border-purple-500/30">
-              <span className="text-5xl">📦</span>
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No products yet</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">Add your first product to your store.</p>
-            <button
-              type="button"
-              onClick={() => navigate('/studio/store/products/new')}
-              className="bg-gradient-to-r from-purple-600 to-purple-800 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/30 transition-all inline-flex items-center gap-2"
-            >
-              ➕ Add Your First Product
-            </button>
+      {!loading && products.length === 0 && (() => {
+        // Determine which empty state to show based on filter
+        const getEmptyStateType = (): EmptyStateType => {
+          switch (filterStatus) {
+            case 'archived': return 'no-archived';
+            case 'deleted': return 'no-deleted';
+            case 'draft': return 'no-drafts';
+            case 'active': return 'no-products';
+            default: return 'no-products';
+          }
+        };
+        return (
+          <div className="backdrop-blur-xl bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl shadow-xl mt-6">
+            <StoreEmptyState 
+              type={getEmptyStateType()} 
+              isOwner={true}
+              onAction={filterStatus === 'draft' ? () => navigate('/studio/store/products/new') : undefined}
+            />
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {showBulkActions && (
         <div className="fixed bottom-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-full bg-purple-600 px-6 py-3 text-sm font-semibold text-white shadow-2xl">

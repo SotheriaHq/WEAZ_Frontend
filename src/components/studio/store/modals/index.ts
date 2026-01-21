@@ -4,5 +4,6 @@ export { default as ArchiveProductModal } from './ArchiveProductModal';
 export { default as RestoreDeletedProductModal } from './RestoreDeletedProductModal';
 export { default as PermanentDeleteProductModal } from './PermanentDeleteProductModal';
 export { default as ComingSoonModal } from './ComingSoonModal';
+export { default as DiscardChangesModal } from './DiscardChangesModal';
 export { default as ProductActionsMenu, getDefaultProductActions } from './ProductActionsMenu';
 export type { ProductAction } from './ProductActionsMenu';

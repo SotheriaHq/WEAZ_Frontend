@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../store';
@@ -80,16 +80,31 @@ export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
-  const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1920));
-
-  useEffect(() => {
-    const onResize = () => setViewportWidth(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
   
-  const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
+  // Use centralized viewport state from Redux (no local state needed)
+  const { sidebarMode, isSidebarOpen, viewportWidth } = useSelector((state: RootState) => state.ui);
   const { profile: user } = useSelector((state: RootState) => state.user);
+  
+  const isMobile = viewportWidth < 1024;
+
+  // ============================================
+  // SYNCHRONOUS ROUTE CHECKS - Run immediately during render
+  // These are critical for preventing sidebar flash on navigation
+  // ============================================
+  
+  // NEVER show sidebar on Settings pages (has its own sidebar)
+  if (location.pathname.startsWith('/settings') || location.pathname.startsWith('/profile/settings')) {
+    return null;
+  }
+  
+  // NEVER show sidebar on Studio pages
+  if (location.pathname.startsWith('/studio')) {
+    return null;
+  }
+
+  // ============================================
+  // Redux state checks (backup for other cases)
+  // ============================================
 
   const showOverlay = isSidebarOpen;
   const slideClasses = showOverlay
@@ -101,8 +116,8 @@ export const Sidebar: React.FC = () => {
     return null;
   }
   
-  // If mobile and closed, render nothing; uses tracked viewport width so it re-renders on resize
-  if (viewportWidth < 1024 && !isSidebarOpen) {
+  // If mobile and closed, render nothing
+  if (isMobile && !isSidebarOpen) {
       return null; 
   }
 
@@ -143,10 +158,10 @@ export const Sidebar: React.FC = () => {
     // Removed Fashion, Awards
   ];
 
-  // Hide Rail in Studio (only show if open/overlay)
-  if (location.pathname.startsWith('/studio') && !isSidebarOpen) {
-    return null;
-  }
+  // NOTE: Route-based hiding (studio, settings) is now handled by Layout.tsx
+  // which sets sidebarMode to 'HIDDEN' for those routes.
+  // The check at line 97 (sidebarMode === 'HIDDEN' && !isSidebarOpen) handles this.
+
 
   return (
     <>

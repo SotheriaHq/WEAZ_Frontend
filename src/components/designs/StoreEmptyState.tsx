@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, ShoppingBag, Search, Sparkles, Store, Heart } from 'lucide-react';
+import { Package, ShoppingBag, Search, Sparkles, Store, Heart, Archive, Trash2, FileEdit } from 'lucide-react';
 import { FrostedButton } from '@/components/ui/FrostedButton';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,10 +10,13 @@ export type EmptyStateType =
   | 'brand-not-found'       // Brand doesn't exist
   | 'store-setup'           // Brand needs to set up store (owner view)
   | 'store-not-setup'       // Owner store is not configured/live yet
-  | 'store-not-open-yet'     // Visitor view: store exists but is not open
+  | 'store-not-open-yet'    // Visitor view: store exists but is not open
   | 'coming-soon'           // Store is being prepared
   | 'empty-cart'            // Cart is empty
-  | 'empty-wishlist';       // Wishlist is empty
+  | 'empty-wishlist'        // Wishlist is empty
+  | 'no-archived'           // No archived products
+  | 'no-deleted'            // No deleted products
+  | 'no-drafts';            // No draft products
 
 interface StoreEmptyStateProps {
   type: EmptyStateType;
@@ -99,6 +102,27 @@ const EMPTY_STATES: Record<EmptyStateType, {
     title: 'Nothing saved yet',
     description: 'Save items you love by tapping the heart icon. They\'ll be waiting for you here!',
     actionLabel: 'Explore Products',
+  },
+  'no-archived': {
+    icon: <Archive size={48} className="text-amber-400" />,
+    emoji: '📁',
+    title: 'No archived products',
+    description: 'Archived products will appear here. Archive items you want to temporarily hide from your store.',
+    actionLabel: undefined,
+  },
+  'no-deleted': {
+    icon: <Trash2 size={48} className="text-red-400" />,
+    emoji: '🗑️',
+    title: 'Nothing in the trash',
+    description: 'Deleted products will appear here for 60 days before permanent removal. You can restore them anytime.',
+    actionLabel: undefined,
+  },
+  'no-drafts': {
+    icon: <FileEdit size={48} className="text-blue-400" />,
+    emoji: '📝',
+    title: 'No draft products',
+    description: 'Products saved as drafts will appear here. Start creating and save your progress anytime!',
+    actionLabel: 'Create New Product',
   },
 };
 

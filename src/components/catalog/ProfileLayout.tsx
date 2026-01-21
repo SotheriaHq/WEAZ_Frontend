@@ -1,5 +1,4 @@
-
-
+import React from 'react';
 import { Sidebar } from '../SideBar';
 import { Navbar } from '../Navbar';
 import ProfileHeaderSkeleton from '../profile/ProfileHeaderSkeleton';
@@ -7,22 +6,42 @@ import CollectionsSkeleton from '../profile/CollectionsSkeleton';
 import Profile from '../../pages/catalog/Catalog';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '@/context/AuthContext';
-import { closeSidebar } from '@/features/uiSlice';
+import { closeSidebar, selectIsMobile, setSidebarMode } from '@/features/uiSlice';
 import type { AppDispatch, RootState } from '@/store';
 import { useLocation, Navigate, Outlet, useParams } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
+
+const computeSidebarMode = (pathname: string, isMobile: boolean) => {
+  if (isMobile) return 'HIDDEN' as const;
+  if (pathname.startsWith('/settings') || pathname.startsWith('/profile/settings')) return 'HIDDEN' as const;
+  if (pathname.startsWith('/studio')) return 'HIDDEN' as const;
+  return 'RAIL' as const;
+};
 
 export const ProfileLayout: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { loading } = useAuth();
   const user = useSelector((state: RootState) => state.user.profile);
   const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
+  const isMobile = useSelector(selectIsMobile);
   const location = useLocation();
   const { id: routeBrandId } = useParams<{ id?: string }>();
 
   const isVisitorRoute = Boolean(routeBrandId);
 
-  // Determine effective sidebar state (similar to Layout.tsx)
-  const isRail = sidebarMode === 'RAIL';
+  const computedSidebarMode = useMemo(
+    () => computeSidebarMode(location.pathname, isMobile),
+    [location.pathname, isMobile]
+  );
+  const isRouteSidebarHidden = location.pathname.startsWith('/settings') || location.pathname.startsWith('/profile/settings') || location.pathname.startsWith('/studio');
+
+  useEffect(() => {
+    if (computedSidebarMode !== sidebarMode) {
+      dispatch(setSidebarMode(computedSidebarMode));
+    }
+  }, [computedSidebarMode, sidebarMode, dispatch]);
+
+  const isRail = computedSidebarMode === 'RAIL';
   const mainMarginLeft = isRail ? '72px' : '0px';
 
   if (!isVisitorRoute) {
@@ -33,7 +52,7 @@ export const ProfileLayout: React.FC = () => {
     if (loading && !user) {
       return (
           <div className="min-h-screen bg-gradient-to-br from-[#faf8ff] via-[#f5f0ff] to-[#ede9f7] dark:from-[#0f0f0f] dark:via-[#0a0a0a] dark:to-[#000000] text-gray-900 dark:text-white">
-            <Sidebar />
+            {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen) && <Sidebar />}
             <Navbar />
             <main
               className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out"
@@ -68,7 +87,7 @@ export const ProfileLayout: React.FC = () => {
       <div 
         className="min-h-screen bg-gradient-to-br from-[#faf8ff] via-[#f5f0ff] to-[#ede9f7] dark:from-[#0f0f0f] dark:via-[#0a0a0a] dark:to-[#000000] text-gray-900 dark:text-white"
       >
-        <Sidebar />
+        {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen) && <Sidebar />}
         <Navbar />
         <main 
           className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out"
@@ -80,7 +99,7 @@ export const ProfileLayout: React.FC = () => {
         </main>
 
         {/* Backdrop for OVERLAY mode */}
-        {isSidebarOpen && (sidebarMode === 'OVERLAY' || sidebarMode === 'HIDDEN' || sidebarMode === 'RAIL' || window.innerWidth < 1024) && (
+        {isSidebarOpen && !isRouteSidebarHidden && (
           <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30"
             onClick={() => dispatch(closeSidebar())}

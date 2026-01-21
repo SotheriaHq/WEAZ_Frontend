@@ -3,14 +3,27 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 
 export type SidebarMode = 'RAIL' | 'DRAWER' | 'OVERLAY' | 'HIDDEN';
 
+// Breakpoint constant - single source of truth
+export const MOBILE_BREAKPOINT = 1024;
+
 interface UiState {
     sidebarMode: SidebarMode;
     isSidebarOpen: boolean;
+    viewportWidth: number; // Centralized viewport width
 }
+
+// Get initial viewport width safely (SSR-safe)
+const getInitialViewportWidth = () => {
+    if (typeof window !== 'undefined') {
+        return window.innerWidth;
+    }
+    return 1920; // Default to desktop
+};
 
 const initialState: UiState = {
     sidebarMode: 'RAIL',
-    isSidebarOpen: false, // For OVERLAY/DRAWER states
+    isSidebarOpen: false,
+    viewportWidth: getInitialViewportWidth(),
 };
 
 const uiSlice = createSlice({
@@ -19,18 +32,15 @@ const uiSlice = createSlice({
     reducers: {
         setSidebarMode: (state, action: PayloadAction<SidebarMode>) => {
             state.sidebarMode = action.payload;
-            // Reset open state when mode changes, unless switching between Drawer/Rail
+            // Reset open state when mode changes to HIDDEN
             if (action.payload === 'HIDDEN') {
                 state.isSidebarOpen = false;
             }
         },
+        setViewportWidth: (state, action: PayloadAction<number>) => {
+            state.viewportWidth = action.payload;
+        },
         toggleSidebar: (state) => {
-            // Toggle open state. 
-            // If it was RAIL or HIDDEN, opening it makes it OVERLAY (conceptually).
-            // We don't need to change sidebarMode to 'DRAWER' or 'OVERLAY' explicitly if we just use isSidebarOpen to trigger the Overlay component.
-            // However, to keep it clean:
-            // If we are in RAIL mode, we stay in RAIL mode but set isSidebarOpen = true.
-            // The Sidebar component will see isSidebarOpen=true and render the Overlay ON TOP of the Rail.
             state.isSidebarOpen = !state.isSidebarOpen;
         },
         closeSidebar: (state) => {
@@ -42,5 +52,10 @@ const uiSlice = createSlice({
     },
 });
 
-export const { setSidebarMode, toggleSidebar, closeSidebar, openSidebar } = uiSlice.actions;
+// Selector helpers
+export const selectIsMobile = (state: { ui: UiState }) => state.ui.viewportWidth < MOBILE_BREAKPOINT;
+export const selectViewportWidth = (state: { ui: UiState }) => state.ui.viewportWidth;
+
+export const { setSidebarMode, setViewportWidth, toggleSidebar, closeSidebar, openSidebar } = uiSlice.actions;
 export default uiSlice.reducer;
+

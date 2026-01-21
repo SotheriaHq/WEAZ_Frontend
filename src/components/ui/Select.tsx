@@ -1,4 +1,8 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useMemo, useState } from 'react';
+import { ChevronDown, Check } from 'lucide-react';
+import { Dropdown, DropdownMenu, DropdownTrigger, DropdownItem } from './Dropdown';
+
+export type SelectVariant = 'default' | 'filter' | 'compact';
 
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
@@ -6,7 +10,49 @@ export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElemen
   error?: string;
   helperText?: string;
   fullWidth?: boolean;
+  /** Visual variant: 'default' for forms, 'filter' for filter bars, 'compact' for inline */
+  variant?: SelectVariant;
 }
+
+const variantStyles: Record<SelectVariant, string> = {
+  default: `
+    px-4 py-3 text-sm font-medium
+    bg-white dark:bg-zinc-900/60
+    border rounded-xl
+    text-gray-900 dark:text-white
+    shadow-sm
+    focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500
+    transition-all duration-200
+    appearance-none pr-10 cursor-pointer
+  `,
+  filter: `
+    px-3 py-2 text-sm font-medium
+    bg-white dark:bg-zinc-900/80
+    border border-gray-200 dark:border-white/10
+    rounded-lg
+    text-gray-700 dark:text-gray-200
+    shadow-sm
+    hover:border-purple-300 dark:hover:border-purple-500/50
+    focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500
+    transition-all duration-200
+    cursor-pointer
+    appearance-none
+    pr-8
+  `,
+  compact: `
+    px-2.5 py-1.5 text-xs font-medium
+    bg-white/80 dark:bg-zinc-900/60
+    border border-gray-200 dark:border-white/10
+    rounded-md
+    text-gray-600 dark:text-gray-300
+    hover:bg-gray-50 dark:hover:bg-white/5
+    focus:outline-none focus:ring-1 focus:ring-purple-500/30
+    transition-all duration-150
+    cursor-pointer
+    appearance-none
+    pr-6
+  `,
+};
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   (
@@ -16,6 +62,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       error,
       helperText,
       fullWidth = true,
+      variant = 'default',
       className = '',
       disabled,
       children,
@@ -23,34 +70,110 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     },
     ref
   ) => {
+    const [open, setOpen] = useState(false);
+    const valueProp = props.value;
+    const defaultValueProp = props.defaultValue;
+    const isControlled = valueProp !== undefined;
+    const [uncontrolledValue, setUncontrolledValue] = useState<string | number | readonly string[] | undefined>(
+      defaultValueProp as string | number | readonly string[] | undefined
+    );
+    const currentValue = isControlled ? valueProp : uncontrolledValue;
+
+    const options = useMemo(() => {
+      const nodes = React.Children.toArray(children).filter(React.isValidElement);
+      return nodes
+        .filter((node) => {
+          if (!React.isValidElement(node)) return false;
+          return node.type === 'option';
+        })
+        .map((node) => {
+          const option = node as React.ReactElement<React.OptionHTMLAttributes<HTMLOptionElement>>;
+          const rawLabel = option.props.children;
+          const labelText = typeof rawLabel === 'string' ? rawLabel : Array.isArray(rawLabel) ? rawLabel.join('') : `${rawLabel ?? ''}`;
+          return {
+            value: option.props.value ?? labelText,
+            label: labelText,
+            disabled: option.props.disabled ?? false,
+          };
+        });
+    }, [children]);
+
+    const selectedOption = options.find((opt) => `${opt.value}` === `${currentValue ?? ''}`) ?? options[0];
+    const selectedLabel = selectedOption?.label ?? '';
+
     const baseClasses = `
       ${fullWidth ? 'w-full' : ''}
-      px-4 py-3 text-sm font-medium
-      bg-white dark:bg-zinc-900/60
-      border rounded-xl
-      text-gray-900 dark:text-white
-      shadow-sm
-      focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500
-      transition-all duration-200
+      ${variantStyles[variant]}
       ${
         error
           ? 'border-red-500 dark:border-red-500 focus:ring-red-500/50 focus:border-red-500'
-          : 'border-gray-300/80 dark:border-zinc-700/60'
+          : ''
       }
       ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-zinc-800/50' : ''}
     `;
 
+    const showChevron = true;
+    const handleSelect = (value: string) => {
+      if (!isControlled) {
+        setUncontrolledValue(value);
+      }
+      if (props.onChange) {
+        props.onChange({ target: { value } } as React.ChangeEvent<HTMLSelectElement>);
+      }
+      setOpen(false);
+    };
+
     return (
-      <div className={`${fullWidth ? 'w-full' : ''} ${className}`}>
+      <div className={`${fullWidth ? 'w-full' : ''} ${variant !== 'default' ? 'relative inline-block' : ''} ${className}`}>
         {label && (
           <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-300 mb-2">
             {label}
             {required && <span className="text-purple-500 ml-1">*</span>}
           </label>
         )}
-        <select ref={ref} disabled={disabled} className={baseClasses} {...props}>
-          {children}
-        </select>
+        <div className="relative">
+          <Dropdown open={open} onOpenChange={setOpen} placement="bottom-start" className={fullWidth ? 'w-full' : ''}>
+            <DropdownTrigger
+              type="button"
+              disabled={disabled}
+              className={`${baseClasses} flex items-center justify-between gap-3 text-left ${disabled ? 'pointer-events-none' : ''}`}
+              aria-label={label}
+            >
+              <span className="truncate">{selectedLabel}</span>
+              {showChevron && (
+                <ChevronDown
+                  className={`shrink-0 text-gray-400 ${variant === 'compact' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
+                />
+              )}
+            </DropdownTrigger>
+            <DropdownMenu className="min-w-[220px]">
+              {options.map((opt) => {
+                const isActive = `${opt.value}` === `${currentValue ?? ''}`;
+                return (
+                  <DropdownItem
+                    key={`${opt.value}`}
+                    disabled={opt.disabled}
+                    onClick={() => !opt.disabled && handleSelect(`${opt.value}`)}
+                    className={`${isActive ? 'bg-white/30 dark:bg-white/10' : ''} ${opt.disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    rightIcon={isActive ? <Check className="w-4 h-4 text-purple-500" /> : null}
+                  >
+                    {opt.label}
+                  </DropdownItem>
+                );
+              })}
+            </DropdownMenu>
+          </Dropdown>
+          <select
+            ref={ref}
+            disabled={disabled}
+            className="sr-only"
+            value={currentValue as string | number | readonly string[] | undefined}
+            {...props}
+            readOnly
+          >
+            {children}
+          </select>
+        </div>
         {(helperText || error) && (
           <div className="mt-1.5">
             {error ? (
@@ -68,3 +191,4 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 Select.displayName = 'Select';
 
 export default Select;
+

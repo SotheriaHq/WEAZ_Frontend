@@ -212,7 +212,7 @@ const CollectionsSettings: React.FC = () => {
         />
         <div className="flex items-center gap-2" aria-label="Pagination size selector">
           <label htmlFor="pageSize" className="text-sm text-gray-600 dark:text-gray-300">Per page</label>
-          <select id="pageSize" value={pageSize} onChange={(e)=>{ setPageSize(parseInt(e.target.value,10)); setPage(1); }} className="px-2 py-1 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm">
+          <select id="pageSize" value={pageSize} onChange={(e)=>{ setPageSize(parseInt(e.target.value,10)); setPage(1); }} className="select-threadly px-2 py-1 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm">
             {[10,20,50].map(n => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>

@@ -2,9 +2,6 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { 
   ArrowLeft, 
   ChevronDown, 
-  Copy, 
-  Archive, 
-  Trash2, 
   Crop, 
   Plus, 
   CheckCircle, 
@@ -25,6 +22,7 @@ import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
 import Tag from '@/components/ui/Tag';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { DiscardChangesModal } from '@/components/studio/store/modals';
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -792,22 +790,9 @@ const EditProduct: React.FC = () => {
             </div>
           </div>
 
+
           <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-            {isEditMode && (
-              <>
-                <div className="hidden md:flex items-center gap-2 mr-2">
-                  <button onClick={handleDuplicate} className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors" title="Duplicate">
-                    <Copy className="w-4 h-4" />
-                  </button>
-                  <button onClick={handleArchive} className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors" title="Archive">
-                    <Archive className="w-4 h-4" />
-                  </button>
-                  <button onClick={handleDelete} className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors" title="Delete">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </>
-            )}
+            {/* Action buttons removed - duplicate/archive/delete should be done from Store page */}
           </div>
         </div>
         
@@ -1362,27 +1347,23 @@ const EditProduct: React.FC = () => {
         </div>
       </footer>
 
-      <ConfirmDialog
-        open={showDiscardPrompt}
-        title="Discard changes?"
-        message="You have unsaved changes. You can save as a draft or discard your edits."
-        confirmText="Discard Changes"
-        cancelText={!isEditMode ? 'Save Draft' : 'Keep Editing'}
-        isDestructive
-        onCancel={() => {
-          if (!isEditMode) {
-            setShowDiscardPrompt(false);
-            void handleSave(true);
-            return;
-          }
-          setShowDiscardPrompt(false);
-        }}
-        onConfirm={() => {
-          setShowDiscardPrompt(false);
+      {/* Discard Changes Modal - Premium styled */}
+      <DiscardChangesModal
+        isOpen={showDiscardPrompt}
+        onClose={() => setShowDiscardPrompt(false)}
+        onDiscard={() => {
           setHasChanges(false);
           navigate(-1);
         }}
+        title="Discard Changes?"
+        message={!isEditMode 
+          ? "You have unsaved changes. Would you like to save this as a draft before leaving?"
+          : "You have unsaved changes. Are you sure you want to discard them? This action cannot be undone."
+        }
       />
+      
+      {/* Delete confirmation - using ConfirmDialog for destructive action */}
+      {/* Note: window.confirm in handleDelete should be replaced with a proper modal */}
 
     </div>
   );

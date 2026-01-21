@@ -7,6 +7,31 @@ import { productApi } from '@/api/ProductApi';
 // Informs user about 60-day auto-delete and 7-day reminders
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Generate initials from product name
+const getProductInitials = (name: string): string => {
+  if (!name) return 'P';
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+};
+
+// Premium gradient backgrounds for fallback
+const gradientBackgrounds = [
+  'bg-gradient-to-br from-purple-500 to-pink-500',
+  'bg-gradient-to-br from-blue-500 to-cyan-500',
+  'bg-gradient-to-br from-amber-500 to-orange-500',
+  'bg-gradient-to-br from-emerald-500 to-teal-500',
+  'bg-gradient-to-br from-rose-500 to-red-500',
+];
+
+// Get consistent gradient based on product name
+const getGradientForName = (name: string): string => {
+  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return gradientBackgrounds[hash % gradientBackgrounds.length];
+};
+
 interface ArchiveProductModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -30,11 +55,13 @@ const ArchiveProductModal: React.FC<ArchiveProductModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   // Reset error when modal opens
   useEffect(() => {
     if (isOpen) {
       setError(null);
+      setImageError(false);
     }
   }, [isOpen]);
 
@@ -67,6 +94,9 @@ const ArchiveProductModal: React.FC<ArchiveProductModalProps> = ({
 
   const productImage = product.thumbnail || product.images?.[0];
   const isArchiving = mode === 'archive';
+  const showFallback = !productImage || imageError;
+  const initials = getProductInitials(product.name);
+  const gradientClass = getGradientForName(product.name);
 
   // Calculate days until auto-delete if already archived
   const daysUntilDelete = product.archivedAt
@@ -86,12 +116,19 @@ const ArchiveProductModal: React.FC<ArchiveProductModalProps> = ({
         {/* Header */}
         <div className="p-6 border-b border-gray-100 dark:border-white/10">
           <div className="flex items-start gap-4">
-            {/* Product thumbnail */}
-            <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 dark:bg-zinc-800 flex-shrink-0">
-              {productImage ? (
-                <img src={productImage} alt={product.name} className="w-full h-full object-cover" />
+            {/* Product thumbnail with initials fallback */}
+            <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
+              {showFallback ? (
+                <div className={`w-full h-full ${gradientClass} flex items-center justify-center`}>
+                  <span className="text-xl font-bold text-white drop-shadow-sm">{initials}</span>
+                </div>
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
+                <img 
+                  src={productImage} 
+                  alt={product.name} 
+                  className="w-full h-full object-cover"
+                  onError={() => setImageError(true)}
+                />
               )}
             </div>
             <div className="flex-1 min-w-0">

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet, Navigate, useParams } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import Market from './pages/Market';
@@ -43,14 +43,34 @@ import ShopSetupWizardPage from './pages/studio/shop/ShopSetupWizardPage';
 import ShopSetupEssentialsPage from './pages/studio/shop/ShopSetupEssentialsPage';
 import StudioScaffold from './components/studio/StudioScaffold';
 import StoreManagement from './pages/studio/store/StoreManagement';
+import { useDispatch } from 'react-redux';
+import type { AppDispatch } from '@/store';
+import { setViewportWidth } from '@/features/uiSlice';
 
 /**
  * Root layout component that wraps all routes
  * Contains global overlays like CartDrawer and WishlistDrawer
  * that need Router context (useNavigate)
  */
+const ViewportSync: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>();
+
+  useEffect(() => {
+    const handleResize = () => {
+      dispatch(setViewportWidth(window.innerWidth));
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [dispatch]);
+
+  return null;
+};
+
 const RootLayout: React.FC = () => (
   <>
+    <ViewportSync />
     <CartDrawer />
     <WishlistDrawer />
     <GlobalModalRouter />

@@ -556,7 +556,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 <div className="space-y-2 z-10">
                   <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Business Type</label>
                   <div className="relative">
-                    <select className="w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white appearance-none cursor-pointer focus:ring-2 focus:ring-purple-500 focus:border-transparent" {...register('businessType')}>
+                    <select className="select-threadly w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white cursor-pointer focus:ring-2 focus:ring-purple-500 focus:border-transparent" {...register('businessType')}>
                       <option value="" className="bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300">Select Type</option>
                       <option value="Retailer" className="bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300">Retailer</option>
                       <option value="Designer" className="bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300">Designer</option>
