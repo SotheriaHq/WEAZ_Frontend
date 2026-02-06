@@ -125,7 +125,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   return (
     <>
     <div 
-      className="relative group w-full glass-panel overflow-hidden rounded-lg cursor-pointer shadow-md transition-transform duration-200 hover:scale-[1.02]"
+      className="relative group w-full overflow-hidden cursor-pointer shadow-md transition-transform duration-200 hover:scale-[1.02]"
       onClick={isPublishing ? undefined : onClick}
     >
       {/* Background Media */}
@@ -175,8 +175,10 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
                     muted
                     loop
                     playsInline
-                    maxHeightClassName="max-h-[320px]"
-                    className={`w-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+                    fit="contain"
+                    maxHeightClassName="max-h-none"
+                    className={`w-full h-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+                    mediaClassName="w-full h-full object-contain"
                     onLoadedData={() => setImgLoaded(true)}
                   />
                 );
@@ -186,8 +188,10 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
                   kind="image"
                   src={resolvedCover}
                   alt={title}
-                  maxHeightClassName="max-h-[320px]"
-                  className={`w-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  fit="contain"
+                  maxHeightClassName="max-h-none"
+                  className={`w-full h-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  mediaClassName="w-full h-full object-contain"
                   onLoad={() => setImgLoaded(true)}
                 />
               );

@@ -1,0 +1,69 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - region "Notifications alt+T"
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - img "Fashion Model" [ref=e7]
+      - link "T Threadly" [ref=e11] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e12]: T
+        - generic [ref=e13]: Threadly
+      - generic [ref=e14]:
+        - heading "\"Fashion is the armor to survive the reality of everyday life.\"" [level=2] [ref=e16]
+        - paragraph [ref=e17]: — Bill Cunningham
+      - generic [ref=e18]:
+        - link "About Us" [ref=e19] [cursor=pointer]:
+          - /url: /about
+        - link "Collection" [ref=e20] [cursor=pointer]:
+          - /url: /collections
+        - link "Contact" [ref=e21] [cursor=pointer]:
+          - /url: /contact
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - heading "Welcome Back" [level=1] [ref=e26]
+          - paragraph [ref=e27]: Enter your details to access your personal wardrobe.
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - text: Email Address
+            - generic [ref=e30]:
+              - generic:
+                - img
+              - textbox "name@example.com" [ref=e31]
+          - generic [ref=e32]:
+            - generic [ref=e33]:
+              - generic [ref=e34]: Password
+              - link "Forgot password?" [ref=e35] [cursor=pointer]:
+                - /url: /forgot-password
+            - generic [ref=e36]:
+              - generic:
+                - img
+              - textbox "••••••••" [ref=e37]
+              - button [ref=e38] [cursor=pointer]:
+                - img [ref=e39]
+          - generic [ref=e42]:
+            - checkbox "Remember me for 30 days" [ref=e43] [cursor=pointer]
+            - generic [ref=e44] [cursor=pointer]: Remember me for 30 days
+          - button "Sign In" [ref=e45] [cursor=pointer]
+        - generic [ref=e50]: Or continue with
+        - generic [ref=e51]:
+          - button "Google" [ref=e52] [cursor=pointer]:
+            - img [ref=e53]
+            - generic [ref=e58]: Google
+          - button "Apple" [ref=e59] [cursor=pointer]:
+            - img [ref=e60]
+            - generic [ref=e62]: Apple
+        - paragraph [ref=e64]:
+          - text: Don't have an account?
+          - link "Sign Up" [ref=e65] [cursor=pointer]:
+            - /url: /signup
+      - generic [ref=e66]:
+        - generic [ref=e67]:
+          - img [ref=e68]
+          - generic [ref=e70]: Secure Login
+        - generic [ref=e72]:
+          - img [ref=e73]
+          - generic [ref=e77]: 256-bit Encryption
+```

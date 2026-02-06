@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Share2 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { CommentsApi } from '@/api/CommentsApi';
@@ -74,7 +73,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
 
   return (
     <article
-      className={`group relative w-full overflow-hidden rounded-lg transition-all duration-300 hover:shadow-xl cursor-pointer ${className ?? ''}`}
+      className={`group relative w-full overflow-hidden rounded-xl transition-all duration-300 hover:shadow-xl cursor-pointer ${className ?? ''}`}
       onClick={() => {
         if (onOpenView) {
           onOpenView(item);
@@ -88,18 +87,18 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
       }}
     >
       {/* Full Image Background */}
-      <div className="relative w-full h-full aspect-[2/3]">
+      <div className="relative w-full h-full">
         {isVideo ? (
           <MediaRenderer
             kind="video"
             src={item.media.url ?? ''}
             poster={item.media.previewUrl ?? undefined}
             controls={false}
-            fit="cover"
-            maxHeightClassName="max-h-full"
+            fit="contain"
+            maxHeightClassName="max-h-none"
             maxWidthClassName="max-w-full"
             className="w-full h-full"
-            mediaClassName="w-full h-full object-cover"
+            mediaClassName="w-full h-full object-contain"
           />
         ) : (
           <>
@@ -110,11 +109,11 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
               kind="image"
               src={item.media.url ?? ''}
               alt={item.collectionTitle}
-              fit="cover"
-              maxHeightClassName="max-h-full"
+              fit="contain"
+              maxHeightClassName="max-h-none"
               maxWidthClassName="max-w-full"
               className={`w-full h-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-              mediaClassName="w-full h-full object-cover"
+              mediaClassName="w-full h-full object-contain"
               onLoad={() => setImgLoaded(true)}
               onError={() => {
                 setImgLoaded(true);
@@ -209,8 +208,9 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
               e.stopPropagation();
               // Handle share action
             }}
+            aria-label="Share"
           >
-            <Share2 className="h-5 w-5" />
+            <span className="text-lg">🔗</span>
             <span className="text-xs font-bold mt-1 drop-shadow">{item.patchesCount ?? 0}</span>
           </button>
         </div>
