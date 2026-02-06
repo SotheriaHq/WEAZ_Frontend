@@ -192,7 +192,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
             </label>
             <input
               type="text"
-              className="w-full px-3 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              className="threadly-search-input"
               placeholder="Search by username or email"
               disabled={isSubmitting}
             />

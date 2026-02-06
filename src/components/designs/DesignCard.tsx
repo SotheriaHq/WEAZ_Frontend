@@ -74,7 +74,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
 
   return (
     <article
-      className={`group relative w-full overflow-hidden rounded-lg shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(129,140,248,0.3)] cursor-pointer ${className ?? ''}`}
+      className={`group relative w-full overflow-hidden rounded-lg transition-all duration-300 hover:shadow-xl cursor-pointer ${className ?? ''}`}
       onClick={() => {
         if (onOpenView) {
           onOpenView(item);
@@ -88,15 +88,18 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
       }}
     >
       {/* Full Image Background */}
-      <div className="relative w-full overflow-hidden">
+      <div className="relative w-full h-full aspect-[2/3]">
         {isVideo ? (
           <MediaRenderer
             kind="video"
             src={item.media.url ?? ''}
             poster={item.media.previewUrl ?? undefined}
             controls={false}
-            maxHeightClassName="max-h-[70vh]"
-            className="w-fit"
+            fit="cover"
+            maxHeightClassName="max-h-full"
+            maxWidthClassName="max-w-full"
+            className="w-full h-full"
+            mediaClassName="w-full h-full object-cover"
           />
         ) : (
           <>
@@ -107,8 +110,11 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
               kind="image"
               src={item.media.url ?? ''}
               alt={item.collectionTitle}
-              maxHeightClassName="max-h-[70vh]"
-              className={`transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+              fit="cover"
+              maxHeightClassName="max-h-full"
+              maxWidthClassName="max-w-full"
+              className={`w-full h-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+              mediaClassName="w-full h-full object-cover"
               onLoad={() => setImgLoaded(true)}
               onError={() => {
                 setImgLoaded(true);

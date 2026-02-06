@@ -1,8 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { checkout } from '@/api/StoreApi';
-import { fetchCart, clearCart } from '@/features/cartSlice';
+import {
+  fetchCart,
+  clearCart,
+  selectCartPriceChangeNotices,
+  selectCartRemovedItemNotices,
+} from '@/features/cartSlice';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import Input from '@/components/ui/Input';
@@ -12,6 +17,8 @@ const CheckoutPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const cart = useSelector((s: RootState) => s.cart);
+  const priceChangeNotices = useSelector(selectCartPriceChangeNotices);
+  const removedItemNotices = useSelector(selectCartRemovedItemNotices);
   const user = useSelector((s: RootState) => s.user.profile);
 
   const [customerName, setCustomerName] = useState(() => `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim());
@@ -24,6 +31,10 @@ const CheckoutPage: React.FC = () => {
       dispatch(fetchCart());
     }
   }, [cart.items.length, dispatch]);
+
+  const priceNoticeByItemId = useMemo(() => {
+    return new Map(priceChangeNotices.map((notice) => [notice.itemId, notice]));
+  }, [priceChangeNotices]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +67,22 @@ const CheckoutPage: React.FC = () => {
           <h1 className="text-2xl font-semibold">Checkout</h1>
           <p className="text-sm text-gray-500">Confirm your details and place your order.</p>
         </div>
+
+        {(priceChangeNotices.length > 0 || removedItemNotices.length > 0) && (
+          <div className="rounded-xl border border-amber-200/70 dark:border-amber-700/40 bg-amber-50/70 dark:bg-amber-900/20 p-4 text-sm text-amber-900 dark:text-amber-100">
+            {removedItemNotices.length > 0 && (
+              <p className="font-medium">
+                Some items were removed because they are out of stock or no longer available.
+              </p>
+            )}
+            {priceChangeNotices.length > 0 && (
+              <p className="font-medium">
+                Prices were updated for {priceChangeNotices.length} item
+                {priceChangeNotices.length > 1 ? 's' : ''}. Review the changes below.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-6 space-y-4">
           <Input
@@ -98,7 +125,37 @@ const CheckoutPage: React.FC = () => {
               <div>
                 <div className="font-medium">{item.product.name}</div>
                 <div className="text-gray-500">
-                  {item.quantity} × {item.product.effectivePrice.toLocaleString('en-NG', { style: 'currency', currency: cart.currency })}
+                  {(() => {
+                    const notice = priceNoticeByItemId.get(item.id);
+                    if (!notice) {
+                      return (
+                        <>
+                          {item.quantity} ×{' '}
+                          {item.product.effectivePrice.toLocaleString('en-NG', {
+                            style: 'currency',
+                            currency: cart.currency,
+                          })}
+                        </>
+                      );
+                    }
+                    return (
+                      <>
+                        {item.quantity} ×{' '}
+                        <span className="line-through text-gray-400 mr-1">
+                          {notice.oldPrice.toLocaleString('en-NG', {
+                            style: 'currency',
+                            currency: cart.currency,
+                          })}
+                        </span>
+                        <span className="text-amber-700 dark:text-amber-300 font-medium">
+                          {notice.newPrice.toLocaleString('en-NG', {
+                            style: 'currency',
+                            currency: cart.currency,
+                          })}
+                        </span>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="text-gray-400">
                   {item.selectedSize && <span className="mr-2">Size {item.selectedSize}</span>}

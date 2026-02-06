@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { X, Heart, ShoppingCart, Trash2, Sparkles, ChevronRight, AlertTriangle } from 'lucide-react';
+import { X, Heart, ShoppingCart, Trash2, Sparkles, ChevronRight, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -12,6 +12,9 @@ import {
   selectWishlistTotal,
   selectWishlistIsDrawerOpen,
   selectWishlistIsLoading,
+  selectWishlistRemovedItemNotices,
+  selectWishlistPriceChangeNotices,
+  clearWishlistNotices,
 } from '@/features/wishlistSlice';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
@@ -39,8 +42,16 @@ const WishlistDrawer: React.FC = () => {
   const items = useSelector(selectWishlistItems);
   const total = useSelector(selectWishlistTotal);
   const isLoading = useSelector(selectWishlistIsLoading);
+  const removedItemNotices = useSelector(selectWishlistRemovedItemNotices);
+  const priceChangeNotices = useSelector(selectWishlistPriceChangeNotices);
   const user = useSelector((state: RootState) => state.user.profile);
   const isAuthenticated = !!user;
+
+  useEffect(() => {
+    if (!isOpen) {
+      dispatch(clearWishlistNotices());
+    }
+  }, [isOpen, dispatch]);
 
   const formatPrice = (price: number, currency: string = 'NGN') => {
     return new Intl.NumberFormat('en-NG', {
@@ -202,6 +213,53 @@ const WishlistDrawer: React.FC = () => {
 
               {/* Wishlist Items */}
               <div className="flex-1 overflow-y-auto">
+                {(removedItemNotices.length > 0 || priceChangeNotices.length > 0) && (
+                  <div className="p-4 pb-0">
+                    <div className="rounded-2xl border border-amber-200/70 dark:border-amber-700/40 bg-amber-50/70 dark:bg-amber-900/20 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
+                          <AlertCircle size={18} className="text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                              We updated your wishlist
+                            </p>
+                            <button
+                              onClick={() => dispatch(clearWishlistNotices())}
+                              className="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+
+                          {removedItemNotices.length > 0 && (
+                            <div className="space-y-1">
+                              {removedItemNotices.map((notice) => (
+                                <p key={notice.productId} className="text-xs text-amber-800 dark:text-amber-200">
+                                  {notice.name} was removed because it is{' '}
+                                  {notice.reason === 'out_of_stock' ? 'out of stock' : 'no longer available'}.
+                                </p>
+                              ))}
+                            </div>
+                          )}
+
+                          {priceChangeNotices.length > 0 && (
+                            <div className="space-y-1">
+                              {priceChangeNotices.map((notice) => (
+                                <p key={notice.productId} className="text-xs text-amber-800 dark:text-amber-200">
+                                  {notice.name} price changed from{' '}
+                                  {formatPrice(notice.oldPrice, notice.currency)} to{' '}
+                                  {formatPrice(notice.newPrice, notice.currency)}.
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {items.length === 0 ? (
                   /* Empty State */
                   <div className="flex flex-col items-center justify-center h-full text-center p-6">

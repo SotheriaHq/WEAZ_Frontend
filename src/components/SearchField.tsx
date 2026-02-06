@@ -5,15 +5,18 @@ import { Dropdown, DropdownMenu, DropdownTrigger, DropdownItem } from '@/compone
 interface SearchFieldProps {
   placeholder?: string;
   onSearch?: (value: string) => void;
+  value?: string;
+  onChange?: (value: string) => void;
   showFilter?: boolean; // show the filter dropdown control
   className?: string;
 }
 
-const SearchField: React.FC<SearchFieldProps> = ({ placeholder = 'Search...', onSearch, showFilter = true, className }) => {
+const SearchField: React.FC<SearchFieldProps> = ({ placeholder = 'Search...', onSearch, value, onChange, showFilter = true, className }) => {
   const [isFocused, setIsFocused] = useState(false);
-  const [value, setValue] = useState('');
+  const [internalValue, setInternalValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputValue = value ?? internalValue;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -33,32 +36,36 @@ const SearchField: React.FC<SearchFieldProps> = ({ placeholder = 'Search...', on
 
   return (
     <div ref={wrapperRef} className={`relative z-[80] flex-1 min-w-0 max-w-2xl ${className ?? ''}`}>
-      <div className="glass-panel px-3 py-2 rounded-xl flex items-center gap-2">
-        <Search className="w-4 h-4 text-gray-500" />
+      <div className="relative flex items-center">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input
           ref={inputRef}
           type="text"
-          value={value}
+          value={inputValue}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           onChange={e => {
-            setValue(e.target.value);
-            onSearch?.(e.target.value);
+            const next = e.target.value;
+            setInternalValue(next);
+            onSearch?.(next);
+            onChange?.(next);
           }}
           placeholder={placeholder}
-          className="w-full bg-transparent outline-none border-0 focus:ring-0 text-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 caret-primary"
+          className={`threadly-search-input pl-10 ${showFilter ? 'pr-10' : ''}`}
         />
         {showFilter && (
-          <Dropdown placement="bottom-end">
-            <DropdownTrigger className="btn-frost-ghost btn-tight-xs aspect-square p-0 min-w-[2rem]">
-              <SlidersHorizontal className="w-4 h-4" />
-            </DropdownTrigger>
-            <DropdownMenu>
-              <DropdownItem>Brands</DropdownItem>
-              <DropdownItem>Collections</DropdownItem>
-              <DropdownItem>People</DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
+          <div className="absolute right-2">
+            <Dropdown placement="bottom-end">
+              <DropdownTrigger className="btn-frost-ghost btn-tight-xs aspect-square p-0 min-w-[2rem]">
+                <SlidersHorizontal className="w-4 h-4" />
+              </DropdownTrigger>
+              <DropdownMenu>
+                <DropdownItem>Brands</DropdownItem>
+                <DropdownItem>Collections</DropdownItem>
+                <DropdownItem>People</DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          </div>
         )}
       </div>
     </div>

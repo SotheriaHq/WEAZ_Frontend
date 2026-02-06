@@ -42,6 +42,8 @@ export interface WishlistState {
   error: string | null;
   // Track wishlisted product IDs for quick lookup
   wishlistedIds: Set<string>;
+  removedItemNotices: Array<{ productId: string; name: string; reason: 'out_of_stock' | 'unavailable' }>;
+  priceChangeNotices: Array<{ productId: string; name: string; oldPrice: number; newPrice: number; currency?: string }>;
 }
 
 const initialState: WishlistState = {
@@ -51,6 +53,8 @@ const initialState: WishlistState = {
   isDrawerOpen: false,
   error: null,
   wishlistedIds: new Set(),
+  removedItemNotices: [],
+  priceChangeNotices: [],
 };
 
 // Async thunks
@@ -115,6 +119,10 @@ export const wishlistSlice = createSlice({
     toggleWishlistDrawer: (state) => {
       state.isDrawerOpen = !state.isDrawerOpen;
     },
+    clearWishlistNotices: (state) => {
+      state.removedItemNotices = [];
+      state.priceChangeNotices = [];
+    },
     resetWishlistState: () => initialState,
     // Optimistic update for toggle
     toggleWishlistOptimistic: (state, action: PayloadAction<string>) => {
@@ -144,6 +152,48 @@ export const wishlistSlice = createSlice({
           : Array.isArray(payload)
             ? payload
             : [];
+
+        const previousItems = state.items || [];
+        const previousByProductId = new Map<string, WishlistItem>();
+        previousItems.forEach((item) => {
+          const productId = item?.product?.id;
+          if (typeof productId === 'string') {
+            previousByProductId.set(productId, item);
+          }
+        });
+        const incomingProductIds = new Set(
+          items
+            .map((item) => item?.product?.id)
+            .filter((id): id is string => typeof id === 'string')
+        );
+
+        state.removedItemNotices = previousItems
+          .filter((item) => item?.product?.id && !incomingProductIds.has(item.product.id))
+          .map((item) => ({
+            productId: item.product.id,
+            name: item.product.name,
+            reason:
+              (item.product.totalStock ?? 0) <= 0 || item.product.isOutOfStock
+                ? 'out_of_stock'
+                : 'unavailable',
+          }));
+
+        state.priceChangeNotices = items
+          .map((item) => {
+            const productId = item?.product?.id;
+            if (!productId) return null;
+            const previous = previousByProductId.get(productId);
+            if (!previous) return null;
+            if (previous.product.effectivePrice === item.product.effectivePrice) return null;
+            return {
+              productId,
+              name: item.product.name,
+              oldPrice: previous.product.effectivePrice,
+              newPrice: item.product.effectivePrice,
+              currency: item.product.brand?.currency,
+            };
+          })
+          .filter((notice): notice is NonNullable<typeof notice> => Boolean(notice));
 
         state.items = items;
         state.total = typeof payload?.total === 'number' ? payload.total : items.length;
@@ -203,6 +253,7 @@ export const {
   openWishlistDrawer,
   closeWishlistDrawer,
   toggleWishlistDrawer,
+  clearWishlistNotices,
   resetWishlistState,
   toggleWishlistOptimistic,
 } = wishlistSlice.actions;
@@ -212,6 +263,10 @@ export const selectWishlistItems = (state: { wishlist: WishlistState }) => state
 export const selectWishlistTotal = (state: { wishlist: WishlistState }) => state.wishlist.total;
 export const selectWishlistIsLoading = (state: { wishlist: WishlistState }) => state.wishlist.isLoading;
 export const selectWishlistIsDrawerOpen = (state: { wishlist: WishlistState }) => state.wishlist.isDrawerOpen;
+export const selectWishlistRemovedItemNotices = (state: { wishlist: WishlistState }) =>
+  state.wishlist.removedItemNotices;
+export const selectWishlistPriceChangeNotices = (state: { wishlist: WishlistState }) =>
+  state.wishlist.priceChangeNotices;
 export const selectIsProductWishlisted = (state: { wishlist: WishlistState }, productId: string) =>
   state.wishlist.wishlistedIds.has(productId);
 

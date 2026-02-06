@@ -767,7 +767,7 @@ const CreateCollectionInner: React.FC = () => {
                         onKeyDown={handleTagInputKeyDown}
                         placeholder="Search or create a tag..."
                         disabled={disabled || selectedTags.length >= 10}
-                        className="w-full pl-10 pr-12 py-2.5 rounded-xl glass-light bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                        className="threadly-search-input pl-10 pr-12"
                       />
                       <button
                         type="button"

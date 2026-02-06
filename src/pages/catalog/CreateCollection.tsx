@@ -372,7 +372,7 @@ const CreateCollectionInner: React.FC = () => {
             type="text"
             placeholder="Search by username or email"
             disabled={disabled}
-            className="w-full rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="threadly-search-input"
           />
         </div>
       </Section>

@@ -1,25 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCcw, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/useConfirm';
 
 export const HiddenContentSettings: React.FC = () => {
   const [hiddenCount, setHiddenCount] = useState(0);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   useEffect(() => {
     const items = JSON.parse(localStorage.getItem('hiddenMarketItems') || '[]');
     setHiddenCount(items.length);
   }, []);
 
-  const handleClearAll = () => {
-    if (window.confirm('Are you sure you want to unhide all content?')) {
-      localStorage.removeItem('hiddenMarketItems');
-      setHiddenCount(0);
-      toast.success('All hidden content has been restored.');
-    }
+  const handleClearAll = async () => {
+    const approved = await confirm({
+      title: 'Unhide all content?',
+      message: 'This will restore all items you previously hid from your feed.',
+      confirmText: 'Unhide all',
+      cancelText: 'Cancel',
+      isDestructive: true,
+    });
+    if (!approved) return;
+    localStorage.removeItem('hiddenMarketItems');
+    setHiddenCount(0);
+    toast.success('All hidden content has been restored.');
   };
 
   return (
     <div className="max-w-2xl mx-auto p-6">
+      {ConfirmDialog}
       <div className="flex items-center gap-3 mb-6">
         <div className="p-3 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400">
           <EyeOff className="w-6 h-6" />

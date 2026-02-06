@@ -80,9 +80,9 @@ const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose
               className="fixed inset-0 z-layer-overlay"
               onClick={onClose}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
+              <div className="absolute inset-0 bg-gradient-to-br from-white/70 via-purple-50/60 to-white/70 dark:from-purple-900/40 dark:via-indigo-900/50 dark:to-blue-900/40" />
               <div className="absolute inset-0 backdrop-blur-xl" />
-              <div className="absolute inset-0 bg-black/40" />
+              <div className="absolute inset-0 bg-black/30 dark:bg-black/40" />
             </motion.div>
 
             {/* Modal */}
@@ -99,7 +99,7 @@ const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose
               <div
                 ref={dialogRef}
                 tabIndex={-1}
-                className="w-full max-w-4xl max-h-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden flex flex-col"
+                className="w-full max-w-4xl max-h-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-gray-200/70 dark:border-white/10 overflow-hidden flex flex-col text-gray-900 dark:text-gray-100"
                 onClick={(e) => e.stopPropagation()}
               >
               {/* Header */}

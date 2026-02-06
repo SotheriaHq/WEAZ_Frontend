@@ -594,21 +594,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
                     {/* Gradient overlay for readability */}
                     <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/20 to-transparent pointer-events-none" />
                     
-                    {/* Hover overlay with edit button */}
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm opacity-0 transition-all duration-300 group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const suffix = product.deletedAt ? '?includeDeleted=true' : '';
-                          navigate(`/studio/store/products/${product.id}/edit${suffix}`);
-                        }}
-                        className="px-5 py-2.5 bg-white text-gray-900 rounded-xl font-semibold text-sm shadow-xl hover:bg-gray-100 transition-all active:scale-95"
-                      >
-                        ✏️ Edit Product
-                      </button>
-                    </div>
-                    
                     {/* Status badge inside image area */}
                     <div className="absolute bottom-3 left-3 z-10">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold shadow-lg ${

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
   ArrowLeft, 
+  ArrowUp,
+  ArrowDown,
   ChevronDown, 
-  Crop, 
   Plus, 
   CheckCircle, 
   Video, 
@@ -21,8 +22,9 @@ import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
 import Tag from '@/components/ui/Tag';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { useConfirm } from '@/components/ui/useConfirm';
 import { DiscardChangesModal } from '@/components/studio/store/modals';
+import { normalizePrimary, reorderItems, setPrimary, validateMedia } from './mediaUtils';
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -220,17 +222,19 @@ const EditProduct: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
+  const { confirm, ConfirmDialog: ConfirmModal } = useConfirm();
   
   // Media state (simplified - using URLs for display)
   const [mediaUrls, setMediaUrls] = useState<Array<{ id: string; url: string; isPrimary?: boolean }>>([]);
 
-  const primaryFileInputRef = useRef<HTMLInputElement | null>(null);
+  const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
   const [pendingMediaFiles, setPendingMediaFiles] = useState<
     Array<{ tempId: string; file: File; previewUrl: string; isPrimary: boolean }>
   >([]);
 
-  const maxMediaCount = 1;
+  const maxMediaCount = 4;
   const canAddMoreMedia = mediaUrls.length < maxMediaCount;
+  const hasPrimaryMedia = useMemo(() => mediaUrls.some((m) => m.isPrimary), [mediaUrls]);
 
   // Calculate profit margin
   const profitMargin = useMemo(() => {
@@ -349,9 +353,15 @@ const EditProduct: React.FC = () => {
 
         // Set media for display
         if (product.media?.length) {
-          setMediaUrls(product.media.map(m => ({ id: m.id, url: m.url, isPrimary: m.isPrimary })));
+          const mapped = product.media.map((m) => ({ id: m.id, url: m.url, isPrimary: m.isPrimary }));
+          setMediaUrls(normalizePrimary(mapped));
         } else if (product.images?.length) {
-          setMediaUrls(product.images.map((url, i) => ({ id: `img-${i}`, url, isPrimary: i === 0 })));
+          const mapped = product.images.map((url, i) => ({
+            id: `img-${i}`,
+            url,
+            isPrimary: product.thumbnail ? url === product.thumbnail : i === 0,
+          }));
+          setMediaUrls(normalizePrimary(mapped));
         }
       } catch (error) {
         console.error('Failed to load product', error);
@@ -493,6 +503,12 @@ const EditProduct: React.FC = () => {
       }
     }
 
+    const mediaValidation = validateMedia(mediaUrls, maxMediaCount);
+    if (!mediaValidation.ok) {
+      toast.error(mediaValidation.error || 'Please review your media selection');
+      return;
+    }
+
     setSaving(true);
     try {
       const ensuredSku = form.sku?.trim() || buildBaseSku({ brandInitials: brandInitialsFromProfile(user), title: form.title });
@@ -541,11 +557,11 @@ const EditProduct: React.FC = () => {
 
         // Upload pending media after we have a product id
         if (pendingMediaFiles.length > 0) {
-          const uploads = [...pendingMediaFiles];
-          // Ensure exactly one primary (fallback to first)
-          if (!uploads.some((u) => u.isPrimary) && uploads[0]) {
-            uploads[0] = { ...uploads[0], isPrimary: true };
-          }
+          const pendingById = new Map(pendingMediaFiles.map((p) => [p.tempId, p]));
+          const orderedPending = mediaUrls
+            .map((m) => pendingById.get(m.id))
+            .filter(Boolean) as Array<{ tempId: string; file: File; previewUrl: string; isPrimary: boolean }>;
+          const uploads = normalizePrimary(orderedPending);
 
           const uploadedIds: string[] = [];
           for (const u of uploads) {
@@ -569,7 +585,7 @@ const EditProduct: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [form, hasDuplicateVariants, isEditMode, mediaUrls.length, navigate, pendingMediaFiles, productId, variantTotalStock]);
+  }, [form, hasDuplicateVariants, isEditMode, maxMediaCount, mediaUrls, navigate, pendingMediaFiles, productId, variantTotalStock]);
 
   // Auto-generate SKU (product + variants). Users shouldn't type SKUs manually.
   useEffect(() => {
@@ -621,68 +637,145 @@ const EditProduct: React.FC = () => {
 
       setPendingMediaFiles((prev) => {
         const merged = [...prev, ...nextPending];
-        // Only allow 1 primary across pending+uploaded
-        if (makePrimary) {
-          const primaryTempId = nextPending[0]?.tempId;
-          return merged.map((m) => ({ ...m, isPrimary: m.tempId === primaryTempId }));
+        if (makePrimary && nextPending[0]) {
+          return normalizePending(merged.map((m) => ({ ...m, isPrimary: m.tempId === nextPending[0].tempId })));
         }
-        return merged;
+        return normalizePending(merged);
       });
 
       setMediaUrls((prev) => {
-        const base = makePrimary
-          ? prev.map((m) => ({ ...m, isPrimary: false }))
-          : prev;
-        const primaryTempId = makePrimary ? nextPending[0]?.tempId : null;
         const mapped = nextPending.map((m) => ({
           id: m.tempId,
           url: m.previewUrl,
-          isPrimary: makePrimary ? m.tempId === primaryTempId : false,
+          isPrimary: false,
         }));
-        // If we have no primary at all, set first as primary
-        const next = [...base, ...mapped];
-        if (!next.some((m) => m.isPrimary) && next[0]) {
-          next[0] = { ...next[0], isPrimary: true };
+        const next = [...prev, ...mapped];
+        if (makePrimary && mapped[0]) {
+          return normalizePrimary(setPrimary(next, mapped[0].id));
         }
-        return next;
+        return normalizePrimary(next);
       });
     },
-    [mediaUrls.length],
+    [mediaUrls.length, normalizePending],
   );
 
-  const handlePrimaryFilesSelected: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
+  const handleMediaFilesSelected: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
     const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/'));
     e.target.value = '';
     if (!files.length) return;
 
+    if (!canAddMoreMedia) {
+      toast.error(`You can upload up to ${maxMediaCount} images`);
+      return;
+    }
+
     if (isEditMode && productId) {
-      if (!canAddMoreMedia && mediaUrls.length > 0) {
-        toast.error(`You can upload up to ${maxMediaCount} images`);
-        return;
-      }
-      try {
-        const file = files[0];
-        const uploaded = await productApi.uploadProductMedia(productId, file, true);
-        updateForm('mediaIds', Array.from(new Set([...(form.mediaIds ?? []), uploaded.id])));
-        setMediaUrls((prev) => {
-          const next = prev.map((m) => ({ ...m, isPrimary: false }));
-          next.unshift({ id: uploaded.id, url: uploaded.url, isPrimary: true });
-          return next.slice(0, maxMediaCount);
-        });
-        toast.success('Primary image uploaded');
-      } catch (err) {
-        console.error('Primary upload failed', err);
-        toast.error('Failed to upload image');
+      const uploadQueue = files.slice(0, maxMediaCount - mediaUrls.length);
+      const shouldMakePrimary = !hasPrimaryMedia && uploadQueue.length > 0;
+
+      for (const [index, file] of uploadQueue.entries()) {
+        try {
+          const makePrimary = shouldMakePrimary && index === 0;
+          const uploaded = await productApi.uploadProductMedia(productId, file, makePrimary);
+          setMediaUrls((prev) => {
+            const next = [...prev, { id: uploaded.id, url: uploaded.url, isPrimary: makePrimary }];
+            const normalized = normalizePrimary(next);
+            updateForm(
+              'mediaIds',
+              normalized.map((m) => m.id).filter((id) => !id.startsWith('pending-')),
+            );
+            return normalized;
+          });
+          toast.success(makePrimary ? 'Cover image uploaded' : 'Image uploaded');
+        } catch (err) {
+          console.error('Upload failed', err);
+          toast.error('Failed to upload image');
+        }
       }
       return;
     }
 
-    if (mediaUrls.length > 0) {
-      setMediaUrls([]);
-      setPendingMediaFiles([]);
-    }
-    pushMediaPreviews(files.slice(0, 1), { makePrimary: true });
+    const makePrimary = !hasPrimaryMedia;
+    pushMediaPreviews(files, { makePrimary });
   };
+
+  const normalizePending = useCallback(
+    (items: Array<{ tempId: string; file: File; previewUrl: string; isPrimary: boolean }>) => {
+      const normalized = normalizePrimary(items.map((item) => ({ ...item, id: item.tempId })));
+      return normalized.map(({ id, ...rest }) => rest);
+    },
+    [],
+  );
+
+  const handleSetCover = useCallback(
+    async (mediaId: string) => {
+      if (!mediaId) return;
+      setMediaUrls((prev) => normalizePrimary(setPrimary(prev, mediaId)));
+      setPendingMediaFiles((prev) => normalizePending(prev.map((p) => ({ ...p, isPrimary: p.tempId === mediaId }))));
+
+      if (isEditMode && productId && !mediaId.startsWith('pending-')) {
+        try {
+          await productApi.setPrimaryMedia(productId, mediaId);
+          toast.success('Cover image updated');
+        } catch (error) {
+          toast.error('Failed to update cover image');
+        }
+      }
+    },
+    [isEditMode, normalizePending, productId],
+  );
+
+  const handleDeleteMedia = useCallback(
+    async (mediaId: string) => {
+      const target = mediaUrls.find((m) => m.id === mediaId);
+      if (!target) return;
+
+      const nextMedia = normalizePrimary(mediaUrls.filter((m) => m.id !== mediaId));
+      setMediaUrls(nextMedia);
+      setPendingMediaFiles((prev) => prev.filter((p) => p.tempId !== mediaId));
+
+      if (isEditMode && productId && !mediaId.startsWith('pending-')) {
+        try {
+          await productApi.deleteProductMedia(productId, mediaId);
+          const orderedIds = nextMedia.map((m) => m.id).filter((id) => !id.startsWith('pending-'));
+          updateForm('mediaIds', orderedIds);
+          if (target.isPrimary && orderedIds[0]) {
+            await productApi.setPrimaryMedia(productId, orderedIds[0]);
+          }
+          toast.success('Image deleted');
+        } catch (error) {
+          toast.error('Failed to delete image');
+          setMediaUrls((prev) => normalizePrimary([...prev, target]));
+        }
+      }
+    },
+    [isEditMode, mediaUrls, productId, updateForm],
+  );
+
+  const handleReorderMedia = useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      if (fromIndex === toIndex) return;
+      const nextMedia = reorderItems(mediaUrls, fromIndex, toIndex);
+      setMediaUrls(nextMedia);
+
+      setPendingMediaFiles((prev) => {
+        if (!prev.length) return prev;
+        const byId = new Map(prev.map((p) => [p.tempId, p]));
+        return nextMedia.map((m) => byId.get(m.id)).filter(Boolean) as typeof prev;
+      });
+
+      const orderedIds = nextMedia.map((m) => m.id).filter((id) => !id.startsWith('pending-'));
+      if (isEditMode && productId && orderedIds.length > 0) {
+        try {
+          await productApi.reorderProductMedia(productId, orderedIds);
+          updateForm('mediaIds', orderedIds);
+        } catch (error) {
+          toast.error('Failed to reorder images');
+        }
+      }
+    },
+    [isEditMode, mediaUrls, productId, updateForm],
+  );
 
   const handleDuplicate = useCallback(async () => {
     if (!productId) return;
@@ -708,9 +801,14 @@ const EditProduct: React.FC = () => {
 
   const handleDelete = useCallback(async () => {
     if (!productId) return;
-    if (!window.confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
-      return;
-    }
+    const approved = await confirm({
+      title: 'Delete product?',
+      message: 'This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      isDestructive: true,
+    });
+    if (!approved) return;
     try {
       await productApi.deleteProduct(productId);
       toast.success('Product deleted');
@@ -718,7 +816,7 @@ const EditProduct: React.FC = () => {
     } catch (error) {
       toast.error('Failed to delete product');
     }
-  }, [productId, navigate]);
+  }, [confirm, productId, navigate]);
 
   const handleDiscard = useCallback(() => {
     if (hasChanges) {
@@ -809,49 +907,102 @@ const EditProduct: React.FC = () => {
               </div>
 
               <input
-                ref={primaryFileInputRef}
+                ref={mediaFileInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 className="hidden"
-                onChange={handlePrimaryFilesSelected}
+                data-testid="product-media-input"
+                onChange={handleMediaFilesSelected}
               />
-              {/* Main Image */}
-              {mediaUrls.length > 0 ? (
-                <div className="relative w-full rounded-lg mb-3 group border border-gray-200/70 dark:border-white/10">
-                  <MediaRenderer
-                    kind="image"
-                    src={mediaUrls.find(m => m.isPrimary)?.url || mediaUrls[0]?.url}
-                    alt="Main Product"
-                    maxHeightClassName="max-h-none"
-                    allowScroll
-                    className="w-full rounded-lg"
-                    mediaClassName="rounded-lg"
-                  />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => primaryFileInputRef.current?.click()}
-                      className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-colors"
-                      title="Replace primary"
-                    >
-                      <Crop className="w-4 h-4" />
-                    </button>
+
+              <div className="grid grid-cols-2 gap-3">
+                {mediaUrls.map((media, index) => (
+                  <div
+                    key={media.id}
+                    className="relative group rounded-lg bg-gray-100/40 dark:bg-white/5 aspect-square overflow-hidden"
+                  >
+                    <MediaRenderer
+                      kind="image"
+                      src={media.url}
+                      alt="Product"
+                      fit="contain"
+                      maxHeightClassName="max-h-full"
+                      maxWidthClassName="max-w-full"
+                      className="w-full h-full"
+                      mediaClassName="w-full h-full object-contain"
+                    />
+
+                    {media.isPrimary && (
+                      <div className="absolute top-2 left-2 px-2 py-1 bg-black/70 backdrop-blur-sm rounded text-[10px] font-semibold text-white">
+                        Cover
+                      </div>
+                    )}
+
+                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 px-2 py-2 bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleReorderMedia(index, Math.max(0, index - 1))}
+                          disabled={index === 0}
+                          className="p-1 rounded-md hover:bg-white/10 disabled:opacity-50"
+                          aria-label="Move image up"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleReorderMedia(index, Math.min(mediaUrls.length - 1, index + 1))}
+                          disabled={index === mediaUrls.length - 1}
+                          className="p-1 rounded-md hover:bg-white/10 disabled:opacity-50"
+                          aria-label="Move image down"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        {!media.isPrimary && (
+                          <button
+                            type="button"
+                            onClick={() => handleSetCover(media.id)}
+                            className="p-1 rounded-md hover:bg-white/10"
+                            aria-label="Set as cover"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMedia(media.id)}
+                          className="p-1 rounded-md hover:bg-white/10"
+                          aria-label="Delete image"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-[10px] font-medium text-white">Primary</div>
-                </div>
-              ) : (
-                <div
-                  onClick={() => primaryFileInputRef.current?.click()}
-                  className="aspect-square rounded-lg border border-dashed border-gray-300 dark:border-white/20 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:border-purple-400/60 hover:bg-purple-50 dark:hover:bg-white/5 transition-all cursor-pointer mb-3"
-                >
-                  <Plus className="w-8 h-8 mb-2" />
-                  <span className="text-sm">Upload Primary Image</span>
-                  <span className="text-xs text-gray-500 mt-1">Min 1200x1200px</span>
-                </div>
+                ))}
+
+                {canAddMoreMedia && (
+                  <button
+                    type="button"
+                    onClick={() => mediaFileInputRef.current?.click()}
+                    className="aspect-square rounded-lg border border-dashed border-gray-300 dark:border-white/20 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:border-purple-400/60 hover:bg-purple-50 dark:hover:bg-white/5 transition-all"
+                  >
+                    <Plus className="w-6 h-6 mb-2" />
+                    <span className="text-xs font-medium">Add image</span>
+                  </button>
+                )}
+              </div>
+
+              {!hasPrimaryMedia && mediaUrls.length > 0 && (
+                <p className="mt-3 text-xs text-orange-500">Select a cover image before saving.</p>
               )}
 
               <div className="pt-4 border-t border-gray-200 dark:border-white/10">
-                <p className="text-xs text-gray-500">One image only • No cropping • Full preview</p>
+                <p className="text-xs text-gray-500">Up to 4 images • Full preview • Cover required when images exist</p>
               </div>
             </div>
 
@@ -886,6 +1037,7 @@ const EditProduct: React.FC = () => {
                   value={form.title}
                   onChange={(e) => updateForm('title', e.target.value)}
                   placeholder="Enter product title"
+                  data-testid="product-title-input"
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -992,6 +1144,7 @@ const EditProduct: React.FC = () => {
                   onChange={(e) => updateForm('price', Number(e.target.value))}
                   placeholder="0"
                   startIcon={<span className="text-gray-400 dark:text-zinc-500 text-sm">₦</span>}
+                  data-testid="product-price-input"
                 />
                 <Input
                   label="Sale Price"
@@ -1347,6 +1500,8 @@ const EditProduct: React.FC = () => {
         </div>
       </footer>
 
+      {ConfirmModal}
+
       {/* Discard Changes Modal - Premium styled */}
       <DiscardChangesModal
         isOpen={showDiscardPrompt}
@@ -1361,10 +1516,6 @@ const EditProduct: React.FC = () => {
           : "You have unsaved changes. Are you sure you want to discard them? This action cannot be undone."
         }
       />
-      
-      {/* Delete confirmation - using ConfirmDialog for destructive action */}
-      {/* Note: window.confirm in handleDelete should be replaced with a proper modal */}
-
     </div>
   );
 };

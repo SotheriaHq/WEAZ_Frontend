@@ -44,6 +44,8 @@ export interface CartState {
   isLoading: boolean;
   isDrawerOpen: boolean;
   error: string | null;
+  removedItemNotices: Array<{ itemId: string; name: string; reason: 'out_of_stock' | 'unavailable' }>;
+  priceChangeNotices: Array<{ itemId: string; name: string; oldPrice: number; newPrice: number; currency?: string }>;
 }
 
 const initialState: CartState = {
@@ -55,6 +57,8 @@ const initialState: CartState = {
   isLoading: false,
   isDrawerOpen: false,
   error: null,
+  removedItemNotices: [],
+  priceChangeNotices: [],
 };
 
 // Async thunks
@@ -130,6 +134,10 @@ export const cartSlice = createSlice({
     toggleCartDrawer: (state) => {
       state.isDrawerOpen = !state.isDrawerOpen;
     },
+    clearCartNotices: (state) => {
+      state.removedItemNotices = [];
+      state.priceChangeNotices = [];
+    },
     resetCartState: () => initialState,
   },
   extraReducers: (builder) => {
@@ -141,7 +149,35 @@ export const cartSlice = createSlice({
       })
       .addCase(fetchCart.fulfilled, (state, action: PayloadAction<CartState>) => {
         state.isLoading = false;
-        state.items = action.payload.items;
+        const incomingItems = action.payload.items || [];
+        const previousItems = state.items || [];
+        const previousById = new Map(previousItems.map((item) => [item.id, item]));
+        const incomingIds = new Set(incomingItems.map((item) => item.id));
+
+        state.removedItemNotices = previousItems
+          .filter((item) => !incomingIds.has(item.id))
+          .map((item) => ({
+            itemId: item.id,
+            name: item.product.name,
+            reason: (item.product.totalStock ?? 0) <= 0 ? 'out_of_stock' : 'unavailable',
+          }));
+
+        state.priceChangeNotices = incomingItems
+          .map((item) => {
+            const previous = previousById.get(item.id);
+            if (!previous) return null;
+            if (previous.product.effectivePrice === item.product.effectivePrice) return null;
+            return {
+              itemId: item.id,
+              name: item.product.name,
+              oldPrice: previous.product.effectivePrice,
+              newPrice: item.product.effectivePrice,
+              currency: item.brand?.currency,
+            };
+          })
+          .filter((notice): notice is NonNullable<typeof notice> => Boolean(notice));
+
+        state.items = incomingItems;
         state.itemCount = action.payload.itemCount;
         state.totalQuantity = action.payload.totalQuantity;
         state.subtotal = action.payload.subtotal;
@@ -213,7 +249,7 @@ export const cartSlice = createSlice({
   },
 });
 
-export const { openCartDrawer, closeCartDrawer, toggleCartDrawer, resetCartState } = cartSlice.actions;
+export const { openCartDrawer, closeCartDrawer, toggleCartDrawer, clearCartNotices, resetCartState } = cartSlice.actions;
 
 // Selectors
 export const selectCartItems = (state: { cart: CartState }) => state.cart.items;
@@ -222,6 +258,8 @@ export const selectCartTotalQuantity = (state: { cart: CartState }) => state.car
 export const selectCartSubtotal = (state: { cart: CartState }) => state.cart.subtotal;
 export const selectCartCurrency = (state: { cart: CartState }) => state.cart.currency;
 export const selectCartIsLoading = (state: { cart: CartState }) => state.cart.isLoading;
+export const selectCartRemovedItemNotices = (state: { cart: CartState }) => state.cart.removedItemNotices;
+export const selectCartPriceChangeNotices = (state: { cart: CartState }) => state.cart.priceChangeNotices;
 export const selectCartIsDrawerOpen = (state: { cart: CartState }) => state.cart.isDrawerOpen;
 
 export default cartSlice.reducer;

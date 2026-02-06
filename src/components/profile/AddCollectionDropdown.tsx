@@ -29,7 +29,7 @@ const AddCollectionDropdown: React.FC<AddCollectionDropdownProps> = ({ openModal
         {asLink ? 'Create collection' : '+ Add Collection'}
       </DropdownTrigger>
       <DropdownMenu>
-        <DropdownItem onClick={() => navigate('/profile/collections/create')}>Basic Collection</DropdownItem>
+        <DropdownItem onClick={() => navigate('/profile/collections/create')}>Basic Design</DropdownItem>
         <DropdownItem onClick={() => openModal('INSTORE')}>Instore Collection</DropdownItem>
       </DropdownMenu>
     </Dropdown>

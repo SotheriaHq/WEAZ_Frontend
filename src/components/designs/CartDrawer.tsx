@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { X, Minus, Plus, Trash2, ShoppingBag, Lock, ArrowLeft, Tag, Check, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +13,9 @@ import {
   selectCartCurrency,
   selectCartIsDrawerOpen,
   selectCartIsLoading,
+  selectCartRemovedItemNotices,
+  selectCartPriceChangeNotices,
+  clearCartNotices,
 } from '@/features/cartSlice';
 import { FrostedButton } from '@/components/ui/FrostedButton';
 import { toast } from 'sonner';
@@ -57,8 +60,16 @@ const CartDrawer: React.FC = () => {
   const totalQuantity = useSelector(selectCartTotalQuantity) || 0;
   const currency = useSelector(selectCartCurrency);
   const isLoading = useSelector(selectCartIsLoading);
+  const removedItemNotices = useSelector(selectCartRemovedItemNotices);
+  const priceChangeNotices = useSelector(selectCartPriceChangeNotices);
   const user = useSelector((state: RootState) => state.user.profile);
   const isAuthenticated = !!user;
+
+  useEffect(() => {
+    if (!isOpen) {
+      dispatch(clearCartNotices());
+    }
+  }, [isOpen, dispatch]);
 
   // Promo code state
   const [promoInput, setPromoInput] = useState('');
@@ -228,6 +239,52 @@ const CartDrawer: React.FC = () => {
 
               {/* Cart Items */}
               <div className="flex-1 overflow-y-auto">
+                {(removedItemNotices.length > 0 || priceChangeNotices.length > 0) && (
+                  <div className="p-4 pb-0">
+                    <div className="rounded-2xl border border-amber-200/70 dark:border-amber-700/40 bg-amber-50/70 dark:bg-amber-900/20 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
+                          <AlertCircle size={18} className="text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                              We updated your cart
+                            </p>
+                            <button
+                              onClick={() => dispatch(clearCartNotices())}
+                              className="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+
+                          {removedItemNotices.length > 0 && (
+                            <div className="space-y-1">
+                              {removedItemNotices.map((notice) => (
+                                <p key={notice.itemId} className="text-xs text-amber-800 dark:text-amber-200">
+                                  {notice.name} was removed because it is{' '}
+                                  {notice.reason === 'out_of_stock' ? 'out of stock' : 'no longer available'}.
+                                </p>
+                              ))}
+                            </div>
+                          )}
+
+                          {priceChangeNotices.length > 0 && (
+                            <div className="space-y-1">
+                              {priceChangeNotices.map((notice) => (
+                                <p key={notice.itemId} className="text-xs text-amber-800 dark:text-amber-200">
+                                  {notice.name} price changed from {formatPrice(notice.oldPrice)} to{' '}
+                                  {formatPrice(notice.newPrice)}.
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {items.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center p-6">
                     <div className="relative mb-6">

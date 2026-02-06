@@ -175,10 +175,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         group relative flex flex-col
         bg-white dark:bg-zinc-900/80
         rounded-2xl
-        border border-gray-100 dark:border-white/[0.08]
-        shadow-sm
-        hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30
-        hover:border-gray-200 dark:hover:border-white/[0.12]
+        rounded-lg
         transition-all duration-300 ease-out
         cursor-pointer
         overflow-hidden
@@ -188,8 +185,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Image Container - Fixed 4:5 aspect ratio for fashion */}
-      <div className="relative aspect-[4/5] overflow-hidden bg-gray-50 dark:bg-zinc-800/50">
+      {/* Image Container - Square Aspect Ratio */}
+      <div className="relative aspect-square overflow-hidden bg-gray-50 dark:bg-zinc-800/50">
         {/* Skeleton loader */}
         {!imgLoaded && !imgError && (
           <div className="absolute inset-0 animate-pulse">
@@ -260,8 +257,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             disabled={wishlistLoading}
             aria-label={isProductWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
             className={`
-              absolute top-3 right-3 z-10
-              p-2.5 rounded-full
+              absolute top-2 right-2 z-10
+              p-2 rounded-full
               backdrop-blur-md
               transition-all duration-200 ease-out
               ${isProductWishlisted
@@ -272,47 +269,10 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             `}
           >
             <Heart
-              size={18}
+              size={16}
               className={`transition-transform duration-200 ${isProductWishlisted ? 'fill-current' : ''}`}
             />
           </button>
-        )}
-
-        {/* Quick Add to Cart - Hover Overlay (Customer View Only) */}
-        {!isOwnerView && (
-          <div
-            className={`
-              absolute bottom-0 left-0 right-0
-              p-4 pt-16
-              bg-gradient-to-t from-black/70 via-black/40 to-transparent
-              transform transition-all duration-300 ease-out
-              ${isHovered ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}
-            `}
-          >
-            <button
-              onClick={handleQuickAddToCart}
-              disabled={cartLoading || product.isOutOfStock}
-              className={`
-                w-full py-3 px-4 rounded-xl
-                font-semibold text-sm
-                flex items-center justify-center gap-2
-                transition-all duration-200
-                ${product.isOutOfStock
-                  ? 'bg-gray-400/80 text-white/80 cursor-not-allowed'
-                  : 'bg-white text-gray-900 hover:bg-gray-100 active:scale-[0.98] shadow-lg'
-                }
-                ${cartLoading ? 'opacity-70 cursor-wait' : ''}
-              `}
-            >
-              <ShoppingBag size={16} />
-              {product.isOutOfStock
-                ? 'Out of Stock'
-                : product.sizes.length > 0
-                  ? 'Quick View'
-                  : 'Add to Bag'
-              }
-            </button>
-          </div>
         )}
 
         {/* Owner View: Edit Overlay */}
@@ -349,15 +309,15 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       </div>
 
       {/* Product Info */}
-      <div className="flex flex-col gap-1.5 p-3">
+      <div className="flex flex-col gap-2 p-3 flex-1">
         {/* Product Name */}
-        <h3 className="text-xs font-semibold text-gray-900 dark:text-white line-clamp-2 leading-snug min-h-[2rem]">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1 leading-snug">
           {product.name}
         </h3>
 
         {/* Price Section */}
-        <div className="flex items-baseline gap-2 flex-wrap">
-          <span className={`text-sm font-bold ${product.isOnSale ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white'}`}>
+        <div className="flex items-baseline gap-2 flex-wrap mb-1">
+          <span className={`text-sm font-semibold ${product.isOnSale ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white'}`}>
             {formatPrice(product.effectivePrice, product.brand.currency)}
           </span>
           {product.isOnSale && product.salePrice && (
@@ -367,25 +327,46 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           )}
         </div>
 
-        {/* Available Sizes - only show if has sizes */}
-        {sizesText && !isOwnerView && (
-          <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
-            {sizesText}
-          </p>
+        {/* Add to Cart Button (Customer View) */}
+        {!isOwnerView && (
+          <button
+            onClick={handleQuickAddToCart}
+            disabled={cartLoading || product.isOutOfStock}
+            className={`
+              mt-auto w-full py-2 px-3 rounded-lg
+              font-medium text-xs
+              flex items-center justify-center gap-2
+              transition-all duration-200
+              border
+              ${product.isOutOfStock
+                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed dark:bg-white/5 dark:border-white/10 dark:text-zinc-500'
+                : 'bg-transparent border-gray-200 text-gray-900 hover:bg-black hover:text-white hover:border-black dark:border-white/20 dark:text-white dark:hover:bg-white dark:hover:text-black active:scale-[0.98]'
+              }
+              ${cartLoading ? 'opacity-70 cursor-wait' : ''}
+            `}
+          >
+            <ShoppingBag size={14} />
+            {product.isOutOfStock
+              ? 'Sold Out'
+              : product.sizes.length > 0
+                ? 'Select Options'
+                : 'Add to Cart'
+            }
+          </button>
         )}
 
-        {/* Engagement Stats */}
-        <div className="flex items-center gap-4 mt-auto pt-2 border-t border-gray-100 dark:border-white/5">
-          <span className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
-            <Heart size={12} className={product.likesCount > 0 ? 'text-rose-400' : ''} />
-            <span>{product.likesCount}</span>
-          </span>
-          <span className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
-            <Eye size={12} />
-            <span>{product.viewsCount}</span>
-          </span>
-          {/* Stock indicator for owner view */}
-          {isOwnerView && (
+        {/* Engagement Stats (Visible mostly to Owner, or small on bottom) */}
+        {isOwnerView && (
+          <div className="flex items-center gap-4 mt-auto pt-2 border-t border-gray-100 dark:border-white/5">
+            <span className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+              <Heart size={12} className={product.likesCount > 0 ? 'text-rose-400' : ''} />
+              <span>{product.likesCount}</span>
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+              <Eye size={12} />
+              <span>{product.viewsCount}</span>
+            </span>
+            {/* Stock indicator for owner view */}
             <span className={`ml-auto text-xs font-medium ${
               product.isOutOfStock
                 ? 'text-rose-500'
@@ -393,10 +374,10 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                   ? 'text-amber-500'
                   : 'text-emerald-500'
             }`}>
-              {product.isOutOfStock ? 'Out of stock' : `${product.totalStock} left`}
+              {product.isOutOfStock ? 'Out' : `${product.totalStock}`}
             </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </article>
   );

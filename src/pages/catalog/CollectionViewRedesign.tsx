@@ -195,7 +195,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             
             <div>
               <h1 
-                className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-1"
+                className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-1"
                 style={{ textShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
               >
                 {title}
