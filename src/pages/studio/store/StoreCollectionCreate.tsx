@@ -444,61 +444,63 @@ const StoreCollectionCreate: React.FC = () => {
                       }}
                       role="button"
                       tabIndex={0}
-                      className={`relative flex gap-4 rounded-xl border p-4 text-left transition ${
+                      className={`relative flex gap-4 rounded-2xl border-2 p-4 text-left transition-all duration-300 cursor-pointer group ${
                         selected
-                          ? 'border-purple-500/80 bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-purple-500/20 dark:via-white/5 dark:to-pink-500/10 ring-2 ring-purple-400/50 shadow-lg shadow-purple-500/15'
-                          : 'border-gray-200 dark:border-white/10 hover:border-purple-300 hover:shadow-sm'
+                          ? 'border-transparent bg-gradient-to-br from-purple-100 via-white to-pink-100 dark:from-purple-600/30 dark:via-fuchsia-600/20 dark:to-pink-600/20 ring-2 ring-purple-500/60 shadow-xl shadow-purple-500/20 scale-[1.02]'
+                          : 'border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/5 hover:border-purple-400/60 hover:shadow-lg hover:shadow-purple-500/10 hover:scale-[1.01] hover:bg-gradient-to-br hover:from-purple-50/50 hover:to-pink-50/50 dark:hover:from-purple-900/20 dark:hover:to-pink-900/20'
                       }`}
                     >
-                      <div className="h-16 w-16 rounded-xl bg-white/60 dark:bg-white/5 border border-gray-200/70 dark:border-white/10 overflow-hidden flex items-center justify-center">
+                      <div className="shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-gray-100 dark:bg-white/10 border border-gray-200/70 dark:border-white/10">
                         {image.src || image.fileId ? (
                           <ImageWithFallback
                             src={image.src}
                             fileId={image.fileId}
                             alt={product.name}
                             fit="cover"
-                            className="h-full w-full object-cover"
-                            containerClassName="h-full w-full"
-                            rounded="md"
+                            className="w-full h-full object-cover"
+                            containerClassName="w-full h-full"
+                            rounded="lg"
                           />
                         ) : (
-                          <span className="text-xs text-gray-400">No image</span>
+                          <div className="w-full h-full flex items-center justify-center">
+                            <span className="text-xs text-gray-400">No image</span>
+                          </div>
                         )}
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <div className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1">
                               {product.name}
                             </div>
                             <div className="text-xs text-gray-500">
                               {formatCurrency(product.price)}
                             </div>
+                            <div className="mt-1 text-[11px] text-gray-500">
+                              Stock: {typeof product.totalStock === 'number' ? product.totalStock : '—'}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col items-end gap-1.5 shrink-0">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setPreviewProduct(product);
                               }}
-                              className="text-[10px] px-2 py-1 rounded-full border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-purple-300"
+                              className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
                             >
                               View
                             </button>
                             <span
-                              className={`text-[10px] px-2 py-1 rounded-full border ${
+                              className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 ${
                                 selected
-                                  ? 'border-purple-500 bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm'
-                                  : 'border-gray-200 bg-gray-100 text-gray-500'
+                                  ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm'
+                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                               }`}
                             >
-                              {selected ? 'Selected' : 'Select'}
+                              {selected ? '✓' : 'Select'}
                             </span>
                           </div>
-                        </div>
-                        <div className="mt-2 text-[11px] text-gray-500">
-                          Stock: {typeof product.totalStock === 'number' ? product.totalStock : '—'}
                         </div>
                       </div>
                     </div>
@@ -649,29 +651,39 @@ const StoreCollectionCreate: React.FC = () => {
 
       {previewProduct && (
         <OverlayPortal>
-          <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 animate-in fade-in duration-200">
             <button
               type="button"
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-gradient-to-br from-purple-900/60 via-black/70 to-pink-900/60 backdrop-blur-md transition-opacity duration-200"
               onClick={() => setPreviewProduct(null)}
               aria-label="Close product preview"
             />
-            <div className="relative w-full max-w-3xl rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/10">
-                <div>
-                  <div className="text-sm font-semibold text-gray-900 dark:text-white">Product Details</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">{previewProduct.name}</div>
+            <div className="relative w-full max-w-3xl rounded-3xl border border-white/20 bg-gradient-to-br from-white/95 via-white/90 to-purple-50/90 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-purple-950/90 shadow-2xl shadow-purple-500/20 overflow-hidden backdrop-blur-xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 ease-out">
+              {/* Decorative gradient orbs */}
+              <div className="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-gradient-to-br from-purple-400/30 via-fuchsia-400/20 to-transparent blur-3xl" />
+              <div className="absolute -bottom-20 -left-20 h-40 w-40 rounded-full bg-gradient-to-tr from-pink-400/30 via-purple-400/20 to-transparent blur-3xl" />
+              
+              {/* Header with gradient accent */}
+              <div className="relative">
+                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500" />
+                <div className="flex items-center justify-between px-6 py-5 border-b border-purple-200/30 dark:border-white/10">
+                  <div>
+                    <div className="text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 bg-clip-text text-transparent">Product Details</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{previewProduct.name}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewProduct(null)}
+                    className="rounded-full bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800 dark:hover:to-pink-800 hover:text-purple-700 dark:hover:text-white transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    Close
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setPreviewProduct(null)}
-                  className="rounded-full border border-gray-200 dark:border-white/10 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:border-purple-300"
-                >
-                  Close
-                </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
-                <div className="rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 p-4 flex items-center justify-center">
+              
+              <div className="relative grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+                {/* Image Container with enhanced styling */}
+                <div className="rounded-2xl bg-gradient-to-br from-gray-100/80 via-white to-purple-50/50 dark:from-white/10 dark:via-white/5 dark:to-purple-900/20 p-4 flex items-center justify-center border border-purple-200/40 dark:border-white/10 shadow-inner">
                   {(() => {
                     const image = getProductImageSource(previewProduct);
                     return image.src || image.fileId ? (
@@ -680,7 +692,7 @@ const StoreCollectionCreate: React.FC = () => {
                         fileId={image.fileId}
                         alt={previewProduct.name}
                         fit="contain"
-                        className="max-h-[360px] w-auto"
+                        className="max-h-[360px] w-auto rounded-xl shadow-lg"
                         containerClassName="w-full flex justify-center"
                         rounded="xl"
                       />
@@ -689,36 +701,40 @@ const StoreCollectionCreate: React.FC = () => {
                     );
                   })()}
                 </div>
-                <div className="space-y-4">
+                
+                {/* Details Section */}
+                <div className="space-y-5">
                   <div>
-                    <div className="text-xl font-semibold text-gray-900 dark:text-white">{previewProduct.name}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <div className="text-2xl font-bold bg-gradient-to-r from-gray-900 via-purple-800 to-gray-900 dark:from-white dark:via-purple-200 dark:to-white bg-clip-text text-transparent">{previewProduct.name}</div>
+                    <div className="text-lg font-semibold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mt-1">
                       {formatCurrency(previewProduct.price)}
                     </div>
                   </div>
                   {previewProduct.description ? (
-                    <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                    <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed bg-white/50 dark:bg-white/5 rounded-xl p-3 border border-gray-200/50 dark:border-white/10">
                       {previewProduct.description}
                     </p>
                   ) : null}
-                  <div className="grid grid-cols-2 gap-3 text-xs text-gray-600 dark:text-gray-300">
-                    <div className="rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Stock</div>
-                      <div className="font-semibold">{previewProduct.totalStock ?? '—'}</div>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-900/30 dark:to-blue-900/30 border border-indigo-200/50 dark:border-indigo-500/20 px-4 py-3 shadow-sm">
+                      <div className="text-[10px] uppercase tracking-wider text-indigo-500 dark:text-indigo-400 font-semibold">Stock</div>
+                      <div className="font-bold text-indigo-900 dark:text-indigo-100 text-base mt-0.5">{previewProduct.totalStock ?? '—'}</div>
                     </div>
-                    <div className="rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Status</div>
-                      <div className="font-semibold">{previewProduct.isActive ? 'Active' : 'Draft'}</div>
+                    <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/30 dark:to-green-900/30 border border-emerald-200/50 dark:border-emerald-500/20 px-4 py-3 shadow-sm">
+                      <div className="text-[10px] uppercase tracking-wider text-emerald-500 dark:text-emerald-400 font-semibold">Status</div>
+                      <div className={`font-bold text-base mt-0.5 ${previewProduct.isActive ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'}`}>
+                        {previewProduct.isActive ? 'Active' : 'Draft'}
+                      </div>
                     </div>
-                    <div className="rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Sizes</div>
-                      <div className="font-semibold">
+                    <div className="rounded-xl bg-gradient-to-br from-purple-50 to-fuchsia-50 dark:from-purple-900/30 dark:to-fuchsia-900/30 border border-purple-200/50 dark:border-purple-500/20 px-4 py-3 shadow-sm">
+                      <div className="text-[10px] uppercase tracking-wider text-purple-500 dark:text-purple-400 font-semibold">Sizes</div>
+                      <div className="font-bold text-purple-900 dark:text-purple-100 text-base mt-0.5">
                         {previewProduct.sizes?.length ? previewProduct.sizes.join(', ') : '—'}
                       </div>
                     </div>
-                    <div className="rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Colors</div>
-                      <div className="font-semibold">
+                    <div className="rounded-xl bg-gradient-to-br from-pink-50 to-rose-50 dark:from-pink-900/30 dark:to-rose-900/30 border border-pink-200/50 dark:border-pink-500/20 px-4 py-3 shadow-sm">
+                      <div className="text-[10px] uppercase tracking-wider text-pink-500 dark:text-pink-400 font-semibold">Colors</div>
+                      <div className="font-bold text-pink-900 dark:text-pink-100 text-base mt-0.5">
                         {previewProduct.colors?.length ? previewProduct.colors.join(', ') : '—'}
                       </div>
                     </div>
