@@ -1,12 +1,8 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, Smile, Send } from 'lucide-react';
 import type { MarketItem } from '@/types/market';
-// MediaViewer removed
 import DesignCommentsPanel from '@/components/designs/DesignCommentsPanel';
-// Tag, IconButton removed
-import CommentInput from '@/components/ui/CommentInput';
 import { formatPrice } from '@/utils/helpers';
-// getTagColor removed
 import { CommentsApi } from '@/api/CommentsApi';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -14,6 +10,7 @@ import { toast } from 'sonner';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import EmojiPicker, { Theme, type EmojiClickData } from 'emoji-picker-react';
 
 
 
@@ -30,8 +27,14 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const [commentText, setCommentText] = React.useState('');
   const [postingComment, setPostingComment] = React.useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const currentUserId = useSelector((s: RootState) => s.user.profile?.id);
   const dialogRef = React.useRef<HTMLDivElement>(null);
+
+  const onEmojiClick = (emojiData: EmojiClickData) => {
+    setCommentText((prev) => prev + emojiData.emoji);
+    setShowEmojiPicker(false);
+  };
 
   useFocusTrap({
     containerRef: dialogRef,
@@ -116,20 +119,23 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           {/* Close */}
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 z-50 text-white/80 hover:text-white"
+            className="absolute top-3 right-3 z-50 p-1.5 rounded-full bg-black/40 dark:bg-white/10 text-white hover:bg-black/60 dark:hover:bg-white/20 transition"
             aria-label="Close"
           >
-            <X />
+            <X size={18} />
           </button>
 
-          <div className="grid md:grid-cols-[50%_50%] h-full">
+          <div className="grid md:grid-cols-[55%_45%] h-full">
             {/* Media column */}
             <div className="bg-black h-[82vh] md:h-[90vh] w-full overflow-y-auto scrollbar-hide">
               <MediaRenderer
                 kind={item.media?.type?.toUpperCase().includes('VIDEO') ? 'video' : 'image'}
                 src={item.media.url || ''}
-                className="w-full h-auto min-h-full"
+                className="w-full"
                 mediaClassName="w-full h-auto block"
+                maxHeightClassName=""
+                maxWidthClassName=""
+                allowScroll={false}
                 controls={false}
               />
             </div>
@@ -139,21 +145,21 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               {/* Brand + title */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="size-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-lg font-bold">
+                  <div className="size-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-lg font-bold text-white">
                     {brandLabel.charAt(0)}
                   </div>
                   <div>
-                    <p className="font-semibold text-sm">{brandLabel}</p>
-                    {item.username && <p className="text-xs text-white/60">@{item.username}</p>}
+                    <p className="font-semibold text-sm text-slate-900 dark:text-white">{brandLabel}</p>
+                    {item.username && <p className="text-xs text-slate-500 dark:text-white/50">@{item.username}</p>}
                   </div>
                 </div>
-                <button className="text-xs px-3 py-1 rounded-full bg-white/10 border border-white/15 hover:bg-white/15 transition">Follow</button>
+                <button className="text-[11px] px-3 py-1 rounded-full bg-purple-600 text-white font-medium hover:bg-purple-700 transition">Follow</button>
               </div>
 
               <div>
-                <h1 className="text-xl font-semibold leading-tight mb-1">{item.collectionTitle}</h1>
+                <h1 className="text-lg font-bold leading-tight mb-0.5 text-slate-900 dark:text-white">{item.collectionTitle}</h1>
                 {item.collectionDescription && (
-                  <p className="text-[13px] text-slate-600 dark:text-white/70 leading-relaxed">{item.collectionDescription}</p>
+                  <p className="text-[12px] text-slate-500 dark:text-white/60 leading-relaxed">{item.collectionDescription}</p>
                 )}
               </div>
 
@@ -169,17 +175,17 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               ) : null}
 
               {/* Price */}
-              <div className="p-3 rounded-lg bg-slate-100 border border-slate-200 dark:bg-white/5 dark:border-white/10">
-                <p className="text-sm font-semibold">{saleBand || baseBand || 'Price on request'}</p>
-                {saleBand && baseBand && <p className="text-[11px] text-slate-500 dark:text-white/50 line-through">{baseBand}</p>}
+              <div className="py-2 px-3 rounded-lg bg-emerald-50 border border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-700/30 inline-block">
+                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{saleBand || baseBand || 'Price on request'}</p>
+                {saleBand && baseBand && <p className="text-[10px] text-emerald-600/70 dark:text-emerald-500/60 line-through">{baseBand}</p>}
               </div>
 
-              {/* Emoji action row */}
-              <div className="flex flex-wrap gap-2">
-                <button className="flex-1 min-w-[120px] rounded-lg px-3 py-2 bg-slate-100 border border-slate-200 text-xs font-semibold hover:bg-slate-200 transition dark:bg-white/10 dark:border-white/10 dark:hover:bg-white/15">🛒 Add to Cart</button>
-                <button className="rounded-lg px-3 py-2 bg-slate-100 border border-slate-200 text-xs font-semibold hover:bg-slate-200 transition dark:bg-white/10 dark:border-white/10 dark:hover:bg-white/15">💜 Save</button>
-                <button className="rounded-lg px-3 py-2 bg-slate-100 border border-slate-200 text-xs font-semibold hover:bg-slate-200 transition dark:bg-white/10 dark:border-white/10 dark:hover:bg-white/15">🔗 Share</button>
-                <button className="rounded-lg px-3 py-2 bg-slate-100 border border-slate-200 text-xs font-semibold hover:bg-slate-200 transition dark:bg-white/10 dark:border-white/10 dark:hover:bg-white/15">🏬 View in Store</button>
+              {/* Action buttons - compact with colors */}
+              <div className="flex flex-wrap gap-1.5">
+                <button className="rounded-md px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[11px] font-semibold hover:opacity-90 transition shadow-sm">🛒 Add to Cart</button>
+                <button className="rounded-md px-2.5 py-1.5 bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold hover:bg-rose-200 transition dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-700/40">💜 Save</button>
+                <button className="rounded-md px-2.5 py-1.5 bg-sky-100 text-sky-700 border border-sky-200 text-[11px] font-semibold hover:bg-sky-200 transition dark:bg-sky-900/30 dark:text-sky-400 dark:border-sky-700/40">🔗 Share</button>
+                <button className="rounded-md px-2.5 py-1.5 bg-amber-100 text-amber-700 border border-amber-200 text-[11px] font-semibold hover:bg-amber-200 transition dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700/40">🏬 Store</button>
               </div>
 
               {/* Comments */}
@@ -193,25 +199,52 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                 showComposer={false}
               />
 
-              {/* Comment input with send emoji */}
-              <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 dark:bg-white/10 dark:border-white/10 sticky bottom-0">
-                <CommentInput
-                  value={commentText}
-                  onChange={setCommentText}
-                  onSubmit={handleCommentSubmit}
-                  disabled={postingComment}
-                  busy={postingComment}
-                  placeholder="Share your thoughts..."
-                  className="!bg-transparent !border-none !p-0 flex-1 !text-sm"
-                />
-                <button
-                  onClick={handleCommentSubmit}
-                  disabled={postingComment || !commentText.trim()}
-                  className="text-lg disabled:opacity-40"
-                  aria-label="Send"
-                >
-                  📨
-                </button>
+              {/* Comment input with emoji picker */}
+              <div className="relative sticky bottom-0">
+                <div className="flex items-center gap-2 rounded-xl px-3 py-2 bg-white border border-slate-200 dark:bg-transparent dark:border-white/15">
+                  <input
+                    type="text"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleCommentSubmit()}
+                    disabled={postingComment}
+                    placeholder="Share your thoughts..."
+                    className="flex-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40"
+                  />
+                  <button
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    className="p-1 text-slate-400 hover:text-purple-600 dark:text-white/40 dark:hover:text-purple-400 transition"
+                    aria-label="Emoji"
+                    type="button"
+                  >
+                    <Smile size={18} />
+                  </button>
+                  <button
+                    onClick={handleCommentSubmit}
+                    disabled={postingComment || !commentText.trim()}
+                    className="p-1.5 rounded-full bg-purple-600 text-white disabled:opacity-40 hover:bg-purple-700 transition"
+                    aria-label="Send"
+                  >
+                    <Send size={14} />
+                  </button>
+                </div>
+                {/* Emoji Picker */}
+                {showEmojiPicker && (
+                  <div className="absolute bottom-full right-0 mb-2 z-50">
+                    <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
+                    <div className="relative z-50 rounded-xl overflow-hidden shadow-2xl border border-white/10">
+                      <EmojiPicker
+                        onEmojiClick={onEmojiClick}
+                        theme={Theme.DARK}
+                        height={320}
+                        width={280}
+                        searchDisabled
+                        skinTonesDisabled
+                        previewConfig={{ showPreview: false }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

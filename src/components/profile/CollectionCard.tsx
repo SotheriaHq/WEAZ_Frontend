@@ -125,7 +125,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   return (
     <>
     <div 
-      className="relative group w-full overflow-hidden cursor-pointer shadow-md transition-transform duration-200 hover:scale-[1.02]"
+      className="relative group w-full overflow-hidden cursor-pointer shadow-md transition-transform duration-200 hover:scale-[1.02] rounded-xl"
       onClick={isPublishing ? undefined : onClick}
     >
       {/* Background Media */}

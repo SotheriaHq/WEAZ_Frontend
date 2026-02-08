@@ -207,7 +207,7 @@ const ProfilePage: React.FC = () => {
           status: 'publishing',
           startedAt,
           attempts: 0,
-          message: navState.publishingTitle ? `Publishing "${navState.publishingTitle}"` : 'Publishing your collection',
+          message: navState.publishingTitle ? `Publishing "${navState.publishingTitle}"` : 'Publishing your design',
         },
       }));
       // Clear state so refresh/back does not re-run
@@ -614,6 +614,7 @@ const ProfilePage: React.FC = () => {
   }, [isVisitorView, visitorProfile?.isStoreOpen, storeStatus?.isStoreOpen]);
 
   const shopBrandId = routeBrandId ?? user?.id ?? '';
+  
   const ownerHasStoreProfile = useMemo(() => {
     if (!isOwner) return undefined;
     if (storeStatusLoading) return undefined;
@@ -697,7 +698,7 @@ const ProfilePage: React.FC = () => {
         delete next[collectionId];
         return next;
       });
-      toast.success('Collection is live');
+      toast.success('Design is live');
     } catch (error) {
       console.error('Publish status check failed', error);
       setPublishingStates((prev) => ({
@@ -755,7 +756,7 @@ const ProfilePage: React.FC = () => {
               status: tookTooLong ? 'failed' : 'publishing',
               message: tookTooLong
                 ? 'Publishing is taking longer than usual. Retry to check again.'
-                : 'Still processing your collection...'
+                : 'Still processing your design...'
             },
           }));
         }
@@ -1132,7 +1133,7 @@ const ProfilePage: React.FC = () => {
                                         </svg>
                                       </div>
                                       <p className="text-sm text-gray-700 dark:text-gray-300">
-                                        {hasPending ? '✓ Access request pending for other collections' : hasRevoked ? 'Some requests were declined (wait 72h to re-request)' : 'Request access to view all private collections'}
+                                        {hasPending ? '✓ Access request pending for other designs' : hasRevoked ? 'Some requests were declined (wait 72h to re-request)' : 'Request access to view all private designs'}
                                       </p>
                                     </div>
                                   </div>
@@ -1161,10 +1162,10 @@ const ProfilePage: React.FC = () => {
                                   {/* Title & Message */}
                                   <div className="space-y-2">
                                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                      Private Collections
+                                      Private Designs
                                     </h2>
                                     <p className="text-sm text-gray-600 dark:text-gray-300">
-                                      You do not have permission to view private collections from this brand. Request access to view exclusive drops and content.
+                                      You do not have permission to view private designs from this brand. Request access to view exclusive drops and content.
                                     </p>
                                   </div>
 
@@ -1173,7 +1174,7 @@ const ProfilePage: React.FC = () => {
                                     <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                     </svg>
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{privateStates.length} private collection{privateStates.length !== 1 ? 's' : ''}</span>
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{privateStates.length} private design{privateStates.length !== 1 ? 's' : ''}</span>
                                   </div>
 
                                   {/* Request State */}
@@ -1209,7 +1210,7 @@ const ProfilePage: React.FC = () => {
                                   </div>
 
                                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    One request gives you access to all private collections from this brand
+                                    One request gives you access to all private designs from this brand
                                   </p>
                                 </div>
                               </div>
@@ -1225,8 +1226,8 @@ const ProfilePage: React.FC = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                               </svg>
                             </div>
-                            <p className="text-gray-600 dark:text-gray-400 font-medium">No private collections available</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">This brand hasn't created any private collections yet</p>
+                            <p className="text-gray-600 dark:text-gray-400 font-medium">No private designs available</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">This brand hasn't created any private designs yet</p>
                           </div>
                         );
                       })()
@@ -1235,7 +1236,7 @@ const ProfilePage: React.FC = () => {
                         <div className="relative h-[60vh] min-h-[400px] w-full rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800">
                           <ComingSoon
                             title="Connection Issue"
-                            description="We couldn't connect to the server to load your collections. Please check your internet connection."
+                            description="We couldn't connect to the server to load your designs. Please check your internet connection."
                             emoji="🔌"
                             showNotify={false}
                             backPath="#"
@@ -1268,13 +1269,13 @@ const ProfilePage: React.FC = () => {
                       ) : (
                         isOwner ? (
                           <EmptyState
-                            title={visibilityFilter === 'Drafts' ? "No drafts" : "No collections yet"}
-                            description={visibilityFilter === 'Drafts' ? "You don't have any unfinished collections." : "Create a collection to save and curate posts."}
+                            title={visibilityFilter === 'Drafts' ? "No drafts" : "No designs yet"}
+                            description={visibilityFilter === 'Drafts' ? "You don't have any unfinished designs." : "Create a design to showcase your work."}
                             // Removed redundant CTA button as requested
                           />
                         ) : (
                           <div className="text-center text-gray-500">
-                            No collections available.
+                            No designs available.
                           </div>
                         )
                       )
@@ -1340,7 +1341,7 @@ const ProfilePage: React.FC = () => {
       <ConfirmDialog
         open={Boolean(pendingAccessConfirm)}
         title="Request Private Access"
-        message="Request access to this private collection? If the brand rejects your request, you must wait 72 hours before trying again."
+        message="Request access to this private design? If the brand rejects your request, you must wait 72 hours before trying again."
         confirmText="Request Access"
         cancelText="Cancel"
         onCancel={() => setPendingAccessConfirm(null)}
@@ -1377,10 +1378,10 @@ const ProfilePage: React.FC = () => {
       {/* Confirm Delete Collection Dialog */}
       <ConfirmDialog
         open={Boolean(collectionToDelete)}
-        title={drafts.some(d => d.id === collectionToDelete) ? "Delete Draft" : "Delete Collection"}
+        title={drafts.some(d => d.id === collectionToDelete) ? "Delete Draft" : "Delete Design"}
         message={drafts.some(d => d.id === collectionToDelete) 
           ? "Are you sure you want to discard this draft? This action cannot be undone." 
-          : "Are you sure you want to delete this collection? This action cannot be undone."}
+          : "Are you sure you want to delete this design? This action cannot be undone."}
         confirmText="Delete"
         cancelText="Cancel"
         isDestructive
@@ -1393,7 +1394,7 @@ const ProfilePage: React.FC = () => {
           try {
             const success = await brandApi.deleteCollection(id);
             if (success) {
-              toast.success(isDraft ? 'Draft discarded' : 'Collection deleted');
+              toast.success(isDraft ? 'Draft discarded' : 'Design deleted');
               if (isDraft) {
                 // Refresh drafts list
                 setDraftsLoading(true);
@@ -1406,7 +1407,7 @@ const ProfilePage: React.FC = () => {
                 await fetchCollections(user.id);
               }
             } else {
-              toast.error(isDraft ? 'Failed to discard draft' : 'Failed to delete collection');
+              toast.error(isDraft ? 'Failed to discard draft' : 'Failed to delete design');
             }
           } catch (error) {
             console.error('Error deleting collection:', error);

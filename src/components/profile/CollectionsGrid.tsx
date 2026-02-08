@@ -30,7 +30,7 @@ const CollectionsGrid: React.FC<CollectionsGridProps> = ({
   };
 
   if (!collections || collections.length === 0) {
-    return <div className="text-center text-gray-500">No collections yet</div>;
+    return <div className="text-center text-gray-500">No designs yet</div>;
   }
 
   return (

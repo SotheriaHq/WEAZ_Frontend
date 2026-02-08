@@ -3,7 +3,9 @@ import {
   ArrowLeft, 
   ArrowUp,
   ArrowDown,
-  ChevronDown, 
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Plus, 
   CheckCircle, 
   Video, 
@@ -25,6 +27,9 @@ import Tag from '@/components/ui/Tag';
 import { useConfirm } from '@/components/ui/useConfirm';
 import { DiscardChangesModal } from '@/components/studio/store/modals';
 import { normalizePrimary, reorderItems, setPrimary, validateMedia } from './mediaUtils';
+import { getTagColor } from '@/utils/tagColors';
+import { PriceChangePreviewModal } from '@/components/collections/PriceChangePreviewModal';
+import { getProductPriceChangePreview } from '@/api/StoreApi';
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -171,46 +176,18 @@ const EditProduct: React.FC = () => {
   );
 
   const shippingRegionOptions = useMemo(() => {
-    const all = [
-      { value: 'NG', label: 'Nigeria', setupKey: 'nigeria' },
-      { value: 'GH', label: 'Ghana', setupKey: 'ghana' },
-      { value: 'KE', label: 'Kenya', setupKey: 'kenya' },
-      { value: 'ZA', label: 'South Africa', setupKey: 'south-africa' },
-      { value: 'RW', label: 'Rwanda', setupKey: 'rwanda' },
-      { value: 'EG', label: 'Egypt', setupKey: 'egypt' },
-      { value: 'GB', label: 'United Kingdom', setupKey: 'uk' },
-      { value: 'US', label: 'United States', setupKey: 'us' },
-      { value: 'INTL', label: 'International', setupKey: 'international' },
+    // Return all supported shipping regions without filtering
+    return [
+      { value: 'NG', label: 'Nigeria' },
+      { value: 'GH', label: 'Ghana' },
+      { value: 'KE', label: 'Kenya' },
+      { value: 'ZA', label: 'South Africa' },
+      { value: 'RW', label: 'Rwanda' },
+      { value: 'EG', label: 'Egypt' },
+      { value: 'GB', label: 'United Kingdom' },
+      { value: 'US', label: 'United States' },
+      { value: 'INTL', label: 'International' },
     ];
-
-    if (typeof window === 'undefined') return all.slice(0, 1);
-
-    const raw = localStorage.getItem('store-progress') ?? localStorage.getItem('store-draft');
-    if (!raw) return all.slice(0, 1);
-
-    try {
-      const parsed = JSON.parse(raw) as { shippingRegions?: unknown };
-      const rawRegions = Array.isArray((parsed as any).shippingRegions)
-        ? ((parsed as any).shippingRegions as unknown[])
-        : [];
-
-      const regions = rawRegions
-        .map((r) => String(r ?? '').trim().toLowerCase())
-        .filter(Boolean);
-
-      if (regions.includes('international') || regions.includes('intl') || regions.includes('int')) return all;
-
-      // Support either setup keys (nigeria) or codes (NG) or labels (Nigeria)
-      const filtered = all.filter((opt) => {
-        const code = opt.value.toLowerCase();
-        const setup = opt.setupKey.toLowerCase();
-        const label = opt.label.toLowerCase();
-        return regions.includes(setup) || regions.includes(code) || regions.includes(label);
-      });
-      return filtered.length ? filtered : all.slice(0, 1);
-    } catch {
-      return all.slice(0, 1);
-    }
   }, []);
 
   // State
@@ -231,6 +208,18 @@ const EditProduct: React.FC = () => {
   const [pendingMediaFiles, setPendingMediaFiles] = useState<
     Array<{ tempId: string; file: File; previewUrl: string; isPrimary: boolean }>
   >([]);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+
+  // Price change preview state
+  const [originalPrice, setOriginalPrice] = useState<number | null>(null);
+  const [showPricePreview, setShowPricePreview] = useState(false);
+  const [pricePreviewData, setPricePreviewData] = useState<{
+    affectedCollections: Array<{ collectionId: string; collectionName: string; isDraft: boolean; oldPriceRange: { min: number; max: number }; newPriceRange: { min: number; max: number } }>;
+    productName: string;
+    oldPrice: number;
+    newPrice: number;
+  } | null>(null);
+  const [pendingSaveDraft, setPendingSaveDraft] = useState(false);
 
   const maxMediaCount = 4;
   const canAddMoreMedia = mediaUrls.length < maxMediaCount;
@@ -314,10 +303,13 @@ const EditProduct: React.FC = () => {
         const product = await productApi.getProduct(productId, includeDeleted ? { includeDeleted: true } : undefined);
         if (!product || !mounted) return;
 
+        // Track original price for change detection
+        setOriginalPrice(product.price || 0);
+
         setForm({
           title: product.title || product.name || '',
           description: product.description || '',
-          categoryId: (product as any).collectionId || product.categoryId || '',
+          categoryId: (product as any).collectionId || (product as any).collectionIds?.[0] || '',
           tags: product.tags || [],
           price: product.price || 0,
           compareAtPrice: (product as any).salePrice || product.compareAtPrice || 0,
@@ -351,10 +343,24 @@ const EditProduct: React.FC = () => {
               })(),
         });
 
-        // Set media for display
+        // Set media for display - resolve signed URLs
         if (product.media?.length) {
-          const mapped = product.media.map((m) => ({ id: m.id, url: m.url, isPrimary: m.isPrimary }));
-          setMediaUrls(normalizePrimary(mapped));
+          const mediaWithSignedUrls = await Promise.all(
+            product.media.map(async (m) => {
+              let signedUrl = m.url;
+              // Check if URL needs signing (S3 reference without query params)
+              if (m.id && m.url && !m.url.includes('?') && (m.url.includes('s3') || !m.url.startsWith('http'))) {
+                try {
+                  const signed = await brandApi.getSignedFileUrl(m.id);
+                  if (signed) signedUrl = signed;
+                } catch (e) {
+                  console.warn('Failed to sign URL for media', m.id, e);
+                }
+              }
+              return { id: m.id, url: signedUrl, isPrimary: m.isPrimary };
+            })
+          );
+          setMediaUrls(normalizePrimary(mediaWithSignedUrls));
         } else if (product.images?.length) {
           const mapped = product.images.map((url, i) => ({
             id: `img-${i}`,
@@ -509,6 +515,27 @@ const EditProduct: React.FC = () => {
       return;
     }
 
+    // Check if price changed in edit mode - show preview before saving
+    if (isEditMode && productId && originalPrice !== null && form.price !== originalPrice && !showPricePreview) {
+      try {
+        const preview = await getProductPriceChangePreview(productId, form.price);
+        if (preview.affectedCollections.length > 0) {
+          setPricePreviewData({
+            affectedCollections: preview.affectedCollections,
+            productName: form.title || 'This product',
+            oldPrice: originalPrice,
+            newPrice: form.price,
+          });
+          setPendingSaveDraft(asDraft);
+          setShowPricePreview(true);
+          return; // Wait for user confirmation
+        }
+      } catch (e) {
+        // If preview fails, proceed with save anyway
+        console.warn('Failed to load price change preview', e);
+      }
+    }
+
     setSaving(true);
     try {
       const ensuredSku = form.sku?.trim() || buildBaseSku({ brandInitials: brandInitialsFromProfile(user), title: form.title });
@@ -516,7 +543,7 @@ const EditProduct: React.FC = () => {
       const payload: ProductCreateDto = {
         title: asDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
         description: form.description.trim() || undefined,
-        categoryId: form.categoryId || undefined,
+        collectionId: form.categoryId || undefined,
         tags: form.tags,
         price: asDraft ? (form.price > 0 ? form.price : 0) : form.price,
         compareAtPrice: form.onSale && form.compareAtPrice > 0 ? form.compareAtPrice : undefined,
@@ -585,7 +612,63 @@ const EditProduct: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [form, hasDuplicateVariants, isEditMode, maxMediaCount, mediaUrls, navigate, pendingMediaFiles, productId, variantTotalStock]);
+  }, [form, hasDuplicateVariants, isEditMode, maxMediaCount, mediaUrls, navigate, pendingMediaFiles, productId, variantTotalStock, originalPrice, showPricePreview]);
+
+  const handlePriceChangeConfirm = useCallback(async () => {
+    setShowPricePreview(false);
+    // Continue with save
+    setSaving(true);
+    try {
+      const ensuredSku = form.sku?.trim() || buildBaseSku({ brandInitials: brandInitialsFromProfile(user), title: form.title });
+
+      const payload: ProductCreateDto = {
+        title: pendingSaveDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
+        description: form.description.trim() || undefined,
+        collectionId: form.categoryId || undefined,
+        tags: form.tags,
+        price: pendingSaveDraft ? (form.price > 0 ? form.price : 0) : form.price,
+        compareAtPrice: form.onSale && form.compareAtPrice > 0 ? form.compareAtPrice : undefined,
+        costPerItem: form.costPerItem || undefined,
+        currency: form.currency,
+        sku: ensuredSku,
+        weight: form.weight || undefined,
+        weightUnit: form.weightUnit,
+        materials: form.materials || undefined,
+        careInstructions: form.careInstructions || undefined,
+        returnsEligible: form.returnsEligible,
+        sustainabilityClaim: form.sustainabilityClaim,
+        trackInventory: form.trackInventory,
+        allowBackorders: form.allowBackorders,
+        stock: form.variants.length > 0 ? variantTotalStock : form.stock,
+        lowStockThreshold: form.lowStockThreshold,
+        status: pendingSaveDraft ? 'DRAFT' : form.status,
+        isPhysicalProduct: form.isPhysicalProduct,
+        customsRegion: form.customsRegion || undefined,
+        mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
+        variants: form.variants.length > 0
+          ? form.variants.map((v, idx) => ({
+              ...v,
+              size: v.size?.trim() || undefined,
+              color: v.color?.trim() || undefined,
+              sku: (v.sku?.trim() || buildVariantSku(ensuredSku, v, idx)).trim() || undefined,
+              price: typeof v.price === 'number' && v.price > 0 ? v.price : undefined,
+              stock: Number.isFinite(v.stock) ? v.stock : 0,
+            }))
+          : undefined,
+      };
+
+      await productApi.updateProduct(productId!, payload);
+      toast.success('Product updated successfully');
+      setOriginalPrice(form.price); // Update tracked price
+      setHasChanges(false);
+      navigate('/studio/store');
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Failed to save product';
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  }, [form, user, pendingSaveDraft, variantTotalStock, productId, navigate]);
 
   // Auto-generate SKU (product + variants). Users shouldn't type SKUs manually.
   useEffect(() => {
@@ -612,6 +695,14 @@ const EditProduct: React.FC = () => {
       setForm((prev) => ({ ...prev, variants: nextVariants }));
     }
   }, [form.sku, form.variants]);
+
+  const normalizePending = useCallback(
+    (items: Array<{ tempId: string; file: File; previewUrl: string; isPrimary: boolean }>) => {
+      const normalized = normalizePrimary(items.map((item) => ({ ...item, id: item.tempId })));
+      return normalized.map(({ id, ...rest }) => rest);
+    },
+    [],
+  );
 
   const pushMediaPreviews = useCallback(
     (files: File[], { makePrimary }: { makePrimary: boolean }) => {
@@ -698,14 +789,6 @@ const EditProduct: React.FC = () => {
     const makePrimary = !hasPrimaryMedia;
     pushMediaPreviews(files, { makePrimary });
   };
-
-  const normalizePending = useCallback(
-    (items: Array<{ tempId: string; file: File; previewUrl: string; isPrimary: boolean }>) => {
-      const normalized = normalizePrimary(items.map((item) => ({ ...item, id: item.tempId })));
-      return normalized.map(({ id, ...rest }) => rest);
-    },
-    [],
-  );
 
   const handleSetCover = useCallback(
     async (mediaId: string) => {
@@ -896,8 +979,8 @@ const EditProduct: React.FC = () => {
         
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
-          {/* LEFT COLUMN: Media (30% approx -> 4 cols) */}
-          <div className="lg:col-span-4 space-y-6">
+          {/* LEFT COLUMN: Media (42% approx -> 5 cols) */}
+          <div className="lg:col-span-5 space-y-6">
               
             {/* Media Gallery */}
             <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-5">
@@ -916,86 +999,122 @@ const EditProduct: React.FC = () => {
                 onChange={handleMediaFilesSelected}
               />
 
-              <div className="grid grid-cols-2 gap-3">
-                {mediaUrls.map((media, index) => (
-                  <div
-                    key={media.id}
-                    className="relative group rounded-lg bg-gray-100/40 dark:bg-white/5 aspect-square overflow-hidden"
-                  >
-                    <MediaRenderer
-                      kind="image"
-                      src={media.url}
-                      alt="Product"
-                      fit="contain"
-                      maxHeightClassName="max-h-full"
-                      maxWidthClassName="max-w-full"
-                      className="w-full h-full"
-                      mediaClassName="w-full h-full object-contain"
-                    />
+              {/* Carousel for media (shows one at a time with navigation) */}
+              {mediaUrls.length > 0 ? (
+                <div className="relative">
+                  {/* Main carousel view */}
+                  <div className="relative rounded-xl bg-gray-100/40 dark:bg-white/5 aspect-[4/5] overflow-hidden">
+                    {mediaUrls[carouselIndex] && (
+                      <>
+                        <MediaRenderer
+                          kind="image"
+                          src={mediaUrls[carouselIndex].url}
+                          alt="Product"
+                          fit="contain"
+                          maxHeightClassName="max-h-full"
+                          maxWidthClassName="max-w-full"
+                          className="w-full h-full"
+                          mediaClassName="w-full h-full object-contain"
+                        />
 
-                    {media.isPrimary && (
-                      <div className="absolute top-2 left-2 px-2 py-1 bg-black/70 backdrop-blur-sm rounded text-[10px] font-semibold text-white">
-                        Cover
-                      </div>
-                    )}
+                        {mediaUrls[carouselIndex].isPrimary && (
+                          <div className="absolute top-2 left-2 px-2 py-1 bg-black/70 backdrop-blur-sm rounded text-[10px] font-semibold text-white">
+                            Cover
+                          </div>
+                        )}
 
-                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 px-2 py-2 bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleReorderMedia(index, Math.max(0, index - 1))}
-                          disabled={index === 0}
-                          className="p-1 rounded-md hover:bg-white/10 disabled:opacity-50"
-                          aria-label="Move image up"
-                        >
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleReorderMedia(index, Math.min(mediaUrls.length - 1, index + 1))}
-                          disabled={index === mediaUrls.length - 1}
-                          className="p-1 rounded-md hover:bg-white/10 disabled:opacity-50"
-                          aria-label="Move image down"
-                        >
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        {!media.isPrimary && (
+                        {/* Action buttons - Set cover + Delete only */}
+                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 px-3 py-3 bg-gradient-to-t from-black/80 to-transparent">
+                          {!mediaUrls[carouselIndex].isPrimary && (
+                            <button
+                              type="button"
+                              onClick={() => handleSetCover(mediaUrls[carouselIndex].id)}
+                              className="px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white text-sm font-medium flex items-center gap-1.5"
+                              title="Set this image as the product cover"
+                            >
+                              <span>⭐</span>
+                              <span>Set Cover</span>
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => handleSetCover(media.id)}
-                            className="p-1 rounded-md hover:bg-white/10"
-                            aria-label="Set as cover"
+                            onClick={() => {
+                              handleDeleteMedia(mediaUrls[carouselIndex].id);
+                              setCarouselIndex(Math.max(0, carouselIndex - 1));
+                            }}
+                            className="p-2 rounded-lg bg-red-500/80 backdrop-blur-sm hover:bg-red-600 text-white"
+                            title="Delete this image"
                           >
-                            <CheckCircle className="w-3.5 h-3.5" />
+                            <X className="w-4 h-4" />
                           </button>
-                        )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Navigation arrows */}
+                    {mediaUrls.length > 1 && (
+                      <>
                         <button
                           type="button"
-                          onClick={() => handleDeleteMedia(media.id)}
-                          className="p-1 rounded-md hover:bg-white/10"
-                          aria-label="Delete image"
+                          onClick={() => setCarouselIndex(Math.max(0, carouselIndex - 1))}
+                          disabled={carouselIndex === 0}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                          aria-label="Previous image"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <ChevronLeft className="w-5 h-5" />
                         </button>
-                      </div>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => setCarouselIndex(Math.min(mediaUrls.length - 1, carouselIndex + 1))}
+                          disabled={carouselIndex === mediaUrls.length - 1}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                          aria-label="Next image"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
                   </div>
-                ))}
 
-                {canAddMoreMedia && (
-                  <button
-                    type="button"
-                    onClick={() => mediaFileInputRef.current?.click()}
-                    className="aspect-square rounded-lg border border-dashed border-gray-300 dark:border-white/20 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:border-purple-400/60 hover:bg-purple-50 dark:hover:bg-white/5 transition-all"
-                  >
-                    <Plus className="w-6 h-6 mb-2" />
-                    <span className="text-xs font-medium">Add image</span>
-                  </button>
-                )}
-              </div>
+                  {/* Dot indicators + add button */}
+                  <div className="flex items-center justify-center gap-2 mt-3">
+                    {mediaUrls.map((_, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setCarouselIndex(idx)}
+                        className={`w-2.5 h-2.5 rounded-full transition-all ${
+                          idx === carouselIndex 
+                            ? 'bg-purple-600 scale-110' 
+                            : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400'
+                        }`}
+                        aria-label={`Go to image ${idx + 1}`}
+                      />
+                    ))}
+                    {canAddMoreMedia && (
+                      <button
+                        type="button"
+                        onClick={() => mediaFileInputRef.current?.click()}
+                        className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-400 hover:border-purple-400 hover:text-purple-500 transition-all"
+                        aria-label="Add more images"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Empty state - Add first image */
+                <button
+                  type="button"
+                  onClick={() => mediaFileInputRef.current?.click()}
+                  className="aspect-[4/5] rounded-xl border-2 border-dashed border-gray-300 dark:border-white/20 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:border-purple-400/60 hover:bg-purple-50 dark:hover:bg-white/5 transition-all"
+                >
+                  <Plus className="w-8 h-8 mb-2" />
+                  <span className="text-sm font-medium">Add images</span>
+                  <span className="text-xs text-gray-400 mt-1">Up to 4 images</span>
+                </button>
+              )}
 
               {!hasPrimaryMedia && mediaUrls.length > 0 && (
                 <p className="mt-3 text-xs text-orange-500">Select a cover image before saving.</p>
@@ -1022,8 +1141,8 @@ const EditProduct: React.FC = () => {
 
           </div>
 
-          {/* RIGHT COLUMN: Details (70% approx -> 8 cols) */}
-          <div className="lg:col-span-8 space-y-6">
+          {/* RIGHT COLUMN: Details (58% approx -> 7 cols) */}
+          <div className="lg:col-span-7 space-y-6">
               
             {/* Basic Info */}
             <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-6">
@@ -1063,7 +1182,10 @@ const EditProduct: React.FC = () => {
                     {!categoriesLoading && categories.length === 0 ? (
                       <button
                         type="button"
-                        onClick={() => navigate('/profile/collections/create')}
+                        onClick={() => {
+                          const suffix = productId ? `?productId=${encodeURIComponent(productId)}` : '';
+                          navigate(`/studio/store/collections/new${suffix}`);
+                        }}
                         className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 transition-colors"
                       >
                         Create collection
@@ -1091,11 +1213,11 @@ const EditProduct: React.FC = () => {
                     </div>
                     {form.tags.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {form.tags.map((tag) => (
+                        {form.tags.map((tag, index) => (
                           <Tag
                             key={tag}
                             label={tag}
-                            color="purple"
+                            color={getTagColor(tag, index)}
                             size="xs"
                             rightIcon={<X className="w-3 h-3 cursor-pointer" onClick={() => handleRemoveTag(tag)} />}
                             className="gap-1"
@@ -1501,6 +1623,20 @@ const EditProduct: React.FC = () => {
       </footer>
 
       {ConfirmModal}
+
+      {/* Price Change Preview Modal */}
+      {showPricePreview && pricePreviewData && (
+        <PriceChangePreviewModal
+          isOpen={showPricePreview}
+          productName={pricePreviewData.productName}
+          oldPrice={pricePreviewData.oldPrice}
+          newPrice={pricePreviewData.newPrice}
+          affectedCollections={pricePreviewData.affectedCollections}
+          onConfirm={handlePriceChangeConfirm}
+          onClose={() => setShowPricePreview(false)}
+          loading={saving}
+        />
+      )}
 
       {/* Discard Changes Modal - Premium styled */}
       <DiscardChangesModal

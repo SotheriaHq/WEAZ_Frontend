@@ -29,6 +29,7 @@ import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
 import CheckoutPage from './pages/checkout/CheckoutPage';
 import MyOrders from './pages/orders/MyOrders';
 import OrderDetail from './pages/orders/OrderDetail';
+import ProductDetailsPage from './pages/catalog/ProductDetailsPage';
 // Placeholder pages for features under development
 import {
   NotFound,
@@ -43,6 +44,7 @@ import ShopSetupWizardPage from './pages/studio/shop/ShopSetupWizardPage';
 import ShopSetupEssentialsPage from './pages/studio/shop/ShopSetupEssentialsPage';
 import StudioScaffold from './components/studio/StudioScaffold';
 import StoreManagement from './pages/studio/store/StoreManagement';
+import StoreCollectionCreate from './pages/studio/store/StoreCollectionCreate';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { setViewportWidth } from '@/features/uiSlice';
@@ -134,6 +136,16 @@ const router = createBrowserRouter([
           <RequireBrand>
             <StudioScaffold active="store" onSelect={() => {}}>
               <StoreManagement />
+            </StudioScaffold>
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/store/collections/new',
+        element: (
+          <RequireBrand>
+            <StudioScaffold active="store" onSelect={() => {}}>
+              <StoreCollectionCreate />
             </StudioScaffold>
           </RequireBrand>
         ),
@@ -248,9 +260,12 @@ const router = createBrowserRouter([
         element: <Navigate to="/studio/store" replace />,
       },
       {
-        // Standalone collection view page (redesigned)
         path: '/collections/:id',
         element: <CollectionViewRedesign />,
+      },
+      {
+        path: '/products/:id',
+        element: <ProductDetailsPage />,
       },
       // Catch-all 404 route - must be last
       {

@@ -1,4 +1,3 @@
-import MediaRenderer from '../media/MediaRenderer';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
 
@@ -182,7 +181,7 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
     <div className={`w-full ${className}`}>
       <div
         ref={containerRef}
-        className="relative w-full h-[500px] sm:h-[600px] lg:h-[700px] flex items-center justify-center"
+        className="relative w-full flex items-center justify-center"
         style={{ perspective: '1200px' }}
         onClick={undefined}
       >
@@ -212,27 +211,23 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
         {items.map((item, index) => (
           <div
             key={item.id}
-            className="absolute w-full max-w-[95%] sm:max-w-[85%] lg:max-w-[75%] max-h-[70vh] rounded-2xl shadow-2xl"
-            style={getItemStyle(index)}
+            className={`w-full max-w-[80%] sm:max-w-[70%] lg:max-w-[55%] rounded-2xl shadow-2xl overflow-hidden mx-auto ${index === activeIndex ? 'relative' : 'absolute opacity-0 pointer-events-none'}`}
+            style={index === activeIndex ? {} : getItemStyle(index)}
           >
-            <div className="relative w-full flex items-center justify-center overflow-y-auto">
+            <div className="relative w-full">
               {item.type === 'image' ? (
-                <MediaRenderer
-                  kind="image"
+                <img
                   src={item.url}
                   alt={item.caption ?? 'Collection media'}
-                  maxHeightClassName="max-h-[70vh]"
-                  maxWidthClassName="max-w-full"
+                  className="w-full h-auto block rounded-2xl"
                 />
               ) : (
-                <MediaRenderer
-                  kind="video"
+                <video
                   src={item.url}
                   controls
                   muted
-                  maxHeightClassName="max-h-[70vh]"
-                  maxWidthClassName="max-w-full"
-                  videoRef={(el) => {
+                  className="w-full h-auto block rounded-2xl"
+                  ref={(el) => {
                     if (el) videoRefs.current.set(item.id, el);
                     else videoRefs.current.delete(item.id);
                   }}

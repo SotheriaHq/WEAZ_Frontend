@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Share2, Heart, MessageCircle, Eye, 
@@ -9,13 +9,14 @@ import {
   Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { RootState } from '@/store';
+import type { AppDispatch, RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
 import AccessApi, { type AccessState } from '@/api/AccessApi';
 import LikeButton from '@/components/ui/LikeButton';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UnifiedCollectionComments from '@/components/collections/UnifiedCollectionComments';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { addToCart, openCartDrawer } from '@/features/cartSlice';
 
 // ============================================
 // TYPES
@@ -66,6 +67,23 @@ interface CollectionDetail {
     comments?: number;
     views?: number;
   };
+  products?: any[];
+}
+
+interface ProductItem {
+  id: string;
+  name: string;
+  price: number;
+  salePrice?: number | null;
+  saleStartAt?: string | null;
+  saleEndAt?: string | null;
+  images: string[];
+  thumbnail?: string | null;
+  sizes: string[];
+  colors: string[];
+  hasVariants: boolean;
+  totalStock: number;
+  orderIndex?: number;
 }
 
 interface RelatedCollection {
@@ -433,6 +451,122 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
 };
 
 // ============================================
+// PRODUCT GRID SECTION (MEDIA-LESS COLLECTIONS)
+// ============================================
+interface ProductGridProps {
+  products: ProductItem[];
+  isOwner?: boolean;
+  addingAll?: boolean;
+  onAddAll?: () => void;
+  onAddToCart: (productId: string) => void;
+  onViewProduct: (productId: string) => void;
+}
+
+const ProductGrid: React.FC<ProductGridProps> = ({
+  products,
+  isOwner,
+  addingAll,
+  onAddAll,
+  onAddToCart,
+  onViewProduct,
+}) => {
+  return (
+    <div className="flex-1">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Products in this collection</h3>
+          <p className="text-sm text-white/60">{products.length} item{products.length === 1 ? '' : 's'}</p>
+        </div>
+        {!isOwner && onAddAll ? (
+          <button
+            type="button"
+            onClick={onAddAll}
+            disabled={addingAll}
+            className="px-4 py-2 rounded-full text-xs font-semibold bg-white/10 border border-white/20 hover:bg-white/20 transition"
+          >
+            {addingAll ? 'Adding…' : 'Add all to cart'}
+          </button>
+        ) : null}
+      </div>
+
+      {products.length === 0 ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-white/60">
+          This collection doesn’t have any products yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+          {products.map((product) => {
+            const now = Date.now();
+            const onSale =
+              product.salePrice != null &&
+              (!product.saleStartAt || new Date(product.saleStartAt).getTime() <= now) &&
+              (!product.saleEndAt || new Date(product.saleEndAt).getTime() >= now);
+            const price = formatPrice(product.price);
+            const salePrice = onSale ? formatPrice(product.salePrice ?? null) : null;
+            const image = product.thumbnail || product.images[0];
+            const canQuickAdd =
+              product.totalStock > 0 &&
+              product.sizes.length === 0 &&
+              product.colors.length === 0 &&
+              !product.hasVariants;
+
+            return (
+              <div key={product.id} className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => onViewProduct(product.id)}
+                  className="block w-full text-left"
+                >
+                  <div className="aspect-square bg-white/5 flex items-center justify-center">
+                    {image ? (
+                      <img src={image} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <span className="text-xs text-white/40">No image</span>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <div className="text-sm font-semibold text-white line-clamp-1">{product.name}</div>
+                    <div className="mt-2 text-sm text-white/80">
+                      {salePrice ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-rose-400 font-semibold">{salePrice}</span>
+                          {price ? <span className="line-through text-white/40">{price}</span> : null}
+                        </div>
+                      ) : (
+                        <span>{price ?? 'Price unavailable'}</span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+                <div className="px-4 pb-4">
+                  {canQuickAdd ? (
+                    <button
+                      type="button"
+                      onClick={() => onAddToCart(product.id)}
+                      className="w-full rounded-xl bg-white text-black text-xs font-semibold py-2 hover:bg-white/90"
+                    >
+                      Add to cart
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onViewProduct(product.id)}
+                      className="w-full rounded-xl border border-white/20 text-xs font-semibold py-2 text-white/80 hover:text-white hover:border-white/40"
+                    >
+                      View options
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
 // COMMENTS PANEL
 // ============================================
 interface CommentsPanelProps {
@@ -443,7 +577,7 @@ interface CommentsPanelProps {
   ownerId?: string;
   highlightCommentId?: string | null;
   price?: { min?: number | null; max?: number | null; saleMin?: number | null; saleMax?: number | null; saleEndAt?: string | null };
-  onAddToCart: () => void;
+  onAddToCart?: () => void;
   onAddToWishlist: () => void;
   onShare: () => void;
   onContactBrand: () => void;
@@ -544,15 +678,17 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onAddToCart}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-shadow"
-            >
-              <ShoppingCart className="w-4 h-4" />
-              <span>Add to Cart</span>
-            </motion.button>
+            {onAddToCart ? (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={onAddToCart}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-shadow"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                <span>Add to Cart</span>
+              </motion.button>
+            ) : null}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -829,6 +965,8 @@ const CollectionViewRedesign: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const me = useSelector((s: RootState) => s.user.profile);
+  const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const dispatch = useDispatch<AppDispatch>();
 
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(false);
@@ -836,10 +974,12 @@ const CollectionViewRedesign: React.FC = () => {
   const [requestState, setRequestState] = useState<AccessState | null>(null);
   const [isRequesting, setIsRequesting] = useState(false);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [productItems, setProductItems] = useState<ProductItem[]>([]);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [coverUrl, setCoverUrl] = useState<string | undefined>();
   const [moreFromBrand, setMoreFromBrand] = useState<RelatedCollection[]>([]);
   const [youMightLike, setYouMightLike] = useState<RelatedCollection[]>([]);
+  const [addingAll, setAddingAll] = useState(false);
 
   const highlightCommentId = new URLSearchParams(window.location.search).get('commentId');
 
@@ -864,6 +1004,33 @@ const CollectionViewRedesign: React.FC = () => {
         
         if (d) {
           setDetail(d);
+
+          const products: ProductItem[] = (d.products ?? [])
+            .map((link: any): ProductItem => {
+              const p = link?.product ?? link ?? {};
+              return {
+                id: p.id ?? link?.productId,
+                name: p.name ?? p.title ?? 'Product',
+                price: Number(p.price ?? 0),
+                salePrice: p.salePrice != null ? Number(p.salePrice) : null,
+                saleStartAt: p.saleStartAt ?? null,
+                saleEndAt: p.saleEndAt ?? null,
+                images: Array.isArray(p.images) ? p.images : [],
+                thumbnail: p.thumbnail ?? null,
+                sizes: Array.isArray(p.sizes) ? p.sizes : [],
+                colors: Array.isArray(p.colors) ? p.colors : [],
+                hasVariants: Array.isArray(p.variants)
+                  ? p.variants.length > 0
+                  : Boolean((p as any)?._count?.variants),
+                totalStock: typeof p.totalStock === 'number' ? p.totalStock : 0,
+                orderIndex: link?.orderIndex ?? 0,
+              };
+            })
+            .filter((p: ProductItem) => Boolean(p.id))
+            .sort((a: ProductItem, b: ProductItem) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+          if (mounted) {
+            setProductItems(products);
+          }
           
           // Process media items
           const medias = (d.medias ?? []).map((m: any, idx: number) => {
@@ -903,10 +1070,16 @@ const CollectionViewRedesign: React.FC = () => {
             const coverMedia = resolved.find(m => m.id === d.coverMediaId) || resolved[0];
             if (coverMedia) {
               setCoverUrl(coverMedia.url);
+            } else if (products.length > 0) {
+              const coverProduct = products.find((p) => p.thumbnail || p.images[0]);
+              if (coverProduct) {
+                setCoverUrl(coverProduct.thumbnail || coverProduct.images[0]);
+              }
             }
           }
         } else {
           setLocked(true);
+          setProductItems([]);
         }
       } catch (e: any) {
         if (mounted) {
@@ -996,10 +1169,62 @@ const CollectionViewRedesign: React.FC = () => {
   };
 
   const handleAddToCart = () => {
-    if (!detail) return;
-    // TODO: Wire to actual cart API when products are supported
-    // For now collections aren't individual products - show placeholder toast
-    toast.success(`${detail.title} added to cart`);
+    void handleAddAllToCart();
+  };
+
+  const handleAddAllToCart = async () => {
+    if (!isAuth) {
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    const eligible = productItems.filter(
+      (p) =>
+        p.totalStock > 0 &&
+        p.sizes.length === 0 &&
+        p.colors.length === 0 &&
+        !p.hasVariants,
+    );
+    if (eligible.length === 0) {
+      toast.info('No products available for quick add');
+      return;
+    }
+    setAddingAll(true);
+    try {
+      const results = await Promise.all(
+        eligible.map((p) =>
+          dispatch(addToCart({ productId: p.id, quantity: 1 }))
+            .unwrap()
+            .then(() => true)
+            .catch(() => false),
+        ),
+      );
+      const successCount = results.filter(Boolean).length;
+      if (successCount > 0) {
+        dispatch(openCartDrawer());
+        toast.success(`Added ${successCount} item${successCount === 1 ? '' : 's'} to cart`);
+      }
+      if (successCount < eligible.length) {
+        toast.error('Some items could not be added to cart');
+      }
+    } finally {
+      setAddingAll(false);
+    }
+  };
+
+  const handleAddProductToCart = async (productId: string) => {
+    if (!isAuth) {
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    try {
+      await dispatch(addToCart({ productId, quantity: 1 })).unwrap();
+      dispatch(openCartDrawer());
+      toast.success('Added to cart');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to add to cart');
+    }
   };
 
   const handleAddToWishlist = () => {
@@ -1073,6 +1298,10 @@ const CollectionViewRedesign: React.FC = () => {
 
   const commentsCount = (detail.commentsCount ?? detail._count?.comments ?? 0) +
     (detail.medias?.reduce((sum: number, m: any) => sum + (m?.commentsCount || 0), 0) || 0);
+  const hasMedia = mediaItems.length > 0;
+  const hasProducts = productItems.length > 0;
+  const mediaCount = detail._count?.medias ?? mediaItems.length;
+  const itemCount = (mediaCount || 0) + productItems.length;
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -1084,7 +1313,7 @@ const CollectionViewRedesign: React.FC = () => {
         ownerAvatarFileId={detail.owner?.brand?.logoFileId}
         ownerName={detail.owner?.brand?.brandName}
         username={detail.owner?.username}
-        itemCount={detail._count?.medias || mediaItems.length}
+        itemCount={itemCount}
         visibility={detail.visibility}
         onBack={handleBack}
         onShare={handleShare}
@@ -1094,17 +1323,30 @@ const CollectionViewRedesign: React.FC = () => {
       <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-black to-gray-900">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col lg:flex-row gap-8">
-            {/* Media Gallery */}
-            {mediaItems.length > 0 && (
-              <MediaGallery
-                items={mediaItems}
-                currentIndex={currentMediaIndex}
-                onIndexChange={setCurrentMediaIndex}
-                coverMediaId={detail.coverMediaId}
-                isOwner={isOwner}
-                onSetCover={handleSetCover}
-              />
-            )}
+            <div className="flex-1 lg:w-2/3 flex flex-col gap-8">
+              {/* Media Gallery */}
+              {hasMedia && (
+                <MediaGallery
+                  items={mediaItems}
+                  currentIndex={currentMediaIndex}
+                  onIndexChange={setCurrentMediaIndex}
+                  coverMediaId={detail.coverMediaId}
+                  isOwner={isOwner}
+                  onSetCover={handleSetCover}
+                />
+              )}
+
+              {(hasProducts || !hasMedia) && (
+                <ProductGrid
+                  products={productItems}
+                  isOwner={isOwner}
+                  addingAll={addingAll}
+                  onAddAll={!isOwner && hasProducts ? handleAddAllToCart : undefined}
+                  onAddToCart={handleAddProductToCart}
+                  onViewProduct={(productId) => navigate(`/products/${productId}`)}
+                />
+              )}
+            </div>
 
             {/* Comments Panel */}
             <CommentsPanel
@@ -1121,7 +1363,7 @@ const CollectionViewRedesign: React.FC = () => {
                 saleMax: detail.saleMaxPrice,
                 saleEndAt: detail.saleEndAt,
               }}
-              onAddToCart={handleAddToCart}
+              onAddToCart={!isOwner && hasProducts ? handleAddToCart : undefined}
               onAddToWishlist={handleAddToWishlist}
               onShare={handleShare}
               onContactBrand={handleContactBrand}

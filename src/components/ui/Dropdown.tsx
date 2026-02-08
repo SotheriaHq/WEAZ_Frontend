@@ -185,7 +185,7 @@ export const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
           style={{ top: pos.top, left: pos.left, minWidth: pos.minWidth, maxHeight: 'min(60vh, 360px)' }}
           role="menu"
         >
-          <div className="flex flex-col divide-y divide-white/10 overflow-y-auto">
+          <div className="flex flex-col divide-y divide-white/10 overflow-y-auto max-h-[inherit]">
             {children}
           </div>
         </div>

@@ -410,7 +410,7 @@ const CreateCollectionInner: React.FC = () => {
           await Promise.all(toDelete.map((itemId) => brandApi.deleteCollectionItem(id, itemId)));
         }
 
-        toast.success('Collection updated');
+        toast.success('Design updated');
       } else {
         const response = await uploadCollection(
           files,
@@ -432,7 +432,7 @@ const CreateCollectionInner: React.FC = () => {
         if (newCollectionId && coverRemoteId) {
           await brandApi.updateCollection(newCollectionId, { coverMediaId: coverRemoteId } as any);
         }
-        toast.success('Collection published');
+        toast.success('Design published');
 
         // Navigate back to profile/catalog with a publishing badge so the user is not blocked on this page
         navigate(`/profile?tab=Content`, {
@@ -456,7 +456,7 @@ const CreateCollectionInner: React.FC = () => {
         return;
       }
       console.error(error);
-      toast.error(isEditMode ? 'Failed to update collection' : 'Failed to publish collection');
+      toast.error(isEditMode ? 'Failed to update design' : 'Failed to publish design');
       throw error; // Re-throw so modal can handle state
     } finally {
       setIsSubmitting(false);
@@ -538,7 +538,7 @@ const CreateCollectionInner: React.FC = () => {
           <div className="flex items-center gap-2">
             <HiOutlineSparkles className="w-5 h-5 text-purple-500" />
             <h1 className="text-lg sm:text-xl font-semibold">
-              {isEditMode ? 'Edit Collection' : 'Create Collection'}
+              {isEditMode ? 'Edit Design' : 'Create Design'}
             </h1>
           </div>
 
@@ -680,10 +680,10 @@ const CreateCollectionInner: React.FC = () => {
             )}
           </section>
 
-          {/* Collection Details */}
+          {/* Design Details */}
           <div className="h-full">
             <FormSection
-              title="Collection Details"
+              title="Design Details"
               icon="📝"
               isOpen={expandedSections.details}
               onToggle={() => toggleSection('details')}
@@ -691,7 +691,7 @@ const CreateCollectionInner: React.FC = () => {
             >
               <div className="space-y-4">
                 <TextField
-                  label="Collection Title"
+                  label="Design Title"
                   value={title}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
                   placeholder="e.g., Summer Breeze '24"
@@ -867,7 +867,7 @@ const CreateCollectionInner: React.FC = () => {
                   />
                   <div>
                     <span className="text-gray-900 dark:text-white font-medium">Available in Physical Store</span>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Show "Visit Store" option on collection</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Show "Visit Store" option on design</p>
                   </div>
                 </label>
 
@@ -881,7 +881,7 @@ const CreateCollectionInner: React.FC = () => {
                   />
                   <div>
                     <span className="text-gray-900 dark:text-white font-medium">Made to Order</span>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Show "Custom Order" badge on collection</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Show "Custom Order" badge on design</p>
                   </div>
                 </label>
               </div>
@@ -925,7 +925,7 @@ const CreateCollectionInner: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">Who Can See This?</label>
                 <div className="space-y-3">
                   {([
-                    { value: 'PUBLIC', emoji: '🌍', label: 'Public', desc: 'Everyone can see this collection' },
+                    { value: 'PUBLIC', emoji: '🌍', label: 'Public', desc: 'Everyone can see this design' },
                     { value: 'PRIVATE', emoji: '🔒', label: 'Private', desc: 'Only you and collaborators can see' },
                   ] as const).map((option) => (
                     <label
@@ -968,7 +968,7 @@ const CreateCollectionInner: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">
             {lastSaved
-              ? `Collection saved locally • Last edit: ${formatTimeAgo(lastSaved)}`
+              ? `Design saved locally • Last edit: ${formatTimeAgo(lastSaved)}`
               : 'Unsaved changes'}
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
@@ -996,7 +996,7 @@ const CreateCollectionInner: React.FC = () => {
               className="flex-1 sm:flex-none py-3 px-6 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <HiOutlineSparkles className="w-5 h-5" />
-              {isEditMode ? 'Update Collection' : 'Publish Collection'}
+              {isEditMode ? 'Update Design' : 'Publish Design'}
             </button>
           </div>
         </div>
@@ -1156,7 +1156,7 @@ const CreateCollectionInner: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-white/60">Draft snapshot</p>
-                  <h3 className="text-xl font-semibold text-white">{title || 'Untitled collection'}</h3>
+                  <h3 className="text-xl font-semibold text-white">{title || 'Untitled design'}</h3>
                 </div>
                 <button
                   type="button"

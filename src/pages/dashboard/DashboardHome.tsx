@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
+import { getDraftExpiryStats, type DraftExpiryStats } from '@/api/collectionUploads';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { DraftExpiryStats as DraftExpiryStatsComponent } from '@/components/collections/DraftExpiryComponents';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -39,18 +41,21 @@ const DashboardHome: React.FC = () => {
   const [, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<'7d' | '30d' | 'ytd'>('30d');
+  const [draftStats, setDraftStats] = useState<DraftExpiryStats | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
         if (user?.id) {
-          const [overviewData, analyticsData] = await Promise.all([
+          const [overviewData, analyticsData, draftStatsData] = await Promise.all([
             brandApi.getDashboardOverview(user.id),
-            brandApi.getDashboardAnalytics(user.id, range)
+            brandApi.getDashboardAnalytics(user.id, range),
+            getDraftExpiryStats().catch(() => null),
           ]);
           setOverview(overviewData);
           setAnalytics(analyticsData);
+          setDraftStats(draftStatsData);
         } else {
           throw new Error('No user ID');
         }
@@ -280,12 +285,14 @@ const DashboardHome: React.FC = () => {
             label="Create Collection"
             baseColor="bg-blue-500/20 text-blue-500"
             hoverColor="hover:bg-blue-500/10 hover:border-blue-500/30"
+            onClick={() => navigate('/studio/store/collections/new')}
           />
           <QuickActionButton
             icon={<Wand2 className="w-5 h-5" />}
             label="Style a Look"
             baseColor="bg-pink-500/20 text-pink-500"
             hoverColor="hover:bg-pink-500/10 hover:border-pink-500/30"
+            onClick={() => navigate('/profile/collections/create')}
           />
           <QuickActionButton
             icon={<Ticket className="w-5 h-5" />}
@@ -389,6 +396,17 @@ const DashboardHome: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Draft Expiry Stats */}
+          {draftStats && draftStats.totalDrafts > 0 && (
+            <DraftExpiryStatsComponent
+              totalDrafts={draftStats.totalDrafts}
+              expiringIn7Days={draftStats.expiringIn7Days}
+              expiringToday={draftStats.expiringToday}
+              oldestDraftAge={draftStats.oldestDraftAge}
+              onViewDrafts={() => navigate('/studio/collections?filter=drafts')}
+            />
+          )}
         </div>
       </div>
     </div>

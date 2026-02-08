@@ -338,13 +338,14 @@ export default function StoreManagement() {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/profile/collections/create')}
+              onClick={() => navigate('/studio/store/collections/new')}
               className="rounded-lg bg-purple-50 px-4 py-2.5 text-sm font-semibold text-purple-700 hover:bg-purple-100"
             >
               📦 Add Collection
             </button>
             <button
               type="button"
+              onClick={() => navigate('/profile/collections/create')}
               className="rounded-lg bg-purple-50 px-4 py-2.5 text-sm font-semibold text-purple-700 hover:bg-purple-100"
             >
               🎨 Create Look

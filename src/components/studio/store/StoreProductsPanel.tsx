@@ -42,6 +42,7 @@ interface BackendProduct {
   archivedAt?: string | null;
   archiveExpiresAt?: string | null;
   deletedAt?: string | null;
+  createdAt?: string | null;
 }
 
 interface ProductsResponse {
@@ -62,6 +63,18 @@ interface CollectionOption {
 interface StoreProductsPanelProps {
   layoutMode?: boolean;
 }
+
+const resolveProductStatus = (product: BackendProduct): StudioStatus => {
+  if (product.deletedAt) return 'DELETED';
+  if (product.archivedAt) return 'ARCHIVED';
+
+  const rawStatus = String((product as any).status || '').toUpperCase();
+  if (rawStatus === 'ARCHIVED') return 'ARCHIVED';
+  if (rawStatus === 'ACTIVE' || rawStatus === 'PUBLISHED') return 'ACTIVE';
+  if (rawStatus === 'DRAFT') return 'DRAFT';
+
+  return product.isActive ? 'ACTIVE' : 'DRAFT';
+};
 
 const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = false }) => {
   const navigate = useNavigate();
@@ -113,13 +126,13 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
 
     if (filterStatus !== 'all') {
       if (filterStatus === 'archived') {
-        items = items.filter((p) => !!p.archivedAt && !p.deletedAt);
+        items = items.filter((p) => resolveProductStatus(p) === 'ARCHIVED');
       } else if (filterStatus === 'deleted') {
-        items = items.filter((p) => !!p.deletedAt);
+        items = items.filter((p) => resolveProductStatus(p) === 'DELETED');
       } else if (filterStatus === 'active') {
-        items = items.filter((p) => p.isActive && !p.archivedAt && !p.deletedAt);
+        items = items.filter((p) => resolveProductStatus(p) === 'ACTIVE');
       } else if (filterStatus === 'draft') {
-        items = items.filter((p) => !p.isActive && !p.archivedAt && !p.deletedAt);
+        items = items.filter((p) => resolveProductStatus(p) === 'DRAFT');
       }
     }
 
@@ -252,7 +265,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
     if (typeof window === 'undefined') return;
     if (loading || products.length === 0) return;
 
-    const draft = products.find((p) => !p.isActive && !p.archivedAt && !p.deletedAt);
+    const draft = products.find((p) => resolveProductStatus(p) === 'DRAFT');
     if (!draft) return;
 
     const key = `draft-reminder:${draft.id}`;
@@ -455,12 +468,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
                 '—';
               
               // Determine status for badge
-              const getProductStatus = (): StudioStatus => {
-                if (product.deletedAt) return 'DELETED';
-                if (product.archivedAt) return 'ARCHIVED';
-                return product.isActive ? 'ACTIVE' : 'DRAFT';
-              };
-              const productStatus = getProductStatus();
+              const productStatus = resolveProductStatus(product);
 
               return (
                 <div
@@ -660,6 +668,29 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
                             ? `🟡 ${product.totalStock} in stock` 
                             : `🟢 ${product.totalStock} in stock`}
                       </span>
+                      
+                      {/* Creation time - especially useful for drafts */}
+                      {product.createdAt && (
+                        <span 
+                          className="text-[10px] text-gray-400 dark:text-zinc-500"
+                          title={new Date(product.createdAt).toLocaleString()}
+                        >
+                          {(() => {
+                            const created = new Date(product.createdAt);
+                            const now = new Date();
+                            const diffMs = now.getTime() - created.getTime();
+                            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                            const diffMins = Math.floor(diffMs / (1000 * 60));
+                            
+                            if (diffMins < 60) return `${diffMins}m ago`;
+                            if (diffHours < 24) return `${diffHours}h ago`;
+                            if (diffDays < 7) return `${diffDays}d ago`;
+                            if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+                            return created.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          })()}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

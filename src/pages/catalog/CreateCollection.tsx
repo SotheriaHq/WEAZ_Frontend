@@ -10,6 +10,7 @@ import SimpleAccordion from '@/components/forms/SimpleAccordion';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import TagsApi from '@/api/TagsApi';
 import { brandApi } from '@/api/BrandApi';
+import { startDraftSession, takeOverDraftSession } from '@/api/collectionUploads';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
 import useFilePicker from '../../components/upload/useFilePicker';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ import useCollectionUpload from '../../hooks/useCollectionUpload';
 import WizardLayout from '../../components/layouts/WizardLayout';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { MediaItem } from '@/types/media';
+import { DraftConflictWarningModal } from '@/components/collections/DraftConflictWarningModal';
 
 // Stable wrapper around SimpleAccordion so it doesn't remount on each render
 const Section: React.FC<React.PropsWithChildren<{ title: string; defaultOpen?: boolean }>> = ({ title, defaultOpen = true, children }) => (
@@ -48,11 +50,22 @@ const CreateCollectionInner: React.FC = () => {
   // Track original items for deletion in edit mode
   const originalItemIds = useRef<Set<string>>(new Set());
 
+  // Draft session conflict state
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictDetails, setConflictDetails] = useState<{
+    deviceName?: string;
+    deviceType?: 'desktop' | 'tablet' | 'mobile';
+    startedAt: Date;
+  } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [readOnly, setReadOnly] = useState(false);
+
   const { uploadCollection, isUploading, progress, perFileProgress } = useCollectionUpload();
   const { user, fetchCollections } = useBrandProfile();
   const navigate = useNavigate();
 
-  const disabled = isSubmitting || isUploading;
+  const disabled = isSubmitting || isUploading || readOnly;
   const picker = useFilePicker({ accept: ['image/*', 'video/*'], maxFiles: 20, onFiles: mediaStore.addFiles, disabled: disabled || isEditMode });
 
   useEffect(() => {
@@ -70,8 +83,27 @@ const CreateCollectionInner: React.FC = () => {
           if (mapped.length) setCategoryId((prev) => prev || mapped[0].id);
         }
         
-        // If edit mode, fetch collection details
+        // If edit mode, fetch collection details and start draft session
         if (isEditMode && id) {
+            // Start draft session to check for conflicts
+            try {
+              const session = await startDraftSession(id);
+              if (mounted) {
+                setSessionToken(session.sessionToken);
+                if (session.hasConflict && session.conflictDetails) {
+                  setConflictDetails({
+                    deviceName: session.conflictDetails.deviceName,
+                    deviceType: session.conflictDetails.deviceType,
+                    startedAt: new Date(session.conflictDetails.startedAt),
+                  });
+                  setShowConflictModal(true);
+                }
+              }
+            } catch (e) {
+              // If session fails, still load collection data
+              console.warn('Failed to start draft session', e);
+            }
+
             const d = await brandApi.getCollectionDetail(id);
             if (mounted && d) {
                 setTitle(d.title || '');
@@ -160,7 +192,7 @@ const CreateCollectionInner: React.FC = () => {
               await Promise.all(toDelete.map(itemId => brandApi.deleteCollectionItem(id, itemId)));
           }
           
-          toast.success('Collection updated');
+          toast.success('Design updated');
       } else {
           // Create mode
           await uploadCollection(
@@ -173,7 +205,7 @@ const CreateCollectionInner: React.FC = () => {
             finalTags,
             { categoryId, type, visibility },
           );
-          toast.success('Collection created');
+          toast.success('Design created');
       }
 
       if (user?.id) {
@@ -193,7 +225,7 @@ const CreateCollectionInner: React.FC = () => {
       navigate('/profile');
     } catch (error) {
       console.error(error);
-      toast.error(isEditMode ? 'Failed to update collection' : 'Failed to create collection');
+      toast.error(isEditMode ? 'Failed to update design' : 'Failed to create design');
     } finally {
       setIsSubmitting(false);
     }
@@ -240,7 +272,7 @@ const CreateCollectionInner: React.FC = () => {
             disabled={disabled} 
             progressById={perFileProgress} 
           />
-          {isEditMode && <p className="text-xs text-gray-500 text-center mt-2">Adding new files to existing collections is currently disabled.</p>}
+          {isEditMode && <p className="text-xs text-gray-500 text-center mt-2">Adding new files to existing designs is currently disabled.</p>}
         </>
       )}
     </div>
@@ -250,7 +282,7 @@ const CreateCollectionInner: React.FC = () => {
     <div className="space-y-4 glass-panel p-0">
       <Section title="Basics" defaultOpen>
         <TextField 
-          label="Collection Title" 
+          label="Design Title" 
           value={title} 
           onChange={(e) => setTitle(e.target.value)} 
           placeholder="e.g., Summer Breeze '24" 
@@ -262,7 +294,7 @@ const CreateCollectionInner: React.FC = () => {
           label="Description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Describe the inspiration, materials, and feel of your collection."
+          placeholder="Describe the inspiration, materials, and feel of your design."
           rows={4}
           disabled={disabled}
           variant="glass"
@@ -436,22 +468,55 @@ const CreateCollectionInner: React.FC = () => {
           disabled={disabled} 
           loading={isSubmitting || isUploading}
         >
-          {isUploading ? `Uploading... ${progress}%` : (isEditMode ? 'Update Collection' : 'Create Collection')}
+          {isUploading ? `Uploading... ${progress}%` : (isEditMode ? 'Update Design' : 'Create Design')}
         </FrostedButton>
       </div>
     </div>
   );
 
+  const handleTakeOver = async () => {
+    if (!id) return;
+    try {
+      const newSession = await takeOverDraftSession(id);
+      setSessionToken(newSession.sessionToken);
+      setReadOnly(false);
+      setShowConflictModal(false);
+      toast.success('You now have edit access');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to take over session');
+    }
+  };
+
+  const handleViewReadOnly = () => {
+    setReadOnly(true);
+    setShowConflictModal(false);
+    toast.info('Viewing in read-only mode');
+  };
+
   return (
     <div className="min-h-screen  p-6 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
       <form onSubmit={handleSubmit}>
         <WizardLayout
-          title={isEditMode ? "Edit Collection" : "Create a Collection"}
-          description={isEditMode ? "Update your collection details and manage media." : "Upload imagery, craft your story, and publish the collection in one seamless flow."}
+          title={isEditMode ? "Edit Design" : "Create a Design"}
+          description={isEditMode ? "Update your design details and manage media." : "Upload imagery, craft your story, and publish the design in one seamless flow."}
           left={leftContent}
           right={rightContent}
         />
       </form>
+
+      {showConflictModal && conflictDetails && (
+        <DraftConflictWarningModal
+          isOpen={showConflictModal}
+          collectionTitle={title || 'This design'}
+          existingSession={conflictDetails}
+          onTakeOver={handleTakeOver}
+          onViewReadOnly={handleViewReadOnly}
+          onClose={() => {
+            setShowConflictModal(false);
+            navigate(-1);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -120,7 +120,7 @@ export function useCollectionUpload() {
 
       // Allow saving drafts without tags when shouldPublish is false.
       if (shouldPublish && normalizedTags.length === 0) {
-        throw new Error('Add at least one tag to describe this collection.');
+        throw new Error('Add at least one tag to describe this design.');
       }
 
       setIsUploading(true);
@@ -146,7 +146,7 @@ export function useCollectionUpload() {
           minPrice,
           maxPrice,
           isAvailableInStore,
-          tags: normalizedTags.slice(0, 10),
+          tags: normalizedTags.slice(0, 20),
           files: filesPayload,
           categoryId: meta?.categoryId,
           type: meta?.type,
@@ -154,7 +154,7 @@ export function useCollectionUpload() {
         }) as InitializeCollectionResponse & { id?: string };
         const collectionId = init.collectionId ?? init.id;
         if (!collectionId) {
-          throw new Error('Upload session response is missing a collection id.');
+          throw new Error('Upload session response is missing a design id.');
         }
         const uploads: PresignEntry[] = Array.isArray(init.uploads) ? init.uploads : ((init as unknown as Record<string, unknown>).uploads as PresignEntry[]) || [];
 

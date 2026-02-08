@@ -480,6 +480,44 @@ export const getBrandStoreInfo = async (brandId: string): Promise<BrandStoreInfo
   };
 };
 
+// ===================== Price Change Preview (Item #8) =====================
+
+export interface CollectionPriceImpact {
+  collectionId: string;
+  collectionTitle: string;
+  currentMinPrice: number | null;
+  currentMaxPrice: number | null;
+  newMinPrice: number | null;
+  newMaxPrice: number | null;
+  productsCount: number;
+  isPublished: boolean;
+}
+
+export interface PriceChangePreviewResponse {
+  productId: string;
+  productName: string;
+  currentPrice: number;
+  newPrice: number;
+  currency: string;
+  affectedCollections: CollectionPriceImpact[];
+}
+
+/**
+ * Get preview of how a price change affects collection price ranges
+ * Call this before confirming a product price update
+ */
+export const getProductPriceChangePreview = async (
+  productId: string,
+  newPrice: number,
+  newSalePrice?: number | null
+): Promise<PriceChangePreviewResponse> => {
+  const res = await apiClient.post(`/store/products/${productId}/price-preview`, {
+    newPrice,
+    newSalePrice,
+  });
+  return extractData<PriceChangePreviewResponse>(res);
+};
+
 export default {
   getProducts,
   getProductById,
@@ -500,4 +538,5 @@ export default {
   getStoreStatus,
   openStore,
   updateStoreProfile,
+  getProductPriceChangePreview,
 };

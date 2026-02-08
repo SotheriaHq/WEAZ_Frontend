@@ -164,10 +164,10 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const displayImage = isHovered && secondarySignedUrl ? secondarySignedUrl : primarySignedUrl;
 
   // Calculate available sizes
-  const availableSizes = product.sizeAvailability.filter((s) => s.inStock);
-  const sizesText = availableSizes.length > 0
-    ? availableSizes.slice(0, 4).map((s) => s.size).join(' · ') + (availableSizes.length > 4 ? ' +' : '')
-    : null;
+  // const availableSizes = product.sizeAvailability.filter((s) => s.inStock);
+  // const sizesText = availableSizes.length > 0
+  //   ? availableSizes.slice(0, 4).map((s) => s.size).join(' · ') + (availableSizes.length > 4 ? ' +' : '')
+  //   : null;
 
   return (
     <article
@@ -256,6 +256,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             onClick={handleWishlistToggle}
             disabled={wishlistLoading}
             aria-label={isProductWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+            title={isProductWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
             className={`
               absolute top-2 right-2 z-10
               p-2 rounded-full
@@ -332,6 +333,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           <button
             onClick={handleQuickAddToCart}
             disabled={cartLoading || product.isOutOfStock}
+            title={product.isOutOfStock ? 'Item is out of stock' : 'Add to your shopping cart'}
             className={`
               mt-auto w-full py-2 px-3 rounded-lg
               font-medium text-xs
@@ -350,7 +352,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               ? 'Sold Out'
               : product.sizes.length > 0
                 ? 'Select Options'
-                : 'Add to Cart'
+                : 'Buy'
             }
           </button>
         )}

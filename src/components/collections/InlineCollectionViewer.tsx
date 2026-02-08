@@ -5,8 +5,8 @@ import { toast } from 'sonner';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import StackedCarousel, { type CarouselMediaItem } from '@/components/collections/StackedCarousel';
 import CollectionMetadata from '@/components/collections/CollectionMetadata';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '@/store';
 import { ArrowLeft, Lock, Eye } from 'lucide-react';
 import UnifiedCollectionComments from '@/components/collections/UnifiedCollectionComments';
 import Dropdown from '@/components/Dropdown';
@@ -15,6 +15,9 @@ import DiscountSaleModal from '@/components/collections/DiscountSaleModal';
 import { MessageCircle } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { FrostedButton } from '@/components/ui/FrostedButton';
+import { addToCart, openCartDrawer } from '@/features/cartSlice';
+import { CollectionCartPreviewModal } from '@/components/collections/CollectionCartPreviewModal';
+import { getCollectionCartPreview } from '@/api/collectionUploads';
 
 interface InlineCollectionViewerProps {
   collectionId: string;
@@ -42,9 +45,18 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const [showUpdateMeta, setShowUpdateMeta] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const me = useSelector((s: RootState) => s.user.profile);
+  const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const dispatch = useDispatch<AppDispatch>();
   const [resolvedItems, setResolvedItems] = useState<CarouselMediaItem[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [requestingAccess, setRequestingAccess] = useState(false);
+  const [addingAll, setAddingAll] = useState(false);
+  const [showCartPreview, setShowCartPreview] = useState(false);
+  const [cartPreviewData, setCartPreviewData] = useState<{
+    available: Array<{ productId: string; name: string; thumbnail?: string; price: number; salePrice?: number; variants: Array<{ variantId: string; name: string; stock: number; price?: number }> }>;
+    unavailable: Array<{ productId: string; name: string; thumbnail?: string; reason: string }>;
+    totalEstimate: { min: number; max: number };
+  } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -150,6 +162,33 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }, [detail?.medias]);
 
+  const productItems = useMemo(() => {
+    const links = Array.isArray(detail?.products) ? detail.products : [];
+    return links
+      .map((link: any) => {
+        const p = link?.product ?? link ?? {};
+        return {
+          id: p.id ?? link?.productId,
+          name: p.name ?? p.title ?? 'Product',
+          price: Number(p.price ?? 0),
+          salePrice: p.salePrice != null ? Number(p.salePrice) : null,
+          saleStartAt: p.saleStartAt ?? null,
+          saleEndAt: p.saleEndAt ?? null,
+          images: Array.isArray(p.images) ? p.images : [],
+          thumbnail: p.thumbnail ?? null,
+          sizes: Array.isArray(p.sizes) ? p.sizes : [],
+          colors: Array.isArray(p.colors) ? p.colors : [],
+          hasVariants: Array.isArray(p.variants)
+            ? p.variants.length > 0
+            : Boolean((p as any)?._count?.variants),
+          totalStock: typeof p.totalStock === 'number' ? p.totalStock : 0,
+          orderIndex: link?.orderIndex ?? 0,
+        };
+      })
+      .filter((p: any) => Boolean(p.id))
+      .sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+  }, [detail?.products]);
+
   // Resolve signed URLs for media files to ensure content displays in modal/viewer
   useEffect(() => {
     let mounted = true;
@@ -182,6 +221,14 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       : 0;
     return base + mediaSum;
   }, [detail]);
+
+  const mediaCount = useMemo(() => {
+    if (typeof detail?._count?.medias === 'number') return detail._count.medias;
+    return mediaItems.length;
+  }, [detail?._count?.medias, mediaItems.length]);
+
+  const totalItems = useMemo(() => mediaCount + productItems.length, [mediaCount, productItems.length]);
+  const showProductSection = productItems.length > 0 || mediaItems.length === 0;
 
   // active media id no longer needed for unified comments
 
@@ -236,8 +283,72 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
     }
   };
 
-  const handleAddToCart = () => {
-    toast.success('Added to cart');
+  const formatPrice = (value?: number | null) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) return null;
+    try {
+      return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(value);
+    } catch {
+      return `₦${Math.round(value).toLocaleString()}`;
+    }
+  };
+
+  const handleAddAllToCart = async () => {
+    if (!isAuth) {
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    // Fetch cart preview data and show modal
+    setAddingAll(true);
+    try {
+      const preview = await getCollectionCartPreview(collectionId);
+      setCartPreviewData(preview);
+      setShowCartPreview(true);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to load cart preview');
+    } finally {
+      setAddingAll(false);
+    }
+  };
+
+  const handleCartPreviewConfirm = async (selections: Array<{ productId: string; variantId?: string; quantity: number }>) => {
+    setAddingAll(true);
+    try {
+      const results = await Promise.all(
+        selections.map((s) =>
+          dispatch(addToCart({ productId: s.productId, variantId: s.variantId, quantity: s.quantity }))
+            .unwrap()
+            .then(() => true)
+            .catch(() => false),
+        ),
+      );
+      const successCount = results.filter(Boolean).length;
+      if (successCount > 0) {
+        dispatch(openCartDrawer());
+        toast.success(`Added ${successCount} item${successCount === 1 ? '' : 's'} to cart`);
+      }
+      if (successCount < selections.length) {
+        toast.error('Some items could not be added to cart');
+      }
+      setShowCartPreview(false);
+    } finally {
+      setAddingAll(false);
+    }
+  };
+
+  const handleAddProductToCart = async (productId: string) => {
+    if (!isAuth) {
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    try {
+      await dispatch(addToCart({ productId, quantity: 1 })).unwrap();
+      dispatch(openCartDrawer());
+      toast.success('Added to cart');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to add to cart');
+    }
   };
 
   const handleCancelSale = async () => {
@@ -447,37 +558,130 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Carousel (2/3 width on desktop) */}
+        {/* Left: Carousel or Product Grid (2/3 width on desktop) */}
         <div className="lg:col-span-2 relative">
-          <StackedCarousel
-            items={resolvedItems.length ? resolvedItems : mediaItems}
-            initialIndex={0}
-            onIndexChange={(index) => setActiveIndex(index)}
-            className="mb-2"
-            isOwner={isOwner}
-            coverMediaId={detail?.coverMediaId ?? null}
-            onSetCover={async (item) => {
-              if (!isOwner) return;
-              try {
-                const res = await brandApi.updateCollection(collectionId, { coverMediaId: item.id } as any);
-                if (res) {
-                  setDetail((d: any) => ({ ...d, coverMediaId: item.id }));
-                  toast.success('Cover updated');
+          {mediaItems.length > 0 ? (
+            <StackedCarousel
+              items={resolvedItems.length ? resolvedItems : mediaItems}
+              initialIndex={0}
+              onIndexChange={(index) => setActiveIndex(index)}
+              className="mb-4"
+              isOwner={isOwner}
+              coverMediaId={detail?.coverMediaId ?? null}
+              onSetCover={async (item) => {
+                if (!isOwner) return;
+                try {
+                  const res = await brandApi.updateCollection(collectionId, { coverMediaId: item.id } as any);
+                  if (res) {
+                    setDetail((d: any) => ({ ...d, coverMediaId: item.id }));
+                    toast.success('Cover updated');
+                  }
+                } catch {
+                  toast.error('Failed to set cover');
                 }
-              } catch {
-                toast.error('Failed to set cover');
-              }
-            }}
-            tags={detail?.tags || []}
-            price={{ 
-              min: detail?.minPrice, 
-              max: detail?.maxPrice, 
-              saleMin: detail?.saleMinPrice ?? null, 
-              saleMax: detail?.saleMaxPrice ?? null,
-              saleStartAt: detail?.saleStartAt ?? null,
-              saleEndAt: detail?.saleEndAt ?? null
-            }}
-          />
+              }}
+              tags={detail?.tags || []}
+              price={{ 
+                min: detail?.minPrice, 
+                max: detail?.maxPrice, 
+                saleMin: detail?.saleMinPrice ?? null, 
+                saleMax: detail?.saleMaxPrice ?? null,
+                saleStartAt: detail?.saleStartAt ?? null,
+                saleEndAt: detail?.saleEndAt ?? null
+              }}
+            />
+          ) : null}
+          {showProductSection ? (
+            <div className="glass-panel rounded-2xl border border-white/20 bg-white/70 dark:bg-white/5 backdrop-blur-md p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Products in this collection</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{productItems.length} item{productItems.length === 1 ? '' : 's'}</p>
+              </div>
+              {!isOwner && productItems.length > 0 ? (
+                <FrostedButton
+                  onClick={handleAddAllToCart}
+                  disabled={addingAll}
+                  className="text-xs px-3 py-1.5"
+                >
+                  {addingAll ? 'Adding…' : 'Add all to cart'}
+                </FrostedButton>
+              ) : null}
+            </div>
+            {productItems.length === 0 ? (
+              <div className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                This collection doesn’t have any products yet.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {productItems.map((product) => {
+                  const now = Date.now();
+                  const onSale =
+                    product.salePrice != null &&
+                    (!product.saleStartAt || new Date(product.saleStartAt).getTime() <= now) &&
+                    (!product.saleEndAt || new Date(product.saleEndAt).getTime() >= now);
+                  const price = formatPrice(product.price);
+                  const salePrice = onSale ? formatPrice(product.salePrice) : null;
+                  const image = product.thumbnail || product.images[0];
+                    const canQuickAdd =
+                      product.totalStock > 0 &&
+                      product.sizes.length === 0 &&
+                      product.colors.length === 0 &&
+                      !product.hasVariants;
+                  return (
+                    <div key={product.id} className="rounded-xl border border-gray-200/60 dark:border-white/10 bg-white/80 dark:bg-white/5 overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/products/${product.id}`)}
+                        className="block w-full text-left"
+                      >
+                        <div className="aspect-square bg-gray-100 dark:bg-zinc-800/50 flex items-center justify-center">
+                          {image ? (
+                            <img src={image} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                          ) : (
+                            <span className="text-xs text-gray-400">No image</span>
+                          )}
+                        </div>
+                        <div className="p-3">
+                          <div className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1">{product.name}</div>
+                          <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                            {salePrice ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-rose-600 dark:text-rose-400 font-semibold">{salePrice}</span>
+                                {price ? <span className="line-through text-gray-400">{price}</span> : null}
+                              </div>
+                            ) : (
+                              <span>{price ?? 'Price unavailable'}</span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                      <div className="px-3 pb-3">
+                        {canQuickAdd ? (
+                          <button
+                            type="button"
+                            onClick={() => handleAddProductToCart(product.id)}
+                            className="w-full rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-2"
+                          >
+                            Add to cart
+                          </button>
+                        ) : (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/products/${product.id}`)}
+                          className="w-full rounded-lg border border-gray-300/70 dark:border-white/20 text-xs font-semibold py-2 text-gray-700 dark:text-gray-200"
+                        >
+                          View options
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          </div>
+          ) : null}
         </div>
 
         {/* Right: Metadata & Comments (1/3 width on desktop) */}
@@ -491,7 +695,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               stats={{
                 likes: detail?.totalLikes,
                 comments: unifiedCommentsCount,
-                items: detail?._count?.medias,
+                items: totalItems,
                 views: detail?._count?.views,
               }}
               price={{ min: detail?.minPrice, max: detail?.maxPrice, saleMin: detail?.saleMinPrice ?? null, saleMax: detail?.saleMaxPrice ?? null, saleStartAt: detail?.saleStartAt ?? null, saleEndAt: detail?.saleEndAt ?? null }}
@@ -501,7 +705,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               isLiked={isLiked}
               onLike={handleLike}
               onShare={handleShare}
-              onAddToCart={handleAddToCart}
+              onAddToCart={!isOwner && productItems.length > 0 ? handleAddAllToCart : undefined}
               onAddToWishlist={handleWishlist}
               isWishlisted={isWishlisted}
               onDelete={handleDeleteCollection}
@@ -590,6 +794,18 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
         onConfirm={confirmDelete}
         onCancel={() => setConfirmOpen(false)}
       />
+      {showCartPreview && cartPreviewData && (
+        <CollectionCartPreviewModal
+          isOpen={showCartPreview}
+          collectionTitle={detail?.name ?? 'Collection'}
+          available={cartPreviewData.available}
+          unavailable={cartPreviewData.unavailable}
+          totalEstimate={cartPreviewData.totalEstimate}
+          onConfirm={handleCartPreviewConfirm}
+          onClose={() => setShowCartPreview(false)}
+          loading={addingAll}
+        />
+      )}
     </div>
   );
 };

@@ -26,11 +26,13 @@ const AddCollectionDropdown: React.FC<AddCollectionDropdownProps> = ({ openModal
         variant === 'outline' ? 'btn-frost-outline btn-tight-sm' :
         'btn-frost-primary btn-tight-sm'
       }>
-        {asLink ? 'Create collection' : '+ Add Collection'}
+        {asLink ? 'Create design' : '+ Add Design'}
       </DropdownTrigger>
       <DropdownMenu>
-        <DropdownItem onClick={() => navigate('/profile/collections/create')}>Basic Design</DropdownItem>
-        <DropdownItem onClick={() => openModal('INSTORE')}>Instore Collection</DropdownItem>
+        <DropdownItem onClick={() => navigate('/profile/collections/create')}>Design (Lookbook)</DropdownItem>
+        <DropdownItem onClick={() => navigate('/studio/store/collections/new')}>
+          Store Collection (Products)
+        </DropdownItem>
       </DropdownMenu>
     </Dropdown>
   );

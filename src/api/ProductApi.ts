@@ -26,7 +26,7 @@ function buildStoreProductPayload(data: Partial<ProductCreateDto>) {
     if (data.title !== undefined) payload.name = data.title;
     if (data.description !== undefined) payload.description = data.description;
     if (data.currency !== undefined) payload.currency = data.currency;
-    if (data.categoryId !== undefined) payload.collectionId = data.categoryId;
+    if (data.collectionId !== undefined) payload.collectionId = data.collectionId;
     if (data.price !== undefined) payload.price = data.price;
 
     // Frontend uses compareAtPrice+onSale; backend uses salePrice.
@@ -116,7 +116,7 @@ function buildStoreProductPayload(data: Partial<ProductCreateDto>) {
 export interface ProductCreateDto {
     title: string;
     description?: string;
-    categoryId?: string;
+    collectionId?: string;
     tags?: string[];
     price: number;
     compareAtPrice?: number;
@@ -148,8 +148,8 @@ export interface ProductDto {
     title: string;
     name?: string; // Alias for title
     description?: string;
-    categoryId?: string;
-    category?: { id: string; name: string; slug: string };
+    collectionId?: string;
+    collectionIds?: string[];
     tags?: string[];
     price: number;
     compareAtPrice?: number;
@@ -389,7 +389,7 @@ export const productApi = {
             sortBy?: string;
             status?: string;
             search?: string;
-            categoryId?: string;
+            collectionId?: string;
         }
     ): Promise<ProductListResponse> {
         try {

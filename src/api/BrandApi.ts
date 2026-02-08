@@ -319,6 +319,17 @@ export const brandApi = {
           (fileObj?.s3Url && typeof fileObj.s3Url === 'string' ? fileObj.s3Url : undefined) ||
           (fileObj?.url && typeof fileObj.url === 'string' ? fileObj.url : undefined) ||
           '';
+        const productLinks = Array.isArray((backendItem as any).products)
+          ? ((backendItem as any).products as Array<any>)
+          : [];
+        const firstProduct = productLinks[0]?.product ?? productLinks[0];
+        const productCoverUrl =
+          typeof firstProduct?.thumbnail === 'string'
+            ? firstProduct.thumbnail
+            : Array.isArray(firstProduct?.images)
+              ? firstProduct.images.find((img: any) => typeof img === 'string')
+              : undefined;
+        const resolvedCoverImage = coverImageUrl || productCoverUrl || '';
         const coverFileId = typeof fileObj?.id === 'string' ? fileObj!.id : undefined;
         const countObj = (backendItem._count as { medias?: number } | undefined) ?? undefined;
         const mediaCount = typeof countObj?.medias === 'number' ? countObj!.medias! : ((backendItem.medias as unknown[])?.length || 0);
@@ -344,7 +355,7 @@ export const brandApi = {
           visibility,
           type: (backendItem as any).type as any,
           categoryId: (backendItem.categoryId as string) || undefined,
-          coverImage: coverImageUrl,
+          coverImage: resolvedCoverImage,
           coverFileId,
           itemCount: mediaCount,
           postsCount: mediaCount,
@@ -452,17 +463,28 @@ export const brandApi = {
   // Create collection
   async createCollection(data: { name: string; description?: string; isPublic?: boolean; categoryId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY' }): Promise<CollectionDto | null> {
     try {
-      const payload: any = {
-        name: data.name,
+      const init = await apiClient.post('/collections/initialize', {
+        mode: 'existing',
+        title: data.name,
         description: data.description,
-        isPublic: data.isPublic,
-        // map to backend DTO fields when create endpoint is available
         visibility: data.isPublic === false ? 'PRIVATE' : 'PUBLIC',
         categoryId: data.categoryId,
         type: data.type ?? 'EVERYBODY',
-      };
-      const response = await apiClient.post('/collections', payload);
-      return unwrapApiResponse<CollectionDto>(response.data);
+      });
+      const sessionId = (init.data as any)?.sessionId ?? (init.data as any)?.collectionId ?? (init.data as any)?.id;
+      if (!sessionId) return null;
+
+      const finalized = await apiClient.post(`/collections/${sessionId}/finalize`, {
+        action: 'draft',
+        collectionMetadata: {
+          title: data.name,
+          description: data.description,
+          visibility: data.isPublic === false ? 'PRIVATE' : 'PUBLIC',
+          categoryId: data.categoryId,
+          type: data.type ?? 'EVERYBODY',
+        },
+      });
+      return unwrapApiResponse<CollectionDto>(finalized.data as any);
     } catch (error) {
       console.error('Error creating collection:', error);
       return null;

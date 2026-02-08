@@ -3,7 +3,7 @@ import { render, fireEvent, act, getAllByRole } from '@testing-library/react';
 import AddCollectionModal from '../components/profile/AddCollectionModal';
 
 // Minimal mock for upload hook used inside modal
-vi.mock('../components/upload/useCollectionUpload', () => ({
+vi.mock('../hooks/useCollectionUpload', () => ({
   useCollectionUpload: () => ({ uploadCollection: async () => ({ id: 'x' }), isUploading: false, progress: 0 })
 }));
 vi.mock('../api/BrandApi', () => ({ brandApi: { getCategories: async () => [{ id: 'cat1', slug: 'c1', name: 'Cat 1' }] } }));

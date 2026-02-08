@@ -36,7 +36,7 @@ const MyDraftsPage: React.FC = () => {
       const cleaned = (response || []).filter((d) => d && d.id && ((d.title && d.title.trim().length) || d.coverImage || (d.itemCount ?? 0) > 0));
       setDrafts(cleaned);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message ?? 'Failed to load draft collections');
+      toast.error(error?.response?.data?.message ?? 'Failed to load draft designs');
     } finally {
       setLoading(false);
     }
@@ -76,10 +76,10 @@ const MyDraftsPage: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            My Draft Collections
+            My Draft Designs
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Collections pending category approval. They will be published automatically once the category is approved.
+            Designs pending category approval. They will be published automatically once the category is approved.
           </p>
         </div>
 
@@ -95,16 +95,16 @@ const MyDraftsPage: React.FC = () => {
               <Eye className="h-8 w-8 text-gray-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              No draft collections
+              No draft designs
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              All your collections are published or you haven't created any drafts yet.
+              All your designs are published or you haven't created any drafts yet.
             </p>
             <button
-              onClick={() => navigate('/brand/collections/create')}
+              onClick={() => navigate('/profile/collections/create')}
               className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
             >
-              Create Collection
+              Create Design
             </button>
           </div>
         ) : (
