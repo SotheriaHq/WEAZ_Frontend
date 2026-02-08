@@ -482,15 +482,15 @@ const StoreCollectionCreate: React.FC = () => {
                                 e.stopPropagation();
                                 setPreviewProduct(product);
                               }}
-                              className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-gray-50 dark:bg-white/10 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-white/10 hover:bg-white hover:shadow-md hover:border-purple-200 transition-all duration-200 active:scale-95"
+                              className="text-[10px] px-2 py-1 rounded-full border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-purple-300"
                             >
                               View
                             </button>
                             <span
-                              className={`px-3 py-1.5 rounded-full text-[11px] font-bold border shadow-sm transition-all duration-300 ${
+                              className={`text-[10px] px-2 py-1 rounded-full border ${
                                 selected
-                                  ? 'border-transparent bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-purple-500/30'
-                                  : 'border-gray-200 bg-white text-gray-500 group-hover:border-purple-200'
+                                  ? 'border-purple-500 bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm'
+                                  : 'border-gray-200 bg-gray-100 text-gray-500'
                               }`}
                             >
                               {selected ? 'Selected' : 'Select'}
@@ -652,39 +652,26 @@ const StoreCollectionCreate: React.FC = () => {
           <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
             <button
               type="button"
-              className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity"
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
               onClick={() => setPreviewProduct(null)}
               aria-label="Close product preview"
             />
-            {/* Modal Container with Glassmorphism */}
-            <div className="relative w-full max-w-4xl max-h-[90vh] rounded-3xl border border-white/20 bg-white/90 dark:bg-gray-900/90 shadow-2xl overflow-y-auto overflow-x-hidden backdrop-blur-2xl animate-scale-in">
-              {/* Decorative Gradients */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl -z-10 pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-fuchsia-500/20 rounded-full blur-3xl -z-10 pointer-events-none" />
-              
-              <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-md sticky top-0 z-10">
+            <div className="relative w-full max-w-3xl rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/10">
                 <div>
-                  <div className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    Product Details
-                    <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 text-[10px] font-bold uppercase tracking-wider">
-                      Preview
-                    </span>
-                  </div>
+                  <div className="text-sm font-semibold text-gray-900 dark:text-white">Product Details</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">{previewProduct.name}</div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setPreviewProduct(null)}
-                  className="rounded-full p-2 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+                  className="rounded-full border border-gray-200 dark:border-white/10 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:border-purple-300"
                 >
-                  <span className="sr-only">Close</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 18 18"/></svg>
+                  Close
                 </button>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8">
-                {/* Image Section */}
-                <div className="rounded-3xl border border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 p-6 flex items-center justify-center relative overflow-hidden group">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+                <div className="rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 p-4 flex items-center justify-center">
                   {(() => {
                     const image = getProductImageSource(previewProduct);
                     return image.src || image.fileId ? (
@@ -693,79 +680,46 @@ const StoreCollectionCreate: React.FC = () => {
                         fileId={image.fileId}
                         alt={previewProduct.name}
                         fit="contain"
-                        className="max-h-[400px] w-auto drop-shadow-xl transition-transform duration-500 group-hover:scale-105"
+                        className="max-h-[360px] w-auto"
                         containerClassName="w-full flex justify-center"
                         rounded="xl"
                       />
                     ) : (
-                      <div className="flex flex-col items-center justify-center text-gray-400 py-20">
-                         <span className="text-4xl mb-2">📷</span>
-                         <span className="text-sm">No image available</span>
-                      </div>
+                      <div className="text-sm text-gray-400">No image</div>
                     );
                   })()}
                 </div>
-
-                {/* Details Section */}
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <div>
-                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white leading-tight">
-                      {previewProduct.name}
-                    </h2>
-                    <div className="mt-2 flex items-baseline gap-3">
-                      <span className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                        {formatCurrency(previewProduct.price)}
-                      </span>
-                      {previewProduct.salePrice && (
-                        <span className="text-lg text-gray-400 line-through">
-                          {formatCurrency(previewProduct.salePrice)}
-                        </span>
-                      )}
+                    <div className="text-xl font-semibold text-gray-900 dark:text-white">{previewProduct.name}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      {formatCurrency(previewProduct.price)}
                     </div>
                   </div>
-
-                  {previewProduct.description && (
-                    <div className="prose prose-sm dark:prose-invert">
-                      <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-base">
-                        {previewProduct.description}
-                      </p>
+                  {previewProduct.description ? (
+                    <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                      {previewProduct.description}
+                    </p>
+                  ) : null}
+                  <div className="grid grid-cols-2 gap-3 text-xs text-gray-600 dark:text-gray-300">
+                    <div className="rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Stock</div>
+                      <div className="font-semibold">{previewProduct.totalStock ?? '—'}</div>
                     </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Stock Status</div>
-                      <div className={`text-sm font-bold ${previewProduct.totalStock > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {previewProduct.totalStock > 0 ? `${previewProduct.totalStock} Available` : 'Out of Stock'}
+                    <div className="rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Status</div>
+                      <div className="font-semibold">{previewProduct.isActive ? 'Active' : 'Draft'}</div>
+                    </div>
+                    <div className="rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Sizes</div>
+                      <div className="font-semibold">
+                        {previewProduct.sizes?.length ? previewProduct.sizes.join(', ') : '—'}
                       </div>
                     </div>
-                    
-                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Publish Status</div>
-                      <div className={`text-sm font-bold ${previewProduct.isActive ? 'text-purple-600' : 'text-amber-600'}`}>
-                         {previewProduct.isActive ? 'Active' : 'Draft'}
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Sizes</div>
-                      <div className="flex flex-wrap gap-1">
-                        {previewProduct.sizes?.length ? (
-                          previewProduct.sizes.map(s => (
-                            <span key={s} className="px-2 py-0.5 bg-white dark:bg-white/10 rounded-md text-xs font-medium shadow-sm border border-gray-100 dark:border-white/5">{s}</span>
-                          ))
-                        ) : <span className="text-sm font-semibold text-gray-900 dark:text-white">—</span>}
-                      </div>
-                    </div>
-                    
-                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Colors</div>
-                      <div className="flex flex-wrap gap-1">
-                         {previewProduct.colors?.length ? (
-                          previewProduct.colors.map(c => (
-                            <span key={c} className="px-2 py-0.5 bg-white dark:bg-white/10 rounded-md text-xs font-medium shadow-sm border border-gray-100 dark:border-white/5">{c}</span>
-                          ))
-                        ) : <span className="text-sm font-semibold text-gray-900 dark:text-white">—</span>}
+                    <div className="rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Colors</div>
+                      <div className="font-semibold">
+                        {previewProduct.colors?.length ? previewProduct.colors.join(', ') : '—'}
                       </div>
                     </div>
                   </div>
