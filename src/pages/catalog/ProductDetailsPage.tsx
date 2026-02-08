@@ -36,10 +36,11 @@ function SignedMediaItem({
   isActive?: boolean;
   isThumbnail?: boolean;
 }) {
-  const fileId = typeof media.id === 'string' && !media.url?.startsWith('http') 
+  const fileId = typeof media.id === 'string' && !media.id.startsWith('img-')
     ? media.id 
     : undefined;
   const { url: signedUrl } = useSignedFileUrl(fileId, media.url);
+  const resolvedSrc = typeof signedUrl === 'string' && signedUrl.trim().length > 0 ? signedUrl : null;
   const mediaKind = media.type?.toLowerCase()?.includes('video') ? 'video' : 'image';
 
   if (isThumbnail) {
@@ -53,24 +54,40 @@ function SignedMediaItem({
             : 'border-transparent opacity-70 hover:opacity-100'}
         `}
       >
-        <MediaRenderer
-          kind={mediaKind}
-          src={signedUrl || ''}
-          alt={alt}
-          fit="cover"
-          className="w-full h-full"
-        />
+        {resolvedSrc ? (
+          <MediaRenderer
+            kind={mediaKind}
+            src={resolvedSrc}
+            alt={alt}
+            fit="cover"
+            className="w-full h-full"
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-100 dark:bg-white/5 flex items-center justify-center text-gray-300">
+            <span className="text-xs">No image</span>
+          </div>
+        )}
       </button>
+    );
+  }
+
+  if (!resolvedSrc) {
+    return (
+      <div className="w-full min-h-[240px] bg-gray-100 dark:bg-white/5 rounded-2xl flex items-center justify-center text-gray-300">
+        <span className="text-sm">No image</span>
+      </div>
     );
   }
 
   return (
     <MediaRenderer
       kind={mediaKind}
-      src={signedUrl || ''}
+      src={resolvedSrc}
       alt={alt}
-      fit="cover"
+      fit="contain"
       className={className}
+      mediaClassName="rounded-3xl"
+      maxHeightClassName="max-h-[70vh]"
     />
   );
 }
@@ -264,12 +281,12 @@ export default function ProductDetailsPage() {
             {/* Visuals Column */}
             <div className="space-y-4">
               {/* Main Image */}
-              <div className="aspect-[3/4] lg:aspect-[4/5] bg-gray-50 dark:bg-white/5 rounded-3xl overflow-hidden relative group">
+              <div className="w-full rounded-3xl relative group flex justify-center">
                 {currentMedia ? (
                   <SignedMediaItem
                      media={currentMedia}
                      alt={product.title}
-                     className="w-full h-full"
+                     className="flex justify-center"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-300">

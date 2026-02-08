@@ -36,6 +36,7 @@ interface CollectionDetail {
   description?: string | null;
   visibility: 'PUBLIC' | 'PRIVATE';
   coverMediaId?: string | null;
+  coverImageUrl?: string | null;
   minPrice?: number | null;
   maxPrice?: number | null;
   saleMinPrice?: number | null;
@@ -1070,6 +1071,8 @@ const CollectionViewRedesign: React.FC = () => {
             const coverMedia = resolved.find(m => m.id === d.coverMediaId) || resolved[0];
             if (coverMedia) {
               setCoverUrl(coverMedia.url);
+            } else if (d.coverImageUrl) {
+              setCoverUrl(d.coverImageUrl as string);
             } else if (products.length > 0) {
               const coverProduct = products.find((p) => p.thumbnail || p.images[0]);
               if (coverProduct) {
@@ -1084,7 +1087,7 @@ const CollectionViewRedesign: React.FC = () => {
       } catch (e: any) {
         if (mounted) {
           const status = e?.response?.status;
-          if (status === 404 || status === 403) {
+          if (status === 404 || status === 403 || status === 410) {
             setLocked(true);
           } else {
             toast.error('Failed to load collection');

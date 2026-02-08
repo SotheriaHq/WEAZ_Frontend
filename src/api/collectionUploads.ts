@@ -1,4 +1,5 @@
 import { apiClient } from './httpClient';
+import { createIdempotencyKey } from './idempotency';
 import { unwrapApiResponse } from '../types/auth'; // Keep this import for potential future use
 
 // Type for presigned upload entries from collections/initialize
@@ -104,7 +105,11 @@ export async function initializeCollectionUploads(
 export type CompletionDto = { fileId: string; s3Key: string; actualSize: number; actualMimeType: string };
 
 export async function finalizeCollectionUploads(collectionId: string, completions: CompletionDto[], shouldPublish = true) {
-  const resp = await apiClient.post(`/collections/${collectionId}/finalize`, { completions, shouldPublish });
+  const resp = await apiClient.post(
+    `/collections/${collectionId}/finalize`,
+    { completions, shouldPublish },
+    { headers: { 'Idempotency-Key': createIdempotencyKey() } },
+  );
   // Unwrap interceptor-wrapped response
   return unwrapApiResponse(resp.data);
 }

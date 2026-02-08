@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { createBrowserRouter, RouterProvider, Outlet, Navigate, useParams } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Outlet, Navigate, useParams, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import Market from './pages/Market';
 import SettingsHome from './pages/settings/SettingsHome';
@@ -54,31 +54,53 @@ import { setViewportWidth } from '@/features/uiSlice';
  * Contains global overlays like CartDrawer and WishlistDrawer
  * that need Router context (useNavigate)
  */
-const ViewportSync: React.FC = () => {
+const ViewportSync: React.FC<{ watchKey?: string }> = ({ watchKey }) => {
   const dispatch = useDispatch<AppDispatch>();
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const handleResize = () => {
       dispatch(setViewportWidth(window.innerWidth));
     };
 
     handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        handleResize();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [dispatch]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      dispatch(setViewportWidth(window.innerWidth));
+    }
+  }, [dispatch, watchKey]);
 
   return null;
 };
 
-const RootLayout: React.FC = () => (
-  <>
-    <ViewportSync />
-    <CartDrawer />
-    <WishlistDrawer />
-    <GlobalModalRouter />
-    <Outlet />
-  </>
-);
+const RootLayout: React.FC = () => {
+  const location = useLocation();
+
+  return (
+    <>
+      <ViewportSync watchKey={location.pathname} />
+      <CartDrawer />
+      <WishlistDrawer />
+      <GlobalModalRouter />
+      <Outlet />
+    </>
+  );
+};
 
 const LegacyProductEditRedirect: React.FC = () => {
   const { id } = useParams<{ id: string }>();

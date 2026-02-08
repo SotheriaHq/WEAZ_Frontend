@@ -83,7 +83,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
         description.trim() || undefined,
         undefined,
         undefined,
-        undefined,
+        false,
         tags,
         { visibility: isPublic ? 'PUBLIC' : 'PRIVATE', categoryId, type },
       );

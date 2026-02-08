@@ -12,8 +12,10 @@ import {
   type CollectionType,
   type CollectionVisibility,
 } from '@/api/storeCollections';
-import MediaRenderer from '@/components/media/MediaRenderer';
+import ImageWithFallback from '@/components/ImageWithFallback';
 import SearchField from '@/components/SearchField';
+import Select from '@/components/ui/Select';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
 
 const MAX_PRODUCTS = 5;
 const MAX_TAGS = 20;
@@ -38,9 +40,11 @@ const StoreCollectionCreate: React.FC = () => {
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [creationMode, setCreationMode] = useState<'existing' | 'new'>('existing');
 
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [previewProduct, setPreviewProduct] = useState<StoreProduct | null>(null);
 
   const preselectProductId = searchParams.get('productId');
 
@@ -68,30 +72,35 @@ const StoreCollectionCreate: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-    const loadProducts = async () => {
-      if (!user?.id) return;
-      setProductsLoading(true);
-      setProductsError(null);
-      try {
-        const res = await getBrandProductsForOwner(user.id, 200);
-        const items = Array.isArray(res?.data) ? res.data : [];
-        if (!mounted) return;
-        setProducts(items);
-      } catch (error: any) {
-        if (!mounted) return;
-        setProducts([]);
-        setProductsError(error?.response?.data?.message ?? 'Failed to load products.');
-      } finally {
-        if (mounted) setProductsLoading(false);
-      }
-    };
-    void loadProducts();
-    return () => {
-      mounted = false;
-    };
+  const loadProducts = useCallback(async () => {
+    if (!user?.id) {
+      setProducts([]);
+      setProductsLoading(false);
+      return;
+    }
+    setProductsLoading(true);
+    setProductsError(null);
+    try {
+      const res = await getBrandProductsForOwner(user.id, 200);
+      const items = Array.isArray((res as any)?.items)
+        ? (res as any).items
+        : Array.isArray((res as any)?.data?.items)
+          ? (res as any).data.items
+          : Array.isArray((res as any)?.data)
+            ? (res as any).data
+            : [];
+      setProducts(items);
+    } catch (error: any) {
+      setProducts([]);
+      setProductsError(error?.response?.data?.message ?? 'Failed to load products.');
+    } finally {
+      setProductsLoading(false);
+    }
   }, [user?.id]);
+
+  useEffect(() => {
+    void loadProducts();
+  }, [loadProducts]);
 
   useEffect(() => {
     if (!preselectProductId || products.length === 0) return;
@@ -187,7 +196,7 @@ const StoreCollectionCreate: React.FC = () => {
     setSubmitting(true);
     try {
       const init = await initializeStoreCollection({
-        mode: 'existing',
+        mode: creationMode === 'new' ? 'new-individual' : 'existing',
         title: title.trim(),
         description: description.trim() || undefined,
         visibility,
@@ -253,6 +262,13 @@ const StoreCollectionCreate: React.FC = () => {
   };
 
   const getProductImage = (product: StoreProduct) => {
+    const cover =
+      typeof (product as any)?.coverImage === 'string'
+        ? ((product as any).coverImage as string)
+        : typeof (product as any)?.coverUrl === 'string'
+          ? ((product as any).coverUrl as string)
+          : null;
+    if (cover) return cover;
     if (product.thumbnail) return product.thumbnail;
     if (Array.isArray(product.images)) {
       const img = product.images.find(Boolean);
@@ -261,61 +277,150 @@ const StoreCollectionCreate: React.FC = () => {
     return undefined;
   };
 
+  const getProductImageSource = (product: StoreProduct) => {
+    const media = (product as any)?.media as
+      | Array<{ id?: string; url?: string; type?: string; isPrimary?: boolean }>
+      | undefined;
+    const primaryMedia = media?.find((m) => m.isPrimary) ?? media?.[0];
+    const fallbackImage = getProductImage(product);
+    const image = primaryMedia?.url ?? fallbackImage ?? null;
+
+    const mediaIds = Array.isArray((product as any)?.mediaIds) ? ((product as any).mediaIds as string[]) : [];
+    const isLikelyFileId = (value?: string | null) =>
+      Boolean(value) &&
+      !value!.includes('://') &&
+      !value!.startsWith('http') &&
+      !value!.startsWith('/') &&
+      !value!.includes('/');
+
+    const primaryId =
+      typeof primaryMedia?.id === 'string' && isLikelyFileId(primaryMedia.id)
+        ? primaryMedia.id
+        : null;
+    const fallbackId = mediaIds.find((id) => isLikelyFileId(id)) ?? null;
+    const resolvedFileId = primaryId ?? fallbackId ?? null;
+
+    if (!image) {
+      return {
+        src: null,
+        fileId: resolvedFileId,
+      };
+    }
+
+    const isRemote =
+      image.startsWith('http') ||
+      image.startsWith('/') ||
+      image.startsWith('data:') ||
+      image.includes('://') ||
+      image.includes('?');
+
+    return {
+      src: isRemote ? image : null,
+      fileId: resolvedFileId ?? (!isRemote && isLikelyFileId(image) ? image : null),
+    };
+  };
+
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
+      <div className="relative overflow-hidden rounded-3xl border border-purple-100/60 dark:border-white/10 bg-white/80 dark:bg-white/5 p-6">
+        <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-gradient-to-br from-purple-400/20 via-fuchsia-300/10 to-transparent blur-2xl" />
+        <div className="absolute -bottom-12 -left-10 h-40 w-40 rounded-full bg-gradient-to-tr from-indigo-300/20 via-purple-300/10 to-transparent blur-2xl" />
+        <div className="relative">
           <p className="text-xs uppercase tracking-wide text-purple-500 font-semibold">Store Collections</p>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create Collection</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Select up to {MAX_PRODUCTS} products and publish a store collection.
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="rounded-lg border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-purple-300"
-          >
-            Back
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSubmit('draft')}
-            disabled={submitting}
-            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60"
-          >
-            Save Draft
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSubmit('publish')}
-            disabled={submitting}
-            className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60"
-          >
-            Publish
-          </button>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <section className="lg:col-span-2 space-y-6">
-          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="rounded-2xl border border-purple-100/70 dark:border-white/10 bg-gradient-to-br from-white/90 via-purple-50/40 to-white/90 dark:from-white/5 dark:via-white/5 dark:to-white/5 p-6">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">How would you like to build this collection?</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Start with existing products or create new items before publishing.
+            </p>
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setCreationMode('existing')}
+                className={`rounded-xl border px-4 py-3 text-left transition ${
+                  creationMode === 'existing'
+                    ? 'border-purple-500 bg-purple-50/70 dark:bg-purple-500/10'
+                    : 'border-gray-200 dark:border-white/10 hover:border-purple-300'
+                }`}
+              >
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">From Existing Products</div>
+                  <div className="text-xs text-gray-500 mt-1">Select from store, drafts, or archived items.</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreationMode('new')}
+                className={`rounded-xl border px-4 py-3 text-left transition ${
+                  creationMode === 'new'
+                    ? 'border-purple-500 bg-purple-50/70 dark:bg-purple-500/10'
+                    : 'border-gray-200 dark:border-white/10 hover:border-purple-300'
+                }`}
+              >
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">Create New Products</div>
+                <div className="text-xs text-gray-500 mt-1">Add new items, then return to finish this collection.</div>
+              </button>
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/90 dark:bg-white/5 p-6">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-400 via-fuchsia-400 to-indigo-400" />
+            <div className="flex items-center justify-between mb-4 relative">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Products</h2>
               <span className="text-xs font-semibold text-gray-500">
                 Selected {selectedProductIds.length}/{MAX_PRODUCTS}
               </span>
             </div>
 
-            <SearchField
-              placeholder="Search products..."
-              value={search}
-              onChange={setSearch}
-              showFilter={false}
-              className="!max-w-none"
-            />
+            {creationMode === 'existing' ? (
+              <SearchField
+                placeholder="Search products..."
+                value={search}
+                onChange={setSearch}
+                showFilter={false}
+                className="!max-w-none"
+              />
+            ) : (
+              <div className="rounded-xl border border-dashed border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/5 p-4">
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Create new products first, then refresh this list to add them to the collection.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/studio/store/products/new?returnTo=/studio/store/collections/new&returnContext=collection')}
+                    className="rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white hover:bg-purple-700"
+                  >
+                    Create a Product
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toast.info('Bulk upload is coming soon.');
+                    }}
+                    className="rounded-lg border border-gray-200 dark:border-white/10 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300"
+                  >
+                    Bulk Upload (Soon)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void loadProducts()}
+                    className="rounded-lg border border-gray-200 dark:border-white/10 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300"
+                  >
+                    Refresh Products
+                  </button>
+                </div>
+              </div>
+            )}
 
+            {creationMode === 'existing' && (
+              <>
             {productsLoading ? (
               <div className="py-10 text-sm text-gray-500">Loading products...</div>
             ) : productsError ? (
@@ -325,28 +430,36 @@ const StoreCollectionCreate: React.FC = () => {
             ) : (
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {filteredProducts.map((product) => {
-                  const image = getProductImage(product);
+                  const image = getProductImageSource(product);
                   const selected = selectedProductIds.includes(product.id);
                   return (
-                    <button
+                    <div
                       key={product.id}
-                      type="button"
                       onClick={() => toggleProduct(product.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          toggleProduct(product.id);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
                       className={`relative flex gap-4 rounded-xl border p-4 text-left transition ${
                         selected
-                          ? 'border-purple-500 bg-purple-50/70 dark:bg-purple-500/10'
-                          : 'border-gray-200 dark:border-white/10 hover:border-purple-300'
+                          ? 'border-purple-500/80 bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-purple-500/20 dark:via-white/5 dark:to-pink-500/10 ring-2 ring-purple-400/50 shadow-lg shadow-purple-500/15'
+                          : 'border-gray-200 dark:border-white/10 hover:border-purple-300 hover:shadow-sm'
                       }`}
                     >
-                      <div className="h-16 w-16 rounded-lg bg-gray-100 dark:bg-white/5 overflow-hidden flex items-center justify-center">
-                        {image ? (
-                          <MediaRenderer
-                            kind="image"
-                            src={image}
+                      <div className="h-16 w-16 rounded-xl bg-white/60 dark:bg-white/5 border border-gray-200/70 dark:border-white/10 overflow-hidden flex items-center justify-center">
+                        {image.src || image.fileId ? (
+                          <ImageWithFallback
+                            src={image.src}
+                            fileId={image.fileId}
                             alt={product.name}
                             fit="cover"
-                            className="h-full w-full"
-                            mediaClassName="h-full w-full object-cover"
+                            className="h-full w-full object-cover"
+                            containerClassName="h-full w-full"
+                            rounded="md"
                           />
                         ) : (
                           <span className="text-xs text-gray-400">No image</span>
@@ -362,25 +475,46 @@ const StoreCollectionCreate: React.FC = () => {
                               {formatCurrency(product.price)}
                             </div>
                           </div>
-                          <span className={`text-[10px] px-2 py-1 rounded-full ${selected ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                            {selected ? 'Selected' : 'Select'}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewProduct(product);
+                              }}
+                              className="text-[10px] px-2 py-1 rounded-full border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-purple-300"
+                            >
+                              View
+                            </button>
+                            <span
+                              className={`text-[10px] px-2 py-1 rounded-full border ${
+                                selected
+                                  ? 'border-purple-500 bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm'
+                                  : 'border-gray-200 bg-gray-100 text-gray-500'
+                              }`}
+                            >
+                              {selected ? 'Selected' : 'Select'}
+                            </span>
+                          </div>
                         </div>
                         <div className="mt-2 text-[11px] text-gray-500">
                           Stock: {typeof product.totalStock === 'number' ? product.totalStock : '—'}
                         </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
+            )}
+              </>
             )}
           </div>
         </section>
 
         <section className="space-y-6">
-          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Collection Details</h2>
+          <div className="relative overflow-hidden rounded-2xl border border-purple-100/70 dark:border-white/10 bg-white/90 dark:bg-white/5 p-6 space-y-4">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white relative">Collection Details</h2>
 
             <div>
               <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Title</label>
@@ -405,12 +539,12 @@ const StoreCollectionCreate: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Category</label>
-              <select
+              <Select
+                label="Category"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
                 disabled={loadingCategories || categories.length === 0}
-                className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                variant="default"
               >
                 {loadingCategories && <option>Loading categories...</option>}
                 {!loadingCategories && categories.length === 0 && <option>No categories available</option>}
@@ -419,32 +553,32 @@ const StoreCollectionCreate: React.FC = () => {
                     {cat.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Visibility</label>
-                <select
+                <Select
+                  label="Visibility"
                   value={visibility}
                   onChange={(e) => setVisibility(e.target.value as CollectionVisibility)}
-                  className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  variant="default"
                 >
                   <option value="PUBLIC">Public</option>
                   <option value="PRIVATE">Private</option>
-                </select>
+                </Select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Type</label>
-                <select
+                <Select
+                  label="Type"
                   value={type}
                   onChange={(e) => setType(e.target.value as CollectionType)}
-                  className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  variant="default"
                 >
                   <option value="EVERYBODY">Everybody</option>
                   <option value="MALE">Male</option>
                   <option value="FEMALE">Female</option>
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -463,7 +597,7 @@ const StoreCollectionCreate: React.FC = () => {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 p-6">
+          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 p-6">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Selected Products</h3>
             {selectedProducts.length === 0 ? (
               <p className="text-xs text-gray-500">No products selected yet.</p>
@@ -486,6 +620,115 @@ const StoreCollectionCreate: React.FC = () => {
           </div>
         </section>
       </div>
+
+      <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="rounded-lg border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-purple-300"
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSubmit('draft')}
+          disabled={submitting}
+          className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60"
+        >
+          Save Draft
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSubmit('publish')}
+          disabled={submitting}
+          className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60"
+        >
+          Publish
+        </button>
+      </div>
+
+      {previewProduct && (
+        <OverlayPortal>
+          <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setPreviewProduct(null)}
+              aria-label="Close product preview"
+            />
+            <div className="relative w-full max-w-3xl rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/10">
+                <div>
+                  <div className="text-sm font-semibold text-gray-900 dark:text-white">Product Details</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">{previewProduct.name}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewProduct(null)}
+                  className="rounded-full border border-gray-200 dark:border-white/10 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:border-purple-300"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+                <div className="rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 p-4 flex items-center justify-center">
+                  {(() => {
+                    const image = getProductImageSource(previewProduct);
+                    return image.src || image.fileId ? (
+                      <ImageWithFallback
+                        src={image.src}
+                        fileId={image.fileId}
+                        alt={previewProduct.name}
+                        fit="contain"
+                        className="max-h-[360px] w-auto"
+                        containerClassName="w-full flex justify-center"
+                        rounded="xl"
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-400">No image</div>
+                    );
+                  })()}
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-xl font-semibold text-gray-900 dark:text-white">{previewProduct.name}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      {formatCurrency(previewProduct.price)}
+                    </div>
+                  </div>
+                  {previewProduct.description ? (
+                    <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                      {previewProduct.description}
+                    </p>
+                  ) : null}
+                  <div className="grid grid-cols-2 gap-3 text-xs text-gray-600 dark:text-gray-300">
+                    <div className="rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Stock</div>
+                      <div className="font-semibold">{previewProduct.totalStock ?? '—'}</div>
+                    </div>
+                    <div className="rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Status</div>
+                      <div className="font-semibold">{previewProduct.isActive ? 'Active' : 'Draft'}</div>
+                    </div>
+                    <div className="rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Sizes</div>
+                      <div className="font-semibold">
+                        {previewProduct.sizes?.length ? previewProduct.sizes.join(', ') : '—'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Colors</div>
+                      <div className="font-semibold">
+                        {previewProduct.colors?.length ? previewProduct.colors.join(', ') : '—'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </OverlayPortal>
+      )}
     </div>
   );
 };

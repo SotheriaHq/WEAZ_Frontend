@@ -82,7 +82,7 @@ export const Sidebar: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   
   // Use centralized viewport state from Redux (no local state needed)
-  const { sidebarMode, isSidebarOpen, viewportWidth } = useSelector((state: RootState) => state.ui);
+  const { isSidebarOpen, viewportWidth } = useSelector((state: RootState) => state.ui);
   const { profile: user } = useSelector((state: RootState) => state.user);
   
   const isMobile = viewportWidth < 1024;
@@ -92,8 +92,10 @@ export const Sidebar: React.FC = () => {
   // These are critical for preventing sidebar flash on navigation
   // ============================================
   
-  // NEVER show sidebar on Settings pages (has its own sidebar)
-  if (location.pathname.startsWith('/settings') || location.pathname.startsWith('/profile/settings')) {
+  const isSettingsRoute = location.pathname.startsWith('/settings') || location.pathname.startsWith('/profile/settings');
+
+  // Hide sidebar on settings routes unless explicitly opened (prevents flash on load).
+  if (isSettingsRoute && !isSidebarOpen) {
     return null;
   }
   
@@ -102,20 +104,11 @@ export const Sidebar: React.FC = () => {
     return null;
   }
 
-  // ============================================
-  // Redux state checks (backup for other cases)
-  // ============================================
-
   const showOverlay = isSidebarOpen;
   const slideClasses = showOverlay
     ? `transform transition-transform duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'}`
     : '';
 
-  // If hidden and not open, render nothing
-  if (sidebarMode === 'HIDDEN' && !isSidebarOpen) {
-    return null;
-  }
-  
   // If mobile and closed, render nothing
   if (isMobile && !isSidebarOpen) {
       return null; 
@@ -158,9 +151,8 @@ export const Sidebar: React.FC = () => {
     // Removed Fashion, Awards
   ];
 
-  // NOTE: Route-based hiding (studio, settings) is now handled by Layout.tsx
-  // which sets sidebarMode to 'HIDDEN' for those routes.
-  // The check at line 97 (sidebarMode === 'HIDDEN' && !isSidebarOpen) handles this.
+  // NOTE: Route-based hiding is handled by Layout/ProfileLayout.
+  // Settings routes still short-circuit when closed to prevent a flash on load.
 
 
   return (

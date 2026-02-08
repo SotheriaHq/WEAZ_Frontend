@@ -33,7 +33,7 @@ export const ProfileLayout: React.FC = () => {
     () => computeSidebarMode(location.pathname, isMobile),
     [location.pathname, isMobile]
   );
-  const isRouteSidebarHidden = location.pathname.startsWith('/settings') || location.pathname.startsWith('/profile/settings') || location.pathname.startsWith('/studio');
+  const isRouteSidebarHidden = location.pathname.startsWith('/studio');
 
   useEffect(() => {
     if (computedSidebarMode !== sidebarMode) {

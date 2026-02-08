@@ -118,7 +118,7 @@ const CreateCollectionInner: React.FC = () => {
             setDescription(d.description || '');
             setMinPrice(d.minPrice ? String(d.minPrice) : '');
             setMaxPrice(d.maxPrice ? String(d.maxPrice) : '');
-            setIsAvailableInStore(!!d.isAvailableInStore);
+            setIsAvailableInStore(false);
             setSelectedTags(d.tags || []);
             setCategoryId(d.categoryId || '');
             setType(d.type || 'EVERYBODY');
@@ -334,7 +334,7 @@ const CreateCollectionInner: React.FC = () => {
         description,
         parsedMinPrice,
         parsedMaxPrice,
-        isAvailableInStore,
+        false,
         finalTags,
         { categoryId, type, visibility },
         undefined,
@@ -392,11 +392,11 @@ const CreateCollectionInner: React.FC = () => {
 
       if (isEditMode && id) {
         await brandApi.updateCollection(id, {
-          name: title,
+          title,
           description,
           minPrice: parsedMinPrice,
           maxPrice: parsedMaxPrice,
-          isAvailableInStore,
+          isAvailableInStore: false,
           tags: finalTags,
           categoryId,
           type,
@@ -418,7 +418,7 @@ const CreateCollectionInner: React.FC = () => {
           description,
           parsedMinPrice,
           parsedMaxPrice,
-          isAvailableInStore,
+          false,
           finalTags,
           { categoryId, type, visibility }
         );
@@ -487,7 +487,7 @@ const CreateCollectionInner: React.FC = () => {
     mediaCount: files.filter((f) => f.kind === 'image').length,
     videoCount: files.filter((f) => f.kind === 'video').length,
     coverImageUrl,
-    isAvailableInStore,
+    isAvailableInStore: false,
     isMadeToOrder,
   };
 
@@ -860,14 +860,14 @@ const CreateCollectionInner: React.FC = () => {
                 <label className="flex items-start gap-3 p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 cursor-pointer hover:border-purple-500/30 transition-colors">
                   <input
                     type="checkbox"
-                    checked={isAvailableInStore}
-                    onChange={(e) => setIsAvailableInStore(e.target.checked)}
-                    disabled={disabled}
+                    checked={false}
+                    onChange={() => setIsAvailableInStore(false)}
+                    disabled={true}
                     className="w-5 h-5 mt-0.5 rounded border-gray-400 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-transparent"
                   />
                   <div>
-                    <span className="text-gray-900 dark:text-white font-medium">Available in Physical Store</span>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Show "Visit Store" option on design</p>
+                    <span className="text-gray-900 dark:text-white font-medium">Store availability</span>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Store collections are created in Store Studio.</p>
                   </div>
                 </label>
 

@@ -44,7 +44,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     () => computeSidebarMode(location.pathname, isMobile),
     [location.pathname, isMobile]
   );
-  const isRouteSidebarHidden = location.pathname.startsWith('/settings') || location.pathname.startsWith('/studio');
+  const isRouteSidebarHidden = location.pathname.startsWith('/studio');
 
   // Update sidebar mode when route or viewport changes
   useEffect(() => {

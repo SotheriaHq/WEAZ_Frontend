@@ -19,6 +19,7 @@ import type { AppDispatch } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
+import MediaRenderer from '@/components/media/MediaRenderer';
 import { formatPrice } from '@/utils/helpers';
 import ImageLightbox from './ImageLightbox';
 
@@ -46,11 +47,11 @@ function SignedImage({
 }) {
   const fileId = typeof media.id === 'string' && 
     !media.id.startsWith('img-') && 
-    !media.id.startsWith('thumb-') && 
-    !media.url?.startsWith('http') 
+    !media.id.startsWith('thumb-') 
     ? media.id 
     : undefined;
   const { url: signedUrl } = useSignedFileUrl(fileId, media.url);
+  const resolvedSrc = typeof signedUrl === 'string' && signedUrl.trim().length > 0 ? signedUrl : null;
 
   if (isThumbnail) {
     return (
@@ -64,23 +65,39 @@ function SignedImage({
             : 'border-transparent opacity-70 hover:opacity-100 hover:border-purple-300'}
         `}
       >
-        <img
-          src={signedUrl || ''}
-          alt={alt}
-          className="w-full h-full object-cover"
-          loading="lazy"
-        />
+        {resolvedSrc ? (
+          <img
+            src={resolvedSrc}
+            alt={alt}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-100 dark:bg-white/5 flex items-center justify-center text-gray-300">
+            <ShoppingBag size={18} />
+          </div>
+        )}
       </button>
     );
   }
 
+  if (!resolvedSrc) {
+    return (
+      <div className="w-full min-h-[220px] flex items-center justify-center text-gray-300 bg-gray-100 dark:bg-white/5 rounded-xl">
+        <ShoppingBag size={28} />
+      </div>
+    );
+  }
+
   return (
-    <img
-      src={signedUrl || ''}
+    <MediaRenderer
+      kind="image"
+      src={resolvedSrc}
       alt={alt}
+      fit="contain"
       className={className}
-      loading="lazy"
-      onClick={onClick}
+      mediaClassName="rounded-2xl transition-transform duration-300 group-hover:scale-[1.02]"
+      maxHeightClassName="max-h-[70vh]"
     />
   );
 }
@@ -102,9 +119,9 @@ function AccordionSection({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex justify-between items-center w-full py-4 text-left hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+        className="flex justify-between items-center w-full py-3 text-left hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
       >
-        <span className="font-medium text-gray-900 dark:text-white">{title}</span>
+        <span className="text-sm font-semibold text-gray-900 dark:text-white">{title}</span>
         <ChevronDown 
           size={18} 
           className={`text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
@@ -267,13 +284,13 @@ export default function InlineProductDetail({ product, onBack, brandName }: Inli
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 xl:gap-12">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
         
         {/* Left Column: Image Gallery */}
-        <div className="xl:col-span-7 flex flex-col gap-4">
+        <div className="lg:col-span-7 flex flex-col gap-4">
           {/* Main Image - Adaptive container */}
           <div 
-            className="relative w-full rounded-2xl overflow-hidden bg-gray-100 dark:bg-white/5 cursor-zoom-in group"
+            className="relative w-full rounded-2xl cursor-zoom-in group flex justify-center"
             onClick={handleOpenLightbox}
             role="button"
             tabIndex={0}
@@ -285,7 +302,7 @@ export default function InlineProductDetail({ product, onBack, brandName }: Inli
                 <SignedImage
                   media={currentMedia}
                   alt={product.name}
-                  className="w-full h-auto max-h-[70vh] object-contain mx-auto transition-transform duration-300 group-hover:scale-[1.02]"
+                  className="flex justify-center"
                 />
                 {/* Zoom hint */}
                 <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -293,7 +310,7 @@ export default function InlineProductDetail({ product, onBack, brandName }: Inli
                 </div>
               </>
             ) : (
-              <div className="aspect-[3/4] flex items-center justify-center text-gray-400">
+              <div className="w-full min-h-[220px] flex items-center justify-center text-gray-400">
                 <ShoppingBag size={48} />
               </div>
             )}
@@ -324,7 +341,7 @@ export default function InlineProductDetail({ product, onBack, brandName }: Inli
         </div>
 
         {/* Right Column: Product Details */}
-        <div className="xl:col-span-5 flex flex-col gap-6 xl:sticky xl:top-24 h-fit">
+        <div className="lg:col-span-5 flex flex-col gap-6 lg:sticky lg:top-24 h-fit">
           
           {/* Header */}
           <div className="space-y-3">
@@ -495,23 +512,27 @@ export default function InlineProductDetail({ product, onBack, brandName }: Inli
           </div>
 
           {/* Accordion Sections */}
-          <div className="pt-4 border-t border-gray-200 dark:border-white/10">
-            <AccordionSection title="Product Description" defaultOpen>
-              {product.description || 'No description available.'}
-            </AccordionSection>
-            
-            <AccordionSection title="Shipping & Returns">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Truck size={16} className="text-purple-600" />
-                  <span>Free shipping on orders over ₦50,000</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <RotateCcw size={16} className="text-purple-600" />
-                  <span>30-day return policy</span>
-                </div>
+          <div className="pt-4">
+            <div className="rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/70 dark:bg-white/5 overflow-hidden">
+              <div className="px-4">
+                <AccordionSection title="Product Description" defaultOpen>
+                  {product.description || 'No description available.'}
+                </AccordionSection>
+                
+                <AccordionSection title="Shipping & Returns">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="flex items-start gap-2 rounded-lg bg-gray-50 dark:bg-white/5 px-3 py-2">
+                      <Truck size={16} className="text-purple-600 mt-0.5" />
+                      <span>Free shipping on orders over NGN 50,000</span>
+                    </div>
+                    <div className="flex items-start gap-2 rounded-lg bg-gray-50 dark:bg-white/5 px-3 py-2">
+                      <RotateCcw size={16} className="text-purple-600 mt-0.5" />
+                      <span>30-day return policy</span>
+                    </div>
+                  </div>
+                </AccordionSection>
               </div>
-            </AccordionSection>
+            </div>
           </div>
         </div>
       </div>

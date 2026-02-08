@@ -166,10 +166,13 @@ const EditProduct: React.FC = () => {
   const navigate = useNavigate();
   const { id: productId } = useParams<{ id: string }>();
   const location = useLocation();
+  const returnTo = useMemo(() => new URLSearchParams(location.search).get('returnTo'), [location.search]);
+  const returnContext = useMemo(() => new URLSearchParams(location.search).get('returnContext'), [location.search]);
   const user = useSelector((state: RootState) => state.user.profile);
 
   const isEditMode = Boolean(productId);
-  const pageTitle = isEditMode ? 'Edit Product' : 'Create Product';
+  const isCollectionFlow = returnContext === 'collection' && !isEditMode;
+  const pageTitle = isCollectionFlow ? 'Add Product to Collection' : isEditMode ? 'Edit Product' : 'Create Product';
   const includeDeleted = useMemo(
     () => new URLSearchParams(location.search).get('includeDeleted') === 'true',
     [location.search],
@@ -445,6 +448,8 @@ const EditProduct: React.FC = () => {
   // =====================
 
   const handleSave = useCallback(async (asDraft = false) => {
+    const effectiveDraft = asDraft || isCollectionFlow;
+    const shouldValidatePublish = !asDraft || isCollectionFlow;
     const hasDraftContent = Boolean(
       form.title.trim() ||
         form.description.trim() ||
@@ -462,7 +467,7 @@ const EditProduct: React.FC = () => {
         pendingMediaFiles.length > 0
     );
 
-    if (asDraft) {
+    if (!shouldValidatePublish) {
       if (!hasDraftContent) {
         toast.error('Add at least one detail to save a draft');
         return;
@@ -541,11 +546,11 @@ const EditProduct: React.FC = () => {
       const ensuredSku = form.sku?.trim() || buildBaseSku({ brandInitials: brandInitialsFromProfile(user), title: form.title });
 
       const payload: ProductCreateDto = {
-        title: asDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
+        title: effectiveDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
         description: form.description.trim() || undefined,
         collectionId: form.categoryId || undefined,
         tags: form.tags,
-        price: asDraft ? (form.price > 0 ? form.price : 0) : form.price,
+        price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
         compareAtPrice: form.onSale && form.compareAtPrice > 0 ? form.compareAtPrice : undefined,
         costPerItem: form.costPerItem || undefined,
         currency: form.currency,
@@ -560,7 +565,7 @@ const EditProduct: React.FC = () => {
         allowBackorders: form.allowBackorders,
         stock: form.variants.length > 0 ? variantTotalStock : form.stock,
         lowStockThreshold: form.lowStockThreshold,
-        status: asDraft ? 'DRAFT' : form.status,
+        status: effectiveDraft ? 'DRAFT' : form.status,
         isPhysicalProduct: form.isPhysicalProduct,
         customsRegion: form.customsRegion || undefined,
         mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
@@ -580,6 +585,9 @@ const EditProduct: React.FC = () => {
         await productApi.updateProduct(productId, payload);
         toast.success('Product updated successfully');
       } else {
+        if (asDraft && !isCollectionFlow) {
+          payload.isActive = false;
+        }
         const created = await productApi.createProduct(payload);
 
         // Upload pending media after we have a product id
@@ -601,7 +609,17 @@ const EditProduct: React.FC = () => {
           }
         }
 
-        toast.success(asDraft ? 'Draft saved successfully' : 'Product created successfully');
+        const successMessage = effectiveDraft
+          ? isCollectionFlow
+            ? 'Product added to collection.'
+            : 'Draft saved successfully'
+          : 'Product created successfully';
+        toast.success(successMessage);
+        if (returnTo && returnContext === 'collection') {
+          const joiner = returnTo.includes('?') ? '&' : '?';
+          navigate(`${returnTo}${joiner}productId=${created.id}`);
+          return;
+        }
       }
 
       setHasChanges(false);
@@ -612,7 +630,7 @@ const EditProduct: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [form, hasDuplicateVariants, isEditMode, maxMediaCount, mediaUrls, navigate, pendingMediaFiles, productId, variantTotalStock, originalPrice, showPricePreview]);
+  }, [form, hasDuplicateVariants, isEditMode, isCollectionFlow, maxMediaCount, mediaUrls, navigate, pendingMediaFiles, productId, variantTotalStock, originalPrice, showPricePreview, returnContext, returnTo]);
 
   const handlePriceChangeConfirm = useCallback(async () => {
     setShowPricePreview(false);
@@ -901,13 +919,21 @@ const EditProduct: React.FC = () => {
     }
   }, [confirm, productId, navigate]);
 
+  const navigateBack = useCallback(() => {
+    if (isCollectionFlow && returnTo) {
+      navigate(returnTo);
+      return;
+    }
+    navigate(-1);
+  }, [isCollectionFlow, navigate, returnTo]);
+
   const handleDiscard = useCallback(() => {
     if (hasChanges) {
       setShowDiscardPrompt(true);
       return;
     }
-    navigate(-1);
-  }, [hasChanges, navigate]);
+    navigateBack();
+  }, [hasChanges, navigateBack]);
 
   // =====================
   // Loading State
@@ -936,11 +962,36 @@ const EditProduct: React.FC = () => {
         <div className="mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex flex-col gap-1">
             <div className="flex items-center text-xs text-gray-600 dark:text-gray-400 gap-2">
-              <button onClick={() => navigate('/studio/store')} className="hover:text-gray-900 dark:hover:text-white transition-colors flex items-center">
-                <ArrowLeft className="w-3 h-3 mr-1" /> Products
-              </button>
-              <span>/</span>
-              <span>{pageTitle}</span>
+              {isCollectionFlow ? (
+                <>
+                  <button
+                    onClick={() => navigate('/studio/store/collections')}
+                    className="hover:text-gray-900 dark:hover:text-white transition-colors flex items-center"
+                  >
+                    <ArrowLeft className="w-3 h-3 mr-1" /> Collections
+                  </button>
+                  <span>/</span>
+                  <button
+                    onClick={() => navigate(returnTo || '/studio/store/collections/new')}
+                    className="hover:text-gray-900 dark:hover:text-white transition-colors"
+                  >
+                    Create Collection
+                  </button>
+                  <span>/</span>
+                  <span>Add Product</span>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => navigate('/studio/store')}
+                    className="hover:text-gray-900 dark:hover:text-white transition-colors flex items-center"
+                  >
+                    <ArrowLeft className="w-3 h-3 mr-1" /> Products
+                  </button>
+                  <span>/</span>
+                  <span>{pageTitle}</span>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -1601,14 +1652,14 @@ const EditProduct: React.FC = () => {
                 disabled={saving}
                 className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
               >
-                Save as Draft
+                {isCollectionFlow ? 'Save Draft Product' : 'Save as Draft'}
               </button>
             )}
             <button 
               onClick={handleDiscard}
               className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
             >
-              {hasChanges ? 'Discard Changes' : 'Cancel'}
+              {hasChanges ? 'Discard Changes' : isCollectionFlow ? 'Back to Collection' : 'Cancel'}
             </button>
             <button 
               onClick={() => handleSave(false)}
@@ -1616,7 +1667,7 @@ const EditProduct: React.FC = () => {
               className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 text-white text-sm font-semibold rounded-lg shadow-lg shadow-purple-500/20 transition-all flex items-center gap-2"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isEditMode ? 'Save Changes' : 'Create Product'}
+              {isEditMode ? 'Save Changes' : isCollectionFlow ? 'Add to Collection' : 'Create Product'}
             </button>
           </div>
         </div>
@@ -1644,7 +1695,7 @@ const EditProduct: React.FC = () => {
         onClose={() => setShowDiscardPrompt(false)}
         onDiscard={() => {
           setHasChanges(false);
-          navigate(-1);
+          navigateBack();
         }}
         title="Discard Changes?"
         message={!isEditMode 
