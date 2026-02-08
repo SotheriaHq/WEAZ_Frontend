@@ -241,24 +241,30 @@ export default function InlineProductDetail({ product, onBack, brandName }: Inli
   }, [mediaList.length]);
 
   return (
-    <div className="w-full animate-fadeIn">
+    <div className="w-full animate-fadeIn relative rounded-3xl border border-white/20 bg-white/60 dark:bg-black/40 backdrop-blur-xl shadow-2xl overflow-hidden">
+      {/* Decorative Gradients */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-fuchsia-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+
+      <div className="p-4 sm:p-6 lg:p-10">
       {/* Breadcrumbs - Desktop */}
-      <nav className="hidden sm:flex items-center gap-2 mb-6 text-sm">
+      <nav className="hidden sm:flex items-center gap-2 mb-8 text-sm">
         <button 
           type="button"
           onClick={onBack}
-          className="text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-white hover:border-purple-200 hover:text-purple-600 transition-all shadow-sm"
         >
-          Store
+          <ArrowLeft size={14} />
+          <span>Back to Store</span>
         </button>
-        <ChevronRight size={14} className="text-gray-400" />
+        <div className="h-4 w-px bg-gray-300 dark:bg-white/20 mx-2" />
         {product.brand && (
           <>
-            <span className="text-gray-500 dark:text-gray-400">{brandName || product.brand.name}</span>
-            <ChevronRight size={14} className="text-gray-400" />
+            <span className="text-gray-500 dark:text-gray-400 font-medium">{brandName || product.brand.name}</span>
+            <ChevronRight size={14} className="text-gray-300" />
           </>
         )}
-        <span className="text-gray-900 dark:text-white font-medium truncate max-w-[200px]">
+        <span className="text-gray-900 dark:text-white font-semibold truncate max-w-[200px] bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
           {product.name}
         </span>
       </nav>
@@ -317,7 +323,7 @@ export default function InlineProductDetail({ product, onBack, brandName }: Inli
             
             {/* Sale badge */}
             {isOnSale && (
-              <span className="absolute top-4 left-4 bg-rose-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+              <span className="absolute top-4 left-4 bg-rose-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
                 SALE
               </span>
             )}
@@ -344,7 +350,7 @@ export default function InlineProductDetail({ product, onBack, brandName }: Inli
         <div className="lg:col-span-5 flex flex-col gap-6 lg:sticky lg:top-24 h-fit">
           
           {/* Header */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             {/* Badges & Rating */}
             <div className="flex items-center gap-3 flex-wrap">
               {product.isFeatured && (
@@ -367,17 +373,17 @@ export default function InlineProductDetail({ product, onBack, brandName }: Inli
             </div>
 
             {/* Title */}
-            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white leading-tight">
+            <h1 className="text-3xl lg:text-4xl font-black text-gray-900 dark:text-white leading-tight tracking-tight drop-shadow-sm">
               {product.name}
             </h1>
 
             {/* Price */}
-            <div className="flex items-baseline gap-3">
-              <span className="text-2xl lg:text-3xl font-bold text-purple-600 dark:text-purple-400">
+            <div className="flex items-baseline gap-3 pb-4 border-b border-gray-100 dark:border-white/5">
+              <span className="text-3xl lg:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600">
                 {formatPrice(currentPrice)}
               </span>
               {comparePrice && (
-                <span className="text-lg text-gray-400 line-through">
+                <span className="text-lg text-gray-400 line-through font-medium">
                   {formatPrice(comparePrice)}
                 </span>
               )}
@@ -487,7 +493,7 @@ export default function InlineProductDetail({ product, onBack, brandName }: Inli
                   flex-1 h-14 rounded-xl font-bold flex items-center justify-center gap-2 transition-all
                   ${product.isOutOfStock 
                     ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-600/25'}
+                    : 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-xl shadow-purple-500/20 hover:shadow-purple-500/40 transform hover:-translate-y-0.5'}
                 `}
               >
                 <ShoppingBag size={18} />
@@ -567,7 +573,7 @@ export default function InlineProductDetail({ product, onBack, brandName }: Inli
             flex-1 h-12 rounded-lg font-bold flex items-center justify-center gap-2 text-sm
             ${product.isOutOfStock 
               ? 'bg-gray-300 text-gray-500'
-              : 'bg-purple-600 text-white shadow-lg shadow-purple-600/25'}
+              : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30'}
           `}
         >
           Add to Bag
@@ -590,6 +596,7 @@ export default function InlineProductDetail({ product, onBack, brandName }: Inli
           onSelectIndex={setSelectedMediaIndex}
         />
       )}
+      </div>
     </div>
   );
 }
