@@ -47,10 +47,9 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
 
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        menuRef.current && 
+        menuRef.current &&
         !menuRef.current.contains(event.target as Node) &&
-        triggerRef?.current &&
-        !triggerRef.current.contains(event.target as Node)
+        (!triggerRef?.current || !triggerRef.current.contains(event.target as Node))
       ) {
         onClose();
       }
@@ -83,7 +82,7 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
   return (
     <div
       ref={menuRef}
-      className={`absolute ${positionStyles[position]} z-50 w-56 py-2 bg-white dark:bg-zinc-800 rounded-xl shadow-2xl border border-gray-200 dark:border-zinc-700 animate-in fade-in zoom-in-95 duration-150`}
+      className={`absolute ${positionStyles[position]} z-50 w-72 max-w-[calc(100vw-2rem)] py-2 bg-white dark:bg-zinc-800 rounded-xl shadow-2xl border border-gray-200 dark:border-zinc-700 animate-in fade-in zoom-in-95 duration-150`}
       onClick={(e) => e.stopPropagation()}
     >
       {actions.map((action, index) => (
@@ -113,7 +112,7 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
             <div className="flex-1 min-w-0">
               <div className="font-medium text-sm">{action.label}</div>
               {action.description && (
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-4 whitespace-normal">
                   {action.description}
                 </div>
               )}

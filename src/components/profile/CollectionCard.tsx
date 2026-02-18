@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { MessageCircle, Share2, MoreVertical, Store, AlertTriangle, Loader2 } from 'lucide-react';
-import LikeButton from '@/components/ui/LikeButton';
+import { MessageCircle, Share2, MoreVertical, Store, AlertTriangle, Loader2, Bookmark } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import ThreadButton from '@/components/ui/ThreadButton';
 import type { CollectionDto } from '../../types/profile';
 import { formatPrice } from '@/utils/helpers';
 import { brandApi } from '@/api/BrandApi';
@@ -8,6 +9,9 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@/components/ui/Dropdown';
 import ManageAccessModal from './ManageAccessModal';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { apiClient } from '@/api/httpClient';
+import { toast } from 'sonner';
+import type { RootState } from '@/store';
 
 interface CollectionCardProps {
   collection: CollectionDto;
@@ -17,6 +21,9 @@ interface CollectionCardProps {
   showActions?: boolean;
   isDraft?: boolean;
   onRetryPublish?: (id: string) => void;
+  isSaved?: boolean;
+  onToggleSave?: (id: string) => void;
+  saveBusy?: boolean;
 }
 
 const CollectionCard: React.FC<CollectionCardProps> = ({ 
@@ -27,12 +34,15 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   showActions = true,
   isDraft = false,
   onRetryPublish,
+  isSaved: isSavedProp,
+  onToggleSave,
+  saveBusy: saveBusyProp,
 }) => {
   const {
     title,
     coverImage,
     coverFileId,
-    likesCount = 0,
+    threadsCount = 0,
     commentsCount = 0,
     itemCount = 0,
     postsCount = 0,
@@ -121,6 +131,64 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
 
   const showStacked = Boolean(saleBand && baseBand);
   const singleBand = saleBand ?? baseBand;
+  const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const [isSavedLocal, setIsSavedLocal] = useState(false);
+  const [saveBusyLocal, setSaveBusyLocal] = useState(false);
+  const isControlled = typeof isSavedProp === 'boolean' && typeof onToggleSave === 'function';
+  const resolvedSaved = isControlled ? (isSavedProp as boolean) : isSavedLocal;
+  const resolvedSaveBusy = isControlled ? Boolean(saveBusyProp) : saveBusyLocal;
+
+  useEffect(() => {
+    let mounted = true;
+    const loadSaved = async () => {
+      if (isControlled) return;
+      if (!isAuth) {
+        if (mounted) setIsSavedLocal(false);
+        return;
+      }
+      try {
+        const res = await apiClient.get('/saved/check', {
+          params: { targetType: 'COLLECTION', targetId: collection.id },
+        });
+        if (mounted) {
+          setIsSavedLocal(Boolean(res.data?.isSaved));
+        }
+      } catch {
+        if (mounted) setIsSavedLocal(false);
+      }
+    };
+    void loadSaved();
+    return () => { mounted = false; };
+  }, [collection.id, isAuth, isControlled]);
+
+  const handleToggleSave = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isControlled) {
+      onToggleSave?.(collection.id);
+      return;
+    }
+    if (!isAuth) {
+      toast.info('Please sign in to save collections.');
+      return;
+    }
+    if (saveBusyLocal) return;
+    try {
+      setSaveBusyLocal(true);
+      if (isSavedLocal) {
+        await apiClient.delete('/saved', { data: { targetType: 'COLLECTION', targetId: collection.id } });
+        setIsSavedLocal(false);
+        toast.success('Removed from saved.');
+      } else {
+        await apiClient.post('/saved', { targetType: 'COLLECTION', targetId: collection.id });
+        setIsSavedLocal(true);
+        toast.success('Saved for later.');
+      }
+    } catch {
+      toast.error('Unable to update saved items.');
+    } finally {
+      setSaveBusyLocal(false);
+    }
+  };
 
   return (
     <>
@@ -248,7 +316,16 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
         {/* Vertical Action Bar (like in Reels) - Right side */}
         {!isDraft && (
         <div className="absolute bottom-28 right-2 z-10 flex flex-col items-center gap-3">
-          <LikeButton contentType="COLLECTION" contentId={collection.id} initialCount={likesCount} ownerId={collection.ownerId} />
+          <ThreadButton contentType="COLLECTION" contentId={collection.id} initialCount={threadsCount} ownerId={collection.ownerId} />
+          <button
+            type="button"
+            className="flex flex-col items-center text-white hover:scale-110 transition-transform"
+            onClick={handleToggleSave}
+            disabled={resolvedSaveBusy}
+            aria-label={resolvedSaved ? 'Unsave collection' : 'Save collection'}
+          >
+            <Bookmark className={`w-5 h-5 ${resolvedSaved ? 'fill-white' : ''}`} />
+          </button>
           <button className="flex flex-col items-center text-white hover:scale-110 transition-transform" onClick={(e) => e.stopPropagation()}>
             <MessageCircle className="w-5 h-5" />
             <span className="text-[10px] font-semibold mt-0.5">{commentsCount}</span>

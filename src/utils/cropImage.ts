@@ -21,6 +21,7 @@ const loadImage = (src: string): Promise<HTMLImageElement> =>
 export interface CropImageResult {
   file: File;
   previewUrl: string;
+  disposePreview: () => void;
 }
 
 interface CropImageOptions {
@@ -78,9 +79,19 @@ export const cropImageFromFile = async (
 
   const croppedFile = new File([blob], fileName ?? `cropped-${file.name}`, { type: mimeType });
   const previewUrl = URL.createObjectURL(croppedFile);
+  let disposed = false;
+
+  const disposePreview = () => {
+    if (disposed) {
+      return;
+    }
+    disposed = true;
+    URL.revokeObjectURL(previewUrl);
+  };
 
   return {
     file: croppedFile,
     previewUrl,
+    disposePreview,
   };
 };

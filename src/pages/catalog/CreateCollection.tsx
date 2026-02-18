@@ -57,8 +57,7 @@ const CreateCollectionInner: React.FC = () => {
     deviceType?: 'desktop' | 'tablet' | 'mobile';
     startedAt: Date;
   } | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [, setSessionToken] = useState<string | null>(null);
   const [readOnly, setReadOnly] = useState(false);
 
   const { uploadCollection, isUploading, progress, perFileProgress } = useCollectionUpload();
@@ -80,7 +79,13 @@ const CreateCollectionInner: React.FC = () => {
         if (mounted && Array.isArray(cats)) {
           const mapped = cats.map((c) => ({ id: c.id, slug: c.slug, name: c.name }));
           setCategories(mapped);
-          if (mapped.length) setCategoryId((prev) => prev || mapped[0].id);
+          if (mapped.length) {
+            setCategoryId((prev) =>
+              prev && mapped.some((category) => category.id === prev)
+                ? prev
+                : mapped[0].id,
+            );
+          }
         }
         
         // If edit mode, fetch collection details and start draft session
@@ -143,9 +148,9 @@ const CreateCollectionInner: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [id, isEditMode, mediaStore]);
+  }, [id, isEditMode]);
 
-  const isValid = title.trim().length > 0 && files.length > 0 && selectedTags.length > 0;
+  const isValid = title.trim().length > 0 && files.length > 0 && selectedTags.length > 0 && categoryId.trim().length > 0;
 
   const handleDelete = (itemId: string) => {
     mediaStore.remove(itemId);
@@ -159,6 +164,7 @@ const CreateCollectionInner: React.FC = () => {
       if (files.length === 0) reasons.push('at least one file');
       const hasTags = selectedTags.length > 0;
       if (!hasTags) reasons.push('at least one tag');
+      if (categoryId.trim().length === 0) reasons.push('a category');
       toast.error(`Please provide ${reasons.join(', ')}.`);
       return;
     }

@@ -4,10 +4,10 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 type Key = string; // `${contentType}:${contentId}`
 
 interface ItemState {
-  likedByMe: boolean;
-  likeCount: number;
+  threadedByMe: boolean;
+  threadCount: number;
   commentCount: number;
-  patchCount: number;
+  collabCount: number;
 }
 
 interface EngagementState { items: Record<Key, ItemState>; }
@@ -18,7 +18,7 @@ function key(t: string, id: string) { return `${t}:${id}`; }
 
 function ensureItem(state: EngagementState, k: Key): ItemState {
   if (!state.items[k]) {
-    state.items[k] = { likedByMe: false, likeCount: 0, commentCount: 0, patchCount: 0 };
+    state.items[k] = { threadedByMe: false, threadCount: 0, commentCount: 0, collabCount: 0 };
   }
   return state.items[k];
 }
@@ -31,63 +31,62 @@ export const engagementSlice = createSlice({
     setEngagementState: (state, action: PayloadAction<{
       contentType: string;
       contentId: string;
-      likedByMe?: boolean;
-      likeCount?: number;
+      threadedByMe?: boolean;
+      threadCount?: number;
       commentCount?: number;
-      patchCount?: number;
+      collabCount?: number;
     }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
       const item = ensureItem(state, k);
-      if (action.payload.likedByMe !== undefined) item.likedByMe = action.payload.likedByMe;
-      if (action.payload.likeCount !== undefined) item.likeCount = action.payload.likeCount;
+      if (action.payload.threadedByMe !== undefined) item.threadedByMe = action.payload.threadedByMe;
+      if (action.payload.threadCount !== undefined) item.threadCount = action.payload.threadCount;
       if (action.payload.commentCount !== undefined) item.commentCount = action.payload.commentCount;
-      if (action.payload.patchCount !== undefined) item.patchCount = action.payload.patchCount;
+      if (action.payload.collabCount !== undefined) item.collabCount = action.payload.collabCount;
     },
 
-    // Legacy setLikeState for backward compatibility
-    setLikeState: (state, action: PayloadAction<{ contentType: string; contentId: string; likedByMe: boolean; likeCount: number }>) => {
+    setThreadState: (state, action: PayloadAction<{ contentType: string; contentId: string; threadedByMe: boolean; threadCount: number }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
       const item = ensureItem(state, k);
-      item.likedByMe = action.payload.likedByMe;
-      item.likeCount = action.payload.likeCount;
+      item.threadedByMe = action.payload.threadedByMe;
+      item.threadCount = action.payload.threadCount;
     },
 
-    // Optimistic like toggle
-    optimisticToggle: (state, action: PayloadAction<{ contentType: string; contentId: string; nextLiked: boolean }>) => {
+    // Optimistic thread toggle
+    optimisticToggle: (state, action: PayloadAction<{ contentType: string; contentId: string; nextThreaded: boolean }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
       const item = ensureItem(state, k);
-      const delta = action.payload.nextLiked ? 1 : -1;
-      item.likedByMe = action.payload.nextLiked;
-      item.likeCount = Math.max(0, item.likeCount + delta);
+      const delta = action.payload.nextThreaded ? 1 : -1;
+      item.threadedByMe = action.payload.nextThreaded;
+      item.threadCount = Math.max(0, item.threadCount + delta);
     },
 
     // Reconcile with API response
-    reconcile: (state, action: PayloadAction<{ contentType: string; contentId: string; likedByMe?: boolean; likeCount?: number }>) => {
+    reconcile: (state, action: PayloadAction<{ contentType: string; contentId: string; threadedByMe?: boolean; threadCount?: number }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
       const item = ensureItem(state, k);
 
-      if (typeof action.payload.likedByMe === 'boolean') {
-        item.likedByMe = action.payload.likedByMe;
+      if (typeof action.payload.threadedByMe === 'boolean') {
+        item.threadedByMe = action.payload.threadedByMe;
       }
 
-      if (typeof action.payload.likeCount === 'number') {
-        item.likeCount = action.payload.likeCount;
+      if (typeof action.payload.threadCount === 'number') {
+        item.threadCount = action.payload.threadCount;
       }
     },
 
-    // WebSocket update for likes
-    wsApplied: (state, action: PayloadAction<{ contentType: string; contentId: string; likeCount: number }>) => {
+    // WebSocket update for threads
+    wsApplied: (state, action: PayloadAction<{ contentType: string; contentId: string; threadCount: number }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
       const item = ensureItem(state, k);
-      item.likeCount = Number(action.payload.likeCount) || 0;
+      item.threadCount = Number(action.payload.threadCount) || 0;
     },
 
-    // Adjust (aggregate) a collection's like count when a media like is toggled.
+    // Adjust (aggregate) a collection's thread count when a media thread is toggled.
     // This is a UI-level aggregation so backend remains unchanged.
-    adjustAggregatedCollectionLikes: (state, action: PayloadAction<{ collectionId: string; delta: number }>) => {
+    adjustAggregatedCollectionThreads: (state, action: PayloadAction<{ collectionId: string; delta: number }>) => {
       const k = key('COLLECTION', action.payload.collectionId);
       const item = ensureItem(state, k);
-      item.likeCount = Math.max(0, item.likeCount + action.payload.delta);
+      item.threadCount = Math.max(0, item.threadCount + action.payload.delta);
     },
 
     // Update comment count
@@ -111,61 +110,61 @@ export const engagementSlice = createSlice({
       item.commentCount = Math.max(0, item.commentCount - 1);
     },
 
-    // Update patch count
-    updatePatchCount: (state, action: PayloadAction<{ contentType: string; contentId: string; patchCount: number }>) => {
+    // Update collab count
+    updateCollabCount: (state, action: PayloadAction<{ contentType: string; contentId: string; collabCount: number }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
       const item = ensureItem(state, k);
-      item.patchCount = action.payload.patchCount;
+      item.collabCount = action.payload.collabCount;
     },
 
-    // Increment patch count (optimistic)
-    incrementPatchCount: (state, action: PayloadAction<{ contentType: string; contentId: string }>) => {
+    // Increment collab count (optimistic)
+    incrementCollabCount: (state, action: PayloadAction<{ contentType: string; contentId: string }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
       const item = ensureItem(state, k);
-      item.patchCount += 1;
+      item.collabCount += 1;
     },
 
-    // Decrement patch count (optimistic)
-    decrementPatchCount: (state, action: PayloadAction<{ contentType: string; contentId: string }>) => {
+    // Decrement collab count (optimistic)
+    decrementCollabCount: (state, action: PayloadAction<{ contentType: string; contentId: string }>) => {
       const k = key(action.payload.contentType, action.payload.contentId);
       const item = ensureItem(state, k);
-      item.patchCount = Math.max(0, item.patchCount - 1);
+      item.collabCount = Math.max(0, item.collabCount - 1);
     },
   },
 });
 
 export const {
   setEngagementState,
-  setLikeState,
+  setThreadState,
   optimisticToggle,
   reconcile,
   wsApplied,
-  adjustAggregatedCollectionLikes,
+  adjustAggregatedCollectionThreads,
   updateCommentCount,
   incrementCommentCount,
   decrementCommentCount,
-  updatePatchCount,
-  incrementPatchCount,
-  decrementPatchCount,
+  updateCollabCount,
+  incrementCollabCount,
+  decrementCollabCount,
 } = engagementSlice.actions;
 
 // Selectors
 export const selectEngagementItem = (state: { engagement: EngagementState }, contentType: string, contentId: string): ItemState => {
   const k = key(contentType, contentId);
-  return state.engagement.items[k] ?? { likedByMe: false, likeCount: 0, commentCount: 0, patchCount: 0 };
+  return state.engagement.items[k] ?? { threadedByMe: false, threadCount: 0, commentCount: 0, collabCount: 0 };
 };
 
-export const selectLikeState = (state: { engagement: EngagementState }, contentType: string, contentId: string) => {
+export const selectThreadState = (state: { engagement: EngagementState }, contentType: string, contentId: string) => {
   const item = selectEngagementItem(state, contentType, contentId);
-  return { likedByMe: item.likedByMe, likeCount: item.likeCount };
+  return { threadedByMe: item.threadedByMe, threadCount: item.threadCount };
 };
 
 export const selectCommentCount = (state: { engagement: EngagementState }, contentType: string, contentId: string): number => {
   return selectEngagementItem(state, contentType, contentId).commentCount;
 };
 
-export const selectPatchCount = (state: { engagement: EngagementState }, contentType: string, contentId: string): number => {
-  return selectEngagementItem(state, contentType, contentId).patchCount;
+export const selectCollabCount = (state: { engagement: EngagementState }, contentType: string, contentId: string): number => {
+  return selectEngagementItem(state, contentType, contentId).collabCount;
 };
 
 export default engagementSlice.reducer;

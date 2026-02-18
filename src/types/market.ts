@@ -26,14 +26,14 @@ export interface MarketItem {
   saleMaxPrice?: number | null;
   saleStartAt?: string | null;
   saleEndAt?: string | null;
-  likesCount?: number | null;
+  threadsCount?: number | null;
   commentsCount?: number | null;
   // When requested with counts=combined, backend may supply combined total
   combinedCommentsCount?: number | null;
-  patchesCount?: number | null;
+  collectionCollabCount?: number | null;
   tags: string[];
   media: MarketMedia;
-  isLiked?: boolean; // Backend includes this for authenticated users
+  isThreaded?: boolean; // Backend includes this for authenticated users
 }
 
 export interface MarketFeedResponse {

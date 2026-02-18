@@ -3,8 +3,8 @@ export interface MediaItem {
   isPrimary?: boolean;
 }
 
-export const normalizePrimary = <T extends MediaItem>(items: T[]): T[] => {
-  if (items.length === 0) return items;
+export const normalizePrimary = <T extends MediaItem>(items: T[]): Array<T & { isPrimary: boolean }> => {
+  if (items.length === 0) return [] as Array<T & { isPrimary: boolean }>;
   const primaryIndex = items.findIndex((item) => item.isPrimary);
   if (primaryIndex === -1) {
     return items.map((item, idx) => ({ ...item, isPrimary: idx === 0 }));
@@ -12,7 +12,7 @@ export const normalizePrimary = <T extends MediaItem>(items: T[]): T[] => {
   return items.map((item, idx) => ({ ...item, isPrimary: idx === primaryIndex }));
 };
 
-export const setPrimary = <T extends MediaItem>(items: T[], id: string): T[] => {
+export const setPrimary = <T extends MediaItem>(items: T[], id: string): Array<T & { isPrimary: boolean }> => {
   return items.map((item) => ({ ...item, isPrimary: item.id === id }));
 };
 

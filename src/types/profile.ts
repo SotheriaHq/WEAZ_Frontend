@@ -15,7 +15,7 @@ export interface CollectionDto {
   createdAt: string;
   updatedAt: string;
   postsCount?: number;
-  likesCount?: number;
+  threadsCount?: number;
   commentsCount?: number;
   minPrice?: number;
   maxPrice?: number;
@@ -29,7 +29,7 @@ export interface CollectionDto {
   brandLogoFileId?: string;
   isAvailableInStore?: boolean;
   tags?: string[];
-  isLiked?: boolean; // Backend includes this for authenticated users
+  isThreaded?: boolean; // Backend includes this for authenticated users
   // Client-only status metadata for optimistic publish/progress states
   clientStatus?: 'publishing' | 'publish-failed';
   clientStatusMessage?: string;
@@ -94,6 +94,7 @@ export interface BrandProfileDto {
   averageRating?: number;
   totalReviews?: number;
   collectionsCount?: number;
+  patchesCount?: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,14 +1,17 @@
 import { ReactionsApi } from '@/api/ReactionsApi';
 
 type QueueItem = { kind: 'COLLECTION_TOGGLE' | 'COLLECTION_MEDIA_TOGGLE'; id: string; ts: number };
-const KEY = 'offline_like_queue_v1';
+const KEY = 'offline_thread_queue_v1';
 
 function load(): QueueItem[] {
   try { return JSON.parse(localStorage.getItem(KEY) || '[]') as QueueItem[]; } catch { return []; }
 }
 function save(items: QueueItem[]) { localStorage.setItem(KEY, JSON.stringify(items)); }
 
-export const OfflineLikes = {
+let _threadsBound = false;
+const _threadsOnlineHandler = () => { void OfflineThreads.flush(); };
+
+export const OfflineThreads = {
   enqueueCollectionToggle(id: string) {
     const items = load();
     items.push({ kind: 'COLLECTION_TOGGLE', id, ts: Date.now() });
@@ -26,9 +29,9 @@ export const OfflineLikes = {
     for (const it of items) {
       try {
         if (it.kind === 'COLLECTION_TOGGLE') {
-          await ReactionsApi.toggleCollectionLike(it.id);
+          await ReactionsApi.toggleCollectionThread(it.id);
         } else if (it.kind === 'COLLECTION_MEDIA_TOGGLE') {
-          await ReactionsApi.toggleCollectionMediaLike(it.id);
+          await ReactionsApi.toggleCollectionMediaThread(it.id);
         }
       } catch {
         remaining.push(it); // keep for later if failed
@@ -37,12 +40,18 @@ export const OfflineLikes = {
     save(remaining);
   },
   attach() {
-    window.addEventListener('online', () => { void OfflineLikes.flush(); });
+    if (_threadsBound) return;
+    window.addEventListener('online', _threadsOnlineHandler);
+    _threadsBound = true;
+  },
+  detach() {
+    if (!_threadsBound) return;
+    window.removeEventListener('online', _threadsOnlineHandler);
+    _threadsBound = false;
   },
 };
 
 // auto attach on import
 if (typeof window !== 'undefined') {
-  OfflineLikes.attach();
+  OfflineThreads.attach();
 }
-

@@ -6,9 +6,9 @@ import ComingSoon from './ComingSoon';
  */
 const SubscriptionsPlaceholder: React.FC = () => (
   <ComingSoon
-    title="Subscriptions"
-    description="Follow your favorite brands and creators to get exclusive content, early access to drops, and special member perks."
-    emoji="📺"
+    title="Patches"
+    description="Connect with your favorite brands and creators to get exclusive content, early access to drops, and special member perks."
+    emoji="🔧"
     variant="social"
     eta="Q1 2025"
     features={[

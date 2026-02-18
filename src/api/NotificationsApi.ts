@@ -30,6 +30,12 @@ export class NotificationsApi {
     return (payload?.data ?? payload) as { success: boolean; count: number };
   }
 
+  static async delete(id: string): Promise<{ success: boolean; id: string }> {
+    const response = await apiClient.delete(`/notifications/${id}`);
+    const payload = response.data;
+    return (payload?.data ?? payload) as { success: boolean; id: string };
+  }
+
   static async getSettings(): Promise<any> {
     const response = await apiClient.get('/notifications/settings');
     return response.data?.data ?? response.data;

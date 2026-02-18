@@ -43,18 +43,18 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           aria-labelledby="confirm-title"
           aria-describedby="confirm-message"
           tabIndex={-1}
-          className="relative w-[90%] max-w-sm rounded-lg bg-white dark:bg-gray-900 shadow-xl border border-gray-200/70 dark:border-white/10 p-4 outline-none"
+          className="relative w-[90%] max-w-sm rounded-2xl neu-modal-surface shadow-xl p-4 outline-none"
         >
-          <h2 id="confirm-title" className="text-base font-semibold text-gray-900 dark:text-white mb-2">
+          <h2 id="confirm-title" className="text-base font-semibold text-[color:var(--neu-text)] mb-2">
             {title}
           </h2>
-          <p id="confirm-message" className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+          <p id="confirm-message" className="text-sm neu-text-muted mb-4">
             {message}
           </p>
           <div className="flex justify-end gap-2">
             <button
               onClick={onCancel}
-              className="px-3 py-1.5 rounded-md text-sm font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+              className="px-3 py-1.5 rounded-md text-sm font-medium neu-modal-inset text-[color:var(--neu-text)]"
             >
               {cancelText}
             </button>

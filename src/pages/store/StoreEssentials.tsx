@@ -2,19 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
-import { ArrowRight, Sparkles, Store, Instagram, CheckCircle2, Circle, Star } from 'lucide-react';
+import { ArrowRight, Sparkles, Store, CheckCircle2, Circle } from 'lucide-react';
 import type { RootState } from '@/store';
 import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
 import Input from '@/components/ui/Input';
 
 const MAX_CATEGORIES = 3;
+const MAX_DESCRIPTION = 500;
 const LOCAL_PROGRESS_KEY = 'store-progress';
-
-const normalizeInstagramHandle = (value: string): string => {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  return trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
-};
 
 const getCategoryEmoji = (nameOrSlug: string): string | null => {
   const value = nameOrSlug.toLowerCase();
@@ -38,7 +33,6 @@ const StoreEssentials: React.FC = () => {
 
   const [selected, setSelected] = useState<string[]>([]);
   const [tagline, setTagline] = useState('');
-  const [instagram, setInstagram] = useState('');
   const [description, setDescription] = useState('');
 
   const brandName = useMemo(() => {
@@ -67,8 +61,10 @@ const StoreEssentials: React.FC = () => {
 
         // Best-effort prefill for quick-start
         if (prefill.brand?.tagline) setTagline(prefill.brand.tagline);
-        if (prefill.brand?.instagram) setInstagram(prefill.brand.instagram);
         if (prefill.brand?.description) setDescription(prefill.brand.description);
+        if (prefill.brand?.tags?.length) {
+          setSelected(prefill.brand.tags.slice(0, MAX_CATEGORIES));
+        }
       } catch (error) {
         // If this fails, still render with empty lists; wizard will have fallback categories.
         console.error('Failed to load store essentials prefill', error);
@@ -130,28 +126,33 @@ const StoreEssentials: React.FC = () => {
     []
   );
 
-  const canContinue = selected.length > 0;
+  const descriptionValid = description.trim().length > 0;
+  const canContinue = selected.length > 0 && descriptionValid;
+  const canSkip = descriptionValid;
 
   const persistAndContinue = useCallback(
     async (skipCategories: boolean) => {
-      const cleanInstagram = normalizeInstagramHandle(instagram);
       const payload = {
         tags: skipCategories ? [] : selected,
         tagline: tagline.trim(),
         description: description.trim(),
-        socialInstagram: cleanInstagram,
+      };
+      const localProgress = {
+        categories: skipCategories ? [] : selected,
+        tagline: tagline.trim(),
+        description: description.trim(),
+        step: 1,
+        essentialsComplete: true,
       };
 
       try {
+        localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(localProgress));
+      } catch {
+        // ignore storage errors; onboarding can still continue
+      }
+
+      try {
         await updateStoreProfile(payload);
-        localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify({
-          categories: skipCategories ? [] : selected,
-          tagline: tagline.trim(),
-          instagram: cleanInstagram,
-          description: description.trim(),
-          step: 1,
-          essentialsComplete: true,
-        }));
       } catch (error) {
         console.error('Failed to save store essentials', error);
         // Don’t block onboarding on transient failures.
@@ -159,7 +160,7 @@ const StoreEssentials: React.FC = () => {
 
       navigate('/studio/store/setup', { replace: true });
     },
-    [description, instagram, navigate, selected, tagline]
+    [description, navigate, selected, tagline]
   );
 
   const selectedLabels = useMemo(() => {
@@ -264,26 +265,26 @@ const StoreEssentials: React.FC = () => {
                 </div>
               </div>
 
-              {/* Instagram */}
+              {/* Description */}
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-semibold text-gray-700">Instagram Handle</span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                    <Star className="w-3 h-3 mr-1" />
-                    Recommended for verification
-                  </span>
-                </div>
-                <Input
-                  label=""
-                  value={instagram}
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Store Description <span className="text-purple-500">*</span>
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION))}
+                  maxLength={MAX_DESCRIPTION}
                   disabled={isLoading}
-                  onChange={(e) => setInstagram(e.target.value)}
-                  placeholder="username"
-                  startIcon={<span className="text-gray-500 font-medium">@</span>}
-                  endIcon={normalizeInstagramHandle(instagram) ? <Instagram className="w-4 h-4 text-pink-500" /> : null}
+                  rows={4}
+                  placeholder="Tell shoppers what your brand is about..."
+                  className="w-full rounded-xl border border-gray-300/80 bg-white/80 px-4 py-3 text-sm font-medium text-gray-900 shadow-sm transition-all duration-200 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/30 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:opacity-60"
                 />
-                <p className="text-xs text-gray-500 mt-1">Connect for trust badge & cross-promotion</p>
+                <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
+                  <span>Required to publish your store.</span>
+                  <span>{description.length}/{MAX_DESCRIPTION}</span>
+                </div>
               </div>
+
             </div>
 
             {/* Live Preview */}
@@ -297,11 +298,6 @@ const StoreEssentials: React.FC = () => {
                       <h3 className="text-lg font-bold text-gray-900">{brandName}</h3>
                       <p className="text-sm text-gray-600 mt-1 min-h-[20px]">{tagline.trim() || ''}</p>
                     </div>
-                    {normalizeInstagramHandle(instagram) ? (
-                      <div className="text-pink-500">
-                        <Instagram className="w-5 h-5" />
-                      </div>
-                    ) : null}
                   </div>
                   <div className="flex flex-wrap gap-2 mt-3">
                     {selectedLabels.map((label) => (
@@ -339,13 +335,19 @@ const StoreEssentials: React.FC = () => {
                   <span className="text-sm text-gray-400">Tagline (optional)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Circle className="w-4 h-4 text-gray-300" />
-                  <span className="text-sm text-gray-400">Instagram (optional)</span>
+                  {descriptionValid ? (
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <Circle className="w-4 h-4 text-gray-300" />
+                  )}
+                  <span className={"text-sm " + (descriptionValid ? 'text-gray-700' : 'text-gray-500')}>
+                    Description
+                  </span>
                 </div>
               </div>
 
               <p className={"text-sm font-semibold mt-3 " + (canContinue ? 'text-green-600' : 'text-gray-400')}>
-                {canContinue ? 'Ready to continue!' : 'Select at least 1 category to continue'}
+                {canContinue ? 'Ready to continue!' : 'Add a description and select at least 1 category'}
               </p>
             </div>
 
@@ -362,7 +364,7 @@ const StoreEssentials: React.FC = () => {
               </button>
               <button
                 type="button"
-                disabled={isLoading}
+                disabled={isLoading || !canSkip}
                 onClick={() => void persistAndContinue(true)}
                 className="px-6 py-4 text-gray-600 font-medium hover:text-gray-800 transition-colors duration-200"
               >

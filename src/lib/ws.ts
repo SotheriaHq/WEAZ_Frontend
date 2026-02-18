@@ -10,6 +10,14 @@ export function getSocket(): Socket {
   return socket;
 }
 
+export function disconnectSocket(): void {
+  if (socket) {
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = null;
+  }
+}
+
 export function joinContentRoom(contentType: string, contentId: string, userId?: string) {
   const s = getSocket();
   s.emit('join', { room: `${contentType}:${contentId}`, userId });

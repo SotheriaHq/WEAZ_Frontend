@@ -226,7 +226,7 @@ const SignUpPage = () => {
         localStorage.removeItem('threadly.brandProfileSetup.dismissedUntil');
         navigate('/profile?modal=brand-setup&modalOrigin=prompt', { replace: true });
       } else {
-        navigate('/', { replace: true });
+        navigate('/profile', { replace: true });
       }
       setIsRedirecting(true);
       reset();
@@ -408,7 +408,7 @@ const SignUpPage = () => {
                       
                       {/* Feature List */}
                       <ul className="space-y-2">
-                        {['Exclusive drops', 'Follow designers', 'Create wishlists'].map((feat, i) => (
+                        {['Exclusive drops', 'Connect with designers', 'Create wishlists'].map((feat, i) => (
                            <li key={i} className="flex items-center gap-2 text-xs text-gray-200 font-medium">
                              <span className="feature-list-check"><Check className="w-2.5 h-2.5" /></span>
                              {feat}

@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import { Heart } from 'lucide-react';
+import { Link2 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import { optimisticToggle, reconcile, setLikeState, wsApplied, adjustAggregatedCollectionLikes } from '@/features/engagementSlice';
+import { optimisticToggle, reconcile, setThreadState, wsApplied, adjustAggregatedCollectionThreads } from '@/features/engagementSlice';
 import { ReactionsApi } from '@/api/ReactionsApi';
 import { useRealtime } from '@/realtime';
-import LikerListModal from '@/components/engagement/LikerListModal';
-import { OfflineLikes } from '@/lib/offlineLikes';
+import ThreadListModal from '@/components/engagement/ThreadListModal';
+import { OfflineThreads } from '@/lib/offlineThreads';
 import { toast } from 'sonner';
 
 type ContentType = 'COLLECTION' | 'COLLECTION_MEDIA';
@@ -15,18 +15,18 @@ type Props = {
   contentType: ContentType;
   contentId: string;
   initialCount?: number;
-  initialLiked?: boolean;
+  initialThreaded?: boolean;
   className?: string;
   size?: number;
   ownerId?: string;
-  parentCollectionId?: string; // For COLLECTION_MEDIA likes aggregation
+  parentCollectionId?: string; // For COLLECTION_MEDIA threads aggregation
 };
 
-const LikeButton: React.FC<Props> = ({ 
+const ThreadButton: React.FC<Props> = ({ 
   contentType, 
   contentId, 
   initialCount = 0, 
-  initialLiked, 
+  initialThreaded, 
   className, 
   size = 20,
   ownerId,
@@ -42,15 +42,15 @@ const LikeButton: React.FC<Props> = ({
   const item = useMemo(() => {
     if (stateItem) {
       return {
-        likedByMe: stateItem.likedByMe ?? !!initialLiked,
-        likeCount: stateItem.likeCount ?? initialCount
+        threadedByMe: stateItem.threadedByMe ?? !!initialThreaded,
+        threadCount: stateItem.threadCount ?? initialCount
       };
     }
     return {
-      likedByMe: !!initialLiked,
-      likeCount: initialCount
+      threadedByMe: !!initialThreaded,
+      threadCount: initialCount
     };
-  }, [stateItem, initialLiked, initialCount]);
+  }, [stateItem, initialThreaded, initialCount]);
   // const initKeyRef = useRef<string | null>(null); // no longer needed
   const me = useSelector((s: RootState) => s.user.profile?.id);
   const realtime = useRealtime();
@@ -63,61 +63,61 @@ const LikeButton: React.FC<Props> = ({
   useEffect(() => {
   // Establish realtime joins & subscriptions
     // Always join the room to get real-time updates
-  const { joinCollection, joinCollectionMedia, onLike } = realtime;
+  const { joinCollection, joinCollectionMedia, onThread } = realtime;
   if (contentType === 'COLLECTION') joinCollection(contentId);
   else if (contentType === 'COLLECTION_MEDIA') joinCollectionMedia(contentId);
 
-    // If initialLiked is provided, we can immediately set the state and avoid a fetch.
-    if (initialLiked !== undefined) {
-      dispatch(setLikeState({
+    // If initialThreaded is provided, we can immediately set the state and avoid a fetch.
+    if (initialThreaded !== undefined) {
+      dispatch(setThreadState({
         contentType,
         contentId,
-        likedByMe: initialLiked,
-        likeCount: initialCount,
+        threadedByMe: initialThreaded,
+        threadCount: initialCount,
       }));
       setInitializing(false);
     } else if (isAuth) {
       // Fetch only if the initial state is unknown and user is logged in.
       setInitializing(true);
       const fetchApi = contentType === 'COLLECTION_MEDIA'
-        ? ReactionsApi.getCollectionMediaIsLiked
-        : ReactionsApi.getCollectionIsLiked;
+        ? ReactionsApi.getCollectionMediaIsThreaded
+        : ReactionsApi.getCollectionIsThreaded;
 
       fetchApi(contentId)
-        .then(likeStatus => {
-          dispatch(setLikeState({
+        .then(threadStatus => {
+          dispatch(setThreadState({
             contentType,
             contentId,
-            likedByMe: !!likeStatus.liked,
-            likeCount: initialCount, // Count is fetched separately or comes from props
+            threadedByMe: !!threadStatus.threaded,
+            threadCount: initialCount, // Count is fetched separately or comes from props
           }));
         })
         .catch(() => {
           // On failure, fallback to the initial prop values.
-          dispatch(setLikeState({
+          dispatch(setThreadState({
             contentType,
             contentId,
-            likedByMe: false, // Assume not liked on error
-            likeCount: initialCount,
+            threadedByMe: false, // Assume not threaded on error
+            threadCount: initialCount,
           }));
         })
         .finally(() => setInitializing(false));
     } else {
       // Not authenticated and no initial value, so set to default.
-      dispatch(setLikeState({
+      dispatch(setThreadState({
         contentType,
         contentId,
-        likedByMe: false,
-        likeCount: initialCount,
+        threadedByMe: false,
+        threadCount: initialCount,
       }));
       setInitializing(false);
     }
 
-  const unsub = onLike(contentType, contentId, (p: any) => {
+  const unsub = onThread(contentType, contentId, (p: any) => {
       if (p.contentType === contentType && p.contentId === contentId) {
-        dispatch(wsApplied({ contentType, contentId, likeCount: p.likeCount }));
-        if (p.userId && me && ownerId && ownerId === me && p.userId !== me && p.likeCount > item.likeCount) {
-          toast.info('Someone liked your content!');
+        dispatch(wsApplied({ contentType, contentId, threadCount: p.threadCount }));
+        if (p.userId && me && ownerId && ownerId === me && p.userId !== me && p.threadCount > item.threadCount) {
+          toast.info('Someone threaded your content!');
         }
       }
     });
@@ -131,7 +131,7 @@ const LikeButton: React.FC<Props> = ({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentType, contentId, dispatch, isAuth, initialCount, initialLiked, ownerId]);
+  }, [contentType, contentId, dispatch, isAuth, initialCount, initialThreaded, ownerId]);
 
   const toggle = async () => {
     // Prevent multiple simultaneous requests - strict deduplication
@@ -142,7 +142,7 @@ const LikeButton: React.FC<Props> = ({
 
     // Show toast and abort if user is not authenticated
     if (!isAuth) {
-      toast.info('Please sign in to like items.');
+      toast.info('Please sign in to thread items.');
       return;
     }
 
@@ -154,23 +154,23 @@ const LikeButton: React.FC<Props> = ({
     // Increment version to track request order
     const thisRequestVersion = ++requestVersionRef.current;
 
-    const next = !item.likedByMe;
-    const previousLikeCount = item.likeCount;
-    dispatch(optimisticToggle({ contentType, contentId, nextLiked: next }));
-    // Optimistically bump aggregated collection likes if liking media
+    const next = !item.threadedByMe;
+    const previousThreadCount = item.threadCount;
+    dispatch(optimisticToggle({ contentType, contentId, nextThreaded: next }));
+    // Optimistically bump aggregated collection threads if threading media
     if (contentType === 'COLLECTION_MEDIA' && parentCollectionId) {
       const delta = next ? 1 : -1;
-      dispatch(adjustAggregatedCollectionLikes({ collectionId: parentCollectionId, delta }));
+      dispatch(adjustAggregatedCollectionThreads({ collectionId: parentCollectionId, delta }));
     }
     setBusy(true);
 
     try {
-      let res: { likes: number };
+      let res: { threads: number };
 
       if (contentType === 'COLLECTION') {
-        res = await ReactionsApi.toggleCollectionLike(contentId);
+        res = await ReactionsApi.toggleCollectionThread(contentId);
       } else {
-        res = await ReactionsApi.toggleCollectionMediaLike(contentId);
+        res = await ReactionsApi.toggleCollectionMediaThread(contentId);
       }
 
       // Only reconcile if this is still the latest request
@@ -180,17 +180,17 @@ const LikeButton: React.FC<Props> = ({
         dispatch(reconcile({
           contentType,
           contentId,
-          likeCount: res.likes,
-          likedByMe: next
+          threadCount: res.threads,
+          threadedByMe: next
         }));
-        // Reconcile aggregated collection likes using actual delta if media like
+        // Reconcile aggregated collection threads using actual delta if media thread
         if (contentType === 'COLLECTION_MEDIA' && parentCollectionId) {
-          const delta = res.likes - previousLikeCount;
+          const delta = res.threads - previousThreadCount;
           if (delta !== (next ? 1 : -1)) {
             // Adjust difference between optimistic and actual delta
             const correction = delta - (next ? 1 : -1);
             if (correction !== 0) {
-              dispatch(adjustAggregatedCollectionLikes({ collectionId: parentCollectionId, delta: correction }));
+              dispatch(adjustAggregatedCollectionThreads({ collectionId: parentCollectionId, delta: correction }));
             }
           }
         }
@@ -207,18 +207,18 @@ const LikeButton: React.FC<Props> = ({
         if (!navigator.onLine) {
           // Queue toggle for offline handling (collection or media)
           if (contentType === 'COLLECTION') {
-            OfflineLikes.enqueueCollectionToggle(contentId);
+            OfflineThreads.enqueueCollectionToggle(contentId);
           } else if (contentType === 'COLLECTION_MEDIA') {
-            OfflineLikes.enqueueCollectionMediaToggle(contentId);
+            OfflineThreads.enqueueCollectionMediaToggle(contentId);
           }
           // Keep optimistic state; reconciliation will happen on flush
         } else {
           // Revert optimistic update on error
-          dispatch(optimisticToggle({ contentType, contentId, nextLiked: !next }));
-          // Roll back optimistic aggregation if media like failed
+          dispatch(optimisticToggle({ contentType, contentId, nextThreaded: !next }));
+          // Roll back optimistic aggregation if media thread failed
           if (contentType === 'COLLECTION_MEDIA' && parentCollectionId) {
             const rollbackDelta = next ? -1 : 1;
-            dispatch(adjustAggregatedCollectionLikes({ collectionId: parentCollectionId, delta: rollbackDelta }));
+            dispatch(adjustAggregatedCollectionThreads({ collectionId: parentCollectionId, delta: rollbackDelta }));
           }
         }
       }
@@ -241,7 +241,7 @@ const LikeButton: React.FC<Props> = ({
           void toggle();
         }}
         disabled={busy && pendingActionsCount.current >= 3}
-        aria-label={item.likedByMe ? "Unlike" : "Like"}
+        aria-label={item.threadedByMe ? "Unthread" : "Thread"}
         className={`transition-transform disabled:opacity-60 disabled:cursor-not-allowed hover:scale-110 ${
           busy ? 'animate-pulse' : ''
         }`}
@@ -250,11 +250,11 @@ const LikeButton: React.FC<Props> = ({
           style={{ width: size, height: size }}
           className="flex items-center justify-center"
         >
-          <Heart
+          <Link2
             className={`transition-colors duration-200 ${
-              item.likedByMe
-                ? 'fill-red-600 text-red-600'
-                : 'fill-transparent text-white'
+              item.threadedByMe
+                ? 'text-indigo-500'
+                : 'text-white'
             }`}
             width={size}
             height={size}
@@ -268,11 +268,11 @@ const LikeButton: React.FC<Props> = ({
           setOpen(true);
         }}
         className="text-xs font-bold drop-shadow text-white hover:text-rose-300 transition-colors mt-1"
-        aria-label={`View ${item.likeCount ?? 0} likes`}
+        aria-label={`View ${item.threadCount ?? 0} threads`}
       >
-        {item.likeCount ?? 0}
+        {item.threadCount ?? 0}
       </button>
-      <LikerListModal
+      <ThreadListModal
         open={open}
         onClose={() => setOpen(false)}
         contentId={contentId}
@@ -282,5 +282,5 @@ const LikeButton: React.FC<Props> = ({
   );
 };
 
-export default LikeButton;
+export default ThreadButton;
 

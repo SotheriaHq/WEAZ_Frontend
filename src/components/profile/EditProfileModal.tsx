@@ -12,6 +12,7 @@ import UniversalSelect from '../forms/UniversalSelect';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { BRAND_TAG_OPTIONS } from '../../data/brandTags';
 
 // ----------------------------------------------------------------------------
 // Zod Schemas & Helpers
@@ -56,6 +57,7 @@ const profileSchema = z.object({
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
+const MAX_TAGS = 5;
 
 const getFirstErrorMessage = (errors: unknown): string | null => {
   if (!errors) return null;
@@ -142,8 +144,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [cities, setCities] = useState<string[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
 
-  // Tags State (Local management for string input)
-  const [tagsInput, setTagsInput] = useState('');
+  // Tags State
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [tagError, setTagError] = useState<string | null>(null);
 
   // Initial Values
   const initialValues = useMemo<ProfileFormValues>(() => {
@@ -157,7 +160,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       brandCountry: brandProfile?.country || user.brandCountry || '',
       brandState: brandProfile?.state || user.brandState || '',
       brandCity: brandProfile?.city || user.brandCity || '',
-      brandTags: brandProfile?.tags || user.brandTags || [],
+      brandTags:
+        brandProfile?.tags ||
+        user.brandTags ||
+        BRAND_TAG_OPTIONS.slice(0, 3).map((tag) => tag.value),
       socialInstagram: brandProfile?.socialLinks?.instagram || user.socialInstagram || '',
       socialFacebook: brandProfile?.socialLinks?.facebook || user.socialFacebook || '',
       socialTwitter: brandProfile?.socialLinks?.twitter || user.socialTwitter || '',
@@ -187,13 +193,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const selectedCountry = watch('brandCountry');
   const selectedState = watch('brandState');
 
-  // Helper to init tags string
+  // Initialize selected tags from profile/user
   useEffect(() => {
-    if (initialValues.brandTags && initialValues.brandTags.length > 0) {
-      setTagsInput(initialValues.brandTags.join(', '));
-    } else {
-      setTagsInput('');
-    }
+    setSelectedTags(initialValues.brandTags ?? []);
+    setTagError(null);
   }, [initialValues]);
 
   // Load Countries on Mount
@@ -260,25 +263,31 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const onSubmit = useCallback(
     async (values: ProfileFormValues) => {
       try {
-        // Parse tags from local state
-        const parsedTags = tagsInput
-          .split(',')
-          .map(t => t.trim())
-          .filter(t => t.length > 0);
+        if (selectedTags.length === 0) {
+          setTagError('Select at least one tag.');
+          toast.error('Select at least one tag.');
+          return;
+        }
+
+        const brandCountry = values.brandCountry?.trim() || undefined;
+        const brandState = values.brandState?.trim() || undefined;
+        const brandCity = values.brandCity?.trim() || undefined;
+        const phoneNumber = values.phoneNumber?.trim() || undefined;
+        const businessType = values.businessType?.trim() || undefined;
 
         const payload: UpdateBrandProfilePayload = {
           brandFullName: values.brandFullName.trim(),
           brandDescription: values.brandDescription.trim(),
-          brandCountry: values.brandCountry ?? '',
-          brandState: values.brandState ?? '',
-          brandCity: values.brandCity ?? '',
-          brandTags: parsedTags,
+          brandCountry,
+          brandState,
+          brandCity,
+          brandTags: selectedTags,
           socialInstagram: normalizeSocialLink('instagram', values.socialInstagram),
           socialFacebook: normalizeSocialLink('facebook', values.socialFacebook),
           socialTwitter: normalizeSocialLink('twitter', values.socialTwitter),
           socialWebsite: normalizeSocialLink('website', values.socialWebsite),
-          phoneNumber: values.phoneNumber?.trim() ?? '',
-          businessType: values.businessType?.trim() ?? '',
+          phoneNumber,
+          businessType,
         };
 
         const updatedUser = await brandApi.updateBrandProfile(user.id, payload);
@@ -292,7 +301,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         else toast.error('Unable to update profile.');
       }
     },
-    [onSaved, user.id, onClose, tagsInput],
+    [onSaved, user.id, onClose, selectedTags],
   );
 
   const onInvalid = useCallback(
@@ -331,6 +340,32 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     value: c,
     label: c
   })), [cities]);
+
+  const tagOptions = useMemo(() => {
+    const base = BRAND_TAG_OPTIONS;
+    const baseValues = new Set(base.map((tag) => tag.value));
+    const extras = selectedTags
+      .filter((tag) => tag && !baseValues.has(tag))
+      .map((tag) => ({ label: tag, value: tag }));
+    return [...extras, ...base];
+  }, [selectedTags]);
+
+  const toggleTag = (value: string) => {
+    setSelectedTags((prev) => {
+      if (prev.includes(value)) {
+        const next = prev.filter((tag) => tag !== value);
+        if (tagError && next.length > 0) setTagError(null);
+        return next;
+      }
+      if (prev.length >= MAX_TAGS) {
+        setTagError(`Choose up to ${MAX_TAGS} tags.`);
+        return prev;
+      }
+      const next = [...prev, value];
+      if (tagError && next.length > 0) setTagError(null);
+      return next;
+    });
+  };
 
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -483,16 +518,32 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 <div className="space-y-2">
                     <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                         Brand Tags 
-                        <span className="ml-2 text-xs font-normal text-gray-500">(Keywords for discovery)</span>
+                        <span className="ml-2 text-xs font-normal text-gray-500">(Select up to {MAX_TAGS})</span>
                     </label>
-                    <input 
-                        type="text" 
-                        value={tagsInput}
-                        onChange={(e) => setTagsInput(e.target.value)}
-                        placeholder="e.g. minimalist, sustainable, luxury, streetwear (comma separated)" 
-                        className="w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" 
-                    />
-                    <p className="text-xs text-gray-500">Add at least one tag to help users find you.</p>
+                    <div className="flex flex-wrap gap-2 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                      {tagOptions.map((tag) => {
+                        const isSelected = selectedTags.includes(tag.value);
+                        return (
+                          <button
+                            key={tag.value}
+                            type="button"
+                            onClick={() => toggleTag(tag.value)}
+                            disabled={isSubmitting}
+                            className={`px-4 py-2 rounded-full text-xs font-semibold transition ${
+                              isSelected
+                                ? 'bg-purple-600 text-white shadow-md'
+                                : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }`}
+                          >
+                            #{tag.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {tagError && <p className="text-xs text-red-500 mt-1 font-medium">{tagError}</p>}
+                    {!tagError && (
+                      <p className="text-xs text-gray-500">Add at least one tag to help users find you.</p>
+                    )}
                 </div>
               </div>
             </div>

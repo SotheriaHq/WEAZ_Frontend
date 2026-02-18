@@ -8,12 +8,9 @@ import StoreProductsPanel from '@/components/studio/store/StoreProductsPanel';
 import { brandApi } from '@/api/BrandApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
+import { clearStoreOpenPending, isStoreOpenPending, resolveStoreSetupDestination, sleep } from '@/utils/storeSetup';
 import {
-  BarChart3,
-  Boxes,
   Eye,
-  Settings,
-  ShoppingBag,
 } from 'lucide-react';
 
 export default function StoreManagement() {
@@ -28,6 +25,8 @@ export default function StoreManagement() {
   const [analyticsOpen] = useState(true);
   const [analyticsCollapsed, setAnalyticsCollapsed] = useState(true);
   const [layoutMode, setLayoutMode] = useState(false);
+  const [draftCollections, setDraftCollections] = useState<any[]>([]);
+  const [draftCollectionsLoading, setDraftCollectionsLoading] = useState(false);
 
   const avatarInitial = user?.profileImage ?? user?.profileImageFile?.s3Url ?? null;
   const { url: avatarUrl } = useSignedFileUrl(user?.profileImageId, avatarInitial);
@@ -72,30 +71,51 @@ export default function StoreManagement() {
     const run = async () => {
       try {
         setLoading(true);
-        const s = await getStoreStatus();
+        let s = await getStoreStatus();
+
+        if (!s?.isStoreOpen && isStoreOpenPending()) {
+          for (let attempt = 0; attempt < 5; attempt += 1) {
+            await sleep(500);
+            try {
+              const retryStatus = await getStoreStatus();
+              s = retryStatus;
+              if (retryStatus?.isStoreOpen) {
+                break;
+              }
+            } catch {
+              // Keep trying while in pending-open grace period.
+            }
+          }
+        }
+
         if (!mounted) return;
         setStatus(s);
 
+        if (s?.isStoreOpen) {
+          clearStoreOpenPending();
+        }
+
         if (s?.profile == null) {
+          if (isStoreOpenPending()) {
+            return;
+          }
           navigate('/studio/store/setup', { replace: true });
           return;
         }
 
-        if (s?.isStoreOpen === false && s?.isSetupComplete === false) {
-          let hasEssentials = false;
-          try {
-            const raw = localStorage.getItem('store-progress');
-            const parsed = raw ? JSON.parse(raw) : null;
-            hasEssentials = Boolean(parsed?.essentialsComplete);
-          } catch {
-            hasEssentials = false;
+        if (!s?.isStoreOpen) {
+          if (isStoreOpenPending()) {
+            return;
           }
 
-          navigate(hasEssentials ? '/studio/store/setup' : '/studio/store/essentials', { replace: true });
+          navigate(resolveStoreSetupDestination(), { replace: true });
         }
       } catch (e) {
         const code = (e as any)?.response?.status;
         if (code === 404) {
+          if (isStoreOpenPending()) {
+            return;
+          }
           navigate('/studio/store/setup', { replace: true });
           return;
         }
@@ -155,6 +175,29 @@ export default function StoreManagement() {
     };
   }, [brandName, status?.isStoreOpen, user?.id, user?.username]);
 
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      if (!user?.id) return;
+      setDraftCollectionsLoading(true);
+      try {
+        const drafts = await brandApi.getMyDraftCollections();
+        if (!mounted) return;
+        setDraftCollections(drafts || []);
+      } catch (error) {
+        if (!mounted) return;
+        setDraftCollections([]);
+      } finally {
+        if (mounted) setDraftCollectionsLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
+
   if (loading) {
     return (
       <div className="animate-in fade-in duration-300">
@@ -174,121 +217,127 @@ export default function StoreManagement() {
     );
   }
 
-  // If store isn't open, we already redirected to wizard.
-  if (status.isStoreOpen === false) return null;
+  // If store isn't open, we already redirected to the setup flow.
+  if (!status.isStoreOpen) {
+    if (isStoreOpenPending()) {
+      return (
+        <div className="rounded-2xl bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 p-6">
+          <div className="text-gray-900 dark:text-white font-semibold">Finalizing Store</div>
+          <div className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+            Your store is being activated. This usually takes a few seconds.
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* ═══ Compact Brand Bar ═══ */}
       <div className="sticky top-0 z-30">
-        <div className="backdrop-blur-xl bg-purple-50/70 dark:bg-white/5 border border-purple-200/50 dark:border-white/10 rounded-2xl px-5 py-3 shadow-lg">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-4 text-sm font-medium">
-              <button
-                type="button"
-                onClick={() => navigate('/studio?tab=overview')}
-                className="flex items-center gap-2 text-purple-700 dark:text-purple-300 hover:text-purple-900"
-              >
-                <BarChart3 className="w-4 h-4" />
-                Dashboard
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/studio?tab=orders')}
-                className="flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:text-purple-700"
-              >
-                <ShoppingBag className="w-4 h-4" />
-                Orders
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/studio?tab=store')}
-                className="flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:text-purple-700"
-              >
-                <Boxes className="w-4 h-4" />
-                Inventory
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/profile/settings')}
-                className="flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:text-purple-700"
-              >
-                <Settings className="w-4 h-4" />
-                Settings
-              </button>
+        <div className="backdrop-blur-xl bg-white/90 dark:bg-[#111118]/90 border border-gray-200/60 dark:border-white/10 rounded-2xl px-4 py-3 shadow-lg">
+          <div className="flex items-center gap-4">
+            {/* Avatar */}
+            <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl border-2 border-white dark:border-white/10 shadow-md">
+              {avatarUrl ? (
+                <MediaRenderer
+                  kind="image"
+                  src={avatarUrl}
+                  alt={brandName}
+                  fit="cover"
+                  className="h-full w-full"
+                  mediaClassName="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-600 to-indigo-600 text-sm font-bold text-white">
+                  {brandName.charAt(0) || 'S'}
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-2 rounded-full border border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/10 px-4 py-2 text-sm font-semibold text-green-700 dark:text-green-300">
-              <span className="text-lg">{status?.isStoreOpen ? '🟢' : '🟡'}</span>
+            {/* Brand name + tagline */}
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base font-bold text-gray-900 dark:text-white truncate leading-tight">{brandName}</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate leading-tight mt-0.5">{brandDescription}</p>
+            </div>
+
+            {/* Emoji feature badges with hover tooltips */}
+            <div className="hidden sm:flex items-center gap-1">
+              {/* Reviews */}
+              <div className="relative group">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-default text-sm">
+                  {kpis.reviewScore ? '⭐' : '☆'}
+                </span>
+                <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+                  {kpis.reviewScore
+                    ? `${kpis.reviewScore.toFixed(1)} (${kpis.reviewCount || 0} reviews)`
+                    : 'No reviews yet'}
+                </span>
+              </div>
+
+              {/* Location */}
+              {brandLocation && (
+                <div className="relative group">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-default text-sm">📍</span>
+                  <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+                    {brandLocation}
+                  </span>
+                </div>
+              )}
+
+              {/* Shipping */}
+              <div className="relative group">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-default text-sm">🚚</span>
+                <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+                  Ships Nationwide
+                </span>
+              </div>
+
+              {/* Verification */}
+              <div className="relative group">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-default text-sm">
+                  {user?.isEmailVerified ? '✅' : '⏳'}
+                </span>
+                <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+                  {user?.isEmailVerified ? 'Verified Seller' : 'Verification Pending'}
+                </span>
+              </div>
+
+              {/* Buyer Protection */}
+              <div className="relative group">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-default text-sm">🛡️</span>
+                <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+                  Buyer Protection
+                </span>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="h-6 w-px bg-gray-200 dark:bg-white/10 hidden sm:block" />
+
+            {/* Live badge */}
+            <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+              status?.isStoreOpen
+                ? 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-500/30'
+                : 'bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-500/30'
+            }`}>
+              <span className="text-xs">{status?.isStoreOpen ? '🟢' : '🟡'}</span>
               {status?.isStoreOpen ? 'Live' : 'Draft'}
             </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/profile')}
-                className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:border-purple-300"
-              >
-                <Eye className="w-4 h-4" />
+            {/* Preview as visitor */}
+            <button
+              type="button"
+              onClick={() => navigate('/profile')}
+              className="relative group flex-shrink-0 h-9 w-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-white/10 hover:text-purple-600 dark:hover:text-purple-400 hover:scale-105 active:scale-95 transition-all flex items-center justify-center shadow-sm"
+              aria-label="Preview as visitor"
+            >
+              <Eye className="w-4 h-4" />
+              <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
                 Preview as visitor
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/profile/settings')}
-                className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20"
-              >
-                Publish Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="relative px-2 md:px-6">
-        <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-[#10101b]/90 p-6 shadow-xl">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
-              <div className="relative h-28 w-28 overflow-hidden rounded-2xl border-4 border-white dark:border-[#0d0d15] shadow-lg">
-                {avatarUrl ? (
-                  <MediaRenderer
-                    kind="image"
-                    src={avatarUrl}
-                    alt={brandName}
-                    fit="cover"
-                    className="h-full w-full"
-                    mediaClassName="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-600 to-indigo-600 text-xl font-bold text-white">
-                    {brandName.charAt(0) || 'S'}
-                  </div>
-                )}
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{brandName}</h1>
-                <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-300">{brandDescription}</p>
-                <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                  {kpis.reviewScore ? (
-                    <span className="flex items-center gap-2">
-                      <span className="text-yellow-400">★★★★★</span>
-                      {kpis.reviewScore.toFixed(1)} ({kpis.reviewCount || 0} reviews)
-                    </span>
-                  ) : (
-                    <span className="text-gray-500">No reviews yet</span>
-                  )}
-                  {brandLocation && <span>📍 {brandLocation}</span>}
-                  <span>🚚 Ships Nationwide</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold ${user?.isEmailVerified ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>
-                {user?.isEmailVerified ? '✓ Verified Seller' : '⏳ Verification Pending'}
-              </div>
-              <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
-                🛡️ Buyer Protection
-              </div>
-            </div>
+              </span>
+            </button>
           </div>
         </div>
       </div>
@@ -326,56 +375,12 @@ export default function StoreManagement() {
         ))}
       </div>
 
-      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/studio/store/products/new')}
-              className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg"
-            >
-              ➕ Add Product
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/studio/store/collections/new')}
-              className="rounded-lg bg-purple-50 px-4 py-2.5 text-sm font-semibold text-purple-700 hover:bg-purple-100"
-            >
-              📦 Add Collection
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/profile/collections/create')}
-              className="rounded-lg bg-purple-50 px-4 py-2.5 text-sm font-semibold text-purple-700 hover:bg-purple-100"
-            >
-              🎨 Create Look
-            </button>
-            <button
-              type="button"
-              className="rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700"
-            >
-              🏷️ Bulk Edit
-            </button>
-            <button
-              type="button"
-              className="rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700"
-            >
-              📥 Import Products
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => setLayoutMode((prev) => !prev)}
-            className={`rounded-lg border px-4 py-2.5 text-sm font-semibold ${layoutMode ? 'border-purple-500 text-purple-700' : 'border-gray-200 text-gray-700'}`}
-          >
-            🎯 {layoutMode ? 'Exit' : 'Edit'} Layout Mode
-          </button>
-        </div>
-      </div>
-
-      <div>
-        <StoreProductsPanel layoutMode={layoutMode} />
-      </div>
+      <StoreProductsPanel
+        layoutMode={layoutMode}
+        onToggleLayoutMode={() => setLayoutMode((prev) => !prev)}
+        draftCollections={draftCollections}
+        draftCollectionsLoading={draftCollectionsLoading}
+      />
 
       {analyticsOpen && analyticsCollapsed && (
         <button

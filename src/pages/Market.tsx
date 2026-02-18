@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { RefreshCcw, WifiOff, ServerCrash, SearchX, Sparkles, TrendingUp, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Masonry from 'react-masonry-css';
@@ -11,6 +11,9 @@ import DesignSkeleton from '@/components/designs/DesignSkeleton';
 // Category chips live directly on page; tag chips removed for now
 import DesignViewModal from '@/components/designs/DesignViewModal';
 import { setEngagementState } from '@/features/engagementSlice';
+import { apiClient } from '@/api/httpClient';
+import { toast } from 'sonner';
+import type { RootState } from '@/store';
 
 // Error type detection
 type ErrorType = 'network' | 'timeout' | 'server' | 'empty' | 'category_empty' | 'unknown';
@@ -236,6 +239,13 @@ const Market: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const user = useSelector((s: RootState) => s.user.profile);
+  const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [patchMap, setPatchMap] = useState<Record<string, boolean>>({});
+  const [patchingIds, setPatchingIds] = useState<Set<string>>(new Set());
+  const isRegular = user?.type === 'REGULAR';
 
   const loadFeed = useCallback(async () => {
     // First load shows skeleton; subsequent loads use a soft overlay
@@ -253,15 +263,15 @@ const Market: React.FC = () => {
       });
       setItems(feed.items);
       
-      // Initialize Redux engagement state for all items (CRITICAL for like persistence & real-time comment sync)
+      // Initialize Redux engagement state for all items (CRITICAL for thread persistence & real-time comment sync)
       feed.items.forEach((item) => {
         dispatch(setEngagementState({
           contentType: 'COLLECTION_MEDIA',
           contentId: item.id,
-          likedByMe: item.isLiked ?? false,
-          likeCount: item.likesCount ?? 0,
+          threadedByMe: item.isThreaded ?? false,
+          threadCount: item.threadsCount ?? 0,
           commentCount: item.commentsCount ?? 0,
-          patchCount: item.patchesCount ?? 0,
+          collabCount: item.collectionCollabCount ?? 0,
         }));
       });
       
@@ -279,6 +289,68 @@ const Market: React.FC = () => {
   useEffect(() => {
     void loadFeed();
   }, [loadFeed]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadSaved = async () => {
+      if (!isAuth || items.length === 0) {
+        if (mounted) setSavedMap({});
+        return;
+      }
+      try {
+        const res = await apiClient.post('/saved/check/batch', {
+          targetType: 'COLLECTION_MEDIA',
+          targetIds: items.map((item) => item.id).filter(Boolean),
+        });
+        const list = res.data?.items ?? [];
+        if (mounted) {
+          const next: Record<string, boolean> = {};
+          for (const entry of list) {
+            if (entry?.targetId) next[entry.targetId] = Boolean(entry.isSaved);
+          }
+          setSavedMap(next);
+        }
+      } catch {
+        if (mounted) setSavedMap({});
+      }
+    };
+    void loadSaved();
+    return () => { mounted = false; };
+  }, [items, isAuth]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadPatches = async () => {
+      if (!isAuth || !isRegular || items.length === 0) {
+        if (mounted) setPatchMap({});
+        return;
+      }
+      const brandIds = Array.from(
+        new Set(items.map((item) => item.brandId).filter(Boolean))
+      ) as string[];
+      if (brandIds.length === 0) {
+        if (mounted) setPatchMap({});
+        return;
+      }
+      try {
+        const res = await apiClient.post('/brands/patches/check/batch', {
+          targetIds: brandIds,
+        });
+        const list = res.data?.items ?? [];
+        if (mounted) {
+          const next: Record<string, boolean> = {};
+          for (const entry of list) {
+            if (entry?.targetId) next[entry.targetId] = Boolean(entry.isPatched);
+          }
+          setPatchMap(next);
+        }
+      } catch {
+        if (mounted) setPatchMap({});
+      }
+    };
+    void loadPatches();
+    return () => { mounted = false; };
+  }, [items, isAuth, isRegular]);
   
   // Force reload when navigating back to this page (fixes image loading issue after route changes)
   useEffect(() => {
@@ -351,6 +423,61 @@ const Market: React.FC = () => {
         item.id === itemId ? { ...item, commentsCount: newCount } : item
       )
     );
+  };
+
+  const handleToggleSave = async (itemId: string) => {
+    if (!isAuth) {
+      toast.info('Please sign in to save items.');
+      return;
+    }
+    if (savingIds.has(itemId)) return;
+    try {
+      setSavingIds((prev) => new Set(prev).add(itemId));
+      const isSaved = Boolean(savedMap[itemId]);
+      if (isSaved) {
+        await apiClient.delete('/saved', { data: { targetType: 'COLLECTION_MEDIA', targetId: itemId } });
+      } else {
+        await apiClient.post('/saved', { targetType: 'COLLECTION_MEDIA', targetId: itemId });
+      }
+      setSavedMap((prev) => ({ ...prev, [itemId]: !isSaved }));
+      toast.success(isSaved ? 'Removed from saved.' : 'Saved for later.');
+    } catch {
+      toast.error('Unable to update saved items.');
+    } finally {
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+    }
+  };
+
+  const handleTogglePatch = async (brandId: string) => {
+    if (!isAuth) {
+      toast.info('Please sign in to patch brands.');
+      return;
+    }
+    if (!isRegular) return;
+    if (patchingIds.has(brandId)) return;
+    try {
+      setPatchingIds((prev) => new Set(prev).add(brandId));
+      const isPatched = Boolean(patchMap[brandId]);
+      if (isPatched) {
+        await apiClient.delete(`/brands/${brandId}/patches`);
+      } else {
+        await apiClient.post(`/brands/${brandId}/patches`);
+      }
+      setPatchMap((prev) => ({ ...prev, [brandId]: !isPatched }));
+      toast.success(isPatched ? 'Brand unpatched.' : 'Brand patched.');
+    } catch {
+      toast.error('Unable to update patch.');
+    } finally {
+      setPatchingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(brandId);
+        return next;
+      });
+    }
   };
 
   return (
@@ -429,6 +556,12 @@ const Market: React.FC = () => {
                 onOpenView={(it) => setViewItem(it)}
                 onViewCollection={handleViewCollection}
                 onViewBrand={handleViewBrand}
+                isSaved={savedMap[item.id] ?? false}
+                onToggleSave={handleToggleSave}
+                saveBusy={savingIds.has(item.id)}
+                isPatched={item.brandId ? patchMap[item.brandId] ?? false : false}
+                onTogglePatch={handleTogglePatch}
+                patchBusy={item.brandId ? patchingIds.has(item.brandId) : false}
               />
             </div>
           ))}

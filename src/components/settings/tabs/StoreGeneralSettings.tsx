@@ -1,33 +1,228 @@
-import React, { useState } from 'react';
-import { 
-  Store, 
-  Palette, 
-  Power, 
-  Clock, 
-  Check, 
-  AlertTriangle,
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Store,
+  Palette,
+  Power,
+  Clock,
   ExternalLink,
   Camera,
-  Bolt
+  Bolt,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import {
+  closeStore,
+  getStoreGeneralSettings,
+  getStoreWizardPrefill,
+  openStore,
+  updateStorePolicies,
+  updateStoreName,
+  updateStoreProfile,
+  type StoreGeneralSettingsResponse,
+} from '@/api/StoreApi';
 
-/**
- * Store General Settings
- * Manage store's basic information, branding, and status
- */
+const MAX_CATEGORIES = 3;
+const RESPONSE_TIME_OPTIONS = ['12h', '24h', '48h'];
+
+const FALLBACK_CATEGORIES = [
+  { value: 'african', label: 'African Fashion' },
+  { value: 'western', label: 'Western Fashion' },
+  { value: 'streetwear', label: 'Streetwear' },
+  { value: 'vintage', label: 'Vintage' },
+  { value: 'luxury', label: 'Luxury' },
+  { value: 'sustainable', label: 'Sustainable' },
+  { value: 'plus-size', label: 'Plus Size' },
+  { value: 'modest', label: 'Modest Fashion' },
+];
+
 const StoreGeneralSettings: React.FC = () => {
-  // Form state
-  const [storeName, setStoreName] = useState('Urban Threads Co.');
-  const [category, setCategory] = useState('Fashion & Apparel');
-  const [slug, setSlug] = useState('urban-threads');
-  const [tagline, setTagline] = useState('Sustainable fashion for the modern soul.');
-  const [description, setDescription] = useState(
-    'We curate high-quality, sustainable fashion pieces that help you express your unique style while caring for the planet. Founded in 2023.'
-  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+  const [isSavingName, setIsSavingName] = useState(false);
+
+  const [storeName, setStoreName] = useState('');
+  const [storeNamePassword, setStoreNamePassword] = useState('');
+  const [slug, setSlug] = useState('');
+  const [tagline, setTagline] = useState('');
+  const [description, setDescription] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [responseTime, setResponseTime] = useState('24h');
   const [brandColor, setBrandColor] = useState('#8B5CF6');
-  const [isLive, setIsLive] = useState(true);
-  const [responseTime, setResponseTime] = useState('24');
-  const [slugAvailable, setSlugAvailable] = useState(true);
+  const [isLive, setIsLive] = useState(false);
+
+  const [systemCategories, setSystemCategories] = useState<Array<{ id: string; slug: string; name: string }>>([]);
+  const [initialSettings, setInitialSettings] = useState<StoreGeneralSettingsResponse | null>(null);
+
+  const categories = useMemo(() => {
+    if (systemCategories.length) {
+      return systemCategories.map((c) => ({ value: c.slug, label: c.name }));
+    }
+    return FALLBACK_CATEGORIES;
+  }, [systemCategories]);
+
+  const toggleCategory = useCallback((value: string) => {
+    setSelectedCategories((prev) => {
+      if (prev.includes(value)) return prev.filter((item) => item !== value);
+      if (prev.length >= MAX_CATEGORIES) return prev;
+      return [...prev, value];
+    });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        const settings = await getStoreGeneralSettings();
+        if (cancelled) return;
+
+        setStoreName(settings.storeName || '');
+        setSlug(settings.slug || '');
+        setTagline(settings.tagline || '');
+        setDescription(settings.description || '');
+        setContactEmail(settings.contactEmail || '');
+        setSelectedCategories(settings.tags || []);
+        const resolvedResponseTime = RESPONSE_TIME_OPTIONS.includes(settings.responseTimeSla || '')
+          ? (settings.responseTimeSla as string)
+          : '24h';
+        setResponseTime(resolvedResponseTime);
+        setIsLive(Boolean(settings.isStoreOpen));
+        setInitialSettings(settings);
+      } catch (error) {
+        console.error('Failed to load store settings', error);
+        toast.error('Failed to load store settings. Please refresh and try again.');
+      }
+
+      try {
+        const prefill = await getStoreWizardPrefill();
+        if (!cancelled) {
+          setSystemCategories(prefill.system?.categories ?? []);
+        }
+      } catch (error) {
+        console.error('Failed to load store categories', error);
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const storeNameChanged = initialSettings ? storeName.trim() !== initialSettings.storeName : false;
+  const normalizedTagSnapshot = selectedCategories.slice().sort().join('|');
+  const normalizedInitialTags = (initialSettings?.tags || []).slice().sort().join('|');
+
+  const isDirty = Boolean(
+    initialSettings && (
+      tagline.trim() !== (initialSettings.tagline || '') ||
+      description.trim() !== (initialSettings.description || '') ||
+      contactEmail.trim() !== (initialSettings.contactEmail || '') ||
+      normalizedTagSnapshot !== normalizedInitialTags ||
+      responseTime !== (RESPONSE_TIME_OPTIONS.includes(initialSettings.responseTimeSla || '')
+        ? (initialSettings.responseTimeSla as string)
+        : '24h')
+    )
+  );
+
+  const nextNameChangeAt = initialSettings?.storeNameNextAllowedAt
+    ? new Date(initialSettings.storeNameNextAllowedAt)
+    : null;
+  const nameChangeLocked = Boolean(nextNameChangeAt && nextNameChangeAt.getTime() > Date.now());
+
+  const handleSaveSettings = async () => {
+    if (!initialSettings) return;
+
+    setIsSaving(true);
+    try {
+      await Promise.all([
+        updateStoreProfile({
+          tagline: tagline.trim(),
+          description: description.trim(),
+          tags: selectedCategories,
+          contactEmail: contactEmail.trim(),
+        }),
+        updateStorePolicies({
+          responseTimeSla: responseTime,
+        }),
+      ]);
+
+      setInitialSettings({
+        ...initialSettings,
+        tagline: tagline.trim(),
+        description: description.trim(),
+        tags: selectedCategories,
+        contactEmail: contactEmail.trim(),
+        responseTimeSla: responseTime,
+      });
+
+      toast.success('Store settings updated.');
+    } catch (error) {
+      console.error('Failed to save store settings', error);
+      toast.error('Failed to save store settings. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleStoreNameSave = async () => {
+    if (!storeNameChanged || nameChangeLocked || !storeNamePassword.trim()) {
+      return;
+    }
+
+    setIsSavingName(true);
+    try {
+      const updated = await updateStoreName({
+        newName: storeName.trim(),
+        currentPassword: storeNamePassword,
+      });
+
+      setStoreName(updated.storeName || '');
+      setSlug(updated.slug || '');
+      setInitialSettings(updated);
+      setStoreNamePassword('');
+      toast.success('Store name updated.');
+    } catch (error) {
+      console.error('Failed to update store name', error);
+      toast.error('Unable to update store name. Please verify your password.');
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleToggleStatus = async () => {
+    setIsTogglingStatus(true);
+    const nextLiveState = !isLive;
+
+    try {
+      if (nextLiveState) {
+        await openStore();
+      } else {
+        await closeStore();
+      }
+      setIsLive(nextLiveState);
+      toast.success(nextLiveState ? 'Store is now live.' : 'Store is now paused.');
+    } catch (error: any) {
+      console.error('Failed to update store status', error);
+      const missingFields: string[] | undefined =
+        error?.response?.data?.missingFields ??
+        error?.response?.data?.data?.missingFields;
+
+      if (Array.isArray(missingFields) && missingFields.length > 0) {
+        toast.error(`Complete: ${missingFields.join(', ')}`);
+      } else {
+        toast.error('Unable to update store status.');
+      }
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  };
 
   const colorPresets = ['#3B82F6', '#8B5CF6', '#10B981', '#EF4444', '#F59E0B'];
 
@@ -62,39 +257,66 @@ const StoreGeneralSettings: React.FC = () => {
             {/* Store Name */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Store Name</label>
-              <div className="relative">
+              <input
+                type="text"
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
+                disabled={isLoading}
+                className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all disabled:opacity-60"
+              />
+              <div className="flex flex-col gap-2">
                 <input
-                  type="text"
-                  value={storeName}
-                  onChange={(e) => setStoreName(e.target.value)}
-                  className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
+                  type="password"
+                  value={storeNamePassword}
+                  onChange={(e) => setStoreNamePassword(e.target.value)}
+                  placeholder="Confirm password to save"
+                  disabled={isLoading || nameChangeLocked}
+                  className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all disabled:opacity-60"
                 />
-                <button className="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-white/50 dark:bg-white/10 hover:bg-white/80 dark:hover:bg-white/20 text-gray-700 dark:text-white px-2 py-1 rounded transition-colors">
-                  Save
+                <button
+                  type="button"
+                  onClick={handleStoreNameSave}
+                  disabled={isLoading || isSavingName || !storeNameChanged || nameChangeLocked || !storeNamePassword.trim()}
+                  className="w-fit px-4 py-2 rounded-lg bg-white/70 dark:bg-white/10 hover:bg-white text-gray-700 dark:text-white text-sm font-medium border border-gray-200 dark:border-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingName ? 'Saving...' : 'Save Store Name'}
                 </button>
               </div>
+              {nameChangeLocked && nextNameChangeAt && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                  Store name can be changed again on {nextNameChangeAt.toLocaleDateString()}.
+                </p>
+              )}
             </div>
 
-            {/* Category */}
+            {/* Categories */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Category</label>
-              <div className="relative">
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 appearance-none cursor-pointer transition-all"
-                >
-                  <option>Fashion & Apparel</option>
-                  <option>Accessories</option>
-                  <option>Home & Living</option>
-                  <option>Art & Collectibles</option>
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Categories</label>
+              <div className="flex flex-wrap gap-2">
+                {categories.map((cat) => {
+                  const isSelected = selectedCategories.includes(cat.value);
+                  const isDisabled = !isSelected && selectedCategories.length >= MAX_CATEGORIES;
+                  return (
+                    <button
+                      key={cat.value}
+                      type="button"
+                      onClick={() => toggleCategory(cat.value)}
+                      disabled={isDisabled || isLoading}
+                      className={
+                        'rounded-full px-3 py-1.5 text-xs font-medium border transition-all ' +
+                        (isSelected
+                          ? 'bg-purple-600 text-white border-purple-600'
+                          : isDisabled
+                            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-purple-300 hover:text-purple-600')
+                      }
+                    >
+                      {cat.label}
+                    </button>
+                  );
+                })}
               </div>
+              <p className="text-xs text-gray-500">{selectedCategories.length} of {MAX_CATEGORIES} selected</p>
             </div>
           </div>
 
@@ -106,26 +328,13 @@ const StoreGeneralSettings: React.FC = () => {
               <input
                 type="text"
                 value={slug}
-                onChange={(e) => {
-                  setSlug(e.target.value);
-                  setSlugAvailable(e.target.value.length > 3);
-                }}
-                className="flex-1 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
+                disabled
+                className="flex-1 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white opacity-70 cursor-not-allowed"
               />
-              {slugAvailable ? (
-                <span className="text-green-500 text-xs flex items-center gap-1">
-                  <Check className="w-3 h-3" /> Available
-                </span>
-              ) : (
-                <span className="text-red-500 text-xs">Taken</span>
-              )}
             </div>
-            <div className="flex items-start gap-2 mt-2 bg-yellow-500/10 dark:bg-yellow-500/5 p-3 rounded-lg border border-yellow-500/20">
-              <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                Changing your slug will break existing links to your store. We'll set up a temporary redirect for 30 days.
-              </p>
-            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Slug is tied to your username. Update it from profile settings.
+            </p>
           </div>
 
           {/* Tagline */}
@@ -136,7 +345,8 @@ const StoreGeneralSettings: React.FC = () => {
               value={tagline}
               onChange={(e) => setTagline(e.target.value.slice(0, 60))}
               maxLength={60}
-              className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
+              disabled={isLoading}
+              className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all disabled:opacity-60"
             />
             <p className="text-xs text-gray-400 dark:text-gray-500 text-right">
               {tagline.length}/60 characters
@@ -150,7 +360,20 @@ const StoreGeneralSettings: React.FC = () => {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
-              className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 resize-none transition-all"
+              disabled={isLoading}
+              className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 resize-none transition-all disabled:opacity-60"
+            />
+          </div>
+
+          {/* Contact Email */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Contact Email</label>
+            <input
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              disabled={isLoading}
+              className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all disabled:opacity-60"
             />
           </div>
         </div>
@@ -173,7 +396,7 @@ const StoreGeneralSettings: React.FC = () => {
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-900 dark:text-white">Store banner & logo</p>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Your store uses your brand profile banner and profile photo. To keep things consistent, images can’t be changed from store settings.
+                  Your store uses your brand profile banner and profile photo. To keep things consistent, images cannot be changed from store settings.
                 </p>
                 <a
                   href="/profile/settings"
@@ -196,6 +419,7 @@ const StoreGeneralSettings: React.FC = () => {
                 {colorPresets.map((color) => (
                   <button
                     key={color}
+                    type="button"
                     onClick={() => setBrandColor(color)}
                     className={`w-8 h-8 rounded-full transition-all ${
                       brandColor === color
@@ -256,10 +480,12 @@ const StoreGeneralSettings: React.FC = () => {
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Temporarily pause new orders.</p>
             </div>
             <button
-              onClick={() => setIsLive(!isLive)}
-              className="px-4 py-2 rounded-lg bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-900 dark:text-white text-sm font-medium border border-gray-200 dark:border-white/10 transition-all"
+              type="button"
+              onClick={handleToggleStatus}
+              disabled={isTogglingStatus || isLoading}
+              className="px-4 py-2 rounded-lg bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-900 dark:text-white text-sm font-medium border border-gray-200 dark:border-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLive ? 'Go On Break' : 'Go Live'}
+              {isTogglingStatus ? 'Updating...' : isLive ? 'Go On Break' : 'Go Live'}
             </button>
           </div>
           <div className="mt-4 text-right">
@@ -287,11 +513,12 @@ const StoreGeneralSettings: React.FC = () => {
                 <select
                   value={responseTime}
                   onChange={(e) => setResponseTime(e.target.value)}
-                  className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 appearance-none cursor-pointer transition-all"
+                  disabled={isLoading}
+                  className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 appearance-none cursor-pointer transition-all disabled:opacity-60"
                 >
-                  <option value="12">Within 12 hours</option>
-                  <option value="24">Within 24 hours</option>
-                  <option value="48">Within 48 hours</option>
+                  <option value="12h">Within 12 hours</option>
+                  <option value="24h">Within 24 hours</option>
+                  <option value="48h">Within 48 hours</option>
                 </select>
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -318,11 +545,30 @@ const StoreGeneralSettings: React.FC = () => {
 
       {/* Action Footer */}
       <div className="sticky bottom-0 z-20 flex items-center justify-end gap-4 py-4 bg-gradient-to-t from-white dark:from-[#0f0f0f] via-white/90 dark:via-[#0f0f0f]/90 to-transparent">
-        <button className="px-6 py-2.5 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium text-sm transition-colors">
+        <button
+          type="button"
+          onClick={() => {
+            if (!initialSettings) return;
+            setTagline(initialSettings.tagline || '');
+            setDescription(initialSettings.description || '');
+            setContactEmail(initialSettings.contactEmail || '');
+            setSelectedCategories(initialSettings.tags || []);
+            const resolvedResponseTime = RESPONSE_TIME_OPTIONS.includes(initialSettings.responseTimeSla || '')
+              ? (initialSettings.responseTimeSla as string)
+              : '24h';
+            setResponseTime(resolvedResponseTime);
+          }}
+          className="px-6 py-2.5 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium text-sm transition-colors"
+        >
           Discard Changes
         </button>
-        <button className="px-6 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium text-sm shadow-lg shadow-purple-900/20 transition-all transform hover:scale-105">
-          Save Changes
+        <button
+          type="button"
+          onClick={handleSaveSettings}
+          disabled={!isDirty || isSaving || isLoading}
+          className="px-6 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium text-sm shadow-lg shadow-purple-900/20 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+        >
+          {isSaving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </div>

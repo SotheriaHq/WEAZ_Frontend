@@ -97,7 +97,7 @@ const Modal: React.FC<ModalProps> = ({
                 aria-modal="true"
                 tabIndex={-1}
                 className={clsx(
-                  'relative w-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden outline-none',
+                  'relative w-full neu-modal-surface rounded-2xl shadow-2xl overflow-hidden outline-none',
                   sizeClasses[size],
                   className
                 )}
@@ -105,22 +105,22 @@ const Modal: React.FC<ModalProps> = ({
               >
                 {/* Header */}
                 {title && (
-                  <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <h2 className="text-xl font-bold text-[color:var(--neu-text)]">
                       {title}
                     </h2>
                     <button
                       onClick={onClose}
-                      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      className="p-2 rounded-full neu-modal-inset transition-colors"
                       aria-label="Close modal"
                     >
-                      <X size={20} className="text-gray-500 dark:text-gray-400" />
+                      <X size={20} className="text-[color:var(--neu-text-muted)]" />
                     </button>
                   </div>
                 )}
 
                 {/* Content */}
-                <div className="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+                <div className="px-6 pb-5 pt-2 max-h-[calc(100vh-200px)] overflow-y-auto">
                   {children}
                 </div>
               </div>

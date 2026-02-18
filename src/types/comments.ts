@@ -18,13 +18,13 @@ export interface CommentV2Dto {
   depth: number;
   contentRaw?: string | null;
   contentSanitized: string;
-  likeCount: number;
+  threadCount: number;
   replyCount: number;
   createdAt: string;
   updatedAt: string;
   editedAt?: string | null;
   deletedAt?: string | null;
-  isLikedByMe?: boolean;
+  isThreadedByMe?: boolean;
   children?: CommentV2Dto[];
   optimistic?: boolean;
   pending?: boolean;
@@ -35,4 +35,3 @@ export interface PageResult<T> {
   hasNextPage: boolean;
   endCursor: string | null;
 }
-

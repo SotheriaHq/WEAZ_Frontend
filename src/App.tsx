@@ -45,6 +45,7 @@ import ShopSetupEssentialsPage from './pages/studio/shop/ShopSetupEssentialsPage
 import StudioScaffold from './components/studio/StudioScaffold';
 import StoreManagement from './pages/studio/store/StoreManagement';
 import StoreCollectionCreate from './pages/studio/store/StoreCollectionCreate';
+import RequireStoreSetup from './components/store/RequireStoreSetup';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { setViewportWidth } from '@/features/uiSlice';
@@ -148,7 +149,9 @@ const router = createBrowserRouter([
         path: '/studio',
         element: (
           <RequireBrand>
-            <StudioHome />
+            <RequireStoreSetup>
+              <StudioHome />
+            </RequireStoreSetup>
           </RequireBrand>
         ),
       },
@@ -156,9 +159,11 @@ const router = createBrowserRouter([
         path: '/studio/store',
         element: (
           <RequireBrand>
-            <StudioScaffold active="store" onSelect={() => {}}>
-              <StoreManagement />
-            </StudioScaffold>
+            <RequireStoreSetup>
+              <StudioScaffold active="store" onSelect={() => {}}>
+                <StoreManagement />
+              </StudioScaffold>
+            </RequireStoreSetup>
           </RequireBrand>
         ),
       },
@@ -166,9 +171,11 @@ const router = createBrowserRouter([
         path: '/studio/store/collections/new',
         element: (
           <RequireBrand>
-            <StudioScaffold active="store" onSelect={() => {}}>
-              <StoreCollectionCreate />
-            </StudioScaffold>
+            <RequireStoreSetup>
+              <StudioScaffold active="store" onSelect={() => {}}>
+                <StoreCollectionCreate />
+              </StudioScaffold>
+            </RequireStoreSetup>
           </RequireBrand>
         ),
       },
@@ -176,9 +183,11 @@ const router = createBrowserRouter([
         path: '/studio/store/products/new',
         element: (
           <RequireBrand>
-            <StudioScaffold active="store" onSelect={() => {}}>
-              <EditProduct />
-            </StudioScaffold>
+            <RequireStoreSetup>
+              <StudioScaffold active="store" onSelect={() => {}}>
+                <EditProduct />
+              </StudioScaffold>
+            </RequireStoreSetup>
           </RequireBrand>
         ),
       },
@@ -186,9 +195,23 @@ const router = createBrowserRouter([
         path: '/studio/store/products/:id/edit',
         element: (
           <RequireBrand>
-            <StudioScaffold active="store" onSelect={() => {}}>
-              <EditProduct />
-            </StudioScaffold>
+            <RequireStoreSetup>
+              <StudioScaffold active="store" onSelect={() => {}}>
+                <EditProduct />
+              </StudioScaffold>
+            </RequireStoreSetup>
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/store/products/:id',
+        element: (
+          <RequireBrand>
+            <RequireStoreSetup>
+              <StudioScaffold active="store" onSelect={() => {}}>
+                <ProductDetailsPage />
+              </StudioScaffold>
+            </RequireStoreSetup>
           </RequireBrand>
         ),
       },
@@ -287,7 +310,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/products/:id',
-        element: <ProductDetailsPage />,
+        element: <Layout><ProductDetailsPage /></Layout>,
       },
       // Catch-all 404 route - must be last
       {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Trash2 } from 'lucide-react';
+import { Link2, Trash2 } from 'lucide-react';
 import TagChip from '@/components/ui/Tag';
 import { FrostedButton } from '@/components/ui/FrostedButton';
 
@@ -8,7 +8,7 @@ interface MetaPanelProps {
   description?: string | null;
   tags?: string[];
   owner?: { id: string; name?: string | null; username?: string | null; avatarUrl?: string | null } | null;
-  stats?: { likes?: number; comments?: number; items?: number; views?: number };
+  stats?: { threads?: number; comments?: number; items?: number; views?: number };
   price?: { min?: number; max?: number };
   availabilityInStore?: boolean;
   visibility?: 'PUBLIC' | 'PRIVATE';
@@ -97,10 +97,10 @@ export const CollectionMetaPanel: React.FC<MetaPanelProps> = ({
             <div className="text-sm font-semibold">{stats.comments}</div>
           </div>
         )}
-        {typeof stats?.likes === 'number' && (
+        {typeof stats?.threads === 'number' && (
           <div className="rounded-lg bg-white/70 dark:bg-white/5 p-3 border border-white/20">
-            <div className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Likes</div>
-            <div className="text-sm font-semibold">{stats.likes}</div>
+            <div className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Threads</div>
+            <div className="text-sm font-semibold">{stats.threads}</div>
           </div>
         )}
       </div>
@@ -119,7 +119,7 @@ export const CollectionMetaPanel: React.FC<MetaPanelProps> = ({
       {!isOwner && (
         <div className="mt-4">
           <FrostedButton variant="primary" className="w-full">
-            <Heart className="w-4 h-4 mr-2"/> Appreciate
+            <Link2 className="w-4 h-4 mr-2"/> Thread
           </FrostedButton>
         </div>
       )}

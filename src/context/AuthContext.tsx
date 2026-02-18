@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { disconnectSocket } from '../lib/ws';
 import type { ReactNode } from 'react';
 import { unwrapApiResponse } from '../types/auth';
 import type { AuthUserDto, AuthProfileResponse, AuthTokensResponse } from '../types/auth';
@@ -189,6 +190,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     void apiClient.post('/auth/logout').catch(() => undefined);
     dropStoredAccessToken();
     dispatch(clearUser());
+    disconnectSocket();
   };
 
   return (

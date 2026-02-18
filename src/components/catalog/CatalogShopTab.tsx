@@ -1,5 +1,13 @@
 import { useState, useEffect, useMemo, useTransition, useCallback, useRef } from 'react';
-import { SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Bookmark,
+  Search,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from 'lucide-react';
+import { useSelector } from 'react-redux';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
@@ -15,6 +23,7 @@ import { useSignedFileUrl } from '@/hooks/useSignedFileUrl';
 import SearchField from '@/components/SearchField';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import InlineProductDetail from './InlineProductDetail';
+import type { RootState } from '@/store';
 
 interface ProductsResponse {
   items: StoreProduct[];
@@ -78,6 +87,9 @@ export default function CatalogShopTab({
   const [, startTransition] = useTransition();
   const [collections, setCollections] = useState<CollectionDto[]>([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   
   // Inline product detail state - when set, shows product detail instead of grid
   const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
@@ -129,6 +141,36 @@ export default function CatalogShopTab({
       mounted = false;
     };
   }, [brandId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadSaved = async () => {
+      if (!isAuth || collections.length === 0) {
+        if (mounted) setSavedMap({});
+        return;
+      }
+      try {
+        const res = await apiClient.post('/saved/check/batch', {
+          targetType: 'COLLECTION',
+          targetIds: collections.map((c) => c.id).filter(Boolean),
+        });
+        const items = res.data?.items ?? [];
+        if (mounted) {
+          const next: Record<string, boolean> = {};
+          for (const item of items) {
+            if (item?.targetId) next[item.targetId] = Boolean(item.isSaved);
+          }
+          setSavedMap(next);
+        }
+      } catch {
+        if (mounted) setSavedMap({});
+      }
+    };
+    void loadSaved();
+    return () => {
+      mounted = false;
+    };
+  }, [collections, isAuth]);
 
   // Click-outside handler for search field
   useEffect(() => {
@@ -277,13 +319,6 @@ export default function CatalogShopTab({
     return <div className="w-full">{storeClosedPlaceholder}</div>;
   }
 
-  const isFilterActive = Boolean(
-    minPrice ||
-    maxPrice ||
-    onSale ||
-    (selectedCategory !== 'ALL' && selectedCategory !== 'NEW')
-  );
-
   const clearFilters = () => {
     setMinPrice(undefined);
     setMaxPrice(undefined);
@@ -298,6 +333,35 @@ export default function CatalogShopTab({
     const { url } = useSignedFileUrl(collection.coverFileId ?? null, coverInitial ?? null);
     const cover = url || coverInitial;
     const itemCount = collection.itemCount ?? collection.postsCount ?? 0;
+    const isSaved = Boolean(savedMap[collection.id]);
+    const saveBusy = savingIds.has(collection.id);
+
+    const handleToggleSave = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!isAuth) {
+        toast.info('Please sign in to save collections.');
+        return;
+      }
+      if (saveBusy) return;
+      try {
+        setSavingIds((prev) => new Set(prev).add(collection.id));
+        if (isSaved) {
+          await apiClient.delete('/saved', { data: { targetType: 'COLLECTION', targetId: collection.id } });
+        } else {
+          await apiClient.post('/saved', { targetType: 'COLLECTION', targetId: collection.id });
+        }
+        setSavedMap((prev) => ({ ...prev, [collection.id]: !isSaved }));
+        toast.success(isSaved ? 'Removed from saved.' : 'Saved for later.');
+      } catch {
+        toast.error('Unable to update saved items.');
+      } finally {
+        setSavingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(collection.id);
+          return next;
+        });
+      }
+    };
 
     return (
       <button
@@ -321,6 +385,15 @@ export default function CatalogShopTab({
               {title.slice(0, 1).toUpperCase()}
             </div>
           )}
+          <button
+            type="button"
+            onClick={handleToggleSave}
+            disabled={saveBusy}
+            className="absolute top-3 right-3 z-10 rounded-full bg-black/55 p-2 text-white shadow-md transition hover:bg-black/70 disabled:opacity-60"
+            aria-label={isSaved ? 'Unsave collection' : 'Save collection'}
+          >
+            <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-white' : ''}`} />
+          </button>
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent p-4">
             <div className="text-sm font-semibold text-white">{title}</div>
             <div className="text-xs text-white/80">{itemCount} items</div>
@@ -417,7 +490,7 @@ export default function CatalogShopTab({
                 className="h-11 w-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
                 aria-label="Open search"
               >
-                <span className="text-base">🔎</span>
+                <Search size={16} />
               </button>
             ) : (
               <SearchField
@@ -437,7 +510,7 @@ export default function CatalogShopTab({
               onClick={() => setFiltersCollapsed((prev) => !prev)}
               className="flex-shrink-0 h-9 w-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
             >
-              <span className="text-sm">{filtersCollapsed ? '📁' : '📂'}</span>
+              {filtersCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
             </button>
             <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
               {filtersCollapsed ? 'Show filters' : 'Hide filters'}
@@ -479,7 +552,7 @@ export default function CatalogShopTab({
             className="flex-shrink-0 h-9 w-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
             aria-label={chipsCollapsed ? 'Show filters' : 'Hide filters'}
           >
-            <span className="text-sm">{chipsCollapsed ? '📂' : '📁'}</span>
+            {chipsCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
           </button>
           
           {/* Sort Dropdown */}
@@ -518,7 +591,7 @@ export default function CatalogShopTab({
                   className="h-8 w-8 flex-shrink-0 rounded-full border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 transition flex items-center justify-center"
                   aria-label={filtersCollapsed ? 'Expand filters' : 'Collapse filters'}
                 >
-                  {filtersCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                  {filtersCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
                 </button>
               </div>
             </div>
@@ -610,6 +683,7 @@ export default function CatalogShopTab({
                     <StoreProductCard 
                       key={p.id} 
                       product={p} 
+                      isOwnerView={isOwner}
                       onViewProduct={(product) => setSelectedProduct(product)}
                     />
                   ))}

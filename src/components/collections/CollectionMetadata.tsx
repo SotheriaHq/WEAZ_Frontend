@@ -1,18 +1,18 @@
 import React from 'react';
-import { Heart, Share2, ShoppingCart, Trash2, MessageCircle, Eye } from 'lucide-react';
+import { Link2, Share2, ShoppingCart, Trash2, MessageCircle, Eye, Heart } from 'lucide-react';
 import TagChip from '@/components/ui/Tag';
 
 interface CollectionMetadataProps {
   title: string;
   description?: string | null;
   tags?: string[];
-  stats?: { likes?: number; comments?: number; items?: number; views?: number };
+  stats?: { threads?: number; comments?: number; items?: number; views?: number };
   price?: { min?: number; max?: number; saleMin?: number | null; saleMax?: number | null; saleStartAt?: string | null; saleEndAt?: string | null };
   availabilityInStore?: boolean;
   visibility?: 'PUBLIC' | 'PRIVATE';
   isOwner?: boolean;
-  isLiked?: boolean;
-  onLike?: () => void;
+  isThreaded?: boolean;
+  onThread?: () => void;
   onShare?: () => void;
   onAddToCart?: () => void;
   onAddToWishlist?: () => void;
@@ -42,8 +42,8 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
   availabilityInStore,
   visibility,
   isOwner,
-  isLiked = false,
-  onLike,
+  isThreaded = false,
+  onThread,
   onShare,
   onAddToCart,
   onAddToWishlist,
@@ -180,17 +180,17 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
           {/* Engagement Stats - Top Position with Icons */}
           {/* 🔧 FIX #6: Responsive gap and text sizing */}
           <div className="flex items-center gap-3 text-xs sm:text-sm flex-wrap">
-            {typeof stats?.likes === 'number' && (
+            {typeof stats?.threads === 'number' && (
               <button
-                onClick={onLike}
+                onClick={onThread}
                 className={`flex items-center gap-1 transition ${
-                  isLiked
-                    ? 'text-pink-600 dark:text-pink-400'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-pink-600 dark:hover:text-pink-400'
+                  isThreaded
+                    ? 'text-indigo-600 dark:text-indigo-400'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400'
                 }`}
               >
-                <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-                <span className="font-semibold">{stats.likes}</span>
+                <Link2 className="w-4 h-4" />
+                <span className="font-semibold">{stats.threads}</span>
               </button>
             )}
             {typeof stats?.comments === 'number' && (

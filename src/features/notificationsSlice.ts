@@ -19,7 +19,7 @@ export interface RemoteNotification {
   isRead: boolean;
   actor?: RemoteNotificationActor | null;
   target?: {
-    type: 'POST' | 'COLLECTION' | 'COLLECTION_MEDIA' | 'USER' | 'SYSTEM';
+    type: 'POST' | 'COLLECTION' | 'COLLECTION_MEDIA' | 'PRODUCT' | 'USER' | 'SYSTEM';
     id: string;
     preview?: string;
   } | null;
@@ -90,6 +90,14 @@ export const markAllNotificationsRead = createAsyncThunk(
   },
 );
 
+export const deleteNotification = createAsyncThunk(
+  'notifications/delete',
+  async (id: string) => {
+    const res = await NotificationsApi.delete(id);
+    return { id: res.id, success: res.success };
+  },
+);
+
 export const notificationsSlice = createSlice({
   name: 'notifications',
   initialState,
@@ -117,6 +125,10 @@ export const notificationsSlice = createSlice({
     },
     clearLocalNotifications: (state) => { state.local = []; },
     resetState: () => ({ ...initialState }),
+    removeNotification: (state, action: PayloadAction<{ id: string }>) => {
+      state.items = state.items.filter((n) => n.id !== action.payload.id);
+      state.unreadCount = state.items.filter((n) => !n.isRead).length;
+    },
     ingestRealtime: (
       state,
       action: PayloadAction<{
@@ -201,6 +213,10 @@ export const notificationsSlice = createSlice({
       .addCase(markAllNotificationsRead.fulfilled, (state) => {
         state.items = state.items.map((n) => ({ ...n, isRead: true }));
         state.unreadCount = 0;
+      })
+      .addCase(deleteNotification.fulfilled, (state, action) => {
+        state.items = state.items.filter((n) => n.id !== action.payload.id);
+        state.unreadCount = state.items.filter((n) => !n.isRead).length;
       });
   },
 });
@@ -214,6 +230,7 @@ export const {
   addLocalNotification,
   clearLocalNotifications,
   resetState,
+  removeNotification,
   ingestRealtime,
 } = notificationsSlice.actions;
 

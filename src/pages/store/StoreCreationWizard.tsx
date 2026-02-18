@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
 
 // Step Components
 import StoreBasicInfoStep from '@/components/store/wizard/StoreBasicInfoStep';
@@ -13,12 +15,16 @@ import {
   getStoreStatus,
   updateStoreProfile,
   getStoreWizardPrefill,
+  getStorePolicies,
   openStore,
+  updateStorePolicies,
   type StoreProfileUpdateData,
+  type StorePoliciesUpdateData,
   type StoreWizardPrefillResponse,
 } from '@/api/StoreApi';
 
 import type { StoreWizardData } from '@/types/storeWizard';
+import { markStoreOpenPending } from '@/utils/storeSetup';
 
 // Initial empty state for the wizard
 const initialData: StoreWizardData = {
@@ -106,6 +112,9 @@ const sanitizeWizardData = (data: StoreWizardData): StoreWizardData => {
     return value.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
   };
 
+  const safeCategories = safeStringArray(data.categories).slice(0, MAX_STORE_CATEGORIES);
+  const safeTags = safeStringArray(data.tags);
+
   return {
     ...data,
     description: safeString(data.description, MAX_STORE_DESCRIPTION_LEN),
@@ -115,8 +124,8 @@ const sanitizeWizardData = (data: StoreWizardData): StoreWizardData => {
     twitter: safeString(data.twitter, MAX_STORE_SOCIAL_HANDLE_LEN),
     tiktok: safeString(data.tiktok, MAX_STORE_SOCIAL_HANDLE_LEN),
     website: safeString(data.website, MAX_STORE_WEBSITE_LEN),
-    categories: safeStringArray(data.categories).slice(0, MAX_STORE_CATEGORIES),
-    tags: safeStringArray(data.tags),
+    categories: safeCategories,
+    tags: safeTags.length ? safeTags : safeCategories,
   };
 };
 
@@ -130,17 +139,19 @@ const stepToNumber = (step: WizardStep): number => {
  */
 const StoreCreationWizard: React.FC = () => {
   const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.user.profile);
   
   // Current step state
   const [currentStep, setCurrentStep] = useState<WizardStep>('basic-info');
   const [wizardData, setWizardData] = useState<StoreWizardData>(initialData);
   const [hasLiveStore, setHasLiveStore] = useState<boolean>(false);
   const [saveState, setSaveState] = useState<WizardSaveState>('idle');
-  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   const [systemCategories, setSystemCategories] = useState<StoreWizardPrefillResponse['system']['categories']>([]);
   
   // Refs for autosave
   const lastSavedPayloadRef = useRef<string>('');
+  const lastSavedPolicyRef = useRef<string>('');
   const saveTimerRef = useRef<number | null>(null);
   const intervalRef = useRef<number | null>(null);
 
@@ -167,6 +178,7 @@ const StoreCreationWizard: React.FC = () => {
 
   // --- API SAVE LOGIC (Debounced, for server sync) ---
   const buildSavePayload = useCallback(() => {
+    const resolvedTags = wizardData.tags?.length ? wizardData.tags : wizardData.categories;
     const payload: StoreProfileUpdateData = {
       tagline: wizardData.tagline,
       description: wizardData.description,
@@ -175,28 +187,75 @@ const StoreCreationWizard: React.FC = () => {
       socialTwitter: wizardData.twitter,
       socialWebsite: wizardData.website,
       contactEmail: wizardData.contactEmail,
-      tags: wizardData.tags,
+      tags: resolvedTags,
     };
+    return payload;
+  }, [wizardData]);
+
+  const buildPolicyPayload = useCallback(() => {
+    const hasSizeChart = Boolean(wizardData.sizeChartUrl || wizardData.sizeChartPresetKey);
+    const sizeChart = hasSizeChart
+      ? {
+          url: wizardData.sizeChartUrl,
+          presetKey: wizardData.sizeChartPresetKey,
+          system: wizardData.sizeChartSystem,
+        }
+      : null;
+
+    const hasShippingRules = Boolean(
+      (wizardData.shippingRates && wizardData.shippingRates.length > 0) ||
+        wizardData.shippingMethod
+    );
+    const shippingRules = hasShippingRules
+      ? {
+          shippingRates: wizardData.shippingRates,
+          shippingMethod: wizardData.shippingMethod,
+        }
+      : null;
+
+    const payload: StorePoliciesUpdateData = {
+      shippingRegions: wizardData.shippingRegions,
+      processingTime: wizardData.processingTime,
+      shippingMethods: wizardData.shippingMethods,
+      freeShippingThreshold: wizardData.freeShippingThreshold,
+      returnsAccepted: wizardData.returnsAccepted,
+      returnWindow: wizardData.returnWindow,
+      returnConditions: wizardData.returnConditions,
+      refundMethod: wizardData.refundMethod,
+      responseTimeSla: wizardData.responseTimeSla,
+      sizeChart,
+      shippingRules,
+    };
+
     return payload;
   }, [wizardData]);
 
   const persistProgress = useCallback(
     async (reason?: string) => {
       const payload = buildSavePayload();
+      const policyPayload = buildPolicyPayload();
       const serialized = JSON.stringify(payload);
-      if (serialized === lastSavedPayloadRef.current) return;
+      const policySerialized = JSON.stringify(policyPayload);
+
+      const profileDirty = serialized !== lastSavedPayloadRef.current;
+      const policyDirty = policySerialized !== lastSavedPolicyRef.current;
+      if (!profileDirty && !policyDirty) return;
 
       setSaveState('saving');
       try {
-        await updateStoreProfile(payload);
-        lastSavedPayloadRef.current = serialized;
+        const ops: Promise<unknown>[] = [];
+        if (profileDirty) ops.push(updateStoreProfile(payload));
+        if (policyDirty) ops.push(updateStorePolicies(policyPayload));
+        await Promise.all(ops);
+        if (profileDirty) lastSavedPayloadRef.current = serialized;
+        if (policyDirty) lastSavedPolicyRef.current = policySerialized;
         setSaveState('saved');
       } catch (error) {
         console.error('Failed to save store progress', { reason, error });
         setSaveState('error');
       }
     },
-    [buildSavePayload]
+    [buildSavePayload, buildPolicyPayload]
   );
 
   // --- HYDRATION ---
@@ -240,6 +299,7 @@ const StoreCreationWizard: React.FC = () => {
             twitter: response.profile.socialTwitter || nextData.twitter,
             tiktok: response.profile.socialTiktok || nextData.tiktok,
             website: response.profile.socialWebsite || nextData.website,
+            responseTimeSla: response.profile.responseTimeSla || nextData.responseTimeSla,
           };
         }
       } catch (error) {
@@ -265,10 +325,61 @@ const StoreCreationWizard: React.FC = () => {
             website: nextData.website || prefill.brand.website || '',
             tagline: nextData.tagline || prefill.brand.tagline || '',
             tags: nextData.tags?.length ? nextData.tags : (prefill.brand.tags || []),
+            responseTimeSla: nextData.responseTimeSla || prefill.brand.responseTimeSla || '24h',
           };
         }
       } catch (error) {
         console.error('Failed to prefill wizard data', error);
+      }
+
+      // 2.5) Policy prefill
+      try {
+        const policy = await getStorePolicies();
+        if (!isCancelled && policy) {
+          nextData = {
+            ...nextData,
+            shippingRegions: policy.shippingRegions?.length ? policy.shippingRegions : nextData.shippingRegions,
+            processingTime: policy.processingTime || nextData.processingTime,
+            shippingMethods: policy.shippingMethods?.length ? policy.shippingMethods : nextData.shippingMethods,
+            freeShippingThreshold:
+              policy.freeShippingThreshold !== null && policy.freeShippingThreshold !== undefined
+                ? policy.freeShippingThreshold
+                : nextData.freeShippingThreshold,
+            returnsAccepted:
+              typeof policy.returnsAccepted === 'boolean'
+                ? policy.returnsAccepted
+                : nextData.returnsAccepted,
+            returnWindow: policy.returnWindow || nextData.returnWindow,
+            returnConditions: policy.returnConditions?.length ? policy.returnConditions : nextData.returnConditions,
+            refundMethod: policy.refundMethod || nextData.refundMethod,
+            responseTimeSla: policy.responseTimeSla || nextData.responseTimeSla,
+            sizeChartUrl: policy.sizeChart?.url ?? nextData.sizeChartUrl,
+            sizeChartPresetKey: policy.sizeChart?.presetKey ?? nextData.sizeChartPresetKey,
+            sizeChartSystem: policy.sizeChart?.system ?? nextData.sizeChartSystem,
+            shippingRates: Array.isArray(policy.shippingRules?.shippingRates)
+              ? policy.shippingRules?.shippingRates
+              : nextData.shippingRates,
+            shippingMethod: policy.shippingRules?.shippingMethod || nextData.shippingMethod,
+          };
+        }
+      } catch (error) {
+        console.error('Failed to load store policies', error);
+      }
+
+      // 3) Local fallback from authenticated profile (if API calls failed)
+      if (user) {
+        const fallbackName =
+          (user.brandFullName ?? '').trim() ||
+          `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() ||
+          user.username ||
+          '';
+        const fallbackSlug = user.username || '';
+        nextData = {
+          ...nextData,
+          name: nextData.name || fallbackName,
+          slug: nextData.slug || fallbackSlug,
+          contactEmail: nextData.contactEmail || user.email || '',
+        };
       }
 
       if (!isCancelled) {
@@ -298,7 +409,7 @@ const StoreCreationWizard: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [user]);
 
   // Redirect if user already has a live store
   useEffect(() => {
@@ -363,8 +474,8 @@ const StoreCreationWizard: React.FC = () => {
       setCurrentStep(STEP_ORDER[currentIndex - 1]);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      // On step 1, back goes to profile
-      navigate('/profile');
+      // On step 1, back goes to store essentials
+      navigate('/studio/store/essentials');
     }
   }, [currentStep, navigate]);
 
@@ -383,6 +494,7 @@ const StoreCreationWizard: React.FC = () => {
       
       // Call openStore API to mark setup as complete
       await openStore();
+      markStoreOpenPending();
       
       // Clear the localStorage draft since setup is complete
       localStorage.removeItem(LOCAL_PROGRESS_KEY);

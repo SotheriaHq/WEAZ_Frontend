@@ -1,5 +1,5 @@
 ﻿import React, { useEffect } from "react";
-import { X, Tag as TagIcon, Eye, Heart, MessageCircle } from "lucide-react";
+import { X, Tag as TagIcon, Eye, Link2, MessageCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { MarketMedia } from "@/types/market";
 import { formatPrice } from "@/utils/helpers";
@@ -15,7 +15,7 @@ type CollectionDetail = {
   tags?: string[];
   minPrice?: number | null;
   maxPrice?: number | null;
-  likesCount?: number | null;
+  threadsCount?: number | null;
   commentsCount?: number | null;
 };
 
@@ -125,9 +125,9 @@ const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose
                       <span className="flex items-center gap-1">
                         <Eye size={14} /> {mediaCount} items
                       </span>
-                      {collection.likesCount && collection.likesCount > 0 && (
+                      {collection.threadsCount && collection.threadsCount > 0 && (
                         <span className="flex items-center gap-1">
-                          <Heart size={14} /> {collection.likesCount}
+                          <Link2 size={14} /> {collection.threadsCount}
                         </span>
                       )}
                       {collection.commentsCount && collection.commentsCount > 0 && (

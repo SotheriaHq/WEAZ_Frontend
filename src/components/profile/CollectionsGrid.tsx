@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Masonry from 'react-masonry-css';
 import type { CollectionDto } from '../../types/profile';
 import CollectionCard from './CollectionCard';
+import { useSelector } from 'react-redux';
+import { apiClient } from '@/api/httpClient';
+import { toast } from 'sonner';
+import type { RootState } from '@/store';
 
 interface CollectionsGridProps {
   collections: CollectionDto[];
@@ -20,6 +24,69 @@ const CollectionsGrid: React.FC<CollectionsGridProps> = ({
   isDraft,
   onRetryPublish,
 }) => {
+  const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+
+  const collectionIds = useMemo(
+    () => (collections ?? []).map((c) => c.id).filter(Boolean),
+    [collections]
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    const loadSaved = async () => {
+      if (!isAuth || collectionIds.length === 0) {
+        if (mounted) setSavedMap({});
+        return;
+      }
+      try {
+        const res = await apiClient.post('/saved/check/batch', {
+          targetType: 'COLLECTION',
+          targetIds: collectionIds,
+        });
+        const items = res.data?.items ?? [];
+        if (mounted) {
+          const next: Record<string, boolean> = {};
+          for (const item of items) {
+            if (item?.targetId) next[item.targetId] = Boolean(item.isSaved);
+          }
+          setSavedMap(next);
+        }
+      } catch {
+        if (mounted) setSavedMap({});
+      }
+    };
+    void loadSaved();
+    return () => { mounted = false; };
+  }, [collectionIds, isAuth]);
+
+  const handleToggleSave = async (collectionId: string) => {
+    if (!isAuth) {
+      toast.info('Please sign in to save collections.');
+      return;
+    }
+    if (savingIds.has(collectionId)) return;
+    try {
+      setSavingIds((prev) => new Set(prev).add(collectionId));
+      const isSaved = Boolean(savedMap[collectionId]);
+      if (isSaved) {
+        await apiClient.delete('/saved', { data: { targetType: 'COLLECTION', targetId: collectionId } });
+      } else {
+        await apiClient.post('/saved', { targetType: 'COLLECTION', targetId: collectionId });
+      }
+      setSavedMap((prev) => ({ ...prev, [collectionId]: !isSaved }));
+      toast.success(isSaved ? 'Removed from saved.' : 'Saved for later.');
+    } catch {
+      toast.error('Unable to update saved items.');
+    } finally {
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(collectionId);
+        return next;
+      });
+    }
+  };
   const breakpointColumns = {
     default: 4,
     1536: 4,
@@ -48,6 +115,9 @@ const CollectionsGrid: React.FC<CollectionsGridProps> = ({
             onDelete={onDelete}
             isDraft={isDraft}
             onRetryPublish={onRetryPublish}
+            isSaved={savedMap[collection.id] ?? false}
+            onToggleSave={handleToggleSave}
+            saveBusy={savingIds.has(collection.id)}
           />
         </div>
       ))}

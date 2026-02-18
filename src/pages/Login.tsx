@@ -232,8 +232,10 @@ const LoginPage = () => {
       dispatch(setUser(user));
       dispatch(addLocalNotification({ message: 'Signed in successfully.' }));
       toast.success('Login successful!');
-      
-      const redirectPath = user.type === 'BRAND' ? '/profile' : '/';
+
+      // Redirect based on user type
+      // BRAND users go to profile, REGULAR users also go to profile now
+      const redirectPath = user.type === 'BRAND' || user.type === 'REGULAR' ? '/profile' : '/';
       navigate(redirectPath, { replace: true });
       setIsRedirecting(true);
       reset({ email: rememberMe ? normalizedEmail : '', password: '' });

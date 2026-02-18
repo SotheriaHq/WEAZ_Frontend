@@ -17,7 +17,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { FrostedButton } from '@/components/ui/FrostedButton';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { CollectionCartPreviewModal } from '@/components/collections/CollectionCartPreviewModal';
-import { getCollectionCartPreview } from '@/api/collectionUploads';
+import { getCollectionCartPreview, type CollectionCartPreviewResponse } from '@/api/collectionUploads';
 
 interface InlineCollectionViewerProps {
   collectionId: string;
@@ -39,7 +39,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const [locked, setLocked] = useState(false);
   const [detail, setDetail] = useState<any | null>(null);
   const [requestState, setRequestState] = useState<AccessState | null>(null);
-  const [isLiked, setIsLiked] = useState(false);
+  const [isThreaded, setIsThreaded] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [, setActiveIndex] = useState(0); // track index changes for potential side-effects
   const [showUpdateMeta, setShowUpdateMeta] = useState(false);
@@ -52,11 +52,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const [requestingAccess, setRequestingAccess] = useState(false);
   const [addingAll, setAddingAll] = useState(false);
   const [showCartPreview, setShowCartPreview] = useState(false);
-  const [cartPreviewData, setCartPreviewData] = useState<{
-    available: Array<{ productId: string; name: string; thumbnail?: string; price: number; salePrice?: number; variants: Array<{ variantId: string; name: string; stock: number; price?: number }> }>;
-    unavailable: Array<{ productId: string; name: string; thumbnail?: string; reason: string }>;
-    totalEstimate: { min: number; max: number };
-  } | null>(null);
+  const [cartPreviewData, setCartPreviewData] = useState<CollectionCartPreviewResponse | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -75,7 +71,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
         if (d) {
           console.log('[InlineCollectionViewer] Collection loaded:', d.id, 'Owner:', d.owner?.id, 'Visibility:', d.visibility);
           setDetail(d);
-          setIsLiked(false);
+          setIsThreaded(false);
           setLocked(false);
         } else {
           // API returned null - likely permission issue
@@ -251,9 +247,9 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
     }
   };
 
-  const handleLike = async () => {
-    setIsLiked(!isLiked);
-    toast.info('Like feature coming soon');
+  const handleThread = async () => {
+    setIsThreaded(!isThreaded);
+    toast.info('Thread feature coming soon');
   };
 
   const handleWishlist = async () => {
@@ -311,12 +307,19 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
     }
   };
 
-  const handleCartPreviewConfirm = async (selections: Array<{ productId: string; variantId?: string; quantity: number }>) => {
+  const handleCartPreviewConfirm = async (
+    selections: Array<{ productId: string; quantity: number; variantSize?: string; variantColor?: string }>
+  ) => {
     setAddingAll(true);
     try {
       const results = await Promise.all(
         selections.map((s) =>
-          dispatch(addToCart({ productId: s.productId, variantId: s.variantId, quantity: s.quantity }))
+          dispatch(addToCart({
+            productId: s.productId,
+            quantity: s.quantity,
+            selectedSize: s.variantSize,
+            selectedColor: s.variantColor,
+          }))
             .unwrap()
             .then(() => true)
             .catch(() => false),
@@ -614,7 +617,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {productItems.map((product) => {
+                {productItems.map((product: (typeof productItems)[number]) => {
                   const now = Date.now();
                   const onSale =
                     product.salePrice != null &&
@@ -693,7 +696,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               description={detail?.description}
               tags={detail?.tags || []}
               stats={{
-                likes: detail?.totalLikes,
+                threads: detail?.totalThreads,
                 comments: unifiedCommentsCount,
                 items: totalItems,
                 views: detail?._count?.views,
@@ -702,8 +705,8 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               availabilityInStore={detail?.isAvailableInStore}
               visibility={detail?.visibility}
               isOwner={isOwner}
-              isLiked={isLiked}
-              onLike={handleLike}
+              isThreaded={isThreaded}
+              onThread={handleThread}
               onShare={handleShare}
               onAddToCart={!isOwner && productItems.length > 0 ? handleAddAllToCart : undefined}
               onAddToWishlist={handleWishlist}
@@ -724,7 +727,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                       ? [{ label: 'Cancel Discount Sale', onClick: handleCancelSale }]
                       : [{ label: 'Discount Sale', onClick: () => setShowDiscountModal(true) }]
                     ),
-                    { label: 'Edit Collection Details', onClick: () => { window.location.href = `/collections/${collectionId}/edit`; } },
+                    { label: 'Edit Collection Details', onClick: () => { navigate(`/profile/collections/edit/${collectionId}`); } },
                   ]}
                 />
               ) : undefined}
@@ -797,13 +800,14 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       {showCartPreview && cartPreviewData && (
         <CollectionCartPreviewModal
           isOpen={showCartPreview}
-          collectionTitle={detail?.name ?? 'Collection'}
-          available={cartPreviewData.available}
-          unavailable={cartPreviewData.unavailable}
-          totalEstimate={cartPreviewData.totalEstimate}
-          onConfirm={handleCartPreviewConfirm}
+          collection={{
+            id: collectionId,
+            title: String(detail?.title || detail?.name || cartPreviewData.collectionTitle || 'Collection'),
+          }}
+          previewData={cartPreviewData}
+          onAddToCart={handleCartPreviewConfirm}
           onClose={() => setShowCartPreview(false)}
-          loading={addingAll}
+          isLoading={addingAll}
         />
       )}
     </div>

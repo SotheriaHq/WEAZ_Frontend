@@ -35,7 +35,27 @@ export interface NotificationTelemetryEvent {
 }
 
 // Concurrency safety - prevent duplicate events from rapid clicks
-const telemetrySent = new Set<string>();
+const telemetrySent = new Map<string, number>();
+const TELEMETRY_CAP = 500;
+const TELEMETRY_TTL_MS = 5000;
+
+function pruneTelemetry(now: number): void {
+    for (const [k, expiresAt] of telemetrySent) {
+        if (expiresAt <= now) {
+            telemetrySent.delete(k);
+        }
+    }
+
+    if (telemetrySent.size <= TELEMETRY_CAP) return;
+
+    const overflow = telemetrySent.size - TELEMETRY_CAP;
+    let removed = 0;
+    for (const key of telemetrySent.keys()) {
+        telemetrySent.delete(key);
+        removed += 1;
+        if (removed >= overflow) break;
+    }
+}
 
 /**
  * Track a notification interaction, with deduplication
@@ -43,13 +63,13 @@ const telemetrySent = new Set<string>();
  * @param event The telemetry event data
  */
 export function trackOnce(key: string, event: NotificationTelemetryEvent): void {
-    if (telemetrySent.has(key)) return;
+    const now = Date.now();
+    pruneTelemetry(now);
+    const expiresAt = telemetrySent.get(key);
+    if (expiresAt && expiresAt > now) return;
 
-    telemetrySent.add(key);
+    telemetrySent.set(key, now + TELEMETRY_TTL_MS);
     trackNotificationInteraction(event);
-
-    // Clear after 5 seconds to allow re-tracking if user returns
-    setTimeout(() => telemetrySent.delete(key), 5000);
 }
 
 /**

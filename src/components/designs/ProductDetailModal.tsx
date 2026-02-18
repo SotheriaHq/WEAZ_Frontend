@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  X, Heart, ShoppingCart, Minus, Plus, Star, ChevronRight, AlertTriangle, Check, Share2,
+import {
+  X, ShoppingCart, Minus, Plus, Star, ChevronRight, AlertTriangle, Check, Share2,
   ChevronDown, Truck, Ruler, Package, Sparkles, Copy
 } from 'lucide-react';
 import { FaInstagram, FaWhatsapp } from 'react-icons/fa';
@@ -339,6 +339,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div ref={dialogRef} tabIndex={-1} className="w-full max-w-6xl max-h-full bg-white dark:bg-gray-950 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
               {/* Close button */}
               <button
+                type="button"
                 onClick={onClose}
                 className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:bg-white dark:hover:bg-gray-900 transition-colors shadow-lg"
               >
@@ -371,6 +372,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
                       {/* Wishlist button */}
                       <button
+                        type="button"
                         onClick={handleToggleWishlist}
                         className={`absolute top-4 right-4 p-3 rounded-full backdrop-blur-md transition-all duration-200 shadow-lg ${
                           isWishlisted
@@ -378,7 +380,9 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             : 'bg-white/90 dark:bg-gray-900/90 text-gray-600 dark:text-gray-400 hover:text-red-500'
                         }`}
                       >
-                        <Heart size={20} fill={isWishlisted ? 'currentColor' : 'none'} />
+                        <span role="img" aria-hidden="true" className="text-lg leading-none">
+                          {isWishlisted ? '❤️' : '🖤'}
+                        </span>
                       </button>
                     </div>
 

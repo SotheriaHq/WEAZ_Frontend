@@ -17,6 +17,9 @@ function load(): QueueItem[] {
 }
 function save(items: QueueItem[]) { localStorage.setItem(KEY, JSON.stringify(items)); }
 
+let _commentsBound = false;
+const _commentsOnlineHandler = () => { void OfflineComments.flush(); };
+
 export const OfflineComments = {
   enqueue(targetType: CommentTarget, targetId: string, content: string, parentId?: string | null): CommentV2Dto {
     const id = `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -33,12 +36,12 @@ export const OfflineComments = {
       depth: parentId ? 1 : 0,
       contentRaw: content,
       contentSanitized: content.replace(/</g, '&lt;').replace(/>/g, '&gt;'),
-      likeCount: 0,
+      threadCount: 0,
       replyCount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       deletedAt: null,
-      isLikedByMe: false,
+      isThreadedByMe: false,
       children: [],
       optimistic: true,
       pending: true,
@@ -61,7 +64,14 @@ export const OfflineComments = {
     return succeeded;
   },
   attach() {
-    window.addEventListener('online', () => { void OfflineComments.flush(); });
+    if (_commentsBound) return;
+    window.addEventListener('online', _commentsOnlineHandler);
+    _commentsBound = true;
+  },
+  detach() {
+    if (!_commentsBound) return;
+    window.removeEventListener('online', _commentsOnlineHandler);
+    _commentsBound = false;
   },
 };
 

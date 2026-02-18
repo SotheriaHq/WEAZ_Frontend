@@ -21,6 +21,8 @@ interface StorePoliciesStepProps {
   onBack: () => void;
   onContinue: () => void;
   isSaving?: boolean;
+  mode?: 'wizard' | 'settings';
+  primaryActionLabel?: string;
 }
 
 // Shipping regions with flags (Africa-first)
@@ -144,7 +146,11 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
   onBack,
   onContinue,
   isSaving = false,
+  mode = 'wizard',
+  primaryActionLabel,
 }) => {
+  const isSettingsMode = mode === 'settings';
+  const actionLabel = primaryActionLabel || (isSettingsMode ? 'Save Policies' : 'Continue');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
   // Accordion state for collapsible sections
@@ -237,26 +243,26 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
         <div className="w-full max-w-[900px]">
           {/* Glass Card Container */}
           <div className="rounded-2xl overflow-hidden bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-gray-200/50 dark:border-purple-500/10 shadow-xl">
-            {/* Step Progress Header */}
-            <div className="px-8 pt-8 pb-4 border-b border-gray-200/50 dark:border-white/5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center text-purple-600 dark:text-purple-400 text-sm font-bold border border-purple-500/30">
-                    3
+            {!isSettingsMode && (
+              <div className="px-8 pt-8 pb-4 border-b border-gray-200/50 dark:border-white/5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center text-purple-600 dark:text-purple-400 text-sm font-bold border border-purple-500/30">
+                      3
+                    </div>
+                    <span className="text-gray-900 dark:text-white font-medium">
+                      Store Policies
+                    </span>
                   </div>
-                  <span className="text-gray-900 dark:text-white font-medium">
-                    Store Policies
+                  <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">
+                    Step 3 of 4
                   </span>
                 </div>
-                <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">
-                  Step 3 of 4
-                </span>
+                <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-purple-600 to-blue-500 w-1/2 rounded-full transition-all duration-500" />
+                </div>
               </div>
-              {/* Progress Bar */}
-              <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-purple-600 to-blue-500 w-1/2 rounded-full transition-all duration-500" />
-              </div>
-            </div>
+            )}
 
             {/* Content Area */}
             <div className="p-8 space-y-8">
@@ -760,36 +766,38 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
               </div>
             </div>
 
-            {/* Footer Actions */}
             <div className="p-6 border-t border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-black/20">
-              {/* Progress Bar */}
-              <div className="mb-6">
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-500">Progress</span>
-                  <span className="text-purple-600 font-medium">Step 3 of 4</span>
+              {!isSettingsMode && (
+                <div className="mb-6">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-500">Progress</span>
+                    <span className="text-purple-600 font-medium">Step 3 of 4</span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-purple-600 to-purple-700 h-full rounded-full transition-all duration-300"
+                      style={{ width: '50%' }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-purple-600 to-purple-700 h-full rounded-full transition-all duration-300"
-                    style={{ width: '50%' }}
-                  />
-                </div>
-              </div>
+              )}
 
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <button
-                  onClick={onBack}
-                  className="text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors text-sm inline-flex items-center gap-2"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back
-                </button>
+                {!isSettingsMode && (
+                  <button
+                    onClick={onBack}
+                    className="text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors text-sm inline-flex items-center gap-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                  </button>
+                )}
                 <button
                   onClick={onContinue}
                   disabled={isSaving}
                   className="px-8 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 shadow-lg shadow-purple-500/20"
                 >
-                  Continue
+                  {actionLabel}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>

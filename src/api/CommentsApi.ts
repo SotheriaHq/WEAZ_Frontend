@@ -21,18 +21,18 @@ export const CommentsApi = {
     const { data } = await apiClient.get(`/api/v1/comments/${commentId}/replies`, { params: { cursor, limit } });
     return unwrapApiResponse<PageResult<CommentV2Dto>>(data);
   },
-  async toggleLike(commentId: string) {
+  async toggleThread(commentId: string) {
     const clientEventId = (globalThis.crypto && 'randomUUID' in globalThis.crypto)
       ? (globalThis.crypto as any).randomUUID()
       : undefined;
-    const { data } = await apiClient.post(`/api/v1/comments/${commentId}/like`, {}, {
+    const { data } = await apiClient.post(`/api/v1/comments/${commentId}/thread`, {}, {
       headers: clientEventId ? { 'x-client-event-id': clientEventId } : undefined,
     });
-    return unwrapApiResponse<{ liked: boolean; likeCount: number }>(data);
+    return unwrapApiResponse<{ threaded: boolean; threadCount: number }>(data);
   },
-  async isLiked(commentId: string) {
-    const { data } = await apiClient.get(`/api/v1/comments/${commentId}/is-liked`);
-    return unwrapApiResponse<{ liked: boolean }>(data);
+  async isThreaded(commentId: string) {
+    const { data } = await apiClient.get(`/api/v1/comments/${commentId}/is-threaded`);
+    return unwrapApiResponse<{ threaded: boolean }>(data);
   },
   async remove(commentId: string) {
     const { data } = await apiClient.delete(`/api/v1/comments/${commentId}`);
@@ -40,11 +40,10 @@ export const CommentsApi = {
   },
   async stats(commentId: string) {
     const { data } = await apiClient.get(`/api/v1/comments/${commentId}/stats`);
-    return unwrapApiResponse<{ likeCount: number; replyCount: number }>(data);
+    return unwrapApiResponse<{ threadCount: number; replyCount: number }>(data);
   },
   async listUnifiedForCollection(collectionId: string, cursor?: string, limit = 20) {
     const { data } = await apiClient.get(`/api/v1/collections/${collectionId}/comments-unified`, { params: { cursor, limit } });
     return unwrapApiResponse<PageResult<CommentV2Dto>>(data);
   },
 };
-

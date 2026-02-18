@@ -141,6 +141,7 @@ export interface ProductCreateDto {
     metaTitle?: string;
     metaDescription?: string;
     publishAt?: string;
+    isActive?: boolean;
 }
 
 export interface ProductDto {
@@ -182,7 +183,7 @@ export interface ProductDto {
     isOutOfStock?: boolean;
     isLowStock?: boolean;
     viewsCount?: number;
-    likesCount?: number;
+    threadsCount?: number;
     effectivePrice?: number;
     createdAt?: string;
     updatedAt?: string;
@@ -194,6 +195,10 @@ export interface ProductDto {
         id: string;
         name: string;
         currency?: string;
+    };
+    category?: {
+        id: string;
+        name: string;
     };
 }
 
@@ -313,7 +318,7 @@ export const productApi = {
         inCarts: number;
         inWishlists: number;
         totalViews: number;
-        totalLikes: number;
+        totalThreads: number;
         canDelete: boolean;
         mustArchiveReason?: string;
     }> {

@@ -3,12 +3,14 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { CommentsApi } from '@/api/CommentsApi';
 import { toast } from 'sonner';
-import LikeButton from '@/components/ui/LikeButton';
+import ThreadButton from '@/components/ui/ThreadButton';
 import CommentInput from '@/components/ui/CommentInput';
 import type { MarketItem } from '@/types/market';
 import { selectCommentCount } from '@/features/engagementSlice';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { apiClient } from '@/api/httpClient';
+import { Link, Tag } from 'lucide-react';
 
 interface DesignCardProps {
   item: MarketItem;
@@ -16,18 +18,48 @@ interface DesignCardProps {
   onViewCollection?: (collectionId: string) => void;
   onViewBrand?: (brandId: string, item: MarketItem) => void;
   className?: string;
+  isSaved?: boolean;
+  onToggleSave?: (id: string) => void;
+  saveBusy?: boolean;
+  isPatched?: boolean;
+  onTogglePatch?: (brandId: string) => void;
+  patchBusy?: boolean;
 }
 
-export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onViewCollection, onViewBrand, className }) => {
+export const DesignCard: React.FC<DesignCardProps> = ({
+  item,
+  onOpenView,
+  onViewCollection,
+  onViewBrand,
+  className,
+  isSaved: isSavedProp,
+  onToggleSave,
+  saveBusy: saveBusyProp,
+  isPatched: isPatchedProp,
+  onTogglePatch,
+  patchBusy: patchBusyProp,
+}) => {
   const [imgLoaded, setImgLoaded] = useState(false);
   const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const [commentText, setCommentText] = useState('');
   const [commentBusy, setCommentBusy] = useState(false);
   const realtime = useRealtime();
+  const user = useSelector((s: RootState) => s.user.profile);
   const [isHidden, setIsHidden] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showTags, setShowTags] = useState(false);
+  const [isSavedLocal, setIsSavedLocal] = useState(false);
+  const [saveBusyLocal, setSaveBusyLocal] = useState(false);
+  const [isPatchedLocal, setIsPatchedLocal] = useState(false);
+  const [patchBusyLocal, setPatchBusyLocal] = useState(false);
+  const isRegular = user?.type === 'REGULAR';
+  const isSaveControlled = typeof isSavedProp === 'boolean' && typeof onToggleSave === 'function';
+  const isPatchControlled = typeof isPatchedProp === 'boolean' && typeof onTogglePatch === 'function';
+  const resolvedSaved = isSaveControlled ? (isSavedProp as boolean) : isSavedLocal;
+  const resolvedSaveBusy = isSaveControlled ? Boolean(saveBusyProp) : saveBusyLocal;
+  const resolvedPatched = isPatchControlled ? (isPatchedProp as boolean) : isPatchedLocal;
+  const resolvedPatchBusy = isPatchControlled ? Boolean(patchBusyProp) : patchBusyLocal;
   
   // Check if item is hidden in local storage on mount
   useEffect(() => {
@@ -37,10 +69,54 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
     }
   }, [item.id]);
 
-  // Join WebSocket room for real-time comment/like updates
+  // Join WebSocket room for real-time comment/thread updates
   useEffect(() => {
     realtime.joinCollectionMedia(item.id);
   }, [item.id, realtime]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadSaved = async () => {
+      if (isSaveControlled) return;
+      if (!isAuth) {
+        if (mounted) setIsSavedLocal(false);
+        return;
+      }
+      try {
+        const res = await apiClient.get('/saved/check', {
+          params: { targetType: 'COLLECTION_MEDIA', targetId: item.id },
+        });
+        if (mounted) {
+          setIsSavedLocal(Boolean(res.data?.isSaved));
+        }
+      } catch {
+        if (mounted) setIsSavedLocal(false);
+      }
+    };
+    void loadSaved();
+    return () => { mounted = false; };
+  }, [isAuth, item.id, isSaveControlled]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadPatch = async () => {
+      if (isPatchControlled) return;
+      if (!isAuth || !isRegular || !item.brandId) {
+        if (mounted) setIsPatchedLocal(false);
+        return;
+      }
+      try {
+        const res = await apiClient.get(`/brands/${item.brandId}/patches/check`);
+        if (mounted) {
+          setIsPatchedLocal(Boolean(res.data?.isPatched));
+        }
+      } catch {
+        if (mounted) setIsPatchedLocal(false);
+      }
+    };
+    void loadPatch();
+    return () => { mounted = false; };
+  }, [isAuth, isRegular, item.brandId, isPatchControlled]);
 
   // Use Redux selector for real-time comment count synchronization
   const commentCount = useSelector((s: RootState) => 
@@ -61,12 +137,63 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
     toast.info('Content hidden. You can undo this in Settings.');
   };
 
-  const handleAddToWishlist = (e: React.MouseEvent) => {
+  const handleToggleSave = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isAuth) { toast.info('Please sign in to use wishlist.'); return; }
-    // Placeholder for actual API call
-    toast.success('Added to wishlist (Coming Soon)');
-    setShowMenu(false);
+    if (isSaveControlled) {
+      onToggleSave?.(item.id);
+      return;
+    }
+    if (!isAuth) { toast.info('Please sign in to save items.'); return; }
+    if (saveBusyLocal) return;
+    try {
+      setSaveBusyLocal(true);
+      if (isSavedLocal) {
+        await apiClient.delete('/saved', {
+          data: { targetType: 'COLLECTION_MEDIA', targetId: item.id },
+        });
+        setIsSavedLocal(false);
+        toast.success('Removed from saved.');
+      } else {
+        await apiClient.post('/saved', { targetType: 'COLLECTION_MEDIA', targetId: item.id });
+        setIsSavedLocal(true);
+        toast.success('Saved for later.');
+      }
+    } catch {
+      toast.error('Unable to update saved items.');
+    } finally {
+      setSaveBusyLocal(false);
+      setShowMenu(false);
+    }
+  };
+
+  const handleTogglePatch = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isPatchControlled) {
+      if (item.brandId) {
+        onTogglePatch?.(item.brandId);
+      }
+      return;
+    }
+    if (!isAuth) { toast.info('Please sign in to patch brands.'); return; }
+    if (!isRegular || !item.brandId) return;
+    if (patchBusyLocal) return;
+    try {
+      setPatchBusyLocal(true);
+      if (isPatchedLocal) {
+        await apiClient.delete(`/brands/${item.brandId}/patches`);
+        setIsPatchedLocal(false);
+        toast.success('Brand unpatched.');
+      } else {
+        await apiClient.post(`/brands/${item.brandId}/patches`);
+        setIsPatchedLocal(true);
+        toast.success('Brand patched.');
+      }
+    } catch {
+      toast.error('Unable to update patch.');
+    } finally {
+      setPatchBusyLocal(false);
+      setShowMenu(false);
+    }
   };
 
   if (isHidden) return null;
@@ -125,17 +252,17 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
         {/* Gradient Overlay for Text Readability */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-        {/* Tag Emoji Button */}
+        {/* Tag Button */}
         <div className="absolute top-3 left-3 z-20">
            <button
             onClick={(e) => {
               e.stopPropagation();
               setShowTags(!showTags);
             }}
-            className="text-xl hover:scale-110 transition-transform drop-shadow-md"
+            className="hover:scale-110 transition-transform drop-shadow-md"
             title="View Tags"
           >
-            🏷️
+            <Tag className="h-5 w-5 text-white" aria-hidden="true" />
           </button>
           {showTags && item.tags && item.tags.length > 0 && (
             <div className="absolute top-8 left-0 flex flex-wrap gap-1 w-48 animate-in fade-in zoom-in-95 duration-100">
@@ -167,14 +294,28 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
           {showMenu && (
             <div className="absolute right-0 mt-1 w-40 rounded-lg bg-white/90 dark:bg-black/80 backdrop-blur-md border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right z-40">
               <button
-                onClick={handleAddToWishlist}
-                className="w-full text-left px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 transition-colors"
+                onClick={handleToggleSave}
+                disabled={resolvedSaveBusy}
+                className="w-full text-left px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 transition-colors disabled:opacity-60"
               >
                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
                 </svg>
-                Save to Wishlist
+                {resolvedSaved ? 'Unsave' : 'Save'}
               </button>
+              {isRegular && item.brandId && (
+                <>
+                  <div className="h-px bg-gray-200 dark:bg-white/10 my-0.5" />
+                  <button
+                    onClick={handleTogglePatch}
+                    disabled={resolvedPatchBusy}
+                    className="w-full text-left px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 transition-colors disabled:opacity-60"
+                  >
+                    <Tag className="h-3.5 w-3.5" aria-hidden="true" />
+                    {resolvedPatched ? 'Unpatch brand' : 'Patch brand'}
+                  </button>
+                </>
+              )}
               <div className="h-px bg-gray-200 dark:bg-white/10 my-0.5" />
               <button
                 onClick={handleHideContent}
@@ -193,11 +334,11 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
 
         {/* Vertical Action Bar (Right Side - Instagram/TikTok Style) */}
         <div className="absolute bottom-24 right-3 z-10 flex flex-col items-center gap-4">
-          <LikeButton
+          <ThreadButton
             contentType="COLLECTION_MEDIA"
             contentId={item.id}
-            initialCount={item.likesCount ?? 0}
-            initialLiked={item.isLiked}
+            initialCount={item.threadsCount ?? 0}
+            initialThreaded={item.isThreaded}
             ownerId={item.brandId}
             parentCollectionId={item.collectionId}
           />
@@ -210,16 +351,16 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
             }}
             aria-label="Share"
           >
-            <span className="text-lg">🔗</span>
-            <span className="text-xs font-bold mt-1 drop-shadow">{item.patchesCount ?? 0}</span>
+            <Link className="h-5 w-5" aria-hidden="true" />
+            <span className="text-xs font-bold mt-1 drop-shadow">{item.collectionCollabCount ?? 0}</span>
           </button>
         </div>
 
         {/* Bottom Content Overlay */}
-        {/* 🔧 FIX #6: Responsive padding for different screen sizes */}
+        {/* FIX #6: Responsive padding for different screen sizes */}
         <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3 md:p-4 text-white z-10">
           {/* Brand Info with Glassmorphism */}
-          {/* 🔧 FIX #6: Responsive padding and spacing */}
+          {/* FIX #6: Responsive padding and spacing */}
           <button
             type="button"
             onClick={(e) => {
@@ -248,7 +389,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
               </div>
             )}
             <div className="flex-1 min-w-0 text-left">
-              {/* 🔧 FIX #5: Responsive font sizing, removed truncate, allow wrapping with line-clamp */}
+              {/* FIX #5: Responsive font sizing, removed truncate, allow wrapping with line-clamp */}
               <p 
                 className="font-bold leading-tight text-white drop-shadow line-clamp-2"
                 style={{ fontSize: 'clamp(0.75rem, 2.5vw, 0.875rem)' }}
@@ -267,7 +408,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({ item, onOpenView, onView
           </button>
 
           {/* Collection Title - Fancy Typography */}
-          {/* 🔧 FIX #5: Responsive title sizing */}
+          {/* FIX #5: Responsive title sizing */}
           <h3 
             className="font-bold mb-1 line-clamp-2 leading-tight drop-shadow-lg text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-100 to-white"
             style={{ 

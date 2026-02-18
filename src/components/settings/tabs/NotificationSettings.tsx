@@ -6,14 +6,35 @@ interface NotificationSettingsData {
   security: {
     login: boolean;
   };
-  engagement: {
-    likes: boolean;
-    comments: boolean;
+  social: {
+    threads: boolean;
     follows: boolean;
+    patches: boolean;
+  };
+  comments: {
+    enabled: boolean;
+    replies: boolean;
+    fromUnpatchedUsers: boolean;
+  };
+  tags: {
+    mentions: boolean;
+    fromUnpatchedUsers: boolean;
+  };
+  collections: {
+    lifecycle: boolean;
+    access: boolean;
   };
   brand: {
     patchRequests: boolean;
     contributions: boolean;
+  };
+  orders: {
+    updates: boolean;
+  };
+  fit: {
+    reminders: boolean;
+    shares: boolean;
+    approvals: boolean;
   };
 }
 
@@ -73,6 +94,40 @@ const NotificationSettings: React.FC = () => {
 
   const sections = [
     {
+      title: 'Social & Engagement',
+      category: 'social' as const,
+      items: [
+        { id: 'threads', label: 'Threads', description: 'When someone threads your content' },
+        { id: 'follows', label: 'Follows', description: 'When someone follows your profile' },
+        { id: 'patches', label: 'Patches', description: 'When someone patches your profile or collabs your collection' },
+      ],
+    },
+    {
+      title: 'Comments',
+      category: 'comments' as const,
+      items: [
+        { id: 'enabled', label: 'All Comment Notifications', description: 'Master switch for comment notifications' },
+        { id: 'replies', label: 'Replies To My Comments', description: 'When someone replies to your comment thread' },
+        { id: 'fromUnpatchedUsers', label: 'Allow Comments From Unpatched Users', description: 'Turn off to receive comment notifications only from users patched with you' },
+      ],
+    },
+    {
+      title: 'Tagging',
+      category: 'tags' as const,
+      items: [
+        { id: 'mentions', label: 'Tag Mentions', description: 'When you are tagged or your saved tags are matched in content/products' },
+        { id: 'fromUnpatchedUsers', label: 'Allow Tags From Unpatched Users', description: 'Turn off to receive tag notifications only from users patched with you' },
+      ],
+    },
+    {
+      title: 'Collections',
+      category: 'collections' as const,
+      items: [
+        { id: 'lifecycle', label: 'Collection Lifecycle', description: 'Collection/product publish and delete activity' },
+        { id: 'access', label: 'Private Access Requests', description: 'Requests, approvals, and revocations for private collection access' },
+      ],
+    },
+    {
       title: 'Brand Interactions',
       category: 'brand' as const,
       items: [
@@ -81,19 +136,38 @@ const NotificationSettings: React.FC = () => {
       ],
     },
     {
-      title: 'Engagement',
-      category: 'engagement' as const,
+      title: 'Orders',
+      category: 'orders' as const,
       items: [
-        { id: 'follows', label: 'New Subscribers', description: 'When a user subscribes to your brand' },
-        { id: 'comments', label: 'Comments', description: 'When someone comments on your collections' },
-        { id: 'likes', label: 'Likes', description: 'When someone likes your content' },
+        { id: 'updates', label: 'Order Updates', description: 'Order placement and order status updates' },
       ],
     },
     {
       title: 'Security',
       category: 'security' as const,
       items: [
-        { id: 'login', label: 'Login Alerts', description: 'Get notified when a new login occurs on your account' },
+        { id: 'login', label: 'Authentication Alerts', description: 'Get notified when login or logout activity occurs on your account' },
+      ],
+    },
+    {
+      title: 'Size Fittings',
+      category: 'fit' as const,
+      items: [
+        {
+          id: 'reminders',
+          label: 'Fit Update Reminders',
+          description: 'Remind me every two weeks to refresh my size measurements',
+        },
+        {
+          id: 'shares',
+          label: 'Fit Sharing Activity',
+          description: 'Notify me when my fitting profile is shared or reshared',
+        },
+        {
+          id: 'approvals',
+          label: 'Share Approvals',
+          description: 'Notify me about share request approvals and rejections',
+        },
       ],
     },
   ];

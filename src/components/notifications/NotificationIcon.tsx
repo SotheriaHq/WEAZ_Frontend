@@ -5,6 +5,27 @@
  */
 
 import React from 'react';
+import {
+  Bell,
+  MessageCircle,
+  Link2,
+  UserPlus,
+  Share2,
+  Lock,
+  CheckCircle,
+  XCircle,
+  Mail,
+  Sparkles,
+  Handshake,
+  ShieldCheck,
+  LogOut,
+  ShoppingCart,
+  Package,
+  Upload,
+  Trash2,
+  Ruler,
+  Tag,
+} from 'lucide-react';
 import { getNotificationIcon } from '@/types/notificationTypes';
 
 interface NotificationIconProps {
@@ -13,25 +34,42 @@ interface NotificationIconProps {
   className?: string;
 }
 
-const sizeClasses = {
-  sm: 'text-sm',
-  md: 'text-base',
-  lg: 'text-lg',
+const sizePx = {
+  sm: 14,
+  md: 16,
+  lg: 18,
+} as const;
+
+const iconMap: Record<string, React.ElementType> = {
+  thread: Link2,
+  comment: MessageCircle,
+  patch: UserPlus,
+  tag: Tag,
+  collab: Share2,
+  access: Lock,
+  approved: CheckCircle,
+  rejected: XCircle,
+  revoked: Lock,
+  mail: Mail,
+  celebrate: Sparkles,
+  contribution: Handshake,
+  security: ShieldCheck,
+  logout: LogOut,
+  order: ShoppingCart,
+  order_status: Package,
+  upload: Upload,
+  delete: Trash2,
+  fit: Ruler,
+  bell: Bell,
 };
 
 export const NotificationIcon = React.memo<NotificationIconProps>(
   ({ type, size = 'md', className = '' }) => {
-    const icon = getNotificationIcon(type);
-    const sizeClass = sizeClasses[size];
+    const iconKey = getNotificationIcon(type);
+    const Icon = iconMap[iconKey] || Bell;
 
     return (
-      <span 
-        className={`${sizeClass} ${className}`}
-        role="img"
-        aria-hidden="true"
-      >
-        {icon}
-      </span>
+      <Icon className={className} size={sizePx[size]} aria-hidden="true" />
     );
   }
 );

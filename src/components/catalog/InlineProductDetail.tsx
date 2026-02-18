@@ -69,6 +69,7 @@ export default function InlineProductDetail({
 
   const sizes = product.sizes || [];
   const colors = product.colors || [];
+  const compareAtPrice = (product as any).compareAtPrice as number | undefined;
 
   return (
     <div className="w-full animate-in fade-in slide-in-from-right-4 duration-300">
@@ -170,8 +171,8 @@ export default function InlineProductDetail({
             <span className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
               {formatCurrency(product.price)}
             </span>
-            {product.compareAtPrice && product.compareAtPrice > (product.price || 0) && (
-              <span className="text-lg text-gray-400 line-through">{formatCurrency(product.compareAtPrice)}</span>
+            {compareAtPrice && compareAtPrice > (product.price || 0) && (
+              <span className="text-lg text-gray-400 line-through">{formatCurrency(compareAtPrice)}</span>
             )}
           </div>
 

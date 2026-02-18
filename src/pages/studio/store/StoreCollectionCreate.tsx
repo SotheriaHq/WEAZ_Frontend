@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
+import { X } from 'lucide-react';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
 import { getBrandProductsForOwner, type Product as StoreProduct } from '@/api/StoreApi';
@@ -16,6 +17,8 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import SearchField from '@/components/SearchField';
 import Select from '@/components/ui/Select';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import Tag from '@/components/ui/Tag';
+import { getTagColor } from '@/utils/tagColors';
 
 const MAX_PRODUCTS = 5;
 const MAX_TAGS = 20;
@@ -31,7 +34,8 @@ const StoreCollectionCreate: React.FC = () => {
   const [visibility, setVisibility] = useState<CollectionVisibility>('PUBLIC');
   const [type, setType] = useState<CollectionType>('EVERYBODY');
   const [categoryId, setCategoryId] = useState('');
-  const [tagsInput, setTagsInput] = useState('');
+  const [tagInput, setTagInput] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
 
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
@@ -47,6 +51,10 @@ const StoreCollectionCreate: React.FC = () => {
   const [previewProduct, setPreviewProduct] = useState<StoreProduct | null>(null);
 
   const preselectProductId = searchParams.get('productId');
+  const prefillCollectionId = searchParams.get('collectionId');
+  const returnMode = searchParams.get('mode');
+  const [collectionSessionId, setCollectionSessionId] = useState<string | null>(null);
+  const [sessionDraftProductIds, setSessionDraftProductIds] = useState<string[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -71,6 +79,63 @@ const StoreCollectionCreate: React.FC = () => {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!prefillCollectionId) return;
+    setCollectionSessionId((prev) => prev ?? prefillCollectionId);
+  }, [prefillCollectionId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadDraftDetails = async () => {
+      if (!collectionSessionId) return;
+      let detail: any = null;
+      try {
+        detail = await brandApi.getCollectionDetail(collectionSessionId);
+      } catch (error: any) {
+        if (!mounted) return;
+        toast.error(error?.response?.data?.message ?? 'Unable to load draft collection.');
+        return;
+      }
+      if (!mounted || !detail) return;
+
+      const links = Array.isArray(detail.products) ? detail.products : [];
+      const linkedProducts = links
+        .map((link: any) => link?.product ?? link)
+        .filter(Boolean);
+      const linkedIds = linkedProducts
+        .map((product: any) => String(product.id || ''))
+        .filter(Boolean);
+      const draftIds = linkedProducts
+        .filter((product: any) => product?.isActive === false)
+        .map((product: any) => String(product.id || ''))
+        .filter(Boolean);
+
+      if (linkedIds.length > 0) {
+        setSelectedProductIds((prev) => Array.from(new Set([...prev, ...linkedIds])));
+      }
+      if (draftIds.length > 0) {
+        setSessionDraftProductIds((prev) => Array.from(new Set([...prev, ...draftIds])));
+        setCreationMode('new');
+      }
+
+      if (!preselectProductId) {
+        if (!title && detail.title) setTitle(detail.title);
+        if (!description && detail.description) setDescription(detail.description);
+        if (!categoryId && detail.categoryId) setCategoryId(detail.categoryId);
+        if (detail.visibility) setVisibility(detail.visibility);
+        if (detail.type) setType(detail.type);
+        if (Array.isArray(detail.tags) && tags.length === 0) {
+          setTags(detail.tags.filter((tag: any) => typeof tag === 'string'));
+        }
+      }
+    };
+
+    void loadDraftDetails();
+    return () => {
+      mounted = false;
+    };
+  }, [collectionSessionId, preselectProductId, title, description, categoryId, tags.length]);
 
   const loadProducts = useCallback(async () => {
     if (!user?.id) {
@@ -103,18 +168,28 @@ const StoreCollectionCreate: React.FC = () => {
   }, [loadProducts]);
 
   useEffect(() => {
-    if (!preselectProductId || products.length === 0) return;
+    if (!preselectProductId) return;
+    void loadProducts();
+    setSessionDraftProductIds((prev) =>
+      prev.includes(preselectProductId) ? prev : [...prev, preselectProductId]
+    );
     setSelectedProductIds((prev) => {
       if (prev.includes(preselectProductId)) return prev;
       if (prev.length >= MAX_PRODUCTS) return prev;
       return [...prev, preselectProductId];
     });
-  }, [preselectProductId, products.length]);
+    setCreationMode('new');
+  }, [preselectProductId, loadProducts]);
+
+  useEffect(() => {
+    if (returnMode === 'new') {
+      setCreationMode('new');
+    }
+  }, [returnMode]);
 
   const normalizedTags = useMemo(() => {
     const seen = new Set<string>();
-    const tags = tagsInput
-      .split(',')
+    const cleaned = tags
       .map((tag) => tag.trim())
       .filter(Boolean)
       .map((tag) => tag.slice(0, TAG_CHAR_LIMIT))
@@ -124,14 +199,58 @@ const StoreCollectionCreate: React.FC = () => {
         seen.add(key);
         return true;
       });
-    return tags.slice(0, MAX_TAGS);
-  }, [tagsInput]);
+    return cleaned.slice(0, MAX_TAGS);
+  }, [tags]);
+
+  const handleAddTag = useCallback(() => {
+    const raw = tagInput.trim();
+    if (!raw) return;
+    const cleaned = raw.replace(/#/g, '').trim().slice(0, TAG_CHAR_LIMIT);
+    if (!cleaned) return;
+    setTags((prev) => {
+      if (prev.length >= MAX_TAGS) {
+        toast.error(`You can add up to ${MAX_TAGS} tags.`);
+        return prev;
+      }
+      if (prev.some((t) => t.toLowerCase() === cleaned.toLowerCase())) return prev;
+      return [...prev, cleaned];
+    });
+    setTagInput('');
+  }, [tagInput]);
+
+  const handleTagKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        handleAddTag();
+      }
+    },
+    [handleAddTag],
+  );
+
+  const handleRemoveTag = useCallback((tagToRemove: string) => {
+    setTags((prev) => prev.filter((tag) => tag !== tagToRemove));
+  }, []);
 
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return products;
     return products.filter((p) => p.name?.toLowerCase().includes(q));
   }, [products, search]);
+
+  const sessionProducts = useMemo(
+    () => products.filter((p) => sessionDraftProductIds.includes(p.id)),
+    [products, sessionDraftProductIds]
+  );
+
+  const visibleProducts = useMemo(() => {
+    if (creationMode === 'new') {
+      return sessionProducts;
+    }
+    return filteredProducts.filter(
+      (p) => p.isActive !== false && !sessionDraftProductIds.includes(p.id)
+    );
+  }, [creationMode, filteredProducts, sessionDraftProductIds, sessionProducts]);
 
   const selectedProducts = useMemo(
     () => products.filter((p) => selectedProductIds.includes(p.id)),
@@ -163,6 +282,38 @@ const StoreCollectionCreate: React.FC = () => {
     []
   );
 
+  const ensureCollectionSession = async () => {
+    if (collectionSessionId) return collectionSessionId;
+    const init = await initializeStoreCollection({
+      mode: creationMode === 'new' ? 'new-individual' : 'existing',
+      title: title.trim() || undefined,
+      description: description.trim() || undefined,
+      visibility,
+      categoryId: categoryId || undefined,
+      type,
+      tags: normalizedTags,
+      isAvailableInStore: true,
+    });
+    setCollectionSessionId(init.sessionId);
+    return init.sessionId;
+  };
+
+  const openCollectionProductEditor = async (productId?: string) => {
+    try {
+      const sessionId = await ensureCollectionSession();
+      const mode = creationMode === 'new' ? 'new' : 'existing';
+      const returnPath = `/studio/store/collections/new?collectionId=${sessionId}&mode=${mode}`;
+      const basePath = productId
+        ? `/studio/store/products/${productId}/edit`
+        : '/studio/store/products/new';
+      navigate(
+        `${basePath}?returnTo=${encodeURIComponent(returnPath)}&returnContext=collection&collectionId=${sessionId}`,
+      );
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message ?? 'Failed to start product flow for this collection.');
+    }
+  };
+
   const handleSubmit = async (action: 'publish' | 'draft') => {
     if (!title.trim()) {
       toast.error('Please enter a collection title.');
@@ -191,26 +342,21 @@ const StoreCollectionCreate: React.FC = () => {
         toast.error('At least one selected product needs an image to publish.');
         return;
       }
+      if (selectedProducts.some((product) => product.isActive === false)) {
+        toast.error('One or more selected products are still drafts. Edit and publish those products first.');
+        return;
+      }
     }
 
     setSubmitting(true);
     try {
-      const init = await initializeStoreCollection({
-        mode: creationMode === 'new' ? 'new-individual' : 'existing',
-        title: title.trim(),
-        description: description.trim() || undefined,
-        visibility,
-        categoryId: categoryId || undefined,
-        type,
-        tags: normalizedTags,
-        isAvailableInStore: true,
-      });
+      const sessionId = await ensureCollectionSession();
 
       if (selectedProductIds.length > 0) {
-        await addProductsToCollection(init.sessionId, selectedProductIds);
+        await addProductsToCollection(sessionId, selectedProductIds);
       }
 
-      await finalizeStoreCollection(init.sessionId, {
+      await finalizeStoreCollection(sessionId, {
         action,
         collectionMetadata: {
           title: title.trim(),
@@ -352,7 +498,7 @@ const StoreCollectionCreate: React.FC = () => {
                 }`}
               >
                 <div className="text-sm font-semibold text-gray-900 dark:text-white">From Existing Products</div>
-                  <div className="text-xs text-gray-500 mt-1">Select from store, drafts, or archived items.</div>
+                  <div className="text-xs text-gray-500 mt-1">Select from your existing store products.</div>
               </button>
               <button
                 type="button"
@@ -364,7 +510,7 @@ const StoreCollectionCreate: React.FC = () => {
                 }`}
               >
                 <div className="text-sm font-semibold text-gray-900 dark:text-white">Create New Products</div>
-                <div className="text-xs text-gray-500 mt-1">Add new items, then return to finish this collection.</div>
+                <div className="text-xs text-gray-500 mt-1">Create products and add them directly into this collection.</div>
               </button>
             </div>
           </div>
@@ -389,12 +535,12 @@ const StoreCollectionCreate: React.FC = () => {
             ) : (
               <div className="rounded-xl border border-dashed border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/5 p-4">
                 <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Create new products first, then refresh this list to add them to the collection.
+                  Add products directly to this collection. Product-level draft save is disabled in this flow.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => navigate('/studio/store/products/new?returnTo=/studio/store/collections/new&returnContext=collection')}
+                    onClick={() => void openCollectionProductEditor()}
                     className="rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white hover:bg-purple-700"
                   >
                     Create a Product
@@ -425,13 +571,14 @@ const StoreCollectionCreate: React.FC = () => {
               <div className="py-10 text-sm text-gray-500">Loading products...</div>
             ) : productsError ? (
               <div className="py-10 text-sm text-red-500">{productsError}</div>
-            ) : filteredProducts.length === 0 ? (
+            ) : visibleProducts.length === 0 ? (
               <div className="py-10 text-sm text-gray-500">No products found.</div>
             ) : (
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {filteredProducts.map((product) => {
+                {visibleProducts.map((product) => {
                   const image = getProductImageSource(product);
                   const selected = selectedProductIds.includes(product.id);
+                  const isSession = sessionDraftProductIds.includes(product.id);
                   return (
                     <div
                       key={product.id}
@@ -476,11 +623,26 @@ const StoreCollectionCreate: React.FC = () => {
                             <div className="text-xs text-gray-500">
                               {formatCurrency(product.price)}
                             </div>
+                            {isSession && (
+                              <div className="mt-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
+                                New • Collection Flow
+                              </div>
+                            )}
                             <div className="mt-1 text-[11px] text-gray-500">
                               Stock: {typeof product.totalStock === 'number' ? product.totalStock : '—'}
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void openCollectionProductEditor(product.id);
+                              }}
+                              className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
+                            >
+                              Edit
+                            </button>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -508,6 +670,109 @@ const StoreCollectionCreate: React.FC = () => {
                 })}
               </div>
             )}
+              </>
+            )}
+
+            {creationMode === 'new' && (
+              <>
+                {sessionProducts.length === 0 ? (
+                  <div className="mt-4 rounded-xl border border-dashed border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/5 p-6 text-sm text-gray-600 dark:text-gray-300">
+                    No new products added yet. Use "Create a Product" to add items to this collection.
+                  </div>
+                ) : (
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {sessionProducts.map((product) => {
+                      const image = getProductImageSource(product);
+                      const selected = selectedProductIds.includes(product.id);
+                      return (
+                        <div
+                          key={product.id}
+                          onClick={() => toggleProduct(product.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              toggleProduct(product.id);
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          className={`relative flex gap-4 rounded-2xl border-2 p-4 text-left transition-all duration-300 cursor-pointer group ${
+                            selected
+                              ? 'border-transparent bg-gradient-to-br from-purple-100 via-white to-pink-100 dark:from-purple-600/30 dark:via-fuchsia-600/20 dark:to-pink-600/20 ring-2 ring-purple-500/60 shadow-xl shadow-purple-500/20 scale-[1.02]'
+                              : 'border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/5 hover:border-purple-400/60 hover:shadow-lg hover:shadow-purple-500/10 hover:scale-[1.01] hover:bg-gradient-to-br hover:from-purple-50/50 hover:to-pink-50/50 dark:hover:from-purple-900/20 dark:hover:to-pink-900/20'
+                          }`}
+                        >
+                          <div className="shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-gray-100 dark:bg-white/10 border border-gray-200/70 dark:border-white/10">
+                            {image.src || image.fileId ? (
+                              <ImageWithFallback
+                                src={image.src}
+                                fileId={image.fileId}
+                                alt={product.name}
+                                fit="cover"
+                                className="w-full h-full object-cover"
+                                containerClassName="w-full h-full"
+                                rounded="lg"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="text-xs text-gray-400">No image</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1">
+                                  {product.name}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {formatCurrency(product.price)}
+                                </div>
+                                <div className="mt-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
+                                  New • Collection Flow
+                                </div>
+                                <div className="mt-1 text-[11px] text-gray-500">
+                                  Stock: {typeof product.totalStock === 'number' ? product.totalStock : '—'}
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void openCollectionProductEditor(product.id);
+                                  }}
+                                  className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewProduct(product);
+                                  }}
+                                  className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
+                                >
+                                  View
+                                </button>
+                                <span
+                                  className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 ${
+                                    selected
+                                      ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm'
+                                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                                  }`}
+                                >
+                                  {selected ? '✓' : 'Select'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -585,16 +850,40 @@ const StoreCollectionCreate: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Tags</label>
-              <input
-                type="text"
-                value={tagsInput}
-                onChange={(e) => setTagsInput(e.target.value)}
-                placeholder="e.g. spring, limited, drop"
-                className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-3 py-2 text-sm text-gray-900 dark:text-white"
-              />
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">Tags</label>
+              <div className="bg-white dark:bg-zinc-900/60 border border-gray-300/80 dark:border-zinc-700/60 rounded-xl px-3 py-2 min-h-[46px] flex items-center gap-2 shadow-sm">
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  placeholder="Add tag..."
+                  className="bg-transparent border-none outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 w-24 flex-1 p-0 focus:ring-0"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddTag}
+                  className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-500 transition"
+                >
+                  Add
+                </button>
+              </div>
+              {normalizedTags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {normalizedTags.map((tag, index) => (
+                    <Tag
+                      key={tag}
+                      label={tag}
+                      color={getTagColor(tag, index)}
+                      size="xs"
+                      rightIcon={<X className="w-3 h-3 cursor-pointer" onClick={() => handleRemoveTag(tag)} />}
+                      className="gap-1"
+                    />
+                  ))}
+                </div>
+              )}
               <p className="mt-1 text-[11px] text-gray-500">
-                {normalizedTags.length}/{MAX_TAGS} tags (comma-separated)
+                {normalizedTags.length}/{MAX_TAGS} tags. Press Enter or click Add.
               </p>
             </div>
           </div>
@@ -605,18 +894,37 @@ const StoreCollectionCreate: React.FC = () => {
               <p className="text-xs text-gray-500">No products selected yet.</p>
             ) : (
               <div className="space-y-2">
-                {selectedProducts.map((product) => (
+                {selectedProducts.map((product) => {
+                  const isDraft = product.isActive === false || sessionDraftProductIds.includes(product.id);
+                  return (
                   <div key={product.id} className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300">
-                    <span className="line-clamp-1">{product.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => toggleProduct(product.id)}
-                      className="text-purple-600 hover:text-purple-700"
-                    >
-                      Remove
-                    </button>
+                    <span className="line-clamp-1 flex items-center gap-2">
+                      {product.name}
+                      {isDraft && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                          Draft
+                        </span>
+                      )}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void openCollectionProductEditor(product.id)}
+                        className="text-indigo-600 hover:text-indigo-700"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleProduct(product.id)}
+                        className="text-purple-600 hover:text-purple-700"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

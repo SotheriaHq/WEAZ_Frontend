@@ -101,7 +101,7 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
   }, [showEmojiPicker]);
 
   const applyCreated = (c: CommentV2Dto) => setItems((prev) => [c, ...prev]);
-  const handleLike = (commentId: string, likeCount: number) => setItems((prev) => prev.map((c) => c.id === commentId ? { ...c, likeCount } : { ...c, children: c.children?.map(r => r.id === commentId ? { ...r, likeCount } : r) }));
+  const handleThread = (commentId: string, threadCount: number) => setItems((prev) => prev.map((c) => c.id === commentId ? { ...c, threadCount } : { ...c, children: c.children?.map(r => r.id === commentId ? { ...r, threadCount } : r) }));
   const handleDelete = (commentId: string) => setItems((prev) => prev.filter((c) => c.id !== commentId).map((c) => ({ ...c, children: c.children?.filter(r => r.id !== commentId) })));
   const toggleReplies = (parentId: string) => {
     setExpanded((prev) => {
@@ -180,7 +180,7 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
               <div id={`comment-${c.id}`} key={c.id} className="py-0.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
                 <CommentItem 
                   comment={c} 
-                  onLike={handleLike} 
+                  onThread={handleThread} 
                   onDelete={handleDelete} 
                   onReply={(parentId) => {
                     // Auto-expand replies when user clicks Reply
@@ -222,7 +222,7 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
                           <CommentItem 
                             key={r.id} 
                             comment={r} 
-                            onLike={handleLike} 
+                            onThread={handleThread} 
                             onDelete={handleDelete} 
                             onReply={() => {}} 
                             currentUserId={me?.id}

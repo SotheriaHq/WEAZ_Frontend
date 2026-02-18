@@ -19,7 +19,7 @@ interface ProductCardSkeletonProps {
  */
 const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({ 
   count, 
-  viewMode = 'grid' 
+  viewMode: _viewMode = 'grid' 
 }) => {
   // Single skeleton card component
   const SkeletonCard = ({ index }: { index: number }) => (

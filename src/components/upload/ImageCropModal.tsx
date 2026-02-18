@@ -14,8 +14,8 @@ interface ImageCropModalProps {
   title: string;
   enforceAspect?: boolean;
   allowUseOriginal?: boolean;
-  onConfirm: (result: { file: File; previewUrl: string }) => void;
-  onUseOriginal?: (result: { file: File; previewUrl: string }) => void;
+  onConfirm: (result: { file: File; previewUrl: string; disposePreview: () => void }) => void | Promise<void>;
+  onUseOriginal?: (result: { file: File; previewUrl: string; disposePreview: () => void }) => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -42,6 +42,20 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
 
   const objectUrlRef = useRef<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const setProcessing = (value: boolean) => {
+    if (!isMountedRef.current) {
+      return;
+    }
+    setIsProcessing(value);
+  };
 
   useFocusTrap({
     containerRef: dialogRef,
@@ -81,17 +95,17 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
     if (!file || !croppedAreaPixels) {
       return;
     }
-    setIsProcessing(true);
+    setProcessing(true);
     try {
       const result = await cropImageFromFile(file, {
         areaPixels: croppedAreaPixels,
         fileName: enforceAspect ? `banner-${file.name}` : `avatar-${file.name}`,
       });
-      onConfirm(result);
-      setIsProcessing(false);
+      await Promise.resolve(onConfirm(result));
+      setProcessing(false);
     } catch (error) {
       console.error('Unable to crop image', error);
-      setIsProcessing(false);
+      setProcessing(false);
     }
   };
 
@@ -100,7 +114,15 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
       return;
     }
     const url = URL.createObjectURL(file);
-    onUseOriginal({ file, previewUrl: url });
+    let disposed = false;
+    const disposePreview = () => {
+      if (disposed) {
+        return;
+      }
+      disposed = true;
+      URL.revokeObjectURL(url);
+    };
+    await Promise.resolve(onUseOriginal({ file, previewUrl: url, disposePreview }));
   };
 
   const zoomLabel = useMemo(() => `${Math.round(zoom * 100)}%`, [zoom]);

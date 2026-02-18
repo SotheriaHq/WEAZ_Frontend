@@ -21,6 +21,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import type { AuthUserDto } from '../../types/auth';
 import { setUser } from '../../features/userSlice';
 import { brandApi } from '../../api/BrandApi';
+import { apiClient } from '@/api/httpClient';
 import ProfileImageModal from '../../components/profile/ProfileImageModal';
 import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQuickEditModal';
 import ImageCropModal from '../../components/upload/ImageCropModal';
@@ -455,7 +456,7 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  const processAvatarUpload = async (file: File, previewUrl: string) => {
+  const processAvatarUpload = async (file: File, previewUrl: string, disposePreview?: () => void) => {
     if (!user) return;
     const currentUser = user;
     const previousPreview = localAvatarPreview;
@@ -492,10 +493,11 @@ const ProfilePage: React.FC = () => {
       updateAvatarPreview(previousPreview ?? null);
     } finally {
       setAvatarUploading(false);
+      disposePreview?.();
     }
   };
 
-  const processBannerUpload = async (file: File, previewUrl: string) => {
+  const processBannerUpload = async (file: File, previewUrl: string, disposePreview?: () => void) => {
     if (!user) return;
     const currentUser = user;
     const previousPreview = bannerPreviewUrl;
@@ -536,6 +538,7 @@ const ProfilePage: React.FC = () => {
       updateBannerPreview(previousPreview ?? null);
     } finally {
       setBannerUploading(false);
+      disposePreview?.();
     }
   };
 
@@ -559,23 +562,29 @@ const ProfilePage: React.FC = () => {
     event.target.value = '';
   };
 
-  const handleCropConfirm = async (result: { file: File; previewUrl: string }) => {
+  const handleCropConfirm = async (result: { file: File; previewUrl: string; disposePreview: () => void }) => {
     const activeTask = cropTask;
     setCropTask(null);
-    if (!activeTask) return;
+    if (!activeTask) {
+      result.disposePreview();
+      return;
+    }
 
     if (activeTask.type === 'avatar') {
-      await processAvatarUpload(result.file, result.previewUrl);
+      await processAvatarUpload(result.file, result.previewUrl, result.disposePreview);
     } else {
-      await processBannerUpload(result.file, result.previewUrl);
+      await processBannerUpload(result.file, result.previewUrl, result.disposePreview);
     }
   };
 
-  const handleCropUseOriginal = async (result: { file: File; previewUrl: string }) => {
+  const handleCropUseOriginal = async (result: { file: File; previewUrl: string; disposePreview: () => void }) => {
     const activeTask = cropTask;
     setCropTask(null);
-    if (!activeTask || activeTask.type !== 'avatar') return;
-    await processAvatarUpload(result.file, result.previewUrl);
+    if (!activeTask || activeTask.type !== 'avatar') {
+      result.disposePreview();
+      return;
+    }
+    await processAvatarUpload(result.file, result.previewUrl, result.disposePreview);
   };
 
   // ---------------- Visitor data fetch ----------------
@@ -583,6 +592,10 @@ const ProfilePage: React.FC = () => {
   const [visitorCollections, setVisitorCollections] = useState<CollectionDto[]>([]);
   const [visitorLoading, setVisitorLoading] = useState(false);
   const [visitorError, setVisitorError] = useState<string | null>(null);
+  const [isPatched, setIsPatched] = useState(false);
+  const [patchLoading, setPatchLoading] = useState(false);
+
+  const showPatchAction = Boolean(isVisitorView && user?.type === 'REGULAR' && routeBrandId);
 
   useEffect(() => {
     let mounted = true;
@@ -607,6 +620,57 @@ const ProfilePage: React.FC = () => {
     void run();
     return () => { mounted = false; };
   }, [isVisitorView, routeBrandId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      if (!showPatchAction || !routeBrandId) return;
+      try {
+        setPatchLoading(true);
+        const res = await apiClient.get(`/brands/${routeBrandId}/patches/check`);
+        if (mounted) {
+          setIsPatched(Boolean(res.data?.isPatched));
+        }
+      } catch {
+        if (mounted) {
+          setIsPatched(false);
+        }
+      } finally {
+        if (mounted) {
+          setPatchLoading(false);
+        }
+      }
+    };
+    void run();
+    return () => { mounted = false; };
+  }, [showPatchAction, routeBrandId]);
+
+  const handleTogglePatch = async () => {
+    if (!routeBrandId) return;
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    try {
+      setPatchLoading(true);
+      const nextPatchedState = !isPatched;
+      if (isPatched) {
+        await apiClient.delete(`/brands/${routeBrandId}/patches`);
+      } else {
+        await apiClient.post(`/brands/${routeBrandId}/patches`);
+      }
+      setIsPatched(nextPatchedState);
+      toast.success(
+        nextPatchedState
+          ? 'Patched successfully. You will now receive brand updates.'
+          : 'Unpatched successfully. You will no longer receive patch-only updates.',
+      );
+    } catch {
+      toast.error('Failed to update patch status.');
+    } finally {
+      setPatchLoading(false);
+    }
+  };
 
   const viewIsStoreOpen = useMemo(() => {
     if (isVisitorView) return Boolean(visitorProfile?.isStoreOpen);
@@ -965,13 +1029,17 @@ const ProfilePage: React.FC = () => {
       ) : null}
 
       <ProfileHeader
-        profileData={{
-          name: viewDisplayData.brandName,
-          location: viewDisplayData.location,
-          username: viewDisplayData.username,
-          avatar: (localAvatarPreview ?? viewDisplayData.logoImage) ?? '',
-          banner: bannerPreviewUrl ?? viewDisplayData.bannerImage ?? '',
-          tags: viewDisplayData.hashtags || [],
+        profile={{
+          id: (isVisitorView ? routeBrandId : user?.id) ?? '',
+          username: viewDisplayData.username ?? '',
+          firstName: viewDisplayData.brandName ?? '',
+          lastName: '',
+          profileImage: (localAvatarPreview ?? viewDisplayData.logoImage) ?? undefined,
+          bannerImage: (bannerPreviewUrl ?? viewDisplayData.bannerImage) ?? undefined,
+          address: viewDisplayData.location ?? undefined,
+          location: viewDisplayData.location ?? undefined,
+          isOwner,
+          profileVisibility: 'UNLOCKED',
         }}
         canEdit={isOwner}
         onEditProfile={() => setIsHeaderQuickEditOpen(true)}
@@ -989,6 +1057,10 @@ const ProfilePage: React.FC = () => {
             }
           }
         }}
+        showPatchAction={showPatchAction}
+        isPatched={isPatched}
+        patchLoading={patchLoading}
+        onTogglePatch={handleTogglePatch}
       />
       <ImageCropModal
         open={Boolean(cropTask)}

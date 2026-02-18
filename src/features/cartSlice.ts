@@ -61,6 +61,46 @@ const initialState: CartState = {
   priceChangeNotices: [],
 };
 
+const normalizeCartPayload = (payload: Partial<CartState> | null | undefined): CartState => {
+  const items = Array.isArray(payload?.items) ? payload!.items : [];
+  const totalQuantityFromItems = items.reduce(
+    (sum, item) => sum + (Number(item?.quantity) || 0),
+    0,
+  );
+  const subtotalFromItems = items.reduce(
+    (sum, item) => sum + (Number(item?.itemTotal) || 0),
+    0,
+  );
+
+  return {
+    ...initialState,
+    ...payload,
+    items,
+    itemCount:
+      typeof payload?.itemCount === 'number'
+        ? payload.itemCount
+        : items.length,
+    totalQuantity:
+      typeof payload?.totalQuantity === 'number'
+        ? payload.totalQuantity
+        : totalQuantityFromItems,
+    subtotal:
+      typeof payload?.subtotal === 'number'
+        ? payload.subtotal
+        : subtotalFromItems,
+    currency:
+      typeof payload?.currency === 'string' && payload.currency.trim().length > 0
+        ? payload.currency
+        : 'NGN',
+    removedItemNotices: Array.isArray(payload?.removedItemNotices)
+      ? payload!.removedItemNotices
+      : [],
+    priceChangeNotices: Array.isArray(payload?.priceChangeNotices)
+      ? payload!.priceChangeNotices
+      : [],
+  };
+};
+
 // Async thunks
 export const fetchCart = createAsyncThunk('cart/fetchCart', async (_, { rejectWithValue }) => {
   try {
@@ -148,8 +188,9 @@ export const cartSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchCart.fulfilled, (state, action: PayloadAction<CartState>) => {
+        const normalized = normalizeCartPayload(action.payload);
         state.isLoading = false;
-        const incomingItems = action.payload.items || [];
+        const incomingItems = normalized.items || [];
         const previousItems = state.items || [];
         const previousById = new Map(previousItems.map((item) => [item.id, item]));
         const incomingIds = new Set(incomingItems.map((item) => item.id));
@@ -177,11 +218,11 @@ export const cartSlice = createSlice({
           })
           .filter((notice): notice is NonNullable<typeof notice> => Boolean(notice));
 
-        state.items = incomingItems;
-        state.itemCount = action.payload.itemCount;
-        state.totalQuantity = action.payload.totalQuantity;
-        state.subtotal = action.payload.subtotal;
-        state.currency = action.payload.currency;
+        state.items = normalized.items;
+        state.itemCount = normalized.itemCount;
+        state.totalQuantity = normalized.totalQuantity;
+        state.subtotal = normalized.subtotal;
+        state.currency = normalized.currency;
       })
       .addCase(fetchCart.rejected, (state, action) => {
         state.isLoading = false;
@@ -195,12 +236,13 @@ export const cartSlice = createSlice({
         state.error = null;
       })
       .addCase(addToCart.fulfilled, (state, action: PayloadAction<CartState>) => {
+        const normalized = normalizeCartPayload(action.payload);
         state.isLoading = false;
-        state.items = action.payload.items;
-        state.itemCount = action.payload.itemCount;
-        state.totalQuantity = action.payload.totalQuantity;
-        state.subtotal = action.payload.subtotal;
-        state.currency = action.payload.currency;
+        state.items = normalized.items;
+        state.itemCount = normalized.itemCount;
+        state.totalQuantity = normalized.totalQuantity;
+        state.subtotal = normalized.subtotal;
+        state.currency = normalized.currency;
         state.isDrawerOpen = true; // Open drawer after adding
       })
       .addCase(addToCart.rejected, (state, action) => {
@@ -214,10 +256,11 @@ export const cartSlice = createSlice({
         state.error = null;
       })
       .addCase(updateCartItem.fulfilled, (state, action: PayloadAction<CartState>) => {
-        state.items = action.payload.items;
-        state.itemCount = action.payload.itemCount;
-        state.totalQuantity = action.payload.totalQuantity;
-        state.subtotal = action.payload.subtotal;
+        const normalized = normalizeCartPayload(action.payload);
+        state.items = normalized.items;
+        state.itemCount = normalized.itemCount;
+        state.totalQuantity = normalized.totalQuantity;
+        state.subtotal = normalized.subtotal;
       })
       .addCase(updateCartItem.rejected, (state, action) => {
         state.error = action.payload as string;
@@ -229,10 +272,11 @@ export const cartSlice = createSlice({
         state.error = null;
       })
       .addCase(removeFromCart.fulfilled, (state, action: PayloadAction<CartState>) => {
-        state.items = action.payload.items;
-        state.itemCount = action.payload.itemCount;
-        state.totalQuantity = action.payload.totalQuantity;
-        state.subtotal = action.payload.subtotal;
+        const normalized = normalizeCartPayload(action.payload);
+        state.items = normalized.items;
+        state.itemCount = normalized.itemCount;
+        state.totalQuantity = normalized.totalQuantity;
+        state.subtotal = normalized.subtotal;
       })
       .addCase(removeFromCart.rejected, (state, action) => {
         state.error = action.payload as string;

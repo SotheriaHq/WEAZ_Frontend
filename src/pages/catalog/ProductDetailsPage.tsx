@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Heart, 
   Share2, 
@@ -73,7 +73,7 @@ function SignedMediaItem({
 
   if (!resolvedSrc) {
     return (
-      <div className="w-full min-h-[240px] bg-gray-100 dark:bg-white/5 rounded-2xl flex items-center justify-center text-gray-300">
+      <div className="w-full min-h-[240px] flex items-center justify-center text-gray-300">
         <span className="text-sm">No image</span>
       </div>
     );
@@ -86,8 +86,9 @@ function SignedMediaItem({
       alt={alt}
       fit="contain"
       className={className}
-      mediaClassName="rounded-3xl"
-      maxHeightClassName="max-h-[70vh]"
+      mediaClassName="block h-auto w-auto"
+      maxHeightClassName="max-h-[78vh]"
+      maxWidthClassName="max-w-full"
     />
   );
 }
@@ -123,6 +124,7 @@ function ProductDetailsSkeleton() {
 export default function ProductDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
   const [product, setProduct] = useState<ProductDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -211,9 +213,6 @@ export default function ProductDetailsPage() {
     );
   }
 
-  // Safe currency fallback
-  const currency = (product as any).brand?.currency || product.currency || 'USD';
-  
   const handleAddToCart = () => {
     if (!product) return;
     
@@ -249,44 +248,57 @@ export default function ProductDetailsPage() {
   );
   
   const isOutOfStock = variants.length > 0 ? (currentVariant?.stock === 0) : false;
+  const isStudioStoreView = location.pathname.startsWith('/studio/store');
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-white pb-20 lg:pb-0">
+    <div className="text-gray-900 dark:text-white pb-20 lg:pb-0">
        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
          {/* Breadcrumbs */}
          <nav className="mb-6 flex items-center gap-2 text-sm text-gray-500">
-           <Link to="/" className="hover:text-gray-900 dark:hover:text-white transition-colors">Home</Link>
-           <ChevronRight size={14} className="text-gray-400" />
-           {product.brand && (
+           {isStudioStoreView ? (
              <>
-               <Link 
-                 to={`/brand/${product.brandId}?tab=store`} 
-                 className="hover:text-gray-900 dark:hover:text-white transition-colors"
-               >
-                 {product.brand.name}
-               </Link>
+               <Link to="/studio" className="hover:text-gray-900 dark:hover:text-white transition-colors">Studio</Link>
                <ChevronRight size={14} className="text-gray-400" />
+               <Link to="/studio/store" className="hover:text-gray-900 dark:hover:text-white transition-colors">Store</Link>
+               <ChevronRight size={14} className="text-gray-400" />
+               <span className="text-gray-900 dark:text-white font-medium truncate max-w-[220px]">{product.title}</span>
+             </>
+           ) : (
+             <>
+               <Link to="/" className="hover:text-gray-900 dark:hover:text-white transition-colors">Home</Link>
+               <ChevronRight size={14} className="text-gray-400" />
+               {product.brand && (
+                 <>
+                   <Link
+                     to={`/profile/${product.brandId}`}
+                     className="hover:text-gray-900 dark:hover:text-white transition-colors"
+                   >
+                     {product.brand.name}
+                   </Link>
+                   <ChevronRight size={14} className="text-gray-400" />
+                 </>
+               )}
+               {product.category && (
+                 <>
+                   <span className="text-gray-400">{product.category.name}</span>
+                   <ChevronRight size={14} className="text-gray-400" />
+                 </>
+               )}
+               <span className="text-gray-900 dark:text-white font-medium truncate max-w-[200px]">{product.title}</span>
              </>
            )}
-           {product.category && (
-             <>
-               <span className="text-gray-400">{product.category.name}</span>
-               <ChevronRight size={14} className="text-gray-400" />
-             </>
-           )}
-           <span className="text-gray-900 dark:text-white font-medium truncate max-w-[200px]">{product.title}</span>
          </nav>
 
          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 xl:gap-20">
             {/* Visuals Column */}
             <div className="space-y-4">
               {/* Main Image */}
-              <div className="w-full rounded-3xl relative group flex justify-center">
+              <div className="relative flex w-full items-start justify-center">
                 {currentMedia ? (
                   <SignedMediaItem
                      media={currentMedia}
                      alt={product.title}
-                     className="flex justify-center"
+                     className="flex w-full justify-center"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-300">

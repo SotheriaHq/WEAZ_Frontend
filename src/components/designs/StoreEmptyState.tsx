@@ -87,7 +87,7 @@ const EMPTY_STATES: Record<EmptyStateType, {
     emoji: '🛍️',
     title: 'Coming soon!',
     description: 'This store is preparing something special. Follow to get notified when they launch!',
-    actionLabel: 'Follow Store',
+    actionLabel: 'Patch Store',
   },
   'empty-cart': {
     icon: <ShoppingBag size={48} className="text-gray-400" />,

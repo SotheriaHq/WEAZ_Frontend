@@ -45,7 +45,7 @@ const DropdownDemo: React.FC = () => {
               </DropdownTrigger>
               <DropdownMenu>
                 <DropdownItem>Latest</DropdownItem>
-                <DropdownItem>Most Liked</DropdownItem>
+                <DropdownItem>Most Threaded</DropdownItem>
                 <DropdownItem>Trending</DropdownItem>
                 <DropdownItem>Price: Low to High</DropdownItem>
               </DropdownMenu>

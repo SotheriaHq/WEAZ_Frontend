@@ -6,11 +6,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { wsApplied, incrementCommentCount, decrementCommentCount } from '@/features/engagementSlice';
 
-interface LikeEventPayload {
+interface ThreadEventPayload {
   contentType: string;
   contentId: string;
   userId: string;
-  likeCount: number;
+  threadCount: number;
   ts: number;
   version: number;
 }
@@ -23,19 +23,25 @@ interface CommentEventPayload {
   [key: string]: any;
 }
 
-type LikeHandler = (p: LikeEventPayload) => void;
+type ThreadHandler = (p: ThreadEventPayload) => void;
 type CommentHandler = (p: CommentEventPayload) => void;
 
 interface SubscriptionMap<T> { [id: string]: Set<T>; }
+interface PendingJoinListeners {
+  socket: Socket;
+  onJoined: (payload?: { room?: string }) => void;
+  onJoinDenied: (payload?: { room?: string }) => void;
+}
 
 interface RealtimeContextValue {
   joinCollection: (collectionId: string) => void;
   joinCollectionMedia: (mediaId: string) => void;
   joinUser: (userId: string) => void;
   joinComment: (commentId: string) => void;
-  onLike: (contentType: string, contentId: string, handler: LikeHandler) => () => void;
+  onThread: (contentType: string, contentId: string, handler: ThreadHandler) => () => void;
   onComment: (room: string, handler: CommentHandler) => () => void;
   onNotification: (handler: (payload: any) => void) => () => void;
+  onNotificationDeleted: (handler: (payload: any) => void) => () => void;
   socketConnected: boolean;
   degraded: boolean;
 }
@@ -62,54 +68,126 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
   const dispatch = useDispatch();
   const userId = useSelector((state: RootState) => state.user.profile?.id);
   const socketRef = useRef<Socket | null>(null);
-  const likeSubs = useRef<SubscriptionMap<LikeHandler>>({});
+  const threadSubs = useRef<SubscriptionMap<ThreadHandler>>({});
   const commentSubs = useRef<SubscriptionMap<CommentHandler>>({});
   const pendingJoins = useRef<Set<string>>(new Set());
+  const pendingJoinTimeouts = useRef<Map<string, number>>(new Map());
+  const pendingJoinListeners = useRef<Map<string, PendingJoinListeners>>(new Map());
   const [socketConnected, setSocketConnected] = useState(false);
   const failureCountRef = useRef(0);
   const degradedRef = useRef(false);
   const [degraded, setDegraded] = useState(false);
 
+  const clearPendingJoin = useCallback((room: string) => {
+    pendingJoins.current.delete(room);
+    const listeners = pendingJoinListeners.current.get(room);
+    if (listeners) {
+      listeners.socket.off('joined', listeners.onJoined);
+      listeners.socket.off('join.denied', listeners.onJoinDenied);
+      pendingJoinListeners.current.delete(room);
+    }
+    const timeoutId = pendingJoinTimeouts.current.get(room);
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+      pendingJoinTimeouts.current.delete(room);
+    }
+  }, []);
+
+  const clearAllPendingJoins = useCallback(() => {
+    pendingJoins.current.clear();
+    for (const listeners of pendingJoinListeners.current.values()) {
+      listeners.socket.off('joined', listeners.onJoined);
+      listeners.socket.off('join.denied', listeners.onJoinDenied);
+    }
+    pendingJoinListeners.current.clear();
+    for (const timeoutId of pendingJoinTimeouts.current.values()) {
+      window.clearTimeout(timeoutId);
+    }
+    pendingJoinTimeouts.current.clear();
+  }, []);
+
   // Establish socket
   useEffect(() => {
     const token = getStoredAccessToken();
+    if (!token || !userId) {
+      const current = socketRef.current;
+      if (current) {
+        current.removeAllListeners();
+        current.disconnect();
+        socketRef.current = null;
+      }
+      clearAllPendingJoins();
+      threadSubs.current = {};
+      commentSubs.current = {};
+      setSocketConnected(false);
+      failureCountRef.current = 0;
+      degradedRef.current = false;
+      setDegraded(false);
+      return;
+    }
+
     const url = buildUrl();
     const s = io(url, {
       auth: token ? { token } : undefined,
       transports: ['polling', 'websocket'],
       autoConnect: true,
-      reconnectionAttempts: 10,
+      timeout: 3000,
+      reconnectionAttempts: 3,
       reconnectionDelay: 500,
     });
     socketRef.current = s;
-    s.on('connect', () => setSocketConnected(true));
-    s.on('disconnect', () => setSocketConnected(false));
-
-    const onConnErr = () => {
-      failureCountRef.current += 1;
-      if (failureCountRef.current >= 5 && !degradedRef.current) {
-        degradedRef.current = true;
-        setDegraded(true);
-        try { (s.io as any).opts.reconnection = false; } catch {}
-      }
-    };
-    s.on('reconnect_error', onConnErr);
-    s.on('reconnect_failed', onConnErr);
-    s.on('error', onConnErr);
-    s.on('connect', () => {
+    const onConnect = () => {
+      setSocketConnected(true);
       failureCountRef.current = 0;
       degradedRef.current = false;
       setDegraded(false);
       window.dispatchEvent(new CustomEvent('ws:restored'));
-    });
+    };
+    const onDisconnect = () => {
+      setSocketConnected(false);
+      clearAllPendingJoins();
+      threadSubs.current = {};
+      commentSubs.current = {};
+    };
+    s.on('connect', onConnect);
+    s.on('disconnect', onDisconnect);
+
+    const onConnErr = () => {
+      if (degradedRef.current) return;
+      failureCountRef.current += 1;
+      if (failureCountRef.current >= 3) {
+        degradedRef.current = true;
+        setDegraded(true);
+        try {
+          (s.io as any).opts.reconnection = false;
+        } catch {
+          // Ignore socket adapter errors.
+        }
+        s.disconnect();
+      }
+    };
+    s.on('connect_error', onConnErr);
+    s.on('reconnect_error', onConnErr);
+    s.on('reconnect_failed', onConnErr);
+    s.on('error', onConnErr);
     return () => {
+      s.off('connect', onConnect);
+      s.off('connect_error', onConnErr);
       s.off('reconnect_error', onConnErr);
       s.off('reconnect_failed', onConnErr);
       s.off('error', onConnErr);
+      s.off('disconnect', onDisconnect);
+      s.removeAllListeners();
       s.disconnect();
-      socketRef.current = null;
+      clearAllPendingJoins();
+      threadSubs.current = {};
+      commentSubs.current = {};
+      if (socketRef.current === s) {
+        socketRef.current = null;
+      }
+      setSocketConnected(false);
     };
-  }, []);
+  }, [clearAllPendingJoins, userId]);
 
   const safeJoin = useCallback((room: string) => {
     if (!room) return;
@@ -122,15 +200,37 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     } else if (type === 'COLLECTION' || type === 'COLLECTION_MEDIA' || type === 'COMMENT') {
       if (!uuidRe.test(id)) return; // discard malformed
     }
-    if (pendingJoins.current.has(room)) return;
-    pendingJoins.current.add(room);
     const s = socketRef.current;
     if (!s) return;
+    if (pendingJoins.current.has(room)) return;
+
+    pendingJoins.current.add(room);
+
+    const removeRoomTracking = () => {
+      clearPendingJoin(room);
+    };
+
+    const onJoined = (payload?: { room?: string }) => {
+      if (payload?.room && payload.room !== room) return;
+      removeRoomTracking();
+    };
+
+    const onJoinDenied = (payload?: { room?: string }) => {
+      if (payload?.room && payload.room !== room) return;
+      removeRoomTracking();
+    };
+
+    s.on('joined', onJoined);
+    s.on('join.denied', onJoinDenied);
+    pendingJoinListeners.current.set(room, { socket: s, onJoined, onJoinDenied });
+
+    const timeoutId = window.setTimeout(() => {
+      removeRoomTracking();
+    }, 10000);
+    pendingJoinTimeouts.current.set(room, timeoutId);
+
     s.emit('join', { room, userId });
-    const cleanup = () => pendingJoins.current.delete(room);
-    s.once('joined', cleanup);
-    s.once('join.denied', cleanup);
-  }, [userId]);
+  }, [clearPendingJoin, userId]);
 
   const joinCollection = useCallback((collectionId: string) => safeJoin(`COLLECTION:${collectionId}`), [safeJoin]);
   const joinCollectionMedia = useCallback((mediaId: string) => safeJoin(`COLLECTION_MEDIA:${mediaId}`), [safeJoin]);
@@ -142,24 +242,24 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     const s = socketRef.current;
     if (!s) return;
 
-    const likeEvents = ['like.created', 'like.removed'] as const;
-    for (const ev of likeEvents) {
-      s.on(ev, (payload: LikeEventPayload) => {
+    const threadEvents = ['thread.created', 'thread.removed'] as const;
+    for (const ev of threadEvents) {
+      s.on(ev, (payload: ThreadEventPayload) => {
         const room = `${payload.contentType}:${payload.contentId}`;
         
-        // Dispatch Redux action for like count update
+        // Dispatch Redux action for thread count update
         dispatch(wsApplied({ 
           contentType: payload.contentType, 
           contentId: payload.contentId, 
-          likeCount: payload.likeCount 
+          threadCount: payload.threadCount 
         }));
         
-        const handlers = likeSubs.current[room];
+        const handlers = threadSubs.current[room];
         if (handlers) handlers.forEach((h) => h(payload));
       });
     }
 
-    const commentEvents = ['comment.created', 'comment.deleted', 'comment.liked'] as const;
+    const commentEvents = ['comment.created', 'comment.deleted', 'comment.threaded'] as const;
     for (const ev of commentEvents) {
       s.on(ev, (payload: CommentEventPayload & { room?: string; targetType?: string; targetId?: string }) => {
         // Normalize keys and compute room
@@ -182,24 +282,24 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     }
 
     return () => {
-      for (const ev of [...likeEvents, ...commentEvents]) {
+      for (const ev of [...threadEvents, ...commentEvents]) {
         s.off(ev);
       }
     };
   }, [dispatch]);
 
-  const onLike = useCallback((contentType: string, contentId: string, handler: LikeHandler) => {
+  const onThread = useCallback((contentType: string, contentId: string, handler: ThreadHandler) => {
     const room = `${contentType}:${contentId}`;
-    if (!likeSubs.current[room]) likeSubs.current[room] = new Set();
-    likeSubs.current[room].add(handler);
+    if (!threadSubs.current[room]) threadSubs.current[room] = new Set();
+    threadSubs.current[room].add(handler);
     if (contentType === 'COLLECTION') {
       joinCollection(contentId);
     } else if (contentType === 'COLLECTION_MEDIA') {
       joinCollectionMedia(contentId);
     }
     return () => {
-      likeSubs.current[room]?.delete(handler);
-      if (likeSubs.current[room]?.size === 0) delete likeSubs.current[room];
+      threadSubs.current[room]?.delete(handler);
+      if (threadSubs.current[room]?.size === 0) delete threadSubs.current[room];
     };
   }, [joinCollection, joinCollectionMedia]);
 
@@ -220,17 +320,25 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     return () => { s.off('notification.created', handler); };
   }, []);
 
+  const onNotificationDeleted = useCallback((handler: (payload: any) => void) => {
+    const s = socketRef.current;
+    if (!s) return () => void 0;
+    s.on('notification.deleted', handler);
+    return () => { s.off('notification.deleted', handler); };
+  }, []);
+
   const value = React.useMemo<RealtimeContextValue>(() => ({
     joinCollection,
     joinCollectionMedia,
     joinUser,
     joinComment,
-    onLike,
+    onThread,
     onComment,
     onNotification,
+    onNotificationDeleted,
     socketConnected,
     degraded,
-  }), [joinCollection, joinCollectionMedia, joinUser, joinComment, onLike, onComment, onNotification, socketConnected, degraded]);
+  }), [joinCollection, joinCollectionMedia, joinUser, joinComment, onThread, onComment, onNotification, onNotificationDeleted, socketConnected, degraded]);
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;
 };

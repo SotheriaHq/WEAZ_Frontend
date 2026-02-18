@@ -9,7 +9,7 @@ interface BrandHeaderProps {
   brandAvatar?: string | null;
   brandBio?: string | null;
   totalCollections?: number;
-  totalFollowers?: number;
+  totalPatches?: number;
   onBack?: () => void;
 }
 
@@ -19,7 +19,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
   brandAvatar,
   brandBio,
   totalCollections,
-  totalFollowers,
+  totalPatches,
   onBack,
 }) => {
   const navigate = useNavigate();
@@ -91,10 +91,10 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
                 <span className="text-gray-500 dark:text-gray-400">collection{totalCollections !== 1 ? 's' : ''}</span>
               </div>
             )}
-            {typeof totalFollowers === 'number' && (
+            {typeof totalPatches === 'number' && (
               <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-gray-900 dark:text-white">{totalFollowers}</span>
-                <span className="text-gray-500 dark:text-gray-400">follower{totalFollowers !== 1 ? 's' : ''}</span>
+                <span className="font-semibold text-gray-900 dark:text-white">{totalPatches}</span>
+                <span className="text-gray-500 dark:text-gray-400">patch{totalPatches !== 1 ? 'es' : ''}</span>
               </div>
             )}
           </div>

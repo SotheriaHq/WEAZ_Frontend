@@ -169,7 +169,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             className="sr-only"
             value={currentValue as string | number | readonly string[] | undefined}
             {...props}
-            readOnly
+            tabIndex={-1}
           >
             {children}
           </select>

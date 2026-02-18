@@ -1,4 +1,5 @@
 import { apiClient } from './httpClient';
+import { isAxiosError } from 'axios';
 import { unwrapApiResponse, type AuthUserDto } from '../types/auth';
 import type {
   CollectionDto,
@@ -54,6 +55,9 @@ export const brandApi = {
     }
     try {
       const response = await apiClient.get(`/collections/categories`);
+      if (response?.status === 304 && categoriesCache.items.length) {
+        return categoriesCache.items;
+      }
       // Support plain array or wrapped { data } or nested { data: { data } }
       const payload = (response?.data ?? undefined) as unknown;
       const items = Array.isArray(payload)
@@ -69,7 +73,14 @@ export const brandApi = {
         slug: String(c?.slug ?? ''),
         name: String(c?.name ?? ''),
         description: c?.description ?? null,
-      }));
+      })).filter((c: { id: string; name: string }) => c.id.length > 0 && c.name.length > 0);
+
+      if (mapped.length === 0) {
+        if (categoriesCache.items.length) {
+          return categoriesCache.items;
+        }
+        return [];
+      }
 
       categoriesCache.items = mapped;
       categoriesCache.lastFetched = Date.now();
@@ -81,13 +92,8 @@ export const brandApi = {
       if (categoriesCache.items.length) {
         return categoriesCache.items;
       }
-      // Provide synthetic fallback list for offline scenario to avoid an empty select
       if (isNetworkError) {
-        return [
-          { id: 'fallback-african-fashion', slug: 'african-fashion', name: 'African Fashion', description: 'Fallback category' },
-          { id: 'fallback-western-fashion', slug: 'western-fashion', name: 'Western Fashion', description: 'Fallback category' },
-          { id: 'fallback-de-house', slug: 'de-house', name: 'De House', description: 'Fallback category' },
-        ];
+        return [];
       }
       return [];
     }
@@ -292,8 +298,9 @@ export const brandApi = {
       const response = await apiClient.patch(`/brands/${brandId}`, data);
       return unwrapApiResponse<AuthUserDto>(response.data);
     } catch (error) {
-      console.error('Error updating brand profile:', error);
-      return null;
+      const message = extractApiErrorMessage(error) ?? 'Error updating brand profile';
+      console.error('Error updating brand profile:', message, error);
+      throw new Error(message);
     }
   },
 
@@ -311,7 +318,7 @@ export const brandApi = {
       const items = Array.isArray(data?.items) ? data.items : [];
       const mapped = items.map((item: unknown) => {
         const backendItem = item as Record<string, unknown>;
-        const medias = (backendItem.medias as Array<{ id?: string; commentsCount?: number; likesCount?: number; file?: { url?: string; s3Url?: string; id?: string } }>) || [];
+        const medias = (backendItem.medias as Array<{ id?: string; commentsCount?: number; threadsCount?: number; file?: { url?: string; s3Url?: string; id?: string } }>) || [];
         const coverMediaId = (backendItem as any)?.coverMediaId as string | undefined;
         const preferredMedia = (coverMediaId && medias.find((m) => String(m.id) === String(coverMediaId))) || medias[0] || null;
         const fileObj = (preferredMedia?.file as { url?: string; s3Url?: string; id?: string } | undefined) ?? undefined;
@@ -333,12 +340,12 @@ export const brandApi = {
         const coverFileId = typeof fileObj?.id === 'string' ? fileObj!.id : undefined;
         const countObj = (backendItem._count as { medias?: number } | undefined) ?? undefined;
         const mediaCount = typeof countObj?.medias === 'number' ? countObj!.medias! : ((backendItem.medias as unknown[])?.length || 0);
-        // Aggregate total likes/comments: include media-level counts if available
-        const baseLikes = (backendItem as any)?.likesCount as number | undefined;
+        // Aggregate total threads/comments: include media-level counts if available
+        const baseThreads = (backendItem as any)?.threadsCount as number | undefined;
         const baseComments = (backendItem as any)?.commentsCount as number | undefined;
-        const mediaLikesSum = Array.isArray(medias) ? medias.reduce((sum, m) => sum + (m?.likesCount || 0), 0) : 0;
+        const mediaThreadsSum = Array.isArray(medias) ? medias.reduce((sum, m) => sum + (m?.threadsCount || 0), 0) : 0;
         const mediaCommentsSum = Array.isArray(medias) ? medias.reduce((sum, m) => sum + (m?.commentsCount || 0), 0) : 0;
-        const totalLikes = (baseLikes || 0) + mediaLikesSum;
+        const totalThreads = (baseThreads || 0) + mediaThreadsSum;
         const totalComments = (baseComments || 0) + mediaCommentsSum;
         const visibility =
           ((backendItem as any).visibility as any) ??
@@ -359,7 +366,7 @@ export const brandApi = {
           coverFileId,
           itemCount: mediaCount,
           postsCount: mediaCount,
-          likesCount: totalLikes,
+          threadsCount: totalThreads,
           commentsCount: totalComments,
           minPrice: (backendItem.minPrice as number) || 0,
           maxPrice: (backendItem.maxPrice as number) || 0,
@@ -434,7 +441,7 @@ export const brandApi = {
         coverFileId: undefined,
         itemCount: item.itemCount || 0,
         postsCount: item.itemCount || 0,
-        likesCount: 0,
+        threadsCount: 0,
         commentsCount: 0,
         minPrice: 0,
         maxPrice: 0,
@@ -819,6 +826,40 @@ export const brandApi = {
       throw error; // Re-throw to handle in UI
     }
   },
+};
+
+const extractApiErrorMessage = (error: unknown): string | null => {
+  if (isAxiosError(error)) {
+    const data = error.response?.data as {
+      message?: unknown;
+      errors?: Array<{ messages?: unknown; constraints?: unknown }>;
+    } | undefined;
+
+    if (data?.errors && data.errors.length > 0) {
+      const first = data.errors[0];
+      const messages =
+        (Array.isArray(first.messages) && first.messages) ||
+        (Array.isArray(first.constraints) && first.constraints) ||
+        [];
+      if (messages.length > 0) {
+        return String(messages[0]);
+      }
+    }
+
+    if (typeof data?.message === 'string' && data.message.length > 0) {
+      return data.message;
+    }
+
+    if (Array.isArray(data?.message) && data.message.length > 0) {
+      return String(data.message[0]);
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return null;
 };
 
 const extractUploadAsset = (raw: unknown): UploadAssetDto | null => {

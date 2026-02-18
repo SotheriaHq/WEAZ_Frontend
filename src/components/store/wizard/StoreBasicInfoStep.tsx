@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { StoreWizardData } from '@/types/storeWizard';
 
@@ -14,10 +14,6 @@ interface StoreBasicInfoStepProps {
   isLoadingDraft: boolean;
 }
 
-const MAX_CATEGORIES = 3;
-const MAX_TAGLINE_LEN = 100;
-const MAX_DESCRIPTION_LEN = 500;
-
 const FALLBACK_CATEGORIES = [
   { value: 'african', label: 'African Fashion' },
   { value: 'western', label: 'Western Fashion' },
@@ -31,12 +27,11 @@ const FALLBACK_CATEGORIES = [
 
 /**
  * Store Basic Info Step (Screen 1.2)
- * Step 1 of 6: Basic store information with live preview
+ * Step 1 of 4: Basic store information with live preview
  * Features: Real-time preview, slug availability check, media uploads
  */
 const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
   data,
-  onChange,
   availableCategories,
   onBack,
   onContinue,
@@ -46,25 +41,17 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
   const categories = availableCategories?.length
     ? availableCategories.map((c) => ({ value: c.slug, label: c.name }))
     : FALLBACK_CATEGORIES;
-
-  // Toggle category selection
-  const toggleCategory = (value: string) => {
-    if (data.categories.includes(value)) {
-      onChange({ categories: data.categories.filter(c => c !== value) });
-    } else if (data.categories.length < MAX_CATEGORIES) {
-      onChange({ categories: [...data.categories, value] });
-    }
-  };
+  const categoryLabelMap = new Map(categories.map((cat) => [cat.value, cat.label]));
+  const selectedCategoryLabels = data.categories.map((cat) => categoryLabelMap.get(cat) ?? cat);
 
   // Validation check with detailed feedback
   const nameValid = data.name.trim().length > 0;
   const slugValid = data.slug.trim().length > 0;
   const categoriesValid = data.categories.length > 0;
-  const taglineValid = data.tagline.trim().length > 0;
-  const descriptionLen = data.description.length;
   const descriptionValid = data.description.trim().length > 0;
-
-  const isValid = nameValid && slugValid && categoriesValid && taglineValid && descriptionValid;
+  const isValid = nameValid && slugValid && categoriesValid && descriptionValid;
+  const taglineDisplay = data.tagline.trim();
+  const descriptionDisplay = data.description.trim();
 
   const handleContinueClick = async () => {
     if (!isValid) {
@@ -72,9 +59,8 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
       const missing: string[] = [];
       if (!nameValid) missing.push('Store Name');
       if (!slugValid) missing.push('Store Slug');
-      if (!categoriesValid) missing.push('At least 1 category');
-      if (!taglineValid) missing.push('Tagline');
-      if (!descriptionValid) missing.push('About Us (from your profile)');
+      if (!categoriesValid) missing.push('At least 1 category (from Essentials)');
+      if (!descriptionValid) missing.push('Description (from Essentials)');
       toast.error(`Please complete: ${missing.join(', ')}`);
       return;
     }
@@ -120,7 +106,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
             </div>
             <div className="pr-4">
               <span className="text-sm font-semibold text-gray-900 dark:text-white">Basic Information</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">• Step 1 of 6</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">• Step 1 of 4</span>
             </div>
           </div>
           
@@ -168,83 +154,56 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
               <p className="text-xs text-gray-400 mt-1">Locked from your username</p>
             </div>
 
-            {/* Categories */}
-            <div>
-                <label className="block text-sm font-semibold mb-2 text-gray-800 dark:text-white">
-                  Categories <span className="text-red-500">*</span>
-                  <span className="text-xs font-normal text-gray-500 dark:text-gray-400 ml-2">(Select up to {MAX_CATEGORIES})</span>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {categories.map((cat) => {
-                    const isSelected = data.categories.includes(cat.value);
-                    const isDisabled = !isSelected && data.categories.length >= MAX_CATEGORIES;
-                    
-                    return (
-                      <button
-                        key={cat.value}
-                        type="button"
-                        onClick={() => toggleCategory(cat.value)}
-                        disabled={isDisabled}
-                        className={`
-                          px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 backdrop-blur-sm
-                          ${isSelected
-                            ? 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/40 shadow-lg shadow-purple-500/10'
-                            : isDisabled
-                              ? 'bg-gray-100/50 dark:bg-gray-800/30 text-gray-400 dark:text-gray-600 border border-gray-200/50 dark:border-gray-700/50 cursor-not-allowed'
-                              : 'bg-white/60 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/50 dark:border-white/10 hover:border-purple-400/50 dark:hover:border-purple-500/30 hover:bg-purple-50/50 dark:hover:bg-purple-500/10'
-                          }
-                        `}
-                      >
-                        {isSelected && <Check className="w-3 h-3 inline mr-1.5 -ml-1" />}
-                        {cat.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {data.categories.length > 0 && (
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                    {data.categories.length} of {MAX_CATEGORIES} selected
+            {/* Essentials Summary */}
+            <div className="rounded-xl border border-gray-200/60 dark:border-white/10 bg-white/70 dark:bg-white/5 p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Essentials summary</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    These come from the essentials step. Edit them there if needed.
                   </p>
-                )}
-            </div>
-
-            {/* Tagline */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">
-                Tagline <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                maxLength={100}
-                value={data.tagline}
-                onChange={(e) => onChange({ tagline: e.target.value.slice(0, MAX_TAGLINE_LEN) })}
-                className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 transition-colors"
-                placeholder="Your brand in one line"
-              />
-              <div className="flex justify-between mt-1">
-                <span className="text-xs text-gray-500">Your brand in one line</span>
-                <span className="text-xs text-gray-500">{data.tagline.length}/{MAX_TAGLINE_LEN}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="inline-flex items-center justify-center rounded-full border border-gray-200 dark:border-white/10 px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:border-purple-400/50 hover:text-purple-600 transition-colors"
+                >
+                  Edit essentials
+                </button>
               </div>
-            </div>
 
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">
-                Description <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                rows={4}
-                maxLength={MAX_DESCRIPTION_LEN}
-                value={data.description}
-                readOnly
-                className="w-full bg-gray-100 dark:bg-white/5 border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-gray-800 dark:text-gray-300 focus:outline-none resize-none"
-                placeholder="Pulled from your profile About Us"
-              />
-              <div className="flex justify-between mt-1">
-                <span className={`text-xs ${descriptionValid ? 'text-gray-500' : 'text-amber-500'}`}>
-                  {descriptionValid ? 'Pulled from your profile About Us' : 'Add About Us in your profile to continue'}
-                </span>
-                <span className="text-xs text-gray-500">{descriptionLen}/{MAX_DESCRIPTION_LEN}</span>
+              <div className="mt-4 space-y-3">
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-gray-400">Categories</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedCategoryLabels.length > 0 ? (
+                      selectedCategoryLabels.map((label) => (
+                        <span
+                          key={label}
+                          className="rounded-full border border-purple-200/60 bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700 dark:border-purple-500/20 dark:bg-purple-500/10 dark:text-purple-200"
+                        >
+                          {label}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-amber-600">No categories selected yet.</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-gray-400">Tagline</div>
+                  <div className="mt-1 text-sm text-gray-700 dark:text-gray-200">
+                    {taglineDisplay || 'Not set yet.'}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-gray-400">Description</div>
+                  <div className="mt-1 text-sm text-gray-700 dark:text-gray-200">
+                    {descriptionDisplay || 'Not set yet.'}
+                  </div>
+                </div>
               </div>
             </div>
           </form>
@@ -255,12 +214,12 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
             <div className="mb-4">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-500">Progress</span>
-                <span className="text-purple-600 font-medium">Step 1 of 6</span>
+                <span className="text-purple-600 font-medium">Step 1 of 4</span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-[#1a1a1a] rounded-full h-2 overflow-hidden">
                 <div
                   className="bg-gradient-to-r from-purple-600 to-purple-700 h-full rounded-full transition-all duration-300"
-                  style={{ width: '16.66%' }}
+                  style={{ width: '25%' }}
                 />
               </div>
             </div>

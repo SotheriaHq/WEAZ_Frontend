@@ -66,7 +66,7 @@ const DesignCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
   // onCountChange?.(merged.length); // Removed to prevent overwriting total count with partial count
   // Normalize global comment count for the media item to reflect combined view
   dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: merged.length }));
-    // Join comment rooms for realtime like updates
+    // Join comment rooms for realtime thread updates
     merged.forEach((c) => joinComment(c.id));
 
       if (mediaRes.ok) {

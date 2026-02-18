@@ -12,8 +12,8 @@ const SubscriptionsSettings: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Subscriptions</h1>
-        <p className="text-gray-600 dark:text-gray-400">Manage users who are subscribed to your brand.</p>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Patches</h1>
+        <p className="text-gray-600 dark:text-gray-400">Manage users who are patched to your brand.</p>
       </div>
 
       <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10">
@@ -21,7 +21,7 @@ const SubscriptionsSettings: React.FC = () => {
           <div className="relative">
             <input
               type="text"
-              placeholder="Search subscribers..."
+              placeholder="Search patches..."
               className="threadly-search-input pl-10"
             />
             <svg
@@ -48,8 +48,8 @@ const SubscriptionsSettings: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-500">Subscribed {sub.date}</span>
-                <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors" title="Remove subscriber">
+                <span className="text-sm text-gray-500">Patched {sub.date}</span>
+                <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors" title="Remove patch">
                   <UserMinus className="w-5 h-5" />
                 </button>
               </div>

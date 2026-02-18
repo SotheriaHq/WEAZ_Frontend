@@ -54,7 +54,13 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   // Check if all requirements are met (minimal requirements)
-  const basicComplete = Boolean(data.name && data.slug && data.categories.length > 0);
+  const descriptionComplete = data.description.trim().length > 0;
+  const basicComplete = Boolean(
+    data.name &&
+    data.slug &&
+    data.categories.length > 0 &&
+    descriptionComplete
+  );
   const socialComplete = Boolean(data.instagram || data.tiktok || data.twitter || data.website);
   // Policies are optional - just need to have passed through the step
   const policiesComplete = true; // Always true - policies page visited

@@ -12,7 +12,7 @@ import type { NormalizedNotification } from './notificationAdapter';
  * Determine the route for navigating to an actor's profile
  */
 export function determineActorRoute(actorId: string): string {
-    return `/brands/${actorId}`;
+    return `/profile/${actorId}`;
 }
 
 /**
@@ -23,7 +23,7 @@ export function determineNotificationRoute(notification: NormalizedNotification)
     const { type, target, subTargetId, targetUrl, actor, payload } = notification;
 
     // Fallback URL if nothing else works
-    const fallbackUrl = targetUrl || '/notifications';
+    const fallbackUrl = targetUrl || '/settings?tab=notifications';
 
     // Try registry-based routing first
     const config = NotificationRegistry[type as keyof typeof NotificationRegistry];
@@ -35,7 +35,7 @@ export function determineNotificationRoute(notification: NormalizedNotification)
 
     // Fallback: type-specific routing for edge cases
     switch (type) {
-        case NotificationTypes.LIKE:
+        case NotificationTypes.THREAD:
             if (target?.type === 'COLLECTION') {
                 return `/collections/${target.id}`;
             }
@@ -57,12 +57,12 @@ export function determineNotificationRoute(notification: NormalizedNotification)
             return fallbackUrl;
 
         case NotificationTypes.FOLLOW:
-            return actor?.id ? `/brands/${actor.id}` : fallbackUrl;
+            return actor?.id ? determineActorRoute(actor.id) : fallbackUrl;
 
         case NotificationTypes.LOGIN:
         case NotificationTypes.LOGOUT:
         case NotificationTypes.LOGOUT_ALL:
-            return '/settings'; // Changed from /settings/security which doesn't exist
+            return '/settings?tab=notifications';
 
         case NotificationTypes.PRIVATE_ACCESS_APPROVED:
         case NotificationTypes.CONTRIBUTION_ACCEPTED:
@@ -71,12 +71,12 @@ export function determineNotificationRoute(notification: NormalizedNotification)
         case NotificationTypes.PRIVATE_ACCESS_REQUESTED:
         case NotificationTypes.PRIVATE_ACCESS_REJECTED:
         case NotificationTypes.PRIVATE_ACCESS_REVOKED:
-            return fallbackUrl;
+            return actor?.id ? determineActorRoute(actor.id) : fallbackUrl;
 
         case NotificationTypes.BRAND_PATCH_REQUEST:
         case NotificationTypes.BRAND_PATCH_ACCEPTED:
         case NotificationTypes.BRAND_PATCH_REJECTED:
-            return '/patches';
+            return '/settings?tab=patches';
 
         case NotificationTypes.ORDER_PLACED:
         case NotificationTypes.ORDER_STATUS_UPDATED:
@@ -84,6 +84,9 @@ export function determineNotificationRoute(notification: NormalizedNotification)
             const orderId = (payload as Record<string, unknown>)?.orderId;
             return orderId ? `/orders/${orderId}` : '/orders';
         }
+
+        case NotificationTypes.PRODUCT_UPLOAD:
+            return target?.id ? `/products/${target.id}` : fallbackUrl;
 
         default:
             return fallbackUrl;
@@ -95,7 +98,7 @@ export function determineNotificationRoute(notification: NormalizedNotification)
  */
 export function hasNavigableTarget(notification: NormalizedNotification): boolean {
     const route = determineNotificationRoute(notification);
-    return route !== '/notifications';
+    return route !== '/settings?tab=notifications';
 }
 
 /**

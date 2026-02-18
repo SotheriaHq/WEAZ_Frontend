@@ -57,9 +57,13 @@ export function normalizeNotification(raw: Record<string, unknown>): NormalizedN
     // Extract payload safely
     const payload = raw.payload as Record<string, unknown> | undefined;
 
+    const rawType = (raw.type as string) || 'UNKNOWN';
+    const normalizedType =
+        rawType === 'LIKE' ? 'THREAD' : rawType;
+
     return {
         id: raw.id as string,
-        type: (raw.type as string) || 'UNKNOWN',
+        type: normalizedType,
         version,
         message: (raw.message as string) || 'You have a notification',
         createdAt: (raw.createdAt as string) || new Date().toISOString(),
@@ -144,6 +148,9 @@ function deriveTarget(
     if (payload?.postId) {
         return { type: 'POST', id: payload.postId as string };
     }
+    if (payload?.productId) {
+        return { type: 'PRODUCT', id: payload.productId as string };
+    }
 
     // Parse from targetUrl as last resort
     const url = (raw.targetUrl as string) || (payload?.targetUrl as string);
@@ -151,6 +158,14 @@ function deriveTarget(
         const collectionMatch = url.match(/\/collections\/([a-f0-9-]+)/);
         if (collectionMatch) {
             return { type: 'COLLECTION', id: collectionMatch[1] };
+        }
+        const productMatch = url.match(/\/products\/([a-f0-9-]+)/);
+        if (productMatch) {
+            return { type: 'PRODUCT', id: productMatch[1] };
+        }
+        const profileMatch = url.match(/\/profile\/([a-f0-9-]+)/);
+        if (profileMatch) {
+            return { type: 'USER', id: profileMatch[1] };
         }
         const brandsMatch = url.match(/\/brands\/([a-f0-9-]+)/);
         if (brandsMatch) {

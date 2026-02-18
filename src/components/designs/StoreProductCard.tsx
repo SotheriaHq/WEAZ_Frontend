@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Heart, ShoppingBag, Eye, ImageOff, Sparkles, AlertTriangle, Package } from 'lucide-react';
+import { ShoppingBag, Eye, ImageOff, Sparkles, AlertTriangle, Package, Link2 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
@@ -29,7 +29,7 @@ export interface StoreProduct {
   isLowStock: boolean;
   isOutOfStock: boolean;
   isFeatured: boolean;
-  likesCount: number;
+  threadsCount: number;
   viewsCount: number;
   brand: {
     id: string;
@@ -81,6 +81,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   }, []);
 
   const handleWishlistToggle = async (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     if (!isAuth) {
       toast.info('Please sign in to use wishlist');
@@ -117,8 +118,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       return;
     }
 
-    // If product has sizes, open product detail for selection
-    if (product.sizes.length > 0) {
+    // Products with selectable options must go through detail selection first.
+    if (product.sizes.length > 0 || product.colors.length > 0) {
       onViewProduct?.(product);
       return;
     }
@@ -185,8 +186,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Image Container - Square Aspect Ratio */}
-      <div className="relative aspect-square overflow-hidden bg-gray-50 dark:bg-zinc-800/50">
+      {/* Image Container - Match studio card framing */}
+      <div className="relative aspect-[4/5] overflow-hidden bg-gray-50 dark:bg-zinc-800/50">
         {/* Skeleton loader */}
         {!imgLoaded && !imgError && (
           <div className="absolute inset-0 animate-pulse">
@@ -253,6 +254,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         {/* Wishlist Button - Top Right */}
         {!isOwnerView && (
           <button
+            type="button"
             onClick={handleWishlistToggle}
             disabled={wishlistLoading}
             aria-label={isProductWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
@@ -269,15 +271,14 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               ${wishlistLoading ? 'opacity-50 cursor-wait' : 'hover:scale-110 active:scale-95'}
             `}
           >
-            <Heart
-              size={16}
-              className={`transition-transform duration-200 ${isProductWishlisted ? 'fill-current' : ''}`}
-            />
+            <span role="img" aria-hidden="true" className="text-base leading-none">
+              {isProductWishlisted ? '❤️' : '🖤'}
+            </span>
           </button>
         )}
 
         {/* Owner View: Edit Overlay */}
-        {isOwnerView && (
+        {isOwnerView && onEdit && (
           <div
             className={`
               absolute inset-0
@@ -288,7 +289,9 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             `}
           >
             <button
+              type="button"
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onEdit?.(product);
               }}
@@ -331,6 +334,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         {/* Add to Cart Button (Customer View) */}
         {!isOwnerView && (
           <button
+            type="button"
             onClick={handleQuickAddToCart}
             disabled={cartLoading || product.isOutOfStock}
             title={product.isOutOfStock ? 'Item is out of stock' : 'Add to your shopping cart'}
@@ -350,7 +354,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             <ShoppingBag size={14} />
             {product.isOutOfStock
               ? 'Sold Out'
-              : product.sizes.length > 0
+              : product.sizes.length > 0 || product.colors.length > 0
                 ? 'Select Options'
                 : 'Buy'
             }
@@ -361,8 +365,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         {isOwnerView && (
           <div className="flex items-center gap-4 mt-auto pt-2 border-t border-gray-100 dark:border-white/5">
             <span className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
-              <Heart size={12} className={product.likesCount > 0 ? 'text-rose-400' : ''} />
-              <span>{product.likesCount}</span>
+              <Link2 size={12} className={product.threadsCount > 0 ? 'text-indigo-400' : ''} />
+              <span>{product.threadsCount}</span>
             </span>
             <span className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
               <Eye size={12} />

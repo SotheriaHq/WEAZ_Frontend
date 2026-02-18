@@ -63,6 +63,23 @@ html {
     --text-primary: #f8fafc;
     --text-secondary: #cbd5e1;
     --border-strong: rgba(255, 255, 255, 0.08);
+    --neu-surface: #161a24;
+    --neu-surface-soft: #1b2030;
+    --neu-text: #f8fafc;
+    --neu-text-muted: #b9c2d3;
+    --neu-border: rgba(255, 255, 255, 0.08);
+    --neu-shadow-dark: rgba(0, 0, 0, 0.45);
+    --neu-shadow-light: rgba(255, 255, 255, 0.04);
+  }
+
+  :root {
+    --neu-surface: #eef2f7;
+    --neu-surface-soft: #e7ecf3;
+    --neu-text: #0f172a;
+    --neu-text-muted: #475569;
+    --neu-border: rgba(148, 163, 184, 0.35);
+    --neu-shadow-dark: rgba(148, 163, 184, 0.36);
+    --neu-shadow-light: rgba(255, 255, 255, 0.95);
   }
 }
 
@@ -145,6 +162,37 @@ html {
 
   .elev-4 {
     @apply shadow-xl;
+  }
+
+  /* Neumorphism modal system */
+  .neu-modal-surface {
+    background: radial-gradient(
+      140% 120% at 0% 0%,
+      var(--neu-surface) 0%,
+      var(--neu-surface-soft) 100%
+    );
+    color: var(--neu-text);
+    border: 1px solid var(--neu-border);
+    box-shadow:
+      14px 14px 28px var(--neu-shadow-dark),
+      -14px -14px 28px var(--neu-shadow-light);
+  }
+
+  .neu-modal-inset {
+    background: radial-gradient(
+      120% 120% at 0% 0%,
+      var(--neu-surface-soft) 0%,
+      var(--neu-surface) 100%
+    );
+    color: var(--neu-text);
+    border: 1px solid color-mix(in srgb, var(--neu-border) 75%, transparent);
+    box-shadow:
+      inset 8px 8px 16px color-mix(in srgb, var(--neu-shadow-dark) 85%, transparent),
+      inset -8px -8px 16px color-mix(in srgb, var(--neu-shadow-light) 90%, transparent);
+  }
+
+  .neu-text-muted {
+    color: var(--neu-text-muted);
   }
 
   /* Frosted buttons: tight padding, purple accents */

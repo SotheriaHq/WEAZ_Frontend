@@ -38,7 +38,6 @@ const CreateCollectionInner: React.FC = () => {
   const [description, setDescription] = useState('');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
-  const [isAvailableInStore, setIsAvailableInStore] = useState(false);
   const [isMadeToOrder, setIsMadeToOrder] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
@@ -80,6 +79,7 @@ const CreateCollectionInner: React.FC = () => {
 
   // Track original items for deletion in edit mode
   const originalItemIds = useRef<Set<string>>(new Set());
+  const transientObjectUrlsRef = useRef<Map<string, string>>(new Map());
 
   const { uploadCollection, isUploading, progress, perFileProgress, cancelUploads } = useCollectionUpload();
   const { user, fetchCollections } = useBrandProfile();
@@ -108,7 +108,13 @@ const CreateCollectionInner: React.FC = () => {
         if (mounted && Array.isArray(cats)) {
           const mapped = cats.map((c) => ({ id: c.id, slug: c.slug, name: c.name }));
           setCategories(mapped);
-          if (mapped.length) setCategoryId((prev) => prev || mapped[0].id);
+          if (mapped.length) {
+            setCategoryId((prev) =>
+              prev && mapped.some((category) => category.id === prev)
+                ? prev
+                : mapped[0].id,
+            );
+          }
         }
 
         if (isEditMode && id) {
@@ -118,7 +124,6 @@ const CreateCollectionInner: React.FC = () => {
             setDescription(d.description || '');
             setMinPrice(d.minPrice ? String(d.minPrice) : '');
             setMaxPrice(d.maxPrice ? String(d.maxPrice) : '');
-            setIsAvailableInStore(false);
             setSelectedTags(d.tags || []);
             setCategoryId(d.categoryId || '');
             setType(d.type || 'EVERYBODY');
@@ -154,7 +159,7 @@ const CreateCollectionInner: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [id, isEditMode, mediaStore]);
+  }, [id, isEditMode]);
 
   // Keep selected/cover indices in range when files change
   useEffect(() => {
@@ -173,15 +178,46 @@ const CreateCollectionInner: React.FC = () => {
   }, [files.length, selectedIndex, coverIndex]);
 
   // Validation
-  const isValid = title.trim().length > 0 && files.length > 0 && selectedTags.length > 0;
+  const isValid = title.trim().length > 0 && files.length > 0 && selectedTags.length > 0 && categoryId.trim().length > 0;
 
   const resolveMediaWithUrl = useCallback((item?: MediaItem | null) => {
     if (!item) return null;
-    let url = item.previewUrl;
+    if (item.previewUrl) {
+      // Prefer stable preview URL from store (already lifecycle-managed).
+      const transient = transientObjectUrlsRef.current.get(item.id);
+      if (transient) {
+        URL.revokeObjectURL(transient);
+        transientObjectUrlsRef.current.delete(item.id);
+      }
+      return { ...item, url: item.previewUrl };
+    }
+
+    let url = transientObjectUrlsRef.current.get(item.id);
     if (!url && item.file) {
       url = URL.createObjectURL(item.file);
+      transientObjectUrlsRef.current.set(item.id, url);
     }
     return url ? { ...item, url } : null;
+  }, []);
+
+  useEffect(() => {
+    const keepIds = new Set(files.map((item) => item.id));
+    for (const [id, url] of Array.from(transientObjectUrlsRef.current.entries())) {
+      const item = files.find((it) => it.id === id);
+      if (!keepIds.has(id) || item?.previewUrl) {
+        URL.revokeObjectURL(url);
+        transientObjectUrlsRef.current.delete(id);
+      }
+    }
+  }, [files]);
+
+  useEffect(() => {
+    return () => {
+      for (const url of transientObjectUrlsRef.current.values()) {
+        URL.revokeObjectURL(url);
+      }
+      transientObjectUrlsRef.current.clear();
+    };
   }, []);
 
   // Get current selected file for main preview
@@ -365,6 +401,7 @@ const CreateCollectionInner: React.FC = () => {
       if (title.trim().length === 0) reasons.push('a title');
       if (files.length === 0) reasons.push('at least one file');
       if (selectedTags.length === 0) reasons.push('at least one tag');
+      if (categoryId.trim().length === 0) reasons.push('a category');
       toast.error(`Please provide ${reasons.join(', ')}.`);
       return;
     }
@@ -579,7 +616,7 @@ const CreateCollectionInner: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-6 items-start mb-8">
           {/* Media Section */}
-          <section className="h-full">
+          <section className="h-full min-w-0">
             {files.length === 0 ? (
               <MediaUploadZone
                 onFilesUpload={mediaStore.addFiles}
@@ -588,7 +625,7 @@ const CreateCollectionInner: React.FC = () => {
                 maxFiles={20}
               />
             ) : (
-              <div className="space-y-4 h-full">
+              <div className="space-y-4 h-full min-w-0">
                 {/* Main Preview - NO background; media defines layout */}
                 <div className="relative rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-sm">
                   <div
@@ -861,7 +898,7 @@ const CreateCollectionInner: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={false}
-                    onChange={() => setIsAvailableInStore(false)}
+                    onChange={() => {}}
                     disabled={true}
                     className="w-5 h-5 mt-0.5 rounded border-gray-400 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-transparent"
                   />

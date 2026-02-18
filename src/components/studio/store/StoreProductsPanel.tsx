@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -6,8 +7,7 @@ import { apiClient } from '@/api/httpClient';
 import { brandApi } from '@/api/BrandApi';
 import { productApi } from '@/api/ProductApi';
 import { toast } from 'sonner';
-import Input from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
+import SearchField from '@/components/SearchField';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { unwrapApiResponse } from '@/types/auth';
 import { useDropdownManager } from '@/context/DropdownManagerContext';
@@ -62,6 +62,9 @@ interface CollectionOption {
 
 interface StoreProductsPanelProps {
   layoutMode?: boolean;
+  onToggleLayoutMode?: () => void;
+  draftCollections?: any[];
+  draftCollectionsLoading?: boolean;
 }
 
 const resolveProductStatus = (product: BackendProduct): StudioStatus => {
@@ -76,7 +79,12 @@ const resolveProductStatus = (product: BackendProduct): StudioStatus => {
   return product.isActive ? 'ACTIVE' : 'DRAFT';
 };
 
-const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = false }) => {
+const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
+  layoutMode = false,
+  onToggleLayoutMode,
+  draftCollections = [],
+  draftCollectionsLoading = false,
+}) => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
   const dropdownManager = useDropdownManager();
@@ -108,6 +116,16 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
   
   const listRef = useRef<HTMLDivElement | null>(null);
   const [listMinHeight, setListMinHeight] = useState<number | undefined>(undefined);
+
+  // Expandable search (emoji pattern reused from CatalogShopTab)
+  const [searchCollapsed, setSearchCollapsed] = useState(true);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Collapsible/expandable command groups
+  const [showFiltersMenu, setShowFiltersMenu] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showDrafts, setShowDrafts] = useState(false);
+  const filtersMenuRef = useRef<HTMLDivElement>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -173,10 +191,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
         setCollectionsLoading(true);
         const collectionsRes = await brandApi.getCollections(user.id, { visibility: 'all' });
         if (!mounted) return;
-        const mappedCollections: CollectionOption[] = (collectionsRes || []).map((c: any) => ({
+        const mappedCollections: CollectionOption[] = (collectionsRes || [])
+          .filter((c: any) => Boolean(c?.isAvailableInStore))
+          .map((c: any) => ({
           id: String(c.id),
           name: String(c.title || c.name || 'Untitled collection'),
-        }));
+          }));
         setCollections(mappedCollections);
       } catch (e) {
         if (!mounted) return;
@@ -260,6 +280,31 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
     const height = listRef.current.getBoundingClientRect().height;
     if (height > 0) setListMinHeight(height);
   }, [filteredProducts.length, loading]);
+
+  // Click-outside handler for expandable search (matches CatalogShopTab pattern)
+  useEffect(() => {
+    if (searchCollapsed) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        if (!searchQuery.trim()) {
+          setSearchCollapsed(true);
+        }
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [searchCollapsed, searchQuery]);
+
+  useEffect(() => {
+    if (!showFiltersMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filtersMenuRef.current && !filtersMenuRef.current.contains(e.target as Node)) {
+        setShowFiltersMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showFiltersMenu]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -378,74 +423,217 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
 
   return (
     <div className="space-y-6">
-      <div className="mb-6 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Products</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Manage your catalog and draft inventory.</p>
+      {/* ═══ UNIFIED COMMAND CENTER ═══ */}
+      <div className="mb-6 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/95 dark:bg-[#111118]/95 backdrop-blur-xl shadow-lg overflow-hidden">
+
+        {/* Header Row */}
+        <div className="relative p-5 pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Your Products</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage catalog, collections, and drafts in one place.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Expandable emoji search */}
+              <div
+                ref={searchContainerRef}
+                className={`transition-all duration-300 ease-out ${searchCollapsed ? 'w-11' : 'flex-1 min-w-[220px] max-w-[320px]'}`}
+              >
+                {searchCollapsed ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchCollapsed(false)}
+                    className="h-11 w-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center shadow-sm"
+                    aria-label="Open search"
+                  >
+                    <span className="text-base">🔎</span>
+                  </button>
+                ) : (
+                  <SearchField
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    placeholder="Search products..."
+                    showFilter={false}
+                    className="!max-w-none w-full shadow-sm border-gray-200 dark:border-white/10 animate-in fade-in slide-in-from-left-2 duration-200"
+                  />
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/studio/store/products/new')}
+                className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3 py-2.5 text-base font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:-translate-y-0.5 active:scale-95 transition-all duration-200"
+                aria-label="Add product"
+                title="Add product"
+              >
+                ➕
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowFiltersMenu((v) => !v)}
+                className={`h-11 w-11 rounded-xl border transition-all shadow-sm flex items-center justify-center ${
+                  showFiltersMenu
+                    ? 'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300'
+                    : 'border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10'
+                }`}
+                aria-label={showFiltersMenu ? 'Hide filters menu' : 'Show filters menu'}
+                title={showFiltersMenu ? 'Hide filters menu' : 'Show filters menu'}
+              >
+                ☰
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="🔍 Search products..."
-              inputSize="sm"
-              className="w-64"
-            />
-          </div>
+
+          {showFiltersMenu && (
+            <div
+              ref={filtersMenuRef}
+              className="absolute right-5 top-[72px] z-40 w-[min(92vw,520px)] rounded-xl border border-gray-200/90 dark:border-white/10 bg-white/98 dark:bg-[#12121a]/98 p-3 shadow-2xl backdrop-blur-xl"
+            >
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                {(
+                  [
+                    { value: 'all', label: 'All', icon: '📦' },
+                    { value: 'active', label: 'Published', icon: '✨' },
+                    { value: 'draft', label: 'Drafts', icon: '📝' },
+                    { value: 'archived', label: 'Archived', icon: '📁' },
+                    { value: 'deleted', label: 'Deleted', icon: '🗑️' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setFilterStatus(opt.value)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
+                      filterStatus === opt.value
+                        ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md shadow-purple-500/30'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/10'
+                    }`}
+                  >
+                    <span>{opt.icon}</span>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <FilterDropdown
+                  value={filterCollection}
+                  onChange={setFilterCollection}
+                  disabled={collectionsLoading}
+                  options={[
+                    { value: 'all', label: 'All Collections' },
+                    ...collections.map((c) => ({ value: c.id, label: c.name })),
+                  ]}
+                />
+                <FilterDropdown
+                  value={filterStock}
+                  onChange={setFilterStock}
+                  options={[
+                    { value: 'all', label: 'All Stock' },
+                    { value: 'in_stock', label: 'In Stock' },
+                    { value: 'low_stock', label: 'Low Stock' },
+                    { value: 'out_of_stock', label: 'Out of Stock' },
+                  ]}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Status Tabs - Prominent segmented control */}
-        <div className="mt-5 flex flex-wrap items-center gap-4">
-          <div className="inline-flex rounded-xl overflow-hidden border border-gray-200/80 dark:border-white/10 bg-gray-50/50 dark:bg-black/20 p-1 shadow-sm">
-            {(
-              [
-                { value: 'all', label: 'All', icon: '📦' },
-                { value: 'active', label: 'Published', icon: '✨' },
-                { value: 'draft', label: 'Drafts', icon: '📝' },
-                { value: 'archived', label: 'Archived', icon: '📁' },
-                { value: 'deleted', label: 'Deleted', icon: '🗑️' },
-              ] as const
-            ).map((opt) => (
+        {/* Quick Actions */}
+        <div className="px-5 pt-4 pb-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowQuickActions((v) => !v)}
+            className={`flex-shrink-0 h-9 w-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 hover:bg-purple-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center shadow-sm ${
+              showQuickActions
+                ? 'text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-500/10'
+                : 'text-gray-700 dark:text-gray-200'
+            }`}
+            aria-label={showQuickActions ? 'Hide quick actions' : 'Show quick actions'}
+          >
+            <span className="text-sm">⚡</span>
+          </button>
+          <div
+            className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ease-out ${
+              showQuickActions ? 'max-w-[800px] opacity-100' : 'max-w-0 opacity-0'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => navigate('/studio/store/collections/new')}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors whitespace-nowrap"
+            >
+              📦 Add Collection
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/profile/collections/create')}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors whitespace-nowrap"
+            >
+              🎨 Create Look
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-white/5 px-3 py-2 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"
+            >
+              📥 Import
+            </button>
+            {onToggleLayoutMode && (
               <button
-                key={opt.value}
                 type="button"
-                onClick={() => setFilterStatus(opt.value)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center gap-2 ${
-                  filterStatus === opt.value
-                    ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md shadow-purple-500/30 transform scale-[1.02]'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/5'
+                onClick={onToggleLayoutMode}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+                  layoutMode
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10'
                 }`}
               >
-                <span className="hidden sm:inline">{opt.icon}</span>
-                {opt.label}
+                🎯 {layoutMode ? 'Exit Layout' : 'Layout Mode'}
               </button>
-            ))}
+            )}
           </div>
+
+          {/* ─── Draft Collections: inline scroll-out ─── */}
+          {(draftCollections.length > 0 || draftCollectionsLoading) && (
+            <>
+              <div className="h-5 w-px bg-gray-200 dark:bg-white/10 mx-1" />
+              <button
+                type="button"
+                onClick={() => setShowDrafts((v) => !v)}
+                className={`flex-shrink-0 h-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 hover:bg-amber-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5 px-2.5 shadow-sm ${
+                  showDrafts
+                    ? 'text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10'
+                    : 'text-gray-700 dark:text-gray-200'
+                }`}
+                aria-label={showDrafts ? 'Hide draft collections' : 'Show draft collections'}
+              >
+                <span className="text-sm">📝</span>
+                <span className="text-[10px] font-bold tabular-nums">{draftCollections.length}</span>
+              </button>
+              <div
+                className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ease-out ${
+                  showDrafts ? 'max-w-[600px] opacity-100' : 'max-w-0 opacity-0'
+                }`}
+              >
+                {draftCollectionsLoading ? (
+                  <div className="h-9 w-32 rounded-lg bg-gray-100 dark:bg-white/5 animate-pulse" />
+                ) : (
+                  draftCollections.map((draft: any) => (
+                    <button
+                      key={draft.id}
+                      type="button"
+                      onClick={() => navigate(`/studio/store/collections/new?collectionId=${draft.id}`)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors whitespace-nowrap"
+                    >
+                      📝 {draft.title?.trim() || 'Untitled Draft'}
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Filter dropdowns - premium styled matching profile dropdown */}
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <FilterDropdown
-            value={filterCollection}
-            onChange={setFilterCollection}
-            disabled={collectionsLoading}
-            options={[
-              { value: 'all', label: 'All Collections' },
-              ...collections.map(c => ({ value: c.id, label: c.name }))
-            ]}
-          />
-          <FilterDropdown
-            value={filterStock}
-            onChange={setFilterStock}
-            options={[
-              { value: 'all', label: 'All Stock' },
-              { value: 'in_stock', label: 'In Stock' },
-              { value: 'low_stock', label: 'Low Stock' },
-              { value: 'out_of_stock', label: 'Out of Stock' },
-            ]}
-          />
-        </div>
       </div>
 
       {/* Products - with CSS containment for smooth tab transitions */}
@@ -480,8 +668,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({ layoutMode = fa
                   } ${layoutMode ? 'cursor-move' : 'cursor-pointer'}`}
                   onClick={() => {
                     if (layoutMode) return;
-                    const suffix = product.deletedAt ? '?includeDeleted=true' : '';
-                    navigate(`/studio/store/products/${product.id}/edit${suffix}`);
+                    navigate(`/studio/store/products/${product.id}`);
                   }}
                 >
                   {/* Selection checkbox */}

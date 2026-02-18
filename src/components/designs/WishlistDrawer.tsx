@@ -71,9 +71,15 @@ const WishlistDrawer: React.FC = () => {
     }
   };
 
+  const requiresOptionSelection = (product: any): boolean => {
+    const hasSizes = Array.isArray(product?.sizes) && product.sizes.length > 0;
+    const hasColors = Array.isArray(product?.colors) && product.colors.length > 0;
+    return hasSizes || hasColors;
+  };
+
   const handleAddToCart = async (product: any) => {
-    // If product has sizes, navigate to product detail
-    if (product.sizes && product.sizes.length > 0) {
+    // If product has selectable options, navigate to product detail first.
+    if (requiresOptionSelection(product)) {
       dispatch(closeWishlistDrawer());
       navigate(`/products/${product.id}`);
       return;
@@ -99,21 +105,23 @@ const WishlistDrawer: React.FC = () => {
   };
 
   const availableItems = items.filter((item) => !item.product.isOutOfStock);
-  const itemsWithoutSize = availableItems.filter((item) => !item.product.sizes || item.product.sizes.length === 0);
+  const itemsWithoutOptionSelection = availableItems.filter(
+    (item) => !requiresOptionSelection(item.product),
+  );
 
   const handleAddAllToCart = async () => {
-    if (itemsWithoutSize.length === 0) {
-      toast.info('All items require size selection - please view each product');
+    if (itemsWithoutOptionSelection.length === 0) {
+      toast.info('All items require option selection - please view each product');
       return;
     }
     
     try {
-      for (const item of itemsWithoutSize) {
+      for (const item of itemsWithoutOptionSelection) {
         await dispatch(addToCart({ productId: item.product.id, quantity: 1 })).unwrap();
       }
       dispatch(closeWishlistDrawer());
       dispatch(openCartDrawer());
-      toast.success(`${itemsWithoutSize.length} items added to cart`);
+      toast.success(`${itemsWithoutOptionSelection.length} items added to cart`);
     } catch (error: any) {
       toast.error(error || 'Failed to add items to cart');
     }
@@ -391,13 +399,13 @@ const WishlistDrawer: React.FC = () => {
                                 }`}
                               >
                                 <ShoppingCart size={12} />
-                                {product.isOutOfStock 
-                                  ? 'Unavailable' 
-                                  : product.sizes?.length > 0 
-                                    ? 'Select Size' 
+                                {product.isOutOfStock
+                                  ? 'Unavailable'
+                                  : requiresOptionSelection(product)
+                                    ? 'Select Options'
                                     : 'Add to Cart'
                                 }
-                                {product.sizes?.length > 0 && !product.isOutOfStock && (
+                                {requiresOptionSelection(product) && !product.isOutOfStock && (
                                   <ChevronRight size={12} />
                                 )}
                               </button>
@@ -431,21 +439,22 @@ const WishlistDrawer: React.FC = () => {
                   {availableItems.length > 0 && (
                     <button
                       onClick={handleAddAllToCart}
-                      disabled={isLoading || itemsWithoutSize.length === 0}
+                      disabled={isLoading || itemsWithoutOptionSelection.length === 0}
                       className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 bg-[length:200%_auto] hover:bg-right text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                     >
                       <ShoppingCart size={18} />
-                      {itemsWithoutSize.length > 0 
-                        ? `Add ${itemsWithoutSize.length} to Cart`
+                      {itemsWithoutOptionSelection.length > 0
+                        ? `Add ${itemsWithoutOptionSelection.length} to Cart`
                         : 'View Products to Add'
                       }
                     </button>
                   )}
 
                   {/* Note for items with sizes */}
-                  {availableItems.length > itemsWithoutSize.length && itemsWithoutSize.length > 0 && (
+                  {availableItems.length > itemsWithoutOptionSelection.length &&
+                    itemsWithoutOptionSelection.length > 0 && (
                     <p className="text-[10px] text-center text-gray-500 dark:text-gray-400 mt-2">
-                      Some items require size selection
+                      Some items require option selection
                     </p>
                   )}
                 </motion.div>

@@ -92,11 +92,11 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
         : typeof (raw as any).saleEndAt === 'string'
           ? ((raw as any).saleEndAt as string)
           : null,
-    likesCount:
-      typeof raw.likesCount === 'number'
-        ? (raw.likesCount as number)
-        : typeof collection.likesCount === 'number'
-          ? (collection.likesCount as number)
+    threadsCount:
+      typeof raw.threadsCount === 'number'
+        ? (raw.threadsCount as number)
+        : typeof collection.threadsCount === 'number'
+          ? (collection.threadsCount as number)
           : null,
     commentsCount:
       typeof raw.commentsCount === 'number'
@@ -104,14 +104,14 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
         : typeof collection.commentsCount === 'number'
           ? (collection.commentsCount as number)
           : null,
-    patchesCount:
-      typeof collection.patchesCount === 'number'
-        ? (collection.patchesCount as number)
-        : typeof raw.patchesCount === 'number'
-          ? (raw.patchesCount as number)
+    collectionCollabCount:
+      typeof collection.collectionCollabCount === 'number'
+        ? (collection.collectionCollabCount as number)
+        : typeof raw.collectionCollabCount === 'number'
+          ? (raw.collectionCollabCount as number)
           : null,
     tags,
-    isLiked: typeof raw.isLiked === 'boolean' ? (raw.isLiked as boolean) : false,
+    isThreaded: typeof raw.isThreaded === 'boolean' ? (raw.isThreaded as boolean) : false,
     media: {
       fileId: mediaFileId || '',
       url: mediaUrl,

@@ -9,6 +9,7 @@ import {
   ingestRealtime,
   markAllNotificationsRead,
   markNotificationRead,
+  removeNotification,
   resetState,
 } from '@/features/notificationsSlice';
 
@@ -50,7 +51,7 @@ export function useNotificationsBootstrap() {
   // Realtime subscription
   useEffect(() => {
     if (!userId) return;
-    const { joinUser, onNotification } = realtime;
+    const { joinUser, onNotification, onNotificationDeleted } = realtime;
     joinUser(userId);
     const unsub = onNotification((payload: any) => {
       dispatch(
@@ -70,7 +71,14 @@ export function useNotificationsBootstrap() {
         toast.info(payload.message);
       }
     });
-    return () => { unsub(); };
+    const unsubDeleted = onNotificationDeleted((payload: any) => {
+      if (!payload?.id) return;
+      dispatch(removeNotification({ id: payload.id }));
+    });
+    return () => {
+      unsub();
+      unsubDeleted();
+    };
   }, [userId, realtime, dispatch]);
 
   // Lightweight debounce for unread fetches
@@ -126,17 +134,30 @@ export function useNotificationsBootstrap() {
   }, [userId, maybeFetchUnread]);
 
   // Preload actor profile images for smoother avatar rendering.
+  // Capped at 200 URLs to prevent unbounded memory growth.
   useEffect(() => {
     if (!items || items.length === 0) return;
+    const MAX_PRELOADED = 200;
     for (const n of items) {
       const url = n.actor?.profileImage;
       if (url && !preloadedRef.current.has(url)) {
+        // Evict all cached URLs when at capacity
+        if (preloadedRef.current.size >= MAX_PRELOADED) {
+          preloadedRef.current.clear();
+        }
         const img = new Image();
         img.src = url;
         preloadedRef.current.add(url);
       }
     }
   }, [items]);
+
+  // Reset preloaded avatar cache when user changes/logs out.
+  useEffect(() => {
+    return () => {
+      preloadedRef.current.clear();
+    };
+  }, [userId]);
 }
 
 export function useNotificationsActions() {

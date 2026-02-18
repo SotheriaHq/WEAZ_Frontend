@@ -12,7 +12,7 @@ interface AddCollectionDropdownProps {
   asLink?: boolean;
 }
 
-const AddCollectionDropdown: React.FC<AddCollectionDropdownProps> = ({ openModal, variant = 'primary', asLink = false }) => {
+const AddCollectionDropdown: React.FC<AddCollectionDropdownProps> = ({ openModal: _openModal, variant = 'primary', asLink = false }) => {
   const navigate = useNavigate();
   return (
     <Dropdown>

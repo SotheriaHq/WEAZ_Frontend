@@ -5,26 +5,29 @@
  * - Named z-layer usage (no arbitrary z-index values)
  * - Viewport-bounded height with internal scrolling
  * - Keyboard accessible with focus trap
- * - Emoji glyphs (per design request)
+ * - Icon glyphs (lucide)
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useCallback, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { 
+  deleteNotification,
   fetchNotifications, 
   fetchUnreadCount, 
   markAllNotificationsRead, 
   markNotificationRead 
 } from '@/features/notificationsSlice';
 import { useNavigate } from 'react-router-dom';
-import { normalizeNotification } from '@/utils/notificationAdapter';
+import { getActorDisplayName, normalizeNotification } from '@/utils/notificationAdapter';
 import type { NormalizedNotification } from '@/utils/notificationAdapter';
-import { determineNotificationRoute } from '@/utils/notificationRouting';
+import { determineActorRoute, determineNotificationRoute } from '@/utils/notificationRouting';
 import { trackDropdownOpen, trackDropdownClose, trackMarkAllRead } from '@/utils/notificationTelemetry';
-import { getTrackingCategory, NotificationTypes } from '@/types/notificationTypes';
+import { NotificationTypes } from '@/types/notificationTypes';
+import { NotificationIcon } from '@/components/notifications/NotificationIcon';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { Bell, Check, Loader2, Settings, Trash2 } from 'lucide-react';
 
 interface Props { 
   open: boolean; 
@@ -34,6 +37,7 @@ interface Props {
 
 // Set to track pending mark-read operations for idempotency
 const pendingMarkIds = new Set<string>();
+const pendingDeleteIds = new Set<string>();
 
 export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRef }) => {
   const dispatch = useDispatch<AppDispatch>();
@@ -45,7 +49,6 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'all' | 'orders' | 'social' | 'store'>('all');
   const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number }>({
     top: 72,
     left: 12,
@@ -67,11 +70,6 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   const normalizedItems = useMemo(() => {
     return items.map(item => normalizeNotification(item as unknown as Record<string, unknown>));
   }, [items]);
-
-  // Reset view state when opening
-  useEffect(() => {
-    if (open) setActiveTab('all');
-  }, [open]);
 
   // Compute placement below the bell, clamped within viewport
   useLayoutEffect(() => {
@@ -179,6 +177,15 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     dispatch(markAllNotificationsRead());
   }, [dispatch, unreadCount]);
 
+  const handleDelete = useCallback((id: string) => {
+    if (pendingDeleteIds.has(id)) return;
+    pendingDeleteIds.add(id);
+    dispatch(deleteNotification(id))
+      .finally(() => {
+        pendingDeleteIds.delete(id);
+      });
+  }, [dispatch]);
+
   const handleLoadMore = useCallback(() => {
     dispatch(fetchNotifications({ cursor: endCursor || undefined, limit: 30 }));
   }, [dispatch, endCursor]);
@@ -188,54 +195,19 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   }, [dispatch]);
 
   const handleSettings = useCallback(() => {
-    // Keep consistent with existing settings tabs (store-notifications)
-    navigate('/settings?tab=store-notifications');
+    navigate('/settings?tab=notifications');
     onClose();
   }, [navigate, onClose]);
 
-  type NotifTab = 'all' | 'orders' | 'social' | 'store';
-
-  const categoryFor = useCallback((n: NormalizedNotification): NotifTab => {
-    const cat = getTrackingCategory(n.type);
-    if (cat === 'order') return 'orders';
-    if (cat === 'engagement') return 'social';
-    // Store/brand/admin-ish notifications: access + content + security
-    return 'store';
-  }, []);
-
-  const filteredItems = useMemo(() => {
-    if (activeTab === 'all') return normalizedItems;
-    return normalizedItems.filter((n) => categoryFor(n) === activeTab);
-  }, [activeTab, normalizedItems, categoryFor]);
-
-  const unreadByTab = useMemo(() => {
-    const counts: Record<NotifTab, number> = { all: 0, orders: 0, social: 0, store: 0 };
-    for (const n of normalizedItems) {
-      if (!n.isRead) {
-        counts.all += 1;
-        counts[categoryFor(n)] += 1;
-      }
-    }
-    return counts;
-  }, [normalizedItems, categoryFor]);
-
-  const totalCountByTab = useMemo(() => {
-    const counts: Record<NotifTab, number> = { all: 0, orders: 0, social: 0, store: 0 };
-    for (const n of normalizedItems) {
-      counts.all += 1;
-      counts[categoryFor(n)] += 1;
-    }
-    return counts;
-  }, [normalizedItems, categoryFor]);
-
-  const tabLabel = (tab: NotifTab) => {
-    switch (tab) {
-      case 'all': return 'All';
-      case 'orders': return 'Orders';
-      case 'social': return 'Social';
-      case 'store': return 'Store';
-    }
-  };
+  const handleActorClick = useCallback(
+    (notification: NormalizedNotification) => {
+      if (!notification.actor?.id) return;
+      handleMarkRead(notification.id);
+      navigate(determineActorRoute(notification.actor.id));
+      onClose();
+    },
+    [handleMarkRead, navigate, onClose],
+  );
 
   const timeAgo = (dateString: string): string => {
     const date = new Date(dateString);
@@ -248,21 +220,6 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const emojiFor = (n: NormalizedNotification): string => {
-    switch (getTrackingCategory(n.type)) {
-      case 'order':
-        return '🛍️';
-      case 'engagement':
-        return '💬';
-      case 'security':
-        return '🔒';
-      case 'access':
-        return '🔑';
-      case 'content':
-      default:
-        return '✨';
-    }
-  };
 
   const titleFor = (n: NormalizedNotification): string => {
     switch (n.type) {
@@ -271,11 +228,17 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
       case NotificationTypes.ORDER_STATUS_UPDATED:
         return 'Order updated';
       case NotificationTypes.FOLLOW:
-        return 'New follower';
-      case NotificationTypes.LIKE:
-        return 'New like';
+        return 'New patch';
+      case NotificationTypes.THREAD:
+        return 'New thread';
       case NotificationTypes.COMMENT:
         return 'New comment';
+      case NotificationTypes.PATCH:
+        if ((n.payload as any)?.action === 'PROFILE_PATCHED') return 'New patch';
+        if ((n.payload as any)?.action === 'PROFILE_UNPATCHED') return 'Patch removed';
+        return (n.payload as any)?.action === 'COLLECTION_COLLAB' ? 'New collab' : 'Patch update';
+      case NotificationTypes.TAG_MENTION:
+        return 'Tag mention';
       case NotificationTypes.PRIVATE_ACCESS_REQUESTED:
         return 'Access request pending';
       case NotificationTypes.PRIVATE_ACCESS_APPROVED:
@@ -286,6 +249,8 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         return 'Patch request';
       case NotificationTypes.CONTRIBUTION_REQUEST:
         return 'Contribution request';
+      case NotificationTypes.PRODUCT_UPLOAD:
+        return 'New product';
       default:
         return n.message || 'Notification';
     }
@@ -340,7 +305,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-2xl bg-[color:var(--brand-primary)]/15 flex items-center justify-center border border-white/20 dark:border-white/10">
-                <span className="text-lg" aria-hidden="true">🔔</span>
+                <Bell className="h-5 w-5 text-[color:var(--brand-primary)]" aria-hidden="true" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -360,9 +325,10 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
             <button
               onClick={handleMarkAllRead}
               disabled={unreadCount === 0}
-              className="text-xs font-semibold text-[color:var(--brand-primary)] hover:opacity-80 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+              className="text-xs font-semibold text-[color:var(--brand-primary)] hover:opacity-80 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
             >
-              ✅ Mark all as read
+              <Check className="h-3.5 w-3.5" aria-hidden="true" />
+              Mark all as read
             </button>
 
             <button
@@ -370,45 +336,11 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
               className="p-2 rounded-full hover:bg-white/10 transition-colors"
               aria-label="Notification settings"
             >
-              <span aria-hidden="true">⚙️</span>
+              <Settings className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-6 mt-3 overflow-x-auto pb-1 scrollbar-hide">
-          {(['all', 'orders', 'social', 'store'] as const).map((tab) => {
-            const active = activeTab === tab;
-            const badge = unreadByTab[tab];
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={
-                  active
-                    ? 'relative whitespace-nowrap py-2.5 text-sm font-semibold text-[color:var(--text-primary)]'
-                    : 'relative whitespace-nowrap py-2.5 text-sm font-medium text-[color:var(--text-secondary)] hover:opacity-90'
-                }
-                aria-pressed={active}
-              >
-                <span className="inline-flex items-center gap-2">
-                  {tabLabel(tab)}
-                  {badge > 0 && (
-                    <span className="min-w-5 h-5 px-1.5 rounded-full bg-[color:var(--brand-primary)]/15 text-[color:var(--brand-primary)] text-[11px] font-bold inline-flex items-center justify-center">
-                      {badge}
-                    </span>
-                  )}
-                </span>
-                {active && (
-                  <span
-                    className="absolute bottom-0 left-0 w-full h-[2px] bg-[color:var(--brand-primary)] rounded-t-full"
-                    aria-hidden="true"
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {/* List */}
@@ -435,7 +367,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         {showEmpty && (
           <div className="rounded-2xl border border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 backdrop-blur p-8 text-center">
             <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center text-white">
-              <span className="text-2xl" aria-hidden="true">🔕</span>
+              <Bell className="h-6 w-6" aria-hidden="true" />
             </div>
             <h4 className="mt-4 text-sm font-semibold text-[color:var(--text-primary)]">You're all caught up!</h4>
             <p className="mt-1 text-xs text-[color:var(--text-secondary)]">No new notifications</p>
@@ -447,19 +379,20 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
           <div className="rounded-2xl border border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 backdrop-blur p-6 text-center">
             <p className="text-sm font-medium text-[color:var(--text-primary)]">Failed to load notifications</p>
             <p className="mt-1 text-xs text-[color:var(--text-secondary)]">Please try again.</p>
-            <button onClick={handleRetry} className="mt-3 btn-frost-outline btn-tight-sm">🔄 Try again</button>
+            <button onClick={handleRetry} className="mt-3 btn-frost-outline btn-tight-sm">Try again</button>
           </div>
         )}
 
         {/* Items */}
-        {!showLoading && !showError && filteredItems.length > 0 && (
+        {!showLoading && !showError && normalizedItems.length > 0 && (
           <ul className="space-y-2" role="list">
-            {filteredItems.map((n) => {
+            {normalizedItems.map((n) => {
               const isUnread = !n.isRead;
               const title = titleFor(n);
               const detail = n.message;
               const action = primaryActionLabel(n);
               const route = determineNotificationRoute(n);
+              const actorDisplayName = n.actor ? getActorDisplayName(n) : null;
 
               return (
                 <li key={n.id} role="listitem">
@@ -487,23 +420,50 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                   >
                     <div className="flex gap-3">
                       <div className="w-11 h-11 rounded-2xl bg-[color:var(--brand-primary)]/15 flex items-center justify-center shrink-0 border border-white/20 dark:border-white/10">
-                        <span className="text-lg" aria-hidden="true">{emojiFor(n)}</span>
+                        <NotificationIcon type={n.type} size="lg" className="text-[color:var(--brand-primary)]" />
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-[color:var(--text-primary)] truncate">{title}</p>
+                            {actorDisplayName && (
+                              <button
+                                type="button"
+                                className="mt-1 text-xs font-medium text-[color:var(--brand-primary)] hover:underline underline-offset-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleActorClick(n);
+                                }}
+                                aria-label={`View ${actorDisplayName}'s profile`}
+                              >
+                                {actorDisplayName}
+                              </button>
+                            )}
                             <p className="mt-1 text-xs text-[color:var(--text-secondary)] line-clamp-2">{detail}</p>
                             <p className="mt-2 text-[11px] text-[color:var(--text-secondary)]">{timeAgo(n.createdAt)}</p>
                           </div>
 
-                          {isUnread && (
-                            <div className="w-2 h-2 rounded-full bg-purple-500 mt-1 shrink-0" aria-hidden="true" />
-                          )}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              className="opacity-70 hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(n.id);
+                              }}
+                              aria-label="Delete notification"
+                              title="Delete notification"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-[color:var(--text-secondary)]" aria-hidden="true" />
+                            </button>
+                            {isUnread && (
+                              <div className="w-2 h-2 rounded-full bg-purple-500 mt-1" aria-hidden="true" />
+                            )}
+                          </div>
                         </div>
 
-                        {action && route !== '/notifications' && (
+                        {action && route !== '/settings?tab=notifications' && (
                           <div className="mt-3">
                             <button
                               className="btn-frost-primary btn-tight-sm"
@@ -514,7 +474,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                                 onClose();
                               }}
                             >
-                              {action === 'View Order' ? `🧾 ${action}` : action}
+                              {action}
                             </button>
                           </div>
                         )}
@@ -528,7 +488,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         )}
 
         {/* Load More */}
-        {hasNextPage && !loadingList && !showLoading && filteredItems.length > 0 && (
+        {hasNextPage && !loadingList && !showLoading && normalizedItems.length > 0 && (
           <div className="pt-2 flex justify-center">
             <button onClick={handleLoadMore} className="btn-frost-ghost btn-tight-sm">
               Load more
@@ -538,8 +498,9 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
 
         {/* Loading more indicator */}
         {loadingList && items.length > 0 && (
-          <div className="pt-2 flex items-center justify-center text-xs text-[color:var(--text-secondary)]">
-            ⏳ Loading...
+          <div className="pt-2 flex items-center justify-center gap-1 text-xs text-[color:var(--text-secondary)]">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            Loading...
           </div>
         )}
       </div>
@@ -550,7 +511,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
           <button
             className="w-full sm:w-auto btn-frost-primary btn-tight-md"
             onClick={() => {
-              navigate('/notifications');
+              navigate('/settings?tab=notifications');
               onClose();
             }}
           >
@@ -563,7 +524,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
             Notification Settings
           </button>
           <span className="hidden sm:block ml-auto text-[11px] text-[color:var(--text-secondary)]">
-            {user?.username || user?.firstName || 'Account'} • {totalCountByTab[activeTab]} shown
+            {user?.username || user?.firstName || 'Account'} {normalizedItems.length} shown
           </span>
         </div>
       </div>

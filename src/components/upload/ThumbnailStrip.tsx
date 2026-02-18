@@ -94,9 +94,9 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
   if (previewFiles.length === 0) return null;
 
   return (
-    <div className="relative">
-      {/* Scrollable container */}
-      <div className="flex gap-2 overflow-x-auto py-2 scrollbar-hide">
+    <div className="relative min-w-0">
+      {/* Fixed 3-column stack so new files wrap instead of expanding the parent layout */}
+      <div className="grid grid-cols-3 gap-3 max-h-60 overflow-y-auto py-2 pr-1 scrollbar-hide">
         <AnimatePresence mode="popLayout">
           {previewFiles.map((pf, idx) => {
             const isSelected = selectedIndex === idx;
@@ -114,7 +114,7 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.2 }}
                 className={`
-                  relative flex-shrink-0 rounded-xl overflow-hidden
+                  relative w-full rounded-xl overflow-hidden
                   border-2 transition-all duration-200 group
                   ${isSelected 
                     ? 'thumbnail-selected border-transparent scale-105' 
@@ -131,8 +131,9 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
                   kind={isVideo ? 'video' : 'image'}
                   src={pf.url}
                   alt={pf.file?.name || `Thumbnail ${idx + 1}`}
-                  maxHeightClassName="max-h-24"
-                  maxWidthClassName="max-w-[240px]"
+                  className="w-full h-24 flex items-center justify-center bg-black/5 dark:bg-white/5"
+                  maxHeightClassName="max-h-full"
+                  maxWidthClassName="max-w-full"
                   controls={false}
                   muted
                 />
@@ -195,7 +196,7 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className={`
-              flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-xl
+              w-full h-24 rounded-xl
               border-2 border-dashed border-white/20
               flex flex-col items-center justify-center gap-1
               text-gray-400 hover:text-purple-400 hover:border-purple-500/50

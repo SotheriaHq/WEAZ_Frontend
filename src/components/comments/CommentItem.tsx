@@ -1,6 +1,6 @@
 import React from 'react';
 import type { CommentV2Dto } from '@/types/comments';
-import { Heart, Reply, Trash2 } from 'lucide-react';
+import { Link2, Reply, Trash2 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { CommentsApi } from '@/api/CommentsApi';
@@ -11,7 +11,7 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 
 type Props = {
   comment: CommentV2Dto;
-  onLike?: (commentId: string, likeCount: number, liked: boolean) => void;
+  onThread?: (commentId: string, threadCount: number, threaded: boolean) => void;
   onReply?: (parentId: string) => void;
   onDelete?: (commentId: string) => void;
   currentUserId?: string; // for gating delete
@@ -20,18 +20,18 @@ type Props = {
   onCreateReply?: (parentId: string, content: string) => Promise<void>;
 };
 
-const CommentItem: React.FC<Props> = ({ comment, onLike, onReply, onDelete, currentUserId, contentOwnerId, enableReplyComposer = false, onCreateReply }) => {
+const CommentItem: React.FC<Props> = ({ comment, onThread, onReply, onDelete, currentUserId, contentOwnerId, enableReplyComposer = false, onCreateReply }) => {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
-  const [liked, setLiked] = React.useState(Boolean(comment.isLikedByMe));
-  const [likeCount, setLikeCount] = React.useState(comment.likeCount ?? 0);
+  const [threaded, setThreaded] = React.useState(Boolean(comment.isThreadedByMe));
+  const [threadCount, setThreadCount] = React.useState(comment.threadCount ?? 0);
 
   const { onComment, joinComment } = useRealtime();
   React.useEffect(() => {
     joinComment(comment.id);
     const unsubscribe = onComment(`COMMENT:${comment.id}`, (p: any) => {
       if (p.commentId === comment.id) {
-        setLikeCount(p.likeCount ?? (p.likeCount || likeCount));
-        if (onLike) onLike(comment.id, p.likeCount ?? likeCount, undefined as any);
+        setThreadCount(p.threadCount ?? (p.threadCount || threadCount));
+        if (onThread) onThread(comment.id, p.threadCount ?? threadCount, undefined as any);
       }
     });
     return () => unsubscribe();
@@ -40,20 +40,20 @@ const CommentItem: React.FC<Props> = ({ comment, onLike, onReply, onDelete, curr
 
   const toggle = async () => {
     if (!isAuth) {
-      toast.info('Please sign in to like comments.');
+      toast.info('Please sign in to thread comments.');
       return;
     }
-    const next = !liked;
-    setLiked(next);
-    setLikeCount((c) => Math.max(0, c + (next ? 1 : -1)));
+    const next = !threaded;
+    setThreaded(next);
+    setThreadCount((c) => Math.max(0, c + (next ? 1 : -1)));
     try {
-      const res = await CommentsApi.toggleLike(comment.id);
-      setLiked(res.liked);
-      setLikeCount(res.likeCount);
-      if (onLike) onLike(comment.id, res.likeCount, res.liked);
+      const res = await CommentsApi.toggleThread(comment.id);
+      setThreaded(res.threaded);
+      setThreadCount(res.threadCount);
+      if (onThread) onThread(comment.id, res.threadCount, res.threaded);
     } catch {
-      setLiked(!next);
-      setLikeCount((c) => Math.max(0, c + (next ? -1 : 1)));
+      setThreaded(!next);
+      setThreadCount((c) => Math.max(0, c + (next ? -1 : 1)));
     }
   };
 
@@ -108,7 +108,7 @@ const CommentItem: React.FC<Props> = ({ comment, onLike, onReply, onDelete, curr
         )}
       </div>
       <div className="flex-1 min-w-0">
-        {/* Header: Username on left, Time and Like on right */}
+        {/* Header: Username on left, Time and Thread on right */}
         <div className="flex items-center justify-between gap-2 text-xs leading-snug">
           <span className="font-semibold truncate">
             {(() => {
@@ -123,9 +123,9 @@ const CommentItem: React.FC<Props> = ({ comment, onLike, onReply, onDelete, curr
             <span className="text-gray-500 text-[11px]">
               {formatRelativeTime(comment.createdAt)}
             </span>
-            <button type="button" onClick={toggle} className={`flex items-center gap-1 ${liked ? 'text-rose-600' : 'text-gray-600'}`}>
-              <Heart className={liked ? 'fill-current' : ''} size={13} />
-              <span className="text-[11px]">{likeCount}</span>
+            <button type="button" onClick={toggle} className={`flex items-center gap-1 ${threaded ? 'text-indigo-600' : 'text-gray-600'}`}>
+              <Link2 size={13} />
+              <span className="text-[11px]">{threadCount}</span>
             </button>
           </div>
         </div>

@@ -27,7 +27,7 @@ interface DeleteImpact {
   inCarts: number;
   inWishlists: number;
   totalViews: number;
-  totalLikes: number;
+  totalThreads: number;
   canDelete: boolean;
   mustArchiveReason?: string;
 }
@@ -77,7 +77,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
         inCarts: 0,
         inWishlists: 0,
         totalViews: 0,
-        totalLikes: 0,
+        totalThreads: 0,
         canDelete: true,
       });
     } finally {
@@ -204,8 +204,8 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
                       </div>
                       <div className="p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-xl">
                         <div className="text-2xl mb-1">👍</div>
-                        <div className="text-lg font-bold text-gray-900 dark:text-white">{impact.totalLikes}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Likes lost</div>
+                        <div className="text-lg font-bold text-gray-900 dark:text-white">{impact.totalThreads}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Threads lost</div>
                       </div>
                     </div>
 

@@ -11,6 +11,7 @@ import type { MediaItem } from '../types/media';
 const MAX_PARALLEL_UPLOADS = 3;
 const MAX_RETRY_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 750;
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -118,6 +119,14 @@ export function useCollectionUpload() {
             .map((tag) => tag.slice(0, 50))
         : [];
 
+      const normalizedCategoryId = meta?.categoryId?.trim();
+      if (!normalizedCategoryId) {
+        throw new Error('Please select a category before publishing.');
+      }
+      if (!UUID_V4_REGEX.test(normalizedCategoryId)) {
+        throw new Error('Selected category is invalid. Please reselect a category and try again.');
+      }
+
       // Allow saving drafts without tags when shouldPublish is false.
       if (shouldPublish && normalizedTags.length === 0) {
         throw new Error('Add at least one tag to describe this design.');
@@ -148,7 +157,7 @@ export function useCollectionUpload() {
           isAvailableInStore,
           tags: normalizedTags.slice(0, 20),
           files: filesPayload,
-          categoryId: meta?.categoryId,
+          categoryId: normalizedCategoryId,
           type: meta?.type,
           visibility: meta?.visibility,
         }) as InitializeCollectionResponse & { id?: string };

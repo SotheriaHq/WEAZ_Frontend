@@ -12,11 +12,12 @@ import { toast } from 'sonner';
 import type { AppDispatch, RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
 import AccessApi, { type AccessState } from '@/api/AccessApi';
-import LikeButton from '@/components/ui/LikeButton';
+import ThreadButton from '@/components/ui/ThreadButton';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UnifiedCollectionComments from '@/components/collections/UnifiedCollectionComments';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
+import { apiClient } from '@/api/httpClient';
 
 // ============================================
 // TYPES
@@ -45,7 +46,7 @@ interface CollectionDetail {
   saleEndAt?: string | null;
   isAvailableInStore?: boolean;
   tags?: string[];
-  totalLikes?: number;
+  totalThreads?: number;
   commentsCount?: number;
   medias?: any[];
   owner?: {
@@ -59,7 +60,7 @@ interface CollectionDetail {
       location?: string;
       bio?: string;
       collectionsCount?: number;
-      followersCount?: number;
+      patchesCount?: number;
       isVerified?: boolean;
     };
   };
@@ -572,14 +573,16 @@ const ProductGrid: React.FC<ProductGridProps> = ({
 // ============================================
 interface CommentsPanelProps {
   collectionId: string;
-  likesCount: number;
+  threadsCount: number;
   commentsCount: number;
   viewsCount: number;
   ownerId?: string;
   highlightCommentId?: string | null;
   price?: { min?: number | null; max?: number | null; saleMin?: number | null; saleMax?: number | null; saleEndAt?: string | null };
   onAddToCart?: () => void;
-  onAddToWishlist: () => void;
+  onToggleSave: () => void;
+  isSaved: boolean;
+  saveBusy: boolean;
   onShare: () => void;
   onContactBrand: () => void;
   onVisitStore: () => void;
@@ -587,20 +590,20 @@ interface CommentsPanelProps {
 
 const CommentsPanel: React.FC<CommentsPanelProps> = ({
   collectionId,
-  likesCount,
+  threadsCount,
   commentsCount,
   viewsCount,
   ownerId,
   highlightCommentId,
   price,
   onAddToCart,
-  onAddToWishlist,
+  onToggleSave,
+  isSaved,
+  saveBusy,
   onShare,
   onContactBrand,
   onVisitStore,
 }) => {
-  const [isWishlisted, setIsWishlisted] = useState(false);
-
   const hasSale = price?.saleMin != null || price?.saleMax != null;
   const baseBand = (() => {
     const min = formatPrice(price?.min);
@@ -630,9 +633,9 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
     return `${days}d ${hours}h`;
   }, [price?.saleEndAt]);
 
-  const handleWishlist = () => {
-    setIsWishlisted((prev) => !prev);
-    onAddToWishlist();
+  const handleSave = () => {
+    if (saveBusy) return;
+    onToggleSave();
   };
 
   return (
@@ -641,10 +644,10 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
         {/* Stats Bar */}
         <div className="flex items-center justify-around py-4 border-b border-white/10 mb-6">
           <div className="flex flex-col items-center gap-1">
-            <LikeButton 
+            <ThreadButton 
               contentType="COLLECTION" 
               contentId={collectionId} 
-              initialCount={likesCount}
+              initialCount={threadsCount}
               ownerId={ownerId}
               size={24}
             />
@@ -693,13 +696,13 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={handleWishlist}
+              onClick={handleSave}
               className={`border-2 border-purple-500 font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors ${
-                isWishlisted ? 'bg-purple-500/20 text-purple-100' : 'text-purple-200 hover:bg-purple-500/10'
+                isSaved ? 'bg-purple-500/20 text-purple-100' : 'text-purple-200 hover:bg-purple-500/10'
               }`}
             >
-              <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-purple-300' : ''}`} />
-              <span>{isWishlisted ? 'In Wishlist' : 'Wishlist'}</span>
+              <Heart className={`w-4 h-4 ${isSaved ? 'fill-purple-300' : ''}`} />
+              <span>{isSaved ? 'Saved' : 'Save'}</span>
             </motion.button>
           </div>
 
@@ -981,6 +984,8 @@ const CollectionViewRedesign: React.FC = () => {
   const [moreFromBrand, setMoreFromBrand] = useState<RelatedCollection[]>([]);
   const [youMightLike, setYouMightLike] = useState<RelatedCollection[]>([]);
   const [addingAll, setAddingAll] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
 
   const highlightCommentId = new URLSearchParams(window.location.search).get('commentId');
 
@@ -1230,10 +1235,52 @@ const CollectionViewRedesign: React.FC = () => {
     }
   };
 
-  const handleAddToWishlist = () => {
-    if (!detail) return;
-    // TODO: Wire to actual wishlist API when products are supported
-    toast.success(`${detail.title} added to wishlist`);
+  useEffect(() => {
+    let mounted = true;
+    const loadSaved = async () => {
+      if (!id || !isAuth) {
+        if (mounted) setIsSaved(false);
+        return;
+      }
+      try {
+        const res = await apiClient.get('/saved/check', {
+          params: { targetType: 'COLLECTION', targetId: id },
+        });
+        if (mounted) {
+          setIsSaved(Boolean(res.data?.isSaved));
+        }
+      } catch {
+        if (mounted) setIsSaved(false);
+      }
+    };
+    void loadSaved();
+    return () => { mounted = false; };
+  }, [id, isAuth]);
+
+  const handleToggleSave = async () => {
+    if (!id) return;
+    if (!isAuth) {
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    if (saveBusy) return;
+    try {
+      setSaveBusy(true);
+      if (isSaved) {
+        await apiClient.delete('/saved', { data: { targetType: 'COLLECTION', targetId: id } });
+        setIsSaved(false);
+        toast.success('Removed from saved.');
+      } else {
+        await apiClient.post('/saved', { targetType: 'COLLECTION', targetId: id });
+        setIsSaved(true);
+        toast.success('Saved for later.');
+      }
+    } catch {
+      toast.error('Unable to update saved items.');
+    } finally {
+      setSaveBusy(false);
+    }
   };
 
   const handleSetCover = async (item: MediaItem) => {
@@ -1354,7 +1401,7 @@ const CollectionViewRedesign: React.FC = () => {
             {/* Comments Panel */}
             <CommentsPanel
               collectionId={detail.id}
-              likesCount={detail.totalLikes || 0}
+              threadsCount={detail.totalThreads || 0}
               commentsCount={commentsCount}
               viewsCount={detail._count?.views || 0}
               ownerId={detail.owner?.id}
@@ -1367,7 +1414,9 @@ const CollectionViewRedesign: React.FC = () => {
                 saleEndAt: detail.saleEndAt,
               }}
               onAddToCart={!isOwner && hasProducts ? handleAddToCart : undefined}
-              onAddToWishlist={handleAddToWishlist}
+              onToggleSave={handleToggleSave}
+              isSaved={isSaved}
+              saveBusy={saveBusy}
               onShare={handleShare}
               onContactBrand={handleContactBrand}
               onVisitStore={handleVisitStore}
@@ -1385,10 +1434,10 @@ const CollectionViewRedesign: React.FC = () => {
         />
       </div>
 
-      {/* You Might Also Like */}
+      {/* You Might Also Thread */}
       <div className="bg-gray-900">
         <RelatedCollectionsSection
-          title="You Might Also Like"
+          title="You Might Also Thread"
           collections={youMightLike}
           onCollectionClick={handleCollectionClick}
         />

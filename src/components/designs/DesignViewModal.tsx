@@ -11,6 +11,7 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import EmojiPicker, { Theme, type EmojiClickData } from 'emoji-picker-react';
+import { useNavigate } from 'react-router-dom';
 
 
 
@@ -30,6 +31,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const currentUserId = useSelector((s: RootState) => s.user.profile?.id);
   const dialogRef = React.useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   const onEmojiClick = (emojiData: EmojiClickData) => {
     setCommentText((prev) => prev + emojiData.emoji);
@@ -48,6 +50,11 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
       setCommentCount(item.commentsCount ?? 0);
     }
   }, [item]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    onCommentCountChange?.(commentCount);
+  }, [commentCount, onCommentCountChange, open]);
 
   React.useEffect(() => {
     if (open) {
@@ -99,6 +106,12 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     } finally { setPostingComment(false); }
   };
 
+  const handleOpenCollectionProducts = () => {
+    if (!item?.collectionId) return;
+    onClose();
+    navigate(`/collections/${item.collectionId}`);
+  };
+
   // (Handled earlier)
 
   // --- Custom Styles from Mockup ---
@@ -125,23 +138,23 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
             <X size={18} />
           </button>
 
-          <div className="grid md:grid-cols-[55%_45%] h-full">
+          <div className="grid md:grid-cols-[minmax(0,55%)_minmax(0,45%)] max-h-[90vh]">
             {/* Media column */}
-            <div className="bg-black h-[82vh] md:h-[90vh] w-full overflow-y-auto scrollbar-hide">
+            <div className="h-[82vh] md:h-[90vh] min-w-0 overflow-y-auto p-3 md:p-4 scrollbar-hide">
               <MediaRenderer
                 kind={item.media?.type?.toUpperCase().includes('VIDEO') ? 'video' : 'image'}
                 src={item.media.url || ''}
-                className="w-full"
-                mediaClassName="w-full h-auto block"
-                maxHeightClassName=""
-                maxWidthClassName=""
+                className="w-full h-full flex items-center justify-center"
+                mediaClassName="block w-auto h-auto"
+                maxHeightClassName="max-h-[calc(82vh-1.5rem)] md:max-h-[calc(90vh-2rem)]"
+                maxWidthClassName="max-w-full"
                 allowScroll={false}
                 controls={false}
               />
             </div>
 
             {/* Info / actions */}
-            <div className="h-[82vh] md:h-[90vh] overflow-y-auto p-4 md:p-5 space-y-4 bg-white/90 text-slate-900 dark:bg-[#0f0b11]/80 dark:text-white scrollbar-hide">
+            <div className="h-[82vh] md:h-[90vh] min-w-0 overflow-y-auto p-4 md:p-5 space-y-4 bg-white/90 text-slate-900 dark:bg-[#0f0b11]/80 dark:text-white scrollbar-hide">
               {/* Brand + title */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -153,7 +166,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     {item.username && <p className="text-xs text-slate-500 dark:text-white/50">@{item.username}</p>}
                   </div>
                 </div>
-                <button className="text-[11px] px-3 py-1 rounded-full bg-purple-600 text-white font-medium hover:bg-purple-700 transition">Follow</button>
+                <button className="text-[11px] px-3 py-1 rounded-full bg-purple-600 text-white font-medium hover:bg-purple-700 transition">Patch</button>
               </div>
 
               <div>
@@ -182,7 +195,12 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
               {/* Action buttons - compact with colors */}
               <div className="flex flex-wrap gap-1.5">
-                <button className="rounded-md px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[11px] font-semibold hover:opacity-90 transition shadow-sm">🛒 Add to Cart</button>
+                <button
+                  className="rounded-md px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[11px] font-semibold hover:opacity-90 transition shadow-sm"
+                  onClick={handleOpenCollectionProducts}
+                >
+                  🛒 Add to Cart
+                </button>
                 <button className="rounded-md px-2.5 py-1.5 bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold hover:bg-rose-200 transition dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-700/40">💜 Save</button>
                 <button className="rounded-md px-2.5 py-1.5 bg-sky-100 text-sky-700 border border-sky-200 text-[11px] font-semibold hover:bg-sky-200 transition dark:bg-sky-900/30 dark:text-sky-400 dark:border-sky-700/40">🔗 Share</button>
                 <button className="rounded-md px-2.5 py-1.5 bg-amber-100 text-amber-700 border border-amber-200 text-[11px] font-semibold hover:bg-amber-200 transition dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700/40">🏬 Store</button>
@@ -255,4 +273,3 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 };
 
 export default DesignViewModal;
-

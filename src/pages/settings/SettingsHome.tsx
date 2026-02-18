@@ -7,6 +7,9 @@ import SubscriptionsSettings from '@/components/settings/tabs/SubscriptionsSetti
 import AccountSettings from '@/components/settings/tabs/AccountSettings';
 import NotificationSettings from '@/components/settings/tabs/NotificationSettings';
 import StoreGeneralSettings from '@/components/settings/tabs/StoreGeneralSettings';
+import StorePoliciesSettings from '@/components/settings/tabs/StorePoliciesSettings';
+import ProfileVisibilitySettings from '@/components/settings/tabs/ProfileVisibilitySettings';
+import SizeFitSettings from '@/components/settings/tabs/SizeFitSettings';
 import HiddenContentSettings from './HiddenContentSettings';
 
 const sections: Record<string, React.ReactNode> = {
@@ -15,6 +18,8 @@ const sections: Record<string, React.ReactNode> = {
   subscriptions: <SubscriptionsSettings />,
   account: <AccountSettings />,
   notifications: <NotificationSettings />,
+  'profile-visibility': <ProfileVisibilitySettings />,
+  'size-fits': <SizeFitSettings />,
   'hidden-content': <HiddenContentSettings />,
   'store-general': <StoreGeneralSettings />,
   'store-social': (
@@ -23,12 +28,7 @@ const sections: Record<string, React.ReactNode> = {
       <p className="text-gray-500 dark:text-gray-400">Manage your store's social links and verification status.</p>
     </>
   ),
-  'store-policies': (
-    <>
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Store Policies</h1>
-      <p className="text-gray-500 dark:text-gray-400">Configure shipping, returns, and other policies.</p>
-    </>
-  ),
+  'store-policies': <StorePoliciesSettings />,
   'store-payments': (
     <>
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Payments & Payouts</h1>

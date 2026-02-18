@@ -68,8 +68,8 @@ const CommentThread: React.FC<Props> = ({ targetType, targetId, className }) => 
     setItems((prev) => [c, ...prev]);
   };
 
-  const handleLike = (commentId: string, likeCount: number) => {
-    setItems((prev) => prev.map((c) => c.id === commentId ? { ...c, likeCount } : { ...c, children: c.children?.map(r => r.id === commentId ? { ...r, likeCount } : r) }));
+  const handleThread = (commentId: string, threadCount: number) => {
+    setItems((prev) => prev.map((c) => c.id === commentId ? { ...c, threadCount } : { ...c, children: c.children?.map(r => r.id === commentId ? { ...r, threadCount } : r) }));
   };
 
   const handleDelete = (commentId: string) => {
@@ -89,12 +89,12 @@ const CommentThread: React.FC<Props> = ({ targetType, targetId, className }) => 
       <div className="divide-y divide-white/20">
         {items.map((c) => (
           <div key={c.id} className="py-3">
-            <CommentItem comment={c} onLike={handleLike} onReply={loadReplies} onDelete={handleDelete} />
+            <CommentItem comment={c} onThread={handleThread} onReply={loadReplies} onDelete={handleDelete} />
             {/* Children */}
             {c.children && c.children.length > 0 && (
               <div className="pl-10 mt-1 space-y-2">
                 {c.children.map((r) => (
-                  <CommentItem key={r.id} comment={r} onLike={handleLike} onReply={loadReplies} onDelete={handleDelete} />
+                  <CommentItem key={r.id} comment={r} onThread={handleThread} onReply={loadReplies} onDelete={handleDelete} />
                 ))}
               </div>
             )}

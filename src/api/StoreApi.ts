@@ -36,7 +36,7 @@ export interface Product {
   isActive: boolean;
   isFeatured: boolean;
   viewsCount: number;
-  likesCount: number;
+  threadsCount: number;
   createdAt: string;
   updatedAt: string;
   collection?: {
@@ -93,6 +93,7 @@ export interface Order {
   customerName: string;
   shippingAddress?: Record<string, any> | null;
   contactInfo?: Record<string, any> | null;
+  sizeFitSnapshot?: Record<string, any> | null;
   items: OrderItem[];
   totalAmount: number;
   currency: string;
@@ -312,11 +313,11 @@ export interface BrandStoreInfo {
   socialInstagram?: string;
   socialTwitter?: string;
   socialWebsite?: string;
-  followersCount: number;
+  patchesCount: number;
   productsCount: number;
   avgRating?: number;
   totalReviews?: number;
-  isFollowing: boolean;
+  isPatched: boolean;
 }
 
 // ============= Store Status & Setup =============
@@ -338,6 +339,7 @@ export interface StoreStatusResponse {
     socialTwitter?: string | null;
     socialTiktok?: string | null;
     socialWebsite?: string | null;
+    responseTimeSla?: string | null;
   };
 }
 
@@ -365,6 +367,7 @@ export interface StoreWizardPrefillResponse {
     website: string;
     tags: string[];
     tagline: string;
+    responseTimeSla?: string;
   };
   system: {
     categories: Array<{ id: string; slug: string; name: string }>;
@@ -392,6 +395,36 @@ export interface StoreGeneralSettingsResponse {
   missingFields: string[];
   storeNameLastChangedAt: string | null;
   storeNameNextAllowedAt: string | null;
+  responseTimeSla?: string;
+}
+
+export interface StorePoliciesResponse {
+  brandId: string;
+  shippingRegions: string[];
+  processingTime: string;
+  shippingMethods: string[];
+  freeShippingThreshold: number | null;
+  returnsAccepted: boolean;
+  returnWindow: string;
+  returnConditions: string[];
+  refundMethod: string;
+  responseTimeSla: string;
+  sizeChart: Record<string, any> | null;
+  shippingRules: Record<string, any> | null;
+}
+
+export interface StorePoliciesUpdateData {
+  shippingRegions?: string[];
+  processingTime?: string;
+  shippingMethods?: string[];
+  freeShippingThreshold?: number | null;
+  returnsAccepted?: boolean;
+  returnWindow?: string;
+  returnConditions?: string[];
+  refundMethod?: string;
+  responseTimeSla?: string;
+  sizeChart?: Record<string, any> | null;
+  shippingRules?: Record<string, any> | null;
 }
 
 export const getStoreWizardPrefill = async (): Promise<StoreWizardPrefillResponse> => {
@@ -422,9 +455,26 @@ export const openStore = async (): Promise<{ success: boolean; message: string; 
   return extractData<{ success: boolean; message: string; brandId: string }>(res);
 };
 
+export const closeStore = async (): Promise<{ success: boolean; message: string; brandId: string }> => {
+  const res = await apiClient.post('/store/close');
+  return extractData<{ success: boolean; message: string; brandId: string }>(res);
+};
+
 export const updateStoreProfile = async (data: StoreProfileUpdateData): Promise<StoreStatusResponse> => {
   const res = await apiClient.patch('/store/profile', data);
   return extractData<StoreStatusResponse>(res);
+};
+
+export const getStorePolicies = async (): Promise<StorePoliciesResponse> => {
+  const res = await apiClient.get('/store/policies');
+  return extractData<StorePoliciesResponse>(res);
+};
+
+export const updateStorePolicies = async (
+  data: StorePoliciesUpdateData
+): Promise<StorePoliciesResponse> => {
+  const res = await apiClient.patch('/store/policies', data);
+  return extractData<StorePoliciesResponse>(res);
 };
 
 interface RawBrandData {
@@ -445,13 +495,13 @@ interface RawBrandData {
   twitter?: string;
   socialWebsite?: string;
   website?: string;
-  followersCount?: number;
+  patchesCount?: number;
   productsCount?: number;
   avgRating?: number;
   totalReviews?: number;
-  isFollowing?: boolean;
+  isPatched?: boolean;
   _count?: {
-    followers?: number;
+    patches?: number;
     products?: number;
   };
 }
@@ -472,11 +522,11 @@ export const getBrandStoreInfo = async (brandId: string): Promise<BrandStoreInfo
     socialInstagram: brand.socialInstagram || brand.instagram,
     socialTwitter: brand.socialTwitter || brand.twitter,
     socialWebsite: brand.socialWebsite || brand.website,
-    followersCount: brand.followersCount || brand._count?.followers || 0,
+    patchesCount: brand.patchesCount || brand._count?.patches || 0,
     productsCount: brand.productsCount || brand._count?.products || 0,
     avgRating: brand.avgRating,
     totalReviews: brand.totalReviews,
-    isFollowing: brand.isFollowing || false,
+    isPatched: brand.isPatched || false,
   };
 };
 
@@ -537,6 +587,9 @@ export default {
   updateStoreName,
   getStoreStatus,
   openStore,
+  closeStore,
   updateStoreProfile,
+  getStorePolicies,
+  updateStorePolicies,
   getProductPriceChangePreview,
 };

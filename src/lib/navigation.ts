@@ -1,5 +1,6 @@
 export function getProfileOrHomeUrl(user?: { type?: string } | null): string {
-  return user?.type === 'BRAND' ? '/profile' : '/';
+  if (!user?.type) return '/';
+  return user.type === 'BRAND' || user.type === 'REGULAR' ? '/profile' : '/';
 }
 
 export default getProfileOrHomeUrl;

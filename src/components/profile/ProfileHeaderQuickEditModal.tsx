@@ -39,7 +39,7 @@ interface ProfileHeaderQuickEditModalProps {
   saving?: boolean;
 }
 
-const MAX_TAGS = 6;
+const MAX_TAGS = 5;
 
 // ----------------------------------------------------------------------------
 // Main Component

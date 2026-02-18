@@ -5,7 +5,7 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 type Props = { open: boolean; onClose: () => void; contentId: string; contentType: 'COLLECTION' | 'COLLECTION_MEDIA' };
 
-const LikerListModal: React.FC<Props> = ({ open, onClose, contentId, contentType }) => {
+const ThreadListModal: React.FC<Props> = ({ open, onClose, contentId, contentType }) => {
   const [rows, setRows] = useState<Array<{ id: string; username?: string; firstName?: string; lastName?: string; profileImage?: string }>>([]);
   const [limit, setLimit] = useState(20);
   const [loading, setLoading] = useState(false);
@@ -38,7 +38,7 @@ const LikerListModal: React.FC<Props> = ({ open, onClose, contentId, contentType
   if (!open) return null;
   return (
     <OverlayPortal>
-      <div className="fixed inset-0 z-layer-modal flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-label="Likes">
+      <div className="fixed inset-0 z-layer-modal flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-label="Threads">
         <div className="fixed inset-0 z-layer-overlay bg-black/40" onClick={onClose} />
         <div
           ref={dialogRef}
@@ -47,7 +47,7 @@ const LikerListModal: React.FC<Props> = ({ open, onClose, contentId, contentType
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold">Likes</h3>
+            <h3 className="font-semibold">Threads</h3>
             <button onClick={onClose} className="btn-frost-ghost btn-tight-xs">Close</button>
           </div>
           <ul className="space-y-2 max-h-80 overflow-y-auto">
@@ -68,4 +68,4 @@ const LikerListModal: React.FC<Props> = ({ open, onClose, contentId, contentType
   );
 };
 
-export default LikerListModal;
+export default ThreadListModal;

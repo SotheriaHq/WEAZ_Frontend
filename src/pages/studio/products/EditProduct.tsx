@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
   ArrowLeft, 
-  ArrowUp,
-  ArrowDown,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -29,7 +27,7 @@ import { DiscardChangesModal } from '@/components/studio/store/modals';
 import { normalizePrimary, reorderItems, setPrimary, validateMedia } from './mediaUtils';
 import { getTagColor } from '@/utils/tagColors';
 import { PriceChangePreviewModal } from '@/components/collections/PriceChangePreviewModal';
-import { getProductPriceChangePreview } from '@/api/StoreApi';
+import { getProductPriceChangePreview, type CollectionPriceImpact } from '@/api/StoreApi';
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -168,11 +166,19 @@ const EditProduct: React.FC = () => {
   const location = useLocation();
   const returnTo = useMemo(() => new URLSearchParams(location.search).get('returnTo'), [location.search]);
   const returnContext = useMemo(() => new URLSearchParams(location.search).get('returnContext'), [location.search]);
+  const collectionContextId = useMemo(() => new URLSearchParams(location.search).get('collectionId'), [location.search]);
   const user = useSelector((state: RootState) => state.user.profile);
 
   const isEditMode = Boolean(productId);
-  const isCollectionFlow = returnContext === 'collection' && !isEditMode;
-  const pageTitle = isCollectionFlow ? 'Add Product to Collection' : isEditMode ? 'Edit Product' : 'Create Product';
+  const isCollectionContext = returnContext === 'collection';
+  const isCollectionFlow = isCollectionContext && !isEditMode;
+  const pageTitle = isCollectionFlow
+    ? 'Add Product to Collection'
+    : isCollectionContext && isEditMode
+      ? 'Edit Product in Collection'
+      : isEditMode
+        ? 'Edit Product'
+        : 'Create Product';
   const includeDeleted = useMemo(
     () => new URLSearchParams(location.search).get('includeDeleted') === 'true',
     [location.search],
@@ -198,6 +204,7 @@ const EditProduct: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
+  const [saveAction, setSaveAction] = useState<'draft' | 'publish' | null>(null);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
   const [tagInput, setTagInput] = useState('');
@@ -209,20 +216,22 @@ const EditProduct: React.FC = () => {
 
   const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
   const [pendingMediaFiles, setPendingMediaFiles] = useState<
-    Array<{ tempId: string; file: File; previewUrl: string; isPrimary: boolean }>
+    Array<{ id: string; tempId: string; file: File; previewUrl: string; isPrimary: boolean }>
   >([]);
+  const pendingPreviewUrlsRef = useRef<Map<string, string>>(new Map());
   const [carouselIndex, setCarouselIndex] = useState(0);
 
   // Price change preview state
   const [originalPrice, setOriginalPrice] = useState<number | null>(null);
   const [showPricePreview, setShowPricePreview] = useState(false);
   const [pricePreviewData, setPricePreviewData] = useState<{
-    affectedCollections: Array<{ collectionId: string; collectionName: string; isDraft: boolean; oldPriceRange: { min: number; max: number }; newPriceRange: { min: number; max: number } }>;
+    affectedCollections: CollectionPriceImpact[];
     productName: string;
     oldPrice: number;
     newPrice: number;
   } | null>(null);
   const [pendingSaveDraft, setPendingSaveDraft] = useState(false);
+  const [pendingStatusOverride, setPendingStatusOverride] = useState<FormState['status'] | null>(null);
 
   const maxMediaCount = 4;
   const canAddMoreMedia = mediaUrls.length < maxMediaCount;
@@ -258,6 +267,37 @@ const EditProduct: React.FC = () => {
     return false;
   }, [variantKeyCounts]);
 
+  const revokeBlobUrl = useCallback((url?: string) => {
+    if (url && url.startsWith('blob:')) {
+      URL.revokeObjectURL(url);
+    }
+  }, []);
+
+  useEffect(() => {
+    for (const it of pendingMediaFiles) {
+      if (it.previewUrl && !pendingPreviewUrlsRef.current.has(it.tempId)) {
+        pendingPreviewUrlsRef.current.set(it.tempId, it.previewUrl);
+      }
+    }
+
+    const keepIds = new Set(pendingMediaFiles.map((it) => it.tempId));
+    for (const [tempId, url] of Array.from(pendingPreviewUrlsRef.current.entries())) {
+      if (!keepIds.has(tempId)) {
+        revokeBlobUrl(url);
+        pendingPreviewUrlsRef.current.delete(tempId);
+      }
+    }
+  }, [pendingMediaFiles, revokeBlobUrl]);
+
+  useEffect(() => {
+    return () => {
+      for (const url of pendingPreviewUrlsRef.current.values()) {
+        revokeBlobUrl(url);
+      }
+      pendingPreviewUrlsRef.current.clear();
+    };
+  }, [revokeBlobUrl]);
+
   // =====================
   // Data Loading
   // =====================
@@ -276,11 +316,13 @@ const EditProduct: React.FC = () => {
         }
         const collections = await brandApi.getCollections(user.id, { visibility: 'all' });
         if (!mounted) return;
-        const mapped: Category[] = (collections || []).map((c: any) => ({
+        const mapped: Category[] = (collections || [])
+          .filter((c: any) => Boolean(c?.isAvailableInStore))
+          .map((c: any) => ({
           id: String(c.id),
           name: String(c.title || c.name || 'Untitled collection'),
           slug: String(c.id),
-        }));
+          }));
         setCategories(mapped);
       } catch (error) {
         console.error('Failed to load collections', error);
@@ -305,6 +347,14 @@ const EditProduct: React.FC = () => {
         setLoading(true);
         const product = await productApi.getProduct(productId, includeDeleted ? { includeDeleted: true } : undefined);
         if (!product || !mounted) return;
+        const resolvedStatus = (() => {
+          const rawStatus = String((product as any).status || '').toUpperCase();
+          if (rawStatus === 'DRAFT' || rawStatus === 'ACTIVE' || rawStatus === 'ARCHIVED') {
+            return rawStatus as FormState['status'];
+          }
+          if ((product as any).archivedAt) return 'ARCHIVED';
+          return (product as any).isActive === false ? 'DRAFT' : 'ACTIVE';
+        })();
 
         // Track original price for change detection
         setOriginalPrice(product.price || 0);
@@ -329,7 +379,7 @@ const EditProduct: React.FC = () => {
           allowBackorders: product.allowBackorders ?? false,
           stock: product.stock ?? product.totalStock ?? 0,
           lowStockThreshold: product.lowStockThreshold ?? 5,
-          status: product.status || 'ACTIVE',
+          status: resolvedStatus,
           isPhysicalProduct: product.isPhysicalProduct ?? true,
           customsRegion: product.customsRegion || 'NG',
           onSale: Boolean(((product as any).salePrice ?? product.compareAtPrice) && ((product as any).salePrice ?? product.compareAtPrice) < product.price),
@@ -447,9 +497,13 @@ const EditProduct: React.FC = () => {
   // Save / Submit
   // =====================
 
-  const handleSave = useCallback(async (asDraft = false) => {
-    const effectiveDraft = asDraft || isCollectionFlow;
-    const shouldValidatePublish = !asDraft || isCollectionFlow;
+  const handleSave = useCallback(async (
+    asDraft = false,
+    options?: { forceStatus?: FormState['status'] },
+  ) => {
+    const forcedStatus = options?.forceStatus;
+    const effectiveDraft = forcedStatus ? forcedStatus === 'DRAFT' : asDraft;
+    const shouldValidatePublish = forcedStatus ? forcedStatus === 'ACTIVE' : !asDraft;
     const hasDraftContent = Boolean(
       form.title.trim() ||
         form.description.trim() ||
@@ -531,7 +585,8 @@ const EditProduct: React.FC = () => {
             oldPrice: originalPrice,
             newPrice: form.price,
           });
-          setPendingSaveDraft(asDraft);
+          setPendingSaveDraft(effectiveDraft);
+          setPendingStatusOverride(forcedStatus ?? null);
           setShowPricePreview(true);
           return; // Wait for user confirmation
         }
@@ -541,8 +596,113 @@ const EditProduct: React.FC = () => {
       }
     }
 
+    if (isCollectionFlow && !collectionContextId) {
+      toast.error('Missing collection context. Please return to the collection builder and try again.');
+      return;
+    }
+
     setSaving(true);
     try {
+      const ensuredSku = form.sku?.trim() || buildBaseSku({ brandInitials: brandInitialsFromProfile(user), title: form.title });
+
+      const payload: ProductCreateDto = {
+        title: effectiveDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
+        description: form.description.trim() || undefined,
+        collectionId: isCollectionFlow ? (collectionContextId || undefined) : form.categoryId || undefined,
+        tags: form.tags,
+        price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
+        compareAtPrice: form.onSale && form.compareAtPrice > 0 ? form.compareAtPrice : undefined,
+        costPerItem: form.costPerItem || undefined,
+        currency: form.currency,
+        sku: ensuredSku,
+        weight: form.weight || undefined,
+        weightUnit: form.weightUnit,
+        materials: form.materials || undefined,
+        careInstructions: form.careInstructions || undefined,
+        returnsEligible: form.returnsEligible,
+        sustainabilityClaim: form.sustainabilityClaim,
+        trackInventory: form.trackInventory,
+        allowBackorders: form.allowBackorders,
+        stock: form.variants.length > 0 ? variantTotalStock : form.stock,
+        lowStockThreshold: form.lowStockThreshold,
+        status: forcedStatus ?? (effectiveDraft ? 'DRAFT' : form.status),
+        isPhysicalProduct: form.isPhysicalProduct,
+        customsRegion: form.customsRegion || undefined,
+        mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
+        variants: form.variants.length > 0
+          ? form.variants.map((v, idx) => ({
+              ...v,
+              size: v.size?.trim() || undefined,
+              color: v.color?.trim() || undefined,
+              sku: (v.sku?.trim() || buildVariantSku(ensuredSku, v, idx)).trim() || undefined,
+              price: typeof v.price === 'number' && v.price > 0 ? v.price : undefined,
+              stock: Number.isFinite(v.stock) ? v.stock : 0,
+            }))
+          : undefined,
+      };
+
+      if (isEditMode && productId) {
+        await productApi.updateProduct(productId, payload);
+        toast.success(isCollectionContext ? 'Product updated for this collection.' : 'Product updated successfully');
+        if (returnTo && isCollectionContext) {
+          navigate(returnTo);
+          return;
+        }
+      } else {
+        const created = await productApi.createProduct(payload);
+
+        // Upload pending media after we have a product id
+        if (pendingMediaFiles.length > 0) {
+          const pendingById = new Map(pendingMediaFiles.map((p) => [p.tempId, p]));
+          const orderedPending = mediaUrls
+            .map((m) => pendingById.get(m.id))
+            .filter(Boolean)
+            .map((p) => ({ ...(p as { id: string; tempId: string; file: File; previewUrl: string; isPrimary: boolean }), id: (p as { id: string }).id || (p as { tempId: string }).tempId }));
+          const uploads = normalizePrimary(orderedPending);
+
+          const uploadedIds: string[] = [];
+          for (const u of uploads) {
+            const uploaded = await productApi.uploadProductMedia(created.id, u.file, u.isPrimary);
+            uploadedIds.push(uploaded.id);
+          }
+
+          if (uploadedIds.length > 0) {
+            await productApi.updateProduct(created.id, { mediaIds: uploadedIds });
+          }
+        }
+
+        const successMessage = isCollectionContext
+          ? 'Product added to collection.'
+          : effectiveDraft
+            ? 'Draft saved successfully'
+            : 'Product created successfully';
+        toast.success(successMessage);
+        if (returnTo && returnContext === 'collection') {
+          const joiner = returnTo.includes('?') ? '&' : '?';
+          navigate(`${returnTo}${joiner}productId=${created.id}`);
+          return;
+        }
+      }
+
+      setHasChanges(false);
+      navigate('/studio/store');
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Failed to save product';
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  }, [form, hasDuplicateVariants, isEditMode, isCollectionFlow, isCollectionContext, collectionContextId, maxMediaCount, mediaUrls, navigate, pendingMediaFiles, productId, variantTotalStock, originalPrice, showPricePreview, returnContext, returnTo]);
+
+  const handlePriceChangeConfirm = useCallback(async () => {
+    setShowPricePreview(false);
+    // Continue with save
+    setSaving(true);
+    try {
+      const effectiveDraft = pendingStatusOverride
+        ? pendingStatusOverride === 'DRAFT'
+        : pendingSaveDraft;
+      const statusToPersist = pendingStatusOverride ?? (effectiveDraft ? 'DRAFT' : form.status);
       const ensuredSku = form.sku?.trim() || buildBaseSku({ brandInitials: brandInitialsFromProfile(user), title: form.title });
 
       const payload: ProductCreateDto = {
@@ -565,101 +725,7 @@ const EditProduct: React.FC = () => {
         allowBackorders: form.allowBackorders,
         stock: form.variants.length > 0 ? variantTotalStock : form.stock,
         lowStockThreshold: form.lowStockThreshold,
-        status: effectiveDraft ? 'DRAFT' : form.status,
-        isPhysicalProduct: form.isPhysicalProduct,
-        customsRegion: form.customsRegion || undefined,
-        mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
-        variants: form.variants.length > 0
-          ? form.variants.map((v, idx) => ({
-              ...v,
-              size: v.size?.trim() || undefined,
-              color: v.color?.trim() || undefined,
-              sku: (v.sku?.trim() || buildVariantSku(ensuredSku, v, idx)).trim() || undefined,
-              price: typeof v.price === 'number' && v.price > 0 ? v.price : undefined,
-              stock: Number.isFinite(v.stock) ? v.stock : 0,
-            }))
-          : undefined,
-      };
-
-      if (isEditMode && productId) {
-        await productApi.updateProduct(productId, payload);
-        toast.success('Product updated successfully');
-      } else {
-        if (asDraft && !isCollectionFlow) {
-          payload.isActive = false;
-        }
-        const created = await productApi.createProduct(payload);
-
-        // Upload pending media after we have a product id
-        if (pendingMediaFiles.length > 0) {
-          const pendingById = new Map(pendingMediaFiles.map((p) => [p.tempId, p]));
-          const orderedPending = mediaUrls
-            .map((m) => pendingById.get(m.id))
-            .filter(Boolean) as Array<{ tempId: string; file: File; previewUrl: string; isPrimary: boolean }>;
-          const uploads = normalizePrimary(orderedPending);
-
-          const uploadedIds: string[] = [];
-          for (const u of uploads) {
-            const uploaded = await productApi.uploadProductMedia(created.id, u.file, u.isPrimary);
-            uploadedIds.push(uploaded.id);
-          }
-
-          if (uploadedIds.length > 0) {
-            await productApi.updateProduct(created.id, { mediaIds: uploadedIds });
-          }
-        }
-
-        const successMessage = effectiveDraft
-          ? isCollectionFlow
-            ? 'Product added to collection.'
-            : 'Draft saved successfully'
-          : 'Product created successfully';
-        toast.success(successMessage);
-        if (returnTo && returnContext === 'collection') {
-          const joiner = returnTo.includes('?') ? '&' : '?';
-          navigate(`${returnTo}${joiner}productId=${created.id}`);
-          return;
-        }
-      }
-
-      setHasChanges(false);
-      navigate('/studio/store');
-    } catch (error: any) {
-      const message = error?.response?.data?.message || 'Failed to save product';
-      toast.error(message);
-    } finally {
-      setSaving(false);
-    }
-  }, [form, hasDuplicateVariants, isEditMode, isCollectionFlow, maxMediaCount, mediaUrls, navigate, pendingMediaFiles, productId, variantTotalStock, originalPrice, showPricePreview, returnContext, returnTo]);
-
-  const handlePriceChangeConfirm = useCallback(async () => {
-    setShowPricePreview(false);
-    // Continue with save
-    setSaving(true);
-    try {
-      const ensuredSku = form.sku?.trim() || buildBaseSku({ brandInitials: brandInitialsFromProfile(user), title: form.title });
-
-      const payload: ProductCreateDto = {
-        title: pendingSaveDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
-        description: form.description.trim() || undefined,
-        collectionId: form.categoryId || undefined,
-        tags: form.tags,
-        price: pendingSaveDraft ? (form.price > 0 ? form.price : 0) : form.price,
-        compareAtPrice: form.onSale && form.compareAtPrice > 0 ? form.compareAtPrice : undefined,
-        costPerItem: form.costPerItem || undefined,
-        currency: form.currency,
-        sku: ensuredSku,
-        weight: form.weight || undefined,
-        weightUnit: form.weightUnit,
-        materials: form.materials || undefined,
-        careInstructions: form.careInstructions || undefined,
-        returnsEligible: form.returnsEligible,
-        sustainabilityClaim: form.sustainabilityClaim,
-        trackInventory: form.trackInventory,
-        allowBackorders: form.allowBackorders,
-        stock: form.variants.length > 0 ? variantTotalStock : form.stock,
-        lowStockThreshold: form.lowStockThreshold,
-        status: pendingSaveDraft ? 'DRAFT' : form.status,
+        status: statusToPersist,
         isPhysicalProduct: form.isPhysicalProduct,
         customsRegion: form.customsRegion || undefined,
         mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
@@ -679,14 +745,32 @@ const EditProduct: React.FC = () => {
       toast.success('Product updated successfully');
       setOriginalPrice(form.price); // Update tracked price
       setHasChanges(false);
+      if (returnTo && isCollectionContext) {
+        navigate(returnTo);
+        return;
+      }
       navigate('/studio/store');
     } catch (error: any) {
       const message = error?.response?.data?.message || 'Failed to save product';
       toast.error(message);
     } finally {
       setSaving(false);
+      setPendingSaveDraft(false);
+      setPendingStatusOverride(null);
     }
-  }, [form, user, pendingSaveDraft, variantTotalStock, productId, navigate]);
+  }, [form, user, pendingSaveDraft, pendingStatusOverride, variantTotalStock, productId, navigate, isCollectionContext, returnTo]);
+
+  const triggerSave = useCallback(async (
+    asDraft: boolean,
+    options: { action: 'draft' | 'publish'; forceStatus?: FormState['status'] },
+  ) => {
+    setSaveAction(options.action);
+    try {
+      await handleSave(asDraft, { forceStatus: options.forceStatus });
+    } finally {
+      setSaveAction(null);
+    }
+  }, [handleSave]);
 
   // Auto-generate SKU (product + variants). Users shouldn't type SKUs manually.
   useEffect(() => {
@@ -715,9 +799,8 @@ const EditProduct: React.FC = () => {
   }, [form.sku, form.variants]);
 
   const normalizePending = useCallback(
-    (items: Array<{ tempId: string; file: File; previewUrl: string; isPrimary: boolean }>) => {
-      const normalized = normalizePrimary(items.map((item) => ({ ...item, id: item.tempId })));
-      return normalized.map(({ id, ...rest }) => rest);
+    (items: Array<{ id: string; tempId: string; file: File; previewUrl: string; isPrimary: boolean }>) => {
+      return normalizePrimary(items);
     },
     [],
   );
@@ -736,8 +819,10 @@ const EditProduct: React.FC = () => {
       const now = Date.now();
       const nextPending = toAdd.map((file, idx) => {
         const previewUrl = URL.createObjectURL(file);
+        const tempId = `pending-${now}-${idx}-${Math.random().toString(16).slice(2)}`;
         return {
-          tempId: `pending-${now}-${idx}-${Math.random().toString(16).slice(2)}`,
+          id: tempId,
+          tempId,
           file,
           previewUrl,
           isPrimary: false,
@@ -831,6 +916,12 @@ const EditProduct: React.FC = () => {
       const target = mediaUrls.find((m) => m.id === mediaId);
       if (!target) return;
 
+      const pendingTarget = pendingMediaFiles.find((p) => p.tempId === mediaId);
+      if (pendingTarget) {
+        revokeBlobUrl(pendingTarget.previewUrl);
+        pendingPreviewUrlsRef.current.delete(pendingTarget.tempId);
+      }
+
       const nextMedia = normalizePrimary(mediaUrls.filter((m) => m.id !== mediaId));
       setMediaUrls(nextMedia);
       setPendingMediaFiles((prev) => prev.filter((p) => p.tempId !== mediaId));
@@ -850,7 +941,7 @@ const EditProduct: React.FC = () => {
         }
       }
     },
-    [isEditMode, mediaUrls, productId, updateForm],
+    [isEditMode, mediaUrls, pendingMediaFiles, productId, revokeBlobUrl, updateForm],
   );
 
   const handleReorderMedia = useCallback(
@@ -919,13 +1010,18 @@ const EditProduct: React.FC = () => {
     }
   }, [confirm, productId, navigate]);
 
+  void handleReorderMedia;
+  void handleDuplicate;
+  void handleArchive;
+  void handleDelete;
+
   const navigateBack = useCallback(() => {
-    if (isCollectionFlow && returnTo) {
+    if (isCollectionContext && returnTo) {
       navigate(returnTo);
       return;
     }
     navigate(-1);
-  }, [isCollectionFlow, navigate, returnTo]);
+  }, [isCollectionContext, navigate, returnTo]);
 
   const handleDiscard = useCallback(() => {
     if (hasChanges) {
@@ -953,6 +1049,7 @@ const EditProduct: React.FC = () => {
   // =====================
   // Render
   // =====================
+  const isDraftEditMode = isEditMode && form.status === 'DRAFT';
 
   return (
     <div className="flex flex-col min-h-full bg-transparent text-gray-900 dark:text-[#e5e5e5] font-sans">
@@ -962,7 +1059,7 @@ const EditProduct: React.FC = () => {
         <div className="mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex flex-col gap-1">
             <div className="flex items-center text-xs text-gray-600 dark:text-gray-400 gap-2">
-              {isCollectionFlow ? (
+              {isCollectionContext ? (
                 <>
                   <button
                     onClick={() => navigate('/studio/store/collections')}
@@ -978,7 +1075,7 @@ const EditProduct: React.FC = () => {
                     Create Collection
                   </button>
                   <span>/</span>
-                  <span>Add Product</span>
+                  <span>{isEditMode ? 'Edit Product' : 'Add Product'}</span>
                 </>
               ) : (
                 <>
@@ -1646,28 +1743,50 @@ const EditProduct: React.FC = () => {
             )}
           </div>
           <div className="flex items-center gap-4">
-            {!isEditMode && (
+            {!isEditMode && !isCollectionContext && (
               <button 
-                onClick={() => handleSave(true)}
+                onClick={() => void triggerSave(true, { action: 'draft', forceStatus: 'DRAFT' })}
                 disabled={saving}
-                className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
               >
-                {isCollectionFlow ? 'Save Draft Product' : 'Save as Draft'}
+                {saving && saveAction === 'draft' && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save as Draft
+              </button>
+            )}
+            {isDraftEditMode && !isCollectionContext && (
+              <button
+                onClick={() => void triggerSave(true, { action: 'draft', forceStatus: 'DRAFT' })}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
+              >
+                {saving && saveAction === 'draft' && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save Changes
               </button>
             )}
             <button 
               onClick={handleDiscard}
               className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
             >
-              {hasChanges ? 'Discard Changes' : isCollectionFlow ? 'Back to Collection' : 'Cancel'}
+              {hasChanges ? 'Discard Changes' : isCollectionContext ? 'Back to Collection' : 'Cancel'}
             </button>
             <button 
-              onClick={() => handleSave(false)}
+              onClick={() => void triggerSave(false, {
+                action: 'publish',
+                forceStatus: isCollectionContext ? 'ACTIVE' : isDraftEditMode ? 'ACTIVE' : undefined,
+              })}
               disabled={saving}
               className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 text-white text-sm font-semibold rounded-lg shadow-lg shadow-purple-500/20 transition-all flex items-center gap-2"
             >
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isEditMode ? 'Save Changes' : isCollectionFlow ? 'Add to Collection' : 'Create Product'}
+              {saving && saveAction === 'publish' && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isDraftEditMode
+                ? 'Publish Product'
+                : isCollectionContext && isEditMode
+                  ? 'Save to Collection'
+                  : isEditMode
+                  ? 'Save Changes'
+                  : isCollectionFlow
+                    ? 'Add to Collection'
+                    : 'Create Product'}
             </button>
           </div>
         </div>
@@ -1680,12 +1799,12 @@ const EditProduct: React.FC = () => {
         <PriceChangePreviewModal
           isOpen={showPricePreview}
           productName={pricePreviewData.productName}
-          oldPrice={pricePreviewData.oldPrice}
+          currentPrice={pricePreviewData.oldPrice}
           newPrice={pricePreviewData.newPrice}
           affectedCollections={pricePreviewData.affectedCollections}
           onConfirm={handlePriceChangeConfirm}
           onClose={() => setShowPricePreview(false)}
-          loading={saving}
+          isLoading={saving}
         />
       )}
 
@@ -1698,8 +1817,10 @@ const EditProduct: React.FC = () => {
           navigateBack();
         }}
         title="Discard Changes?"
-        message={!isEditMode 
-          ? "You have unsaved changes. Would you like to save this as a draft before leaving?"
+        message={!isEditMode
+          ? isCollectionContext
+            ? 'You have unsaved changes. Go back to collection without adding this product?'
+            : "You have unsaved changes. Would you like to save this as a draft before leaving?"
           : "You have unsaved changes. Are you sure you want to discard them? This action cannot be undone."
         }
       />
