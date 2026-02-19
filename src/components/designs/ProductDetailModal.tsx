@@ -97,6 +97,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const dispatch = useDispatch<AppDispatch>();
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const currentUser = useSelector((s: RootState) => s.user.profile);
 
   // Local state
   const [selectedImage, setSelectedImage] = useState(0);
@@ -177,6 +178,9 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   if (!product) return null;
 
   const isWishlisted = wishlistedIds.has(product.id);
+  const isOwnProduct = Boolean(currentUser?.id && product.brand.id === currentUser.id);
+  const filledHeartEmoji = String.fromCodePoint(0x2764, 0xfe0f);
+  const outlineHeartEmoji = String.fromCodePoint(0x1f5a4);
   const isOnSale = product.salePrice && product.salePrice < product.price;
   const effectivePrice = isOnSale ? product.salePrice! : product.price;
   const discountPercent = isOnSale 
@@ -207,6 +211,10 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   const handleToggleWishlist = async () => {
+    if (isOwnProduct) {
+      toast.info('Brands cannot add their own product to wishlist.');
+      return;
+    }
     if (!isAuth) {
       toast.info('Please sign in to save items');
       return;
@@ -226,6 +234,10 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   const handleAddToCart = async () => {
+    if (isOwnProduct) {
+      toast.info('Brands cannot add their own product to cart.');
+      return;
+    }
     if (!isAuth) {
       toast.info('Please sign in to add items to cart');
       return;
@@ -336,7 +348,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               aria-modal="true"
               aria-label={product?.name ?? 'Product details'}
             >
-              <div ref={dialogRef} tabIndex={-1} className="w-full max-w-6xl max-h-full bg-white dark:bg-gray-950 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+              <div ref={dialogRef} tabIndex={-1} className="w-full max-w-6xl max-h-full neu-modal-surface bg-white dark:bg-gray-950 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
               {/* Close button */}
               <button
                 type="button"
@@ -374,14 +386,17 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       <button
                         type="button"
                         onClick={handleToggleWishlist}
+                        disabled={isOwnProduct}
+                        aria-label={isOwnProduct ? 'Wishlist disabled for your own product' : isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                        title={isOwnProduct ? 'Brands cannot wishlist their own products' : isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                         className={`absolute top-4 right-4 p-3 rounded-full backdrop-blur-md transition-all duration-200 shadow-lg ${
                           isWishlisted
                             ? 'bg-red-500 text-white'
                             : 'bg-white/90 dark:bg-gray-900/90 text-gray-600 dark:text-gray-400 hover:text-red-500'
-                        }`}
+                        } ${isOwnProduct ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <span role="img" aria-hidden="true" className="text-lg leading-none">
-                          {isWishlisted ? '❤️' : '🖤'}
+                          {isWishlisted ? filledHeartEmoji : outlineHeartEmoji}
                         </span>
                       </button>
                     </div>
@@ -596,14 +611,21 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
                     {/* Add to Cart & Buy Now */}
                     <div className="flex gap-3 mb-6">
-                      <button
-                        onClick={handleAddToCart}
-                        disabled={isAddingToCart || isOutOfStock || (product.sizes.length > 0 && !selectedSize)}
-                        className="flex-1 h-14 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-                      >
-                        <ShoppingCart size={20} />
-                        {isAddingToCart ? 'Adding...' : 'Add to Cart'}
-                      </button>
+                      {!isOwnProduct ? (
+                        <button
+                          onClick={handleAddToCart}
+                          disabled={isAddingToCart || isOutOfStock || (product.sizes.length > 0 && !selectedSize)}
+                          title="Add selected item to cart"
+                          className="flex-1 h-14 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                        >
+                          <ShoppingCart size={20} />
+                          {isAddingToCart ? 'Adding...' : 'Add to Cart'}
+                        </button>
+                      ) : (
+                        <div className="flex-1 h-14 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 font-medium flex items-center justify-center">
+                          Your product
+                        </div>
+                      )}
                       
                       {/* Share button with dropdown */}
                       <div className="relative" ref={shareMenuRef}>
@@ -888,14 +910,21 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </div>
                   
                   {/* Add to Cart button */}
-                  <button
-                    onClick={handleAddToCart}
-                    disabled={isAddingToCart || isOutOfStock || (product.sizes.length > 0 && !selectedSize)}
-                    className="flex-1 h-12 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-                  >
-                    <ShoppingCart size={18} />
-                    {isAddingToCart ? 'Adding...' : isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-                  </button>
+                  {!isOwnProduct ? (
+                    <button
+                      onClick={handleAddToCart}
+                      disabled={isAddingToCart || isOutOfStock || (product.sizes.length > 0 && !selectedSize)}
+                      title="Add selected item to cart"
+                      className="flex-1 h-12 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                    >
+                      <ShoppingCart size={18} />
+                      {isAddingToCart ? 'Adding...' : isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+                    </button>
+                  ) : (
+                    <div className="flex-1 h-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 font-medium flex items-center justify-center">
+                      Your product
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

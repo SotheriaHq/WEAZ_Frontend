@@ -2,8 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useDispatch, useSelector } from 'react-redux';
-import Tabs from '../../components/Tabs';
-import ProfileHeader from '../../components/catalog/ProfileHeader';
 import { SavedTab } from './tabs/SavedTab';
 import { PatchesTab } from './tabs/PatchesTab';
 import { OrdersPanel } from './tabs/OrdersPanel';
@@ -29,6 +27,7 @@ interface UserProfile {
   address?: string;
   profileVisibility: 'UNLOCKED' | 'LOCKED';
   location?: string;
+  createdAt?: string;
 }
 
 const normalizeProfile = (raw: any): UserProfile | null => {
@@ -46,7 +45,15 @@ const normalizeProfile = (raw: any): UserProfile | null => {
     address: source.address ?? undefined,
     location: source.location ?? source.address ?? undefined,
     profileVisibility: source.profileVisibility === 'LOCKED' ? 'LOCKED' : 'UNLOCKED',
+    createdAt: typeof source.createdAt === 'string' ? source.createdAt : undefined,
   };
+};
+
+const formatJoinLabel = (value?: string): string | null => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return `Joined ${new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(parsed)}`;
 };
 
 export const EndUserProfile: React.FC = () => {
@@ -108,6 +115,7 @@ export const EndUserProfile: React.FC = () => {
             location: currentUser.address ?? undefined,
             profileVisibility:
               (currentUser as any).profileVisibility === 'LOCKED' ? 'LOCKED' : 'UNLOCKED',
+            createdAt: currentUser.createdAt,
           });
           setError(null);
         } else if (mounted) {
@@ -328,84 +336,137 @@ export const EndUserProfile: React.FC = () => {
   }
 
   const profileUrl = `${window.location.origin}/profile/${profile.id}`;
+  const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || profile.username;
+  const joinLabel = formatJoinLabel(profile.createdAt ?? (isOwner ? currentUser?.createdAt : undefined));
+  const tabs = availableTabs.map((tab) => ({
+    key: tab,
+    icon: tab === 'Saved' ? '🗂️' : '🪡',
+  }));
+  const profileActions: ProfileAction[] = [
+    {
+      key: 'edit',
+      icon: '\u270F\uFE0F',
+      label: 'Edit',
+      onClick: () => setIsQuickEditOpen(true),
+    },
+    {
+      key: 'share',
+      icon: '\uD83D\uDD17',
+      label: 'Share',
+      onClick: handleShareProfile,
+    },
+    {
+      key: 'fits',
+      icon: '\uD83D\uDCCF',
+      label: 'Custom Fits',
+      onClick: () => setIsSizeFitOpen(true),
+    },
+    {
+      key: 'quick-share',
+      icon: '\u2197\uFE0F',
+      label: 'Quick Share',
+      onClick: () => setIsQuickShareOpen(true),
+    },
+    {
+      key: 'qr',
+      icon: '\uD83D\uDDF3',
+      label: 'QR Code',
+      onClick: () => setIsQrOpen(true),
+    },
+    {
+      key: 'update-fits',
+      icon: '\u26A0\uFE0F',
+      label: 'Update Fits',
+      onClick: () => setIsReminderDialogOpen(true),
+      pulse: true,
+      hidden: !sizeFitProfile?.isUpdateDue,
+    },
+  ];
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="max-w-screen-xl mx-auto">
-        <ProfileHeader
-          profile={{
-            id: profile.id,
-            username: profile.username,
-            firstName: profile.firstName,
-            lastName: profile.lastName,
-            profileImage: profile.profileImage,
-            bannerImage: profile.bannerImage,
-            address: profile.address,
-            location: profile.location,
-            isOwner,
-            profileVisibility: profile.profileVisibility,
-          }}
-          showBanner={false}
-        />
+    <div className="relative p-3 sm:p-5 lg:p-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-gradient-to-b from-fuchsia-500/10 via-indigo-500/5 to-transparent dark:from-fuchsia-400/10 dark:via-purple-500/10" />
+      <div className="mx-auto w-full max-w-[1280px]">
+        <section className="rounded-[2rem] border border-gray-200/70 bg-white/70 p-4 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-black/20 sm:p-6">
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex min-w-0 items-center gap-4 sm:gap-5">
+                <div className="relative h-20 w-20 shrink-0 rounded-full border border-white/60 bg-white/60 p-1 shadow-md dark:border-white/15 dark:bg-white/5 sm:h-24 sm:w-24">
+                  {profile.profileImage ? (
+                    <img
+                      src={profile.profileImage}
+                      alt={fullName}
+                      className="h-full w-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 text-2xl font-bold text-gray-800 dark:text-white">
+                      {(profile.firstName?.charAt(0) || profile.username?.charAt(0) || '?').toUpperCase()}
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 right-0 rounded-full border border-white/60 bg-white/90 p-1 text-[11px] leading-none dark:border-white/20 dark:bg-zinc-900">
+                    {profile.profileVisibility === 'LOCKED' ? '🔒' : '🌐'}
+                  </div>
+                </div>
 
-        {isOwner ? (
-          <ProfileActionsBar
-            actions={[
-              {
-                key: 'edit',
-                icon: '\u270F\uFE0F',
-                label: 'Edit Profile',
-                onClick: () => setIsQuickEditOpen(true),
-              },
-              {
-                key: 'share',
-                icon: '\uD83D\uDD17',
-                label: 'Share',
-                onClick: handleShareProfile,
-              },
-              {
-                key: 'fits',
-                icon: '\uD83D\uDCCF',
-                label: 'Custom Fits',
-                onClick: () => setIsSizeFitOpen(true),
-              },
-              {
-                key: 'quick-share',
-                icon: '\u2197\uFE0F',
-                label: 'Quick Share',
-                onClick: () => setIsQuickShareOpen(true),
-              },
-              {
-                key: 'qr',
-                icon: '\uD83D\uDDF3',
-                label: 'QR Code',
-                onClick: () => setIsQrOpen(true),
-              },
-              {
-                key: 'update-fits',
-                icon: '\u26A0\uFE0F',
-                label: 'Update Fits',
-                onClick: () => setIsReminderDialogOpen(true),
-                pulse: true,
-                hidden: !sizeFitProfile?.isUpdateDue,
-              },
-            ] satisfies ProfileAction[]}
-          />
-        ) : null}
-
-        <div className="mt-8">
-          <Tabs tabs={availableTabs} activeTab={activeTab} onTabChange={setActiveTab} className="border-b-0" />
-
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px] lg:grid-cols-[minmax(0,1fr)_340px] gap-6">
-            <div>
-              {activeTab === 'Saved' && isOwner ? (
-                <SavedTab isOwner={isOwner} />
-              ) : (
-                <PatchesTab isOwner={isOwner} profileVisibility={profile.profileVisibility} />
-              )}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h1 className="truncate text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">
+                      {fullName}
+                    </h1>
+                    {isOwner ? (
+                      <span className="inline-flex items-center rounded-full border border-fuchsia-400/40 bg-fuchsia-500/10 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700 dark:text-fuchsia-300">
+                        🏷️ Your Profile
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="truncate text-sm font-medium italic text-gray-500 dark:text-gray-400">
+                    @{profile.username}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
+                    {profile.location ? <span>📍 {profile.location}</span> : null}
+                    {profile.location ? (joinLabel ? <span className="h-1 w-1 rounded-full bg-gray-400/80 dark:bg-gray-500" /> : null) : null}
+                    {joinLabel ? <span>{joinLabel}</span> : null}
+                  </div>
+                </div>
+              </div>
             </div>
-            <OrdersPanel enabled={isOwner} />
+
+            {isOwner ? (
+              <ProfileActionsBar actions={profileActions} />
+            ) : null}
+
+            <div className="mt-2 flex items-center gap-8 border-b border-gray-200/70 px-1 dark:border-white/10">
+              {tabs.map(({ key, icon }) => {
+                const active = activeTab === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActiveTab(key)}
+                    className={`inline-flex items-center gap-2 pb-3.5 text-sm font-semibold transition-colors sm:text-base ${
+                      active
+                        ? 'border-b-2 border-fuchsia-500 text-gray-900 dark:text-white'
+                        : 'border-b-2 border-transparent text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                    }`}
+                  >
+                    <span>{icon}</span>
+                    <span>{key}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
+        </section>
+
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div>
+            {activeTab === 'Saved' ? (
+              isOwner ? <SavedTab isOwner={isOwner} /> : <PatchesTab isOwner={isOwner} profileVisibility={profile.profileVisibility} />
+            ) : (
+              <PatchesTab isOwner={isOwner} profileVisibility={profile.profileVisibility} />
+            )}
+          </div>
+          {isOwner ? <OrdersPanel /> : null}
         </div>
       </div>
 
@@ -485,4 +546,3 @@ export const EndUserProfile: React.FC = () => {
     </div>
   );
 };
-

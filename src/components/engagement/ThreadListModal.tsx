@@ -43,7 +43,7 @@ const ThreadListModal: React.FC<Props> = ({ open, onClose, contentId, contentTyp
         <div
           ref={dialogRef}
           tabIndex={-1}
-          className="glass-panel relative w-full max-w-md p-4 rounded-xl"
+          className="glass-panel neu-modal-surface relative w-full max-w-md p-4 rounded-xl"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-3">

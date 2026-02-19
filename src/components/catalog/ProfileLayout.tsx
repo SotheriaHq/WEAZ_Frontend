@@ -87,7 +87,7 @@ export const ProfileLayout: React.FC = () => {
     if (loading && !user) {
       return (
           <div className="min-h-screen bg-[color:var(--surface-primary)] text-gray-900 dark:text-white">
-            {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen) && <Sidebar />}
+            {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
             <Navbar />
             <main
               className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out"
@@ -121,7 +121,7 @@ export const ProfileLayout: React.FC = () => {
   if (isVisitorRoute && visitorLoading) {
     return (
       <div className="min-h-screen bg-[color:var(--surface-primary)] text-gray-900 dark:text-white">
-        {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen) && <Sidebar />}
+        {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
         <Navbar />
         <main
           className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out"
@@ -147,7 +147,7 @@ export const ProfileLayout: React.FC = () => {
 
   return (
       <div className="min-h-screen bg-[color:var(--surface-primary)] text-gray-900 dark:text-white">
-        {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen) && <Sidebar />}
+        {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
         <Navbar />
         <main
           className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out"

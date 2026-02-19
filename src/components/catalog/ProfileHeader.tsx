@@ -30,6 +30,9 @@ interface ProfileHeaderProps {
   patchLoading?: boolean;
   onTogglePatch?: () => void;
   showBanner?: boolean;
+  canEdit?: boolean;
+  onEditProfile?: () => void;
+  onShareProfile?: () => void;
 }
 
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
@@ -45,6 +48,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   patchLoading = false,
   onTogglePatch,
   showBanner = true,
+  canEdit = false,
+  onEditProfile,
+  onShareProfile,
 }) => {
   const [bannerFailed, setBannerFailed] = useState(false);
   const hasBannerImage = showBanner && Boolean(profile.bannerImage) && !bannerFailed;
@@ -228,6 +234,28 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 <Lock className="h-3.5 w-3.5" aria-hidden="true" />
                 Private
               </span>
+            ) : null}
+            {canEdit && onEditProfile ? (
+              <button
+                type="button"
+                onClick={onEditProfile}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-fuchsia-500 text-lg shadow-lg transition hover:scale-105 hover:bg-fuchsia-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300"
+                aria-label="Quick edit profile"
+                title="Quick edit"
+              >
+                <span aria-hidden="true">✏️</span>
+              </button>
+            ) : null}
+            {onShareProfile ? (
+              <button
+                type="button"
+                onClick={onShareProfile}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500 text-lg text-white shadow-lg transition hover:scale-105 hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                aria-label="Share profile"
+                title="Share profile"
+              >
+                <span aria-hidden="true">🔗</span>
+              </button>
             ) : null}
             {showPatchAction && onTogglePatch ? (
               <button

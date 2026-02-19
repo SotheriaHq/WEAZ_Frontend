@@ -161,7 +161,7 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
         />
 
         {/* Modal */}
-        <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-5xl bg-white/95 dark:bg-slate-900/80 backdrop-blur-xl border border-gray-200/50 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
+        <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-5xl neu-modal-surface bg-white/95 dark:bg-slate-900/80 backdrop-blur-xl border border-gray-200/50 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
         {/* Close Button */}
         <button
           onClick={onClose}

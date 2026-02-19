@@ -112,7 +112,7 @@ const ArchiveProductModal: React.FC<ArchiveProductModalProps> = ({
       />
       
       {/* Modal */}
-      <div className="relative w-full max-w-md mx-4 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
+      <div className="relative w-full max-w-md mx-4 neu-modal-surface bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
         {/* Header */}
         <div className="p-6 border-b border-gray-100 dark:border-white/10">
           <div className="flex items-start gap-4">

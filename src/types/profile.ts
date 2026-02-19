@@ -1,6 +1,7 @@
 // Collection Types
 export interface CollectionDto {
   id: string;
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   name: string;
   description?: string;
   ownerId: string;

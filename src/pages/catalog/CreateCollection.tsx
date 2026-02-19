@@ -46,6 +46,7 @@ const CreateCollectionInner: React.FC = () => {
   const [categoryId, setCategoryId] = useState<string>('');
   const [type, setType] = useState<'MALE' | 'FEMALE' | 'EVERYBODY'>('EVERYBODY');
   const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+  const [collectionCreatedAt, setCollectionCreatedAt] = useState<Date | null>(null);
   
   // Track original items for deletion in edit mode
   const originalItemIds = useRef<Set<string>>(new Set());
@@ -65,16 +66,25 @@ const CreateCollectionInner: React.FC = () => {
   const navigate = useNavigate();
 
   const disabled = isSubmitting || isUploading || readOnly;
+  const titleDescriptionLocked = isEditMode && collectionCreatedAt
+    ? Date.now() > collectionCreatedAt.getTime() + 30 * 24 * 60 * 60 * 1000
+    : false;
   const picker = useFilePicker({ accept: ['image/*', 'video/*'], maxFiles: 20, onFiles: mediaStore.addFiles, disabled: disabled || isEditMode });
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    const loadTags = async () => {
       try {
         const s = await TagsApi.getSuggestions(80);
-        if (!mounted) return;
-        setTagSuggestions(s);
-        // Load categories for creation options
+        if (mounted) setTagSuggestions(Array.isArray(s) ? s : []);
+      } catch (error) {
+        console.warn('Failed to load tag suggestions', error);
+        if (mounted) setTagSuggestions([]);
+      }
+    };
+
+    const loadCategories = async () => {
+      try {
         const cats = await brandApi.getCategories();
         if (mounted && Array.isArray(cats)) {
           const mapped = cats.map((c) => ({ id: c.id, slug: c.slug, name: c.name }));
@@ -87,64 +97,79 @@ const CreateCollectionInner: React.FC = () => {
             );
           }
         }
-        
-        // If edit mode, fetch collection details and start draft session
-        if (isEditMode && id) {
-            // Start draft session to check for conflicts
-            try {
-              const session = await startDraftSession(id);
-              if (mounted) {
-                setSessionToken(session.sessionToken);
-                if (session.hasConflict && session.conflictDetails) {
-                  setConflictDetails({
-                    deviceName: session.conflictDetails.deviceName,
-                    deviceType: session.conflictDetails.deviceType,
-                    startedAt: new Date(session.conflictDetails.startedAt),
-                  });
-                  setShowConflictModal(true);
-                }
-              }
-            } catch (e) {
-              // If session fails, still load collection data
-              console.warn('Failed to start draft session', e);
-            }
-
-            const d = await brandApi.getCollectionDetail(id);
-            if (mounted && d) {
-                setTitle(d.title || '');
-                setDescription(d.description || '');
-                setMinPrice(d.minPrice ? String(d.minPrice) : '');
-                setMaxPrice(d.maxPrice ? String(d.maxPrice) : '');
-                setIsAvailableInStore(!!d.isAvailableInStore);
-                setSelectedTags(d.tags || []);
-                setCategoryId(d.categoryId || '');
-                setType(d.type || 'EVERYBODY');
-                setVisibility(d.visibility || 'PUBLIC');
-                
-                // Populate media
-                if (d.medias && Array.isArray(d.medias)) {
-                    const items: MediaItem[] = await Promise.all(d.medias.map(async (m: any) => {
-                        const fileId = m.file?.id || m.fileId;
-                        const url = await brandApi.getSignedFileUrl(fileId);
-                        originalItemIds.current.add(m.id);
-                        return {
-                            id: m.id,
-                            file: undefined,
-                            previewUrl: url || '',
-                            kind: m.type === 'VIDEO' ? 'video' : 'image',
-                            remoteId: m.id
-                        };
-                    }));
-                    mediaStore.set(items);
-                }
-            }
-        }
+      } catch (error) {
+        console.warn('Failed to load categories', error);
+        if (mounted) setCategories([]);
       } finally {
-        if (mounted) {
-          setLoadingCategories(false);
-        }
+        if (mounted) setLoadingCategories(false);
       }
-    })();
+    };
+
+    const loadEditDetail = async () => {
+      if (!isEditMode || !id) return;
+      try {
+        // Start draft session to check for conflicts
+        try {
+          const session = await startDraftSession(id);
+          if (mounted) {
+            setSessionToken(session.sessionToken);
+            if (session.hasConflict && session.conflictDetails) {
+              setConflictDetails({
+                deviceName: session.conflictDetails.deviceName,
+                deviceType: session.conflictDetails.deviceType,
+                startedAt: new Date(session.conflictDetails.startedAt),
+              });
+              setShowConflictModal(true);
+            }
+          }
+        } catch (e) {
+          // If session fails, still load collection data
+          console.warn('Failed to start draft session', e);
+        }
+
+        const d = await brandApi.getCollectionDetail(id);
+        if (mounted && d) {
+          setTitle(d.title || '');
+          setDescription(d.description || '');
+          setMinPrice(d.minPrice ? String(d.minPrice) : '');
+          setMaxPrice(d.maxPrice ? String(d.maxPrice) : '');
+          setIsAvailableInStore(!!d.isAvailableInStore);
+          setSelectedTags(Array.isArray(d.tags) ? d.tags : []);
+          setCategoryId(d.categoryId || '');
+          setType(d.type || 'EVERYBODY');
+          setVisibility(d.visibility || 'PUBLIC');
+          setCollectionCreatedAt(d.createdAt ? new Date(d.createdAt) : null);
+
+          // Populate media
+          if (d.medias && Array.isArray(d.medias)) {
+            const mediaResults = await Promise.all(
+              d.medias.map(async (m: any) => {
+                const fileId = m.file?.id || m.fileId;
+                const remoteUrl = typeof m.file?.s3Url === 'string' ? m.file.s3Url : '';
+                const signedUrl = fileId ? await brandApi.getSignedFileUrl(fileId) : null;
+                originalItemIds.current.add(m.id);
+                const previewUrl = signedUrl || remoteUrl;
+                if (!previewUrl) return null;
+                return {
+                  id: m.id,
+                  file: undefined,
+                  previewUrl,
+                  kind: m.type === 'VIDEO' ? 'video' : 'image',
+                  remoteId: m.id,
+                } as MediaItem;
+              }),
+            );
+            mediaStore.set(mediaResults.filter(Boolean) as MediaItem[]);
+          }
+        }
+      } catch (error: any) {
+        console.error(error);
+        toast.error(error?.response?.data?.message ?? 'Failed to load design for editing.');
+      }
+    };
+
+    void Promise.all([loadTags(), loadCategories(), loadEditDetail()]);
+
     return () => {
       mounted = false;
     };
@@ -179,7 +204,7 @@ const CreateCollectionInner: React.FC = () => {
           // Update mode
           // 1. Update metadata
           await brandApi.updateCollection(id, {
-              name: title, // API expects 'name' but DTO might map it
+              title,
               description,
               minPrice: parsedMinPrice,
               maxPrice: parsedMaxPrice,
@@ -292,7 +317,7 @@ const CreateCollectionInner: React.FC = () => {
           value={title} 
           onChange={(e) => setTitle(e.target.value)} 
           placeholder="e.g., Summer Breeze '24" 
-          disabled={disabled} 
+          disabled={disabled || titleDescriptionLocked} 
           variant="glass"
           inputClassName="border-0 focus:ring-0"
         />
@@ -302,9 +327,14 @@ const CreateCollectionInner: React.FC = () => {
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Describe the inspiration, materials, and feel of your design."
           rows={4}
-          disabled={disabled}
+          disabled={disabled || titleDescriptionLocked}
           variant="glass"
         />
+        {titleDescriptionLocked && (
+          <p className="rounded-lg border border-amber-300/60 bg-amber-50/80 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+            Title and description can only be edited within 30 days of creation.
+          </p>
+        )}
         {/* Category */}
         <div className="space-y-1">
           <UniversalSelect

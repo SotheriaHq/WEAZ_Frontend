@@ -47,7 +47,7 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({ open, src, alt = 
             aria-modal="true"
             aria-label="Image preview"
             tabIndex={-1}
-            className="relative w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-3xl shadow-2xl outline-none"
+            className="relative w-full max-w-3xl max-h-[90vh] neu-modal-surface overflow-hidden rounded-3xl shadow-2xl outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <button

@@ -47,6 +47,7 @@ const CreateCollectionInner: React.FC = () => {
   const [categoryId, setCategoryId] = useState<string>('');
   const [type, setType] = useState<'MALE' | 'FEMALE' | 'EVERYBODY'>('EVERYBODY');
   const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+  const [collectionCreatedAt, setCollectionCreatedAt] = useState<Date | null>(null);
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,6 +86,11 @@ const CreateCollectionInner: React.FC = () => {
   const { user, fetchCollections } = useBrandProfile();
 
   const disabled = isSubmitting || isUploading;
+  const titleDescriptionLocked = useMemo(() => {
+    if (!isEditMode || !collectionCreatedAt) return false;
+    const lockAtMs = collectionCreatedAt.getTime() + 30 * 24 * 60 * 60 * 1000;
+    return Date.now() > lockAtMs;
+  }, [collectionCreatedAt, isEditMode]);
   const picker = useFilePicker({
     accept: ['image/*', 'video/*'],
     maxFiles: 20,
@@ -99,62 +105,82 @@ const CreateCollectionInner: React.FC = () => {
   useEffect(() => {
     let mounted = true;
 
-    (async () => {
+    const loadTagSuggestions = async () => {
       try {
         const s = await TagsApi.getSuggestions(80);
-        if (mounted) setTagSuggestions(s);
+        if (mounted) setTagSuggestions(Array.isArray(s) ? s : []);
+      } catch (error) {
+        console.warn('Failed to load tag suggestions', error);
+        if (mounted) setTagSuggestions([]);
+      }
+    };
 
+    const loadCategories = async () => {
+      try {
         const cats = await brandApi.getCategories();
-        if (mounted && Array.isArray(cats)) {
-          const mapped = cats.map((c) => ({ id: c.id, slug: c.slug, name: c.name }));
-          setCategories(mapped);
-          if (mapped.length) {
-            setCategoryId((prev) =>
-              prev && mapped.some((category) => category.id === prev)
-                ? prev
-                : mapped[0].id,
-            );
-          }
-        }
-
-        if (isEditMode && id) {
-          const d = await brandApi.getCollectionDetail(id);
-          if (mounted && d) {
-            setTitle(d.title || '');
-            setDescription(d.description || '');
-            setMinPrice(d.minPrice ? String(d.minPrice) : '');
-            setMaxPrice(d.maxPrice ? String(d.maxPrice) : '');
-            setSelectedTags(d.tags || []);
-            setCategoryId(d.categoryId || '');
-            setType(d.type || 'EVERYBODY');
-            setVisibility(d.visibility || 'PUBLIC');
-
-            if (d.medias && Array.isArray(d.medias)) {
-              const items: MediaItem[] = await Promise.all(
-                d.medias.map(async (m: any) => {
-                  const fileId = m.file?.id || m.fileId;
-                  const url = await brandApi.getSignedFileUrl(fileId);
-                  originalItemIds.current.add(m.id);
-                  return {
-                    id: m.id,
-                    file: undefined,
-                    previewUrl: url || '',
-                    kind: m.type === 'VIDEO' ? 'video' : 'image',
-                    remoteId: m.id,
-                  };
-                })
-              );
-              // set media items into the global media store
-              mediaStore.set(items);
-            }
-          }
+        if (!mounted || !Array.isArray(cats)) return;
+        const mapped = cats.map((c) => ({ id: c.id, slug: c.slug, name: c.name }));
+        setCategories(mapped);
+        if (mapped.length) {
+          setCategoryId((prev) =>
+            prev && mapped.some((category) => category.id === prev) ? prev : mapped[0].id,
+          );
         }
       } catch (error) {
-        console.error(error);
+        console.warn('Failed to load categories', error);
+        if (mounted) setCategories([]);
       } finally {
         if (mounted) setLoadingCategories(false);
       }
-    })();
+    };
+
+    const loadCollectionDetail = async () => {
+      if (!isEditMode || !id) return;
+      try {
+        const d = await brandApi.getCollectionDetail(id);
+        if (!mounted || !d) return;
+        setTitle(d.title || '');
+        setDescription(d.description || '');
+        setMinPrice(d.minPrice ? String(d.minPrice) : '');
+        setMaxPrice(d.maxPrice ? String(d.maxPrice) : '');
+        setSelectedTags(Array.isArray(d.tags) ? d.tags : []);
+        setCategoryId(d.categoryId || '');
+        setType(d.type || 'EVERYBODY');
+        setVisibility(d.visibility || 'PUBLIC');
+        setCollectionCreatedAt(d.createdAt ? new Date(d.createdAt) : null);
+
+        if (d.medias && Array.isArray(d.medias)) {
+          const mediaResults = await Promise.all(
+            d.medias.map(async (m: any) => {
+              const fileId = m.file?.id || m.fileId;
+              const remoteUrl = typeof m.file?.s3Url === 'string' ? m.file.s3Url : '';
+              const signedUrl = fileId ? await brandApi.getSignedFileUrl(fileId) : null;
+              originalItemIds.current.add(m.id);
+              const previewUrl = signedUrl || remoteUrl;
+              if (!previewUrl) return null;
+              return {
+                id: m.id,
+                file: undefined,
+                previewUrl,
+                kind: m.type === 'VIDEO' ? 'video' : 'image',
+                remoteId: m.id,
+              } as MediaItem;
+            }),
+          );
+          const items = mediaResults.filter(Boolean) as MediaItem[];
+          mediaStore.set(items);
+        }
+      } catch (error: any) {
+        console.error(error);
+        toast.error(error?.response?.data?.message ?? 'Failed to load design for editing.');
+      }
+    };
+
+    void Promise.all([
+      loadTagSuggestions(),
+      loadCategories(),
+      loadCollectionDetail(),
+    ]);
 
     return () => {
       mounted = false;
@@ -732,7 +758,7 @@ const CreateCollectionInner: React.FC = () => {
                   value={title}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
                   placeholder="e.g., Summer Breeze '24"
-                  disabled={disabled}
+                  disabled={disabled || titleDescriptionLocked}
                   variant="glass"
                   required
                 />
@@ -746,13 +772,18 @@ const CreateCollectionInner: React.FC = () => {
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Inspired by the warm coastal breeze of Lagos..."
                     rows={4}
-                    disabled={disabled}
+                    disabled={disabled || titleDescriptionLocked}
                     className="w-full px-4 py-3 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none"
                   />
                   <p className="text-right text-xs text-gray-600 dark:text-gray-400">
                     {description.length} / 500 characters
                   </p>
                 </div>
+                {titleDescriptionLocked && (
+                  <p className="rounded-lg border border-amber-300/60 bg-amber-50/80 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                    Title and description can only be edited within 30 days of creation.
+                  </p>
+                )}
 
                 <UniversalSelect
                   label="Category"

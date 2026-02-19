@@ -130,7 +130,7 @@ export const DraftConflictWarningModal: React.FC<DraftConflictWarningModalProps>
         <div 
           ref={dialogRef} 
           tabIndex={-1}
-          className="relative w-full max-w-md bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden outline-none"
+          className="relative w-full max-w-md neu-modal-surface bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden outline-none"
         >
           {/* Warning Header */}
           <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-800/30 px-6 py-4">

@@ -137,7 +137,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
         aria-modal="true"
         aria-label={title}
       >
-        <div ref={dialogRef} tabIndex={-1} className="w-full max-w-2xl glass-panel p-4">
+        <div ref={dialogRef} tabIndex={-1} className="w-full max-w-2xl glass-panel neu-modal-surface p-4">
         <header className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
           <div className="flex items-center gap-2">

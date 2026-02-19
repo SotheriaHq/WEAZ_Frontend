@@ -226,7 +226,7 @@ export const PriceChangePreviewModal: React.FC<PriceChangePreviewModalProps> = (
         <div 
           ref={dialogRef}
           tabIndex={-1}
-          className="relative w-full max-w-lg bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden outline-none flex flex-col max-h-[85vh]"
+          className="relative w-full max-w-lg neu-modal-surface bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden outline-none flex flex-col max-h-[85vh]"
         >
           {/* Header */}
           <div className="flex-shrink-0 bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 px-6 py-4">

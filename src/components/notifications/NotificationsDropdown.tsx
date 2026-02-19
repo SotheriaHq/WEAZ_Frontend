@@ -44,7 +44,6 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   const { items, hasNextPage, endCursor, loadingList, unreadCount, error } = useSelector(
     (s: RootState) => s.notifications
   );
-  const user = useSelector((s: RootState) => s.user.profile);
   const isAuthenticated = useSelector((s: RootState) => s.user.isAuthenticated);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -299,38 +298,25 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         aria-label="Notifications"
         tabIndex={-1}
       >
-      {/* Header */}
-      <div className="glass-menu-soft px-5 py-4 border-b border-white/20 dark:border-white/10">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-2xl bg-[color:var(--brand-primary)]/15 flex items-center justify-center border border-white/20 dark:border-white/10">
-                <Bell className="h-5 w-5 text-[color:var(--brand-primary)]" aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-[color:var(--text-primary)]">Notifications</h3>
-                  {unreadCount > 0 && (
-                    <span className="bg-[color:var(--brand-primary)] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      {unreadCount}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-[color:var(--text-secondary)] truncate">Stay updated with your activity</p>
-              </div>
+      <div className="px-4 pt-4 pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="inline-flex min-w-0 items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-[color:var(--brand-primary)]/15 flex items-center justify-center border border-white/20 dark:border-white/10">
+              <Bell className="h-4.5 w-4.5 text-[color:var(--brand-primary)]" aria-hidden="true" />
             </div>
+            <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">
+              Notifications {unreadCount > 0 ? `(${unreadCount})` : ''}
+            </p>
           </div>
-
-          <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-1.5">
             <button
               onClick={handleMarkAllRead}
               disabled={unreadCount === 0}
-              className="text-xs font-semibold text-[color:var(--brand-primary)] hover:opacity-80 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+              className="text-[11px] font-semibold text-[color:var(--brand-primary)] hover:opacity-80 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
             >
               <Check className="h-3.5 w-3.5" aria-hidden="true" />
-              Mark all as read
+              Read
             </button>
-
             <button
               onClick={handleSettings}
               className="p-2 rounded-full hover:bg-white/10 transition-colors"
@@ -340,11 +326,10 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
             </button>
           </div>
         </div>
-
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto sleek-scrollbar p-4" aria-live="polite">
+      <div className="flex-1 overflow-y-auto sleek-scrollbar px-4 pb-4" aria-live="polite">
         {/* Loading State */}
         {showLoading && (
           <div className="space-y-2">
@@ -505,29 +490,6 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         )}
       </div>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-white/20 dark:border-white/10 glass-menu-soft">
-        <div className="flex flex-col sm:flex-row items-center gap-2">
-          <button
-            className="w-full sm:w-auto btn-frost-primary btn-tight-md"
-            onClick={() => {
-              navigate('/settings?tab=notifications');
-              onClose();
-            }}
-          >
-            View All Notifications
-          </button>
-          <button
-            className="w-full sm:w-auto btn-frost-outline btn-tight-md"
-            onClick={handleSettings}
-          >
-            Notification Settings
-          </button>
-          <span className="hidden sm:block ml-auto text-[11px] text-[color:var(--text-secondary)]">
-            {user?.username || user?.firstName || 'Account'} {normalizedItems.length} shown
-          </span>
-        </div>
-      </div>
       </div>
     </OverlayPortal>
   );

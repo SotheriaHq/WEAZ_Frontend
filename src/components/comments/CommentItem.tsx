@@ -114,16 +114,20 @@ const CommentItem: React.FC<Props> = ({ comment, onThread, onReply, onDelete, cu
             {(() => {
               const username = comment.user?.username;
               const full = `${comment.user?.firstName ?? ''} ${comment.user?.lastName ?? ''}`.trim();
-              const display = (username ?? full) || 'User';
-              console.log('[CommentItem] Rendering comment:', { commentId: comment.id, display, createdAt: comment.createdAt });
-              return display;
+              return (username ?? full) || 'User';
             })()}
           </span>
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-gray-500 text-[11px]">
               {formatRelativeTime(comment.createdAt)}
             </span>
-            <button type="button" onClick={toggle} className={`flex items-center gap-1 ${threaded ? 'text-indigo-600' : 'text-gray-600'}`}>
+            <button
+              type="button"
+              onClick={toggle}
+              title={threaded ? 'Unthread this comment' : 'Thread this comment'}
+              aria-label={threaded ? 'Unthread this comment' : 'Thread this comment'}
+              className={`flex items-center gap-1 ${threaded ? 'text-indigo-600' : 'text-gray-600'}`}
+            >
               <Link2 size={13} />
               <span className="text-[11px]">{threadCount}</span>
             </button>

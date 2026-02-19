@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { apiClient } from '@/api/httpClient';
@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import SearchField from '@/components/SearchField';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { unwrapApiResponse } from '@/types/auth';
+import type { CollectionDto } from '@/types/profile';
 import { useDropdownManager } from '@/context/DropdownManagerContext';
 import {
   DeleteProductModal,
@@ -24,6 +25,9 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import StoreEmptyState, { type EmptyStateType } from '@/components/designs/StoreEmptyState';
 
 type StudioStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'DELETED';
+type OutletView = 'products' | 'collections';
+type CollectionStatusFilter = 'all' | 'published' | 'draft' | 'archived';
+type CollectionSortBy = 'newest' | 'oldest' | 'title_asc' | 'title_desc' | 'items_desc';
 
 interface BackendProduct {
   id: string;
@@ -58,6 +62,23 @@ interface ProductsResponse {
 interface CollectionOption {
   id: string;
   name: string;
+  description?: string;
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  isAvailableInStore?: boolean;
+  coverImage?: string;
+  coverFileId?: string;
+  itemCount?: number;
+  updatedAt?: string;
+  createdAt?: string;
+}
+
+interface CollectionGalleryImage {
+  id: string;
+  src: string | null;
+  fileId: string | null;
+  alt: string;
+  productName?: string;
+  productId?: string;
 }
 
 interface StoreProductsPanelProps {
@@ -86,6 +107,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   draftCollectionsLoading = false,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useSelector((state: RootState) => state.user.profile);
   const dropdownManager = useDropdownManager();
 
@@ -120,12 +142,46 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   // Expandable search (emoji pattern reused from CatalogShopTab)
   const [searchCollapsed, setSearchCollapsed] = useState(true);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const [collectionSearchCollapsed, setCollectionSearchCollapsed] = useState(true);
+  const collectionSearchContainerRef = useRef<HTMLDivElement>(null);
 
   // Collapsible/expandable command groups
   const [showFiltersMenu, setShowFiltersMenu] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showDrafts, setShowDrafts] = useState(false);
   const filtersMenuRef = useRef<HTMLDivElement>(null);
+  const [outletView, setOutletView] = useState<OutletView>(
+    new URLSearchParams(location.search).get('view') === 'collections' ? 'collections' : 'products',
+  );
+  const quickCollectionsRef = useRef<HTMLDivElement | null>(null);
+
+  const [collectionSearch, setCollectionSearch] = useState('');
+  const [collectionStatusFilter, setCollectionStatusFilter] = useState<CollectionStatusFilter>('all');
+  const [collectionSortBy, setCollectionSortBy] = useState<CollectionSortBy>('newest');
+  const [collectionPage, setCollectionPage] = useState(1);
+  const [collectionLimit, setCollectionLimit] = useState(12);
+  const [collectionBusyId, setCollectionBusyId] = useState<string | null>(null);
+  const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
+  const [editingCollectionTitle, setEditingCollectionTitle] = useState('');
+  const [editingCollectionDescription, setEditingCollectionDescription] = useState('');
+  const [discardingCollectionId, setDiscardingCollectionId] = useState<string | null>(null);
+  const [collectionConfirm, setCollectionConfirm] = useState<{
+    mode: 'archive' | 'unarchive' | 'delete';
+    collection: CollectionOption;
+  } | null>(null);
+  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+  const [activeCollectionProducts, setActiveCollectionProducts] = useState<BackendProduct[]>([]);
+  const [activeCollectionProductsLoading, setActiveCollectionProductsLoading] = useState(false);
+  const [activeCollectionProductsPage, setActiveCollectionProductsPage] = useState(1);
+  const [activeCollectionProductsLimit, setActiveCollectionProductsLimit] = useState(8);
+  const [activeCollectionProductsTotal, setActiveCollectionProductsTotal] = useState(0);
+  const [deleteAllCollectionsConfirmOpen, setDeleteAllCollectionsConfirmOpen] = useState(false);
+  const [deletingAllCollections, setDeletingAllCollections] = useState(false);
+  const [collectionGalleryOpen, setCollectionGalleryOpen] = useState(false);
+  const [collectionGalleryLoading, setCollectionGalleryLoading] = useState(false);
+  const [collectionGalleryImages, setCollectionGalleryImages] = useState<CollectionGalleryImage[]>([]);
+  const [collectionGalleryIndex, setCollectionGalleryIndex] = useState(0);
+  const [collectionGallerySourceName, setCollectionGallerySourceName] = useState('');
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -172,10 +228,134 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     return items;
   }, [filterCollection, filterStatus, filterStock, products, searchQuery]);
 
+  const showDraftCollectionsInProductArea =
+    !loading && filterStatus === 'draft' && filteredProducts.length === 0 && draftCollections.length > 0;
+
+  const previewCollections = useMemo(
+    () => collections.filter((collection) => collection.isAvailableInStore !== false),
+    [collections],
+  );
+
+  const managedCollections = useMemo(() => {
+    let items = [...collections];
+    const q = collectionSearch.trim().toLowerCase();
+
+    if (q) {
+      items = items.filter((collection) => {
+        const name = (collection.name || '').toLowerCase();
+        const description = (collection.description || '').toLowerCase();
+        return name.includes(q) || description.includes(q) || collection.id.toLowerCase().includes(q);
+      });
+    }
+
+    if (collectionStatusFilter !== 'all') {
+      items = items.filter((collection) => {
+        const status = String(collection.status || '').toUpperCase();
+        if (collectionStatusFilter === 'published') return status === 'PUBLISHED';
+        if (collectionStatusFilter === 'draft') return status === 'DRAFT';
+        if (collectionStatusFilter === 'archived') return status === 'ARCHIVED';
+        return true;
+      });
+    }
+
+    items.sort((a, b) => {
+      if (collectionSortBy === 'title_asc') return a.name.localeCompare(b.name);
+      if (collectionSortBy === 'title_desc') return b.name.localeCompare(a.name);
+      if (collectionSortBy === 'items_desc') return (b.itemCount ?? 0) - (a.itemCount ?? 0);
+
+      const aDate = new Date(collectionSortBy === 'oldest' ? a.createdAt || 0 : a.updatedAt || a.createdAt || 0).getTime();
+      const bDate = new Date(collectionSortBy === 'oldest' ? b.createdAt || 0 : b.updatedAt || b.createdAt || 0).getTime();
+      return collectionSortBy === 'oldest' ? aDate - bDate : bDate - aDate;
+    });
+
+    return items;
+  }, [collectionSearch, collectionSortBy, collectionStatusFilter, collections]);
+
+  const managedCollectionsTotal = managedCollections.length;
+  const managedCollectionsPages = Math.max(1, Math.ceil(managedCollectionsTotal / collectionLimit));
+  const pagedManagedCollections = useMemo(() => {
+    const start = (collectionPage - 1) * collectionLimit;
+    return managedCollections.slice(start, start + collectionLimit);
+  }, [collectionLimit, collectionPage, managedCollections]);
+  const activeCollection = useMemo(
+    () => collections.find((collection) => collection.id === activeCollectionId) ?? null,
+    [activeCollectionId, collections],
+  );
+  const activeCollectionProductsPages = Math.max(
+    1,
+    Math.ceil(activeCollectionProductsTotal / activeCollectionProductsLimit),
+  );
+  const collectionConfirmBusy = Boolean(
+    collectionConfirm && collectionBusyId === collectionConfirm.collection.id,
+  );
+  const selectedCollectionGalleryImage = collectionGalleryImages[collectionGalleryIndex] ?? null;
+
   useEffect(() => {
     setCursorByPage({});
     setPage(1);
   }, [filterCollection, filterStatus, limit, searchQuery, user?.id]);
+
+  useEffect(() => {
+    setCollectionPage(1);
+  }, [collectionLimit, collectionSearch, collectionSortBy, collectionStatusFilter]);
+
+  useEffect(() => {
+    if (collectionPage > managedCollectionsPages) {
+      setCollectionPage(managedCollectionsPages);
+    }
+  }, [collectionPage, managedCollectionsPages]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const isCollectionsRoute =
+      params.get('view') === 'collections' || Boolean(params.get('collectionId'));
+    setOutletView(isCollectionsRoute ? 'collections' : 'products');
+
+    if (!isCollectionsRoute) {
+      setActiveCollectionId(null);
+      return;
+    }
+
+    const routeCollectionId = params.get('collectionId');
+    if (routeCollectionId) {
+      setActiveCollectionId(routeCollectionId);
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    if (outletView !== 'products') return;
+    if (!quickCollectionsRef.current) return;
+    if (previewCollections.length === 0) return;
+
+    const scroller = quickCollectionsRef.current;
+    let raf = 0;
+    let lastTick = performance.now();
+    const speed = 0.03;
+
+    const tick = (now: number) => {
+      const elapsed = now - lastTick;
+      lastTick = now;
+      scroller.scrollLeft += elapsed * speed;
+
+      if (scroller.scrollLeft >= scroller.scrollWidth / 2) {
+        scroller.scrollLeft = 0;
+      }
+
+      raf = window.requestAnimationFrame(tick);
+    };
+
+    raf = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(raf);
+  }, [outletView, previewCollections.length]);
+
+  useEffect(() => {
+    setActiveCollectionProductsPage(1);
+  }, [activeCollectionId]);
+
+  useEffect(() => {
+    if (activeCollectionId) return;
+    setCollectionGalleryOpen(false);
+  }, [activeCollectionId]);
 
   useEffect(() => {
     let mounted = true;
@@ -192,10 +372,17 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         const collectionsRes = await brandApi.getCollections(user.id, { visibility: 'all' });
         if (!mounted) return;
         const mappedCollections: CollectionOption[] = (collectionsRes || [])
-          .filter((c: any) => Boolean(c?.isAvailableInStore))
-          .map((c: any) => ({
-          id: String(c.id),
-          name: String(c.title || c.name || 'Untitled collection'),
+          .map((c: CollectionDto) => ({
+            id: String(c.id),
+            name: String(c.title || c.name || 'Untitled collection'),
+            description: typeof c.description === 'string' ? c.description : '',
+            status: c.status,
+            isAvailableInStore: c.isAvailableInStore,
+            coverImage: typeof c.coverImage === 'string' ? c.coverImage : undefined,
+            coverFileId: typeof c.coverFileId === 'string' ? c.coverFileId : undefined,
+            itemCount: typeof c.itemCount === 'number' ? c.itemCount : c.postsCount,
+            updatedAt: typeof c.updatedAt === 'string' ? c.updatedAt : undefined,
+            createdAt: typeof c.createdAt === 'string' ? c.createdAt : undefined,
           }));
         setCollections(mappedCollections);
       } catch (e) {
@@ -213,9 +400,47 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   }, [user?.id]);
 
   useEffect(() => {
+    if (!Array.isArray(draftCollections) || draftCollections.length === 0) return;
+
+    setCollections((prev) => {
+      const byId = new Map(prev.map((collection) => [collection.id, collection]));
+      draftCollections.forEach((draft: any) => {
+        if (!draft?.id) return;
+        const draftId = String(draft.id);
+        if (byId.has(draftId)) return;
+
+        byId.set(draftId, {
+          id: draftId,
+          name: String(draft.title || draft.name || 'Untitled collection'),
+          description: typeof draft.description === 'string' ? draft.description : '',
+          status: 'DRAFT',
+          isAvailableInStore: false,
+          coverImage: typeof draft.coverImage === 'string' ? draft.coverImage : undefined,
+          coverFileId: typeof draft.coverFileId === 'string' ? draft.coverFileId : undefined,
+          itemCount:
+            typeof draft.itemCount === 'number'
+              ? draft.itemCount
+              : typeof draft.postsCount === 'number'
+                ? draft.postsCount
+                : 0,
+          createdAt: typeof draft.createdAt === 'string' ? draft.createdAt : undefined,
+          updatedAt: typeof draft.updatedAt === 'string' ? draft.updatedAt : undefined,
+        });
+      });
+
+      return Array.from(byId.values());
+    });
+  }, [draftCollections]);
+
+  useEffect(() => {
     let mounted = true;
 
     const run = async () => {
+      if (outletView !== 'products') {
+        if (mounted) setLoading(false);
+        return;
+      }
+
       if (!user?.id) {
         setLoading(false);
         return;
@@ -273,13 +498,70 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     return () => {
       mounted = false;
     };
-  }, [filterCollection, filterStatus, limit, page, searchQuery, user?.id]);
+  }, [filterCollection, filterStatus, limit, outletView, page, searchQuery, user?.id]);
 
   useEffect(() => {
+    let mounted = true;
+
+    const run = async () => {
+      if (!user?.id || !activeCollectionId || outletView !== 'collections') {
+        if (mounted) {
+          setActiveCollectionProducts([]);
+          setActiveCollectionProductsTotal(0);
+        }
+        return;
+      }
+
+      try {
+        setActiveCollectionProductsLoading(true);
+        const response = await apiClient.get<Partial<ProductsResponse>>(
+          `/brands/${user.id}/products`,
+          {
+            params: {
+              page: activeCollectionProductsPage,
+              limit: activeCollectionProductsLimit,
+              sortBy: 'newest',
+              collectionId: activeCollectionId,
+              includeDeleted: false,
+            },
+          },
+        );
+
+        if (!mounted) return;
+        const payload = unwrapApiResponse<Partial<ProductsResponse>>(response.data);
+        const items = Array.isArray(payload?.items) ? (payload.items as BackendProduct[]) : [];
+        setActiveCollectionProducts(items);
+        setActiveCollectionProductsTotal(
+          typeof payload?.total === 'number' ? payload.total : items.length,
+        );
+      } catch {
+        if (!mounted) return;
+        setActiveCollectionProducts([]);
+        setActiveCollectionProductsTotal(0);
+        toast.error('Failed to load products for this collection.');
+      } finally {
+        if (mounted) setActiveCollectionProductsLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      mounted = false;
+    };
+  }, [
+    activeCollectionId,
+    activeCollectionProductsLimit,
+    activeCollectionProductsPage,
+    outletView,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    if (outletView !== 'products') return;
     if (!listRef.current) return;
     const height = listRef.current.getBoundingClientRect().height;
     if (height > 0) setListMinHeight(height);
-  }, [filteredProducts.length, loading]);
+  }, [filteredProducts.length, loading, outletView]);
 
   // Click-outside handler for expandable search (matches CatalogShopTab pattern)
   useEffect(() => {
@@ -296,6 +578,22 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   }, [searchCollapsed, searchQuery]);
 
   useEffect(() => {
+    if (collectionSearchCollapsed) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        collectionSearchContainerRef.current &&
+        !collectionSearchContainerRef.current.contains(e.target as Node)
+      ) {
+        if (!collectionSearch.trim()) {
+          setCollectionSearchCollapsed(true);
+        }
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [collectionSearch, collectionSearchCollapsed]);
+
+  useEffect(() => {
     if (!showFiltersMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (filtersMenuRef.current && !filtersMenuRef.current.contains(e.target as Node)) {
@@ -307,6 +605,57 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   }, [showFiltersMenu]);
 
   useEffect(() => {
+    if (!dropdownManager.openId?.startsWith('collection-menu-')) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('.collection-menu-host')) return;
+      dropdownManager.setOpenId(null);
+    };
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dropdownManager.setOpenId(null);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [dropdownManager, dropdownManager.openId]);
+
+  useEffect(() => {
+    if (!collectionGalleryOpen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setCollectionGalleryOpen(false);
+        return;
+      }
+      if (collectionGalleryImages.length <= 1) return;
+
+      if (e.key === 'ArrowRight') {
+        setCollectionGalleryIndex((prev) => (prev + 1) % collectionGalleryImages.length);
+      }
+      if (e.key === 'ArrowLeft') {
+        setCollectionGalleryIndex((prev) =>
+          prev === 0 ? collectionGalleryImages.length - 1 : prev - 1,
+        );
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [collectionGalleryImages.length, collectionGalleryOpen]);
+
+  useEffect(() => {
+    if (collectionGalleryIndex < collectionGalleryImages.length) return;
+    setCollectionGalleryIndex(0);
+  }, [collectionGalleryImages.length, collectionGalleryIndex]);
+
+  useEffect(() => {
+    if (outletView !== 'products') return;
     if (typeof window === 'undefined') return;
     if (loading || products.length === 0) return;
 
@@ -322,7 +671,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     if (!lastShown || now - lastShown >= intervalMs) {
       setDraftReminderProduct(draft);
     }
-  }, [loading, products]);
+  }, [loading, outletView, products]);
 
   const refresh = async () => {
     if (!user?.id) return;
@@ -421,9 +770,357 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     });
   };
 
+  const openCollectionEditor = (collection: CollectionOption) => {
+    setEditingCollectionId(collection.id);
+    setEditingCollectionTitle(collection.name || '');
+    setEditingCollectionDescription(collection.description || '');
+  };
+
+  const closeCollectionEditor = () => {
+    setEditingCollectionId(null);
+    setEditingCollectionTitle('');
+    setEditingCollectionDescription('');
+    setDiscardingCollectionId(null);
+  };
+
+  const openCollectionWorkspace = (collectionId?: string) => {
+    if (collectionId) {
+      setActiveCollectionId(collectionId);
+    }
+
+    const params = new URLSearchParams(location.search);
+    params.set('view', 'collections');
+    if (collectionId) params.set('collectionId', collectionId);
+    else params.delete('collectionId');
+    navigate(`/studio/store?${params.toString()}`);
+  };
+
+  const handleOpenCollectionView = (collectionId: string) => {
+    setActiveCollectionId(collectionId);
+    const params = new URLSearchParams(location.search);
+    params.set('view', 'collections');
+    params.set('collectionId', collectionId);
+    navigate(`/studio/store?${params.toString()}`, { replace: true });
+  };
+
+  const handleCloseActiveCollectionView = () => {
+    setActiveCollectionId(null);
+    const params = new URLSearchParams(location.search);
+    params.set('view', 'collections');
+    params.delete('collectionId');
+    navigate(`/studio/store?${params.toString()}`, { replace: true });
+  };
+
+  const handleDiscardCollectionEdit = (collectionId: string) => {
+    setDiscardingCollectionId(collectionId);
+    window.setTimeout(() => {
+      closeCollectionEditor();
+    }, 250);
+  };
+
+  const handleSaveCollectionEdit = async (collectionId: string) => {
+    const nextTitle = editingCollectionTitle.trim();
+    if (!nextTitle) {
+      toast.error('Collection title is required.');
+      return;
+    }
+
+    setCollectionBusyId(collectionId);
+    try {
+      const updated = await brandApi.updateCollection(collectionId, {
+        title: nextTitle,
+        description: editingCollectionDescription.trim() || '',
+      });
+
+      if (!updated) {
+        toast.error('Unable to update collection.');
+        return;
+      }
+
+      setCollections((prev) =>
+        prev.map((collection) =>
+          collection.id === collectionId
+            ? {
+                ...collection,
+                name: updated.title || updated.name || nextTitle,
+                description: updated.description || editingCollectionDescription.trim(),
+                status: updated.status || collection.status,
+                updatedAt: updated.updatedAt || collection.updatedAt,
+              }
+            : collection,
+        ),
+      );
+      closeCollectionEditor();
+      toast.success('Collection updated.');
+    } catch (error) {
+      const message = (error as any)?.response?.data?.message ?? 'Unable to update collection.';
+      toast.error(typeof message === 'string' ? message : 'Unable to update collection.');
+    } finally {
+      setCollectionBusyId(null);
+    }
+  };
+
+  const handleArchiveCollection = async (collection: CollectionOption) => {
+    setCollectionBusyId(collection.id);
+    try {
+      const ok = await brandApi.archiveCollection(collection.id);
+      if (!ok) {
+        toast.error('Unable to archive collection.');
+        return;
+      }
+      setCollections((prev) =>
+        prev.map((item) =>
+          item.id === collection.id ? { ...item, status: 'ARCHIVED', isAvailableInStore: false } : item,
+        ),
+      );
+      toast.success('Collection archived.');
+    } catch (error) {
+      const message = (error as any)?.response?.data?.message ?? 'Unable to archive collection.';
+      toast.error(typeof message === 'string' ? message : 'Unable to archive collection.');
+    } finally {
+      setCollectionBusyId(null);
+    }
+  };
+
+  const handleUnarchiveCollection = async (collection: CollectionOption) => {
+    setCollectionBusyId(collection.id);
+    try {
+      const ok = await brandApi.unarchiveCollection(collection.id);
+      if (!ok) {
+        toast.error('Unable to unarchive collection.');
+        return;
+      }
+      setCollections((prev) =>
+        prev.map((item) =>
+          item.id === collection.id ? { ...item, status: item.status === 'ARCHIVED' ? 'DRAFT' : item.status } : item,
+        ),
+      );
+      toast.success('Collection restored.');
+    } catch (error) {
+      const message = (error as any)?.response?.data?.message ?? 'Unable to unarchive collection.';
+      toast.error(typeof message === 'string' ? message : 'Unable to unarchive collection.');
+    } finally {
+      setCollectionBusyId(null);
+    }
+  };
+
+  const handleDeleteCollection = async (collection: CollectionOption) => {
+    setCollectionBusyId(collection.id);
+    try {
+      const ok = await brandApi.deleteCollection(collection.id);
+      if (!ok) {
+        toast.error('Unable to delete collection.');
+        return;
+      }
+      setCollections((prev) => prev.filter((item) => item.id !== collection.id));
+      toast.success('Collection deleted. Products are unchanged.');
+    } catch (error) {
+      const message = (error as any)?.response?.data?.message ?? 'Unable to delete collection.';
+      toast.error(typeof message === 'string' ? message : 'Unable to delete collection.');
+    } finally {
+      setCollectionBusyId(null);
+    }
+  };
+
+  const handleConfirmCollectionAction = async () => {
+    if (!collectionConfirm) return;
+
+    const { mode, collection } = collectionConfirm;
+    try {
+      if (mode === 'archive') {
+        await handleArchiveCollection(collection);
+      } else if (mode === 'unarchive') {
+        await handleUnarchiveCollection(collection);
+      } else {
+        await handleDeleteCollection(collection);
+        if (activeCollectionId === collection.id) {
+          setActiveCollectionId(null);
+        }
+      }
+    } finally {
+      setCollectionConfirm(null);
+    }
+  };
+
+  const handleDeleteAllCollections = async () => {
+    if (collections.length === 0 || deletingAllCollections) return;
+
+    setDeletingAllCollections(true);
+    try {
+      const targets = [...collections];
+      const results = await Promise.allSettled(
+        targets.map(async (collection) => ({
+          id: collection.id,
+          ok: await brandApi.deleteCollection(collection.id),
+        })),
+      );
+
+      const deletedIds = new Set<string>();
+      let failedCount = 0;
+      results.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value.ok) {
+          deletedIds.add(result.value.id);
+        } else {
+          failedCount += 1;
+        }
+      });
+
+      setCollections((prev) => prev.filter((collection) => !deletedIds.has(collection.id)));
+      if (activeCollectionId && deletedIds.has(activeCollectionId)) {
+        handleCloseActiveCollectionView();
+      }
+
+      if (deletedIds.size > 0) {
+        toast.success(
+          failedCount > 0
+            ? `${deletedIds.size} collection(s) deleted, ${failedCount} failed.`
+            : `Deleted ${deletedIds.size} collection(s).`,
+        );
+      } else {
+        toast.error('No collections were deleted.');
+      }
+    } catch {
+      toast.error('Failed to delete collections.');
+    } finally {
+      setDeletingAllCollections(false);
+      setDeleteAllCollectionsConfirmOpen(false);
+    }
+  };
+
+  const mapProductToGalleryImages = (product: BackendProduct): CollectionGalleryImage[] => {
+    const seen = new Set<string>();
+    const images: CollectionGalleryImage[] = [];
+
+    const pushCandidate = (src: string | null | undefined, fileId: string | null | undefined) => {
+      const normalizedSrc = typeof src === 'string' && src.trim().length > 0 ? src.trim() : null;
+      const normalizedFileId =
+        typeof fileId === 'string' && fileId.trim().length > 0 ? fileId.trim() : null;
+      if (!normalizedSrc && !normalizedFileId) return;
+
+      const key = `${normalizedSrc ?? ''}|${normalizedFileId ?? ''}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+
+      images.push({
+        id: `${product.id}-${images.length}`,
+        src: normalizedSrc,
+        fileId: normalizedFileId,
+        alt: `${product.name || 'Collection image'} image ${images.length + 1}`,
+        productId: product.id,
+        productName: product.name,
+      });
+    };
+
+    pushCandidate(product.thumbnail ?? null, null);
+
+    (product.images ?? []).forEach((imageUrl) => {
+      pushCandidate(imageUrl, null);
+    });
+
+    (product.media ?? []).forEach((media) => {
+      const mediaType = String(media.type || '').toLowerCase();
+      if (mediaType.includes('video')) return;
+      pushCandidate(media.url, media.id);
+    });
+
+    return images;
+  };
+
+  const handleOpenCollectionGallery = async (collection: CollectionOption) => {
+    if (!user?.id) return;
+
+    setCollectionGalleryOpen(true);
+    setCollectionGalleryLoading(true);
+    setCollectionGalleryImages([]);
+    setCollectionGalleryIndex(0);
+    setCollectionGallerySourceName(collection.name);
+
+    try {
+      const limitPerPage = 50;
+      const maxPages = 20;
+      const allProducts: BackendProduct[] = [];
+      let currentPage = 1;
+      let shouldContinue = true;
+
+      while (shouldContinue && currentPage <= maxPages) {
+        const response = await apiClient.get<Partial<ProductsResponse>>(
+          `/brands/${user.id}/products`,
+          {
+            params: {
+              page: currentPage,
+              limit: limitPerPage,
+              sortBy: 'newest',
+              collectionId: collection.id,
+              includeDeleted: false,
+            },
+          },
+        );
+
+        const payload = unwrapApiResponse<Partial<ProductsResponse>>(response.data);
+        const pageItems = Array.isArray(payload?.items) ? (payload.items as BackendProduct[]) : [];
+        allProducts.push(...pageItems);
+
+        const totalPagesFromPayload =
+          typeof payload?.totalPages === 'number' && payload.totalPages > 0
+            ? payload.totalPages
+            : 1;
+
+        const hasNextPageFromPayload =
+          typeof payload?.hasNextPage === 'boolean'
+            ? payload.hasNextPage
+            : currentPage < totalPagesFromPayload;
+
+        shouldContinue = hasNextPageFromPayload && pageItems.length > 0;
+        currentPage += 1;
+      }
+
+      const flattenedImages = allProducts.flatMap((product) => mapProductToGalleryImages(product));
+      const dedupedImages: CollectionGalleryImage[] = [];
+      const imageKeys = new Set<string>();
+
+      flattenedImages.forEach((image) => {
+        const key = `${image.src ?? ''}|${image.fileId ?? ''}`;
+        if (imageKeys.has(key)) return;
+        imageKeys.add(key);
+        dedupedImages.push({ ...image, id: `${image.productId ?? 'collection'}-${dedupedImages.length}` });
+      });
+
+      if (dedupedImages.length === 0 && (collection.coverImage || collection.coverFileId)) {
+        dedupedImages.push({
+          id: `${collection.id}-cover`,
+          src: collection.coverImage ?? null,
+          fileId: collection.coverFileId ?? null,
+          alt: `${collection.name} cover image`,
+          productName: collection.name,
+        });
+      }
+
+      setCollectionGalleryImages(dedupedImages);
+    } catch (error) {
+      const message = (error as any)?.response?.data?.message ?? 'Unable to load collection gallery.';
+      toast.error(typeof message === 'string' ? message : 'Unable to load collection gallery.');
+      setCollectionGalleryOpen(false);
+    } finally {
+      setCollectionGalleryLoading(false);
+    }
+  };
+
+  const handleNextCollectionGalleryImage = () => {
+    if (collectionGalleryImages.length <= 1) return;
+    setCollectionGalleryIndex((prev) => (prev + 1) % collectionGalleryImages.length);
+  };
+
+  const handlePrevCollectionGalleryImage = () => {
+    if (collectionGalleryImages.length <= 1) return;
+    setCollectionGalleryIndex((prev) =>
+      prev === 0 ? collectionGalleryImages.length - 1 : prev - 1,
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* ═══ UNIFIED COMMAND CENTER ═══ */}
+      {outletView === 'products' && (
       <div className="mb-6 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/95 dark:bg-[#111118]/95 backdrop-blur-xl shadow-lg overflow-hidden">
 
         {/* Header Row */}
@@ -493,7 +1190,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   [
                     { value: 'all', label: 'All', icon: '📦' },
                     { value: 'active', label: 'Published', icon: '✨' },
-                    { value: 'draft', label: 'Drafts', icon: '📝' },
+                    { value: 'draft', label: 'Product Drafts', icon: '📝' },
                     { value: 'archived', label: 'Archived', icon: '📁' },
                     { value: 'deleted', label: 'Deleted', icon: '🗑️' },
                   ] as const
@@ -635,8 +1332,554 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         </div>
 
       </div>
+      )}
+
+      {outletView === 'products' && (
+      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
+        <div className="p-4 sm:p-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Collections Quick Access</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Slow carousel preview with cover images always visible.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/studio/store/collections/new')}
+                className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+              >
+                Create collection
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/studio/store?view=collections')}
+                className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+              >
+                Manage collections
+              </button>
+            </div>
+          </div>
+
+          {collectionsLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div key={idx} className="h-44 animate-pulse rounded-xl bg-gray-200/70 dark:bg-white/10" />
+              ))}
+            </div>
+          ) : collections.length > 0 ? (
+            <div
+              ref={quickCollectionsRef}
+              className="overflow-x-hidden rounded-xl border border-gray-200/80 bg-gray-50/60 dark:border-white/10 dark:bg-white/5"
+            >
+              <div className="flex min-w-max gap-3 p-3">
+                {[...(previewCollections.length > 0 ? previewCollections : collections), ...(previewCollections.length > 0 ? previewCollections : collections)]
+                  .map((collection, idx) => (
+                    <button
+                      key={`${collection.id}-${idx}`}
+                      type="button"
+                      onClick={() => openCollectionWorkspace(collection.id)}
+                      className="group w-64 shrink-0 snap-start overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 text-left transition-all hover:shadow-md bg-white dark:bg-zinc-900/80"
+                    >
+                      <div className="relative h-28 w-full bg-gray-100 dark:bg-white/5">
+                        <ImageWithFallback
+                          src={collection.coverImage ?? null}
+                          fileId={collection.coverFileId ?? null}
+                          alt={collection.name}
+                          fit="cover"
+                          rounded="none"
+                          containerClassName="h-full w-full"
+                          className="h-full w-full transition-transform duration-300 group-hover:scale-105"
+                          fallbackName={collection.name}
+                        />
+                      </div>
+                      <div className="p-3">
+                        <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
+                          {collection.name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {collection.itemCount ?? 0} items
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            </div>
+          ) : (
+            <StoreEmptyState
+              type="no-collections"
+              isOwner={true}
+              onAction={() => navigate('/studio/store/collections/new')}
+            />
+          )}
+        </div>
+      </div>
+      )}
+
+      {outletView === 'collections' && (
+        <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
+          <div className="border-b border-gray-200/80 dark:border-white/10 p-4 sm:p-6">
+            <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+              <button
+                type="button"
+                onClick={() => navigate('/studio/store')}
+                className="rounded-md px-2 py-1 hover:bg-gray-100 dark:hover:bg-white/10"
+              >
+                Products
+              </button>
+              <span>/</span>
+              <span className="text-gray-900 dark:text-white">Collections</span>
+              {activeCollection && (
+                <>
+                  <span>/</span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCollectionView(activeCollection.id)}
+                    className="rounded-md px-2 py-1 text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+                  >
+                    {activeCollection.name}
+                  </button>
+                </>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {activeCollection ? activeCollection.name : 'Collections Management'}
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {activeCollection
+                    ? 'Products in this collection. Open gallery to browse all collection images.'
+                    : 'Edit, archive, unarchive, and view each collection in this store layout.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {activeCollection ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void handleOpenCollectionGallery(activeCollection)}
+                      disabled={collectionGalleryLoading}
+                      className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700 disabled:opacity-50 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300"
+                    >
+                      {collectionGalleryLoading ? 'Opening gallery...' : 'Open gallery'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openCollectionEditor(activeCollection);
+                        handleCloseActiveCollectionView();
+                      }}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+                    >
+                      Edit collection
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCloseActiveCollectionView}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+                    >
+                      Back to collections
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteAllCollectionsConfirmOpen(true)}
+                      disabled={collections.length === 0 || deletingAllCollections}
+                      className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300"
+                    >
+                      {deletingAllCollections ? 'Deleting...' : 'Delete all'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/studio/store/collections/new')}
+                      className="rounded-lg bg-purple-600 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-700"
+                    >
+                      New collection
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {!activeCollection && (
+              <div className="mt-4 grid grid-cols-1 gap-2 lg:grid-cols-4">
+                <div
+                  ref={collectionSearchContainerRef}
+                  className={`transition-all duration-300 ease-out ${collectionSearchCollapsed ? 'w-11' : 'w-full'}`}
+                >
+                  {collectionSearchCollapsed ? (
+                    <button
+                      type="button"
+                      onClick={() => setCollectionSearchCollapsed(false)}
+                      className="h-11 w-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center shadow-sm"
+                      aria-label="Open collection search"
+                    >
+                      <span className="text-base">🔎</span>
+                    </button>
+                  ) : (
+                    <SearchField
+                      value={collectionSearch}
+                      onChange={setCollectionSearch}
+                      placeholder="Search collections..."
+                      showFilter={false}
+                      className="!max-w-none w-full shadow-sm border-gray-200 dark:border-white/10 animate-in fade-in slide-in-from-left-2 duration-200"
+                    />
+                  )}
+                </div>
+                <FilterDropdown
+                  value={collectionStatusFilter}
+                  onChange={(value) => setCollectionStatusFilter(value as CollectionStatusFilter)}
+                  options={[
+                    { value: 'all', label: 'All statuses' },
+                    { value: 'published', label: 'Published' },
+                    { value: 'draft', label: 'Draft' },
+                    { value: 'archived', label: 'Archived' },
+                  ]}
+                />
+                <FilterDropdown
+                  value={collectionSortBy}
+                  onChange={(value) => setCollectionSortBy(value as CollectionSortBy)}
+                  options={[
+                    { value: 'newest', label: 'Newest' },
+                    { value: 'oldest', label: 'Oldest' },
+                    { value: 'title_asc', label: 'Title A-Z' },
+                    { value: 'title_desc', label: 'Title Z-A' },
+                    { value: 'items_desc', label: 'Most items' },
+                  ]}
+                />
+                <FilterDropdown
+                  value={String(collectionLimit)}
+                  onChange={(value) => setCollectionLimit(Number(value))}
+                  options={[
+                    { value: '6', label: '6 per page' },
+                    { value: '12', label: '12 per page' },
+                    { value: '24', label: '24 per page' },
+                  ]}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 sm:p-6">
+            {!activeCollection ? (
+              managedCollectionsTotal === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-300/80 bg-gray-50/70 p-6 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
+                  No collections match your current filters.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {pagedManagedCollections.map((collection) => {
+                    const status = String(collection.status || 'PUBLISHED').toUpperCase();
+                    const isBusy = collectionBusyId === collection.id;
+                    const isDiscarding = discardingCollectionId === collection.id;
+                    const isEditing = editingCollectionId === collection.id;
+                    const isArchived = status === 'ARCHIVED';
+
+                    const collectionMenuId = `collection-menu-${collection.id}`;
+                    const isMenuOpen = dropdownManager.openId === collectionMenuId;
+
+                    return (
+                      <article
+                        key={collection.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (isEditing) return;
+                          handleOpenCollectionView(collection.id);
+                        }}
+                        onKeyDown={(e) => {
+                          if (isEditing) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleOpenCollectionView(collection.id);
+                          }
+                        }}
+                        className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-zinc-900/70"
+                      >
+                        <div className="relative h-36 w-full bg-gray-100 dark:bg-white/5">
+                          <ImageWithFallback
+                            src={collection.coverImage ?? null}
+                            fileId={collection.coverFileId ?? null}
+                            alt={collection.name}
+                            fit="cover"
+                            rounded="none"
+                            containerClassName="h-full w-full"
+                            className="h-full w-full"
+                            fallbackName={collection.name}
+                          />
+                          {!isEditing && (
+                            <div className="collection-menu-host absolute right-3 top-3 z-20">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  dropdownManager.setOpenId(isMenuOpen ? null : collectionMenuId);
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition hover:bg-black/65"
+                                aria-label="Collection actions"
+                              >
+                                <span className="text-base font-bold">...</span>
+                              </button>
+                              {isMenuOpen && (
+                                <div
+                                  className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-zinc-900"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      dropdownManager.setOpenId(null);
+                                      void handleOpenCollectionGallery(collection);
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+                                  >
+                                    Gallery
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      dropdownManager.setOpenId(null);
+                                      openCollectionEditor(collection);
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      dropdownManager.setOpenId(null);
+                                      setCollectionConfirm({
+                                        mode: isArchived ? 'unarchive' : 'archive',
+                                        collection,
+                                      });
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+                                  >
+                                    {isArchived ? 'Unarchive' : 'Archive'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      dropdownManager.setOpenId(null);
+                                      setCollectionConfirm({ mode: 'delete', collection });
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-3 p-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
+                                {collection.name}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {collection.itemCount ?? 0} items
+                              </p>
+                            </div>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                status === 'ARCHIVED'
+                                  ? 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300'
+                                  : status === 'DRAFT'
+                                    ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                              }`}
+                            >
+                              {status}
+                            </span>
+                          </div>
+
+                          {isEditing ? (
+                            <div className="space-y-2">
+                              <input
+                                value={editingCollectionTitle}
+                                onChange={(e) => setEditingCollectionTitle(e.target.value)}
+                                placeholder="Collection title"
+                                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+                              />
+                              <textarea
+                                value={editingCollectionDescription}
+                                onChange={(e) => setEditingCollectionDescription(e.target.value)}
+                                rows={3}
+                                placeholder="Collection description"
+                                className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+                              />
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  disabled={isBusy || isDiscarding}
+                                  onClick={() => void handleSaveCollectionEdit(collection.id)}
+                                  className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                                >
+                                  {isBusy ? 'Saving...' : 'Save'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isBusy || isDiscarding}
+                                  onClick={() => handleDiscardCollectionEdit(collection.id)}
+                                  className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-200"
+                                >
+                                  {isDiscarding ? 'Discarding...' : 'Discard'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="line-clamp-2 text-xs text-gray-600 dark:text-gray-300">
+                              {collection.description?.trim() || 'No description yet.'}
+                            </p>
+                          )}
+
+                          {!isEditing && <p className="text-[11px] text-gray-500 dark:text-gray-400">Click card to view collection products.</p>}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )
+            ) : activeCollectionProductsLoading ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, idx) => (
+                  <div key={idx} className="h-64 animate-pulse rounded-xl bg-gray-200/70 dark:bg-white/10" />
+                ))}
+              </div>
+            ) : activeCollectionProducts.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-300/80 bg-gray-50/70 p-6 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
+                No products currently linked to this collection.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {activeCollectionProducts.map((product) => (
+                  <button
+                    key={product.id}
+                    type="button"
+                    onClick={() => navigate(`/studio/store/products/${product.id}`)}
+                    className="overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-zinc-900/70"
+                  >
+                    <div className="aspect-[4/5] bg-gray-100 dark:bg-white/5">
+                      <ImageWithFallback
+                        src={product.thumbnail || product.images?.[0] || product.media?.[0]?.url || null}
+                        fileId={product.media?.find((media) => media.isPrimary)?.id || null}
+                        alt={product.name}
+                        fit="cover"
+                        rounded="none"
+                        containerClassName="h-full w-full"
+                        className="h-full w-full"
+                        fallbackName={product.name}
+                      />
+                    </div>
+                    <div className="space-y-1 p-3">
+                      <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
+                        {product.name}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Stock: {product.totalStock ?? 0}
+                      </p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                        NGN {product.price.toLocaleString()}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-gray-200/80 dark:border-white/10 p-4">
+            {!activeCollection ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500 dark:text-gray-400">
+                <div>
+                  Showing {managedCollectionsTotal === 0 ? 0 : (collectionPage - 1) * collectionLimit + 1}-
+                  {Math.min(collectionPage * collectionLimit, managedCollectionsTotal)} of {managedCollectionsTotal}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCollectionPage((prev) => Math.max(1, prev - 1))}
+                    disabled={collectionPage === 1}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-xs">
+                    Page {collectionPage} / {managedCollectionsPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCollectionPage((prev) => Math.min(managedCollectionsPages, prev + 1))
+                    }
+                    disabled={collectionPage === managedCollectionsPages}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500 dark:text-gray-400">
+                <div className="flex items-center gap-2">
+                  <span>Items per page:</span>
+                  <select
+                    value={activeCollectionProductsLimit}
+                    onChange={(e) => setActiveCollectionProductsLimit(Number(e.target.value))}
+                    className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+                  >
+                    <option value={4}>4</option>
+                    <option value={8}>8</option>
+                    <option value={12}>12</option>
+                  </select>
+                </div>
+                <div>
+                  Showing {activeCollectionProductsTotal === 0 ? 0 : (activeCollectionProductsPage - 1) * activeCollectionProductsLimit + 1}-
+                  {Math.min(activeCollectionProductsPage * activeCollectionProductsLimit, activeCollectionProductsTotal)} of {activeCollectionProductsTotal}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveCollectionProductsPage((prev) => Math.max(1, prev - 1))}
+                    disabled={activeCollectionProductsPage === 1 || activeCollectionProductsLoading}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-xs">
+                    Page {activeCollectionProductsPage} / {activeCollectionProductsPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveCollectionProductsPage((prev) =>
+                        Math.min(activeCollectionProductsPages, prev + 1),
+                      )
+                    }
+                    disabled={
+                      activeCollectionProductsPage === activeCollectionProductsPages ||
+                      activeCollectionProductsLoading
+                    }
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Products - with CSS containment for smooth tab transitions */}
+      {outletView === 'products' && (
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
         <div className="p-4 sm:p-6">
           <div
@@ -883,7 +2126,34 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 </div>
               );
             })}
-            {!loading && filteredProducts.length === 0 && products.length > 0 && (
+            {showDraftCollectionsInProductArea && (
+              <div className="col-span-full rounded-xl border border-amber-200/80 bg-amber-50/70 p-4 text-left dark:border-amber-500/30 dark:bg-amber-500/10">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                    Collection drafts found
+                  </p>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
+                    {draftCollections.length}
+                  </span>
+                </div>
+                <p className="mb-3 text-xs text-amber-700/90 dark:text-amber-200/80">
+                  The Draft filter above is for product drafts. These are collection drafts.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {draftCollections.map((draft: any) => (
+                    <button
+                      key={draft.id}
+                      type="button"
+                      onClick={() => navigate(`/studio/store/collections/new?collectionId=${draft.id}`)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-white/90 px-3 py-2 text-xs font-semibold text-amber-800 transition-colors hover:bg-white dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20"
+                    >
+                      📝 {draft.title?.trim() || 'Untitled Draft'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!loading && filteredProducts.length === 0 && products.length > 0 && !showDraftCollectionsInProductArea && (
               <div className="col-span-full py-16 text-center text-gray-500 dark:text-gray-400">
                 No products match this filter.
               </div>
@@ -963,8 +2233,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           </div>
         </div>
       </div>
+      )}
 
-      {!loading && products.length === 0 && (() => {
+      {outletView === 'products' && !loading && products.length === 0 && !showDraftCollectionsInProductArea && (() => {
         // Determine which empty state to show based on filter
         const getEmptyStateType = (): EmptyStateType => {
           switch (filterStatus) {
@@ -986,7 +2257,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         );
       })()}
 
-      {showBulkActions && (
+      {outletView === 'products' && showBulkActions && (
         <div className="fixed bottom-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-full bg-purple-600 px-6 py-3 text-sm font-semibold text-white shadow-2xl">
           <span>{selectedProducts.length} selected</span>
           <div className="h-5 w-px bg-white/30" />
@@ -1020,6 +2291,220 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       {/* MODALS */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       
+      {collectionConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setCollectionConfirm(null)}
+            aria-label="Close collection action confirmation"
+          />
+          <div className="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-zinc-900">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+              {collectionConfirm.mode === 'archive'
+                ? 'Archive collection?'
+                : collectionConfirm.mode === 'unarchive'
+                  ? 'Unarchive collection?'
+                  : 'Delete collection?'}
+            </h3>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              {collectionConfirm.mode === 'delete'
+                ? `Delete "${collectionConfirm.collection.name}". Products will remain in store.`
+                : `Confirm ${collectionConfirm.mode} for "${collectionConfirm.collection.name}".`}
+            </p>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCollectionConfirm(null)}
+                disabled={collectionConfirmBusy}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 disabled:opacity-60 dark:border-white/10 dark:text-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmCollectionAction()}
+                disabled={collectionConfirmBusy}
+                className="rounded-lg bg-purple-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {collectionConfirmBusy
+                  ? 'Processing...'
+                  : collectionConfirm.mode === 'unarchive'
+                    ? 'Unarchive'
+                    : collectionConfirm.mode === 'archive'
+                      ? 'Archive'
+                      : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteAllCollectionsConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => {
+              if (!deletingAllCollections) setDeleteAllCollectionsConfirmOpen(false);
+            }}
+            aria-label="Close delete all collections confirmation"
+          />
+          <div className="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-zinc-900">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+              Delete all collections?
+            </h3>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              This will attempt to delete all {collections.length} collection(s) in your store.
+            </p>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteAllCollectionsConfirmOpen(false)}
+                disabled={deletingAllCollections}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 disabled:opacity-60 dark:border-white/10 dark:text-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteAllCollections()}
+                disabled={deletingAllCollections}
+                className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {deletingAllCollections ? 'Deleting...' : 'Delete all'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {collectionGalleryOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+            onClick={() => setCollectionGalleryOpen(false)}
+            aria-label="Close collection gallery"
+          />
+          <div className="relative w-full max-w-6xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-900">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-white/10">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {collectionGallerySourceName || 'Collection gallery'}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {collectionGalleryLoading
+                    ? 'Loading images...'
+                    : `${collectionGalleryImages.length} image(s)`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedCollectionGalleryImage && (
+                  <span className="rounded-full border border-gray-200 px-2 py-0.5 text-xs text-gray-600 dark:border-white/10 dark:text-gray-300">
+                    {collectionGalleryIndex + 1} / {collectionGalleryImages.length}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setCollectionGalleryOpen(false)}
+                  className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/10"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-6">
+              {collectionGalleryLoading ? (
+                <div className="space-y-3">
+                  <div className="h-[54vh] animate-pulse rounded-xl bg-gray-200/70 dark:bg-white/10" />
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                    {Array.from({ length: 6 }).map((_, idx) => (
+                      <div key={idx} className="h-16 animate-pulse rounded-lg bg-gray-200/70 dark:bg-white/10" />
+                    ))}
+                  </div>
+                </div>
+              ) : !selectedCollectionGalleryImage ? (
+                <div className="rounded-xl border border-dashed border-gray-300/80 bg-gray-50/70 p-6 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
+                  This collection has no images to display yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="relative flex h-[54vh] items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/5">
+                    {collectionGalleryImages.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={handlePrevCollectionGalleryImage}
+                        className="absolute left-2 z-10 rounded-full bg-black/60 px-3 py-2 text-xs font-semibold text-white backdrop-blur-sm hover:bg-black/80 sm:left-4"
+                        aria-label="Previous image"
+                      >
+                        Prev
+                      </button>
+                    )}
+
+                    <ImageWithFallback
+                      src={selectedCollectionGalleryImage.src}
+                      fileId={selectedCollectionGalleryImage.fileId}
+                      alt={selectedCollectionGalleryImage.alt}
+                      fit="contain"
+                      rounded="none"
+                      containerClassName="h-full w-full"
+                      className="h-full w-full"
+                      fallbackName={selectedCollectionGalleryImage.productName || collectionGallerySourceName || 'Collection'}
+                    />
+
+                    {collectionGalleryImages.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={handleNextCollectionGalleryImage}
+                        className="absolute right-2 z-10 rounded-full bg-black/60 px-3 py-2 text-xs font-semibold text-white backdrop-blur-sm hover:bg-black/80 sm:right-4"
+                        aria-label="Next image"
+                      >
+                        Next
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-gray-600 dark:text-gray-300">
+                    {selectedCollectionGalleryImage.productName || 'Collection image'}
+                  </p>
+
+                  {collectionGalleryImages.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {collectionGalleryImages.map((image, index) => (
+                        <button
+                          key={image.id}
+                          type="button"
+                          onClick={() => setCollectionGalleryIndex(index)}
+                          className={`h-16 w-16 shrink-0 overflow-hidden rounded-lg border ${
+                            index === collectionGalleryIndex
+                              ? 'border-purple-500 ring-2 ring-purple-500/30'
+                              : 'border-gray-200 dark:border-white/10'
+                          }`}
+                          aria-label={`Open image ${index + 1}`}
+                        >
+                          <ImageWithFallback
+                            src={image.src}
+                            fileId={image.fileId}
+                            alt={image.alt}
+                            fit="cover"
+                            rounded="none"
+                            containerClassName="h-full w-full"
+                            className="h-full w-full"
+                            fallbackName={image.productName || collectionGallerySourceName || 'Collection'}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <DeleteProductModal
         isOpen={!!deleteModalProduct}
         onClose={() => setDeleteModalProduct(null)}

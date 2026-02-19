@@ -97,19 +97,11 @@ export const Sidebar: React.FC = () => {
       : viewportWidth;
   const isMobile = liveViewportWidth < MOBILE_BREAKPOINT;
   const isProfileRoute = location.pathname === '/profile' || location.pathname.startsWith('/profile/');
-  const isSettingsRoute =
-    location.pathname.startsWith('/settings') || location.pathname.startsWith('/profile/settings');
 
   if (location.pathname.startsWith('/studio')) return null;
-  if (isSettingsRoute && !isSidebarOpen) return null;
 
   const showOverlay = isSidebarOpen;
   const isRail = !showOverlay;
-  const forceRailOnProfile = isProfileRoute;
-
-  if (isMobile && !isSidebarOpen && !forceRailOnProfile) {
-    return null;
-  }
 
   const widthClass = isRail ? 'w-[76px]' : 'w-[240px]';
   const positionClass = isRail
@@ -166,6 +158,41 @@ export const Sidebar: React.FC = () => {
   const exploreLinks = [
     { emoji: '📈', label: 'Trending', path: '/trending', active: location.pathname === '/trending' },
   ];
+
+  const mobileDockLinks = [
+    ...mainLinks.slice(0, 4),
+    {
+      emoji: '👤',
+      label: 'Profile',
+      path: '/profile',
+      active: isProfileRoute,
+    },
+  ];
+
+  if (isMobile && !isSidebarOpen) {
+    return (
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200/70 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-black/85">
+        <div className="mx-auto flex max-w-xl items-stretch justify-between gap-1">
+          {mobileDockLinks.map((link) => (
+            <button
+              key={link.path}
+              type="button"
+              onClick={() => navigate(link.path)}
+              className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium transition-colors ${
+                link.active
+                  ? 'bg-purple-50 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300'
+                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10'
+              }`}
+              aria-label={link.label}
+            >
+              <span className="text-lg leading-none">{link.emoji}</span>
+              <span className="truncate">{link.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <>

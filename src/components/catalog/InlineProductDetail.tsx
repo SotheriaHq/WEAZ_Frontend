@@ -1,8 +1,12 @@
 import { ArrowLeft, ShoppingBag, Heart, Share2, Star } from 'lucide-react';
 import { useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { toast } from 'sonner';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import ImageLightbox from './ImageLightbox';
+import type { AppDispatch, RootState } from '@/store';
+import { addToCart, openCartDrawer } from '@/features/cartSlice';
 
 interface InlineProductDetailProps {
   product: StoreProduct;
@@ -15,6 +19,9 @@ export default function InlineProductDetail({
   onBack,
   brandName,
 }: InlineProductDetailProps) {
+  const dispatch = useDispatch<AppDispatch>();
+  const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const currentUser = useSelector((s: RootState) => s.user.profile);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -70,6 +77,46 @@ export default function InlineProductDetail({
   const sizes = product.sizes || [];
   const colors = product.colors || [];
   const compareAtPrice = (product as any).compareAtPrice as number | undefined;
+  const isOutOfStock = !product.totalStock || product.totalStock <= 0;
+  const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
+
+  const handleAddToBag = async () => {
+    if (isOwnProduct) {
+      toast.info('You cannot add your own product to bag.');
+      return;
+    }
+    if (!isAuth) {
+      toast.info('Please sign in to add items to bag.');
+      return;
+    }
+    if (isOutOfStock) {
+      toast.error('This product is out of stock.');
+      return;
+    }
+    if (sizes.length > 0 && !selectedSize) {
+      toast.warning('Please select a size.');
+      return;
+    }
+    if (colors.length > 0 && !selectedColor) {
+      toast.warning('Please select a color.');
+      return;
+    }
+
+    try {
+      await dispatch(
+        addToCart({
+          productId: product.id,
+          quantity: 1,
+          selectedSize: selectedSize || undefined,
+          selectedColor: selectedColor || undefined,
+        }),
+      ).unwrap();
+      dispatch(openCartDrawer());
+      toast.success('Added to bag');
+    } catch (error: any) {
+      toast.error(error || 'Failed to add to bag');
+    }
+  };
 
   return (
     <div className="w-full animate-in fade-in slide-in-from-right-4 duration-300">
@@ -230,9 +277,9 @@ export default function InlineProductDetail({
           {/* Stock Info */}
           <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${product.totalStock && product.totalStock > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div className={`w-2 h-2 rounded-full ${!isOutOfStock ? 'bg-green-500' : 'bg-red-500'}`} />
               <span className="text-gray-600 dark:text-gray-400">
-                {product.totalStock && product.totalStock > 0 
+                {!isOutOfStock 
                   ? `${product.totalStock} in stock` 
                   : 'Out of stock'}
               </span>
@@ -241,14 +288,21 @@ export default function InlineProductDetail({
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              disabled={!product.totalStock || product.totalStock <= 0}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:scale-100"
-            >
-              <ShoppingBag size={18} />
-              Add to bag
-            </button>
+            {!isOwnProduct ? (
+              <button
+                type="button"
+                onClick={handleAddToBag}
+                disabled={isOutOfStock}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:scale-100"
+              >
+                <ShoppingBag size={18} />
+                Add to bag
+              </button>
+            ) : (
+              <div className="flex-1 flex items-center justify-center px-6 py-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm font-medium text-gray-600 dark:text-gray-300">
+                Your product
+              </div>
+            )}
             <button
               type="button"
               className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-pink-500 hover:border-pink-300 transition-all flex items-center justify-center"

@@ -58,38 +58,44 @@ export const EndUserProfileQrModal: React.FC<EndUserProfileQrModalProps> = ({
           aria-label="Close profile qr modal"
         />
 
-        <div className="relative z-10 w-full max-w-sm rounded-3xl neu-modal-surface shadow-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-[color:var(--neu-text)]">Profile QR Code</h3>
+        <div className="relative z-10 w-full max-w-md rounded-[30px] neu-modal-surface shadow-2xl p-5 sm:p-6">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold tracking-[0.16em] uppercase text-[color:var(--neu-text-muted)]">Share</p>
+              <h3 className="mt-1 text-lg font-semibold text-[color:var(--neu-text)]">Profile QR Code</h3>
+            </div>
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-lg neu-modal-inset"
+              className="inline-flex items-center justify-center h-9 w-9 rounded-xl neu-modal-inset"
               aria-label="Close"
             >
               <X className="h-4 w-4 text-[color:var(--neu-text-muted)]" />
             </button>
           </div>
 
-          <div className="rounded-2xl neu-modal-inset p-4 grid place-items-center">
+          <div className="rounded-3xl neu-modal-inset p-4 sm:p-5 grid place-items-center">
             <QRCodeCanvas
               id="end-user-profile-qr"
               value={profileUrl}
-              size={220}
+              size={236}
               includeMargin
               bgColor="#ffffff"
-              fgColor="#111827"
+              fgColor="#0f172a"
               level="Q"
             />
           </div>
 
-          <p className="mt-3 text-xs neu-text-muted break-all">{profileUrl}</p>
+          <div className="mt-4 rounded-2xl neu-modal-inset px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-wide text-[color:var(--neu-text-muted)]">Profile link</p>
+            <p className="mt-1 text-xs font-medium text-[color:var(--neu-text)] break-all">{profileUrl}</p>
+          </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={handleCopy}
-              className="inline-flex items-center justify-center gap-2 rounded-xl neu-modal-inset px-3 py-2 text-sm text-[color:var(--neu-text)]"
+              className="inline-flex items-center justify-center gap-2 rounded-xl neu-modal-inset px-3 py-2.5 text-sm font-medium text-[color:var(--neu-text)]"
             >
               <Copy className="h-4 w-4" />
               Copy
@@ -97,7 +103,7 @@ export const EndUserProfileQrModal: React.FC<EndUserProfileQrModalProps> = ({
             <button
               type="button"
               onClick={handleDownload}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 text-sm"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2.5 text-sm font-semibold"
             >
               <Download className="h-4 w-4" />
               Download

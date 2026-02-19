@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useTransition, useCallback, useRef } from 'react';
+import { memo, useState, useEffect, useMemo, useTransition, useCallback, useRef } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -15,15 +15,14 @@ import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreP
 import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
 import StoreEmptyState from '@/components/designs/StoreEmptyState';
 import { FilterDrawer } from './FilterDrawer';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { unwrapApiResponse } from '@/types/auth';
 import { brandApi } from '@/api/BrandApi';
 import type { CollectionDto } from '@/types/profile';
-import { useSignedFileUrl } from '@/hooks/useSignedFileUrl';
 import SearchField from '@/components/SearchField';
-import MediaRenderer from '@/components/media/MediaRenderer';
 import InlineProductDetail from './InlineProductDetail';
 import type { RootState } from '@/store';
+import ImageWithFallback from '@/components/ImageWithFallback';
 
 interface ProductsResponse {
   items: StoreProduct[];
@@ -56,6 +55,67 @@ interface CatalogShopTabProps {
   ownerHasStoreProfile?: boolean;
 }
 
+interface CollectionCardMiniProps {
+  collection: CollectionDto;
+  isSaved: boolean;
+  saveBusy: boolean;
+  onOpen: (collectionId: string) => void;
+  onToggleSave: (event: React.MouseEvent, collectionId: string, isSaved: boolean) => void;
+}
+
+const CollectionCardMini = memo(function CollectionCardMini({
+  collection,
+  isSaved,
+  saveBusy,
+  onOpen,
+  onToggleSave,
+}: CollectionCardMiniProps) {
+  const title = collection.title || collection.name || 'Collection';
+  const cover = collection.coverImage || undefined;
+  const itemCount = collection.itemCount ?? collection.postsCount ?? 0;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(collection.id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen(collection.id);
+        }
+      }}
+      className="group cursor-pointer text-left"
+    >
+      <div className="relative h-56 w-full overflow-hidden rounded-2xl border border-gray-200/70 bg-gray-100 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:border-white/10 dark:bg-white/5">
+        <ImageWithFallback
+          src={cover ?? null}
+          fileId={collection.coverFileId ?? null}
+          alt={title}
+          fit="cover"
+          rounded="none"
+          containerClassName="h-full w-full"
+          className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+          fallbackName={title}
+        />
+        <button
+          type="button"
+          onClick={(event) => onToggleSave(event, collection.id, isSaved)}
+          disabled={saveBusy}
+          className="absolute top-3 right-3 z-10 rounded-full bg-black/55 p-2 text-white shadow-md transition hover:bg-black/70 disabled:opacity-60"
+          aria-label={isSaved ? 'Unsave collection' : 'Save collection'}
+        >
+          <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-white' : ''}`} />
+        </button>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent p-4">
+          <div className="line-clamp-1 text-sm font-semibold text-white">{title}</div>
+          <div className="text-xs text-white/80">{itemCount} items</div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export default function CatalogShopTab({
   brandId,
   isStoreOpen,
@@ -63,6 +123,7 @@ export default function CatalogShopTab({
   ownerHasStoreProfile,
 }: CatalogShopTabProps) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -93,6 +154,8 @@ export default function CatalogShopTab({
   
   // Inline product detail state - when set, shows product detail instead of grid
   const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
+  const requestedProductId = searchParams.get('productId')?.trim() || null;
+  const storeView = searchParams.get('storeView') === 'collections' ? 'collections' : 'products';
 
   // Auto-collapse filters when entering product view, expand when leaving
   useEffect(() => {
@@ -102,6 +165,21 @@ export default function CatalogShopTab({
       setFiltersCollapsed(false);
     }
   }, [selectedProduct]);
+
+  useEffect(() => {
+    if (!requestedProductId || selectedProduct || loading) return;
+    const match = products.find((product) => product.id === requestedProductId);
+    if (!match) {
+      navigate(`/products/${encodeURIComponent(requestedProductId)}`, { replace: true });
+      return;
+    }
+
+    setSelectedProduct(match);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('productId');
+    setSearchParams(next, { replace: true });
+  }, [loading, navigate, products, requestedProductId, searchParams, selectedProduct, setSearchParams]);
 
 
 
@@ -298,6 +376,17 @@ export default function CatalogShopTab({
   // Only show 'no-collections' empty state if both collections and products are empty
   const showCollectionsEmpty = !collectionsLoading && visibleCollections.length === 0 && !loading && products.length === 0;
 
+  const handleSwitchStoreView = useCallback((nextView: 'products' | 'collections') => {
+    const next = new URLSearchParams(searchParams);
+    if (nextView === 'collections') {
+      next.set('storeView', 'collections');
+      next.delete('productId');
+    } else {
+      next.delete('storeView');
+    }
+    setSearchParams(next, { replace: false });
+  }, [searchParams, setSearchParams]);
+
   const storeClosedPlaceholder = useMemo(() => {
     if (isStoreOpen !== false) return null;
     if (isOwner) {
@@ -315,10 +404,6 @@ export default function CatalogShopTab({
     return <StoreEmptyState type="store-not-open-yet" isOwner={false} />;
   }, [isOwner, isStoreOpen, navigate, ownerHasStoreProfile]);
 
-  if (storeClosedPlaceholder) {
-    return <div className="w-full">{storeClosedPlaceholder}</div>;
-  }
-
   const clearFilters = () => {
     setMinPrice(undefined);
     setMaxPrice(undefined);
@@ -327,89 +412,133 @@ export default function CatalogShopTab({
     setSortBy('newest');
   };
 
-  const CollectionCardMini = ({ collection }: { collection: CollectionDto }) => {
-    const title = collection.title || collection.name || 'Collection';
-    const coverInitial = collection.coverImage || undefined;
-    const { url } = useSignedFileUrl(collection.coverFileId ?? null, coverInitial ?? null);
-    const cover = url || coverInitial;
-    const itemCount = collection.itemCount ?? collection.postsCount ?? 0;
-    const isSaved = Boolean(savedMap[collection.id]);
-    const saveBusy = savingIds.has(collection.id);
+  const handleOpenCollection = useCallback(
+    (collectionId: string) => {
+      navigate(`/collections/${collectionId}`);
+    },
+    [navigate],
+  );
 
-    const handleToggleSave = async (e: React.MouseEvent) => {
-      e.stopPropagation();
+  const handleToggleSave = useCallback(
+    async (event: React.MouseEvent, collectionId: string, currentlySaved: boolean) => {
+      event.stopPropagation();
       if (!isAuth) {
         toast.info('Please sign in to save collections.');
         return;
       }
-      if (saveBusy) return;
+
+      let shouldProceed = false;
+      setSavingIds((prev) => {
+        if (prev.has(collectionId)) return prev;
+        shouldProceed = true;
+        const next = new Set(prev);
+        next.add(collectionId);
+        return next;
+      });
+      if (!shouldProceed) return;
+
       try {
-        setSavingIds((prev) => new Set(prev).add(collection.id));
-        if (isSaved) {
-          await apiClient.delete('/saved', { data: { targetType: 'COLLECTION', targetId: collection.id } });
+        if (currentlySaved) {
+          await apiClient.delete('/saved', { data: { targetType: 'COLLECTION', targetId: collectionId } });
         } else {
-          await apiClient.post('/saved', { targetType: 'COLLECTION', targetId: collection.id });
+          await apiClient.post('/saved', { targetType: 'COLLECTION', targetId: collectionId });
         }
-        setSavedMap((prev) => ({ ...prev, [collection.id]: !isSaved }));
-        toast.success(isSaved ? 'Removed from saved.' : 'Saved for later.');
+        setSavedMap((prev) => ({ ...prev, [collectionId]: !currentlySaved }));
+        toast.success(currentlySaved ? 'Removed from saved.' : 'Saved for later.');
       } catch {
         toast.error('Unable to update saved items.');
       } finally {
         setSavingIds((prev) => {
           const next = new Set(prev);
-          next.delete(collection.id);
+          next.delete(collectionId);
           return next;
         });
       }
-    };
+    },
+    [isAuth],
+  );
 
+  if (storeClosedPlaceholder) {
+    return <div className="w-full">{storeClosedPlaceholder}</div>;
+  }
+
+  if (storeView === 'collections') {
     return (
-      <button
-        type="button"
-        onClick={() => navigate(`/collections/${collection.id}`)}
-        className="group text-left"
-      >
-        <div className="relative h-56 w-full rounded-2xl bg-gray-100 dark:bg-white/5 flex items-center justify-center">
-          {cover ? (
-            <MediaRenderer
-              kind="image"
-              src={cover}
-              alt={title}
-              maxHeightClassName="max-h-56"
-              maxWidthClassName="max-w-full"
-              className="w-full"
-              mediaClassName="transition-transform duration-500 group-hover:scale-105"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-xl font-semibold text-gray-400">
-              {title.slice(0, 1).toUpperCase()}
+      <div className="w-full space-y-6">
+        <div className="rounded-2xl border border-gray-200/70 bg-white/80 p-5 dark:border-white/10 dark:bg-white/5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              <button
+                type="button"
+                onClick={() => handleSwitchStoreView('products')}
+                className="font-medium text-purple-600 hover:text-purple-700"
+              >
+                Store Products
+              </button>
+              <span className="text-gray-400">/</span>
+              <span className="font-semibold text-gray-900 dark:text-white">All Collections</span>
             </div>
-          )}
-          <button
-            type="button"
-            onClick={handleToggleSave}
-            disabled={saveBusy}
-            className="absolute top-3 right-3 z-10 rounded-full bg-black/55 p-2 text-white shadow-md transition hover:bg-black/70 disabled:opacity-60"
-            aria-label={isSaved ? 'Unsave collection' : 'Save collection'}
-          >
-            <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-white' : ''}`} />
-          </button>
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent p-4">
-            <div className="text-sm font-semibold text-white">{title}</div>
-            <div className="text-xs text-white/80">{itemCount} items</div>
+            <button
+              type="button"
+              onClick={() => handleSwitchStoreView('products')}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/10"
+            >
+              Back to products
+            </button>
           </div>
         </div>
-      </button>
+
+        {collectionsLoading ? (
+          <section>
+            <div className="mb-4 h-7 w-56 animate-pulse rounded bg-gray-200/70 dark:bg-white/10" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="h-56 animate-pulse rounded-2xl bg-gray-200/70 dark:bg-white/10" />
+              ))}
+            </div>
+          </section>
+        ) : visibleCollections.length > 0 ? (
+          <section>
+            <h3 className="mb-4 text-xl font-semibold text-gray-900 dark:text-white">All Collections</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {visibleCollections.map((collection) => (
+                <CollectionCardMini
+                  key={collection.id}
+                  collection={collection}
+                  isSaved={Boolean(savedMap[collection.id])}
+                  saveBusy={savingIds.has(collection.id)}
+                  onOpen={handleOpenCollection}
+                  onToggleSave={handleToggleSave}
+                />
+              ))}
+            </div>
+          </section>
+        ) : (
+          <StoreEmptyState type="no-collections" isOwner={isOwner} />
+        )}
+      </div>
     );
-  };
+  }
 
   // Move selectedProduct check inside the specific content area
   // instead of replacing the whole component return
 
   return (
     <div className="w-full">
-      {/* Featured Collections - Only show if there are collections */}
-      {!collectionsLoading && featuredCollections.length > 0 && (
+      {collectionsLoading ? (
+        <section className="mb-8">
+          <div className="mb-4">
+            <div className="h-7 w-56 animate-pulse rounded bg-gray-200/70 dark:bg-white/10" />
+            <div className="mt-2 h-4 w-64 animate-pulse rounded bg-gray-200/60 dark:bg-white/10" />
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <div key={idx} className="h-56 animate-pulse rounded-2xl bg-gray-200/70 dark:bg-white/10" />
+            ))}
+          </div>
+        </section>
+      ) : featuredCollections.length > 0 && (
+        /* Featured Collections - Only show if there are collections */
         <section className="mb-8">
           <div className="mb-4 flex items-end justify-between">
             <div>
@@ -418,7 +547,7 @@ export default function CatalogShopTab({
             </div>
             <button
               type="button"
-              onClick={() => navigate(`/profile/${encodeURIComponent(brandId)}?tab=Content`)}
+              onClick={() => handleSwitchStoreView('collections')}
               className="text-sm font-medium text-purple-600 hover:text-purple-700"
             >
               View all
@@ -426,7 +555,14 @@ export default function CatalogShopTab({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {featuredCollections.map((collection) => (
-              <CollectionCardMini key={collection.id} collection={collection} />
+              <CollectionCardMini
+                key={collection.id}
+                collection={collection}
+                isSaved={Boolean(savedMap[collection.id])}
+                saveBusy={savingIds.has(collection.id)}
+                onOpen={handleOpenCollection}
+                onToggleSave={handleToggleSave}
+              />
             ))}
           </div>
         </section>
@@ -476,7 +612,7 @@ export default function CatalogShopTab({
       )}
 
       {/* Search and Filter Row - Premium Glass Header */}
-      <div className="sticky top-0 z-30 bg-white/90 dark:bg-black/90 backdrop-blur-xl py-5 -mx-4 px-6 mb-8 border-b border-gray-100/50 dark:border-white/5 shadow-sm space-y-4 transition-all duration-300">
+      <div className="sticky top-0 z-30 bg-transparent py-4 -mx-4 px-6 mb-8 space-y-3 transition-all duration-300">
         <div className="flex gap-3 items-center">
           {/* Search Input with click-outside detection */}
           <div 
@@ -676,7 +812,7 @@ export default function CatalogShopTab({
                 <StoreEmptyState type="no-products" isOwner={isOwner} />
               ) : null}
 
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
                 {loading
                   ? Array.from({ length: 8 }).map((_, idx) => <ProductCardSkeleton key={idx} />)
                   : products.map((p) => (

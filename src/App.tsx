@@ -168,6 +168,10 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: '/studio/store/collections',
+        element: <Navigate to="/studio/store?view=collections" replace />,
+      },
+      {
         path: '/studio/store/collections/new',
         element: (
           <RequireBrand>

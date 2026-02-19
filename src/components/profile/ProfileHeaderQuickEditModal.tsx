@@ -145,7 +145,7 @@ const ProfileHeaderQuickEditModal: React.FC<ProfileHeaderQuickEditModalProps> = 
 
                 {/* Main Modal Container - Floating Pane */}
                 <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-label="Quick edit">
-                    <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-2xl bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+                    <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-2xl neu-modal-surface bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                 
                 {/* Header / Drag Handle area */}
                 <div className="px-6 py-4 border-b border-gray-200 dark:border-white/5 flex justify-between items-center bg-white/50 dark:bg-white/5">

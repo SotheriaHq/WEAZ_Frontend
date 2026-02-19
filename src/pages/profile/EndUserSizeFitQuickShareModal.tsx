@@ -67,37 +67,38 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
           aria-label="Close quick share modal"
         />
 
-        <section className="relative z-10 w-full max-w-3xl rounded-3xl border border-white/40 dark:border-white/10 bg-[color:var(--surface-primary)]/95 dark:bg-zinc-900/95 shadow-2xl overflow-hidden">
-          <header className="p-5 border-b border-gray-200/70 dark:border-white/10 bg-[color:var(--surface-primary)]/95 dark:bg-zinc-900/95">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
+        <section className="relative z-10 w-full max-w-3xl rounded-3xl neu-modal-surface shadow-2xl overflow-hidden">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 z-20 inline-flex items-center justify-center h-9 w-9 rounded-xl neu-modal-inset focus-visible:ring-2 focus-visible:ring-indigo-400"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4 text-[color:var(--neu-text-muted)]" aria-hidden="true" />
+          </button>
+
+          <div className="p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0 pr-10">
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 text-white grid place-items-center">
                   <Share2 className="h-4 w-4" aria-hidden="true" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Quick Share</h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <h2 className="text-lg font-semibold text-[color:var(--neu-text)]">Quick Share</h2>
+                  <p className="text-xs text-[color:var(--neu-text-muted)]">
                     Share your size/fits profile fast. Requests are handled here.
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex items-center justify-center h-9 w-9 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-indigo-400"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4 text-gray-500" aria-hidden="true" />
-              </button>
             </div>
-          </header>
+          </div>
 
-          <div className="p-5 space-y-4 max-h-[calc(100vh-11rem)] overflow-y-auto scrollbar-hide">
-            <div className="rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-wide font-semibold text-gray-500 dark:text-gray-400">
+          <div className="px-5 pb-5 space-y-4 max-h-[calc(100vh-9rem)] overflow-y-auto scrollbar-hide">
+            <div className="rounded-2xl neu-modal-inset p-4">
+              <p className="text-xs uppercase tracking-wide font-semibold text-[color:var(--neu-text-muted)]">
                 Share Rule
               </p>
-              <p className="mt-1 text-sm text-gray-800 dark:text-gray-100">
+              <p className="mt-1 text-sm text-[color:var(--neu-text)]">
                 {sharePolicy === 'OWNER_ONLY'
                   ? 'Only you can share directly.'
                   : sharePolicy === 'REQUIRE_PERMISSION'
@@ -109,13 +110,13 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
                 <input
                   value={shareTarget}
                   onChange={(event) => setShareTarget(event.target.value)}
-                  className="rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-black/20 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  className="rounded-lg neu-modal-inset px-3 py-2 text-sm text-[color:var(--neu-text)]"
                   placeholder="Target user id"
                 />
                 <input
                   value={shareNote}
                   onChange={(event) => setShareNote(event.target.value)}
-                  className="rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-black/20 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  className="rounded-lg neu-modal-inset px-3 py-2 text-sm text-[color:var(--neu-text)]"
                   placeholder="Optional note"
                 />
                 <button
@@ -129,7 +130,7 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
                 </button>
               </div>
 
-              <label className="mt-3 inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <label className="mt-3 inline-flex items-center gap-2 text-sm text-[color:var(--neu-text)]">
                 <input
                   type="checkbox"
                   checked={canReshare}
@@ -140,22 +141,22 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
               </label>
             </div>
 
-            <div className="rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 p-4">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">Incoming Share Requests</p>
+            <div className="rounded-2xl neu-modal-inset p-4">
+              <p className="text-sm font-semibold text-[color:var(--neu-text)]">Incoming Share Requests</p>
               {incomingPending.length === 0 ? (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">No pending requests.</p>
+                <p className="text-xs text-[color:var(--neu-text-muted)] mt-2">No pending requests.</p>
               ) : (
                 <div className="mt-3 space-y-2">
                   {incomingPending.map((entry: any) => (
                     <div
                       key={String(entry.id)}
-                      className="rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/80 dark:bg-black/20 p-3 flex items-center justify-between gap-3"
+                      className="rounded-lg neu-modal-inset p-3 flex items-center justify-between gap-3"
                     >
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                        <p className="text-xs font-semibold text-[color:var(--neu-text)] truncate">
                           {(entry.viewer?.username as string) || String(entry.viewerId || 'Unknown user')}
                         </p>
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                        <p className="text-[11px] text-[color:var(--neu-text-muted)]">
                           {(entry.note as string) || 'Requested access to re-share your fittings'}
                         </p>
                       </div>

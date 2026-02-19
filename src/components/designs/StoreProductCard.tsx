@@ -6,6 +6,7 @@ import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { toast } from 'sonner';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 export interface StoreProduct {
   id: string;
@@ -59,6 +60,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 }) => {
   const dispatch = useDispatch<AppDispatch>();
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const currentUser = useSelector((s: RootState) => s.user.profile);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
 
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -67,6 +69,9 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const [isWishlisted, setIsWishlisted] = useState(initialWishlisted);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
+  const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
+  const filledHeartEmoji = String.fromCodePoint(0x2764, 0xfe0f);
+  const outlineHeartEmoji = String.fromCodePoint(0x1f5a4);
 
   // Check if product is wishlisted from Redux state
   const isProductWishlisted = wishlistedIds.has(product.id) || isWishlisted;
@@ -83,6 +88,10 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const handleWishlistToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isOwnProduct) {
+      toast.info('Brands cannot add their own product to wishlist.');
+      return;
+    }
     if (!isAuth) {
       toast.info('Please sign in to use wishlist');
       return;
@@ -108,6 +117,10 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
   const handleQuickAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isOwnProduct) {
+      toast.info('Brands cannot add their own product to cart.');
+      return;
+    }
     if (!isAuth) {
       toast.info('Please sign in to add to cart');
       return;
@@ -197,21 +210,25 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
         {/* Product Image */}
         {!imgError && displayImage ? (
-          <img
+          <MediaRenderer
+            kind="image"
             src={displayImage}
             alt={product.name}
+            fit="cover"
             className={`
-              h-full w-full object-cover
+              h-full w-full
               transition-all duration-500 ease-out
               ${imgLoaded ? 'opacity-100' : 'opacity-0'}
               ${isHovered ? 'scale-105' : 'scale-100'}
             `}
+            mediaClassName="h-full w-full object-cover"
+            maxHeightClassName="max-h-full"
+            maxWidthClassName="max-w-full"
             onLoad={() => setImgLoaded(true)}
             onError={() => {
               setImgError(true);
               setImgLoaded(true);
             }}
-            loading="lazy"
           />
         ) : (
           /* Fallback for missing/broken images */
@@ -256,23 +273,29 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           <button
             type="button"
             onClick={handleWishlistToggle}
-            disabled={wishlistLoading}
+            disabled={wishlistLoading || isOwnProduct}
             aria-label={isProductWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-            title={isProductWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+            title={
+              isOwnProduct
+                ? 'Brands cannot wishlist their own products'
+                : isProductWishlisted
+                  ? 'Remove from wishlist'
+                  : 'Add to wishlist'
+            }
             className={`
               absolute top-2 right-2 z-10
               p-2 rounded-full
               backdrop-blur-md
               transition-all duration-200 ease-out
               ${isProductWishlisted
-                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30'
+                ? 'bg-rose-500/75 dark:bg-rose-500/65 text-white shadow-md shadow-rose-900/30 ring-1 ring-white/20'
                 : 'bg-white/80 dark:bg-black/40 text-gray-700 dark:text-white hover:bg-white dark:hover:bg-black/60'
               }
-              ${wishlistLoading ? 'opacity-50 cursor-wait' : 'hover:scale-110 active:scale-95'}
+              ${wishlistLoading || isOwnProduct ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110 active:scale-95'}
             `}
           >
             <span role="img" aria-hidden="true" className="text-base leading-none">
-              {isProductWishlisted ? '❤️' : '🖤'}
+              {isProductWishlisted ? filledHeartEmoji : outlineHeartEmoji}
             </span>
           </button>
         )}
@@ -336,15 +359,21 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           <button
             type="button"
             onClick={handleQuickAddToCart}
-            disabled={cartLoading || product.isOutOfStock}
-            title={product.isOutOfStock ? 'Item is out of stock' : 'Add to your shopping cart'}
+            disabled={cartLoading || product.isOutOfStock || isOwnProduct}
+            title={
+              isOwnProduct
+                ? 'Brands cannot add their own products to cart'
+                : product.isOutOfStock
+                  ? 'Item is out of stock'
+                  : 'Add to your shopping cart'
+            }
             className={`
               mt-auto w-full py-2 px-3 rounded-lg
               font-medium text-xs
               flex items-center justify-center gap-2
               transition-all duration-200
               border
-              ${product.isOutOfStock
+              ${product.isOutOfStock || isOwnProduct
                 ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed dark:bg-white/5 dark:border-white/10 dark:text-zinc-500'
                 : 'bg-transparent border-gray-200 text-gray-900 hover:bg-black hover:text-white hover:border-black dark:border-white/20 dark:text-white dark:hover:bg-white dark:hover:text-black active:scale-[0.98]'
               }
@@ -352,7 +381,9 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             `}
           >
             <ShoppingBag size={14} />
-            {product.isOutOfStock
+            {isOwnProduct
+              ? 'Unavailable'
+              : product.isOutOfStock
               ? 'Sold Out'
               : product.sizes.length > 0 || product.colors.length > 0
                 ? 'Select Options'

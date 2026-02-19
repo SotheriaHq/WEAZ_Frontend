@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { apiClient } from '../api/httpClient';
+import { unwrapApiResponse } from '@/types/auth';
 
 // Types
 export interface WishlistProduct {
@@ -63,7 +64,7 @@ export const fetchWishlist = createAsyncThunk(
   async (params: { page?: number; limit?: number } = {}, { rejectWithValue }) => {
     try {
       const response = await apiClient.get('/store/wishlist', { params });
-      return response.data;
+      return unwrapApiResponse(response.data);
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch wishlist');
     }
@@ -75,7 +76,8 @@ export const addToWishlist = createAsyncThunk(
   async (productId: string, { rejectWithValue }) => {
     try {
       const response = await apiClient.post('/store/wishlist', { productId });
-      return { productId, ...response.data };
+      const payload = unwrapApiResponse<Record<string, unknown>>(response.data);
+      return { productId, ...(payload ?? {}) };
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to add to wishlist');
     }
@@ -99,7 +101,8 @@ export const checkWishlistStatus = createAsyncThunk(
   async (productId: string, { rejectWithValue }) => {
     try {
       const response = await apiClient.get(`/store/wishlist/${productId}/check`);
-      return { productId, isWishlisted: response.data.isWishlisted };
+      const payload = unwrapApiResponse<{ isWishlisted?: boolean }>(response.data);
+      return { productId, isWishlisted: Boolean(payload?.isWishlisted) };
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to check wishlist status');
     }
@@ -215,8 +218,11 @@ export const wishlistSlice = createSlice({
         state.error = null;
       })
       .addCase(addToWishlist.fulfilled, (state, action) => {
-        state.wishlistedIds.add(action.payload.productId);
-        state.total += 1;
+        const productId = action.payload.productId;
+        if (!state.wishlistedIds.has(productId)) {
+          state.wishlistedIds.add(productId);
+          state.total += 1;
+        }
       })
       .addCase(addToWishlist.rejected, (state, action) => {
         state.error = action.payload as string;

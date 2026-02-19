@@ -29,7 +29,7 @@ const ComingSoonModal: React.FC<ComingSoonModalProps> = ({
       />
       
       {/* Modal */}
-      <div className="relative w-full max-w-sm mx-4 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
+      <div className="relative w-full max-w-sm mx-4 neu-modal-surface bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
         <div className="p-8 text-center">
           {/* Icon */}
           <div className="w-24 h-24 mx-auto bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 rounded-full flex items-center justify-center mb-6 animate-bounce-slow">

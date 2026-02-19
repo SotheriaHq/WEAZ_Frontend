@@ -1,4 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
+import { enableMapSet } from 'immer';
 import userReducer from './features/userSlice';
 import engagementReducer from './features/engagementSlice';
 import notificationsReducer from './features/notificationsSlice';
@@ -6,6 +7,9 @@ import patchesReducer from './features/patchesSlice';
 import uiReducer from './features/uiSlice';
 import cartReducer from './features/cartSlice';
 import wishlistReducer from './features/wishlistSlice';
+
+// Required for reducers that mutate Set/Map values (wishlist.wishlistedIds).
+enableMapSet();
 
 export const store = configureStore({
   reducer: {

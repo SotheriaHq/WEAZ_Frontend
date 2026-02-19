@@ -47,6 +47,27 @@ const categoriesCache: {
 } = { items: [], lastFetched: 0 };
 const CATEGORIES_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+const mapCategories = (
+  payload: unknown,
+): Array<{ id: string; slug: string; name: string; description?: string | null }> => {
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as any)?.data)
+      ? (payload as any).data
+      : Array.isArray((payload as any)?.data?.data)
+        ? (payload as any).data.data
+        : [];
+
+  return items
+    .map((c: any) => ({
+      id: String(c?.id ?? ''),
+      slug: String(c?.slug ?? ''),
+      name: String(c?.name ?? ''),
+      description: c?.description ?? null,
+    }))
+    .filter((c: { id: string; name: string }) => c.id.length > 0 && c.name.length > 0);
+};
+
 export const brandApi = {
   async getCategories(force = false): Promise<Array<{ id: string; slug: string; name: string; description?: string | null }>> {
     // Serve cached categories if fresh and not forcing a reload
@@ -54,33 +75,28 @@ export const brandApi = {
       return categoriesCache.items;
     }
     try {
-      const response = await apiClient.get(`/collections/categories`);
+      const response = await apiClient.get(`/collections/categories`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      });
       if (response?.status === 304 && categoriesCache.items.length) {
         return categoriesCache.items;
       }
-      // Support plain array or wrapped { data } or nested { data: { data } }
-      const payload = (response?.data ?? undefined) as unknown;
-      const items = Array.isArray(payload)
-        ? payload
-        : Array.isArray((payload as any)?.data)
-          ? (payload as any).data
-          : Array.isArray((payload as any)?.data?.data)
-            ? (payload as any).data.data
-            : [];
+      let mapped = mapCategories((response?.data ?? undefined) as unknown);
 
-      const mapped = items.map((c: any) => ({
-        id: String(c?.id ?? ''),
-        slug: String(c?.slug ?? ''),
-        name: String(c?.name ?? ''),
-        description: c?.description ?? null,
-      })).filter((c: { id: string; name: string }) => c.id.length > 0 && c.name.length > 0);
-
-      if (mapped.length === 0) {
-        if (categoriesCache.items.length) {
-          return categoriesCache.items;
-        }
-        return [];
+      if (mapped.length === 0 && response?.status === 304 && categoriesCache.items.length === 0) {
+        const fallbackResponse = await apiClient.get(`/products/categories`, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            Pragma: 'no-cache',
+          },
+        });
+        mapped = mapCategories((fallbackResponse?.data ?? undefined) as unknown);
       }
+
+      if (mapped.length === 0) return categoriesCache.items.length ? categoriesCache.items : [];
 
       categoriesCache.items = mapped;
       categoriesCache.lastFetched = Date.now();
@@ -329,15 +345,36 @@ export const brandApi = {
         const productLinks = Array.isArray((backendItem as any).products)
           ? ((backendItem as any).products as Array<any>)
           : [];
-        const firstProduct = productLinks[0]?.product ?? productLinks[0];
+        const productCandidates = productLinks
+          .map((link: any) => link?.product ?? link)
+          .filter(Boolean);
+        const firstProductWithCover = productCandidates.find((product: any) => {
+          if (typeof product?.thumbnail === 'string' && product.thumbnail.length > 0) return true;
+          return Array.isArray(product?.images)
+            ? product.images.some((img: any) => typeof img === 'string' && img.length > 0)
+            : false;
+        });
         const productCoverUrl =
-          typeof firstProduct?.thumbnail === 'string'
-            ? firstProduct.thumbnail
-            : Array.isArray(firstProduct?.images)
-              ? firstProduct.images.find((img: any) => typeof img === 'string')
+          typeof firstProductWithCover?.thumbnail === 'string'
+            ? firstProductWithCover.thumbnail
+            : Array.isArray(firstProductWithCover?.images)
+              ? firstProductWithCover.images.find((img: any) => typeof img === 'string' && img.length > 0)
               : undefined;
+        const productMedia = Array.isArray(firstProductWithCover?.media)
+          ? (firstProductWithCover.media as Array<{ id?: string; isPrimary?: boolean }>)
+          : [];
+        const productPrimaryMedia = productMedia.find((m) => m?.isPrimary) || productMedia[0];
+        const productCoverFileId =
+          (typeof productPrimaryMedia?.id === 'string' && !productPrimaryMedia.id.startsWith('http')
+            ? productPrimaryMedia.id
+            : undefined) ||
+          (Array.isArray(firstProductWithCover?.mediaIds)
+            ? firstProductWithCover.mediaIds.find((id: unknown) => typeof id === 'string' && !id.startsWith('http'))
+            : undefined);
         const resolvedCoverImage = coverImageUrl || productCoverUrl || '';
-        const coverFileId = typeof fileObj?.id === 'string' ? fileObj!.id : undefined;
+        const coverFileId =
+          (typeof fileObj?.id === 'string' ? fileObj.id : undefined) ||
+          productCoverFileId;
         const countObj = (backendItem._count as { medias?: number } | undefined) ?? undefined;
         const mediaCount = typeof countObj?.medias === 'number' ? countObj!.medias! : ((backendItem.medias as unknown[])?.length || 0);
         // Aggregate total threads/comments: include media-level counts if available
@@ -350,9 +387,15 @@ export const brandApi = {
         const visibility =
           ((backendItem as any).visibility as any) ??
           (backendItem.status === 'PUBLISHED' ? 'PUBLIC' : 'PRIVATE');
+        const rawStatus = typeof backendItem.status === 'string' ? backendItem.status.toUpperCase() : '';
+        const status =
+          rawStatus === 'DRAFT' || rawStatus === 'PUBLISHED' || rawStatus === 'ARCHIVED'
+            ? (rawStatus as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED')
+            : undefined;
 
         const out = {
           id: backendItem.id as string,
+          status,
           name: (backendItem.title as string) || '',
           title: (backendItem.title as string) || '',
           description: (backendItem.description as string) || '',
@@ -564,6 +607,26 @@ export const brandApi = {
       return true;
     } catch (error) {
       console.error('Error deleting collection:', error);
+      return false;
+    }
+  },
+
+  async archiveCollection(collectionId: string): Promise<boolean> {
+    try {
+      await apiClient.patch(`/collections/${collectionId}/archive`);
+      return true;
+    } catch (error) {
+      console.error('Error archiving collection:', error);
+      return false;
+    }
+  },
+
+  async unarchiveCollection(collectionId: string): Promise<boolean> {
+    try {
+      await apiClient.patch(`/collections/${collectionId}/unarchive`);
+      return true;
+    } catch (error) {
+      console.error('Error unarchiving collection:', error);
       return false;
     }
   },

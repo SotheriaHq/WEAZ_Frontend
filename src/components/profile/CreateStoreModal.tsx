@@ -78,7 +78,7 @@ const CreateStoreModal: React.FC<Props> = ({ open, onClose }) => {
             aria-modal="true"
             aria-label="Create a store"
             tabIndex={-1}
-            className="w-full max-w-[480px] max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-xl outline-none dark:bg-gray-900"
+            className="w-full max-w-[480px] max-h-[90vh] neu-modal-surface overflow-hidden rounded-2xl bg-white shadow-xl outline-none dark:bg-gray-900"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="shrink-0 border-b border-gray-200 px-6 py-4 dark:border-gray-800">

@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { AlertTriangle, CalendarClock, Lock, MapPin, Tag } from 'lucide-react';
+import { toast } from 'sonner';
 import { apiClient } from '@/api/httpClient';
+import type { RootState } from '@/store';
 import EmptyState from '@/components/EmptyState';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store';
-import { AlertTriangle, CalendarClock, Lock, MapPin, Tag } from 'lucide-react';
-import { toast } from 'sonner';
+import ImageWithFallback from '@/components/ImageWithFallback';
+import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 
 type ViewMode = 'grid' | 'list' | 'compact';
 
@@ -17,6 +19,8 @@ interface PatchedBrand {
   firstName: string;
   lastName: string;
   profileImage?: string;
+  profileImageId?: string | null;
+  profileImageFile?: { id?: string | null; s3Url?: string | null } | null;
   bannerImage?: string;
   brandName: string;
   brandTitle?: string | null;
@@ -32,6 +36,7 @@ interface PatchesTabProps {
 }
 
 export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibility }) => {
+  const patchDetailsEmoji = String.fromCodePoint(0x1f9f7);
   const [patchedBrands, setPatchedBrands] = useState<PatchedBrand[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +48,6 @@ export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibili
 
   useEffect(() => {
     const fetchPatchedBrands = async () => {
-      // If it's not the owner and the profile is locked, don't show patches
       if (!isOwner && profileVisibility === 'LOCKED') {
         setPatchedBrands([]);
         setLoading(false);
@@ -52,7 +56,7 @@ export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibili
 
       try {
         setLoading(true);
-        const profileId = isOwner ? currentUserId : id; // Route param for visitor view
+        const profileId = isOwner ? currentUserId : id;
         if (!profileId) {
           throw new Error('Profile ID not found');
         }
@@ -72,7 +76,7 @@ export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibili
       }
     };
 
-    fetchPatchedBrands();
+    void fetchPatchedBrands();
   }, [isOwner, profileVisibility, currentUserId, id]);
 
   const sortedPatchedBrands = useMemo(() => {
@@ -124,10 +128,10 @@ export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibili
         {[...Array(3)].map((_, idx) => (
           <div key={idx} className="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 animate-pulse">
             <div className="flex items-center">
-              <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full mr-3"></div>
+              <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full mr-3" />
               <div className="flex-1">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-3/4"></div>
-                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-3/4" />
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
               </div>
             </div>
           </div>
@@ -204,96 +208,105 @@ export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibili
       </div>
 
       <div className={itemLayoutClass}>
-        {sortedPatchedBrands.map((brand) => (
-          <Card
-            key={brand.id}
-            className={`p-4 ${viewMode === 'compact' ? 'py-3' : ''}`}
-          >
-            <div className={`flex ${viewMode === 'list' ? 'items-start' : 'items-center'} gap-3`}>
-              {brand.profileImage ? (
-                <img
-                  src={brand.profileImage}
-                  alt={brand.brandName}
-                  className="h-12 w-12 rounded-full object-cover ring-2 ring-white dark:ring-gray-800"
-                />
-              ) : (
-                <div className="h-12 w-12 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                  <span className="text-lg text-gray-700 dark:text-gray-300">
-                    {brand.firstName?.charAt(0) || brand.lastName?.charAt(0) || '?'}
-                  </span>
-                </div>
-              )}
+        {sortedPatchedBrands.map((brand) => {
+          const avatar = resolveProfileImageSource({
+            profileImage: brand.profileImage,
+            profileImageId: brand.profileImageId,
+            profileImageFile: brand.profileImageFile,
+            brandLogo: brand.brandLogo,
+          });
+          const fallback = getAvatarFallback(brand.brandName, brand.username);
 
-              <div className="min-w-0 flex-1 space-y-1">
-                <button
-                  type="button"
-                  onClick={() => navigateToBrandCatalog(brand.id)}
-                  className="max-w-full truncate text-left font-semibold text-gray-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-300"
-                  title={`Open ${brand.brandName} catalog`}
-                >
-                  {brand.brandName}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigateToBrandCatalog(brand.id)}
-                  className="max-w-full truncate text-left text-sm text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-300"
-                  title={`Open @${brand.username} catalog`}
-                >
-                  @{brand.username}
-                </button>
-                {brand.brandTitle ? (
-                  <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-1">{brand.brandTitle}</p>
-                ) : null}
-                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                  {brand.location ? (
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin className="h-3.5 w-3.5" />
-                      <span className="line-clamp-1">{brand.location}</span>
-                    </span>
-                  ) : null}
-                  {brand.patchedAt ? (
-                    <span className="inline-flex items-center gap-1">
-                      <CalendarClock className="h-3.5 w-3.5" />
-                      <span>Patched {new Date(brand.patchedAt).toLocaleDateString()}</span>
-                    </span>
-                  ) : null}
+          return (
+            <Card
+              key={brand.id}
+              className={`p-4 ${viewMode === 'compact' ? 'py-3' : ''}`}
+            >
+              <div className={`flex ${viewMode === 'list' ? 'items-start' : 'items-center'} gap-3`}>
+                <div className="h-12 w-12 shrink-0">
+                  <ImageWithFallback
+                    src={avatar.src}
+                    fileId={avatar.fileId}
+                    alt={brand.brandName}
+                    fit="cover"
+                    rounded="full"
+                    fallbackName={fallback}
+                    containerClassName="h-12 w-12 rounded-full overflow-hidden ring-2 ring-white dark:ring-gray-800"
+                    className="h-12 w-12 object-cover"
+                  />
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2 self-start sm:self-center">
-                <div className="relative group">
-                  <span
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-base dark:border-indigo-800 dark:bg-indigo-900/30"
-                    role="img"
-                    aria-label="Patch details"
+                <div className="min-w-0 flex-1 space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => navigateToBrandCatalog(brand.id)}
+                    className="max-w-full truncate text-left font-semibold text-gray-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-300"
+                    title={`Open ${brand.brandName} catalog`}
                   >
-                    🧷
-                  </span>
-                  <span className="pointer-events-none absolute right-0 top-10 z-20 min-w-[180px] rounded-xl bg-gray-900 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                    {brand.description?.trim() || 'Patched brand connection active.'}
-                  </span>
+                    {brand.brandName}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigateToBrandCatalog(brand.id)}
+                    className="max-w-full truncate text-left text-sm text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-300"
+                    title={`Open @${brand.username} catalog`}
+                  >
+                    @{brand.username}
+                  </button>
+                  {brand.brandTitle ? (
+                    <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-1">{brand.brandTitle}</p>
+                  ) : null}
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                    {brand.location ? (
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3.5 w-3.5" />
+                        <span className="line-clamp-1">{brand.location}</span>
+                      </span>
+                    ) : null}
+                    {brand.patchedAt ? (
+                      <span className="inline-flex items-center gap-1">
+                        <CalendarClock className="h-3.5 w-3.5" />
+                        <span>Patched {new Date(brand.patchedAt).toLocaleDateString()}</span>
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => navigateToBrandCatalog(brand.id)}
-                >
-                  Catalog
-                </Button>
-                {isOwner && (
+
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  <div className="relative group">
+                    <span
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-base dark:border-indigo-800 dark:bg-indigo-900/30"
+                      role="img"
+                      aria-label="Patch details"
+                    >
+                      {patchDetailsEmoji}
+                    </span>
+                    <span className="pointer-events-none absolute right-0 top-10 z-20 min-w-[180px] rounded-xl bg-gray-900 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
+                      {brand.description?.trim() || 'Patched brand connection active.'}
+                    </span>
+                  </div>
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => handleUnpatchBrand(brand.id)}
-                    disabled={unpatchingBrandId === brand.id}
+                    onClick={() => navigateToBrandCatalog(brand.id)}
                   >
-                    {unpatchingBrandId === brand.id ? 'Unpatching...' : 'Unpatch'}
+                    Catalog
                   </Button>
-                )}
+                  {isOwner ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleUnpatchBrand(brand.id)}
+                      disabled={unpatchingBrandId === brand.id}
+                    >
+                      {unpatchingBrandId === brand.id ? 'Unpatching...' : 'Unpatch'}
+                    </Button>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

@@ -47,7 +47,9 @@ const StoreCollectionCreate: React.FC = () => {
   const [creationMode, setCreationMode] = useState<'existing' | 'new'>('existing');
 
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [primaryProductId, setPrimaryProductId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitAction, setSubmitAction] = useState<'draft' | 'publish' | null>(null);
   const [previewProduct, setPreviewProduct] = useState<StoreProduct | null>(null);
 
   const preselectProductId = searchParams.get('productId');
@@ -100,6 +102,7 @@ const StoreCollectionCreate: React.FC = () => {
       if (!mounted || !detail) return;
 
       const links = Array.isArray(detail.products) ? detail.products : [];
+      const primaryLink = links.find((link: any) => Boolean(link?.isPrimary));
       const linkedProducts = links
         .map((link: any) => link?.product ?? link)
         .filter(Boolean);
@@ -113,6 +116,14 @@ const StoreCollectionCreate: React.FC = () => {
 
       if (linkedIds.length > 0) {
         setSelectedProductIds((prev) => Array.from(new Set([...prev, ...linkedIds])));
+        const nextPrimaryId =
+          primaryLink?.product?.id ||
+          primaryLink?.productId ||
+          linkedIds[0] ||
+          null;
+        if (nextPrimaryId) {
+          setPrimaryProductId((prev) => prev ?? String(nextPrimaryId));
+        }
       }
       if (draftIds.length > 0) {
         setSessionDraftProductIds((prev) => Array.from(new Set([...prev, ...draftIds])));
@@ -178,6 +189,7 @@ const StoreCollectionCreate: React.FC = () => {
       if (prev.length >= MAX_PRODUCTS) return prev;
       return [...prev, preselectProductId];
     });
+    setPrimaryProductId((prev) => prev ?? preselectProductId);
     setCreationMode('new');
   }, [preselectProductId, loadProducts]);
 
@@ -257,6 +269,13 @@ const StoreCollectionCreate: React.FC = () => {
     [products, selectedProductIds]
   );
 
+  const orderedSelectedProductIds = useMemo(() => {
+    if (!primaryProductId || !selectedProductIds.includes(primaryProductId)) {
+      return selectedProductIds;
+    }
+    return [primaryProductId, ...selectedProductIds.filter((id) => id !== primaryProductId)];
+  }, [primaryProductId, selectedProductIds]);
+
   const hasAnyMedia = useMemo(
     () =>
       selectedProducts.some((p) => {
@@ -281,6 +300,16 @@ const StoreCollectionCreate: React.FC = () => {
     },
     []
   );
+
+  useEffect(() => {
+    if (selectedProductIds.length === 0) {
+      if (primaryProductId !== null) setPrimaryProductId(null);
+      return;
+    }
+    if (!primaryProductId || !selectedProductIds.includes(primaryProductId)) {
+      setPrimaryProductId(selectedProductIds[0]);
+    }
+  }, [primaryProductId, selectedProductIds]);
 
   const ensureCollectionSession = async () => {
     if (collectionSessionId) return collectionSessionId;
@@ -349,11 +378,12 @@ const StoreCollectionCreate: React.FC = () => {
     }
 
     setSubmitting(true);
+    setSubmitAction(action);
     try {
       const sessionId = await ensureCollectionSession();
 
-      if (selectedProductIds.length > 0) {
-        await addProductsToCollection(sessionId, selectedProductIds);
+      if (orderedSelectedProductIds.length > 0) {
+        await addProductsToCollection(sessionId, orderedSelectedProductIds);
       }
 
       await finalizeStoreCollection(sessionId, {
@@ -395,6 +425,7 @@ const StoreCollectionCreate: React.FC = () => {
       );
     } finally {
       setSubmitting(false);
+      setSubmitAction(null);
     }
   };
 
@@ -578,6 +609,7 @@ const StoreCollectionCreate: React.FC = () => {
                 {visibleProducts.map((product) => {
                   const image = getProductImageSource(product);
                   const selected = selectedProductIds.includes(product.id);
+                  const isPrimary = primaryProductId === product.id;
                   const isSession = sessionDraftProductIds.includes(product.id);
                   return (
                     <div
@@ -623,6 +655,11 @@ const StoreCollectionCreate: React.FC = () => {
                             <div className="text-xs text-gray-500">
                               {formatCurrency(product.price)}
                             </div>
+                            {isPrimary && (
+                              <div className="mt-1 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                Primary cover
+                              </div>
+                            )}
                             {isSession && (
                               <div className="mt-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
                                 New • Collection Flow
@@ -642,6 +679,23 @@ const StoreCollectionCreate: React.FC = () => {
                               className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
                             >
                               Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPrimaryProductId(product.id);
+                                if (!selectedProductIds.includes(product.id)) {
+                                  toggleProduct(product.id);
+                                }
+                              }}
+                              className={`text-[10px] px-2.5 py-1 rounded-md font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200 ${
+                                isPrimary
+                                  ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white'
+                                  : 'bg-gradient-to-r from-slate-500 to-slate-600 text-white'
+                              }`}
+                            >
+                              {isPrimary ? 'Primary' : 'Set Primary'}
                             </button>
                             <button
                               type="button"
@@ -684,6 +738,7 @@ const StoreCollectionCreate: React.FC = () => {
                     {sessionProducts.map((product) => {
                       const image = getProductImageSource(product);
                       const selected = selectedProductIds.includes(product.id);
+                      const isPrimary = primaryProductId === product.id;
                       return (
                         <div
                           key={product.id}
@@ -728,6 +783,11 @@ const StoreCollectionCreate: React.FC = () => {
                                 <div className="text-xs text-gray-500">
                                   {formatCurrency(product.price)}
                                 </div>
+                                {isPrimary && (
+                                  <div className="mt-1 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                    Primary cover
+                                  </div>
+                                )}
                                 <div className="mt-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
                                   New • Collection Flow
                                 </div>
@@ -745,6 +805,23 @@ const StoreCollectionCreate: React.FC = () => {
                                   className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
                                 >
                                   Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPrimaryProductId(product.id);
+                                    if (!selectedProductIds.includes(product.id)) {
+                                      toggleProduct(product.id);
+                                    }
+                                  }}
+                                  className={`text-[10px] px-2.5 py-1 rounded-md font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200 ${
+                                    isPrimary
+                                      ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white'
+                                      : 'bg-gradient-to-r from-slate-500 to-slate-600 text-white'
+                                  }`}
+                                >
+                                  {isPrimary ? 'Primary' : 'Set Primary'}
                                 </button>
                                 <button
                                   type="button"
@@ -896,10 +973,16 @@ const StoreCollectionCreate: React.FC = () => {
               <div className="space-y-2">
                 {selectedProducts.map((product) => {
                   const isDraft = product.isActive === false || sessionDraftProductIds.includes(product.id);
+                  const isPrimary = primaryProductId === product.id;
                   return (
                   <div key={product.id} className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300">
                     <span className="line-clamp-1 flex items-center gap-2">
                       {product.name}
+                      {isPrimary && (
+                        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                          Primary
+                        </span>
+                      )}
                       {isDraft && (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
                           Draft
@@ -907,6 +990,13 @@ const StoreCollectionCreate: React.FC = () => {
                       )}
                     </span>
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPrimaryProductId(product.id)}
+                        className="text-indigo-600 hover:text-indigo-700"
+                      >
+                        {isPrimary ? 'Primary' : 'Set Primary'}
+                      </button>
                       <button
                         type="button"
                         onClick={() => void openCollectionProductEditor(product.id)}
@@ -943,17 +1033,23 @@ const StoreCollectionCreate: React.FC = () => {
           type="button"
           onClick={() => handleSubmit('draft')}
           disabled={submitting}
-          className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60"
+          className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 inline-flex items-center gap-2"
         >
-          Save Draft
+          {submitting && submitAction === 'draft' && (
+            <span className="h-3.5 w-3.5 rounded-full border-2 border-gray-500/40 border-t-gray-700 animate-spin" />
+          )}
+          {submitting && submitAction === 'draft' ? 'Saving...' : 'Save Draft'}
         </button>
         <button
           type="button"
           onClick={() => handleSubmit('publish')}
           disabled={submitting}
-          className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60"
+          className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60 inline-flex items-center gap-2"
         >
-          Publish
+          {submitting && submitAction === 'publish' && (
+            <span className="h-3.5 w-3.5 rounded-full border-2 border-white/50 border-t-white animate-spin" />
+          )}
+          {submitting && submitAction === 'publish' ? 'Publishing...' : 'Publish'}
         </button>
       </div>
 

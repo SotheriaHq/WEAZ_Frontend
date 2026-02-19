@@ -64,7 +64,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Navbar />
 
       {/* Sidebar */}
-      {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen) && <Sidebar />}
+      {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
        
       {/* Main Content Area */}
       <main

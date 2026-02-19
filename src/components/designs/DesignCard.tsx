@@ -11,6 +11,8 @@ import { useRealtime } from '@/realtime/RealtimeProvider';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { apiClient } from '@/api/httpClient';
 import { Link, Tag } from 'lucide-react';
+import ImageWithFallback from '@/components/ImageWithFallback';
+import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 
 interface DesignCardProps {
   item: MarketItem;
@@ -143,6 +145,10 @@ export const DesignCard: React.FC<DesignCardProps> = ({
       onToggleSave?.(item.id);
       return;
     }
+    if (user?.id && item.brandId && user.id === item.brandId) {
+      toast.info('Brands cannot save their own products.');
+      return;
+    }
     if (!isAuth) { toast.info('Please sign in to save items.'); return; }
     if (saveBusyLocal) return;
     try {
@@ -197,6 +203,12 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   };
 
   if (isHidden) return null;
+
+  const brandAvatar = resolveProfileImageSource({
+    brandLogo: item.brandLogo,
+    brandLogoFileId: item.brandLogoFileId,
+  });
+  const brandAvatarFallback = getAvatarFallback(item.brandName ?? null, item.username ?? null);
 
   return (
     <article
@@ -350,6 +362,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               // Handle share action
             }}
             aria-label="Share"
+            title="Share collection"
           >
             <Link className="h-5 w-5" aria-hidden="true" />
             <span className="text-xs font-bold mt-1 drop-shadow">{item.collectionCollabCount ?? 0}</span>
@@ -369,25 +382,18 @@ export const DesignCard: React.FC<DesignCardProps> = ({
             }}
             className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 w-fit rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 transition-all"
           >
-            {item.brandLogo ? (
-              <div className="relative flex max-h-8 max-w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/60 shadow-md">
-                <MediaRenderer
-                  kind="image"
-                  src={item.brandLogo}
-                  alt={item.brandName ?? item.username ?? 'Brand'}
-                  maxHeightClassName="max-h-8"
-                  maxWidthClassName="max-w-8"
-                  className="rounded-full"
-                  mediaClassName="rounded-full"
-                />
-              </div>
-            ) : (
-              <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/60 bg-gradient-to-br from-primary to-purple-500 shadow-md">
-                <span className="text-xs font-bold text-white">
-                  {(item.brandName ?? item.username ?? 'B').charAt(0).toUpperCase()}
-                </span>
-              </div>
-            )}
+            <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border-2 border-white/60 shadow-md">
+              <ImageWithFallback
+                src={brandAvatar.src}
+                fileId={brandAvatar.fileId}
+                alt={item.brandName ?? item.username ?? 'Brand'}
+                fit="cover"
+                rounded="full"
+                fallbackName={brandAvatarFallback}
+                containerClassName="h-8 w-8 rounded-full"
+                className="h-8 w-8 object-cover"
+              />
+            </div>
             <div className="flex-1 min-w-0 text-left">
               {/* FIX #5: Responsive font sizing, removed truncate, allow wrapping with line-clamp */}
               <p 

@@ -117,48 +117,49 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
           aria-label="Close custom size fits modal"
         />
 
-        <section className="relative z-10 w-full max-w-5xl max-h-[calc(100vh-2rem)] overflow-hidden rounded-3xl bg-[color:var(--surface-primary)]/95 dark:bg-zinc-900/95 border border-white/40 dark:border-white/10 shadow-2xl">
-          <header className="sticky top-0 z-10 p-5 border-b border-gray-200/70 dark:border-white/10 bg-[color:var(--surface-primary)]/95 dark:bg-zinc-900/95 backdrop-blur-md flex items-center justify-between">
-            <div className="flex items-center gap-3 min-w-0">
+        <section className="relative z-10 w-full max-w-5xl max-h-[calc(100vh-2rem)] overflow-hidden rounded-3xl neu-modal-surface shadow-2xl">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 z-20 inline-flex items-center justify-center h-9 w-9 rounded-xl neu-modal-inset focus-visible:ring-2 focus-visible:ring-indigo-400"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4 text-[color:var(--neu-text-muted)]" aria-hidden="true" />
+          </button>
+
+          <div className="p-5 flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0 pr-10">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white grid place-items-center">
                 <Ruler className="h-4 w-4" aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                <h2 className="text-lg font-semibold text-[color:var(--neu-text)] truncate">
                   Custom Size/Fits
                 </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-[color:var(--neu-text-muted)]">
                   Keep these measurements current every two weeks for accurate orders.
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex items-center justify-center h-9 w-9 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-indigo-400"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4 text-gray-500" aria-hidden="true" />
-            </button>
-          </header>
+          </div>
 
           {loading ? (
-            <div className="p-10 flex items-center justify-center text-gray-500">
+            <div className="p-10 flex items-center justify-center text-[color:var(--neu-text-muted)]">
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
               Loading fitting profile...
             </div>
           ) : (
-            <div className="p-5 space-y-4 max-h-[calc(100vh-11rem)] overflow-y-auto scrollbar-hide overscroll-contain">
+            <div className="px-5 pb-5 space-y-4 max-h-[calc(100vh-8rem)] overflow-y-auto scrollbar-hide overscroll-contain">
               <details
                 open
-                className="rounded-2xl border border-gray-200/70 dark:border-white/10 p-4 bg-white/60 dark:bg-white/5"
+                className="rounded-2xl neu-modal-inset p-4"
               >
-                <summary className="cursor-pointer font-semibold text-gray-900 dark:text-white">
+                <summary className="cursor-pointer font-semibold text-[color:var(--neu-text)]">
                   Measurements
                 </summary>
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {MEASUREMENT_FIELDS.map((field) => (
-                    <label key={field.key} className="text-xs text-gray-600 dark:text-gray-300">
+                    <label key={field.key} className="text-xs text-[color:var(--neu-text-muted)]">
                       <span className="block mb-1">{field.label}</span>
                       <input
                         name={field.key}
@@ -166,7 +167,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                         onChange={(e) =>
                           setValues((prev) => ({ ...prev, [field.key]: e.target.value }))
                         }
-                        className="w-full rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-black/20 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                        className="w-full rounded-lg neu-modal-inset px-3 py-2 text-sm text-[color:var(--neu-text)]"
                         placeholder="Enter value"
                         autoComplete="off"
                       />
@@ -174,18 +175,18 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                   ))}
                 </div>
                 <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3">
-                  <label className="text-xs text-gray-600 dark:text-gray-300">
+                  <label className="text-xs text-[color:var(--neu-text-muted)]">
                     <span className="block mb-1">Fit Notes</span>
                     <textarea
                       name="fit_notes"
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       rows={3}
-                      className="w-full rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-black/20 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                      className="w-full rounded-lg neu-modal-inset px-3 py-2 text-sm text-[color:var(--neu-text)]"
                       placeholder="Any additional details"
                     />
                   </label>
-                  <label className="text-xs text-gray-600 dark:text-gray-300">
+                  <label className="text-xs text-[color:var(--neu-text-muted)]">
                     <span className="block mb-1">Reminder Cycle (days)</span>
                     <input
                       name="reminder_days"
@@ -194,7 +195,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                       max={60}
                       value={reminderDays}
                       onChange={(e) => setReminderDays(Number(e.target.value || 14))}
-                      className="w-full rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-black/20 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                      className="w-full rounded-lg neu-modal-inset px-3 py-2 text-sm text-[color:var(--neu-text)]"
                     />
                   </label>
                 </div>
@@ -210,8 +211,8 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                 </div>
               </details>
 
-              <details className="rounded-2xl border border-gray-200/70 dark:border-white/10 p-4 bg-white/60 dark:bg-white/5">
-                <summary className="cursor-pointer font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <details className="rounded-2xl neu-modal-inset p-4">
+                <summary className="cursor-pointer font-semibold text-[color:var(--neu-text)] flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4" aria-hidden="true" />
                   Permissions & Visibility
                 </summary>
@@ -241,7 +242,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                   />
                 </div>
 
-                <label className="mt-3 inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <label className="mt-3 inline-flex items-center gap-2 text-sm text-[color:var(--neu-text)]">
                   <input
                     type="checkbox"
                     checked={notifyOnShare}
@@ -262,18 +263,18 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                   </button>
                 </div>
               </details>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-xl neu-modal-inset px-4 py-2 text-sm font-medium text-[color:var(--neu-text)]"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           )}
-
-          <footer className="px-5 py-4 border-t border-gray-200/70 dark:border-white/10 flex justify-end bg-[color:var(--surface-primary)]/95 dark:bg-zinc-900/95">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-gray-300/80 dark:border-white/20 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-white/5"
-            >
-              Close
-            </button>
-          </footer>
         </section>
       </div>
     </OverlayPortal>

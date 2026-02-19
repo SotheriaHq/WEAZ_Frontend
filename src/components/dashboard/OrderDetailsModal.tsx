@@ -90,7 +90,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     <OverlayPortal>
       <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 animate-in fade-in duration-200" role="dialog" aria-modal="true" aria-label="Order details">
         <div className="fixed inset-0 z-layer-overlay bg-black/50 backdrop-blur-sm" onClick={onClose} />
-        <div ref={dialogRef} tabIndex={-1} className="bg-white dark:bg-gray-900 relative w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div ref={dialogRef} tabIndex={-1} className="bg-white dark:bg-gray-900 neu-modal-surface relative w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
         <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50/50 dark:bg-gray-800/50">

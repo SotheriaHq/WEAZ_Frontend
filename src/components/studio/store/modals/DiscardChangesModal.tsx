@@ -32,7 +32,7 @@ const DiscardChangesModal: React.FC<DiscardChangesModalProps> = ({
       
       {/* Modal */}
       <div className="relative z-10 w-full max-w-md mx-4 animate-in zoom-in-95 fade-in duration-300">
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900 neu-modal-surface rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
           {/* Header */}
           <div className="relative px-6 pt-6 pb-4">
             <button

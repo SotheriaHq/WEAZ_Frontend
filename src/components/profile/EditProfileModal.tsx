@@ -387,7 +387,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
         {/* Main Modal Container */}
         <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-label="Brand setup">
-          <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-4xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in border border-gray-200 dark:border-gray-800">
+          <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-4xl neu-modal-surface bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in border border-gray-200 dark:border-gray-800">
 
           {/* Scrollable Content */}
           <form 

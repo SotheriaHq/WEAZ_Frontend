@@ -160,7 +160,7 @@ const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
         />
 
         {/* Modal */}
-        <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-2xl bg-white dark:bg-zinc-900/80 backdrop-blur-xl border border-gray-200/50 dark:border-zinc-800/50 rounded-2xl shadow-2xl overflow-hidden">
+        <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-2xl neu-modal-surface bg-white dark:bg-zinc-900/80 backdrop-blur-xl border border-gray-200/50 dark:border-zinc-800/50 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-zinc-800/50 px-6 py-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">

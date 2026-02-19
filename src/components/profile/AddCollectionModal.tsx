@@ -109,7 +109,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="glass-panel w-full max-w-md p-6">
+          <div className="glass-panel neu-modal-surface w-full max-w-md p-6">
         <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Create New Design</h2>
 
         <div className="space-y-4">

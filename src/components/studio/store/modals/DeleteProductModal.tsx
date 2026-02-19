@@ -121,7 +121,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
       />
       
       {/* Modal */}
-      <div className="relative w-full max-w-md mx-4 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
+      <div className="relative w-full max-w-md mx-4 neu-modal-surface bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
         
         {/* ═══════════════════════════════════════════════════════════════════════ */}
         {/* SCREEN 1: Impact Preview */}

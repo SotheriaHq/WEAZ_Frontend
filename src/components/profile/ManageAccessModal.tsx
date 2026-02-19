@@ -95,7 +95,7 @@ const ManageAccessModal: React.FC<Props> = ({ open, collectionId, onClose }) => 
             aria-modal="true"
             aria-label="Manage access"
             tabIndex={-1}
-            className="glass-panel relative flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden outline-none"
+            className="glass-panel neu-modal-surface relative flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="shrink-0 border-b border-white/10 px-6 py-4">

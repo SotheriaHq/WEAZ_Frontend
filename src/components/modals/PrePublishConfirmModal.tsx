@@ -166,7 +166,7 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
                 aria-modal="true"
                 aria-label="Review before publishing"
                 tabIndex={-1}
-                className="relative flex w-full max-w-[600px] max-h-[90vh] flex-col overflow-hidden rounded-3xl glass-panel-dark outline-none"
+                className="relative flex w-full max-w-[600px] max-h-[90vh] neu-modal-surface flex-col overflow-hidden rounded-3xl glass-panel-dark outline-none"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Header (always visible) */}

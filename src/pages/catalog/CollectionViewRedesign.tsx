@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft, Share2, Heart, MessageCircle, Eye, 
+  Share2, Heart, MessageCircle, Eye, 
   ChevronDown, ChevronLeft, ChevronRight,
   ShoppingCart, Store, Clock, Play, Star,
   Lock
@@ -13,7 +13,6 @@ import type { AppDispatch, RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
 import AccessApi, { type AccessState } from '@/api/AccessApi';
 import ThreadButton from '@/components/ui/ThreadButton';
-import ImageWithFallback from '@/components/ImageWithFallback';
 import UnifiedCollectionComments from '@/components/collections/UnifiedCollectionComments';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
@@ -117,137 +116,6 @@ const formatCompactNumber = (n?: number): string => {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}m`;
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return n.toString();
-};
-
-// ============================================
-// HERO SECTION
-// ============================================
-interface HeroSectionProps {
-  coverUrl?: string;
-  title: string;
-  ownerAvatar?: string;
-  ownerAvatarFileId?: string | null;
-  ownerName?: string;
-  username?: string;
-  itemCount?: number;
-  visibility?: 'PUBLIC' | 'PRIVATE';
-  onBack: () => void;
-  onShare: () => void;
-}
-
-const HeroSection: React.FC<HeroSectionProps> = ({
-  coverUrl,
-  title,
-  ownerAvatar,
-  ownerAvatarFileId,
-  ownerName,
-  username,
-  itemCount = 0,
-  visibility = 'PUBLIC',
-  onBack,
-  onShare,
-}) => {
-  return (
-    <section className="relative w-full">
-      {/* Cover Image */}
-      {coverUrl ? (
-        <MediaRenderer
-          kind="image"
-          src={coverUrl}
-          alt={title}
-          maxHeightClassName="max-h-[70vh]"
-          className="w-full"
-        />
-      ) : (
-        <div className="w-full h-[70vh] min-h-[360px] bg-gradient-to-br from-purple-900 via-indigo-900 to-black flex items-center justify-center">
-          <span className="text-8xl font-bold text-white/20">{title.charAt(0)}</span>
-        </div>
-      )}
-      
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
-      
-      {/* Floating Header */}
-      <div className="absolute top-0 left-0 right-0 z-20 p-4 sm:p-6">
-        <div className="flex items-center justify-between max-w-7xl mx-auto rounded-2xl bg-white/10 border border-white/15 backdrop-blur-2xl px-4 py-3 shadow-lg shadow-purple-500/20">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-white bg-white/10 border border-white/20 hover:bg-white/20 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline text-sm font-medium">Back</span>
-          </motion.button>
-          
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={onShare}
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-white bg-white/10 border border-white/20 hover:bg-white/20 transition-colors"
-          >
-            <Share2 className="w-4 h-4" />
-            <span className="hidden sm:inline text-sm font-medium">Share</span>
-          </motion.button>
-        </div>
-      </div>
-
-      {/* Hero Content */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 p-6 sm:p-8 lg:p-12">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="max-w-7xl mx-auto"
-        >
-          <div className="flex items-center gap-4 mb-4">
-            {/* Owner Avatar */}
-            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-white/20 overflow-hidden flex-shrink-0">
-              <ImageWithFallback
-                src={ownerAvatar}
-                fileId={ownerAvatarFileId}
-                alt={ownerName || 'Brand'}
-                fit="cover"
-                containerClassName="w-full h-full"
-                fallbackName={ownerName || 'B'}
-              />
-            </div>
-            
-            <div>
-              <h1 
-                className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-1"
-                style={{ textShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
-              >
-                {title}
-              </h1>
-              <p className="text-white/80 text-sm sm:text-base">
-                @{username} • {itemCount} piece{itemCount !== 1 ? 's' : ''} • 
-                <span className={`inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-xs ${
-                  visibility === 'PUBLIC' 
-                    ? 'bg-green-500/20 text-green-400' 
-                    : 'bg-amber-500/20 text-amber-400'
-                }`}>
-                  {visibility === 'PUBLIC' ? 'Public' : 'Private'}
-                </span>
-              </p>
-            </div>
-          </div>
-          
-          {/* Scroll indicator */}
-          <div className="flex justify-center mt-8">
-            <motion.div 
-              animate={{ y: [0, 8, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-              className="text-gray-700 dark:text-white/60 text-sm flex flex-col items-center gap-2"
-            >
-              <span>Scroll to explore</span>
-              <ChevronDown className="w-5 h-5" />
-            </motion.div>
-          </div>
-        </motion.div>
-      </div>
-    </section>
-  );
 };
 
 // ============================================
@@ -474,29 +342,31 @@ const ProductGrid: React.FC<ProductGridProps> = ({
 }) => {
   return (
     <div className="flex-1">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-white">Products in this collection</h3>
-          <p className="text-sm text-white/60">{products.length} item{products.length === 1 ? '' : 's'}</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pt-8 border-t border-white/10">
+        <h2 className="text-xl font-bold text-white tracking-tight">
+          Products in this collection
+          <span className="text-white/40 ml-2 text-base font-normal">({products.length} item{products.length === 1 ? '' : 's'})</span>
+        </h2>
         {!isOwner && onAddAll ? (
           <button
             type="button"
             onClick={onAddAll}
             disabled={addingAll}
-            className="px-4 py-2 rounded-full text-xs font-semibold bg-white/10 border border-white/20 hover:bg-white/20 transition"
+            className="group flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-white/15 text-white hover:bg-white/10 hover:border-white/30 transition-all duration-300 disabled:opacity-60"
           >
-            {addingAll ? 'Adding…' : 'Add all to cart'}
+            <span className="font-medium text-sm">{addingAll ? 'Adding…' : 'Add all to cart'}</span>
+            <span className="text-sm">🛍️</span>
           </button>
         ) : null}
       </div>
 
       {products.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-white/60">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-10 text-center text-white/60">
           This collection doesn’t have any products yet.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        <>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map((product) => {
             const now = Date.now();
             const onSale =
@@ -511,41 +381,60 @@ const ProductGrid: React.FC<ProductGridProps> = ({
               product.sizes.length === 0 &&
               product.colors.length === 0 &&
               !product.hasVariants;
+            const saleLabel = onSale && price && salePrice
+              ? `-${Math.max(1, Math.round((1 - (product.salePrice ?? product.price) / product.price) * 100))}%`
+              : null;
 
             return (
-              <div key={product.id} className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+              <div
+                key={product.id}
+                className="group relative flex flex-col rounded-3xl overflow-hidden bg-white/5 backdrop-blur-md border border-white/10 hover:border-purple-400/40 hover:bg-white/10 transition-all duration-300"
+              >
                 <button
                   type="button"
                   onClick={() => onViewProduct(product.id)}
                   className="block w-full text-left"
                 >
-                  <div className="aspect-square bg-white/5 flex items-center justify-center">
+                  <div className="relative aspect-square bg-white/5 flex items-center justify-center overflow-hidden">
                     {image ? (
-                      <img src={image} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                      <img src={image} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
                     ) : (
                       <span className="text-xs text-white/40">No image</span>
                     )}
+
+                    {saleLabel ? (
+                      <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-purple-500/90 text-white text-[10px] font-bold uppercase tracking-wide">
+                        {saleLabel}
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="p-4">
-                    <div className="text-sm font-semibold text-white line-clamp-1">{product.name}</div>
-                    <div className="mt-2 text-sm text-white/80">
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-base font-semibold text-white line-clamp-1 group-hover:text-purple-300 transition-colors">{product.name}</div>
+                        <div className="mt-1 text-xs text-white/40">
+                          {product.hasVariants ? 'Variants available' : 'Single option'}
+                        </div>
+                      </div>
+                      <div className="text-right min-w-[92px]">
                       {salePrice ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-rose-400 font-semibold">{salePrice}</span>
-                          {price ? <span className="line-through text-white/40">{price}</span> : null}
+                        <div>
+                          <p className="text-purple-300 font-bold text-sm">{salePrice}</p>
+                          {price ? <p className="line-through text-white/40 text-xs">{price}</p> : null}
                         </div>
                       ) : (
-                        <span>{price ?? 'Price unavailable'}</span>
+                        <p className="text-purple-200 font-bold text-sm">{price ?? 'Price unavailable'}</p>
                       )}
+                      </div>
                     </div>
                   </div>
                 </button>
-                <div className="px-4 pb-4">
+                <div className="px-5 pb-5 mt-auto">
                   {canQuickAdd ? (
                     <button
                       type="button"
                       onClick={() => onAddToCart(product.id)}
-                      className="w-full rounded-xl bg-white text-black text-xs font-semibold py-2 hover:bg-white/90"
+                      className="w-full rounded-xl bg-purple-500 hover:bg-purple-400 text-white text-sm font-semibold py-2.5 transition-colors"
                     >
                       Add to cart
                     </button>
@@ -553,7 +442,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
                     <button
                       type="button"
                       onClick={() => onViewProduct(product.id)}
-                      className="w-full rounded-xl border border-white/20 text-xs font-semibold py-2 text-white/80 hover:text-white hover:border-white/40"
+                      className="w-full rounded-xl border border-white/20 text-sm font-semibold py-2.5 text-white/80 hover:text-white hover:border-white/40"
                     >
                       View options
                     </button>
@@ -563,6 +452,16 @@ const ProductGrid: React.FC<ProductGridProps> = ({
             );
           })}
         </div>
+        <div className="flex justify-center mt-10">
+          <button
+            type="button"
+            className="flex items-center gap-2 px-8 py-3 rounded-full border border-white/15 text-white/70 hover:text-white hover:border-purple-400 hover:bg-purple-500/10 transition-all font-medium"
+          >
+            Show more products
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </div>
+        </>
       )}
     </div>
   );
@@ -980,7 +879,6 @@ const CollectionViewRedesign: React.FC = () => {
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [productItems, setProductItems] = useState<ProductItem[]>([]);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
-  const [coverUrl, setCoverUrl] = useState<string | undefined>();
   const [moreFromBrand, setMoreFromBrand] = useState<RelatedCollection[]>([]);
   const [youMightLike, setYouMightLike] = useState<RelatedCollection[]>([]);
   const [addingAll, setAddingAll] = useState(false);
@@ -1071,19 +969,6 @@ const CollectionViewRedesign: React.FC = () => {
           
           if (mounted) {
             setMediaItems(resolved);
-            
-            // Set cover URL from cover media or first media
-            const coverMedia = resolved.find(m => m.id === d.coverMediaId) || resolved[0];
-            if (coverMedia) {
-              setCoverUrl(coverMedia.url);
-            } else if (d.coverImageUrl) {
-              setCoverUrl(d.coverImageUrl as string);
-            } else if (products.length > 0) {
-              const coverProduct = products.find((p) => p.thumbnail || p.images[0]);
-              if (coverProduct) {
-                setCoverUrl(coverProduct.thumbnail || coverProduct.images[0]);
-              }
-            }
           }
         } else {
           setLocked(true);
@@ -1289,7 +1174,6 @@ const CollectionViewRedesign: React.FC = () => {
       const res = await brandApi.updateCollection(id, { coverMediaId: item.id } as any);
       if (res) {
         setDetail(d => d ? { ...d, coverMediaId: item.id } : d);
-        setCoverUrl(item.url);
         toast.success('Cover updated');
       }
     } catch {
@@ -1309,6 +1193,15 @@ const CollectionViewRedesign: React.FC = () => {
 
   const handleCollectionClick = (collectionId: string) => {
     navigate(`/collections/${collectionId}`);
+  };
+
+  const handleViewProduct = (productId: string) => {
+    if (!detail) return;
+    const params = new URLSearchParams({
+      collectionId: detail.id,
+      collectionTitle: detail.title,
+    });
+    navigate(`/products/${productId}?${params.toString()}`);
   };
 
   // Loading state
@@ -1355,27 +1248,45 @@ const CollectionViewRedesign: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Hero Section */}
-      <HeroSection
-        coverUrl={coverUrl}
-        title={detail.title}
-        ownerAvatar={detail.owner?.brand?.logo}
-        ownerAvatarFileId={detail.owner?.brand?.logoFileId}
-        ownerName={detail.owner?.brand?.brandName}
-        username={detail.owner?.username}
-        itemCount={itemCount}
-        visibility={detail.visibility}
-        onBack={handleBack}
-        onShare={handleShare}
-      />
+      <main className="w-full px-4 md:px-8 xl:px-16 py-8 flex justify-center">
+        <div className="w-full max-w-[1280px]">
+          <div className="flex items-center gap-2 mb-8 text-sm">
+            <button onClick={() => navigate('/')} className="text-white/60 hover:text-purple-300 transition-colors" type="button">Home</button>
+            <span className="text-white/40">/</span>
+            <button onClick={handleBack} className="text-white/60 hover:text-purple-300 transition-colors" type="button">Collections</button>
+            <span className="text-white/40">/</span>
+            <span className="text-white font-medium truncate">{detail.title}</span>
+          </div>
 
-      {/* Media Gallery + Comments Section */}
-      <section className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-black to-gray-900">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row gap-8">
-            <div className="flex-1 lg:w-2/3 flex flex-col gap-8">
-              {/* Media Gallery */}
-              {hasMedia && (
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+            <div className="space-y-2">
+              <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">{detail.title}</h1>
+              <p className="text-white/60 max-w-3xl">
+                {detail.description || `A curated collection from @${detail.owner?.username || 'threadly'} with ${itemCount} piece${itemCount === 1 ? '' : 's'}.`}
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button type="button" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-white/80 hover:text-white transition-all text-sm font-medium">
+                Filter
+              </button>
+              <button type="button" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-white/80 hover:text-white transition-all text-sm font-medium">
+                Sort by: Newest
+              </button>
+            </div>
+          </div>
+
+          <ProductGrid
+            products={productItems}
+            isOwner={isOwner}
+            addingAll={addingAll}
+            onAddAll={!isOwner && hasProducts ? handleAddAllToCart : undefined}
+            onAddToCart={handleAddProductToCart}
+            onViewProduct={handleViewProduct}
+          />
+
+          <section className="pt-14">
+            <div className="flex flex-col lg:flex-row gap-8">
+              {hasMedia ? (
                 <MediaGallery
                   items={mediaItems}
                   currentIndex={currentMediaIndex}
@@ -1384,46 +1295,38 @@ const CollectionViewRedesign: React.FC = () => {
                   isOwner={isOwner}
                   onSetCover={handleSetCover}
                 />
+              ) : (
+                <div className="flex-1 lg:w-2/3 rounded-2xl border border-white/10 bg-white/5 p-8 text-white/60">
+                  Collection media is not available for this drop.
+                </div>
               )}
 
-              {(hasProducts || !hasMedia) && (
-                <ProductGrid
-                  products={productItems}
-                  isOwner={isOwner}
-                  addingAll={addingAll}
-                  onAddAll={!isOwner && hasProducts ? handleAddAllToCart : undefined}
-                  onAddToCart={handleAddProductToCart}
-                  onViewProduct={(productId) => navigate(`/products/${productId}`)}
-                />
-              )}
+              <CommentsPanel
+                collectionId={detail.id}
+                threadsCount={detail.totalThreads || 0}
+                commentsCount={commentsCount}
+                viewsCount={detail._count?.views || 0}
+                ownerId={detail.owner?.id}
+                highlightCommentId={highlightCommentId}
+                price={{
+                  min: detail.minPrice,
+                  max: detail.maxPrice,
+                  saleMin: detail.saleMinPrice,
+                  saleMax: detail.saleMaxPrice,
+                  saleEndAt: detail.saleEndAt,
+                }}
+                onAddToCart={!isOwner && hasProducts ? handleAddToCart : undefined}
+                onToggleSave={handleToggleSave}
+                isSaved={isSaved}
+                saveBusy={saveBusy}
+                onShare={handleShare}
+                onContactBrand={handleContactBrand}
+                onVisitStore={handleVisitStore}
+              />
             </div>
-
-            {/* Comments Panel */}
-            <CommentsPanel
-              collectionId={detail.id}
-              threadsCount={detail.totalThreads || 0}
-              commentsCount={commentsCount}
-              viewsCount={detail._count?.views || 0}
-              ownerId={detail.owner?.id}
-              highlightCommentId={highlightCommentId}
-              price={{
-                min: detail.minPrice,
-                max: detail.maxPrice,
-                saleMin: detail.saleMinPrice,
-                saleMax: detail.saleMaxPrice,
-                saleEndAt: detail.saleEndAt,
-              }}
-              onAddToCart={!isOwner && hasProducts ? handleAddToCart : undefined}
-              onToggleSave={handleToggleSave}
-              isSaved={isSaved}
-              saveBusy={saveBusy}
-              onShare={handleShare}
-              onContactBrand={handleContactBrand}
-              onVisitStore={handleVisitStore}
-            />
-          </div>
+          </section>
         </div>
-      </section>
+      </main>
 
       {/* More from Brand */}
       <div className="bg-black">
