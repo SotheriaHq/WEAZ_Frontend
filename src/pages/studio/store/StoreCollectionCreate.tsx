@@ -22,7 +22,9 @@ import SearchField from '@/components/SearchField';
 import Select from '@/components/ui/Select';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import Tag from '@/components/ui/Tag';
+import InfoTooltip from '@/components/ui/InfoTooltip';
 import { getTagColor } from '@/utils/tagColors';
+import FilterSelector, { type FilterSelection } from '@/components/categories/FilterSelector';
 
 const MAX_PRODUCTS = 5;
 const MAX_TAGS = 20;
@@ -88,6 +90,8 @@ const StoreCollectionCreate: React.FC = () => {
 
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -1200,7 +1204,10 @@ const StoreCollectionCreate: React.FC = () => {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white relative">Collection Details</h2>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Title</label>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
+                Title
+                <InfoTooltip text="The name of your store collection (e.g., 'Holiday Drop', 'Summer Capsule')." />
+              </label>
               <input
                 type="text"
                 value={title}
@@ -1211,7 +1218,10 @@ const StoreCollectionCreate: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Description</label>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
+                Description
+                <InfoTooltip text="A brief summary of this collection's theme, season, or purpose." />
+              </label>
               <textarea
                 rows={3}
                 value={description}
@@ -1222,8 +1232,11 @@ const StoreCollectionCreate: React.FC = () => {
             </div>
 
             <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
+                Category
+                <InfoTooltip text="The primary taxonomy category for this collection (e.g., Women's Wear). Helps with discovery." />
+              </label>
               <Select
-                label="Category"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
                 disabled={loadingCategories || categories.length === 0}
@@ -1240,16 +1253,19 @@ const StoreCollectionCreate: React.FC = () => {
             </div>
 
             <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
+                Sub-Category
+                <InfoTooltip text="A more specific type within the selected category (e.g., Evening Wear, Casual Tops)." />
+              </label>
               <Select
-                label="Category Type"
                 value={categoryTypeId}
                 onChange={(e) => setCategoryTypeId(e.target.value)}
                 disabled={loadingCategories || categoryTypeOptions.length === 0}
                 variant="default"
               >
-                {loadingCategories && <option>Loading category types...</option>}
+                {loadingCategories && <option>Loading sub-categories...</option>}
                 {!loadingCategories && categoryTypeOptions.length === 0 && (
-                  <option>No category types available</option>
+                  <option>No sub-categories available</option>
                 )}
                 {categoryTypeOptions.map((categoryType) => (
                   <option key={categoryType.id} value={categoryType.id}>
@@ -1259,10 +1275,27 @@ const StoreCollectionCreate: React.FC = () => {
               </Select>
             </div>
 
+            {/* Filter Selector */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 flex items-center">
+                Filters
+                <InfoTooltip text="Select filter dimensions (fabric, occasion, season, etc.) to generate relevant tag suggestions for your collection." />
+              </label>
+              <FilterSelector
+                value={filterSelection}
+                onChange={setFilterSelection}
+                entityType="COLLECTION"
+                onTagSuggestions={setTagSuggestions}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
+                  Visibility
+                  <InfoTooltip text="Public collections are visible to all users. Private collections are only visible to you." />
+                </label>
                 <Select
-                  label="Visibility"
                   value={visibility}
                   onChange={(e) => setVisibility(e.target.value as CollectionVisibility)}
                   variant="default"
@@ -1272,8 +1305,11 @@ const StoreCollectionCreate: React.FC = () => {
                 </Select>
               </div>
               <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
+                  Type
+                  <InfoTooltip text="Target audience for this collection: everybody, male, or female." />
+                </label>
                 <Select
-                  label="Type"
                   value={type}
                   onChange={(e) => setType(e.target.value as CollectionType)}
                   variant="default"
@@ -1285,8 +1321,39 @@ const StoreCollectionCreate: React.FC = () => {
               </div>
             </div>
 
+            {/* Tags */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">Tags</label>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                Tags
+                <InfoTooltip text="Tags improve discoverability. Add them manually or click suggested tags from the filter selections above." />
+              </label>
+              {/* Filter-driven tag suggestions */}
+              {tagSuggestions.length > 0 && (
+                <div className="mb-2">
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1">Suggested tags from filters:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {tagSuggestions
+                      .filter((t) => !tags.includes(t))
+                      .slice(0, 12)
+                      .map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => {
+                            if (tags.length < MAX_TAGS && !tags.includes(suggestion)) {
+                              setTags([...tags, suggestion]);
+                            }
+                          }}
+                          className="px-2 py-1 rounded-lg text-[10px] font-medium bg-purple-50 dark:bg-purple-500/10
+                            text-purple-600 dark:text-purple-300 border border-purple-200/60 dark:border-purple-500/20
+                            hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
+                        >
+                          + {suggestion}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
               <div className="bg-white dark:bg-zinc-900/60 border border-gray-300/80 dark:border-zinc-700/60 rounded-xl px-3 py-2 min-h-[46px] flex items-center gap-2 shadow-sm">
                 <input
                   type="text"

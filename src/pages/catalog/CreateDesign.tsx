@@ -20,6 +20,7 @@ import { PrePublishConfirmModal } from '@/components/modals';
 import TagsApi from '@/api/TagsApi';
 import { brandApi } from '@/api/BrandApi';
 import FilterSelector, { type FilterSelection } from '@/components/categories/FilterSelector';
+import InfoTooltip from '@/components/ui/InfoTooltip';
 import type { MediaItem } from '@/types/media';
 import { MediaProvider, useMediaStore } from '../../hooks/useMediaStore';
 import useCollectionUpload from '../../hooks/useCollectionUpload';
@@ -34,7 +35,7 @@ type CategoryOption = {
   types: CategoryTypeOption[];
 };
 
-const CreateCollectionInner: React.FC = () => {
+const CreateDesignInner: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
   
@@ -827,8 +828,9 @@ const CreateCollectionInner: React.FC = () => {
                 />
 
                 <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center">
                     Tell Your Story
+                    <InfoTooltip text="Describe the inspiration, mood, and story behind this design. This is visible to buyers browsing the catalog." />
                   </label>
                   <textarea
                     value={description}
@@ -892,8 +894,9 @@ const CreateCollectionInner: React.FC = () => {
 
                 {/* Tags Section */}
                 <div className="space-y-3">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center">
                     🏷️ Tags (up to 10)
+                    <InfoTooltip text="Tags improve catalog discoverability. Add manually or use filter-driven suggestions. Up to 10 tags per design." />
                   </label>
                   
                   <div className="p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10">
@@ -982,7 +985,10 @@ const CreateCollectionInner: React.FC = () => {
           >
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Price Range</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 flex items-center">
+                  Price Range
+                  <InfoTooltip text="An indicative price range for this design. This is NOT a checkout price — it helps buyers understand the expected cost." />
+                </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₦</span>
@@ -1507,10 +1513,10 @@ const formatTimeAgo = (date: Date): string => {
 // WRAPPER WITH PROVIDER
 // ============================================================================
 
-const CreateCollectionPage: React.FC = () => (
+const CreateDesignPage: React.FC = () => (
   <MediaProvider>
-    <CreateCollectionInner />
+    <CreateDesignInner />
   </MediaProvider>
 );
 
-export default CreateCollectionPage;
+export default CreateDesignPage;

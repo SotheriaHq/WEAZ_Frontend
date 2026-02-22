@@ -864,7 +864,7 @@ const LoadingState: React.FC = () => (
 // ============================================
 // MAIN COMPONENT
 // ============================================
-const CollectionViewRedesign: React.FC = () => {
+const DesignView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const me = useSelector((s: RootState) => s.user.profile);
@@ -1373,4 +1373,4 @@ const CollectionViewRedesign: React.FC = () => {
   );
 };
 
-export default CollectionViewRedesign;
+export default DesignView;

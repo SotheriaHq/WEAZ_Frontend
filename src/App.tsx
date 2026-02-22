@@ -16,10 +16,10 @@ import { ThemeProvider } from './context/ThemeContext';
 import { DropdownManagerProvider } from './context/DropdownManagerContext';
 import Profile from './pages/catalog/Catalog';
 import { ProfileLayout } from './components/catalog/ProfileLayout';
-import CreateCollectionPage from './pages/catalog/CreateCollectionRedesign';
+import CreateDesignPage from './pages/catalog/CreateDesign';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
-import CollectionViewRedesign from './pages/catalog/CollectionViewRedesign';
+import DesignView from './pages/catalog/DesignView';
 import ErrorPage from './pages/ErrorPage';
 import StudioHome from './pages/studio/StudioHome';
 import EditProduct from './pages/studio/products/EditProduct';
@@ -114,8 +114,8 @@ const profileChildren = [
     path: 'collections',
     element: <RequireBrand />,
     children: [
-      { path: 'create', element: <CreateCollectionPage /> },
-      { path: 'edit/:id', element: <CreateCollectionPage /> },
+      { path: 'create', element: <CreateDesignPage /> },
+      { path: 'edit/:id', element: <CreateDesignPage /> },
     ],
   },
   { path: 'success', element: <Success /> },
@@ -310,7 +310,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/collections/:id',
-        element: <CollectionViewRedesign />,
+        element: <DesignView />,
       },
       {
         path: '/products/:id',

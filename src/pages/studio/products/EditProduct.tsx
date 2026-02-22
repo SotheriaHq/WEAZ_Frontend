@@ -22,10 +22,12 @@ import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
 import Tag from '@/components/ui/Tag';
+import InfoTooltip from '@/components/ui/InfoTooltip';
 import { useConfirm } from '@/components/ui/useConfirm';
 import { DiscardChangesModal } from '@/components/studio/store/modals';
 import { normalizePrimary, reorderItems, setPrimary, validateMedia } from './mediaUtils';
 import { getTagColor } from '@/utils/tagColors';
+import FilterSelector, { type FilterSelection } from '@/components/categories/FilterSelector';
 import { PriceChangePreviewModal } from '@/components/collections/PriceChangePreviewModal';
 import { getProductPriceChangePreview, type CollectionPriceImpact } from '@/api/StoreApi';
 
@@ -88,6 +90,7 @@ interface FormState {
   title: string;
   description: string;
   categoryId: string;
+  taxonomyCategoryId: string;
   categoryTypeId: string;
   tags: string[];
   price: number;
@@ -117,6 +120,7 @@ const defaultFormState: FormState = {
   title: '',
   description: '',
   categoryId: '',
+  taxonomyCategoryId: '',
   categoryTypeId: '',
   tags: [],
   price: 0,
@@ -214,6 +218,12 @@ const EditProduct: React.FC = () => {
   const [tagInput, setTagInput] = useState('');
   const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
   const { confirm, ConfirmDialog: ConfirmModal } = useConfirm();
+
+  // Taxonomy state (standalone category/sub-category/filters)
+  type TaxonomyCategoryOption = { id: string; name: string; types: { id: string; name: string }[] };
+  const [taxonomyCategories, setTaxonomyCategories] = useState<TaxonomyCategoryOption[]>([]);
+  const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   
   // Media state (simplified - using URLs for display)
   const [mediaUrls, setMediaUrls] = useState<Array<{ id: string; url: string; isPrimary?: boolean }>>([]);
@@ -330,12 +340,30 @@ const EditProduct: React.FC = () => {
         }
       };
 
+      // Load taxonomy categories (standalone category/sub-category tree)
+      const loadTaxonomyCategories = async () => {
+        try {
+          const cats = await brandApi.getCategories(true);
+          if (mounted && Array.isArray(cats)) {
+            setTaxonomyCategories(
+              cats.map((c: any) => ({
+                id: String(c.id),
+                name: String(c.name || ''),
+                types: (c.types || []).map((t: any) => ({ id: String(t.id), name: String(t.name || '') })),
+              }))
+            );
+          }
+        } catch (error) {
+          console.error('Failed to load taxonomy categories', error);
+        }
+      };
+
       try {
         if (!user?.id) {
           if (mounted) {
             setCategories([]);
           }
-          await loadCategoryTypes();
+          await Promise.all([loadCategoryTypes(), loadTaxonomyCategories()]);
           return;
         }
 
@@ -359,14 +387,14 @@ const EditProduct: React.FC = () => {
           }
         });
         setCollectionCategoryById(categoryByCollection);
-        await loadCategoryTypes();
+        await Promise.all([loadCategoryTypes(), loadTaxonomyCategories()]);
       } catch (error) {
         console.error('Failed to load collections', error);
         if (mounted) {
           setCategories([]);
           setCollectionCategoryById({});
         }
-        await loadCategoryTypes();
+        await Promise.all([loadCategoryTypes(), loadTaxonomyCategories()]);
       } finally {
         if (mounted) setCategoriesLoading(false);
       }
@@ -404,6 +432,7 @@ const EditProduct: React.FC = () => {
           title: product.title || product.name || '',
           description: product.description || '',
           categoryId: (product as any).collectionId || (product as any).collectionIds?.[0] || '',
+          taxonomyCategoryId: (product as any).categoryId || '',
           categoryTypeId: (product as any).categoryTypeId || '',
           tags: product.tags || [],
           price: product.price || 0,
@@ -686,6 +715,7 @@ const EditProduct: React.FC = () => {
         title: effectiveDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
         description: form.description.trim() || undefined,
         collectionId: isCollectionFlow ? (collectionContextId || undefined) : form.categoryId || undefined,
+        categoryId: form.taxonomyCategoryId || undefined,
         categoryTypeId: form.categoryTypeId || undefined,
         tags: form.tags,
         price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
@@ -787,6 +817,7 @@ const EditProduct: React.FC = () => {
         title: effectiveDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
         description: form.description.trim() || undefined,
         collectionId: form.categoryId || undefined,
+        categoryId: form.taxonomyCategoryId || undefined,
         categoryTypeId: form.categoryTypeId || undefined,
         tags: form.tags,
         price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
@@ -1387,31 +1418,68 @@ const EditProduct: React.FC = () => {
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <Select
-                    label="Collection (optional)"
-                    value={form.categoryId}
-                    onChange={(e) => updateForm('categoryId', e.target.value)}
-                    disabled={categoriesLoading}
-                  >
-                    <option value="">No collection (standalone)</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </Select>
-                  <Select
-                    label="Category Type"
-                    value={form.categoryTypeId}
-                    onChange={(e) => updateForm('categoryTypeId', e.target.value)}
-                  >
-                    {availableCategoryTypes.length === 0 && (
-                      <option value="">No category types available</option>
-                    )}
-                    {availableCategoryTypes.map((categoryType) => (
-                      <option key={categoryType.id} value={categoryType.id}>
-                        {categoryType.name}
-                      </option>
-                    ))}
-                  </Select>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                      Collection (optional)
+                      <InfoTooltip text="Link this product to a Store Collection for grouped merchandising. Products can also exist standalone." />
+                    </label>
+                    <Select
+                      value={form.categoryId}
+                      onChange={(e) => updateForm('categoryId', e.target.value)}
+                      disabled={categoriesLoading}
+                    >
+                      <option value="">No collection (standalone)</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                      Category
+                      <InfoTooltip text="The primary taxonomy category for this product (e.g., Women's Wear, Men's Wear). Helps with discovery and filtering." />
+                    </label>
+                    <Select
+                      value={form.taxonomyCategoryId}
+                      onChange={(e) => {
+                        updateForm('taxonomyCategoryId', e.target.value);
+                        // Reset sub-category when category changes
+                        updateForm('categoryTypeId', '');
+                      }}
+                      disabled={categoriesLoading}
+                    >
+                      <option value="">Select category</option>
+                      {taxonomyCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                      Sub-Category
+                      <InfoTooltip text="A more specific type within the selected category (e.g., Evening Wear, Casual Tops)." />
+                    </label>
+                    <Select
+                      value={form.categoryTypeId}
+                      onChange={(e) => updateForm('categoryTypeId', e.target.value)}
+                      disabled={!form.taxonomyCategoryId && availableCategoryTypes.length === 0}
+                    >
+                      {(() => {
+                        const scoped = form.taxonomyCategoryId
+                          ? taxonomyCategories.find(c => c.id === form.taxonomyCategoryId)?.types ?? []
+                          : availableCategoryTypes;
+                        if (scoped.length === 0) return <option value="">No sub-categories available</option>;
+                        return (
+                          <>
+                            <option value="">Select sub-category</option>
+                            {scoped.map((ct) => (
+                              <option key={ct.id} value={ct.id}>{ct.name}</option>
+                            ))}
+                          </>
+                        );
+                      })()}
+                    </Select>
+                  </div>
                   <div className="flex items-start justify-between gap-3">
                     <p className="text-[11px] text-gray-500 mt-1">
                       {categoriesLoading
@@ -1433,41 +1501,87 @@ const EditProduct: React.FC = () => {
                       </button>
                     ) : null}
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">Tags</label>
-                    <div className="bg-white dark:bg-zinc-900/60 border border-gray-300/80 dark:border-zinc-700/60 rounded-xl px-3 py-2 min-h-[46px] flex items-center gap-2 shadow-sm">
-                      <input 
-                        type="text" 
-                        value={tagInput}
-                        onChange={(e) => setTagInput(e.target.value)}
-                        onKeyDown={handleTagKeyDown}
-                        placeholder="Add tag..." 
-                        className="bg-transparent border-none outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 w-24 flex-1 p-0 focus:ring-0" 
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddTag}
-                        className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-500 transition"
-                      >
-                        Add
-                      </button>
-                    </div>
-                    {form.tags.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {form.tags.map((tag, index) => (
-                          <Tag
-                            key={tag}
-                            label={tag}
-                            color={getTagColor(tag, index)}
-                            size="xs"
-                            rightIcon={<X className="w-3 h-3 cursor-pointer" onClick={() => handleRemoveTag(tag)} />}
-                            className="gap-1"
-                          />
-                        ))}
+                </div>
+
+                {/* Filter Selector */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 flex items-center">
+                    Filters
+                    <InfoTooltip text="Select filter dimensions (fabric, occasion, season, etc.) to generate relevant tag suggestions for your product." />
+                  </label>
+                  <FilterSelector
+                    value={filterSelection}
+                    onChange={setFilterSelection}
+                    entityType="PRODUCT"
+                    onTagSuggestions={setTagSuggestions}
+                  />
+                </div>
+
+                {/* Tags */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                    Tags
+                    <InfoTooltip text="Tags improve discoverability. Add them manually or click suggested tags from the filter selections above." />
+                  </label>
+                  {/* Filter-driven tag suggestions */}
+                  {tagSuggestions.length > 0 && (
+                    <div className="mb-2">
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1">Suggested tags from filters:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {tagSuggestions
+                          .filter((t) => !form.tags.includes(t))
+                          .slice(0, 12)
+                          .map((suggestion) => (
+                            <button
+                              key={suggestion}
+                              type="button"
+                              onClick={() => {
+                                if (!form.tags.includes(suggestion)) {
+                                  updateForm('tags', [...form.tags, suggestion]);
+                                }
+                              }}
+                              className="px-2 py-1 rounded-lg text-[10px] font-medium bg-purple-50 dark:bg-purple-500/10
+                                text-purple-600 dark:text-purple-300 border border-purple-200/60 dark:border-purple-500/20
+                                hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
+                            >
+                              + {suggestion}
+                            </button>
+                          ))}
                       </div>
-                    )}
-                    <p className="text-[11px] text-gray-500 mt-1">Add one tag at a time. Use Enter or the Add button.</p>
+                    </div>
+                  )}
+                  <div className="bg-white dark:bg-zinc-900/60 border border-gray-300/80 dark:border-zinc-700/60 rounded-xl px-3 py-2 min-h-[46px] flex items-center gap-2 shadow-sm">
+                    <input 
+                      type="text" 
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={handleTagKeyDown}
+                      placeholder="Add tag..." 
+                      className="bg-transparent border-none outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 w-24 flex-1 p-0 focus:ring-0" 
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddTag}
+                      className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-500 transition"
+                    >
+                      Add
+                    </button>
                   </div>
+                  {form.tags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {form.tags.map((tag, index) => (
+                        <Tag
+                          key={tag}
+                          label={tag}
+                          color={getTagColor(tag, index)}
+                          size="xs"
+                          rightIcon={<X className="w-3 h-3 cursor-pointer" onClick={() => handleRemoveTag(tag)} />}
+                          className="gap-1"
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-gray-500 mt-1">Add one tag at a time. Use Enter or the Add button.</p>
                 </div>
 
                 <Textarea

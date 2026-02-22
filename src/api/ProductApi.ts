@@ -118,6 +118,7 @@ export interface ProductCreateDto {
     title: string;
     description?: string;
     collectionId?: string;
+    categoryId?: string;
     categoryTypeId?: string;
     tags?: string[];
     price: number;
@@ -233,7 +234,7 @@ export const productApi = {
      */
     async getProduct(productId: string, options?: { includeDeleted?: boolean }): Promise<ProductDto | null> {
         try {
-            const response = await apiClient.get<{ status: string; data: ProductDto }>(`/products/${productId}` , {
+            const response = await apiClient.get<{ status: string; data: ProductDto }>(`/products/${productId}`, {
                 params: options?.includeDeleted ? { includeDeleted: true } : undefined,
             });
             return response.data?.data ?? response.data as unknown as ProductDto ?? null;
