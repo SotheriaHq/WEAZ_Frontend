@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import SettingsSidebar from '@/components/settings/SettingsSidebar';
 import SecuritySettings from '@/components/settings/tabs/SecuritySettings';
 import PatchesSettings from '@/components/settings/tabs/PatchesSettings';
@@ -11,6 +12,7 @@ import StorePoliciesSettings from '@/components/settings/tabs/StorePoliciesSetti
 import ProfileVisibilitySettings from '@/components/settings/tabs/ProfileVisibilitySettings';
 import SizeFitSettings from '@/components/settings/tabs/SizeFitSettings';
 import HiddenContentSettings from './HiddenContentSettings';
+import type { RootState } from '@/store';
 
 const sections: Record<string, React.ReactNode> = {
   security: <SecuritySettings />,
@@ -84,7 +86,10 @@ const sections: Record<string, React.ReactNode> = {
 
 const SettingsHome: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const me = useSelector((s: RootState) => s.user.profile);
+  const isBrandUser = me?.type === 'BRAND';
   const active = searchParams.get('tab') || 'account';
+  const resolvedActive = !isBrandUser && active.startsWith('store-') ? 'account' : active;
 
   const setActive = (key: string) => {
     setSearchParams({ tab: key });
@@ -93,12 +98,12 @@ const SettingsHome: React.FC = () => {
   return (
     <div className="min-h-screen">
       {/* Local settings sidebar with its own panel */}
-      <SettingsSidebar active={active} onSelect={setActive} />
+      <SettingsSidebar active={resolvedActive} onSelect={setActive} />
 
       {/* Content area shifts for the settings sidebar only (global sidebar is hidden) */}
       <div className="min-h-screen pb-10 px-4 md:pl-[248px] pt-6">
         <div className="max-w-4xl mx-auto">
-          {sections[active]}
+          {sections[resolvedActive]}
         </div>
       </div>
     </div>

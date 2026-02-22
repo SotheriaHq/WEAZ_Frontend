@@ -20,6 +20,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { MediaItem } from '@/types/media';
 import { DraftConflictWarningModal } from '@/components/collections/DraftConflictWarningModal';
 
+type CategoryTypeOption = { id: string; name: string };
+type CategoryOption = {
+  id: string;
+  slug: string;
+  name: string;
+  types: CategoryTypeOption[];
+};
+
 // Stable wrapper around SimpleAccordion so it doesn't remount on each render
 const Section: React.FC<React.PropsWithChildren<{ title: string; defaultOpen?: boolean }>> = ({ title, defaultOpen = true, children }) => (
   <SimpleAccordion title={title} defaultOpen={defaultOpen}>
@@ -42,8 +50,9 @@ const CreateCollectionInner: React.FC = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
-  const [categories, setCategories] = useState<Array<{ id: string; slug: string; name: string }>>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [categoryId, setCategoryId] = useState<string>('');
+  const [categoryTypeId, setCategoryTypeId] = useState<string>('');
   const [type, setType] = useState<'MALE' | 'FEMALE' | 'EVERYBODY'>('EVERYBODY');
   const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
   const [collectionCreatedAt, setCollectionCreatedAt] = useState<Date | null>(null);
@@ -85,9 +94,16 @@ const CreateCollectionInner: React.FC = () => {
 
     const loadCategories = async () => {
       try {
-        const cats = await brandApi.getCategories();
+        const cats = await brandApi.getCategories(true);
         if (mounted && Array.isArray(cats)) {
-          const mapped = cats.map((c) => ({ id: c.id, slug: c.slug, name: c.name }));
+          const mapped = cats.map((c) => ({
+            id: c.id,
+            slug: c.slug,
+            name: c.name,
+            types: Array.isArray(c.types)
+              ? c.types.map((t) => ({ id: t.id, name: t.name }))
+              : [],
+          }));
           setCategories(mapped);
           if (mapped.length) {
             setCategoryId((prev) =>
@@ -95,6 +111,17 @@ const CreateCollectionInner: React.FC = () => {
                 ? prev
                 : mapped[0].id,
             );
+            setCategoryTypeId((prev) => {
+              if (
+                prev &&
+                mapped.some((category) =>
+                  category.types.some((categoryType) => categoryType.id === prev),
+                )
+              ) {
+                return prev;
+              }
+              return mapped[0].types[0]?.id ?? '';
+            });
           }
         }
       } catch (error) {
@@ -136,6 +163,7 @@ const CreateCollectionInner: React.FC = () => {
           setIsAvailableInStore(!!d.isAvailableInStore);
           setSelectedTags(Array.isArray(d.tags) ? d.tags : []);
           setCategoryId(d.categoryId || '');
+          setCategoryTypeId(d.categoryTypeId || '');
           setType(d.type || 'EVERYBODY');
           setVisibility(d.visibility || 'PUBLIC');
           setCollectionCreatedAt(d.createdAt ? new Date(d.createdAt) : null);
@@ -175,7 +203,34 @@ const CreateCollectionInner: React.FC = () => {
     };
   }, [id, isEditMode]);
 
-  const isValid = title.trim().length > 0 && files.length > 0 && selectedTags.length > 0 && categoryId.trim().length > 0;
+  useEffect(() => {
+    if (!categoryId) {
+      setCategoryTypeId('');
+      return;
+    }
+    const selectedCategory = categories.find((category) => category.id === categoryId);
+    if (!selectedCategory) {
+      setCategoryTypeId('');
+      return;
+    }
+    if (
+      categoryTypeId &&
+      selectedCategory.types.some((categoryType) => categoryType.id === categoryTypeId)
+    ) {
+      return;
+    }
+    setCategoryTypeId(selectedCategory.types[0]?.id ?? '');
+  }, [categories, categoryId, categoryTypeId]);
+
+  const selectedCategory = categories.find((category) => category.id === categoryId);
+  const categoryTypeOptions = selectedCategory?.types ?? [];
+
+  const isValid =
+    title.trim().length > 0 &&
+    files.length > 0 &&
+    selectedTags.length > 0 &&
+    categoryId.trim().length > 0 &&
+    categoryTypeId.trim().length > 0;
 
   const handleDelete = (itemId: string) => {
     mediaStore.remove(itemId);
@@ -190,6 +245,7 @@ const CreateCollectionInner: React.FC = () => {
       const hasTags = selectedTags.length > 0;
       if (!hasTags) reasons.push('at least one tag');
       if (categoryId.trim().length === 0) reasons.push('a category');
+      if (categoryTypeId.trim().length === 0) reasons.push('a category type');
       toast.error(`Please provide ${reasons.join(', ')}.`);
       return;
     }
@@ -211,6 +267,7 @@ const CreateCollectionInner: React.FC = () => {
               isAvailableInStore,
               tags: finalTags,
               categoryId,
+              categoryTypeId,
               type,
               visibility
           } as any);
@@ -234,7 +291,7 @@ const CreateCollectionInner: React.FC = () => {
             parsedMaxPrice,
             isAvailableInStore,
             finalTags,
-            { categoryId, type, visibility },
+            { categoryId, categoryTypeId, type, visibility },
           );
           toast.success('Design created');
       }
@@ -344,6 +401,25 @@ const CreateCollectionInner: React.FC = () => {
             options={categories.map(c => ({ value: c.id, label: c.name }))}
             placeholder={loadingCategories ? 'Loading...' : 'Select a category'}
             disabled={disabled}
+          />
+        </div>
+        <div className="space-y-1">
+          <UniversalSelect
+            label="Category Type"
+            value={categoryTypeId}
+            onChange={setCategoryTypeId}
+            options={categoryTypeOptions.map((categoryType) => ({
+              value: categoryType.id,
+              label: categoryType.name,
+            }))}
+            placeholder={
+              loadingCategories
+                ? 'Loading...'
+                : categoryTypeOptions.length
+                  ? 'Select a type'
+                  : 'No types available'
+            }
+            disabled={disabled || categoryTypeOptions.length === 0}
           />
         </div>
         {/* Tags */}
@@ -459,6 +535,8 @@ const CreateCollectionInner: React.FC = () => {
               if (files.length === 0) reasons.push('at least one file');
               const hasTags = selectedTags.length > 0;
               if (!hasTags) reasons.push('at least one tag');
+              if (categoryId.trim().length === 0) reasons.push('a category');
+              if (categoryTypeId.trim().length === 0) reasons.push('a category type');
               toast.error(`Please provide ${reasons.join(', ')}.`);
               return;
             }
@@ -477,7 +555,7 @@ const CreateCollectionInner: React.FC = () => {
                 parsedMaxPrice,
                 isAvailableInStore,
                 finalTags,
-                { categoryId, type, visibility },
+                { categoryId, categoryTypeId, type, visibility },
                 undefined,
                 false // shouldPublish = false -> Save as Draft
               );

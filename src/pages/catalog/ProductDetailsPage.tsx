@@ -202,6 +202,10 @@ export default function ProductDetailsPage() {
     return variant?.price ?? product.price;
   }, [product, variants, selectedColor, selectedSize]);
 
+  const searchParams = new URLSearchParams(location.search);
+  const sourceCollectionId = searchParams.get('collectionId');
+  const sourceCollectionTitle = searchParams.get('collectionTitle') || 'Collection';
+
   if (loading) return <ProductDetailsSkeleton />;
   if (error || !product) {
     return (
@@ -280,24 +284,44 @@ export default function ProductDetailsPage() {
     (product.brandId === currentUser.id || product.brand?.id === currentUser.id),
   );
   const showAddToBag = !isStudioStoreView && !isOwnProduct;
-  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const sourceCollectionId = searchParams.get('collectionId');
-  const sourceCollectionTitle = searchParams.get('collectionTitle') || 'Collection';
   const compareAt = typeof product.compareAtPrice === 'number' && product.compareAtPrice > currentPrice
     ? product.compareAtPrice
     : null;
   const productViews = typeof product.viewsCount === 'number' ? product.viewsCount : null;
   const productThreads = typeof product.threadsCount === 'number' ? product.threadsCount : null;
+  const goToSourceCollection = () => {
+    if (!sourceCollectionId) return;
+    if (isStudioStoreView) {
+      const params = new URLSearchParams();
+      params.set('view', 'collections');
+      params.set('collectionId', sourceCollectionId);
+      navigate(`/studio/store?${params.toString()}`);
+      return;
+    }
+    navigate(`/collections/${sourceCollectionId}`);
+  };
 
   return (
-    <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen pb-10">
-      <main className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-8 lg:px-12 py-8 lg:py-10">
+    <div className={`bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 ${isStudioStoreView ? 'min-h-0 pb-0' : 'min-h-screen pb-10'}`}>
+      <main className={`flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-8 lg:px-12 py-8 lg:py-10 ${isStudioStoreView ? 'rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg' : ''}`}>
         <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           {isStudioStoreView ? (
             <>
               <Link to="/studio" className="hover:text-slate-900 dark:hover:text-white transition-colors">Studio</Link>
               <ChevronRight size={14} className="text-slate-400" />
               <Link to="/studio/store" className="hover:text-slate-900 dark:hover:text-white transition-colors">Store</Link>
+              {sourceCollectionId ? (
+                <>
+                  <ChevronRight size={14} className="text-slate-400" />
+                  <button
+                    type="button"
+                    onClick={goToSourceCollection}
+                    className="hover:text-slate-900 dark:hover:text-white transition-colors"
+                  >
+                    {sourceCollectionTitle}
+                  </button>
+                </>
+              ) : null}
               <ChevronRight size={14} className="text-slate-400" />
               <span className="text-slate-900 dark:text-white font-medium truncate max-w-[260px]">{product.title}</span>
             </>
@@ -307,7 +331,7 @@ export default function ProductDetailsPage() {
               <ChevronRight size={14} className="text-slate-400" />
               <button
                 type="button"
-                onClick={() => navigate(`/collections/${sourceCollectionId}`)}
+                onClick={goToSourceCollection}
                 className="hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 Collections
@@ -315,7 +339,7 @@ export default function ProductDetailsPage() {
               <ChevronRight size={14} className="text-slate-400" />
               <button
                 type="button"
-                onClick={() => navigate(`/collections/${sourceCollectionId}`)}
+                onClick={goToSourceCollection}
                 className="hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 {sourceCollectionTitle}
@@ -345,15 +369,15 @@ export default function ProductDetailsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8 flex flex-col gap-6">
-            <div className="relative w-full aspect-[4/3] rounded-3xl overflow-hidden bg-black/10 dark:bg-white/5 border border-black/10 dark:border-white/10">
+            <div className="w-full flex items-start justify-center">
               {currentMedia ? (
                 <SignedMediaItem
                   media={currentMedia}
                   alt={product.title}
-                  className="w-full h-full"
+                  className="w-full max-w-full"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-500 dark:text-slate-400">
+                <div className="w-full min-h-[220px] flex items-center justify-center text-slate-500 dark:text-slate-400">
                   No image
                 </div>
               )}
@@ -510,7 +534,7 @@ export default function ProductDetailsPage() {
                   {sourceCollectionId ? (
                     <button
                       type="button"
-                      onClick={() => navigate(`/collections/${sourceCollectionId}`)}
+                      onClick={goToSourceCollection}
                       className="flex-1 h-10 rounded-full border border-black/10 dark:border-white/15 text-sm text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5"
                     >
                       Back to Collection

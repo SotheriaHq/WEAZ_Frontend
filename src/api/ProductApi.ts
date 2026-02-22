@@ -27,6 +27,7 @@ function buildStoreProductPayload(data: Partial<ProductCreateDto>) {
     if (data.description !== undefined) payload.description = data.description;
     if (data.currency !== undefined) payload.currency = data.currency;
     if (data.collectionId !== undefined) payload.collectionId = data.collectionId;
+    if (data.categoryTypeId !== undefined) payload.categoryTypeId = data.categoryTypeId;
     if (data.price !== undefined) payload.price = data.price;
 
     // Frontend uses compareAtPrice+onSale; backend uses salePrice.
@@ -117,6 +118,7 @@ export interface ProductCreateDto {
     title: string;
     description?: string;
     collectionId?: string;
+    categoryTypeId?: string;
     tags?: string[];
     price: number;
     compareAtPrice?: number;
@@ -151,6 +153,7 @@ export interface ProductDto {
     description?: string;
     collectionId?: string;
     collectionIds?: string[];
+    categoryTypeId?: string;
     tags?: string[];
     price: number;
     compareAtPrice?: number;

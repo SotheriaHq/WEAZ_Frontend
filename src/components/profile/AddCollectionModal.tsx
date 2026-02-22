@@ -29,7 +29,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
     if (!isOpen) return;
     (async () => {
       setLoadingCategories(true);
-      const cats = await brandApi.getCategories();
+      const cats = await brandApi.getCategories(true);
       setCategories(cats.map((c) => ({ id: c.id, slug: c.slug, name: c.name })));
       if (cats.length) setCategoryId((prev) => prev || cats[0].id);
       setLoadingCategories(false);

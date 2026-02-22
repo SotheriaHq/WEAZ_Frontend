@@ -39,6 +39,10 @@ interface SidebarLinkProps {
   isRail?: boolean;
 }
 
+interface SidebarProps {
+  overlayOnly?: boolean;
+}
+
 const SidebarLink: React.FC<SidebarLinkProps> = ({
   emoji,
   label,
@@ -70,20 +74,20 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center px-3 py-2 rounded-lg transition-all duration-200 ${
+      className={`w-full flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left transition-all duration-200 ${
         active
-          ? 'font-medium text-primary border-l-4 border-primary bg-primary/10'
-          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+          ? 'neu-modal-inset font-semibold text-[color:var(--neu-text)]'
+          : 'text-[color:var(--neu-text)] hover:bg-white/55 dark:hover:bg-white/10'
       }`}
-      title={label}
+      title={isRail ? label : undefined}
     >
-      <span className="text-xl mr-3">{emoji}</span>
-      <span className="text-sm truncate flex-1 text-left">{label}</span>
+      <span className="w-6 shrink-0 text-center text-xl">{emoji}</span>
+      <span className="flex-1 truncate text-[17px] font-medium">{label}</span>
     </button>
   );
 };
 
-export const Sidebar: React.FC = () => {
+export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
@@ -98,10 +102,12 @@ export const Sidebar: React.FC = () => {
   const isMobile = liveViewportWidth < MOBILE_BREAKPOINT;
   const isProfileRoute = location.pathname === '/profile' || location.pathname.startsWith('/profile/');
 
-  if (location.pathname.startsWith('/studio')) return null;
-
   const showOverlay = isSidebarOpen;
   const isRail = !showOverlay;
+
+  if (overlayOnly && !isSidebarOpen) {
+    return null;
+  }
 
   const widthClass = isRail ? 'w-[76px]' : 'w-[240px]';
   const positionClass = isRail
@@ -138,7 +144,7 @@ export const Sidebar: React.FC = () => {
             emoji: '🎬',
             label: 'Studio',
             path: '/studio',
-            active: location.pathname === '/studio',
+            active: location.pathname.startsWith('/studio'),
           },
         ]
       : []),
@@ -205,19 +211,19 @@ export const Sidebar: React.FC = () => {
       )}
 
       <div
-        className={`${positionClass} ${widthClass} bg-[color:var(--surface-primary)]/95 dark:bg-[color:var(--surface-primary)]/95 backdrop-blur-xl flex flex-col transition-all duration-300 ease-out overflow-hidden ${slideClasses}`}
+        className={`${positionClass} ${widthClass} ${showOverlay ? 'neu-modal-surface' : 'bg-[color:var(--surface-primary)]/95 dark:bg-[color:var(--surface-primary)]/95 border-r border-gray-200/70 dark:border-white/10'} backdrop-blur-xl flex flex-col transition-all duration-300 ease-out overflow-hidden ${slideClasses}`}
       >
         {showOverlay && (
-          <div className="h-16 px-4 sm:px-5 flex items-center justify-start shrink-0 border-b border-transparent">
+          <div className="h-16 px-4 sm:px-5 flex items-center justify-start shrink-0 border-b border-[color:var(--neu-border)]/80">
             <button
               onClick={() => dispatch(toggleSidebar())}
-              className="inline-flex items-center justify-center p-2 mr-1 sm:mr-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              className="inline-flex h-9 w-9 items-center justify-center mr-2 sm:mr-3 rounded-xl neu-modal-inset transition-all hover:brightness-105"
             >
               <span className="text-xl">🍔</span>
             </button>
             <div className="flex items-center cursor-pointer" onClick={() => handleLinkClick('/')}>
               <ThreadlyLogo />
-              <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight">
+              <span className="ml-2 text-lg font-bold text-[color:var(--neu-text)] tracking-tight">
                 Threadly
               </span>
             </div>
@@ -240,10 +246,10 @@ export const Sidebar: React.FC = () => {
 
           {!isRail && (
             <>
-              <div className="border-t border-gray-200 dark:border-gray-800 my-3 mx-2" />
+              <div className="border-t border-[color:var(--neu-border)] my-3 mx-2" />
 
               <div className="px-3 mb-2">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center">
+                <h3 className="text-base font-semibold text-[color:var(--neu-text)] flex items-center">
                   You <span className="ml-1 text-xs">{'>'}</span>
                 </h3>
               </div>
@@ -260,10 +266,10 @@ export const Sidebar: React.FC = () => {
                 ))}
               </div>
 
-              <div className="border-t border-gray-200 dark:border-gray-800 my-3 mx-2" />
+              <div className="border-t border-[color:var(--neu-border)] my-3 mx-2" />
 
               <div className="px-3 mb-2">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Explore</h3>
+                <h3 className="text-base font-semibold text-[color:var(--neu-text)]">Explore</h3>
               </div>
               <div className="space-y-1 mb-3">
                 {exploreLinks.map((link) => (
@@ -278,7 +284,7 @@ export const Sidebar: React.FC = () => {
                 ))}
               </div>
 
-              <div className="border-t border-gray-200 dark:border-gray-800 my-3 mx-2" />
+              <div className="border-t border-[color:var(--neu-border)] my-3 mx-2" />
 
               {user && (
                 <div className="space-y-1 mb-3">

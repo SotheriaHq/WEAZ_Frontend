@@ -35,21 +35,58 @@ export interface UploadAssetDto {
   updatedAt: string;
 }
 
+export type CollectionScope = 'design' | 'store' | 'all';
+
 const SIGNED_URL_TTL_MS = 4 * 60 * 1000;
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 const signedUrlPending = new Map<string, Promise<string | null>>();
 
+export type CategoryTypeOption = {
+  id: string;
+  categoryId: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  order?: number;
+};
+
+export type CategoryOption = {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  types?: CategoryTypeOption[];
+};
+
+export type FilterValueOption = {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  order?: number;
+};
+
+export type FilterDimensionOption = {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  isMulti: boolean;
+  appliesTo: string[];
+  values: FilterValueOption[];
+};
+
 // Brand Profile API
 // In‑memory cache for categories to improve perceived reliability and reduce re-fetch churn
 const categoriesCache: {
-  items: Array<{ id: string; slug: string; name: string; description?: string | null }>;
+  items: CategoryOption[];
   lastFetched: number;
 } = { items: [], lastFetched: 0 };
 const CATEGORIES_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 const mapCategories = (
   payload: unknown,
-): Array<{ id: string; slug: string; name: string; description?: string | null }> => {
+): CategoryOption[] => {
   const items = Array.isArray(payload)
     ? payload
     : Array.isArray((payload as any)?.data)
@@ -64,12 +101,27 @@ const mapCategories = (
       slug: String(c?.slug ?? ''),
       name: String(c?.name ?? ''),
       description: c?.description ?? null,
+      types: Array.isArray(c?.types)
+        ? c.types
+          .map((t: any) => ({
+            id: String(t?.id ?? ''),
+            categoryId: String(t?.categoryId ?? c?.id ?? ''),
+            slug: String(t?.slug ?? ''),
+            name: String(t?.name ?? ''),
+            description: t?.description ?? null,
+            order:
+              typeof t?.order === 'number' && Number.isFinite(t.order)
+                ? t.order
+                : undefined,
+          }))
+          .filter((t: CategoryTypeOption) => t.id.length > 0 && t.name.length > 0)
+        : [],
     }))
     .filter((c: { id: string; name: string }) => c.id.length > 0 && c.name.length > 0);
 };
 
 export const brandApi = {
-  async getCategories(force = false): Promise<Array<{ id: string; slug: string; name: string; description?: string | null }>> {
+  async getCategories(force = false): Promise<CategoryOption[]> {
     // Serve cached categories if fresh and not forcing a reload
     if (!force && categoriesCache.items.length && Date.now() - categoriesCache.lastFetched < CATEGORIES_TTL_MS) {
       return categoriesCache.items;
@@ -86,14 +138,15 @@ export const brandApi = {
       }
       let mapped = mapCategories((response?.data ?? undefined) as unknown);
 
-      if (mapped.length === 0 && response?.status === 304 && categoriesCache.items.length === 0) {
-        const fallbackResponse = await apiClient.get(`/products/categories`, {
+      if (mapped.length === 0) {
+        const bypassResponse = await apiClient.get(`/collections/categories`, {
+          params: { _cb: Date.now() },
           headers: {
             'Cache-Control': 'no-cache',
             Pragma: 'no-cache',
           },
         });
-        mapped = mapCategories((fallbackResponse?.data ?? undefined) as unknown);
+        mapped = mapCategories((bypassResponse?.data ?? undefined) as unknown);
       }
 
       if (mapped.length === 0) return categoriesCache.items.length ? categoriesCache.items : [];
@@ -111,6 +164,140 @@ export const brandApi = {
       if (isNetworkError) {
         return [];
       }
+      return [];
+    }
+  },
+  async getCategoryTypes(categoryId?: string, force = false): Promise<CategoryTypeOption[]> {
+    if (!force && categoriesCache.items.length && Date.now() - categoriesCache.lastFetched < CATEGORIES_TTL_MS) {
+      const fromCache = categoriesCache.items
+        .flatMap((category) => category.types ?? [])
+        .filter((type) => (categoryId ? type.categoryId === categoryId : true));
+      if (fromCache.length > 0) return fromCache;
+    }
+
+    try {
+      const response = await apiClient.get('/collections/category-types', {
+        params: categoryId ? { categoryId } : undefined,
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      });
+
+      const payload = response?.data;
+      const items = Array.isArray(payload)
+        ? payload
+        : Array.isArray((payload as any)?.data)
+          ? (payload as any).data
+          : Array.isArray((payload as any)?.data?.data)
+            ? (payload as any).data.data
+            : [];
+
+      return items
+        .map((item: any) => ({
+          id: String(item?.id ?? ''),
+          categoryId: String(item?.categoryId ?? ''),
+          slug: String(item?.slug ?? ''),
+          name: String(item?.name ?? ''),
+          description: item?.description ?? null,
+          order:
+            typeof item?.order === 'number' && Number.isFinite(item.order)
+              ? item.order
+              : undefined,
+        }))
+        .filter((item: CategoryTypeOption) => item.id.length > 0 && item.name.length > 0);
+    } catch (error) {
+      console.error('Error fetching category types', error);
+      return [];
+    }
+  },
+
+  /**
+   * Fetch all active categories with their sub-categories from the public endpoint.
+   * Falls back to the existing getCategories() if the public endpoint is unavailable.
+   */
+  async getCategoriesWithSubCategories(force = false): Promise<CategoryOption[]> {
+    if (!force && categoriesCache.items.length && Date.now() - categoriesCache.lastFetched < CATEGORIES_TTL_MS) {
+      return categoriesCache.items;
+    }
+    try {
+      const response = await apiClient.get('/categories');
+      const payload = response?.data;
+      const items = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : [];
+
+      const mapped: CategoryOption[] = items
+        .map((c: any) => ({
+          id: String(c?.id ?? ''),
+          slug: String(c?.slug ?? ''),
+          name: String(c?.name ?? ''),
+          description: c?.description ?? null,
+          types: Array.isArray(c?.subCategories ?? c?.types)
+            ? (c.subCategories ?? c.types)
+              .map((t: any) => ({
+                id: String(t?.id ?? ''),
+                categoryId: String(t?.categoryId ?? c?.id ?? ''),
+                slug: String(t?.slug ?? ''),
+                name: String(t?.name ?? ''),
+                description: t?.description ?? null,
+                order: typeof t?.order === 'number' ? t.order : undefined,
+              }))
+              .filter((t: CategoryTypeOption) => t.id.length > 0 && t.name.length > 0)
+            : [],
+        }))
+        .filter((c: CategoryOption) => c.id.length > 0 && c.name.length > 0);
+
+      if (mapped.length > 0) {
+        categoriesCache.items = mapped;
+        categoriesCache.lastFetched = Date.now();
+      }
+      return mapped.length > 0 ? mapped : this.getCategories(force);
+    } catch {
+      // Fall back to existing endpoint
+      return this.getCategories(force);
+    }
+  },
+
+  /**
+   * Fetch all active filter dimensions with values.
+   * Used by creation forms to populate filter selectors.
+   */
+  async getFilterDimensions(): Promise<FilterDimensionOption[]> {
+    try {
+      const response = await apiClient.get('/categories/filters');
+      const payload = response?.data;
+      const items = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : [];
+
+      return items
+        .map((d: any) => ({
+          id: String(d?.id ?? ''),
+          slug: String(d?.slug ?? ''),
+          name: String(d?.name ?? ''),
+          description: d?.description ?? null,
+          isMulti: d?.isMulti ?? true,
+          appliesTo: Array.isArray(d?.appliesTo) ? d.appliesTo : [],
+          values: Array.isArray(d?.values)
+            ? d.values
+              .map((v: any) => ({
+                id: String(v?.id ?? ''),
+                slug: String(v?.slug ?? ''),
+                name: String(v?.name ?? ''),
+                description: v?.description ?? null,
+                order: typeof v?.order === 'number' ? v.order : undefined,
+              }))
+              .filter((v: FilterValueOption) => v.id.length > 0 && v.name.length > 0)
+            : [],
+        }))
+        .filter((d: FilterDimensionOption) => d.id.length > 0 && d.values.length > 0);
+    } catch (error) {
+      console.error('Error fetching filter dimensions', error);
       return [];
     }
   },
@@ -321,12 +508,20 @@ export const brandApi = {
   },
 
   // Fetch collections
-  async getCollections(ownerId: string, opts?: { visibility?: 'public' | 'private' | 'all' }): Promise<CollectionDto[]> {
+  async getCollections(
+    ownerId: string,
+    opts?: { visibility?: 'public' | 'private' | 'all'; scope?: CollectionScope },
+  ): Promise<CollectionDto[]> {
     try {
       const params = new URLSearchParams();
       if (opts?.visibility) params.append('visibility', opts.visibility);
+      params.append('scope', opts?.scope ?? 'design');
       const query = params.toString();
-      console.debug('[BrandApi.getCollections] request', { ownerId, visibility: opts?.visibility ?? 'all' });
+      console.debug('[BrandApi.getCollections] request', {
+        ownerId,
+        visibility: opts?.visibility ?? 'all',
+        scope: opts?.scope ?? 'design',
+      });
       const response = await apiClient.get(`/collections/user/${ownerId}${query ? `?${query}` : ''}`);
       const data = unwrapApiResponse<{ items: unknown[]; hasNextPage: boolean; endCursor?: string }>(response.data);
 
@@ -393,6 +588,9 @@ export const brandApi = {
             ? (rawStatus as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED')
             : undefined;
 
+        const rawStoreAvailability = (backendItem as any).isAvailableInStore;
+        const isAvailableInStore = rawStoreAvailability === true;
+
         const out = {
           id: backendItem.id as string,
           status,
@@ -405,6 +603,11 @@ export const brandApi = {
           visibility,
           type: (backendItem as any).type as any,
           categoryId: (backendItem.categoryId as string) || undefined,
+          categoryTypeId: ((backendItem as any).categoryTypeId as string) || undefined,
+          domain:
+            (backendItem as any).domain === 'STORE' || (backendItem as any).domain === 'DESIGN'
+              ? ((backendItem as any).domain as 'STORE' | 'DESIGN')
+              : undefined,
           coverImage: resolvedCoverImage,
           coverFileId,
           itemCount: mediaCount,
@@ -418,7 +621,8 @@ export const brandApi = {
           saleMaxPrice: (backendItem as any)?.saleMaxPrice ?? null,
           saleStartAt: (backendItem as any)?.saleStartAt ?? null,
           saleEndAt: (backendItem as any)?.saleEndAt ?? null,
-          isAvailableInStore: (backendItem.isAvailableInStore as boolean) || false,
+          isAvailableInStore,
+          isSystemGenerated: (backendItem as any).isSystemGenerated === true,
           createdAt: backendItem.createdAt as string,
           updatedAt: backendItem.updatedAt as string,
           brandName: ((backendItem.owner as Record<string, unknown>)?.brandFullName as string) || ((backendItem.owner as Record<string, unknown>)?.username as string) || '',
@@ -479,7 +683,9 @@ export const brandApi = {
         isPublic: false,
         visibility: 'PRIVATE',
         type: 'EVERYBODY', // Default
+        domain: 'DESIGN',
         categoryId: '',
+        categoryTypeId: '',
         coverImage: item.coverImage || '',
         coverFileId: undefined,
         itemCount: item.itemCount || 0,
@@ -511,7 +717,7 @@ export const brandApi = {
   },
 
   // Create collection
-  async createCollection(data: { name: string; description?: string; isPublic?: boolean; categoryId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY' }): Promise<CollectionDto | null> {
+  async createCollection(data: { name: string; description?: string; isPublic?: boolean; categoryId?: string; categoryTypeId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY' }): Promise<CollectionDto | null> {
     try {
       const init = await apiClient.post('/collections/initialize', {
         mode: 'existing',
@@ -519,6 +725,7 @@ export const brandApi = {
         description: data.description,
         visibility: data.isPublic === false ? 'PRIVATE' : 'PUBLIC',
         categoryId: data.categoryId,
+        categoryTypeId: data.categoryTypeId,
         type: data.type ?? 'EVERYBODY',
       });
       const sessionId = (init.data as any)?.sessionId ?? (init.data as any)?.collectionId ?? (init.data as any)?.id;
@@ -531,6 +738,7 @@ export const brandApi = {
           description: data.description,
           visibility: data.isPublic === false ? 'PRIVATE' : 'PUBLIC',
           categoryId: data.categoryId,
+          categoryTypeId: data.categoryTypeId,
           type: data.type ?? 'EVERYBODY',
         },
       });
@@ -590,9 +798,15 @@ export const brandApi = {
   },
 
   // Update collection
-  async updateCollection(collectionId: string, data: Partial<CollectionDto>): Promise<CollectionDto | null> {
+  async updateCollection(
+    collectionId: string,
+    data: Partial<CollectionDto>,
+    opts?: { scope?: CollectionScope },
+  ): Promise<CollectionDto | null> {
     try {
-      const response = await apiClient.patch(`/collections/${collectionId}`, data);
+      const response = await apiClient.patch(`/collections/${collectionId}`, data, {
+        params: { scope: opts?.scope ?? 'design' },
+      });
       return unwrapApiResponse<CollectionDto>(response.data);
     } catch (error) {
       console.error('Error updating collection:', error);
@@ -601,9 +815,14 @@ export const brandApi = {
   },
 
   // Delete collection
-  async deleteCollection(collectionId: string): Promise<boolean> {
+  async deleteCollection(
+    collectionId: string,
+    opts?: { scope?: CollectionScope },
+  ): Promise<boolean> {
     try {
-      await apiClient.delete(`/collections/${collectionId}`);
+      await apiClient.delete(`/collections/${collectionId}`, {
+        params: { scope: opts?.scope ?? 'design' },
+      });
       return true;
     } catch (error) {
       console.error('Error deleting collection:', error);
@@ -611,9 +830,16 @@ export const brandApi = {
     }
   },
 
-  async archiveCollection(collectionId: string): Promise<boolean> {
+  async archiveCollection(
+    collectionId: string,
+    opts?: { scope?: CollectionScope },
+  ): Promise<boolean> {
     try {
-      await apiClient.patch(`/collections/${collectionId}/archive`);
+      await apiClient.patch(
+        `/collections/${collectionId}/archive`,
+        {},
+        { params: { scope: opts?.scope ?? 'design' } },
+      );
       return true;
     } catch (error) {
       console.error('Error archiving collection:', error);
@@ -621,13 +847,35 @@ export const brandApi = {
     }
   },
 
-  async unarchiveCollection(collectionId: string): Promise<boolean> {
+  async unarchiveCollection(
+    collectionId: string,
+    opts?: { scope?: CollectionScope },
+  ): Promise<boolean> {
     try {
-      await apiClient.patch(`/collections/${collectionId}/unarchive`);
+      await apiClient.patch(
+        `/collections/${collectionId}/unarchive`,
+        {},
+        { params: { scope: opts?.scope ?? 'design' } },
+      );
       return true;
     } catch (error) {
       console.error('Error unarchiving collection:', error);
       return false;
+    }
+  },
+
+  async duplicateCollection(
+    collectionId: string,
+    opts?: { scope?: CollectionScope },
+  ): Promise<CollectionDto | null> {
+    try {
+      const response = await apiClient.post(`/collections/${collectionId}/duplicate`, null, {
+        params: { scope: opts?.scope ?? 'design' },
+      });
+      return unwrapApiResponse<CollectionDto>(response.data);
+    } catch (error) {
+      console.error('Error duplicating collection:', error);
+      return null;
     }
   },
   // Delete a single item (media) from a collection
@@ -744,9 +992,14 @@ export const brandApi = {
     return request;
   },
   // Get one collection with medias
-  async getCollectionDetail(collectionId: string): Promise<any> {
+  async getCollectionDetail(
+    collectionId: string,
+    opts?: { scope?: CollectionScope },
+  ): Promise<any> {
     try {
-      const response = await apiClient.get(`/collections/${collectionId}`);
+      const response = await apiClient.get(`/collections/${collectionId}`, {
+        params: { scope: opts?.scope ?? 'design' },
+      });
       return unwrapApiResponse<any>(response.data);
     } catch (error: any) {
       console.error('Error fetching collection detail:', error);

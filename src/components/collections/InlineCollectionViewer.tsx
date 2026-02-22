@@ -37,6 +37,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const highlightCommentId = searchParams.get('commentId');
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const [detail, setDetail] = useState<any | null>(null);
   const [requestState, setRequestState] = useState<AccessState | null>(null);
   const [isThreaded, setIsThreaded] = useState(false);
@@ -60,6 +61,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       if (!collectionId) return;
       setLoading(true);
       setLocked(false);
+      setNotFound(false);
       setDetail(null);
       setRequestState(null);
       
@@ -73,16 +75,9 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
           setDetail(d);
           setIsThreaded(false);
           setLocked(false);
+          setNotFound(false);
         } else {
-          // API returned null - likely permission issue
-          // But check if user is owner before showing locked state
-          if (me?.id) {
-            // User is logged in - null response might mean permission issue or deleted collection
-            setLocked(true);
-          } else {
-            // Not logged in - definitely a permission issue
-            setLocked(true);
-          }
+          setNotFound(true);
         }
       } catch (e: any) {
         if (mounted) {
@@ -98,21 +93,15 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
             error: e.message
           });
           
-          if (status === 404 || status === 403) {
-            // Check if the error response indicates ownership
-            // If user is logged in, try to determine if they own this collection
-            
-            // If we have owner info in the error and user matches, this is a backend issue
-            if (me?.id && errorData?.ownerId && errorData.ownerId === me.id) {
-              // User owns this collection but got 404/403 - shouldn't happen
-              console.error('[InlineCollectionViewer] Owner being blocked - backend issue');
-              toast.error('Unable to load your collection. Please try again.');
-              onBack();
-            } else {
-              // Collection is private and user doesn't have access (or doesn't exist)
-              console.log('[InlineCollectionViewer] Setting locked state - permission denied');
-              setLocked(true);
-            }
+          if (status === 404 || status === 410) {
+            setLocked(false);
+            setNotFound(true);
+            toast.error('Collection not found.');
+            onBack();
+          } else if (status === 403 || status === 401) {
+            console.log('[InlineCollectionViewer] Setting locked state - permission denied');
+            setLocked(true);
+            setNotFound(false);
           } else {
             // Other error - show toast and go back
             toast.error('Failed to load collection');
@@ -534,7 +523,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
     }
   }
 
-  if (!detail) {
+  if (notFound || !detail) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">Collection not found</p>
@@ -671,7 +660,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                         ) : (
                         <button
                           type="button"
-                          onClick={() => navigate(`/products/${product.id}`)}
+                          onClick={() => navigate(`/products/${product.id}?collectionId=${encodeURIComponent(collectionId)}&collectionTitle=${encodeURIComponent(detail?.title || 'Collection')}`)}
                           className="w-full rounded-lg border border-gray-300/70 dark:border-white/20 text-xs font-semibold py-2 text-gray-700 dark:text-gray-200"
                         >
                           View options
@@ -727,7 +716,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                       ? [{ label: 'Cancel Discount Sale', onClick: handleCancelSale }]
                       : [{ label: 'Discount Sale', onClick: () => setShowDiscountModal(true) }]
                     ),
-                    { label: 'Edit Collection Details', onClick: () => { navigate(`/profile/collections/edit/${collectionId}`); } },
+                    { label: 'Edit Collection Details', onClick: () => { navigate(`/profile/edit/${collectionId}`); } },
                   ]}
                 />
               ) : undefined}

@@ -64,9 +64,13 @@ const ProfilePage: React.FC = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const normalizedRouteBrandId = routeBrandId ? decodeURIComponent(routeBrandId) : undefined;
   // Owner view when no route param or when the param matches the logged-in brand user's id
-  const isOwner = Boolean(user?.type === 'BRAND' && (!routeBrandId || routeBrandId === user?.id));
-  const isVisitorView = !isOwner && Boolean(routeBrandId);
+  const isOwner = Boolean(
+    user?.type === 'BRAND' &&
+    (!normalizedRouteBrandId || normalizedRouteBrandId === user?.id),
+  );
+  const isVisitorView = !isOwner && Boolean(normalizedRouteBrandId);
   
   const dispatch = useDispatch();
 
@@ -1323,11 +1327,11 @@ const ProfilePage: React.FC = () => {
                         <CollectionsGrid
                           collections={decoratedCollections}
                           isDraft={visibilityFilter === 'Drafts'}
-                          onEdit={isOwner ? (id) => navigate(`/profile/collections/edit/${id}`) : undefined}
+                          onEdit={isOwner ? (id) => navigate(`/profile/edit/${id}`) : undefined}
                           onDelete={isOwner ? (id) => setCollectionToDelete(id) : undefined}
                           onCollectionClick={(id) => {
                             if (visibilityFilter === 'Drafts') {
-                              navigate(`/profile/collections/edit/${id}`);
+                              navigate(`/profile/edit/${id}`);
                             } else {
                               setSelectedCollectionId(id);
                               setSearchParams(prev => {

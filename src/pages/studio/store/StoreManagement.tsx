@@ -9,6 +9,7 @@ import { brandApi } from '@/api/BrandApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { clearStoreOpenPending, isStoreOpenPending, resolveStoreSetupDestination, sleep } from '@/utils/storeSetup';
+import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import {
   Eye,
 } from 'lucide-react';
@@ -28,8 +29,24 @@ export default function StoreManagement() {
   const [draftCollections, setDraftCollections] = useState<any[]>([]);
   const [draftCollectionsLoading, setDraftCollectionsLoading] = useState(false);
 
-  const avatarInitial = user?.profileImage ?? user?.profileImageFile?.s3Url ?? null;
-  const { url: avatarUrl } = useSignedFileUrl(user?.profileImageId, avatarInitial);
+  const resolvedAvatar = useMemo(
+    () =>
+      resolveProfileImageSource({
+        profileImage: user?.profileImage,
+        profileImageId: user?.profileImageId,
+        profileImageFile: user?.profileImageFile,
+      }),
+    [user?.profileImage, user?.profileImageFile, user?.profileImageId]
+  );
+  const { url: avatarUrl } = useSignedFileUrl(resolvedAvatar.fileId, resolvedAvatar.src);
+  const avatarFallback = useMemo(
+    () =>
+      getAvatarFallback(
+        `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim(),
+        user?.username
+      ),
+    [user?.firstName, user?.lastName, user?.username]
+  );
 
   const brandName = useMemo(() => {
     if (status?.profile?.name) return status.profile.name;
@@ -251,7 +268,7 @@ export default function StoreManagement() {
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-600 to-indigo-600 text-sm font-bold text-white">
-                  {brandName.charAt(0) || 'S'}
+                  {avatarFallback}
                 </div>
               )}
             </div>

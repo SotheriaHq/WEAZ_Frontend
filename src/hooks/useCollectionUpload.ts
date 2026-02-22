@@ -98,7 +98,12 @@ export function useCollectionUpload() {
       maxPrice?: number,
       isAvailableInStore?: boolean,
       tags?: string[],
-      meta?: { categoryId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY'; visibility?: 'PUBLIC' | 'PRIVATE' },
+      meta?: {
+        categoryId?: string;
+        categoryTypeId?: string;
+        type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
+        visibility?: 'PUBLIC' | 'PRIVATE';
+      },
       onProgress?: (value: number) => void,
       shouldPublish: boolean = true
     ) => {
@@ -125,6 +130,13 @@ export function useCollectionUpload() {
       }
       if (!UUID_V4_REGEX.test(normalizedCategoryId)) {
         throw new Error('Selected category is invalid. Please reselect a category and try again.');
+      }
+      const normalizedCategoryTypeId = meta?.categoryTypeId?.trim();
+      if (shouldPublish && !normalizedCategoryTypeId) {
+        throw new Error('Please select a category type before publishing.');
+      }
+      if (normalizedCategoryTypeId && !UUID_V4_REGEX.test(normalizedCategoryTypeId)) {
+        throw new Error('Selected category type is invalid. Please reselect and try again.');
       }
 
       // Allow saving drafts without tags when shouldPublish is false.
@@ -158,6 +170,7 @@ export function useCollectionUpload() {
           tags: normalizedTags.slice(0, 20),
           files: filesPayload,
           categoryId: normalizedCategoryId,
+          categoryTypeId: normalizedCategoryTypeId,
           type: meta?.type,
           visibility: meta?.visibility,
         }) as InitializeCollectionResponse & { id?: string };

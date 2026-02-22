@@ -48,6 +48,10 @@ export const ProfileLayout: React.FC = () => {
   }, [computedSidebarMode, sidebarMode, dispatch]);
 
   useEffect(() => {
+    dispatch(closeSidebar());
+  }, [dispatch, location.pathname]);
+
+  useEffect(() => {
     let mounted = true;
     const run = async () => {
       if (!isVisitorRoute || !routeBrandId) return;

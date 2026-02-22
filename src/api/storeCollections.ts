@@ -10,6 +10,7 @@ export interface InitializeStoreCollectionPayload {
   description?: string;
   visibility?: CollectionVisibility;
   categoryId?: string;
+  categoryTypeId?: string;
   type?: CollectionType;
   tags?: string[];
   isAvailableInStore?: boolean;
@@ -54,6 +55,19 @@ export async function addProductsToCollection(collectionId: string, productIds: 
   return unwrap<{ success: boolean }>(res.data);
 }
 
+export async function removeProductsFromCollection(collectionId: string, productIds: string[]) {
+  const res = await apiClient.post(`/collections/${collectionId}/remove-products`, { productIds });
+  return unwrap<{ success: boolean }>(res.data);
+}
+
+export async function reorderCollectionProducts(
+  collectionId: string,
+  items: Array<{ productId: string; orderIndex: number }>
+) {
+  const res = await apiClient.patch(`/collections/${collectionId}/reorder-products`, { items });
+  return unwrap<{ success: boolean }>(res.data);
+}
+
 export async function finalizeStoreCollection(
   collectionId: string,
   payload: {
@@ -64,11 +78,14 @@ export async function finalizeStoreCollection(
       visibility?: CollectionVisibility;
       type?: CollectionType;
       categoryId?: string;
+      categoryTypeId?: string;
       tags?: string[];
       isAvailableInStore?: boolean;
     };
   }
 ) {
-  const res = await apiClient.post(`/collections/${collectionId}/finalize`, payload);
+  const res = await apiClient.post(`/collections/${collectionId}/finalize`, payload, {
+    params: { scope: 'store' },
+  });
   return unwrap<Record<string, unknown>>(res.data);
 }

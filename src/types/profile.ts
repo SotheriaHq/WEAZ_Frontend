@@ -9,7 +9,9 @@ export interface CollectionDto {
   isPublic: boolean;
   visibility?: 'PUBLIC' | 'PRIVATE';
   type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
+  domain?: 'DESIGN' | 'STORE';
   categoryId?: string;
+  categoryTypeId?: string;
   coverImage?: string;
   coverFileId?: string;
   itemCount?: number;
@@ -29,6 +31,7 @@ export interface CollectionDto {
   brandLogo?: string;
   brandLogoFileId?: string;
   isAvailableInStore?: boolean;
+  isSystemGenerated?: boolean;
   tags?: string[];
   isThreaded?: boolean; // Backend includes this for authenticated users
   // Client-only status metadata for optimistic publish/progress states

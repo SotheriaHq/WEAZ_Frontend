@@ -6,6 +6,7 @@ import { getDraftExpiryStats, type DraftExpiryStats } from '@/api/collectionUplo
 import { getStoreStatus } from '@/api/StoreApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
+import { getAvatarFallback } from '@/utils/profileImage';
 import { DraftExpiryStats as DraftExpiryStatsComponent } from '@/components/collections/DraftExpiryComponents';
 import { 
   TrendingUp, 
@@ -131,6 +132,11 @@ const DashboardHome: React.FC = () => {
     return val.toString();
   };
 
+  const avatarFallback = getAvatarFallback(
+    `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim(),
+    user?.username,
+  );
+
   if (loading && !overview) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -156,7 +162,7 @@ const DashboardHome: React.FC = () => {
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">
-                  {displayStoreName.charAt(0) || 'S'}
+                  {avatarFallback}
                 </div>
               )}
             </div>

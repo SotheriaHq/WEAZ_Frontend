@@ -6,7 +6,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { useNotificationsBootstrap } from '@/hooks/useNotifications';
 import { setSidebarMode, closeSidebar, selectIsMobile } from '@/features/uiSlice';
-import GlassBackdrop from './ui/GlassBackdrop';
 
 interface LayoutProps {
   children?: React.ReactNode;
@@ -53,6 +52,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   }, [computedSidebarMode, sidebarMode, dispatch]);
 
+  useEffect(() => {
+    dispatch(closeSidebar());
+  }, [dispatch, location.pathname]);
+
   // Calculate margins based on mode
   // RAIL: 72px left margin, HIDDEN: 0px left margin
   const mainMarginLeft = computedSidebarMode === 'RAIL' ? '72px' : '0px';
@@ -76,13 +79,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </main>
 
-      {/* Backdrop for OVERLAY mode, Mobile Drawer, or Expanded Rail */}
-      <GlassBackdrop
-        isVisible={isSidebarOpen && !isRouteSidebarHidden}
-        onClick={() => dispatch(closeSidebar())}
-        variant="light"
-        layer="overlay"
-      />
     </div>
   );
 };

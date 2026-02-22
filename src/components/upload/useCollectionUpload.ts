@@ -30,7 +30,12 @@ export function useCollectionUpload() {
     files: File[],
     title: string,
     description?: string,
-    opts?: { visibility?: 'PUBLIC' | 'PRIVATE'; categoryId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY' }
+    opts?: {
+      visibility?: 'PUBLIC' | 'PRIVATE';
+      categoryId?: string;
+      categoryTypeId?: string;
+      type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
+    }
   ) => {
     if (!files || files.length === 0) throw new Error('No files');
     setIsUploading(true);
@@ -44,6 +49,7 @@ export function useCollectionUpload() {
     };
     if (opts?.visibility) (dto as any).visibility = opts.visibility;
     if (opts?.categoryId) (dto as any).categoryId = opts.categoryId;
+    if (opts?.categoryTypeId) (dto as any).categoryTypeId = opts.categoryTypeId;
     if (opts?.type) (dto as any).type = opts.type;
 
     const initResp = await apiClient.post('/collections/initialize', dto);

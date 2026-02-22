@@ -2,7 +2,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearUser, setUser } from '../features/userSlice';
 import { addLocalNotification, resetUnreadCount } from '../features/notificationsSlice';
-import { toggleSidebar } from '../features/uiSlice';
+import { closeSidebar, toggleSidebar } from '../features/uiSlice';
 import {
   openCartDrawer,
   closeCartDrawer,
@@ -465,7 +465,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           )}
 
           {/* Brand: Logo + Name */}
-          <div className="flex items-center cursor-pointer" onClick={() => navigate('/')}>
+          <div
+            className="flex items-center cursor-pointer"
+            onClick={() => {
+              dispatch(closeSidebar());
+              navigate('/');
+            }}
+          >
             <ThreadlyLogo />
             <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight max-w-[200px] truncate" title="Threadly">
               Threadly

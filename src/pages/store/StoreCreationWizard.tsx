@@ -414,8 +414,7 @@ const StoreCreationWizard: React.FC = () => {
   // Redirect if user already has a live store
   useEffect(() => {
     if (hasLiveStore) {
-      toast.error('You already have a live store.');
-      navigate('/store/dashboard');
+      navigate('/studio/store', { replace: true });
     }
   }, [hasLiveStore, navigate]);
 

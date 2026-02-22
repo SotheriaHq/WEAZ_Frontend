@@ -5,11 +5,15 @@ import { toast } from 'sonner';
 import { X } from 'lucide-react';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
+import { apiClient } from '@/api/httpClient';
 import { getBrandProductsForOwner, type Product as StoreProduct } from '@/api/StoreApi';
+import { unwrapApiResponse } from '@/types/auth';
 import {
   addProductsToCollection,
   finalizeStoreCollection,
   initializeStoreCollection,
+  removeProductsFromCollection,
+  reorderCollectionProducts,
   type CollectionType,
   type CollectionVisibility,
 } from '@/api/storeCollections';
@@ -23,6 +27,50 @@ import { getTagColor } from '@/utils/tagColors';
 const MAX_PRODUCTS = 5;
 const MAX_TAGS = 20;
 const TAG_CHAR_LIMIT = 50;
+type CategoryTypeOption = { id: string; name: string };
+type CategoryOption = {
+  id: string;
+  name: string;
+  types: CategoryTypeOption[];
+};
+
+const normalizeLinkedProduct = (raw: any): StoreProduct | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = typeof raw.id === 'string' ? raw.id : '';
+  if (!id) return null;
+  return {
+    id,
+    collectionId: typeof raw.collectionId === 'string' ? raw.collectionId : '',
+    brandId: typeof raw.brandId === 'string' ? raw.brandId : '',
+    name: typeof raw.name === 'string' && raw.name.trim().length > 0 ? raw.name : 'Untitled product',
+    description: typeof raw.description === 'string' ? raw.description : '',
+    price: typeof raw.price === 'number' ? raw.price : 0,
+    salePrice: typeof raw.salePrice === 'number' ? raw.salePrice : undefined,
+    saleStartAt: typeof raw.saleStartAt === 'string' ? raw.saleStartAt : undefined,
+    saleEndAt: typeof raw.saleEndAt === 'string' ? raw.saleEndAt : undefined,
+    sizes: Array.isArray(raw.sizes) ? raw.sizes.filter((v: unknown) => typeof v === 'string') : [],
+    sizeStock: raw.sizeStock && typeof raw.sizeStock === 'object' ? raw.sizeStock : undefined,
+    colors: Array.isArray(raw.colors) ? raw.colors.filter((v: unknown) => typeof v === 'string') : [],
+    colorImages: raw.colorImages && typeof raw.colorImages === 'object' ? raw.colorImages : undefined,
+    images: Array.isArray(raw.images) ? raw.images.filter((v: unknown) => typeof v === 'string') : [],
+    thumbnail: typeof raw.thumbnail === 'string' ? raw.thumbnail : undefined,
+    totalStock: typeof raw.totalStock === 'number' ? raw.totalStock : 0,
+    lowStockThreshold: typeof raw.lowStockThreshold === 'number' ? raw.lowStockThreshold : 5,
+    tags: Array.isArray(raw.tags) ? raw.tags.filter((v: unknown) => typeof v === 'string') : [],
+    gender:
+      raw.gender === 'MALE' || raw.gender === 'FEMALE' || raw.gender === 'EVERYBODY'
+        ? raw.gender
+        : 'EVERYBODY',
+    isActive: raw.isActive !== false,
+    isFeatured: Boolean(raw.isFeatured),
+    viewsCount: typeof raw.viewsCount === 'number' ? raw.viewsCount : 0,
+    threadsCount: typeof raw.threadsCount === 'number' ? raw.threadsCount : 0,
+    createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date(0).toISOString(),
+    updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : new Date(0).toISOString(),
+    collection: raw.collection,
+    brand: raw.brand,
+  };
+};
 
 const StoreCollectionCreate: React.FC = () => {
   const navigate = useNavigate();
@@ -34,10 +82,11 @@ const StoreCollectionCreate: React.FC = () => {
   const [visibility, setVisibility] = useState<CollectionVisibility>('PUBLIC');
   const [type, setType] = useState<CollectionType>('EVERYBODY');
   const [categoryId, setCategoryId] = useState('');
+  const [categoryTypeId, setCategoryTypeId] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
 
-  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
 
   const [products, setProducts] = useState<StoreProduct[]>([]);
@@ -51,26 +100,48 @@ const StoreCollectionCreate: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitAction, setSubmitAction] = useState<'draft' | 'publish' | null>(null);
   const [previewProduct, setPreviewProduct] = useState<StoreProduct | null>(null);
+  const [previewImageIndex, setPreviewImageIndex] = useState(0);
 
   const preselectProductId = searchParams.get('productId');
   const prefillCollectionId = searchParams.get('collectionId');
   const returnMode = searchParams.get('mode');
   const [collectionSessionId, setCollectionSessionId] = useState<string | null>(null);
   const [sessionDraftProductIds, setSessionDraftProductIds] = useState<string[]>([]);
+  const [existingCollectionStatus, setExistingCollectionStatus] = useState<
+    'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | null
+  >(null);
+  const [existingLinkedProductIds, setExistingLinkedProductIds] = useState<string[]>([]);
 
   useEffect(() => {
     let mounted = true;
     const loadCategories = async () => {
       setLoadingCategories(true);
       try {
-        const cats = await brandApi.getCategories();
+        const cats = await brandApi.getCategories(true);
         if (!mounted) return;
-        const mapped = cats.map((c) => ({ id: c.id, name: c.name }));
+        const mapped = cats.map((c) => ({
+          id: c.id,
+          name: c.name,
+          types: Array.isArray(c.types)
+            ? c.types.map((t) => ({ id: t.id, name: t.name }))
+            : [],
+        }));
         setCategories(mapped);
         if (mapped.length) {
           setCategoryId((prev) => prev || mapped[0].id);
+          setCategoryTypeId((prev) => {
+            if (
+              prev &&
+              mapped.some((category) =>
+                category.types.some((categoryType) => categoryType.id === prev),
+              )
+            ) {
+              return prev;
+            }
+            return mapped[0].types[0]?.id ?? '';
+          });
         }
-      } catch (error) {
+      } catch {
         if (mounted) setCategories([]);
       } finally {
         if (mounted) setLoadingCategories(false);
@@ -93,33 +164,52 @@ const StoreCollectionCreate: React.FC = () => {
       if (!collectionSessionId) return;
       let detail: any = null;
       try {
-        detail = await brandApi.getCollectionDetail(collectionSessionId);
+        detail = await brandApi.getCollectionDetail(collectionSessionId, {
+          scope: 'store',
+        });
       } catch (error: any) {
         if (!mounted) return;
         toast.error(error?.response?.data?.message ?? 'Unable to load draft collection.');
         return;
       }
       if (!mounted || !detail) return;
+      setExistingCollectionStatus(
+        detail.status === 'DRAFT' || detail.status === 'PUBLISHED' || detail.status === 'ARCHIVED'
+          ? detail.status
+          : null,
+      );
 
       const links = Array.isArray(detail.products) ? detail.products : [];
       const primaryLink = links.find((link: any) => Boolean(link?.isPrimary));
+      const linkedIds = links
+        .map((link: any) => String(link?.product?.id || link?.productId || link?.id || ''))
+        .filter(Boolean);
       const linkedProducts = links
-        .map((link: any) => link?.product ?? link)
-        .filter(Boolean);
-      const linkedIds = linkedProducts
-        .map((product: any) => String(product.id || ''))
-        .filter(Boolean);
+        .map((link: any) => normalizeLinkedProduct(link?.product))
+        .filter(Boolean) as StoreProduct[];
+      setExistingLinkedProductIds(linkedIds);
       const draftIds = linkedProducts
-        .filter((product: any) => product?.isActive === false)
-        .map((product: any) => String(product.id || ''))
+        .filter((product) => product.isActive === false)
+        .map((product) => String(product.id || ''))
         .filter(Boolean);
+
+      if (linkedProducts.length > 0) {
+        setProducts((prev) => {
+          const merged = new Map(prev.map((product) => [product.id, product]));
+          linkedProducts.forEach((product) => {
+            if (!merged.has(product.id)) {
+              merged.set(product.id, product);
+            }
+          });
+          return Array.from(merged.values());
+        });
+      }
 
       if (linkedIds.length > 0) {
         setSelectedProductIds((prev) => Array.from(new Set([...prev, ...linkedIds])));
         const nextPrimaryId =
           primaryLink?.product?.id ||
           primaryLink?.productId ||
-          linkedIds[0] ||
           null;
         if (nextPrimaryId) {
           setPrimaryProductId((prev) => prev ?? String(nextPrimaryId));
@@ -134,6 +224,7 @@ const StoreCollectionCreate: React.FC = () => {
         if (!title && detail.title) setTitle(detail.title);
         if (!description && detail.description) setDescription(detail.description);
         if (!categoryId && detail.categoryId) setCategoryId(detail.categoryId);
+        if (!categoryTypeId && detail.categoryTypeId) setCategoryTypeId(detail.categoryTypeId);
         if (detail.visibility) setVisibility(detail.visibility);
         if (detail.type) setType(detail.type);
         if (Array.isArray(detail.tags) && tags.length === 0) {
@@ -146,7 +237,7 @@ const StoreCollectionCreate: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [collectionSessionId, preselectProductId, title, description, categoryId, tags.length]);
+  }, [collectionSessionId, preselectProductId, title, description, categoryId, categoryTypeId, tags.length]);
 
   const loadProducts = useCallback(async () => {
     if (!user?.id) {
@@ -189,7 +280,6 @@ const StoreCollectionCreate: React.FC = () => {
       if (prev.length >= MAX_PRODUCTS) return prev;
       return [...prev, preselectProductId];
     });
-    setPrimaryProductId((prev) => prev ?? preselectProductId);
     setCreationMode('new');
   }, [preselectProductId, loadProducts]);
 
@@ -198,6 +288,25 @@ const StoreCollectionCreate: React.FC = () => {
       setCreationMode('new');
     }
   }, [returnMode]);
+
+  useEffect(() => {
+    if (!categoryId) {
+      setCategoryTypeId('');
+      return;
+    }
+    const selectedCategory = categories.find((category) => category.id === categoryId);
+    if (!selectedCategory) {
+      setCategoryTypeId('');
+      return;
+    }
+    if (
+      categoryTypeId &&
+      selectedCategory.types.some((categoryType) => categoryType.id === categoryTypeId)
+    ) {
+      return;
+    }
+    setCategoryTypeId(selectedCategory.types[0]?.id ?? '');
+  }, [categories, categoryId, categoryTypeId]);
 
   const normalizedTags = useMemo(() => {
     const seen = new Set<string>();
@@ -213,6 +322,12 @@ const StoreCollectionCreate: React.FC = () => {
       });
     return cleaned.slice(0, MAX_TAGS);
   }, [tags]);
+
+  const selectedCategory = useMemo(
+    () => categories.find((category) => category.id === categoryId),
+    [categories, categoryId],
+  );
+  const categoryTypeOptions = selectedCategory?.types ?? [];
 
   const handleAddTag = useCallback(() => {
     const raw = tagInput.trim();
@@ -264,6 +379,20 @@ const StoreCollectionCreate: React.FC = () => {
     );
   }, [creationMode, filteredProducts, sessionDraftProductIds, sessionProducts]);
 
+  const displayedProducts = useMemo(() => {
+    const selectedSet = new Set(selectedProductIds);
+    const linkedSet = new Set(existingLinkedProductIds);
+    return [...visibleProducts].sort((a, b) => {
+      const aSelected = selectedSet.has(a.id);
+      const bSelected = selectedSet.has(b.id);
+      if (aSelected !== bSelected) return aSelected ? -1 : 1;
+      const aLinked = linkedSet.has(a.id);
+      const bLinked = linkedSet.has(b.id);
+      if (aLinked !== bLinked) return aLinked ? -1 : 1;
+      return 0;
+    });
+  }, [existingLinkedProductIds, selectedProductIds, visibleProducts]);
+
   const selectedProducts = useMemo(
     () => products.filter((p) => selectedProductIds.includes(p.id)),
     [products, selectedProductIds]
@@ -275,6 +404,15 @@ const StoreCollectionCreate: React.FC = () => {
     }
     return [primaryProductId, ...selectedProductIds.filter((id) => id !== primaryProductId)];
   }, [primaryProductId, selectedProductIds]);
+
+  const hasPrimarySelection = Boolean(
+    primaryProductId && selectedProductIds.includes(primaryProductId),
+  );
+
+  const isExistingCollectionEditMode = useMemo(
+    () => Boolean(prefillCollectionId && existingCollectionStatus && existingCollectionStatus !== 'DRAFT'),
+    [existingCollectionStatus, prefillCollectionId],
+  );
 
   const hasAnyMedia = useMemo(
     () =>
@@ -301,13 +439,20 @@ const StoreCollectionCreate: React.FC = () => {
     []
   );
 
+  const handleSetPrimary = useCallback(
+    (productId: string) => {
+      if (!selectedProductIds.includes(productId)) {
+        toast.error('Select this product first before setting it as primary.');
+        return;
+      }
+      setPrimaryProductId(productId);
+    },
+    [selectedProductIds],
+  );
+
   useEffect(() => {
-    if (selectedProductIds.length === 0) {
+    if (selectedProductIds.length === 0 || !primaryProductId || !selectedProductIds.includes(primaryProductId)) {
       if (primaryProductId !== null) setPrimaryProductId(null);
-      return;
-    }
-    if (!primaryProductId || !selectedProductIds.includes(primaryProductId)) {
-      setPrimaryProductId(selectedProductIds[0]);
     }
   }, [primaryProductId, selectedProductIds]);
 
@@ -319,6 +464,7 @@ const StoreCollectionCreate: React.FC = () => {
       description: description.trim() || undefined,
       visibility,
       categoryId: categoryId || undefined,
+      categoryTypeId: categoryTypeId || undefined,
       type,
       tags: normalizedTags,
       isAvailableInStore: true,
@@ -354,9 +500,18 @@ const StoreCollectionCreate: React.FC = () => {
       return;
     }
 
+    if (selectedProductIds.length > 0 && !hasPrimarySelection) {
+      toast.error('Please choose a primary product before continuing.');
+      return;
+    }
+
     if (action === 'publish') {
       if (!categoryId) {
         toast.error('Please select a category to publish.');
+        return;
+      }
+      if (!categoryTypeId) {
+        toast.error('Please select a category type to publish.');
         return;
       }
       if (normalizedTags.length === 0) {
@@ -381,6 +536,55 @@ const StoreCollectionCreate: React.FC = () => {
     setSubmitAction(action);
     try {
       const sessionId = await ensureCollectionSession();
+      const metadataPayload = {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        visibility,
+        type,
+        categoryId: categoryId || undefined,
+        categoryTypeId: categoryTypeId || undefined,
+        tags: normalizedTags,
+        isAvailableInStore: true,
+      };
+
+      if (isExistingCollectionEditMode) {
+        const updatedResponse = await apiClient.patch(
+          `/collections/${sessionId}`,
+          metadataPayload,
+          { params: { scope: 'store' } },
+        );
+        const updated = unwrapApiResponse<any>(updatedResponse.data);
+        if (!updated) {
+          toast.error('Failed to update collection metadata.');
+          return;
+        }
+
+        const previousIds = existingLinkedProductIds;
+        const nextIds = orderedSelectedProductIds;
+        const previousSet = new Set(previousIds);
+        const nextSet = new Set(nextIds);
+
+        const toRemove = previousIds.filter((productId) => !nextSet.has(productId));
+        const toAdd = nextIds.filter((productId) => !previousSet.has(productId));
+
+        if (toRemove.length > 0) {
+          await removeProductsFromCollection(sessionId, toRemove);
+        }
+        if (toAdd.length > 0) {
+          await addProductsToCollection(sessionId, toAdd);
+        }
+        if (nextIds.length > 0) {
+          await reorderCollectionProducts(
+            sessionId,
+            nextIds.map((productId, orderIndex) => ({ productId, orderIndex })),
+          );
+        }
+
+        setExistingLinkedProductIds(nextIds);
+        toast.success('Collection updated.');
+        navigate('/studio/store?view=collections');
+        return;
+      }
 
       if (orderedSelectedProductIds.length > 0) {
         await addProductsToCollection(sessionId, orderedSelectedProductIds);
@@ -388,19 +592,11 @@ const StoreCollectionCreate: React.FC = () => {
 
       await finalizeStoreCollection(sessionId, {
         action,
-        collectionMetadata: {
-          title: title.trim(),
-          description: description.trim() || undefined,
-          visibility,
-          type,
-          categoryId: categoryId || undefined,
-          tags: normalizedTags,
-          isAvailableInStore: true,
-        },
+        collectionMetadata: metadataPayload,
       });
 
       toast.success(action === 'publish' ? 'Collection published.' : 'Draft saved.');
-      navigate('/studio/store');
+      navigate('/studio/store?view=collections');
     } catch (error: any) {
       const rawMessage = error?.response?.data?.message;
       if (rawMessage && typeof rawMessage === 'object') {
@@ -419,7 +615,9 @@ const StoreCollectionCreate: React.FC = () => {
       }
       toast.error(
         error?.response?.data?.message ??
-          (action === 'publish'
+          (isExistingCollectionEditMode
+            ? 'Failed to update collection.'
+            : action === 'publish'
             ? 'Failed to publish collection.'
             : 'Failed to save draft.')
       );
@@ -437,6 +635,13 @@ const StoreCollectionCreate: React.FC = () => {
       return `₦${price}`;
     }
   };
+
+  const isLikelyFileId = (value?: string | null) =>
+    Boolean(value) &&
+    !value!.includes('://') &&
+    !value!.startsWith('http') &&
+    !value!.startsWith('/') &&
+    !value!.includes('/');
 
   const getProductImage = (product: StoreProduct) => {
     const cover =
@@ -463,12 +668,6 @@ const StoreCollectionCreate: React.FC = () => {
     const image = primaryMedia?.url ?? fallbackImage ?? null;
 
     const mediaIds = Array.isArray((product as any)?.mediaIds) ? ((product as any).mediaIds as string[]) : [];
-    const isLikelyFileId = (value?: string | null) =>
-      Boolean(value) &&
-      !value!.includes('://') &&
-      !value!.startsWith('http') &&
-      !value!.startsWith('/') &&
-      !value!.includes('/');
 
     const primaryId =
       typeof primaryMedia?.id === 'string' && isLikelyFileId(primaryMedia.id)
@@ -497,16 +696,128 @@ const StoreCollectionCreate: React.FC = () => {
     };
   };
 
+  const getProductPreviewSources = useCallback((product: StoreProduct) => {
+    const media = (product as any)?.media as
+      | Array<{ id?: string; url?: string; isPrimary?: boolean }>
+      | undefined;
+    const mediaIds = Array.isArray((product as any)?.mediaIds) ? ((product as any).mediaIds as string[]) : [];
+    const cover =
+      typeof (product as any)?.coverImage === 'string'
+        ? ((product as any).coverImage as string)
+        : typeof (product as any)?.coverUrl === 'string'
+          ? ((product as any).coverUrl as string)
+          : null;
+    const imageValues = [cover, product.thumbnail, ...(Array.isArray(product.images) ? product.images : [])]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+    const entries: Array<{ src: string | null; fileId: string | null; key: string }> = [];
+    const seen = new Set<string>();
+    const pushEntry = (src: string | null, fileId: string | null, keyPrefix: string) => {
+      if (!src && !fileId) return;
+      const dedupeKey = `${src ?? ''}|${fileId ?? ''}`;
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      entries.push({ src, fileId, key: `${keyPrefix}-${dedupeKey}` });
+    };
+
+    const orderedMedia = Array.isArray(media)
+      ? [...media].sort((a, b) => Number(Boolean(b?.isPrimary)) - Number(Boolean(a?.isPrimary)))
+      : [];
+
+    orderedMedia.forEach((item, index) => {
+      const rawUrl = typeof item?.url === 'string' ? item.url : null;
+      const mediaId = typeof item?.id === 'string' && isLikelyFileId(item.id) ? item.id : null;
+      if (rawUrl) {
+        const isRemote =
+          rawUrl.startsWith('http') ||
+          rawUrl.startsWith('/') ||
+          rawUrl.startsWith('data:') ||
+          rawUrl.includes('://') ||
+          rawUrl.includes('?');
+        pushEntry(isRemote ? rawUrl : null, mediaId ?? (!isRemote && isLikelyFileId(rawUrl) ? rawUrl : null), `media-${index}`);
+        return;
+      }
+      pushEntry(null, mediaId, `media-${index}`);
+    });
+
+    imageValues.forEach((value, index) => {
+      const isRemote =
+        value.startsWith('http') ||
+        value.startsWith('/') ||
+        value.startsWith('data:') ||
+        value.includes('://') ||
+        value.includes('?');
+      pushEntry(isRemote ? value : null, !isRemote && isLikelyFileId(value) ? value : null, `fallback-${index}`);
+    });
+
+    mediaIds.forEach((id, index) => {
+      if (!isLikelyFileId(id)) return;
+      pushEntry(null, id, `media-id-${index}`);
+    });
+
+    return entries;
+  }, []);
+
+  const previewImages = useMemo(
+    () => (previewProduct ? getProductPreviewSources(previewProduct) : []),
+    [getProductPreviewSources, previewProduct],
+  );
+
+  useEffect(() => {
+    setPreviewImageIndex(0);
+  }, [previewProduct?.id]);
+
+  useEffect(() => {
+    if (previewImageIndex < previewImages.length) return;
+    setPreviewImageIndex(0);
+  }, [previewImageIndex, previewImages.length]);
+
+  const activePreviewImage = previewImages[previewImageIndex] ?? null;
+
   return (
     <div className="space-y-8">
+      <nav className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400" aria-label="Breadcrumb">
+        <button
+          type="button"
+          onClick={() => navigate('/studio')}
+          className="font-medium hover:text-purple-600 dark:hover:text-purple-300"
+        >
+          Studio
+        </button>
+        <span>/</span>
+        <button
+          type="button"
+          onClick={() => navigate('/studio/store')}
+          className="font-medium hover:text-purple-600 dark:hover:text-purple-300"
+        >
+          Store
+        </button>
+        <span>/</span>
+        <button
+          type="button"
+          onClick={() => navigate('/studio/store?view=collections')}
+          className="font-medium hover:text-purple-600 dark:hover:text-purple-300"
+        >
+          Manage Collections
+        </button>
+        <span>/</span>
+        <span className="font-semibold text-gray-700 dark:text-gray-200">
+          {isExistingCollectionEditMode ? 'Edit Collection' : 'New Collection'}
+        </span>
+      </nav>
+
       <div className="relative overflow-hidden rounded-3xl border border-purple-100/60 dark:border-white/10 bg-white/80 dark:bg-white/5 p-6">
         <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-gradient-to-br from-purple-400/20 via-fuchsia-300/10 to-transparent blur-2xl" />
         <div className="absolute -bottom-12 -left-10 h-40 w-40 rounded-full bg-gradient-to-tr from-indigo-300/20 via-purple-300/10 to-transparent blur-2xl" />
         <div className="relative">
           <p className="text-xs uppercase tracking-wide text-purple-500 font-semibold">Store Collections</p>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create Collection</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {isExistingCollectionEditMode ? 'Edit Collection' : 'Create Collection'}
+          </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Select up to {MAX_PRODUCTS} products and publish a store collection.
+            {isExistingCollectionEditMode
+              ? `Update metadata, product membership, and primary product order for this collection.`
+              : `Select up to ${MAX_PRODUCTS} products and publish a store collection.`}
           </p>
         </div>
       </div>
@@ -554,6 +865,16 @@ const StoreCollectionCreate: React.FC = () => {
                 Selected {selectedProductIds.length}/{MAX_PRODUCTS}
               </span>
             </div>
+            {isExistingCollectionEditMode && existingLinkedProductIds.length > 0 && (
+              <div className="mb-4 rounded-xl border border-indigo-200/70 bg-indigo-50/70 px-3 py-2 text-xs font-medium text-indigo-700 dark:border-indigo-400/30 dark:bg-indigo-500/10 dark:text-indigo-300">
+                {existingLinkedProductIds.length} product(s) are already linked to this collection. They are pinned first and marked below.
+              </div>
+            )}
+            {selectedProductIds.length > 0 && !hasPrimarySelection && (
+              <div className="mb-4 rounded-xl border border-amber-200/70 bg-amber-50/80 px-3 py-2 text-xs font-semibold text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300">
+                Choose one selected product as the primary product before you can save or publish.
+              </div>
+            )}
 
             {creationMode === 'existing' ? (
               <SearchField
@@ -606,11 +927,12 @@ const StoreCollectionCreate: React.FC = () => {
               <div className="py-10 text-sm text-gray-500">No products found.</div>
             ) : (
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {visibleProducts.map((product) => {
+                {displayedProducts.map((product) => {
                   const image = getProductImageSource(product);
                   const selected = selectedProductIds.includes(product.id);
                   const isPrimary = primaryProductId === product.id;
                   const isSession = sessionDraftProductIds.includes(product.id);
+                  const isLinked = existingLinkedProductIds.includes(product.id);
                   return (
                     <div
                       key={product.id}
@@ -660,6 +982,11 @@ const StoreCollectionCreate: React.FC = () => {
                                 Primary cover
                               </div>
                             )}
+                            {isLinked && (
+                              <div className="mt-1 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                Already in collection
+                              </div>
+                            )}
                             {isSession && (
                               <div className="mt-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
                                 New • Collection Flow
@@ -669,30 +996,34 @@ const StoreCollectionCreate: React.FC = () => {
                               Stock: {typeof product.totalStock === 'number' ? product.totalStock : '—'}
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <div className="mt-3 flex flex-wrap items-center gap-2 shrink-0">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                void openCollectionProductEditor(product.id);
+                                toggleProduct(product.id);
                               }}
-                              className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
+                              className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 ${
+                                selected
+                                  ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm'
+                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                              }`}
                             >
-                              Edit
+                              {selected ? 'Selected' : 'Select'}
                             </button>
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setPrimaryProductId(product.id);
-                                if (!selectedProductIds.includes(product.id)) {
-                                  toggleProduct(product.id);
-                                }
+                                handleSetPrimary(product.id);
                               }}
-                              className={`text-[10px] px-2.5 py-1 rounded-md font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200 ${
+                              disabled={!selected}
+                              className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 ${
                                 isPrimary
-                                  ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white'
-                                  : 'bg-gradient-to-r from-slate-500 to-slate-600 text-white'
+                                  ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-sm'
+                                  : selected
+                                    ? 'bg-gradient-to-r from-slate-500 to-slate-600 text-white shadow-sm'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                               }`}
                             >
                               {isPrimary ? 'Primary' : 'Set Primary'}
@@ -701,21 +1032,23 @@ const StoreCollectionCreate: React.FC = () => {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                setPreviewImageIndex(0);
                                 setPreviewProduct(product);
                               }}
-                              className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
+                              className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
                             >
                               View
                             </button>
-                            <span
-                              className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 ${
-                                selected
-                                  ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm'
-                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                              }`}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void openCollectionProductEditor(product.id);
+                              }}
+                              className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
                             >
-                              {selected ? '✓' : 'Select'}
-                            </span>
+                              Edit
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -795,30 +1128,34 @@ const StoreCollectionCreate: React.FC = () => {
                                   Stock: {typeof product.totalStock === 'number' ? product.totalStock : '—'}
                                 </div>
                               </div>
-                              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                              <div className="mt-3 flex flex-wrap items-center gap-2 shrink-0">
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    void openCollectionProductEditor(product.id);
+                                    toggleProduct(product.id);
                                   }}
-                                  className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
+                                  className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 ${
+                                    selected
+                                      ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm'
+                                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                                  }`}
                                 >
-                                  Edit
+                                  {selected ? 'Selected' : 'Select'}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setPrimaryProductId(product.id);
-                                    if (!selectedProductIds.includes(product.id)) {
-                                      toggleProduct(product.id);
-                                    }
+                                    handleSetPrimary(product.id);
                                   }}
-                                  className={`text-[10px] px-2.5 py-1 rounded-md font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200 ${
+                                  disabled={!selected}
+                                  className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 ${
                                     isPrimary
-                                      ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white'
-                                      : 'bg-gradient-to-r from-slate-500 to-slate-600 text-white'
+                                      ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-sm'
+                                      : selected
+                                        ? 'bg-gradient-to-r from-slate-500 to-slate-600 text-white shadow-sm'
+                                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                                   }`}
                                 >
                                   {isPrimary ? 'Primary' : 'Set Primary'}
@@ -827,21 +1164,23 @@ const StoreCollectionCreate: React.FC = () => {
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    setPreviewImageIndex(0);
                                     setPreviewProduct(product);
                                   }}
-                                  className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
+                                  className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
                                 >
                                   View
                                 </button>
-                                <span
-                                  className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 ${
-                                    selected
-                                      ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm'
-                                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                                  }`}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void openCollectionProductEditor(product.id);
+                                  }}
+                                  className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
                                 >
-                                  {selected ? '✓' : 'Select'}
-                                </span>
+                                  Edit
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -895,6 +1234,26 @@ const StoreCollectionCreate: React.FC = () => {
                 {categories.map((cat) => (
                   <option key={cat.id} value={cat.id}>
                     {cat.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div>
+              <Select
+                label="Category Type"
+                value={categoryTypeId}
+                onChange={(e) => setCategoryTypeId(e.target.value)}
+                disabled={loadingCategories || categoryTypeOptions.length === 0}
+                variant="default"
+              >
+                {loadingCategories && <option>Loading category types...</option>}
+                {!loadingCategories && categoryTypeOptions.length === 0 && (
+                  <option>No category types available</option>
+                )}
+                {categoryTypeOptions.map((categoryType) => (
+                  <option key={categoryType.id} value={categoryType.id}>
+                    {categoryType.name}
                   </option>
                 ))}
               </Select>
@@ -967,6 +1326,11 @@ const StoreCollectionCreate: React.FC = () => {
 
           <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 p-6">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Selected Products</h3>
+            {selectedProducts.length > 0 && !hasPrimarySelection && (
+              <p className="mb-3 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                Primary product is required.
+              </p>
+            )}
             {selectedProducts.length === 0 ? (
               <p className="text-xs text-gray-500">No products selected yet.</p>
             ) : (
@@ -992,7 +1356,7 @@ const StoreCollectionCreate: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setPrimaryProductId(product.id)}
+                        onClick={() => handleSetPrimary(product.id)}
                         className="text-indigo-600 hover:text-indigo-700"
                       >
                         {isPrimary ? 'Primary' : 'Set Primary'}
@@ -1024,33 +1388,55 @@ const StoreCollectionCreate: React.FC = () => {
       <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={() => {
+            if (isExistingCollectionEditMode) {
+              navigate('/studio/store?view=collections');
+              return;
+            }
+            navigate(-1);
+          }}
           className="rounded-lg border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-purple-300"
         >
-          Back
+          {isExistingCollectionEditMode ? 'Discard changes' : 'Back'}
         </button>
-        <button
-          type="button"
-          onClick={() => handleSubmit('draft')}
-          disabled={submitting}
-          className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 inline-flex items-center gap-2"
-        >
-          {submitting && submitAction === 'draft' && (
-            <span className="h-3.5 w-3.5 rounded-full border-2 border-gray-500/40 border-t-gray-700 animate-spin" />
-          )}
-          {submitting && submitAction === 'draft' ? 'Saving...' : 'Save Draft'}
-        </button>
-        <button
-          type="button"
-          onClick={() => handleSubmit('publish')}
-          disabled={submitting}
-          className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60 inline-flex items-center gap-2"
-        >
-          {submitting && submitAction === 'publish' && (
-            <span className="h-3.5 w-3.5 rounded-full border-2 border-white/50 border-t-white animate-spin" />
-          )}
-          {submitting && submitAction === 'publish' ? 'Publishing...' : 'Publish'}
-        </button>
+        {isExistingCollectionEditMode ? (
+          <button
+            type="button"
+            onClick={() => handleSubmit('publish')}
+            disabled={submitting}
+            className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60 inline-flex items-center gap-2"
+          >
+            {submitting && (
+              <span className="h-3.5 w-3.5 rounded-full border-2 border-white/50 border-t-white animate-spin" />
+            )}
+            {submitting ? 'Saving...' : 'Save changes'}
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => handleSubmit('draft')}
+              disabled={submitting}
+              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 inline-flex items-center gap-2"
+            >
+              {submitting && submitAction === 'draft' && (
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-gray-500/40 border-t-gray-700 animate-spin" />
+              )}
+              {submitting && submitAction === 'draft' ? 'Saving...' : 'Save Draft'}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSubmit('publish')}
+              disabled={submitting}
+              className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60 inline-flex items-center gap-2"
+            >
+              {submitting && submitAction === 'publish' && (
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/50 border-t-white animate-spin" />
+              )}
+              {submitting && submitAction === 'publish' ? 'Publishing...' : 'Publish'}
+            </button>
+          </>
+        )}
       </div>
 
       {previewProduct && (
@@ -1074,6 +1460,11 @@ const StoreCollectionCreate: React.FC = () => {
                   <div>
                     <div className="text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 bg-clip-text text-transparent">Product Details</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{previewProduct.name}</div>
+                    {previewImages.length > 0 && (
+                      <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                        {previewImages.length} image{previewImages.length === 1 ? '' : 's'}
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -1087,13 +1478,12 @@ const StoreCollectionCreate: React.FC = () => {
               
               <div className="relative grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
                 {/* Image Container with enhanced styling */}
-                <div className="rounded-2xl bg-gradient-to-br from-gray-100/80 via-white to-purple-50/50 dark:from-white/10 dark:via-white/5 dark:to-purple-900/20 p-4 flex items-center justify-center border border-purple-200/40 dark:border-white/10 shadow-inner">
-                  {(() => {
-                    const image = getProductImageSource(previewProduct);
-                    return image.src || image.fileId ? (
+                <div className="rounded-2xl bg-gradient-to-br from-gray-100/80 via-white to-purple-50/50 dark:from-white/10 dark:via-white/5 dark:to-purple-900/20 p-4 border border-purple-200/40 dark:border-white/10 shadow-inner">
+                  <div className="flex items-center justify-center min-h-[260px]">
+                    {activePreviewImage ? (
                       <ImageWithFallback
-                        src={image.src}
-                        fileId={image.fileId}
+                        src={activePreviewImage.src}
+                        fileId={activePreviewImage.fileId}
                         alt={previewProduct.name}
                         fit="contain"
                         className="max-h-[360px] w-auto rounded-xl shadow-lg"
@@ -1102,8 +1492,37 @@ const StoreCollectionCreate: React.FC = () => {
                       />
                     ) : (
                       <div className="text-sm text-gray-400">No image</div>
-                    );
-                  })()}
+                    )}
+                  </div>
+                  {previewImages.length > 1 && (
+                    <div className="mt-4 grid grid-cols-5 gap-2">
+                      {previewImages.map((image, index) => {
+                        const isActive = previewImageIndex === index;
+                        return (
+                          <button
+                            key={image.key}
+                            type="button"
+                            onClick={() => setPreviewImageIndex(index)}
+                            className={`h-14 rounded-lg border-2 overflow-hidden transition-all ${
+                              isActive
+                                ? 'border-purple-500 shadow-md shadow-purple-500/20'
+                                : 'border-gray-200/80 dark:border-white/10 hover:border-purple-300'
+                            }`}
+                          >
+                            <ImageWithFallback
+                              src={image.src}
+                              fileId={image.fileId}
+                              alt={`${previewProduct.name} ${index + 1}`}
+                              fit="cover"
+                              className="h-full w-full object-cover"
+                              containerClassName="h-full w-full"
+                              rounded="none"
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
                 
                 {/* Details Section */}

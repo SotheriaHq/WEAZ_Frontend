@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { ChevronDown, ChevronRight, Settings, CheckCircle, Shield, Wallet, Users, Bell, AlertTriangle } from 'lucide-react';
+import type { RootState } from '@/store';
 
 interface SettingsSidebarProps {
   active: string;
@@ -40,6 +42,8 @@ const studioItems = [
 
 export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSelect }) => {
   const navigate = useNavigate();
+  const me = useSelector((s: RootState) => s.user.profile);
+  const isBrandUser = me?.type === 'BRAND';
   const [studioExpanded, setStudioExpanded] = useState(
     studioItems.some((item) => active === item.key)
   );
@@ -123,49 +127,53 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
             </div>
           )}
 
-          <div className="border-t border-gray-200 dark:border-white/5 my-3 mx-4" />
+          {isBrandUser ? (
+            <>
+              <div className="border-t border-gray-200 dark:border-white/5 my-3 mx-4" />
 
-          {/* Studio Management Section (Collapsible) */}
-          <button
-            onClick={() => setStudioExpanded(!studioExpanded)}
-            className={`w-full text-left px-4 py-2.5 text-sm font-semibold flex items-center justify-between transition-colors uppercase tracking-wider ${
-              isStudioActive
-                ? 'text-purple-600 dark:text-purple-400 bg-purple-500/10'
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
-            }`}
-          >
-            <span>Studio Management</span>
-            {studioExpanded ? (
-              <ChevronDown className="w-4 h-4" />
-            ) : (
-              <ChevronRight className="w-4 h-4" />
-            )}
-          </button>
+              {/* Studio Management Section (Collapsible) */}
+              <button
+                onClick={() => setStudioExpanded(!studioExpanded)}
+                className={`w-full text-left px-4 py-2.5 text-sm font-semibold flex items-center justify-between transition-colors uppercase tracking-wider ${
+                  isStudioActive
+                    ? 'text-purple-600 dark:text-purple-400 bg-purple-500/10'
+                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
+                }`}
+              >
+                <span>Studio Management</span>
+                {studioExpanded ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
 
-          {/* Studio Dropdown Items */}
-          {studioExpanded && (
-            <div className="ml-4 border-l border-gray-200 dark:border-white/10">
-              {studioItems.map(({ key, label, path, icon: Icon, danger }) => {
-                const isActive = active === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => handleSelect(key, path)}
-                    className={`w-full text-left pl-6 pr-4 py-2 text-sm flex items-center gap-2 transition-colors ${
-                      isActive
-                        ? 'font-medium text-primary border-l-4 border-primary bg-primary/10 -ml-[1px]' 
-                        : danger
-                          ? 'text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-500/10'
-                          : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+              {/* Studio Dropdown Items */}
+              {studioExpanded ? (
+                <div className="ml-4 border-l border-gray-200 dark:border-white/10">
+                  {studioItems.map(({ key, label, path, icon: Icon, danger }) => {
+                    const isActive = active === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => handleSelect(key, path)}
+                        className={`w-full text-left pl-6 pr-4 py-2 text-sm flex items-center gap-2 transition-colors ${
+                          isActive
+                            ? 'font-medium text-primary border-l-4 border-primary bg-primary/10 -ml-[1px]' 
+                            : danger
+                              ? 'text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-500/10'
+                              : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </>
+          ) : null}
         </nav>
       </div>
     </aside>

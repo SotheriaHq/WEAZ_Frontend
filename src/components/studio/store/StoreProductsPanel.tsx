@@ -65,6 +65,7 @@ interface CollectionOption {
   description?: string;
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   isAvailableInStore?: boolean;
+  isSystemGenerated?: boolean;
   coverImage?: string;
   coverFileId?: string;
   itemCount?: number;
@@ -98,6 +99,16 @@ const resolveProductStatus = (product: BackendProduct): StudioStatus => {
   if (rawStatus === 'DRAFT') return 'DRAFT';
 
   return product.isActive ? 'ACTIVE' : 'DRAFT';
+};
+
+const isSystemStoreCollection = (collection: Pick<CollectionOption, 'name' | 'description' | 'isSystemGenerated'>): boolean => {
+  if (collection.isSystemGenerated) return true;
+  const normalizedName = String(collection.name || '').trim().toLowerCase();
+  const normalizedDescription = String(collection.description || '').trim().toLowerCase();
+  return (
+    normalizedName === 'store products' &&
+    (normalizedDescription === '' || normalizedDescription === 'system bucket for standalone products.')
+  );
 };
 
 const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
@@ -138,6 +149,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   
   const listRef = useRef<HTMLDivElement | null>(null);
   const [listMinHeight, setListMinHeight] = useState<number | undefined>(undefined);
+  const galleryTouchRef = useRef({ startX: 0, startY: 0 });
 
   // Expandable search (emoji pattern reused from CatalogShopTab)
   const [searchCollapsed, setSearchCollapsed] = useState(true);
@@ -161,10 +173,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const [collectionPage, setCollectionPage] = useState(1);
   const [collectionLimit, setCollectionLimit] = useState(12);
   const [collectionBusyId, setCollectionBusyId] = useState<string | null>(null);
-  const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
-  const [editingCollectionTitle, setEditingCollectionTitle] = useState('');
-  const [editingCollectionDescription, setEditingCollectionDescription] = useState('');
-  const [discardingCollectionId, setDiscardingCollectionId] = useState<string | null>(null);
   const [collectionConfirm, setCollectionConfirm] = useState<{
     mode: 'archive' | 'unarchive' | 'delete';
     collection: CollectionOption;
@@ -231,13 +239,31 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const showDraftCollectionsInProductArea =
     !loading && filterStatus === 'draft' && filteredProducts.length === 0 && draftCollections.length > 0;
 
-  const previewCollections = useMemo(
-    () => collections.filter((collection) => collection.isAvailableInStore !== false),
+  const visibleCollections = useMemo(
+    () => collections.filter((collection) => !isSystemStoreCollection(collection)),
     [collections],
   );
 
+  const previewCollections = useMemo(
+    () => visibleCollections.filter((collection) => collection.isAvailableInStore !== false),
+    [visibleCollections],
+  );
+
+  const quickAccessCollections = useMemo(
+    () => (previewCollections.length > 0 ? previewCollections : visibleCollections),
+    [previewCollections, visibleCollections],
+  );
+
+  const quickAccessCarouselItems = useMemo(
+    () =>
+      quickAccessCollections.length > 1
+        ? [...quickAccessCollections, ...quickAccessCollections]
+        : quickAccessCollections,
+    [quickAccessCollections],
+  );
+
   const managedCollections = useMemo(() => {
-    let items = [...collections];
+    let items = [...visibleCollections];
     const q = collectionSearch.trim().toLowerCase();
 
     if (q) {
@@ -269,7 +295,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     });
 
     return items;
-  }, [collectionSearch, collectionSortBy, collectionStatusFilter, collections]);
+  }, [collectionSearch, collectionSortBy, collectionStatusFilter, visibleCollections]);
 
   const managedCollectionsTotal = managedCollections.length;
   const managedCollectionsPages = Math.max(1, Math.ceil(managedCollectionsTotal / collectionLimit));
@@ -278,8 +304,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     return managedCollections.slice(start, start + collectionLimit);
   }, [collectionLimit, collectionPage, managedCollections]);
   const activeCollection = useMemo(
-    () => collections.find((collection) => collection.id === activeCollectionId) ?? null,
-    [activeCollectionId, collections],
+    () => visibleCollections.find((collection) => collection.id === activeCollectionId) ?? null,
+    [activeCollectionId, visibleCollections],
   );
   const activeCollectionProductsPages = Math.max(
     1,
@@ -325,7 +351,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   useEffect(() => {
     if (outletView !== 'products') return;
     if (!quickCollectionsRef.current) return;
-    if (previewCollections.length === 0) return;
+    if (quickAccessCarouselItems.length <= 1) return;
 
     const scroller = quickCollectionsRef.current;
     let raf = 0;
@@ -346,7 +372,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
     raf = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(raf);
-  }, [outletView, previewCollections.length]);
+  }, [outletView, quickAccessCarouselItems.length]);
 
   useEffect(() => {
     setActiveCollectionProductsPage(1);
@@ -369,7 +395,10 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
       try {
         setCollectionsLoading(true);
-        const collectionsRes = await brandApi.getCollections(user.id, { visibility: 'all' });
+        const collectionsRes = await brandApi.getCollections(user.id, {
+          visibility: 'all',
+          scope: 'store',
+        });
         if (!mounted) return;
         const mappedCollections: CollectionOption[] = (collectionsRes || [])
           .map((c: CollectionDto) => ({
@@ -378,13 +407,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             description: typeof c.description === 'string' ? c.description : '',
             status: c.status,
             isAvailableInStore: c.isAvailableInStore,
+            isSystemGenerated: c.isSystemGenerated === true,
             coverImage: typeof c.coverImage === 'string' ? c.coverImage : undefined,
             coverFileId: typeof c.coverFileId === 'string' ? c.coverFileId : undefined,
             itemCount: typeof c.itemCount === 'number' ? c.itemCount : c.postsCount,
             updatedAt: typeof c.updatedAt === 'string' ? c.updatedAt : undefined,
             createdAt: typeof c.createdAt === 'string' ? c.createdAt : undefined,
           }));
-        setCollections(mappedCollections);
+        setCollections(mappedCollections.filter((collection) => !isSystemStoreCollection(collection)));
       } catch (e) {
         if (!mounted) return;
         setCollections([]);
@@ -406,6 +436,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       const byId = new Map(prev.map((collection) => [collection.id, collection]));
       draftCollections.forEach((draft: any) => {
         if (!draft?.id) return;
+        const draftDomain = typeof draft?.domain === 'string' ? draft.domain.toUpperCase() : '';
+        const isStoreDraft = draftDomain === 'STORE' || draft?.isAvailableInStore === true;
+        if (!isStoreDraft) return;
         const draftId = String(draft.id);
         if (byId.has(draftId)) return;
 
@@ -415,6 +448,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           description: typeof draft.description === 'string' ? draft.description : '',
           status: 'DRAFT',
           isAvailableInStore: false,
+          isSystemGenerated: draft?.isSystemGenerated === true,
           coverImage: typeof draft.coverImage === 'string' ? draft.coverImage : undefined,
           coverFileId: typeof draft.coverFileId === 'string' ? draft.coverFileId : undefined,
           itemCount:
@@ -428,7 +462,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         });
       });
 
-      return Array.from(byId.values());
+      return Array.from(byId.values()).filter((collection) => !isSystemStoreCollection(collection));
     });
   }, [draftCollections]);
 
@@ -771,16 +805,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   };
 
   const openCollectionEditor = (collection: CollectionOption) => {
-    setEditingCollectionId(collection.id);
-    setEditingCollectionTitle(collection.name || '');
-    setEditingCollectionDescription(collection.description || '');
-  };
-
-  const closeCollectionEditor = () => {
-    setEditingCollectionId(null);
-    setEditingCollectionTitle('');
-    setEditingCollectionDescription('');
-    setDiscardingCollectionId(null);
+    navigate(`/studio/store/collections/new?collectionId=${collection.id}&mode=edit`);
   };
 
   const openCollectionWorkspace = (collectionId?: string) => {
@@ -803,6 +828,18 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     navigate(`/studio/store?${params.toString()}`, { replace: true });
   };
 
+  const navigateToStudioProductDetails = (productId: string) => {
+    const params = new URLSearchParams();
+    if (activeCollectionId) {
+      params.set('collectionId', activeCollectionId);
+      if (activeCollection?.name) {
+        params.set('collectionTitle', activeCollection.name);
+      }
+    }
+    const query = params.toString();
+    navigate(`/studio/store/products/${productId}${query ? `?${query}` : ''}`);
+  };
+
   const handleCloseActiveCollectionView = () => {
     setActiveCollectionId(null);
     const params = new URLSearchParams(location.search);
@@ -811,59 +848,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     navigate(`/studio/store?${params.toString()}`, { replace: true });
   };
 
-  const handleDiscardCollectionEdit = (collectionId: string) => {
-    setDiscardingCollectionId(collectionId);
-    window.setTimeout(() => {
-      closeCollectionEditor();
-    }, 250);
-  };
-
-  const handleSaveCollectionEdit = async (collectionId: string) => {
-    const nextTitle = editingCollectionTitle.trim();
-    if (!nextTitle) {
-      toast.error('Collection title is required.');
-      return;
-    }
-
-    setCollectionBusyId(collectionId);
-    try {
-      const updated = await brandApi.updateCollection(collectionId, {
-        title: nextTitle,
-        description: editingCollectionDescription.trim() || '',
-      });
-
-      if (!updated) {
-        toast.error('Unable to update collection.');
-        return;
-      }
-
-      setCollections((prev) =>
-        prev.map((collection) =>
-          collection.id === collectionId
-            ? {
-                ...collection,
-                name: updated.title || updated.name || nextTitle,
-                description: updated.description || editingCollectionDescription.trim(),
-                status: updated.status || collection.status,
-                updatedAt: updated.updatedAt || collection.updatedAt,
-              }
-            : collection,
-        ),
-      );
-      closeCollectionEditor();
-      toast.success('Collection updated.');
-    } catch (error) {
-      const message = (error as any)?.response?.data?.message ?? 'Unable to update collection.';
-      toast.error(typeof message === 'string' ? message : 'Unable to update collection.');
-    } finally {
-      setCollectionBusyId(null);
-    }
-  };
 
   const handleArchiveCollection = async (collection: CollectionOption) => {
     setCollectionBusyId(collection.id);
     try {
-      const ok = await brandApi.archiveCollection(collection.id);
+      const ok = await brandApi.archiveCollection(collection.id, { scope: 'store' });
       if (!ok) {
         toast.error('Unable to archive collection.');
         return;
@@ -885,7 +874,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const handleUnarchiveCollection = async (collection: CollectionOption) => {
     setCollectionBusyId(collection.id);
     try {
-      const ok = await brandApi.unarchiveCollection(collection.id);
+      const ok = await brandApi.unarchiveCollection(collection.id, { scope: 'store' });
       if (!ok) {
         toast.error('Unable to unarchive collection.');
         return;
@@ -907,7 +896,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const handleDeleteCollection = async (collection: CollectionOption) => {
     setCollectionBusyId(collection.id);
     try {
-      const ok = await brandApi.deleteCollection(collection.id);
+      const ok = await brandApi.deleteCollection(collection.id, { scope: 'store' });
       if (!ok) {
         toast.error('Unable to delete collection.');
         return;
@@ -917,6 +906,50 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     } catch (error) {
       const message = (error as any)?.response?.data?.message ?? 'Unable to delete collection.';
       toast.error(typeof message === 'string' ? message : 'Unable to delete collection.');
+    } finally {
+      setCollectionBusyId(null);
+    }
+  };
+
+  const handleDuplicateCollection = async (collection: CollectionOption) => {
+    setCollectionBusyId(collection.id);
+    try {
+      const duplicated = await brandApi.duplicateCollection(collection.id, {
+        scope: 'store',
+      });
+      if (!duplicated) {
+        toast.error('Unable to duplicate collection.');
+        return;
+      }
+
+      const mapped: CollectionOption = {
+        id: String(duplicated.id),
+        name: String(duplicated.title || duplicated.name || 'Untitled collection'),
+        description: typeof duplicated.description === 'string' ? duplicated.description : '',
+        status: duplicated.status,
+        isAvailableInStore: duplicated.isAvailableInStore,
+        isSystemGenerated: duplicated.isSystemGenerated === true,
+        coverImage: typeof duplicated.coverImage === 'string' ? duplicated.coverImage : undefined,
+        coverFileId: typeof duplicated.coverFileId === 'string' ? duplicated.coverFileId : undefined,
+        itemCount:
+          typeof duplicated.itemCount === 'number'
+            ? duplicated.itemCount
+            : typeof duplicated.postsCount === 'number'
+              ? duplicated.postsCount
+              : collection.itemCount ?? 0,
+        updatedAt: typeof duplicated.updatedAt === 'string' ? duplicated.updatedAt : undefined,
+        createdAt: typeof duplicated.createdAt === 'string' ? duplicated.createdAt : undefined,
+      };
+
+      if (isSystemStoreCollection(mapped)) {
+        toast.success('Collection duplicated.');
+        return;
+      }
+      setCollections((prev) => [mapped, ...prev.filter((item) => item.id !== mapped.id)]);
+      toast.success('Collection duplicated.');
+    } catch (error) {
+      const message = (error as any)?.response?.data?.message ?? 'Unable to duplicate collection.';
+      toast.error(typeof message === 'string' ? message : 'Unable to duplicate collection.');
     } finally {
       setCollectionBusyId(null);
     }
@@ -943,15 +976,15 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   };
 
   const handleDeleteAllCollections = async () => {
-    if (collections.length === 0 || deletingAllCollections) return;
+    if (visibleCollections.length === 0 || deletingAllCollections) return;
 
     setDeletingAllCollections(true);
     try {
-      const targets = [...collections];
+      const targets = [...visibleCollections];
       const results = await Promise.allSettled(
         targets.map(async (collection) => ({
           id: collection.id,
-          ok: await brandApi.deleteCollection(collection.id),
+          ok: await brandApi.deleteCollection(collection.id, { scope: 'store' }),
         })),
       );
 
@@ -1218,7 +1251,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   disabled={collectionsLoading}
                   options={[
                     { value: 'all', label: 'All Collections' },
-                    ...collections.map((c) => ({ value: c.id, label: c.name })),
+                    ...visibleCollections.map((c) => ({ value: c.id, label: c.name })),
                   ]}
                 />
                 <FilterDropdown
@@ -1368,14 +1401,13 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 <div key={idx} className="h-44 animate-pulse rounded-xl bg-gray-200/70 dark:bg-white/10" />
               ))}
             </div>
-          ) : collections.length > 0 ? (
+          ) : quickAccessCollections.length > 0 ? (
             <div
               ref={quickCollectionsRef}
               className="overflow-x-hidden rounded-xl border border-gray-200/80 bg-gray-50/60 dark:border-white/10 dark:bg-white/5"
             >
               <div className="flex min-w-max gap-3 p-3">
-                {[...(previewCollections.length > 0 ? previewCollections : collections), ...(previewCollections.length > 0 ? previewCollections : collections)]
-                  .map((collection, idx) => (
+                {quickAccessCarouselItems.map((collection, idx) => (
                     <button
                       key={`${collection.id}-${idx}`}
                       type="button"
@@ -1429,17 +1461,23 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 Products
               </button>
               <span>/</span>
-              <span className="text-gray-900 dark:text-white">Collections</span>
+              {activeCollection ? (
+                <button
+                  type="button"
+                  onClick={handleCloseActiveCollectionView}
+                  className="rounded-md px-2 py-1 hover:bg-gray-100 dark:hover:bg-white/10"
+                >
+                  Collections
+                </button>
+              ) : (
+                <span className="text-gray-900 dark:text-white">Collections</span>
+              )}
               {activeCollection && (
                 <>
                   <span>/</span>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenCollectionView(activeCollection.id)}
-                    className="rounded-md px-2 py-1 text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
-                  >
+                  <span className="text-gray-900 dark:text-white truncate max-w-[200px]">
                     {activeCollection.name}
-                  </button>
+                  </span>
                 </>
               )}
             </div>
@@ -1469,7 +1507,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       type="button"
                       onClick={() => {
                         openCollectionEditor(activeCollection);
-                        handleCloseActiveCollectionView();
                       }}
                       className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
                     >
@@ -1488,7 +1525,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     <button
                       type="button"
                       onClick={() => setDeleteAllCollectionsConfirmOpen(true)}
-                      disabled={collections.length === 0 || deletingAllCollections}
+                      disabled={visibleCollections.length === 0 || deletingAllCollections}
                       className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300"
                     >
                       {deletingAllCollections ? 'Deleting...' : 'Delete all'}
@@ -1574,9 +1611,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {pagedManagedCollections.map((collection) => {
                     const status = String(collection.status || 'PUBLISHED').toUpperCase();
-                    const isBusy = collectionBusyId === collection.id;
-                    const isDiscarding = discardingCollectionId === collection.id;
-                    const isEditing = editingCollectionId === collection.id;
                     const isArchived = status === 'ARCHIVED';
 
                     const collectionMenuId = `collection-menu-${collection.id}`;
@@ -1588,11 +1622,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         role="button"
                         tabIndex={0}
                         onClick={() => {
-                          if (isEditing) return;
                           handleOpenCollectionView(collection.id);
                         }}
                         onKeyDown={(e) => {
-                          if (isEditing) return;
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
                             handleOpenCollectionView(collection.id);
@@ -1611,71 +1643,79 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                             className="h-full w-full"
                             fallbackName={collection.name}
                           />
-                          {!isEditing && (
-                            <div className="collection-menu-host absolute right-3 top-3 z-20">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  dropdownManager.setOpenId(isMenuOpen ? null : collectionMenuId);
-                                }}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition hover:bg-black/65"
-                                aria-label="Collection actions"
+                          <div className="collection-menu-host absolute right-3 top-3 z-20">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                dropdownManager.setOpenId(isMenuOpen ? null : collectionMenuId);
+                              }}
+                              className="flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition hover:bg-black/65"
+                              aria-label="Collection actions"
+                            >
+                              <span className="text-base font-bold">...</span>
+                            </button>
+                            {isMenuOpen && (
+                              <div
+                                className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-zinc-900"
+                                onClick={(e) => e.stopPropagation()}
                               >
-                                <span className="text-base font-bold">...</span>
-                              </button>
-                              {isMenuOpen && (
-                                <div
-                                  className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-zinc-900"
-                                  onClick={(e) => e.stopPropagation()}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    dropdownManager.setOpenId(null);
+                                    void handleOpenCollectionGallery(collection);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
                                 >
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      dropdownManager.setOpenId(null);
-                                      void handleOpenCollectionGallery(collection);
-                                    }}
-                                    className="w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
-                                  >
-                                    Gallery
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      dropdownManager.setOpenId(null);
-                                      openCollectionEditor(collection);
-                                    }}
-                                    className="w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      dropdownManager.setOpenId(null);
-                                      setCollectionConfirm({
-                                        mode: isArchived ? 'unarchive' : 'archive',
-                                        collection,
-                                      });
-                                    }}
-                                    className="w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
-                                  >
-                                    {isArchived ? 'Unarchive' : 'Archive'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      dropdownManager.setOpenId(null);
-                                      setCollectionConfirm({ mode: 'delete', collection });
-                                    }}
-                                    className="w-full px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                  Gallery
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    dropdownManager.setOpenId(null);
+                                    void handleDuplicateCollection(collection);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+                                >
+                                  Duplicate
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    dropdownManager.setOpenId(null);
+                                    openCollectionEditor(collection);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    dropdownManager.setOpenId(null);
+                                    setCollectionConfirm({
+                                      mode: isArchived ? 'unarchive' : 'archive',
+                                      collection,
+                                    });
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+                                >
+                                  {isArchived ? 'Unarchive' : 'Archive'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    dropdownManager.setOpenId(null);
+                                    setCollectionConfirm({ mode: 'delete', collection });
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="space-y-3 p-4">
                           <div className="flex items-start justify-between gap-2">
@@ -1700,47 +1740,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                             </span>
                           </div>
 
-                          {isEditing ? (
-                            <div className="space-y-2">
-                              <input
-                                value={editingCollectionTitle}
-                                onChange={(e) => setEditingCollectionTitle(e.target.value)}
-                                placeholder="Collection title"
-                                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-zinc-900 dark:text-white"
-                              />
-                              <textarea
-                                value={editingCollectionDescription}
-                                onChange={(e) => setEditingCollectionDescription(e.target.value)}
-                                rows={3}
-                                placeholder="Collection description"
-                                className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-zinc-900 dark:text-white"
-                              />
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  disabled={isBusy || isDiscarding}
-                                  onClick={() => void handleSaveCollectionEdit(collection.id)}
-                                  className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-                                >
-                                  {isBusy ? 'Saving...' : 'Save'}
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={isBusy || isDiscarding}
-                                  onClick={() => handleDiscardCollectionEdit(collection.id)}
-                                  className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-200"
-                                >
-                                  {isDiscarding ? 'Discarding...' : 'Discard'}
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="line-clamp-2 text-xs text-gray-600 dark:text-gray-300">
-                              {collection.description?.trim() || 'No description yet.'}
-                            </p>
-                          )}
-
-                          {!isEditing && <p className="text-[11px] text-gray-500 dark:text-gray-400">Click card to view collection products.</p>}
+                          <p className="line-clamp-2 text-xs text-gray-600 dark:text-gray-300">
+                            {collection.description?.trim() || 'No description yet.'}
+                          </p>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                            Click card to view collection products.
+                          </p>
                         </div>
                       </article>
                     );
@@ -1763,7 +1768,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   <button
                     key={product.id}
                     type="button"
-                    onClick={() => navigate(`/studio/store/products/${product.id}`)}
+                    onClick={() => navigateToStudioProductDetails(product.id)}
                     className="overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-zinc-900/70"
                   >
                     <div className="aspect-[4/5] bg-gray-100 dark:bg-white/5">
@@ -1911,7 +1916,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   } ${layoutMode ? 'cursor-move' : 'cursor-pointer'}`}
                   onClick={() => {
                     if (layoutMode) return;
-                    navigate(`/studio/store/products/${product.id}`);
+                    navigateToStudioProductDetails(product.id);
                   }}
                 >
                   {/* Selection checkbox */}
@@ -2355,7 +2360,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               Delete all collections?
             </h3>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              This will attempt to delete all {collections.length} collection(s) in your store.
+              This will attempt to delete all {visibleCollections.length} collection(s) in your store.
             </p>
             <div className="mt-4 flex items-center justify-end gap-2">
               <button
@@ -2379,131 +2384,192 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         </div>
       )}
 
-      {collectionGalleryOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/75 backdrop-blur-sm"
-            onClick={() => setCollectionGalleryOpen(false)}
-            aria-label="Close collection gallery"
-          />
-          <div className="relative w-full max-w-6xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-900">
-            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-white/10">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                  {collectionGallerySourceName || 'Collection gallery'}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {collectionGalleryLoading
-                    ? 'Loading images...'
-                    : `${collectionGalleryImages.length} image(s)`}
-                </p>
+      {collectionGalleryOpen && (() => {
+        const onTouchStart = (e: React.TouchEvent) => {
+          galleryTouchRef.current.startX = e.touches[0].clientX;
+          galleryTouchRef.current.startY = e.touches[0].clientY;
+        };
+
+        const onTouchEnd = (e: React.TouchEvent) => {
+          const deltaX = e.changedTouches[0].clientX - galleryTouchRef.current.startX;
+          const deltaY = e.changedTouches[0].clientY - galleryTouchRef.current.startY;
+          const minSwipe = 50;
+          if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipe) {
+            if (deltaX < 0) handleNextCollectionGalleryImage();
+            else handlePrevCollectionGalleryImage();
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-0">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/90"
+              onClick={() => setCollectionGalleryOpen(false)}
+              aria-label="Close collection gallery"
+            />
+            <div className="relative flex h-full w-full flex-col overflow-hidden bg-transparent max-h-screen">
+              {/* ─── Header ─── */}
+              <div className="hidden">
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-semibold text-white">
+                    {collectionGallerySourceName || 'Collection gallery'}
+                  </h3>
+                  <p className="text-xs text-gray-400">
+                    {collectionGalleryLoading
+                      ? 'Loading images...'
+                      : `${collectionGalleryImages.length} image(s)`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {selectedCollectionGalleryImage && collectionGalleryImages.length > 1 && (
+                    <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-gray-300 tabular-nums">
+                      {collectionGalleryIndex + 1} / {collectionGalleryImages.length}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setCollectionGalleryOpen(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-gray-300 transition hover:bg-white/20 hover:text-white"
+                    aria-label="Close gallery"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {selectedCollectionGalleryImage && (
-                  <span className="rounded-full border border-gray-200 px-2 py-0.5 text-xs text-gray-600 dark:border-white/10 dark:text-gray-300">
-                    {collectionGalleryIndex + 1} / {collectionGalleryImages.length}
-                  </span>
-                )}
+
+              {/* ─── Main image area ─── */}
+              <div
+                className="relative flex flex-1 items-center justify-center overflow-hidden"
+                onTouchStart={onTouchStart}
+                onTouchEnd={onTouchEnd}
+              >
                 <button
                   type="button"
                   onClick={() => setCollectionGalleryOpen(false)}
-                  className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/10"
+                  className="absolute right-4 top-4 z-20 rounded-full bg-black/45 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-black/65"
+                  aria-label="Close gallery"
                 >
                   Close
                 </button>
+                {selectedCollectionGalleryImage && collectionGalleryImages.length > 1 && (
+                  <span className="absolute left-4 top-4 z-20 rounded-full bg-black/45 px-3 py-1.5 text-xs font-semibold text-white tabular-nums">
+                    {collectionGalleryIndex + 1}/{collectionGalleryImages.length}
+                  </span>
+                )}
+                {collectionGalleryLoading ? (
+                  <div className="flex h-[50vh] w-full items-center justify-center">
+                    <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-purple-400" />
+                  </div>
+                ) : !selectedCollectionGalleryImage ? (
+                  <div className="flex h-[40vh] w-full items-center justify-center">
+                    <p className="text-sm text-gray-500">No images to display.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Prev/Next navigation overlays */}
+                    {collectionGalleryImages.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handlePrevCollectionGalleryImage}
+                          className="absolute left-3 top-1/2 z-10 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white/80 backdrop-blur-sm transition hover:bg-black/70 hover:text-white sm:left-5 sm:h-11 sm:w-11"
+                          aria-label="Previous image"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleNextCollectionGalleryImage}
+                          className="absolute right-3 top-1/2 z-10 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white/80 backdrop-blur-sm transition hover:bg-black/70 hover:text-white sm:right-5 sm:h-11 sm:w-11"
+                          aria-label="Next image"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
+                      </>
+                    )}
+
+                    {/* The image — rendered at natural aspect ratio, no cropping, no background */}
+                    <div
+                      key={selectedCollectionGalleryImage.id}
+                      className="flex h-full w-full items-center justify-center animate-in fade-in duration-300"
+                    >
+                      <ImageWithFallback
+                        src={selectedCollectionGalleryImage.src}
+                        fileId={selectedCollectionGalleryImage.fileId}
+                        alt={selectedCollectionGalleryImage.alt}
+                        fit="contain"
+                        rounded="none"
+                        containerClassName="h-full w-full flex items-center justify-center"
+                        className="h-auto max-h-screen w-auto max-w-screen object-contain"
+                        fallbackName={selectedCollectionGalleryImage.productName || collectionGallerySourceName || 'Collection'}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
 
-            <div className="p-4 sm:p-6">
-              {collectionGalleryLoading ? (
-                <div className="space-y-3">
-                  <div className="h-[54vh] animate-pulse rounded-xl bg-gray-200/70 dark:bg-white/10" />
-                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                    {Array.from({ length: 6 }).map((_, idx) => (
-                      <div key={idx} className="h-16 animate-pulse rounded-lg bg-gray-200/70 dark:bg-white/10" />
-                    ))}
-                  </div>
-                </div>
-              ) : !selectedCollectionGalleryImage ? (
-                <div className="rounded-xl border border-dashed border-gray-300/80 bg-gray-50/70 p-6 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
-                  This collection has no images to display yet.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="relative flex h-[54vh] items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/5">
-                    {collectionGalleryImages.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={handlePrevCollectionGalleryImage}
-                        className="absolute left-2 z-10 rounded-full bg-black/60 px-3 py-2 text-xs font-semibold text-white backdrop-blur-sm hover:bg-black/80 sm:left-4"
-                        aria-label="Previous image"
-                      >
-                        Prev
-                      </button>
-                    )}
-
-                    <ImageWithFallback
-                      src={selectedCollectionGalleryImage.src}
-                      fileId={selectedCollectionGalleryImage.fileId}
-                      alt={selectedCollectionGalleryImage.alt}
-                      fit="contain"
-                      rounded="none"
-                      containerClassName="h-full w-full"
-                      className="h-full w-full"
-                      fallbackName={selectedCollectionGalleryImage.productName || collectionGallerySourceName || 'Collection'}
-                    />
-
-                    {collectionGalleryImages.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={handleNextCollectionGalleryImage}
-                        className="absolute right-2 z-10 rounded-full bg-black/60 px-3 py-2 text-xs font-semibold text-white backdrop-blur-sm hover:bg-black/80 sm:right-4"
-                        aria-label="Next image"
-                      >
-                        Next
-                      </button>
-                    )}
-                  </div>
-
-                  <p className="text-xs text-gray-600 dark:text-gray-300">
+              {/* ─── Product name caption ─── */}
+              {selectedCollectionGalleryImage && (
+                <div className="hidden">
+                  <p className="truncate text-xs text-gray-400">
                     {selectedCollectionGalleryImage.productName || 'Collection image'}
                   </p>
+                </div>
+              )}
 
-                  {collectionGalleryImages.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {collectionGalleryImages.map((image, index) => (
-                        <button
-                          key={image.id}
-                          type="button"
-                          onClick={() => setCollectionGalleryIndex(index)}
-                          className={`h-16 w-16 shrink-0 overflow-hidden rounded-lg border ${
-                            index === collectionGalleryIndex
-                              ? 'border-purple-500 ring-2 ring-purple-500/30'
-                              : 'border-gray-200 dark:border-white/10'
-                          }`}
-                          aria-label={`Open image ${index + 1}`}
-                        >
-                          <ImageWithFallback
-                            src={image.src}
-                            fileId={image.fileId}
-                            alt={image.alt}
-                            fit="cover"
-                            rounded="none"
-                            containerClassName="h-full w-full"
-                            className="h-full w-full"
-                            fallbackName={image.productName || collectionGallerySourceName || 'Collection'}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  )}
+              {/* ─── Thumbnail strip ─── */}
+              {collectionGalleryImages.length > 1 && (
+                <div className="hidden">
+                  {/* Mobile dot indicators */}
+                  <div className="flex items-center justify-center gap-1.5 sm:hidden mb-2">
+                    {collectionGalleryImages.map((_, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => setCollectionGalleryIndex(index)}
+                        className={`h-1.5 rounded-full transition-all ${
+                          index === collectionGalleryIndex
+                            ? 'w-4 bg-purple-400'
+                            : 'w-1.5 bg-white/25 hover:bg-white/40'
+                        }`}
+                        aria-label={`Go to image ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                  {/* Desktop thumbnail row */}
+                  <div className="hidden sm:flex gap-2 overflow-x-auto pb-0.5 scrollbar-thin scrollbar-thumb-white/10">
+                    {collectionGalleryImages.map((image, index) => (
+                      <button
+                        key={image.id}
+                        type="button"
+                        onClick={() => setCollectionGalleryIndex(index)}
+                        className={`shrink-0 overflow-hidden rounded-lg border-2 transition-all ${
+                          index === collectionGalleryIndex
+                            ? 'border-purple-500 ring-1 ring-purple-500/40 opacity-100'
+                            : 'border-transparent opacity-60 hover:opacity-90'
+                        }`}
+                        aria-label={`Open image ${index + 1}`}
+                      >
+                        <ImageWithFallback
+                          src={image.src}
+                          fileId={image.fileId}
+                          alt={image.alt}
+                          fit="cover"
+                          rounded="none"
+                          containerClassName="h-14 w-14"
+                          className="h-14 w-14 object-cover"
+                          fallbackName={image.productName || collectionGallerySourceName || 'Collection'}
+                        />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <DeleteProductModal
         isOpen={!!deleteModalProduct}

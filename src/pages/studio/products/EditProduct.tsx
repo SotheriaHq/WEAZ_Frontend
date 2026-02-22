@@ -17,7 +17,7 @@ import type { RootState } from '@/store';
 import { toast } from 'sonner';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { productApi, type ProductCreateDto, type Category, type ProductVariant } from '@/api/ProductApi';
-import { brandApi } from '@/api/BrandApi';
+import { brandApi, type CategoryTypeOption } from '@/api/BrandApi';
 import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
@@ -88,6 +88,7 @@ interface FormState {
   title: string;
   description: string;
   categoryId: string;
+  categoryTypeId: string;
   tags: string[];
   price: number;
   compareAtPrice: number;
@@ -116,6 +117,7 @@ const defaultFormState: FormState = {
   title: '',
   description: '',
   categoryId: '',
+  categoryTypeId: '',
   tags: [],
   price: 0,
   compareAtPrice: 0,
@@ -202,6 +204,8 @@ const EditProduct: React.FC = () => {
   // State
   const [form, setForm] = useState<FormState>(defaultFormState);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [collectionCategoryById, setCollectionCategoryById] = useState<Record<string, string>>({});
+  const [categoryTypes, setCategoryTypes] = useState<CategoryTypeOption[]>([]);
   const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
   const [saveAction, setSaveAction] = useState<'draft' | 'publish' | null>(null);
@@ -306,15 +310,39 @@ const EditProduct: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     const loadCollections = async () => {
+      const loadCategoryTypes = async () => {
+        try {
+          const fetchedTypes = await brandApi.getCategoryTypes(undefined, true);
+          let resolvedTypes = Array.isArray(fetchedTypes) ? fetchedTypes : [];
+          if (resolvedTypes.length === 0) {
+            const categoriesWithTypes = await brandApi.getCategories(true);
+            const fallbackTypes = (categoriesWithTypes || [])
+              .flatMap((category) => category.types ?? [])
+              .filter((type) => Boolean(type?.id) && Boolean(type?.name));
+            resolvedTypes = fallbackTypes;
+          }
+          if (mounted) {
+            setCategoryTypes(resolvedTypes);
+          }
+        } catch (error) {
+          console.error('Failed to load category types', error);
+          if (mounted) setCategoryTypes([]);
+        }
+      };
+
       try {
         if (!user?.id) {
           if (mounted) {
             setCategories([]);
-            setCategoriesLoading(false);
           }
+          await loadCategoryTypes();
           return;
         }
-        const collections = await brandApi.getCollections(user.id, { visibility: 'all' });
+
+        const collections = await brandApi.getCollections(user.id, {
+          visibility: 'all',
+          scope: 'store',
+        });
         if (!mounted) return;
         const mapped: Category[] = (collections || [])
           .filter((c: any) => Boolean(c?.isAvailableInStore))
@@ -324,8 +352,21 @@ const EditProduct: React.FC = () => {
           slug: String(c.id),
           }));
         setCategories(mapped);
+        const categoryByCollection: Record<string, string> = {};
+        (collections || []).forEach((c: any) => {
+          if (c?.id && c?.categoryId) {
+            categoryByCollection[String(c.id)] = String(c.categoryId);
+          }
+        });
+        setCollectionCategoryById(categoryByCollection);
+        await loadCategoryTypes();
       } catch (error) {
         console.error('Failed to load collections', error);
+        if (mounted) {
+          setCategories([]);
+          setCollectionCategoryById({});
+        }
+        await loadCategoryTypes();
       } finally {
         if (mounted) setCategoriesLoading(false);
       }
@@ -363,6 +404,7 @@ const EditProduct: React.FC = () => {
           title: product.title || product.name || '',
           description: product.description || '',
           categoryId: (product as any).collectionId || (product as any).collectionIds?.[0] || '',
+          categoryTypeId: (product as any).categoryTypeId || '',
           tags: product.tags || [],
           price: product.price || 0,
           compareAtPrice: (product as any).salePrice || product.compareAtPrice || 0,
@@ -434,6 +476,37 @@ const EditProduct: React.FC = () => {
     void loadProduct();
     return () => { mounted = false; };
   }, [isEditMode, productId, navigate]);
+
+  const selectedCollectionCategoryId = useMemo(
+    () => (form.categoryId ? collectionCategoryById[form.categoryId] : undefined),
+    [collectionCategoryById, form.categoryId],
+  );
+
+  const availableCategoryTypes = useMemo(() => {
+    if (!selectedCollectionCategoryId) return categoryTypes;
+    return categoryTypes.filter((categoryType) => categoryType.categoryId === selectedCollectionCategoryId);
+  }, [categoryTypes, selectedCollectionCategoryId]);
+
+  useEffect(() => {
+    setForm((prev) => {
+      if (!prev.categoryId) {
+        if (
+          prev.categoryTypeId &&
+          categoryTypes.some((categoryType) => categoryType.id === prev.categoryTypeId)
+        ) {
+          return prev;
+        }
+        return { ...prev, categoryTypeId: categoryTypes[0]?.id ?? '' };
+      }
+      if (
+        prev.categoryTypeId &&
+        availableCategoryTypes.some((categoryType) => categoryType.id === prev.categoryTypeId)
+      ) {
+        return prev;
+      }
+      return { ...prev, categoryTypeId: availableCategoryTypes[0]?.id ?? '' };
+    });
+  }, [availableCategoryTypes, categoryTypes]);
 
   // =====================
   // Form Handlers
@@ -542,6 +615,10 @@ const EditProduct: React.FC = () => {
         toast.error('Please enter a product title');
         return;
       }
+      if (form.categoryId && !form.categoryTypeId) {
+        toast.error('Please select a category type for the selected collection.');
+        return;
+      }
       if (form.price <= 0) {
         toast.error('Please enter a valid price');
         return;
@@ -609,6 +686,7 @@ const EditProduct: React.FC = () => {
         title: effectiveDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
         description: form.description.trim() || undefined,
         collectionId: isCollectionFlow ? (collectionContextId || undefined) : form.categoryId || undefined,
+        categoryTypeId: form.categoryTypeId || undefined,
         tags: form.tags,
         price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
         compareAtPrice: form.onSale && form.compareAtPrice > 0 ? form.compareAtPrice : undefined,
@@ -709,6 +787,7 @@ const EditProduct: React.FC = () => {
         title: effectiveDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
         description: form.description.trim() || undefined,
         collectionId: form.categoryId || undefined,
+        categoryTypeId: form.categoryTypeId || undefined,
         tags: form.tags,
         price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
         compareAtPrice: form.onSale && form.compareAtPrice > 0 ? form.compareAtPrice : undefined,
@@ -1317,6 +1396,20 @@ const EditProduct: React.FC = () => {
                     <option value="">No collection (standalone)</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </Select>
+                  <Select
+                    label="Category Type"
+                    value={form.categoryTypeId}
+                    onChange={(e) => updateForm('categoryTypeId', e.target.value)}
+                  >
+                    {availableCategoryTypes.length === 0 && (
+                      <option value="">No category types available</option>
+                    )}
+                    {availableCategoryTypes.map((categoryType) => (
+                      <option key={categoryType.id} value={categoryType.id}>
+                        {categoryType.name}
+                      </option>
                     ))}
                   </Select>
                   <div className="flex items-start justify-between gap-3">

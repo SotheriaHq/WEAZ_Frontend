@@ -86,6 +86,7 @@ export async function initializeCollectionUploads(
     files: { name: string; type: string; size: number }[];
     // New metadata required by backend
     categoryId?: string;
+    categoryTypeId?: string;
     type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
     visibility?: 'PUBLIC' | 'PRIVATE';
   },

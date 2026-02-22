@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { toast } from 'sonner';
 import { ArrowRight, Sparkles, Store, CheckCircle2, Circle } from 'lucide-react';
 import type { RootState } from '@/store';
 import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
@@ -10,6 +9,36 @@ import Input from '@/components/ui/Input';
 const MAX_CATEGORIES = 3;
 const MAX_DESCRIPTION = 500;
 const LOCAL_PROGRESS_KEY = 'store-progress';
+
+const normalizeToken = (value: string): string => value.trim().toLowerCase();
+
+const normalizeCategorySelection = (
+  values: string[],
+  options: Array<{ value: string; label: string }>
+): string[] => {
+  if (!values.length) return [];
+
+  const byKey = new Map<string, string>();
+
+  options.forEach((option) => {
+    const normalizedValue = normalizeToken(option.value);
+    const normalizedLabel = normalizeToken(option.label);
+    byKey.set(normalizedValue, option.value);
+    byKey.set(normalizedLabel, option.value);
+  });
+
+  const result: string[] = [];
+  for (const entry of values) {
+    const normalizedEntry = normalizeToken(entry);
+    const matched = byKey.get(normalizedEntry);
+    if (!matched) continue;
+    if (result.includes(matched)) continue;
+    result.push(matched);
+    if (result.length >= MAX_CATEGORIES) break;
+  }
+
+  return result;
+};
 
 const getCategoryEmoji = (nameOrSlug: string): string | null => {
   const value = nameOrSlug.toLowerCase();
@@ -52,8 +81,7 @@ const StoreEssentials: React.FC = () => {
         if (cancelled) return;
 
         if (prefill.flags?.hasLiveStore) {
-          toast.error('User can only have one store at a time.');
-          navigate('/profile', { replace: true });
+          navigate('/studio/store', { replace: true });
           return;
         }
 
@@ -114,6 +142,16 @@ const StoreEssentials: React.FC = () => {
       { value: 'modest', label: 'Modest Fashion' },
     ];
   }, [systemCategories]);
+
+  useEffect(() => {
+    if (!categories.length) return;
+
+    setSelected((prev) => {
+      const normalized = normalizeCategorySelection(prev, categories);
+      const unchanged = normalized.length === prev.length && normalized.every((value, index) => value === prev[index]);
+      return unchanged ? prev : normalized;
+    });
+  }, [categories]);
 
   const toggleCategory = useCallback(
     (value: string) => {

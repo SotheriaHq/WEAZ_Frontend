@@ -70,8 +70,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
   const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
-  const filledHeartEmoji = String.fromCodePoint(0x2764, 0xfe0f);
-  const outlineHeartEmoji = String.fromCodePoint(0x1f5a4);
+  const redHeartEmoji = String.fromCodePoint(0x2764, 0xfe0f);
+  const whiteHeartEmoji = String.fromCodePoint(0x1f90d);
 
   // Check if product is wishlisted from Redux state
   const isProductWishlisted = wishlistedIds.has(product.id) || isWishlisted;
@@ -288,14 +288,14 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               backdrop-blur-md
               transition-all duration-200 ease-out
               ${isProductWishlisted
-                ? 'bg-rose-500/75 dark:bg-rose-500/65 text-white shadow-md shadow-rose-900/30 ring-1 ring-white/20'
-                : 'bg-white/80 dark:bg-black/40 text-gray-700 dark:text-white hover:bg-white dark:hover:bg-black/60'
+                ? 'bg-white/90 dark:bg-black/55 text-gray-900 dark:text-white shadow-md ring-1 ring-white/25'
+                : 'bg-black/40 text-white shadow-md ring-1 ring-white/30 hover:bg-black/55'
               }
               ${wishlistLoading || isOwnProduct ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110 active:scale-95'}
             `}
           >
             <span role="img" aria-hidden="true" className="text-base leading-none">
-              {isProductWishlisted ? filledHeartEmoji : outlineHeartEmoji}
+              {isProductWishlisted ? redHeartEmoji : whiteHeartEmoji}
             </span>
           </button>
         )}
