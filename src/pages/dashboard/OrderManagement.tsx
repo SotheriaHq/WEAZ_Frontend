@@ -15,6 +15,7 @@ import {
   Truck
 } from 'lucide-react';
 import OrderDetailsModal from '@/components/dashboard/OrderDetailsModal';
+import { Select } from '@/components/ui/Select';
 
 const OrderManagement: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
@@ -110,10 +111,12 @@ const OrderManagement: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-gray-500" />
-          <select 
-            className="select-threadly px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent focus:outline-none focus:ring-0 text-sm"
+          <Select 
+            variant="filter"
+            aria-label="Filter by order status"
             value={statusFilter}
             onChange={handleStatusChange}
+            fullWidth={false}
           >
             <option value="">All Statuses</option>
             <option value="PENDING">Pending</option>
@@ -121,7 +124,7 @@ const OrderManagement: React.FC = () => {
             <option value="SHIPPED">Shipped</option>
             <option value="COMPLETED">Completed</option>
             <option value="CANCELLED">Cancelled</option>
-          </select>
+          </Select>
         </div>
       </div>
 

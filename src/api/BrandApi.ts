@@ -37,6 +37,9 @@ export interface UploadAssetDto {
 
 export type CollectionScope = 'design' | 'store' | 'all';
 
+const getCollectionBasePath = (scope?: CollectionScope) =>
+  scope === 'store' ? '/store-collections' : '/designs';
+
 const SIGNED_URL_TTL_MS = 4 * 60 * 1000;
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 const signedUrlPending = new Map<string, Promise<string | null>>();
@@ -120,6 +123,40 @@ const mapCategories = (
     .filter((c: { id: string; name: string }) => c.id.length > 0 && c.name.length > 0);
 };
 
+const mapCategoriesWithSubCategories = (payload: unknown): CategoryOption[] => {
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as any)?.data)
+      ? (payload as any).data
+      : Array.isArray((payload as any)?.data?.data)
+        ? (payload as any).data.data
+        : [];
+
+  return items
+    .map((c: any) => ({
+      id: String(c?.id ?? ''),
+      slug: String(c?.slug ?? ''),
+      name: String(c?.name ?? ''),
+      description: c?.description ?? null,
+      types: Array.isArray(c?.subCategories ?? c?.types)
+        ? (c.subCategories ?? c.types)
+          .map((t: any) => ({
+            id: String(t?.id ?? ''),
+            categoryId: String(t?.categoryId ?? c?.id ?? ''),
+            slug: String(t?.slug ?? ''),
+            name: String(t?.name ?? ''),
+            description: t?.description ?? null,
+            order:
+              typeof t?.order === 'number' && Number.isFinite(t.order)
+                ? t.order
+                : undefined,
+          }))
+          .filter((t: CategoryTypeOption) => t.id.length > 0 && t.name.length > 0)
+        : [],
+    }))
+    .filter((c: CategoryOption) => c.id.length > 0 && c.name.length > 0);
+};
+
 export const brandApi = {
   async getCategories(force = false): Promise<CategoryOption[]> {
     // Serve cached categories if fresh and not forcing a reload
@@ -147,6 +184,20 @@ export const brandApi = {
           },
         });
         mapped = mapCategories((bypassResponse?.data ?? undefined) as unknown);
+      }
+
+      if (mapped.length === 0) {
+        try {
+          const taxonomyResponse = await apiClient.get('/categories', {
+            headers: {
+              'Cache-Control': 'no-cache',
+              Pragma: 'no-cache',
+            },
+          });
+          mapped = mapCategoriesWithSubCategories((taxonomyResponse?.data ?? undefined) as unknown);
+        } catch {
+          // Keep fallback behavior below.
+        }
       }
 
       if (mapped.length === 0) return categoriesCache.items.length ? categoriesCache.items : [];
@@ -193,7 +244,7 @@ export const brandApi = {
             ? (payload as any).data.data
             : [];
 
-      return items
+      const mapped = items
         .map((item: any) => ({
           id: String(item?.id ?? ''),
           categoryId: String(item?.categoryId ?? ''),
@@ -206,9 +257,25 @@ export const brandApi = {
               : undefined,
         }))
         .filter((item: CategoryTypeOption) => item.id.length > 0 && item.name.length > 0);
+
+      if (mapped.length > 0) {
+        return mapped.filter((type: CategoryTypeOption) =>
+          categoryId ? type.categoryId === categoryId : true,
+        );
+      }
+
+      const categories = await this.getCategoriesWithSubCategories(force);
+      const fallback = categories.flatMap((category) => category.types ?? []);
+      return fallback.filter((type: CategoryTypeOption) =>
+        categoryId ? type.categoryId === categoryId : true,
+      );
     } catch (error) {
       console.error('Error fetching category types', error);
-      return [];
+      const categories = await this.getCategoriesWithSubCategories(force);
+      const fallback = categories.flatMap((category) => category.types ?? []);
+      return fallback.filter((type: CategoryTypeOption) =>
+        categoryId ? type.categoryId === categoryId : true,
+      );
     }
   },
 
@@ -222,33 +289,7 @@ export const brandApi = {
     }
     try {
       const response = await apiClient.get('/categories');
-      const payload = response?.data;
-      const items = Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload?.data)
-          ? payload.data
-          : [];
-
-      const mapped: CategoryOption[] = items
-        .map((c: any) => ({
-          id: String(c?.id ?? ''),
-          slug: String(c?.slug ?? ''),
-          name: String(c?.name ?? ''),
-          description: c?.description ?? null,
-          types: Array.isArray(c?.subCategories ?? c?.types)
-            ? (c.subCategories ?? c.types)
-              .map((t: any) => ({
-                id: String(t?.id ?? ''),
-                categoryId: String(t?.categoryId ?? c?.id ?? ''),
-                slug: String(t?.slug ?? ''),
-                name: String(t?.name ?? ''),
-                description: t?.description ?? null,
-                order: typeof t?.order === 'number' ? t.order : undefined,
-              }))
-              .filter((t: CategoryTypeOption) => t.id.length > 0 && t.name.length > 0)
-            : [],
-        }))
-        .filter((c: CategoryOption) => c.id.length > 0 && c.name.length > 0);
+      const mapped = mapCategoriesWithSubCategories((response?.data ?? undefined) as unknown);
 
       if (mapped.length > 0) {
         categoriesCache.items = mapped;
@@ -513,16 +554,26 @@ export const brandApi = {
     opts?: { visibility?: 'public' | 'private' | 'all'; scope?: CollectionScope },
   ): Promise<CollectionDto[]> {
     try {
+      const resolvedScope = opts?.scope ?? 'design';
+      if (resolvedScope === 'all') {
+        const [designs, storeCollections] = await Promise.all([
+          this.getCollections(ownerId, { ...opts, scope: 'design' }),
+          this.getCollections(ownerId, { ...opts, scope: 'store' }),
+        ]);
+        return [...storeCollections, ...designs];
+      }
+
       const params = new URLSearchParams();
       if (opts?.visibility) params.append('visibility', opts.visibility);
-      params.append('scope', opts?.scope ?? 'design');
       const query = params.toString();
+      const basePath = getCollectionBasePath(resolvedScope);
       console.debug('[BrandApi.getCollections] request', {
         ownerId,
         visibility: opts?.visibility ?? 'all',
-        scope: opts?.scope ?? 'design',
+        scope: resolvedScope,
+        endpoint: `${basePath}/user/${ownerId}`,
       });
-      const response = await apiClient.get(`/collections/user/${ownerId}${query ? `?${query}` : ''}`);
+      const response = await apiClient.get(`${basePath}/user/${ownerId}${query ? `?${query}` : ''}`);
       const data = unwrapApiResponse<{ items: unknown[]; hasNextPage: boolean; endCursor?: string }>(response.data);
 
       // Transform backend data to frontend format
@@ -656,7 +707,7 @@ export const brandApi = {
   // Fetch draft collections (PHASE 6)
   async getMyDraftCollections(): Promise<CollectionDto[]> {
     try {
-      const response = await apiClient.get('/collections/my/drafts');
+      const response = await apiClient.get('/designs/my/drafts');
       const payload = response.data;
       // Robustly extract items array handling { data: [...] }, { items: [...] }, or [...]
       const items = Array.isArray(payload)
@@ -719,7 +770,7 @@ export const brandApi = {
   // Create collection
   async createCollection(data: { name: string; description?: string; isPublic?: boolean; categoryId?: string; categoryTypeId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY' }): Promise<CollectionDto | null> {
     try {
-      const init = await apiClient.post('/collections/initialize', {
+      const init = await apiClient.post('/designs/initialize', {
         mode: 'existing',
         title: data.name,
         description: data.description,
@@ -731,7 +782,7 @@ export const brandApi = {
       const sessionId = (init.data as any)?.sessionId ?? (init.data as any)?.collectionId ?? (init.data as any)?.id;
       if (!sessionId) return null;
 
-      const finalized = await apiClient.post(`/collections/${sessionId}/finalize`, {
+      const finalized = await apiClient.post(`/designs/${sessionId}/finalize`, {
         action: 'draft',
         collectionMetadata: {
           title: data.name,
@@ -804,9 +855,8 @@ export const brandApi = {
     opts?: { scope?: CollectionScope },
   ): Promise<CollectionDto | null> {
     try {
-      const response = await apiClient.patch(`/collections/${collectionId}`, data, {
-        params: { scope: opts?.scope ?? 'design' },
-      });
+      const basePath = getCollectionBasePath(opts?.scope);
+      const response = await apiClient.patch(`${basePath}/${collectionId}`, data);
       return unwrapApiResponse<CollectionDto>(response.data);
     } catch (error) {
       console.error('Error updating collection:', error);
@@ -820,9 +870,8 @@ export const brandApi = {
     opts?: { scope?: CollectionScope },
   ): Promise<boolean> {
     try {
-      await apiClient.delete(`/collections/${collectionId}`, {
-        params: { scope: opts?.scope ?? 'design' },
-      });
+      const basePath = getCollectionBasePath(opts?.scope);
+      await apiClient.delete(`${basePath}/${collectionId}`);
       return true;
     } catch (error) {
       console.error('Error deleting collection:', error);
@@ -835,11 +884,8 @@ export const brandApi = {
     opts?: { scope?: CollectionScope },
   ): Promise<boolean> {
     try {
-      await apiClient.patch(
-        `/collections/${collectionId}/archive`,
-        {},
-        { params: { scope: opts?.scope ?? 'design' } },
-      );
+      const basePath = getCollectionBasePath(opts?.scope);
+      await apiClient.patch(`${basePath}/${collectionId}/archive`, {});
       return true;
     } catch (error) {
       console.error('Error archiving collection:', error);
@@ -852,11 +898,8 @@ export const brandApi = {
     opts?: { scope?: CollectionScope },
   ): Promise<boolean> {
     try {
-      await apiClient.patch(
-        `/collections/${collectionId}/unarchive`,
-        {},
-        { params: { scope: opts?.scope ?? 'design' } },
-      );
+      const basePath = getCollectionBasePath(opts?.scope);
+      await apiClient.patch(`${basePath}/${collectionId}/unarchive`, {});
       return true;
     } catch (error) {
       console.error('Error unarchiving collection:', error);
@@ -869,9 +912,8 @@ export const brandApi = {
     opts?: { scope?: CollectionScope },
   ): Promise<CollectionDto | null> {
     try {
-      const response = await apiClient.post(`/collections/${collectionId}/duplicate`, null, {
-        params: { scope: opts?.scope ?? 'design' },
-      });
+      const basePath = getCollectionBasePath(opts?.scope);
+      const response = await apiClient.post(`${basePath}/${collectionId}/duplicate`, null);
       return unwrapApiResponse<CollectionDto>(response.data);
     } catch (error) {
       console.error('Error duplicating collection:', error);
@@ -997,9 +1039,8 @@ export const brandApi = {
     opts?: { scope?: CollectionScope },
   ): Promise<any> {
     try {
-      const response = await apiClient.get(`/collections/${collectionId}`, {
-        params: { scope: opts?.scope ?? 'design' },
-      });
+      const basePath = getCollectionBasePath(opts?.scope);
+      const response = await apiClient.get(`${basePath}/${collectionId}`);
       return unwrapApiResponse<any>(response.data);
     } catch (error: any) {
       console.error('Error fetching collection detail:', error);

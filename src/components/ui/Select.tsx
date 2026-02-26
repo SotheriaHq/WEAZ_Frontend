@@ -1,8 +1,13 @@
-import React, { forwardRef, useMemo, useState } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
-import { Dropdown, DropdownMenu, DropdownTrigger, DropdownItem } from './Dropdown';
+import React, { forwardRef, useMemo, useState } from "react";
+import { ChevronDown, Check } from "lucide-react";
+import {
+  Dropdown,
+  DropdownMenu,
+  DropdownTrigger,
+  DropdownItem,
+} from "./Dropdown";
 
-export type SelectVariant = 'default' | 'filter' | 'compact';
+export type SelectVariant = "default" | "filter" | "compact";
 
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
@@ -62,54 +67,79 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       error,
       helperText,
       fullWidth = true,
-      variant = 'default',
-      className = '',
+      variant = "default",
+      className = "",
       disabled,
       children,
       ...props
     },
-    ref
+    ref,
   ) => {
     const [open, setOpen] = useState(false);
     const valueProp = props.value;
     const defaultValueProp = props.defaultValue;
     const isControlled = valueProp !== undefined;
-    const [uncontrolledValue, setUncontrolledValue] = useState<string | number | readonly string[] | undefined>(
-      defaultValueProp as string | number | readonly string[] | undefined
-    );
+    const [uncontrolledValue, setUncontrolledValue] = useState<
+      string | number | readonly string[] | undefined
+    >(defaultValueProp as string | number | readonly string[] | undefined);
     const currentValue = isControlled ? valueProp : uncontrolledValue;
 
     const options = useMemo(() => {
-      const nodes = React.Children.toArray(children).filter(React.isValidElement);
-      return nodes
-        .filter((node) => {
-          if (!React.isValidElement(node)) return false;
-          return node.type === 'option';
-        })
-        .map((node) => {
-          const option = node as React.ReactElement<React.OptionHTMLAttributes<HTMLOptionElement>>;
-          const rawLabel = option.props.children;
-          const labelText = typeof rawLabel === 'string' ? rawLabel : Array.isArray(rawLabel) ? rawLabel.join('') : `${rawLabel ?? ''}`;
-          return {
-            value: option.props.value ?? labelText,
-            label: labelText,
-            disabled: option.props.disabled ?? false,
-          };
+      const collected: Array<{
+        value: string;
+        label: string;
+        disabled: boolean;
+      }> = [];
+      const visit = (nodeChildren: React.ReactNode) => {
+        React.Children.forEach(nodeChildren, (node) => {
+          if (!React.isValidElement(node)) return;
+
+          if (node.type === React.Fragment) {
+            const fragmentNode = node as React.ReactElement<{
+              children?: React.ReactNode;
+            }>;
+            visit(fragmentNode.props.children);
+            return;
+          }
+
+          if (node.type === "option") {
+            const option = node as React.ReactElement<
+              React.OptionHTMLAttributes<HTMLOptionElement>
+            >;
+            const rawLabel = option.props.children;
+            const labelText =
+              typeof rawLabel === "string"
+                ? rawLabel
+                : Array.isArray(rawLabel)
+                  ? rawLabel.join("")
+                  : `${rawLabel ?? ""}`;
+            collected.push({
+              value: String(option.props.value ?? labelText),
+              label: labelText,
+              disabled: option.props.disabled ?? false,
+            });
+          }
         });
+      };
+
+      visit(children);
+      return collected;
     }, [children]);
 
-    const selectedOption = options.find((opt) => `${opt.value}` === `${currentValue ?? ''}`) ?? options[0];
-    const selectedLabel = selectedOption?.label ?? '';
+    const selectedOption =
+      options.find((opt) => `${opt.value}` === `${currentValue ?? ""}`) ??
+      options[0];
+    const selectedLabel = selectedOption?.label ?? "";
 
     const baseClasses = `
-      ${fullWidth ? 'w-full' : ''}
+      ${fullWidth ? "w-full" : ""}
       ${variantStyles[variant]}
       ${
         error
-          ? 'border-red-500 dark:border-red-500 focus:ring-red-500/50 focus:border-red-500'
-          : ''
+          ? "border-red-500 dark:border-red-500 focus:ring-red-500/50 focus:border-red-500"
+          : ""
       }
-      ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-zinc-800/50' : ''}
+      ${disabled ? "opacity-60 cursor-not-allowed bg-gray-100 dark:bg-zinc-800/50" : ""}
     `;
 
     const showChevron = true;
@@ -118,13 +148,17 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         setUncontrolledValue(value);
       }
       if (props.onChange) {
-        props.onChange({ target: { value } } as React.ChangeEvent<HTMLSelectElement>);
+        props.onChange({
+          target: { value },
+        } as React.ChangeEvent<HTMLSelectElement>);
       }
       setOpen(false);
     };
 
     return (
-      <div className={`${fullWidth ? 'w-full' : ''} ${variant !== 'default' ? 'relative inline-block' : ''} ${className}`}>
+      <div
+        className={`${fullWidth ? "w-full" : ""} ${variant !== "default" ? "relative inline-block" : ""} ${className}`}
+      >
         {label && (
           <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-300 mb-2">
             {label}
@@ -132,30 +166,41 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           </label>
         )}
         <div className="relative">
-          <Dropdown open={open} onOpenChange={setOpen} placement="bottom-start" className={fullWidth ? 'w-full' : ''}>
+          <Dropdown
+            open={open}
+            onOpenChange={setOpen}
+            placement="bottom-start"
+            className={fullWidth ? "w-full" : ""}
+          >
             <DropdownTrigger
               type="button"
               disabled={disabled}
-              className={`${baseClasses} flex items-center justify-between gap-3 text-left ${disabled ? 'pointer-events-none' : ''}`}
+              className={`${baseClasses} flex items-center justify-between gap-3 text-left ${disabled ? "pointer-events-none" : ""}`}
               aria-label={label}
             >
               <span className="truncate">{selectedLabel}</span>
               {showChevron && (
                 <ChevronDown
-                  className={`shrink-0 text-gray-400 ${variant === 'compact' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
+                  className={`shrink-0 text-gray-400 ${variant === "compact" ? "w-3.5 h-3.5" : "w-4 h-4"}`}
                 />
               )}
             </DropdownTrigger>
             <DropdownMenu className="min-w-[220px]">
               {options.map((opt) => {
-                const isActive = `${opt.value}` === `${currentValue ?? ''}`;
+                const isActive = `${opt.value}` === `${currentValue ?? ""}`;
                 return (
                   <DropdownItem
                     key={`${opt.value}`}
                     disabled={opt.disabled}
-                    onClick={() => !opt.disabled && handleSelect(`${opt.value}`)}
-                    className={`${isActive ? 'bg-white/30 dark:bg-white/10' : ''} ${opt.disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    rightIcon={isActive ? <Check className="w-4 h-4 text-purple-500" /> : null}
+                    onClick={() =>
+                      !opt.disabled && handleSelect(`${opt.value}`)
+                    }
+                    className={`${isActive ? "bg-white/30 dark:bg-white/10" : ""} ${opt.disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+                    rightIcon={
+                      isActive ? (
+                        <Check className="w-4 h-4 text-purple-500" />
+                      ) : null
+                    }
                   >
                     {opt.label}
                   </DropdownItem>
@@ -167,7 +212,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             ref={ref}
             disabled={disabled}
             className="sr-only"
-            value={currentValue as string | number | readonly string[] | undefined}
+            value={
+              currentValue as string | number | readonly string[] | undefined
+            }
             {...props}
             tabIndex={-1}
           >
@@ -179,16 +226,17 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             {error ? (
               <p className="text-xs text-red-500">{error}</p>
             ) : helperText ? (
-              <p className="text-xs text-gray-500 dark:text-zinc-500">{helperText}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">
+                {helperText}
+              </p>
             ) : null}
           </div>
         )}
       </div>
     );
-  }
+  },
 );
 
-Select.displayName = 'Select';
+Select.displayName = "Select";
 
 export default Select;
-

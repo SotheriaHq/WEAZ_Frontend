@@ -5,6 +5,7 @@ import { brandApi } from '@/api/BrandApi';
 import { getDraftExpiryStats, type DraftExpiryStats } from '@/api/collectionUploads';
 import { getStoreStatus } from '@/api/StoreApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { Select } from '@/components/ui/Select';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { getAvatarFallback } from '@/utils/profileImage';
 import { DraftExpiryStats as DraftExpiryStatsComponent } from '@/components/collections/DraftExpiryComponents';
@@ -201,15 +202,17 @@ const DashboardHome: React.FC = () => {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Overview</h2>
-          <select
+          <Select
+            variant="filter"
+            aria-label="Select date range"
             value={range}
             onChange={(e) => setRange(e.target.value as any)}
-            className="select-threadly bg-white/50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-xs text-gray-600 dark:text-gray-300 px-3 py-1.5 focus:outline-none focus:border-purple-500"
+            fullWidth={false}
           >
             <option value="30d">Last 30 Days</option>
             <option value="7d">This Week</option>
             <option value="ytd">Today</option>
-          </select>
+          </Select>
         </div>
 
         {/* Metrics Grid - 8 cards in 2 rows */}

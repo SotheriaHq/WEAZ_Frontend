@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import FrostedButton from '@/components/ui/FrostedButton';
 import { brandApi } from '../../api/BrandApi';
 import { useCollectionUpload } from '@/hooks/useCollectionUpload';
+import { Select } from '@/components/ui/Select';
 import type { MediaItem } from '@/types/media';
 
 interface AddCollectionModalProps {
@@ -163,16 +164,15 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Type
               </label>
-              <select
-                className="select-threadly w-full px-3 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 cursor-pointer"
+              <Select
                 value={type}
                 onChange={(e) => setType(e.target.value as 'MALE' | 'FEMALE' | 'EVERYBODY')}
                 disabled={isSubmitting}
               >
-                <option value="EVERYBODY" className="bg-slate-900 text-white">Everybody</option>
-                <option value="MALE" className="bg-slate-900 text-white">Male</option>
-                <option value="FEMALE" className="bg-slate-900 text-white">Female</option>
-              </select>
+                <option value="EVERYBODY">Everybody</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+              </Select>
             </div>
 
             {/* Visibility Dropdown */}
@@ -180,15 +180,14 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Visibility
               </label>
-              <select
-                className="select-threadly w-full px-3 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 cursor-pointer"
+              <Select
                 value={isPublic ? 'public' : 'private'}
                 onChange={(e) => setIsPublic(e.target.value === 'public')}
                 disabled={isSubmitting}
               >
-                <option value="public" className="bg-slate-900 text-white">Public</option>
-                <option value="private" className="bg-slate-900 text-white">Private</option>
-              </select>
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+              </Select>
             </div>
           </div>
           {!isPublic && (
@@ -197,28 +196,27 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category <span className="text-red-500">*</span></label>
-            <select
-              className="select-threadly w-full px-3 py-2 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-0 border border-white/20"
+            <Select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               disabled={isSubmitting || loadingCategories || categories.length === 0}
             >
               {loadingCategories && (
-                <option value="" className="bg-slate-900 text-white" disabled>
+                <option value="" disabled>
                   Loading categories…
                 </option>
               )}
               {!loadingCategories && categories.length === 0 && (
-                <option value="" className="bg-slate-900 text-white" disabled>
+                <option value="" disabled>
                   No categories available
                 </option>
               )}
               {categories.map((c) => (
-                <option key={c.id} value={c.id} className="bg-slate-900 text-white">
+                <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Collaborators Search Field */}

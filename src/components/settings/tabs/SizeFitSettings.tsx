@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { SizeFitApi } from '@/api/SizeFitApi';
+import { Select } from '@/components/ui/Select';
 import type { SizeFitProfile } from '@/types/sizeFit';
 
 const SizeFitSettings: React.FC = () => {
@@ -64,7 +65,7 @@ const SizeFitSettings: React.FC = () => {
       <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-4">
         <label className="block text-sm text-gray-700 dark:text-gray-300">
           <span className="block mb-1 font-medium">Visibility</span>
-          <select
+          <Select
             value={profile.visibility}
             onChange={(e) =>
               setProfile((prev) =>
@@ -73,16 +74,15 @@ const SizeFitSettings: React.FC = () => {
                   : prev,
               )
             }
-            className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/30 px-3 py-2"
           >
             <option value="PRIVATE">Private</option>
             <option value="PUBLIC">Public</option>
-          </select>
+          </Select>
         </label>
 
         <label className="block text-sm text-gray-700 dark:text-gray-300">
           <span className="block mb-1 font-medium">Share Policy</span>
-          <select
+          <Select
             value={profile.sharePolicy}
             onChange={(e) =>
               setProfile((prev) =>
@@ -97,12 +97,11 @@ const SizeFitSettings: React.FC = () => {
                   : prev,
               )
             }
-            className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black/30 px-3 py-2"
           >
             <option value="OWNER_ONLY">Only me</option>
             <option value="REQUIRE_PERMISSION">Require owner permission</option>
             <option value="ALLOW_ANYONE">Allow re-share by anyone</option>
-          </select>
+          </Select>
         </label>
 
         <label className="block text-sm text-gray-700 dark:text-gray-300">

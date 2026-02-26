@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Select } from '@/components/ui/Select';
 import {
   Store,
   Palette,
@@ -509,23 +510,15 @@ const StoreGeneralSettings: React.FC = () => {
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400 block mb-2">
                 Commitment to Customers
               </label>
-              <div className="relative">
-                <select
+              <Select
                   value={responseTime}
                   onChange={(e) => setResponseTime(e.target.value)}
                   disabled={isLoading}
-                  className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 appearance-none cursor-pointer transition-all disabled:opacity-60"
                 >
                   <option value="12h">Within 12 hours</option>
                   <option value="24h">Within 24 hours</option>
                   <option value="48h">Within 48 hours</option>
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
+                </Select>
             </div>
 
             <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4 flex items-center gap-4">

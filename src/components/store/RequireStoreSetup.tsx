@@ -30,6 +30,11 @@ const isCacheFresh = () =>
   storeStatusCache.checkedAt > 0 &&
   Date.now() - storeStatusCache.checkedAt < STORE_STATUS_CACHE_TTL_MS;
 
+const canServeFromCache = () =>
+  isCacheFresh() &&
+  !storeStatusCache.hadError &&
+  Boolean(storeStatusCache.status?.isStoreOpen);
+
 const fetchStoreStatusWithRetry = async (): Promise<StoreStatusCache> => {
   const shouldRetryForPendingOpen = isStoreOpenPending();
   const maxAttempts = shouldRetryForPendingOpen ? STATUS_RETRY_ATTEMPTS : 1;
@@ -82,7 +87,7 @@ const getCachedOrFetchStoreStatus = async (): Promise<StoreStatusCache> => {
 const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const [status, setStatus] = useState<StoreStatusResponse | null>(storeStatusCache.status);
-  const [loading, setLoading] = useState(() => !isCacheFresh() && !storeStatusCache.status);
+  const [loading, setLoading] = useState(() => !canServeFromCache());
   const [hadError, setHadError] = useState(storeStatusCache.hadError);
 
   const isSetupRoute = useMemo(() => {
@@ -106,13 +111,16 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
       setLoading(false);
     }
 
-    if (isCacheFresh()) {
+    if (canServeFromCache()) {
       return () => {
         mounted = false;
       };
     }
 
-    const shouldBlockWithLoader = storeStatusCache.checkedAt === 0;
+    const shouldBlockWithLoader =
+      storeStatusCache.checkedAt === 0 ||
+      !storeStatusCache.status?.isStoreOpen ||
+      storeStatusCache.hadError;
     if (shouldBlockWithLoader) {
       setLoading(true);
       setHadError(false);

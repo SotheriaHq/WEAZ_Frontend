@@ -1,59 +1,84 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { 
-  ArrowLeft, 
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import {
+  ArrowLeft,
   ChevronDown,
+  ChevronUp,
   ChevronLeft,
   ChevronRight,
-  Plus, 
-  CheckCircle, 
-  Video, 
+  Plus,
+  CheckCircle,
+  Video,
   X,
-  Loader2
-} from 'lucide-react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store';
+  Loader2,
+} from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/store";
 
-import { toast } from 'sonner';
-import MediaRenderer from '@/components/media/MediaRenderer';
-import { productApi, type ProductCreateDto, type Category, type ProductVariant } from '@/api/ProductApi';
-import { brandApi, type CategoryTypeOption } from '@/api/BrandApi';
-import Input from '@/components/ui/Input';
-import Textarea from '@/components/ui/Textarea';
-import Select from '@/components/ui/Select';
-import Tag from '@/components/ui/Tag';
-import InfoTooltip from '@/components/ui/InfoTooltip';
-import { useConfirm } from '@/components/ui/useConfirm';
-import { DiscardChangesModal } from '@/components/studio/store/modals';
-import { normalizePrimary, reorderItems, setPrimary, validateMedia } from './mediaUtils';
-import { getTagColor } from '@/utils/tagColors';
-import FilterSelector, { type FilterSelection } from '@/components/categories/FilterSelector';
-import { PriceChangePreviewModal } from '@/components/collections/PriceChangePreviewModal';
-import { getProductPriceChangePreview, type CollectionPriceImpact } from '@/api/StoreApi';
+import { toast } from "sonner";
+import MediaRenderer from "@/components/media/MediaRenderer";
+import {
+  productApi,
+  type ProductCreateDto,
+  type Category,
+  type ProductVariant,
+} from "@/api/ProductApi";
+import { brandApi, type CategoryTypeOption } from "@/api/BrandApi";
+import Input from "@/components/ui/Input";
+import Textarea from "@/components/ui/Textarea";
+import Select from "@/components/ui/Select";
+import Tag from "@/components/ui/Tag";
+import InfoTooltip from "@/components/ui/InfoTooltip";
+import { useConfirm } from "@/components/ui/useConfirm";
+import { DiscardChangesModal } from "@/components/studio/store/modals";
+import {
+  normalizePrimary,
+  reorderItems,
+  setPrimary,
+  validateMedia,
+} from "./mediaUtils";
+import { getTagColor } from "@/utils/tagColors";
+import FilterSelector, {
+  type FilterSelection,
+} from "@/components/categories/FilterSelector";
+import { PriceChangePreviewModal } from "@/components/collections/PriceChangePreviewModal";
+import {
+  getProductPriceChangePreview,
+  getStorePolicies,
+  updateStorePolicies,
+  type CollectionPriceImpact,
+} from "@/api/StoreApi";
 
 function toSkuToken(input: string): string {
   const cleaned = input
     .trim()
     .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '-');
-  return cleaned.replace(/^-+/, '').replace(/-+$/, '');
+    .replace(/[^A-Z0-9]+/g, "-");
+  return cleaned.replace(/^-+/, "").replace(/-+$/, "");
 }
 
 function brandInitialsFromProfile(profile: any): string {
-  const raw =
-    String(profile?.brandFullName || profile?.brandName || profile?.username || '').trim();
-  if (!raw) return 'BR';
+  const raw = String(
+    profile?.brandFullName || profile?.brandName || profile?.username || "",
+  ).trim();
+  if (!raw) return "BR";
   const parts = raw
     .split(/\s+/)
-    .map((p: string) => p.replace(/[^A-Za-z0-9]/g, ''))
+    .map((p: string) => p.replace(/[^A-Za-z0-9]/g, ""))
     .filter(Boolean);
-  const initials = parts.map((p: string) => p[0] ?? '').join('');
-  return toSkuToken(initials).slice(0, 4) || 'BR';
+  const initials = parts.map((p: string) => p[0] ?? "").join("");
+  return toSkuToken(initials).slice(0, 4) || "BR";
 }
 
 function randomSkuSuffix(length = 5): string {
   // Base36, uppercase, stable enough for UX (not a security token)
-  let out = '';
+  let out = "";
   while (out.length < length) {
     out += Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)
       .toString(36)
@@ -63,9 +88,9 @@ function randomSkuSuffix(length = 5): string {
 }
 
 function buildBaseSku(opts: { brandInitials: string; title?: string }): string {
-  const prefix = toSkuToken(opts.brandInitials || 'BR');
-  const titleToken = opts.title ? toSkuToken(opts.title).replace(/-/g, '') : '';
-  const shortTitle = titleToken ? titleToken.slice(0, 4) : 'PRD';
+  const prefix = toSkuToken(opts.brandInitials || "BR");
+  const titleToken = opts.title ? toSkuToken(opts.title).replace(/-/g, "") : "";
+  const shortTitle = titleToken ? titleToken.slice(0, 4) : "PRD";
   return `${prefix}-${shortTitle}-${randomSkuSuffix(5)}`;
 }
 
@@ -74,13 +99,79 @@ function buildVariantSku(
   variant: { size?: string; color?: string },
   index: number,
 ): string {
-  const color = variant.color ? toSkuToken(variant.color).slice(0, 6) : '';
-  const size = variant.size ? toSkuToken(variant.size).slice(0, 6) : '';
+  const color = variant.color ? toSkuToken(variant.color).slice(0, 6) : "";
+  const size = variant.size ? toSkuToken(variant.size).slice(0, 6) : "";
   const tokens = [color, size].filter(Boolean);
-  const tail = tokens.length ? tokens.join('-') : `V${index + 1}`;
+  const tail = tokens.length ? tokens.join("-") : `V${index + 1}`;
   return `${toSkuToken(baseSku)}-${tail}`;
 }
 
+type ShippingRegionOption = {
+  code: string;
+  label: string;
+  policyValue: string;
+};
+
+const SHIPPING_REGION_OPTIONS: ShippingRegionOption[] = [
+  { code: "NG", label: "Nigeria", policyValue: "nigeria" },
+  { code: "GH", label: "Ghana", policyValue: "ghana" },
+  { code: "KE", label: "Kenya", policyValue: "kenya" },
+  { code: "ZA", label: "South Africa", policyValue: "south-africa" },
+  { code: "RW", label: "Rwanda", policyValue: "rwanda" },
+  { code: "EG", label: "Egypt", policyValue: "egypt" },
+  { code: "GB", label: "United Kingdom", policyValue: "uk" },
+  { code: "US", label: "United States", policyValue: "us" },
+  { code: "INTL", label: "International", policyValue: "international" },
+];
+
+const normalizeShippingRegionCode = (
+  rawValue: string | null | undefined,
+): string | null => {
+  if (!rawValue) return null;
+  const value = String(rawValue).trim();
+  if (!value) return null;
+
+  const uppercase = value.toUpperCase();
+  const byCode = SHIPPING_REGION_OPTIONS.find((opt) => opt.code === uppercase);
+  if (byCode) return byCode.code;
+
+  const lowercase = value.toLowerCase();
+  const byPolicy = SHIPPING_REGION_OPTIONS.find(
+    (opt) => opt.policyValue === lowercase,
+  );
+  if (byPolicy) return byPolicy.code;
+
+  const byLabel = SHIPPING_REGION_OPTIONS.find(
+    (opt) => opt.label.toLowerCase() === lowercase,
+  );
+  return byLabel?.code ?? null;
+};
+
+const normalizeShippingRegionCodes = (regions: string[]): string[] => {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const region of regions) {
+    const code = normalizeShippingRegionCode(region);
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    normalized.push(code);
+  }
+  return normalized;
+};
+
+const toPolicyShippingRegion = (code: string): string => {
+  const option = SHIPPING_REGION_OPTIONS.find((opt) => opt.code === code);
+  return option?.policyValue ?? code.toLowerCase();
+};
+
+const areShippingRegionSetsEqual = (a: string[], b: string[]): boolean => {
+  if (a.length !== b.length) return false;
+  const aSet = new Set(a);
+  for (const value of b) {
+    if (!aSet.has(value)) return false;
+  }
+  return true;
+};
 
 // =====================
 // Types
@@ -99,7 +190,7 @@ interface FormState {
   currency: string;
   sku: string;
   weight: number;
-  weightUnit: 'kg' | 'lb';
+  weightUnit: "kg" | "lb";
   materials: string;
   careInstructions: string;
   returnsEligible: boolean;
@@ -108,7 +199,7 @@ interface FormState {
   allowBackorders: boolean;
   stock: number;
   lowStockThreshold: number;
-  status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+  status: "DRAFT" | "ACTIVE" | "ARCHIVED";
   isPhysicalProduct: boolean;
   customsRegion: string;
   onSale: boolean;
@@ -117,30 +208,30 @@ interface FormState {
 }
 
 const defaultFormState: FormState = {
-  title: '',
-  description: '',
-  categoryId: '',
-  taxonomyCategoryId: '',
-  categoryTypeId: '',
+  title: "",
+  description: "",
+  categoryId: "",
+  taxonomyCategoryId: "",
+  categoryTypeId: "",
   tags: [],
   price: 0,
   compareAtPrice: 0,
   costPerItem: 0,
-  currency: 'NGN',
-  sku: '',
+  currency: "NGN",
+  sku: "",
   weight: 0,
-  weightUnit: 'kg',
-  materials: '',
-  careInstructions: '',
+  weightUnit: "kg",
+  materials: "",
+  careInstructions: "",
   returnsEligible: true,
   sustainabilityClaim: false,
   trackInventory: true,
   allowBackorders: false,
   stock: 0,
   lowStockThreshold: 5,
-  status: 'ACTIVE',
+  status: "ACTIVE",
   isPhysicalProduct: true,
-  customsRegion: 'NG',
+  customsRegion: "NG",
   onSale: false,
   mediaIds: [],
   variants: [],
@@ -150,10 +241,10 @@ const defaultFormState: FormState = {
 // Currency Formatting
 // =====================
 
-const formatCurrency = (amount: number, currency = 'NGN'): string => {
+const formatCurrency = (amount: number, currency = "NGN"): string => {
   try {
-    return new Intl.NumberFormat('en-NG', {
-      style: 'currency',
+    return new Intl.NumberFormat("en-NG", {
+      style: "currency",
       currency,
       maximumFractionDigits: 0,
     }).format(amount);
@@ -170,67 +261,97 @@ const EditProduct: React.FC = () => {
   const navigate = useNavigate();
   const { id: productId } = useParams<{ id: string }>();
   const location = useLocation();
-  const returnTo = useMemo(() => new URLSearchParams(location.search).get('returnTo'), [location.search]);
-  const returnContext = useMemo(() => new URLSearchParams(location.search).get('returnContext'), [location.search]);
-  const collectionContextId = useMemo(() => new URLSearchParams(location.search).get('collectionId'), [location.search]);
+  const returnTo = useMemo(
+    () => new URLSearchParams(location.search).get("returnTo"),
+    [location.search],
+  );
+  const returnContext = useMemo(
+    () => new URLSearchParams(location.search).get("returnContext"),
+    [location.search],
+  );
+  const collectionContextId = useMemo(
+    () => new URLSearchParams(location.search).get("collectionId"),
+    [location.search],
+  );
   const user = useSelector((state: RootState) => state.user.profile);
 
   const isEditMode = Boolean(productId);
-  const isCollectionContext = returnContext === 'collection';
+  const isCollectionContext = returnContext === "collection";
   const isCollectionFlow = isCollectionContext && !isEditMode;
   const pageTitle = isCollectionFlow
-    ? 'Add Product to Collection'
+    ? "Add Product to Collection"
     : isCollectionContext && isEditMode
-      ? 'Edit Product in Collection'
+      ? "Edit Product in Collection"
       : isEditMode
-        ? 'Edit Product'
-        : 'Create Product';
+        ? "Edit Product"
+        : "Create Product";
   const includeDeleted = useMemo(
-    () => new URLSearchParams(location.search).get('includeDeleted') === 'true',
+    () => new URLSearchParams(location.search).get("includeDeleted") === "true",
     [location.search],
   );
-
-  const shippingRegionOptions = useMemo(() => {
-    // Return all supported shipping regions without filtering
-    return [
-      { value: 'NG', label: 'Nigeria' },
-      { value: 'GH', label: 'Ghana' },
-      { value: 'KE', label: 'Kenya' },
-      { value: 'ZA', label: 'South Africa' },
-      { value: 'RW', label: 'Rwanda' },
-      { value: 'EG', label: 'Egypt' },
-      { value: 'GB', label: 'United Kingdom' },
-      { value: 'US', label: 'United States' },
-      { value: 'INTL', label: 'International' },
-    ];
-  }, []);
 
   // State
   const [form, setForm] = useState<FormState>(defaultFormState);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [collectionCategoryById, setCollectionCategoryById] = useState<Record<string, string>>({});
+  const [collectionCategoryById, setCollectionCategoryById] = useState<
+    Record<string, string>
+  >({});
   const [categoryTypes, setCategoryTypes] = useState<CategoryTypeOption[]>([]);
   const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
-  const [saveAction, setSaveAction] = useState<'draft' | 'publish' | null>(null);
+  const [shippingRegions, setShippingRegions] = useState<string[]>([
+    defaultFormState.customsRegion,
+  ]);
+  const [savedShippingRegions, setSavedShippingRegions] = useState<string[]>([
+    defaultFormState.customsRegion,
+  ]);
+  const [shippingRegionsLoading, setShippingRegionsLoading] = useState(true);
+  const [saveAction, setSaveAction] = useState<"draft" | "publish" | null>(
+    null,
+  );
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
-  const [tagInput, setTagInput] = useState('');
+  const [tagInput, setTagInput] = useState("");
   const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState<{
+    pricing: boolean;
+    variants: boolean;
+    fulfillment: boolean;
+    additional: boolean;
+  }>({
+    pricing: true,
+    variants: true,
+    fulfillment: true,
+    additional: true,
+  });
   const { confirm, ConfirmDialog: ConfirmModal } = useConfirm();
 
   // Taxonomy state (standalone category/sub-category/filters)
-  type TaxonomyCategoryOption = { id: string; name: string; types: { id: string; name: string }[] };
-  const [taxonomyCategories, setTaxonomyCategories] = useState<TaxonomyCategoryOption[]>([]);
+  type TaxonomyCategoryOption = {
+    id: string;
+    name: string;
+    types: { id: string; name: string }[];
+  };
+  const [taxonomyCategories, setTaxonomyCategories] = useState<
+    TaxonomyCategoryOption[]
+  >([]);
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
-  
+
   // Media state (simplified - using URLs for display)
-  const [mediaUrls, setMediaUrls] = useState<Array<{ id: string; url: string; isPrimary?: boolean }>>([]);
+  const [mediaUrls, setMediaUrls] = useState<
+    Array<{ id: string; url: string; isPrimary?: boolean }>
+  >([]);
 
   const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
   const [pendingMediaFiles, setPendingMediaFiles] = useState<
-    Array<{ id: string; tempId: string; file: File; previewUrl: string; isPrimary: boolean }>
+    Array<{
+      id: string;
+      tempId: string;
+      file: File;
+      previewUrl: string;
+      isPrimary: boolean;
+    }>
   >([]);
   const pendingPreviewUrlsRef = useRef<Map<string, string>>(new Map());
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -245,15 +366,21 @@ const EditProduct: React.FC = () => {
     newPrice: number;
   } | null>(null);
   const [pendingSaveDraft, setPendingSaveDraft] = useState(false);
-  const [pendingStatusOverride, setPendingStatusOverride] = useState<FormState['status'] | null>(null);
+  const [pendingStatusOverride, setPendingStatusOverride] = useState<
+    FormState["status"] | null
+  >(null);
 
   const maxMediaCount = 4;
   const canAddMoreMedia = mediaUrls.length < maxMediaCount;
-  const hasPrimaryMedia = useMemo(() => mediaUrls.some((m) => m.isPrimary), [mediaUrls]);
+  const hasPrimaryMedia = useMemo(
+    () => mediaUrls.some((m) => m.isPrimary),
+    [mediaUrls],
+  );
 
   // Calculate profit margin
   const profitMargin = useMemo(() => {
-    if (form.price <= 0 || form.costPerItem <= 0) return { margin: 0, profit: 0 };
+    if (form.price <= 0 || form.costPerItem <= 0)
+      return { margin: 0, profit: 0 };
     const profit = form.price - form.costPerItem;
     const margin = (profit / form.price) * 100;
     return { margin: Math.round(margin), profit };
@@ -261,14 +388,17 @@ const EditProduct: React.FC = () => {
 
   const variantTotalStock = useMemo(() => {
     if (!form.variants.length) return 0;
-    return form.variants.reduce((sum, v) => sum + (Number.isFinite(v.stock) ? v.stock : 0), 0);
+    return form.variants.reduce(
+      (sum, v) => sum + (Number.isFinite(v.stock) ? v.stock : 0),
+      0,
+    );
   }, [form.variants]);
 
   const variantKeyCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const v of form.variants) {
-      const key = `${(v.color ?? '').trim().toLowerCase()}::${(v.size ?? '').trim().toLowerCase()}`;
-      if (key === '::') continue;
+      const key = `${(v.color ?? "").trim().toLowerCase()}::${(v.size ?? "").trim().toLowerCase()}`;
+      if (key === "::") continue;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     return counts;
@@ -281,8 +411,60 @@ const EditProduct: React.FC = () => {
     return false;
   }, [variantKeyCounts]);
 
+  const normalizedShippingRegions = useMemo(
+    () => normalizeShippingRegionCodes(shippingRegions),
+    [shippingRegions],
+  );
+
+  const hasShippingRegionPolicyChanges = useMemo(
+    () =>
+      !areShippingRegionSetsEqual(
+        normalizedShippingRegions,
+        savedShippingRegions,
+      ),
+    [normalizedShippingRegions, savedShippingRegions],
+  );
+
+  const toggleShippingRegion = useCallback((regionCode: string) => {
+    setShippingRegions((prev) => {
+      const next = prev.includes(regionCode)
+        ? prev.filter((code) => code !== regionCode)
+        : [...prev, regionCode];
+      const normalized = normalizeShippingRegionCodes(next);
+      setForm((prevForm) => ({
+        ...prevForm,
+        customsRegion: normalized[0] ?? "",
+      }));
+      setHasChanges(true);
+      return normalized;
+    });
+  }, []);
+
+  const syncShippingRegions = useCallback(async (): Promise<string | undefined> => {
+    if (!form.isPhysicalProduct) {
+      return undefined;
+    }
+
+    if (normalizedShippingRegions.length === 0) {
+      throw new Error("MISSING_SHIPPING_REGION");
+    }
+
+    if (hasShippingRegionPolicyChanges) {
+      await updateStorePolicies({
+        shippingRegions: normalizedShippingRegions.map(toPolicyShippingRegion),
+      });
+      setSavedShippingRegions(normalizedShippingRegions);
+    }
+
+    return normalizedShippingRegions[0] ?? undefined;
+  }, [
+    form.isPhysicalProduct,
+    hasShippingRegionPolicyChanges,
+    normalizedShippingRegions,
+  ]);
+
   const revokeBlobUrl = useCallback((url?: string) => {
-    if (url && url.startsWith('blob:')) {
+    if (url && url.startsWith("blob:")) {
       URL.revokeObjectURL(url);
     }
   }, []);
@@ -295,7 +477,9 @@ const EditProduct: React.FC = () => {
     }
 
     const keepIds = new Set(pendingMediaFiles.map((it) => it.tempId));
-    for (const [tempId, url] of Array.from(pendingPreviewUrlsRef.current.entries())) {
+    for (const [tempId, url] of Array.from(
+      pendingPreviewUrlsRef.current.entries(),
+    )) {
       if (!keepIds.has(tempId)) {
         revokeBlobUrl(url);
         pendingPreviewUrlsRef.current.delete(tempId);
@@ -316,6 +500,52 @@ const EditProduct: React.FC = () => {
   // Data Loading
   // =====================
 
+  useEffect(() => {
+    let mounted = true;
+
+    const loadStoreShippingRegions = async () => {
+      try {
+        setShippingRegionsLoading(true);
+        const policies = await getStorePolicies();
+        if (!mounted) return;
+
+        const fromPolicy = normalizeShippingRegionCodes(
+          policies.shippingRegions || [],
+        );
+        const fallbackRegion =
+          normalizeShippingRegionCode(defaultFormState.customsRegion) ??
+          defaultFormState.customsRegion;
+        const resolved = fromPolicy.length > 0 ? fromPolicy : [fallbackRegion];
+
+        setShippingRegions(resolved);
+        setSavedShippingRegions(resolved);
+        setForm((prev) => ({
+          ...prev,
+          customsRegion: resolved[0] ?? prev.customsRegion,
+        }));
+      } catch (error) {
+        console.error("Failed to load store shipping regions", error);
+        if (!mounted) return;
+        const fallbackRegion =
+          normalizeShippingRegionCode(defaultFormState.customsRegion) ??
+          defaultFormState.customsRegion;
+        setShippingRegions([fallbackRegion]);
+        setSavedShippingRegions([fallbackRegion]);
+        setForm((prev) => ({
+          ...prev,
+          customsRegion: fallbackRegion,
+        }));
+      } finally {
+        if (mounted) setShippingRegionsLoading(false);
+      }
+    };
+
+    void loadStoreShippingRegions();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // Load collections (optional for products; standalone products are allowed)
   useEffect(() => {
     let mounted = true;
@@ -325,7 +555,8 @@ const EditProduct: React.FC = () => {
           const fetchedTypes = await brandApi.getCategoryTypes(undefined, true);
           let resolvedTypes = Array.isArray(fetchedTypes) ? fetchedTypes : [];
           if (resolvedTypes.length === 0) {
-            const categoriesWithTypes = await brandApi.getCategories(true);
+            const categoriesWithTypes =
+              await brandApi.getCategoriesWithSubCategories(true);
             const fallbackTypes = (categoriesWithTypes || [])
               .flatMap((category) => category.types ?? [])
               .filter((type) => Boolean(type?.id) && Boolean(type?.name));
@@ -335,7 +566,7 @@ const EditProduct: React.FC = () => {
             setCategoryTypes(resolvedTypes);
           }
         } catch (error) {
-          console.error('Failed to load category types', error);
+          console.error("Failed to load category types", error);
           if (mounted) setCategoryTypes([]);
         }
       };
@@ -343,18 +574,21 @@ const EditProduct: React.FC = () => {
       // Load taxonomy categories (standalone category/sub-category tree)
       const loadTaxonomyCategories = async () => {
         try {
-          const cats = await brandApi.getCategories(true);
+          const cats = await brandApi.getCategoriesWithSubCategories(true);
           if (mounted && Array.isArray(cats)) {
             setTaxonomyCategories(
               cats.map((c: any) => ({
                 id: String(c.id),
-                name: String(c.name || ''),
-                types: (c.types || []).map((t: any) => ({ id: String(t.id), name: String(t.name || '') })),
-              }))
+                name: String(c.name || ""),
+                types: (c.types || []).map((t: any) => ({
+                  id: String(t.id),
+                  name: String(t.name || ""),
+                })),
+              })),
             );
           }
         } catch (error) {
-          console.error('Failed to load taxonomy categories', error);
+          console.error("Failed to load taxonomy categories", error);
         }
       };
 
@@ -368,16 +602,16 @@ const EditProduct: React.FC = () => {
         }
 
         const collections = await brandApi.getCollections(user.id, {
-          visibility: 'all',
-          scope: 'store',
+          visibility: "all",
+          scope: "store",
         });
         if (!mounted) return;
         const mapped: Category[] = (collections || [])
           .filter((c: any) => Boolean(c?.isAvailableInStore))
           .map((c: any) => ({
-          id: String(c.id),
-          name: String(c.title || c.name || 'Untitled collection'),
-          slug: String(c.id),
+            id: String(c.id),
+            name: String(c.title || c.name || "Untitled collection"),
+            slug: String(c.id),
           }));
         setCategories(mapped);
         const categoryByCollection: Record<string, string> = {};
@@ -389,7 +623,7 @@ const EditProduct: React.FC = () => {
         setCollectionCategoryById(categoryByCollection);
         await Promise.all([loadCategoryTypes(), loadTaxonomyCategories()]);
       } catch (error) {
-        console.error('Failed to load collections', error);
+        console.error("Failed to load collections", error);
         if (mounted) {
           setCategories([]);
           setCollectionCategoryById({});
@@ -400,7 +634,9 @@ const EditProduct: React.FC = () => {
       }
     };
     void loadCollections();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [user?.id]);
 
   // Load product if editing
@@ -414,36 +650,51 @@ const EditProduct: React.FC = () => {
     const loadProduct = async () => {
       try {
         setLoading(true);
-        const product = await productApi.getProduct(productId, includeDeleted ? { includeDeleted: true } : undefined);
+        const product = await productApi.getProduct(
+          productId,
+          includeDeleted ? { includeDeleted: true } : undefined,
+        );
         if (!product || !mounted) return;
         const resolvedStatus = (() => {
-          const rawStatus = String((product as any).status || '').toUpperCase();
-          if (rawStatus === 'DRAFT' || rawStatus === 'ACTIVE' || rawStatus === 'ARCHIVED') {
-            return rawStatus as FormState['status'];
+          const rawStatus = String((product as any).status || "").toUpperCase();
+          if (
+            rawStatus === "DRAFT" ||
+            rawStatus === "ACTIVE" ||
+            rawStatus === "ARCHIVED"
+          ) {
+            return rawStatus as FormState["status"];
           }
-          if ((product as any).archivedAt) return 'ARCHIVED';
-          return (product as any).isActive === false ? 'DRAFT' : 'ACTIVE';
+          if ((product as any).archivedAt) return "ARCHIVED";
+          return (product as any).isActive === false ? "DRAFT" : "ACTIVE";
         })();
 
         // Track original price for change detection
         setOriginalPrice(product.price || 0);
 
         setForm({
-          title: product.title || product.name || '',
-          description: product.description || '',
-          categoryId: (product as any).collectionId || (product as any).collectionIds?.[0] || '',
-          taxonomyCategoryId: (product as any).categoryId || '',
-          categoryTypeId: (product as any).categoryTypeId || '',
+          title: product.title || product.name || "",
+          description: product.description || "",
+          categoryId:
+            (product as any).collectionId ||
+            (product as any).collectionIds?.[0] ||
+            "",
+          taxonomyCategoryId:
+            (product as any).categoryType?.categoryId ||
+            (product as any).categoryId ||
+            "",
+          categoryTypeId: (product as any).categoryTypeId || "",
           tags: product.tags || [],
           price: product.price || 0,
-          compareAtPrice: (product as any).salePrice || product.compareAtPrice || 0,
+          compareAtPrice:
+            (product as any).salePrice || product.compareAtPrice || 0,
           costPerItem: product.costPerItem || 0,
-          currency: (product as any)?.brand?.currency || product.currency || 'NGN',
-          sku: product.sku || '',
+          currency:
+            (product as any)?.brand?.currency || product.currency || "NGN",
+          sku: product.sku || "",
           weight: product.weight || 0,
-          weightUnit: product.weightUnit || 'kg',
-          materials: product.materials || '',
-          careInstructions: product.careInstructions || '',
+          weightUnit: product.weightUnit || "kg",
+          materials: product.materials || "",
+          careInstructions: product.careInstructions || "",
           returnsEligible: product.returnsEligible ?? true,
           sustainabilityClaim: product.sustainabilityClaim ?? false,
           trackInventory: product.trackInventory ?? true,
@@ -452,19 +703,26 @@ const EditProduct: React.FC = () => {
           lowStockThreshold: product.lowStockThreshold ?? 5,
           status: resolvedStatus,
           isPhysicalProduct: product.isPhysicalProduct ?? true,
-          customsRegion: product.customsRegion || 'NG',
-          onSale: Boolean(((product as any).salePrice ?? product.compareAtPrice) && ((product as any).salePrice ?? product.compareAtPrice) < product.price),
+          customsRegion: product.customsRegion || "NG",
+          onSale: Boolean(
+            ((product as any).salePrice ?? product.compareAtPrice) &&
+            ((product as any).salePrice ?? product.compareAtPrice) <
+              product.price,
+          ),
           mediaIds: product.mediaIds || [],
-          variants: (product.variants && product.variants.length)
-            ? product.variants
-            : (() => {
-                const sizeStock = (product as any).sizeStock as Record<string, number> | undefined;
-                if (!sizeStock) return [];
-                return Object.entries(sizeStock).map(([size, stock]) => ({
-                  size,
-                  stock: typeof stock === 'number' ? stock : 0,
-                })) as ProductVariant[];
-              })(),
+          variants:
+            product.variants && product.variants.length
+              ? product.variants
+              : (() => {
+                  const sizeStock = (product as any).sizeStock as
+                    | Record<string, number>
+                    | undefined;
+                  if (!sizeStock) return [];
+                  return Object.entries(sizeStock).map(([size, stock]) => ({
+                    size,
+                    stock: typeof stock === "number" ? stock : 0,
+                  })) as ProductVariant[];
+                })(),
         });
 
         // Set media for display - resolve signed URLs
@@ -473,16 +731,21 @@ const EditProduct: React.FC = () => {
             product.media.map(async (m) => {
               let signedUrl = m.url;
               // Check if URL needs signing (S3 reference without query params)
-              if (m.id && m.url && !m.url.includes('?') && (m.url.includes('s3') || !m.url.startsWith('http'))) {
+              if (
+                m.id &&
+                m.url &&
+                !m.url.includes("?") &&
+                (m.url.includes("s3") || !m.url.startsWith("http"))
+              ) {
                 try {
                   const signed = await brandApi.getSignedFileUrl(m.id);
                   if (signed) signedUrl = signed;
                 } catch (e) {
-                  console.warn('Failed to sign URL for media', m.id, e);
+                  console.warn("Failed to sign URL for media", m.id, e);
                 }
               }
               return { id: m.id, url: signedUrl, isPrimary: m.isPrimary };
-            })
+            }),
           );
           setMediaUrls(normalizePrimary(mediaWithSignedUrls));
         } else if (product.images?.length) {
@@ -494,73 +757,159 @@ const EditProduct: React.FC = () => {
           setMediaUrls(normalizePrimary(mapped));
         }
       } catch (error) {
-        console.error('Failed to load product', error);
-        toast.error('Failed to load product');
-        navigate('/studio/store');
+        console.error("Failed to load product", error);
+        toast.error("Failed to load product");
+        navigate("/studio/store");
       } finally {
         if (mounted) setLoading(false);
       }
     };
 
     void loadProduct();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [isEditMode, productId, navigate]);
 
   const selectedCollectionCategoryId = useMemo(
-    () => (form.categoryId ? collectionCategoryById[form.categoryId] : undefined),
+    () =>
+      form.categoryId ? collectionCategoryById[form.categoryId] : undefined,
     [collectionCategoryById, form.categoryId],
   );
 
   const availableCategoryTypes = useMemo(() => {
     if (!selectedCollectionCategoryId) return categoryTypes;
-    return categoryTypes.filter((categoryType) => categoryType.categoryId === selectedCollectionCategoryId);
+    return categoryTypes.filter(
+      (categoryType) =>
+        categoryType.categoryId === selectedCollectionCategoryId,
+    );
   }, [categoryTypes, selectedCollectionCategoryId]);
+
+  const selectedTaxonomyCategoryTypes = useMemo(() => {
+    if (!form.taxonomyCategoryId) return [];
+    const matched = taxonomyCategories.find(
+      (category) => category.id === form.taxonomyCategoryId,
+    );
+    if (matched?.types?.length) {
+      return matched.types;
+    }
+    return categoryTypes.filter(
+      (categoryType) => categoryType.categoryId === form.taxonomyCategoryId,
+    );
+  }, [categoryTypes, form.taxonomyCategoryId, taxonomyCategories]);
+
+  const categoryTypeParentById = useMemo(() => {
+    const map = new Map<string, string>();
+    categoryTypes.forEach((type) => {
+      if (type?.id && type?.categoryId) {
+        map.set(type.id, type.categoryId);
+      }
+    });
+    taxonomyCategories.forEach((category) => {
+      (category.types || []).forEach((type) => {
+        if (type?.id) {
+          map.set(type.id, category.id);
+        }
+      });
+    });
+    return map;
+  }, [categoryTypes, taxonomyCategories]);
+
+  const handleCollectionChange = useCallback(
+    (nextCollectionId: string) => {
+      const nextCollectionCategoryId = nextCollectionId
+        ? collectionCategoryById[nextCollectionId]
+        : undefined;
+
+      setForm((prev) => {
+        const next: FormState = { ...prev, categoryId: nextCollectionId };
+
+        if (nextCollectionCategoryId) {
+          next.taxonomyCategoryId = nextCollectionCategoryId;
+          const scopedTypes =
+            taxonomyCategories.find((c) => c.id === nextCollectionCategoryId)
+              ?.types ??
+            categoryTypes.filter((t) => t.categoryId === nextCollectionCategoryId);
+          if (
+            next.categoryTypeId &&
+            !scopedTypes.some((t) => t.id === next.categoryTypeId)
+          ) {
+            next.categoryTypeId = "";
+          }
+          return next;
+        }
+
+        if (nextCollectionId) {
+          // Collection has no category, so categoryType must not be carried forward.
+          next.categoryTypeId = "";
+        }
+        return next;
+      });
+      setHasChanges(true);
+
+      if (nextCollectionId && !nextCollectionCategoryId) {
+        toast.warning(
+          "Selected collection has no category. Sub-category was cleared.",
+        );
+      }
+    },
+    [categoryTypes, collectionCategoryById, taxonomyCategories],
+  );
 
   useEffect(() => {
     setForm((prev) => {
-      if (!prev.categoryId) {
-        if (
-          prev.categoryTypeId &&
-          categoryTypes.some((categoryType) => categoryType.id === prev.categoryTypeId)
-        ) {
-          return prev;
-        }
-        return { ...prev, categoryTypeId: categoryTypes[0]?.id ?? '' };
+      const scopedTypes = prev.taxonomyCategoryId
+        ? selectedTaxonomyCategoryTypes
+        : availableCategoryTypes.length > 0
+          ? availableCategoryTypes
+          : categoryTypes;
+
+      if (scopedTypes.length === 0) {
+        if (!prev.categoryTypeId) return prev;
+        return { ...prev, categoryTypeId: "" };
       }
+
       if (
         prev.categoryTypeId &&
-        availableCategoryTypes.some((categoryType) => categoryType.id === prev.categoryTypeId)
+        scopedTypes.some(
+          (categoryType) => categoryType.id === prev.categoryTypeId,
+        )
       ) {
         return prev;
       }
-      return { ...prev, categoryTypeId: availableCategoryTypes[0]?.id ?? '' };
+      return { ...prev, categoryTypeId: scopedTypes[0]?.id ?? "" };
     });
-  }, [availableCategoryTypes, categoryTypes]);
+  }, [availableCategoryTypes, categoryTypes, selectedTaxonomyCategoryTypes]);
 
   // =====================
   // Form Handlers
   // =====================
 
-  const updateForm = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
-    setForm(prev => ({ ...prev, [key]: value }));
-    setHasChanges(true);
-  }, []);
+  const updateForm = useCallback(
+    <K extends keyof FormState>(key: K, value: FormState[K]) => {
+      setForm((prev) => ({ ...prev, [key]: value }));
+      setHasChanges(true);
+    },
+    [],
+  );
 
   const addVariant = useCallback(() => {
     const next: ProductVariant = {
-      size: '',
-      color: '',
-      sku: '',
+      size: "",
+      color: "",
+      sku: "",
       price: undefined,
       stock: 0,
     };
-    updateForm('variants', [...form.variants, next]);
+    updateForm("variants", [...form.variants, next]);
   }, [form.variants, updateForm]);
 
   const updateVariant = useCallback(
     (index: number, patch: Partial<ProductVariant>) => {
-      const next = form.variants.map((v, i) => (i === index ? { ...v, ...patch } : v));
-      updateForm('variants', next);
+      const next = form.variants.map((v, i) =>
+        i === index ? { ...v, ...patch } : v,
+      );
+      updateForm("variants", next);
     },
     [form.variants, updateForm],
   );
@@ -568,7 +917,7 @@ const EditProduct: React.FC = () => {
   const removeVariant = useCallback(
     (index: number) => {
       const next = form.variants.filter((_, i) => i !== index);
-      updateForm('variants', next);
+      updateForm("variants", next);
     },
     [form.variants, updateForm],
   );
@@ -576,38 +925,57 @@ const EditProduct: React.FC = () => {
   const handleAddTag = useCallback(() => {
     const raw = tagInput.trim();
     if (!raw) return;
-    const cleaned = raw.replace(/#/g, '').trim();
+    const cleaned = raw.replace(/#/g, "").trim();
     if (!cleaned) return;
     if (!form.tags.includes(cleaned)) {
-      updateForm('tags', [...form.tags, cleaned]);
+      updateForm("tags", [...form.tags, cleaned]);
     }
-    setTagInput('');
+    setTagInput("");
   }, [tagInput, form.tags, updateForm]);
 
-  const handleRemoveTag = useCallback((tagToRemove: string) => {
-    updateForm('tags', form.tags.filter(t => t !== tagToRemove));
-  }, [form.tags, updateForm]);
+  const handleRemoveTag = useCallback(
+    (tagToRemove: string) => {
+      updateForm(
+        "tags",
+        form.tags.filter((t) => t !== tagToRemove),
+      );
+    },
+    [form.tags, updateForm],
+  );
 
-  const handleTagKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddTag();
-    }
-  }, [handleAddTag]);
+  const handleTagKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleAddTag();
+      }
+    },
+    [handleAddTag],
+  );
+
+  const toggleSection = useCallback(
+    (section: keyof typeof collapsedSections) => {
+      setCollapsedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+    },
+    [],
+  );
 
   // =====================
   // Save / Submit
   // =====================
 
-  const handleSave = useCallback(async (
-    asDraft = false,
-    options?: { forceStatus?: FormState['status'] },
-  ) => {
-    const forcedStatus = options?.forceStatus;
-    const effectiveDraft = forcedStatus ? forcedStatus === 'DRAFT' : asDraft;
-    const shouldValidatePublish = forcedStatus ? forcedStatus === 'ACTIVE' : !asDraft;
-    const hasDraftContent = Boolean(
-      form.title.trim() ||
+  const handleSave = useCallback(
+    async (
+      asDraft = false,
+      options?: { forceStatus?: FormState["status"] },
+    ) => {
+      const forcedStatus = options?.forceStatus;
+      const effectiveDraft = forcedStatus ? forcedStatus === "DRAFT" : asDraft;
+      const shouldValidatePublish = forcedStatus
+        ? forcedStatus === "ACTIVE"
+        : !asDraft;
+      const hasDraftContent = Boolean(
+        form.title.trim() ||
         form.description.trim() ||
         form.categoryId ||
         form.tags.length > 0 ||
@@ -620,187 +988,328 @@ const EditProduct: React.FC = () => {
         form.stock > 0 ||
         form.variants.length > 0 ||
         mediaUrls.length > 0 ||
-        pendingMediaFiles.length > 0
-    );
+        pendingMediaFiles.length > 0,
+      );
 
-    if (!shouldValidatePublish) {
-      if (!hasDraftContent) {
-        toast.error('Add at least one detail to save a draft');
-        return;
-      }
-      if (form.variants.length > 0) {
-        const invalid = form.variants.find((v) => Number.isNaN(Number(v.stock)) || v.stock < 0);
-        if (invalid) {
-          toast.error('Variant stock must be 0 or greater');
+      if (!shouldValidatePublish) {
+        if (!hasDraftContent) {
+          toast.error("Add at least one detail to save a draft");
           return;
         }
-      } else if (form.trackInventory && (Number.isNaN(Number(form.stock)) || form.stock < 0)) {
-        toast.error('Stock must be 0 or greater');
-        return;
-      }
-    } else {
-      // Validation for published products
-      if (!form.title.trim()) {
-        toast.error('Please enter a product title');
-        return;
-      }
-      if (form.categoryId && !form.categoryTypeId) {
-        toast.error('Please select a category type for the selected collection.');
-        return;
-      }
-      if (form.price <= 0) {
-        toast.error('Please enter a valid price');
-        return;
-      }
-      if (form.onSale && form.compareAtPrice > 0 && form.compareAtPrice >= form.price) {
-        toast.error('Sale price must be less than the price');
-        return;
-      }
-      if (form.variants.length > 0) {
-        if (hasDuplicateVariants) {
-          toast.error('Please remove duplicate variant options (same size/color)');
-          return;
-        }
-        const invalid = form.variants.find((v) => Number.isNaN(Number(v.stock)) || v.stock < 0);
-        if (invalid) {
-          toast.error('Variant stock must be 0 or greater');
+        if (form.variants.length > 0) {
+          const invalid = form.variants.find(
+            (v) => Number.isNaN(Number(v.stock)) || v.stock < 0,
+          );
+          if (invalid) {
+            toast.error("Variant stock must be 0 or greater");
+            return;
+          }
+        } else if (
+          form.trackInventory &&
+          (Number.isNaN(Number(form.stock)) || form.stock < 0)
+        ) {
+          toast.error("Stock must be 0 or greater");
           return;
         }
       } else {
-        if (form.trackInventory && (Number.isNaN(Number(form.stock)) || form.stock < 0)) {
-          toast.error('Stock must be 0 or greater');
+        // Validation for published products
+        if (!form.title.trim()) {
+          toast.error("Please enter a product title");
           return;
         }
+        if (
+          form.categoryId &&
+          collectionCategoryById[form.categoryId] &&
+          !form.categoryTypeId
+        ) {
+          toast.error(
+            "Please select a category type for the selected collection.",
+          );
+          return;
+        }
+        if (form.price <= 0) {
+          toast.error("Please enter a valid price");
+          return;
+        }
+        if (
+          form.onSale &&
+          form.compareAtPrice > 0 &&
+          form.compareAtPrice >= form.price
+        ) {
+          toast.error("Sale price must be less than the price");
+          return;
+        }
+        if (form.variants.length > 0) {
+          if (hasDuplicateVariants) {
+            toast.error(
+              "Please remove duplicate variant options (same size/color)",
+            );
+            return;
+          }
+          const invalid = form.variants.find(
+            (v) => Number.isNaN(Number(v.stock)) || v.stock < 0,
+          );
+          if (invalid) {
+            toast.error("Variant stock must be 0 or greater");
+            return;
+          }
+        } else {
+          if (
+            form.trackInventory &&
+            (Number.isNaN(Number(form.stock)) || form.stock < 0)
+          ) {
+            toast.error("Stock must be 0 or greater");
+            return;
+          }
+        }
       }
-    }
 
-    const mediaValidation = validateMedia(mediaUrls, maxMediaCount);
-    if (!mediaValidation.ok) {
-      toast.error(mediaValidation.error || 'Please review your media selection');
-      return;
-    }
+      const mediaValidation = validateMedia(mediaUrls, maxMediaCount);
+      if (!mediaValidation.ok) {
+        toast.error(
+          mediaValidation.error || "Please review your media selection",
+        );
+        return;
+      }
 
-    // Check if price changed in edit mode - show preview before saving
-    if (isEditMode && productId && originalPrice !== null && form.price !== originalPrice && !showPricePreview) {
+      // Check if price changed in edit mode - show preview before saving
+      if (
+        isEditMode &&
+        productId &&
+        originalPrice !== null &&
+        form.price !== originalPrice &&
+        !showPricePreview
+      ) {
+        try {
+          const preview = await getProductPriceChangePreview(
+            productId,
+            form.price,
+          );
+          if (preview.affectedCollections.length > 0) {
+            setPricePreviewData({
+              affectedCollections: preview.affectedCollections,
+              productName: form.title || "This product",
+              oldPrice: originalPrice,
+              newPrice: form.price,
+            });
+            setPendingSaveDraft(effectiveDraft);
+            setPendingStatusOverride(forcedStatus ?? null);
+            setShowPricePreview(true);
+            return; // Wait for user confirmation
+          }
+        } catch (e) {
+          // If preview fails, proceed with save anyway
+          console.warn("Failed to load price change preview", e);
+        }
+      }
+
+      if (isCollectionFlow && !collectionContextId) {
+        toast.error(
+          "Missing collection context. Please return to the collection builder and try again.",
+        );
+        return;
+      }
+
+      const selectedCollectionId = isCollectionFlow
+        ? collectionContextId || undefined
+        : form.categoryId || undefined;
+      const selectedCollectionCategory = selectedCollectionId
+        ? collectionCategoryById[selectedCollectionId]
+        : undefined;
+      const selectedTypeParentCategory = form.categoryTypeId
+        ? categoryTypeParentById.get(form.categoryTypeId)
+        : undefined;
+
+      if (selectedCollectionId && !selectedCollectionCategory) {
+        toast.error(
+          "Selected collection has no category. Update that collection category first or choose no collection.",
+        );
+        return;
+      }
+
+      if (
+        selectedCollectionId &&
+        selectedCollectionCategory &&
+        selectedTypeParentCategory &&
+        selectedTypeParentCategory !== selectedCollectionCategory
+      ) {
+        toast.error(
+          "Selected sub-category does not belong to the selected collection category.",
+        );
+        return;
+      }
+
+      const payloadCategoryTypeId =
+        selectedCollectionId && !selectedCollectionCategory
+          ? undefined
+          : form.categoryTypeId || undefined;
+
+      setSaving(true);
       try {
-        const preview = await getProductPriceChangePreview(productId, form.price);
-        if (preview.affectedCollections.length > 0) {
-          setPricePreviewData({
-            affectedCollections: preview.affectedCollections,
-            productName: form.title || 'This product',
-            oldPrice: originalPrice,
-            newPrice: form.price,
+        const ensuredSku =
+          form.sku?.trim() ||
+          buildBaseSku({
+            brandInitials: brandInitialsFromProfile(user),
+            title: form.title,
           });
-          setPendingSaveDraft(effectiveDraft);
-          setPendingStatusOverride(forcedStatus ?? null);
-          setShowPricePreview(true);
-          return; // Wait for user confirmation
-        }
-      } catch (e) {
-        // If preview fails, proceed with save anyway
-        console.warn('Failed to load price change preview', e);
-      }
-    }
+        const resolvedCustomsRegion = await syncShippingRegions();
 
-    if (isCollectionFlow && !collectionContextId) {
-      toast.error('Missing collection context. Please return to the collection builder and try again.');
-      return;
-    }
+        const payload: ProductCreateDto = {
+          title: effectiveDraft
+            ? form.title.trim() || "Untitled Draft"
+            : form.title.trim(),
+          description: form.description.trim() || undefined,
+          collectionId: selectedCollectionId,
+          categoryTypeId: payloadCategoryTypeId,
+          tags: form.tags,
+          price: effectiveDraft
+            ? form.price > 0
+              ? form.price
+              : 0
+            : form.price,
+          compareAtPrice:
+            form.onSale && form.compareAtPrice > 0
+              ? form.compareAtPrice
+              : undefined,
+          costPerItem: form.costPerItem || undefined,
+          currency: form.currency,
+          sku: ensuredSku,
+          weight: form.weight || undefined,
+          weightUnit: form.weightUnit,
+          materials: form.materials || undefined,
+          careInstructions: form.careInstructions || undefined,
+          returnsEligible: form.returnsEligible,
+          sustainabilityClaim: form.sustainabilityClaim,
+          trackInventory: form.trackInventory,
+          allowBackorders: form.allowBackorders,
+          stock: form.variants.length > 0 ? variantTotalStock : form.stock,
+          lowStockThreshold: form.lowStockThreshold,
+          status: forcedStatus ?? (effectiveDraft ? "DRAFT" : form.status),
+          isPhysicalProduct: form.isPhysicalProduct,
+          customsRegion: resolvedCustomsRegion,
+          mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
+          variants:
+            form.variants.length > 0
+              ? form.variants.map((v, idx) => ({
+                  ...v,
+                  size: v.size?.trim() || undefined,
+                  color: v.color?.trim() || undefined,
+                  sku:
+                    (
+                      v.sku?.trim() || buildVariantSku(ensuredSku, v, idx)
+                    ).trim() || undefined,
+                  price:
+                    typeof v.price === "number" && v.price > 0
+                      ? v.price
+                      : undefined,
+                  stock: Number.isFinite(v.stock) ? v.stock : 0,
+                }))
+              : undefined,
+        };
 
-    setSaving(true);
-    try {
-      const ensuredSku = form.sku?.trim() || buildBaseSku({ brandInitials: brandInitialsFromProfile(user), title: form.title });
+        if (isEditMode && productId) {
+          await productApi.updateProduct(productId, payload);
+          toast.success(
+            isCollectionContext
+              ? "Product updated for this collection."
+              : "Product updated successfully",
+          );
+          if (returnTo && isCollectionContext) {
+            navigate(returnTo);
+            return;
+          }
+        } else {
+          const created = await productApi.createProduct(payload);
 
-      const payload: ProductCreateDto = {
-        title: effectiveDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
-        description: form.description.trim() || undefined,
-        collectionId: isCollectionFlow ? (collectionContextId || undefined) : form.categoryId || undefined,
-        categoryId: form.taxonomyCategoryId || undefined,
-        categoryTypeId: form.categoryTypeId || undefined,
-        tags: form.tags,
-        price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
-        compareAtPrice: form.onSale && form.compareAtPrice > 0 ? form.compareAtPrice : undefined,
-        costPerItem: form.costPerItem || undefined,
-        currency: form.currency,
-        sku: ensuredSku,
-        weight: form.weight || undefined,
-        weightUnit: form.weightUnit,
-        materials: form.materials || undefined,
-        careInstructions: form.careInstructions || undefined,
-        returnsEligible: form.returnsEligible,
-        sustainabilityClaim: form.sustainabilityClaim,
-        trackInventory: form.trackInventory,
-        allowBackorders: form.allowBackorders,
-        stock: form.variants.length > 0 ? variantTotalStock : form.stock,
-        lowStockThreshold: form.lowStockThreshold,
-        status: forcedStatus ?? (effectiveDraft ? 'DRAFT' : form.status),
-        isPhysicalProduct: form.isPhysicalProduct,
-        customsRegion: form.customsRegion || undefined,
-        mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
-        variants: form.variants.length > 0
-          ? form.variants.map((v, idx) => ({
-              ...v,
-              size: v.size?.trim() || undefined,
-              color: v.color?.trim() || undefined,
-              sku: (v.sku?.trim() || buildVariantSku(ensuredSku, v, idx)).trim() || undefined,
-              price: typeof v.price === 'number' && v.price > 0 ? v.price : undefined,
-              stock: Number.isFinite(v.stock) ? v.stock : 0,
-            }))
-          : undefined,
-      };
+          // Upload pending media after we have a product id
+          if (pendingMediaFiles.length > 0) {
+            const pendingById = new Map(
+              pendingMediaFiles.map((p) => [p.tempId, p]),
+            );
+            const orderedPending = mediaUrls
+              .map((m) => pendingById.get(m.id))
+              .filter(Boolean)
+              .map((p) => ({
+                ...(p as {
+                  id: string;
+                  tempId: string;
+                  file: File;
+                  previewUrl: string;
+                  isPrimary: boolean;
+                }),
+                id:
+                  (p as { id: string }).id || (p as { tempId: string }).tempId,
+              }));
+            const uploads = normalizePrimary(orderedPending);
 
-      if (isEditMode && productId) {
-        await productApi.updateProduct(productId, payload);
-        toast.success(isCollectionContext ? 'Product updated for this collection.' : 'Product updated successfully');
-        if (returnTo && isCollectionContext) {
-          navigate(returnTo);
-          return;
-        }
-      } else {
-        const created = await productApi.createProduct(payload);
+            const uploadedIds: string[] = [];
+            for (const u of uploads) {
+              const uploaded = await productApi.uploadProductMedia(
+                created.id,
+                u.file,
+                u.isPrimary,
+              );
+              uploadedIds.push(uploaded.id);
+            }
 
-        // Upload pending media after we have a product id
-        if (pendingMediaFiles.length > 0) {
-          const pendingById = new Map(pendingMediaFiles.map((p) => [p.tempId, p]));
-          const orderedPending = mediaUrls
-            .map((m) => pendingById.get(m.id))
-            .filter(Boolean)
-            .map((p) => ({ ...(p as { id: string; tempId: string; file: File; previewUrl: string; isPrimary: boolean }), id: (p as { id: string }).id || (p as { tempId: string }).tempId }));
-          const uploads = normalizePrimary(orderedPending);
-
-          const uploadedIds: string[] = [];
-          for (const u of uploads) {
-            const uploaded = await productApi.uploadProductMedia(created.id, u.file, u.isPrimary);
-            uploadedIds.push(uploaded.id);
+            if (uploadedIds.length > 0) {
+              await productApi.updateProduct(created.id, {
+                mediaIds: uploadedIds,
+              });
+            }
           }
 
-          if (uploadedIds.length > 0) {
-            await productApi.updateProduct(created.id, { mediaIds: uploadedIds });
+          const successMessage = isCollectionContext
+            ? "Product added to collection."
+            : effectiveDraft
+              ? "Draft saved successfully"
+              : "Product created successfully";
+          toast.success(successMessage);
+          if (returnTo && returnContext === "collection") {
+            const joiner = returnTo.includes("?") ? "&" : "?";
+            navigate(`${returnTo}${joiner}productId=${created.id}`);
+            return;
           }
         }
 
-        const successMessage = isCollectionContext
-          ? 'Product added to collection.'
-          : effectiveDraft
-            ? 'Draft saved successfully'
-            : 'Product created successfully';
-        toast.success(successMessage);
-        if (returnTo && returnContext === 'collection') {
-          const joiner = returnTo.includes('?') ? '&' : '?';
-          navigate(`${returnTo}${joiner}productId=${created.id}`);
+        setHasChanges(false);
+        navigate("/studio/store");
+      } catch (error: any) {
+        if (error?.message === "MISSING_SHIPPING_REGION") {
+          toast.error("Select at least one shipping country for this product.");
           return;
         }
+        const message =
+          error?.response?.data?.message ||
+          "Failed to save product. Shipping policy may not have been saved.";
+        toast.error(message);
+      } finally {
+        setSaving(false);
       }
-
-      setHasChanges(false);
-      navigate('/studio/store');
-    } catch (error: any) {
-      const message = error?.response?.data?.message || 'Failed to save product';
-      toast.error(message);
-    } finally {
-      setSaving(false);
-    }
-  }, [form, hasDuplicateVariants, isEditMode, isCollectionFlow, isCollectionContext, collectionContextId, maxMediaCount, mediaUrls, navigate, pendingMediaFiles, productId, variantTotalStock, originalPrice, showPricePreview, returnContext, returnTo]);
+    },
+    [
+      form,
+      hasDuplicateVariants,
+      isEditMode,
+      isCollectionFlow,
+      isCollectionContext,
+      collectionCategoryById,
+      collectionContextId,
+      categoryTypeParentById,
+      maxMediaCount,
+      mediaUrls,
+      navigate,
+      pendingMediaFiles,
+      productId,
+      variantTotalStock,
+      originalPrice,
+      showPricePreview,
+      returnContext,
+      returnTo,
+      syncShippingRegions,
+      user,
+    ],
+  );
 
   const handlePriceChangeConfirm = useCallback(async () => {
     setShowPricePreview(false);
@@ -808,20 +1317,67 @@ const EditProduct: React.FC = () => {
     setSaving(true);
     try {
       const effectiveDraft = pendingStatusOverride
-        ? pendingStatusOverride === 'DRAFT'
+        ? pendingStatusOverride === "DRAFT"
         : pendingSaveDraft;
-      const statusToPersist = pendingStatusOverride ?? (effectiveDraft ? 'DRAFT' : form.status);
-      const ensuredSku = form.sku?.trim() || buildBaseSku({ brandInitials: brandInitialsFromProfile(user), title: form.title });
+      const statusToPersist =
+        pendingStatusOverride ?? (effectiveDraft ? "DRAFT" : form.status);
+      const ensuredSku =
+        form.sku?.trim() ||
+        buildBaseSku({
+          brandInitials: brandInitialsFromProfile(user),
+          title: form.title,
+        });
+
+      const selectedCollectionId = isCollectionFlow
+        ? collectionContextId || undefined
+        : form.categoryId || undefined;
+      const selectedCollectionCategory = selectedCollectionId
+        ? collectionCategoryById[selectedCollectionId]
+        : undefined;
+      const selectedTypeParentCategory = form.categoryTypeId
+        ? categoryTypeParentById.get(form.categoryTypeId)
+        : undefined;
+
+      if (selectedCollectionId && !selectedCollectionCategory) {
+        toast.error(
+          "Selected collection has no category. Update that collection category first or choose no collection.",
+        );
+        setSaving(false);
+        return;
+      }
+
+      if (
+        selectedCollectionId &&
+        selectedCollectionCategory &&
+        selectedTypeParentCategory &&
+        selectedTypeParentCategory !== selectedCollectionCategory
+      ) {
+        toast.error(
+          "Selected sub-category does not belong to the selected collection category.",
+        );
+        setSaving(false);
+        return;
+      }
+
+      const payloadCategoryTypeId =
+        selectedCollectionId && !selectedCollectionCategory
+          ? undefined
+          : form.categoryTypeId || undefined;
+      const resolvedCustomsRegion = await syncShippingRegions();
 
       const payload: ProductCreateDto = {
-        title: effectiveDraft ? (form.title.trim() || 'Untitled Draft') : form.title.trim(),
+        title: effectiveDraft
+          ? form.title.trim() || "Untitled Draft"
+          : form.title.trim(),
         description: form.description.trim() || undefined,
-        collectionId: form.categoryId || undefined,
-        categoryId: form.taxonomyCategoryId || undefined,
-        categoryTypeId: form.categoryTypeId || undefined,
+        collectionId: selectedCollectionId,
+        categoryTypeId: payloadCategoryTypeId,
         tags: form.tags,
         price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
-        compareAtPrice: form.onSale && form.compareAtPrice > 0 ? form.compareAtPrice : undefined,
+        compareAtPrice:
+          form.onSale && form.compareAtPrice > 0
+            ? form.compareAtPrice
+            : undefined,
         costPerItem: form.costPerItem || undefined,
         currency: form.currency,
         sku: ensuredSku,
@@ -837,57 +1393,94 @@ const EditProduct: React.FC = () => {
         lowStockThreshold: form.lowStockThreshold,
         status: statusToPersist,
         isPhysicalProduct: form.isPhysicalProduct,
-        customsRegion: form.customsRegion || undefined,
+        customsRegion: resolvedCustomsRegion,
         mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
-        variants: form.variants.length > 0
-          ? form.variants.map((v, idx) => ({
-              ...v,
-              size: v.size?.trim() || undefined,
-              color: v.color?.trim() || undefined,
-              sku: (v.sku?.trim() || buildVariantSku(ensuredSku, v, idx)).trim() || undefined,
-              price: typeof v.price === 'number' && v.price > 0 ? v.price : undefined,
-              stock: Number.isFinite(v.stock) ? v.stock : 0,
-            }))
-          : undefined,
+        variants:
+          form.variants.length > 0
+            ? form.variants.map((v, idx) => ({
+                ...v,
+                size: v.size?.trim() || undefined,
+                color: v.color?.trim() || undefined,
+                sku:
+                  (
+                    v.sku?.trim() || buildVariantSku(ensuredSku, v, idx)
+                  ).trim() || undefined,
+                price:
+                  typeof v.price === "number" && v.price > 0
+                    ? v.price
+                    : undefined,
+                stock: Number.isFinite(v.stock) ? v.stock : 0,
+              }))
+            : undefined,
       };
 
       await productApi.updateProduct(productId!, payload);
-      toast.success('Product updated successfully');
+      toast.success("Product updated successfully");
       setOriginalPrice(form.price); // Update tracked price
       setHasChanges(false);
       if (returnTo && isCollectionContext) {
         navigate(returnTo);
         return;
       }
-      navigate('/studio/store');
+      navigate("/studio/store");
     } catch (error: any) {
-      const message = error?.response?.data?.message || 'Failed to save product';
+      if (error?.message === "MISSING_SHIPPING_REGION") {
+        toast.error("Select at least one shipping country for this product.");
+        return;
+      }
+      const message =
+        error?.response?.data?.message ||
+        "Failed to save product. Shipping policy may not have been saved.";
       toast.error(message);
     } finally {
       setSaving(false);
       setPendingSaveDraft(false);
       setPendingStatusOverride(null);
     }
-  }, [form, user, pendingSaveDraft, pendingStatusOverride, variantTotalStock, productId, navigate, isCollectionContext, returnTo]);
+  }, [
+    form,
+    user,
+    isCollectionFlow,
+    collectionContextId,
+    collectionCategoryById,
+    categoryTypeParentById,
+    pendingSaveDraft,
+    pendingStatusOverride,
+    variantTotalStock,
+    productId,
+    navigate,
+    isCollectionContext,
+    returnTo,
+    syncShippingRegions,
+  ]);
 
-  const triggerSave = useCallback(async (
-    asDraft: boolean,
-    options: { action: 'draft' | 'publish'; forceStatus?: FormState['status'] },
-  ) => {
-    setSaveAction(options.action);
-    try {
-      await handleSave(asDraft, { forceStatus: options.forceStatus });
-    } finally {
-      setSaveAction(null);
-    }
-  }, [handleSave]);
+  const triggerSave = useCallback(
+    async (
+      asDraft: boolean,
+      options: {
+        action: "draft" | "publish";
+        forceStatus?: FormState["status"];
+      },
+    ) => {
+      setSaveAction(options.action);
+      try {
+        await handleSave(asDraft, { forceStatus: options.forceStatus });
+      } finally {
+        setSaveAction(null);
+      }
+    },
+    [handleSave],
+  );
 
   // Auto-generate SKU (product + variants). Users shouldn't type SKUs manually.
   useEffect(() => {
     if (!user) return;
     if (!form.title.trim()) return;
     if (form.sku && form.sku.trim()) return;
-    const nextSku = buildBaseSku({ brandInitials: brandInitialsFromProfile(user), title: form.title });
+    const nextSku = buildBaseSku({
+      brandInitials: brandInitialsFromProfile(user),
+      title: form.title,
+    });
     setForm((prev) => ({ ...prev, sku: nextSku }));
   }, [user, form.title, form.sku]);
 
@@ -902,14 +1495,24 @@ const EditProduct: React.FC = () => {
     });
 
     // Avoid setState loops
-    const changed = nextVariants.some((v, idx) => (v.sku ?? '') !== (form.variants[idx]?.sku ?? ''));
+    const changed = nextVariants.some(
+      (v, idx) => (v.sku ?? "") !== (form.variants[idx]?.sku ?? ""),
+    );
     if (changed) {
       setForm((prev) => ({ ...prev, variants: nextVariants }));
     }
   }, [form.sku, form.variants]);
 
   const normalizePending = useCallback(
-    (items: Array<{ id: string; tempId: string; file: File; previewUrl: string; isPrimary: boolean }>) => {
+    (
+      items: Array<{
+        id: string;
+        tempId: string;
+        file: File;
+        previewUrl: string;
+        isPrimary: boolean;
+      }>,
+    ) => {
       return normalizePrimary(items);
     },
     [],
@@ -942,7 +1545,12 @@ const EditProduct: React.FC = () => {
       setPendingMediaFiles((prev) => {
         const merged = [...prev, ...nextPending];
         if (makePrimary && nextPending[0]) {
-          return normalizePending(merged.map((m) => ({ ...m, isPrimary: m.tempId === nextPending[0].tempId })));
+          return normalizePending(
+            merged.map((m) => ({
+              ...m,
+              isPrimary: m.tempId === nextPending[0].tempId,
+            })),
+          );
         }
         return normalizePending(merged);
       });
@@ -963,9 +1571,13 @@ const EditProduct: React.FC = () => {
     [mediaUrls.length, normalizePending],
   );
 
-  const handleMediaFilesSelected: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
-    const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/'));
-    e.target.value = '';
+  const handleMediaFilesSelected: React.ChangeEventHandler<
+    HTMLInputElement
+  > = async (e) => {
+    const files = Array.from(e.target.files ?? []).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    e.target.value = "";
     if (!files.length) return;
 
     if (!canAddMoreMedia) {
@@ -980,20 +1592,31 @@ const EditProduct: React.FC = () => {
       for (const [index, file] of uploadQueue.entries()) {
         try {
           const makePrimary = shouldMakePrimary && index === 0;
-          const uploaded = await productApi.uploadProductMedia(productId, file, makePrimary);
+          const uploaded = await productApi.uploadProductMedia(
+            productId,
+            file,
+            makePrimary,
+          );
           setMediaUrls((prev) => {
-            const next = [...prev, { id: uploaded.id, url: uploaded.url, isPrimary: makePrimary }];
+            const next = [
+              ...prev,
+              { id: uploaded.id, url: uploaded.url, isPrimary: makePrimary },
+            ];
             const normalized = normalizePrimary(next);
             updateForm(
-              'mediaIds',
-              normalized.map((m) => m.id).filter((id) => !id.startsWith('pending-')),
+              "mediaIds",
+              normalized
+                .map((m) => m.id)
+                .filter((id) => !id.startsWith("pending-")),
             );
             return normalized;
           });
-          toast.success(makePrimary ? 'Cover image uploaded' : 'Image uploaded');
+          toast.success(
+            makePrimary ? "Cover image uploaded" : "Image uploaded",
+          );
         } catch (err) {
-          console.error('Upload failed', err);
-          toast.error('Failed to upload image');
+          console.error("Upload failed", err);
+          toast.error("Failed to upload image");
         }
       }
       return;
@@ -1007,14 +1630,18 @@ const EditProduct: React.FC = () => {
     async (mediaId: string) => {
       if (!mediaId) return;
       setMediaUrls((prev) => normalizePrimary(setPrimary(prev, mediaId)));
-      setPendingMediaFiles((prev) => normalizePending(prev.map((p) => ({ ...p, isPrimary: p.tempId === mediaId }))));
+      setPendingMediaFiles((prev) =>
+        normalizePending(
+          prev.map((p) => ({ ...p, isPrimary: p.tempId === mediaId })),
+        ),
+      );
 
-      if (isEditMode && productId && !mediaId.startsWith('pending-')) {
+      if (isEditMode && productId && !mediaId.startsWith("pending-")) {
         try {
           await productApi.setPrimaryMedia(productId, mediaId);
-          toast.success('Cover image updated');
+          toast.success("Cover image updated");
         } catch (error) {
-          toast.error('Failed to update cover image');
+          toast.error("Failed to update cover image");
         }
       }
     },
@@ -1032,26 +1659,37 @@ const EditProduct: React.FC = () => {
         pendingPreviewUrlsRef.current.delete(pendingTarget.tempId);
       }
 
-      const nextMedia = normalizePrimary(mediaUrls.filter((m) => m.id !== mediaId));
+      const nextMedia = normalizePrimary(
+        mediaUrls.filter((m) => m.id !== mediaId),
+      );
       setMediaUrls(nextMedia);
       setPendingMediaFiles((prev) => prev.filter((p) => p.tempId !== mediaId));
 
-      if (isEditMode && productId && !mediaId.startsWith('pending-')) {
+      if (isEditMode && productId && !mediaId.startsWith("pending-")) {
         try {
           await productApi.deleteProductMedia(productId, mediaId);
-          const orderedIds = nextMedia.map((m) => m.id).filter((id) => !id.startsWith('pending-'));
-          updateForm('mediaIds', orderedIds);
+          const orderedIds = nextMedia
+            .map((m) => m.id)
+            .filter((id) => !id.startsWith("pending-"));
+          updateForm("mediaIds", orderedIds);
           if (target.isPrimary && orderedIds[0]) {
             await productApi.setPrimaryMedia(productId, orderedIds[0]);
           }
-          toast.success('Image deleted');
+          toast.success("Image deleted");
         } catch (error) {
-          toast.error('Failed to delete image');
+          toast.error("Failed to delete image");
           setMediaUrls((prev) => normalizePrimary([...prev, target]));
         }
       }
     },
-    [isEditMode, mediaUrls, pendingMediaFiles, productId, revokeBlobUrl, updateForm],
+    [
+      isEditMode,
+      mediaUrls,
+      pendingMediaFiles,
+      productId,
+      revokeBlobUrl,
+      updateForm,
+    ],
   );
 
   const handleReorderMedia = useCallback(
@@ -1063,16 +1701,20 @@ const EditProduct: React.FC = () => {
       setPendingMediaFiles((prev) => {
         if (!prev.length) return prev;
         const byId = new Map(prev.map((p) => [p.tempId, p]));
-        return nextMedia.map((m) => byId.get(m.id)).filter(Boolean) as typeof prev;
+        return nextMedia
+          .map((m) => byId.get(m.id))
+          .filter(Boolean) as typeof prev;
       });
 
-      const orderedIds = nextMedia.map((m) => m.id).filter((id) => !id.startsWith('pending-'));
+      const orderedIds = nextMedia
+        .map((m) => m.id)
+        .filter((id) => !id.startsWith("pending-"));
       if (isEditMode && productId && orderedIds.length > 0) {
         try {
           await productApi.reorderProductMedia(productId, orderedIds);
-          updateForm('mediaIds', orderedIds);
+          updateForm("mediaIds", orderedIds);
         } catch (error) {
-          toast.error('Failed to reorder images');
+          toast.error("Failed to reorder images");
         }
       }
     },
@@ -1083,10 +1725,10 @@ const EditProduct: React.FC = () => {
     if (!productId) return;
     try {
       const duplicated = await productApi.duplicateProduct(productId);
-      toast.success('Product duplicated');
+      toast.success("Product duplicated");
       navigate(`/studio/store/products/${duplicated.id}/edit`);
     } catch (error) {
-      toast.error('Failed to duplicate product');
+      toast.error("Failed to duplicate product");
     }
   }, [productId, navigate]);
 
@@ -1094,29 +1736,29 @@ const EditProduct: React.FC = () => {
     if (!productId) return;
     try {
       await productApi.archiveProduct(productId);
-      toast.success('Product archived');
-      navigate('/studio/store');
+      toast.success("Product archived");
+      navigate("/studio/store");
     } catch (error) {
-      toast.error('Failed to archive product');
+      toast.error("Failed to archive product");
     }
   }, [productId, navigate]);
 
   const handleDelete = useCallback(async () => {
     if (!productId) return;
     const approved = await confirm({
-      title: 'Delete product?',
-      message: 'This action cannot be undone.',
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      title: "Delete product?",
+      message: "This action cannot be undone.",
+      confirmText: "Delete",
+      cancelText: "Cancel",
       isDestructive: true,
     });
     if (!approved) return;
     try {
       await productApi.deleteProduct(productId);
-      toast.success('Product deleted');
-      navigate('/studio/store');
+      toast.success("Product deleted");
+      navigate("/studio/store");
     } catch (error) {
-      toast.error('Failed to delete product');
+      toast.error("Failed to delete product");
     }
   }, [confirm, productId, navigate]);
 
@@ -1159,11 +1801,10 @@ const EditProduct: React.FC = () => {
   // =====================
   // Render
   // =====================
-  const isDraftEditMode = isEditMode && form.status === 'DRAFT';
+  const isDraftEditMode = isEditMode && form.status === "DRAFT";
 
   return (
     <div className="flex flex-col min-h-full bg-transparent text-gray-900 dark:text-[#e5e5e5] font-sans">
-
       {/* Main Content Area */}
       <main className="flex-1 w-full max-w-7xl mx-auto p-6">
         <div className="mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -1172,25 +1813,27 @@ const EditProduct: React.FC = () => {
               {isCollectionContext ? (
                 <>
                   <button
-                    onClick={() => navigate('/studio/store/collections')}
+                    onClick={() => navigate("/studio/store/collections")}
                     className="hover:text-gray-900 dark:hover:text-white transition-colors flex items-center"
                   >
                     <ArrowLeft className="w-3 h-3 mr-1" /> Collections
                   </button>
                   <span>/</span>
                   <button
-                    onClick={() => navigate(returnTo || '/studio/store/collections/new')}
+                    onClick={() =>
+                      navigate(returnTo || "/studio/store/collections/new")
+                    }
                     className="hover:text-gray-900 dark:hover:text-white transition-colors"
                   >
                     Create Collection
                   </button>
                   <span>/</span>
-                  <span>{isEditMode ? 'Edit Product' : 'Add Product'}</span>
+                  <span>{isEditMode ? "Edit Product" : "Add Product"}</span>
                 </>
               ) : (
                 <>
                   <button
-                    onClick={() => navigate('/studio/store')}
+                    onClick={() => navigate("/studio/store")}
                     className="hover:text-gray-900 dark:hover:text-white transition-colors flex items-center"
                   >
                     <ArrowLeft className="w-3 h-3 mr-1" /> Products
@@ -1209,19 +1852,29 @@ const EditProduct: React.FC = () => {
               )}
               {isEditMode && (
                 <div className="relative group">
-                  <button 
+                  <button
                     className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      form.status === 'ACTIVE' 
-                        ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 hover:bg-green-500/20'
-                        : form.status === 'DRAFT'
-                        ? 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20 hover:bg-gray-500/20'
-                        : 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20 hover:bg-orange-500/20'
+                      form.status === "ACTIVE"
+                        ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 hover:bg-green-500/20"
+                        : form.status === "DRAFT"
+                          ? "bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20 hover:bg-gray-500/20"
+                          : "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20 hover:bg-orange-500/20"
                     }`}
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      form.status === 'ACTIVE' ? 'bg-green-500' : form.status === 'DRAFT' ? 'bg-gray-400' : 'bg-orange-500'
-                    }`} />
-                    {form.status === 'ACTIVE' ? 'Active' : form.status === 'DRAFT' ? 'Draft' : 'Archived'}
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        form.status === "ACTIVE"
+                          ? "bg-green-500"
+                          : form.status === "DRAFT"
+                            ? "bg-gray-400"
+                            : "bg-orange-500"
+                      }`}
+                    />
+                    {form.status === "ACTIVE"
+                      ? "Active"
+                      : form.status === "DRAFT"
+                        ? "Draft"
+                        : "Archived"}
                     <ChevronDown className="w-3 h-3" />
                   </button>
                 </div>
@@ -1229,22 +1882,23 @@ const EditProduct: React.FC = () => {
             </div>
           </div>
 
-
           <div className="flex items-center gap-3 w-full md:w-auto justify-end">
             {/* Action buttons removed - duplicate/archive/delete should be done from Store page */}
           </div>
         </div>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
           {/* LEFT COLUMN: Media (42% approx -> 5 cols) */}
           <div className="lg:col-span-5 space-y-6">
-              
             {/* Media Gallery */}
             <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-white">Media</h3>
-                <span className="text-xs text-gray-500 dark:text-gray-400">{mediaUrls.length} of {maxMediaCount} used</span>
+                <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                  Media
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {mediaUrls.length} of {maxMediaCount} used
+                </span>
               </div>
 
               <input
@@ -1286,7 +1940,9 @@ const EditProduct: React.FC = () => {
                           {!mediaUrls[carouselIndex].isPrimary && (
                             <button
                               type="button"
-                              onClick={() => handleSetCover(mediaUrls[carouselIndex].id)}
+                              onClick={() =>
+                                handleSetCover(mediaUrls[carouselIndex].id)
+                              }
                               className="px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white text-sm font-medium flex items-center gap-1.5"
                               title="Set this image as the product cover"
                             >
@@ -1314,7 +1970,9 @@ const EditProduct: React.FC = () => {
                       <>
                         <button
                           type="button"
-                          onClick={() => setCarouselIndex(Math.max(0, carouselIndex - 1))}
+                          onClick={() =>
+                            setCarouselIndex(Math.max(0, carouselIndex - 1))
+                          }
                           disabled={carouselIndex === 0}
                           className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                           aria-label="Previous image"
@@ -1323,7 +1981,11 @@ const EditProduct: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setCarouselIndex(Math.min(mediaUrls.length - 1, carouselIndex + 1))}
+                          onClick={() =>
+                            setCarouselIndex(
+                              Math.min(mediaUrls.length - 1, carouselIndex + 1),
+                            )
+                          }
                           disabled={carouselIndex === mediaUrls.length - 1}
                           className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                           aria-label="Next image"
@@ -1342,9 +2004,9 @@ const EditProduct: React.FC = () => {
                         type="button"
                         onClick={() => setCarouselIndex(idx)}
                         className={`w-2.5 h-2.5 rounded-full transition-all ${
-                          idx === carouselIndex 
-                            ? 'bg-purple-600 scale-110' 
-                            : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400'
+                          idx === carouselIndex
+                            ? "bg-purple-600 scale-110"
+                            : "bg-gray-300 dark:bg-gray-600 hover:bg-gray-400"
                         }`}
                         aria-label={`Go to image ${idx + 1}`}
                       />
@@ -1370,568 +2032,892 @@ const EditProduct: React.FC = () => {
                 >
                   <Plus className="w-8 h-8 mb-2" />
                   <span className="text-sm font-medium">Add images</span>
-                  <span className="text-xs text-gray-400 mt-1">Up to 4 images</span>
+                  <span className="text-xs text-gray-400 mt-1">
+                    Up to 4 images
+                  </span>
                 </button>
               )}
 
               {!hasPrimaryMedia && mediaUrls.length > 0 && (
-                <p className="mt-3 text-xs text-orange-500">Select a cover image before saving.</p>
+                <p className="mt-3 text-xs text-orange-500">
+                  Select a cover image before saving.
+                </p>
               )}
 
               <div className="pt-4 border-t border-gray-200 dark:border-white/10">
-                <p className="text-xs text-gray-500">Up to 4 images • Full preview • Cover required when images exist</p>
+                <p className="text-xs text-gray-500">
+                  Up to 4 images • Full preview • Cover required when images
+                  exist
+                </p>
               </div>
             </div>
 
             {/* Video Section */}
             <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-white">Product Video</h3>
+                <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                  Product Video
+                </h3>
               </div>
               <div className="rounded-lg border border-dashed border-gray-300 dark:border-white/20 p-6 flex flex-col items-center justify-center text-center hover:bg-purple-50 dark:hover:bg-white/5 transition-colors cursor-pointer">
                 <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-white/10 flex items-center justify-center mb-3 text-purple-500">
                   <Video className="w-4 h-4" />
                 </div>
-                <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">Add Video</p>
-                <p className="text-xs text-gray-500 mt-1">MP4, WebM up to 50MB</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                  Add Video
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  MP4, WebM up to 50MB
+                </p>
               </div>
             </div>
-
           </div>
 
           {/* RIGHT COLUMN: Details (58% approx -> 7 cols) */}
           <div className="lg:col-span-7 space-y-6">
-              
             {/* Basic Info */}
-            <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-6">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-6">Basic Information</h2>
-              
+            <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-6">
+                Basic Information
+              </h2>
+
               <div className="space-y-5">
                 <Input
                   label="Product Title"
                   required
                   type="text"
                   value={form.title}
-                  onChange={(e) => updateForm('title', e.target.value)}
+                  onChange={(e) => updateForm("title", e.target.value)}
                   placeholder="Enter product title"
                   data-testid="product-title-input"
                 />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
-                      Collection (optional)
-                      <InfoTooltip text="Link this product to a Store Collection for grouped merchandising. Products can also exist standalone." />
-                    </label>
-                    <Select
-                      value={form.categoryId}
-                      onChange={(e) => updateForm('categoryId', e.target.value)}
-                      disabled={categoriesLoading}
-                    >
-                      <option value="">No collection (standalone)</option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
-                      Category
-                      <InfoTooltip text="The primary taxonomy category for this product (e.g., Women's Wear, Men's Wear). Helps with discovery and filtering." />
-                    </label>
-                    <Select
-                      value={form.taxonomyCategoryId}
-                      onChange={(e) => {
-                        updateForm('taxonomyCategoryId', e.target.value);
-                        // Reset sub-category when category changes
-                        updateForm('categoryTypeId', '');
-                      }}
-                      disabled={categoriesLoading}
-                    >
-                      <option value="">Select category</option>
-                      {taxonomyCategories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
-                      Sub-Category
-                      <InfoTooltip text="A more specific type within the selected category (e.g., Evening Wear, Casual Tops)." />
-                    </label>
-                    <Select
-                      value={form.categoryTypeId}
-                      onChange={(e) => updateForm('categoryTypeId', e.target.value)}
-                      disabled={!form.taxonomyCategoryId && availableCategoryTypes.length === 0}
-                    >
-                      {(() => {
-                        const scoped = form.taxonomyCategoryId
-                          ? taxonomyCategories.find(c => c.id === form.taxonomyCategoryId)?.types ?? []
-                          : availableCategoryTypes;
-                        if (scoped.length === 0) return <option value="">No sub-categories available</option>;
-                        return (
-                          <>
-                            <option value="">Select sub-category</option>
-                            {scoped.map((ct) => (
-                              <option key={ct.id} value={ct.id}>{ct.name}</option>
-                            ))}
-                          </>
-                        );
-                      })()}
-                    </Select>
-                  </div>
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-[11px] text-gray-500 mt-1">
-                      {categoriesLoading
-                        ? 'Loading collections…'
-                        : categories.length
-                          ? 'Choose a collection or keep this product standalone.'
-                          : 'No collections yet. This product can stay standalone.'}
+                <div className="rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/40 dark:bg-white/[0.02] p-3 sm:p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Product Metadata
                     </p>
-                    {!categoriesLoading && categories.length === 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const suffix = productId ? `?productId=${encodeURIComponent(productId)}` : '';
-                          navigate(`/studio/store/collections/new${suffix}`);
-                        }}
-                        className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 transition-colors"
-                      >
-                        Create collection
-                      </button>
-                    ) : null}
+                    <span className="text-[10px] font-medium text-gray-400">
+                      Scroll inside panel
+                    </span>
                   </div>
-                </div>
 
-                {/* Filter Selector */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 flex items-center">
-                    Filters
-                    <InfoTooltip text="Select filter dimensions (fabric, occasion, season, etc.) to generate relevant tag suggestions for your product." />
-                  </label>
-                  <FilterSelector
-                    value={filterSelection}
-                    onChange={setFilterSelection}
-                    entityType="PRODUCT"
-                    onTagSuggestions={setTagSuggestions}
-                  />
-                </div>
+                  <div className="h-[360px] overflow-y-auto scrollbar-threadly-strong pr-1 sm:pr-2">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                        <div className="md:col-span-6">
+                          <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                            Collection (optional)
+                            <InfoTooltip text="Link this product to a Store Collection for grouped merchandising. Products can also exist standalone." />
+                          </label>
+                          <Select
+                            value={form.categoryId}
+                            onChange={(e) =>
+                              handleCollectionChange(e.target.value)
+                            }
+                            disabled={categoriesLoading}
+                          >
+                            <option value="">No collection (standalone)</option>
+                            {categories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
 
-                {/* Tags */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
-                    Tags
-                    <InfoTooltip text="Tags improve discoverability. Add them manually or click suggested tags from the filter selections above." />
-                  </label>
-                  {/* Filter-driven tag suggestions */}
-                  {tagSuggestions.length > 0 && (
-                    <div className="mb-2">
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1">Suggested tags from filters:</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {tagSuggestions
-                          .filter((t) => !form.tags.includes(t))
-                          .slice(0, 12)
-                          .map((suggestion) => (
+                        <div className="md:col-span-6">
+                          <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                            Category
+                            <InfoTooltip text="The primary taxonomy category for this product (e.g., Women's Wear, Men's Wear). Helps with discovery and filtering." />
+                          </label>
+                          <Select
+                            value={form.taxonomyCategoryId}
+                            onChange={(e) => {
+                              updateForm("taxonomyCategoryId", e.target.value);
+                              updateForm("categoryTypeId", "");
+                            }}
+                            disabled={categoriesLoading}
+                          >
+                            <option value="">Select category</option>
+                            {taxonomyCategories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
+
+                        <div className="md:col-span-6">
+                          <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                            Sub-Category
+                            <InfoTooltip text="A more specific type within the selected category (e.g., Evening Wear, Casual Tops)." />
+                          </label>
+                          <Select
+                            value={form.categoryTypeId}
+                            onChange={(e) =>
+                              updateForm("categoryTypeId", e.target.value)
+                            }
+                            disabled={
+                              !form.taxonomyCategoryId &&
+                              availableCategoryTypes.length === 0
+                            }
+                          >
+                            {(() => {
+                              const scoped = form.taxonomyCategoryId
+                                ? selectedTaxonomyCategoryTypes
+                                : availableCategoryTypes;
+                              if (scoped.length === 0) {
+                                return (
+                                  <option value="">
+                                    No sub-categories available
+                                  </option>
+                                );
+                              }
+                              return [
+                                <option key="subcategory-placeholder" value="">
+                                  Select sub-category
+                                </option>,
+                                ...scoped.map((ct) => (
+                                  <option key={ct.id} value={ct.id}>
+                                    {ct.name}
+                                  </option>
+                                )),
+                              ];
+                            })()}
+                          </Select>
+                        </div>
+
+                        <div className="md:col-span-6 flex items-start justify-between gap-3 rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2.5">
+                          <p className="text-[11px] text-gray-500">
+                            {categoriesLoading
+                              ? "Loading collections…"
+                              : categories.length
+                                ? "Choose a collection or keep this product standalone."
+                                : "No collections yet. This product can stay standalone."}
+                          </p>
+                          {!categoriesLoading && categories.length === 0 ? (
                             <button
-                              key={suggestion}
                               type="button"
                               onClick={() => {
-                                if (!form.tags.includes(suggestion)) {
-                                  updateForm('tags', [...form.tags, suggestion]);
-                                }
+                                const suffix = productId
+                                  ? `?productId=${encodeURIComponent(productId)}`
+                                  : "";
+                                navigate(
+                                  `/studio/store/collections/new${suffix}`,
+                                );
                               }}
-                              className="px-2 py-1 rounded-lg text-[10px] font-medium bg-purple-50 dark:bg-purple-500/10
-                                text-purple-600 dark:text-purple-300 border border-purple-200/60 dark:border-purple-500/20
-                                hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
+                              className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 transition-colors whitespace-nowrap"
                             >
-                              + {suggestion}
+                              Create collection
                             </button>
-                          ))}
+                          ) : null}
+                        </div>
                       </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-2 flex items-center">
+                          Filters
+                          <InfoTooltip text="Select filter dimensions (fabric, occasion, season, etc.) to generate relevant tag suggestions for your product." />
+                        </label>
+                        <FilterSelector
+                          value={filterSelection}
+                          onChange={setFilterSelection}
+                          entityType="PRODUCT"
+                          onTagSuggestions={setTagSuggestions}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                          Tags
+                          <InfoTooltip text="Tags improve discoverability. Add them manually or click suggested tags from the filter selections above." />
+                        </label>
+                        {tagSuggestions.length > 0 && (
+                          <div className="mb-2">
+                            <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1">
+                              Suggested tags from filters:
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {tagSuggestions
+                                .filter((t) => !form.tags.includes(t))
+                                .slice(0, 12)
+                                .map((suggestion) => (
+                                  <button
+                                    key={suggestion}
+                                    type="button"
+                                    onClick={() => {
+                                      if (!form.tags.includes(suggestion)) {
+                                        updateForm("tags", [
+                                          ...form.tags,
+                                          suggestion,
+                                        ]);
+                                      }
+                                    }}
+                                    className="px-2 py-1 rounded-lg text-[10px] font-medium bg-purple-50 dark:bg-purple-500/10
+                                      text-purple-600 dark:text-purple-300 border border-purple-200/60 dark:border-purple-500/20
+                                      hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
+                                  >
+                                    + {suggestion}
+                                  </button>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="bg-white dark:bg-zinc-900/60 border border-gray-300/80 dark:border-zinc-700/60 rounded-xl px-3 py-2 min-h-[44px] flex items-center gap-2 shadow-sm">
+                          <input
+                            type="text"
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            onKeyDown={handleTagKeyDown}
+                            placeholder="Add tag..."
+                            className="bg-transparent border-none outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 w-24 flex-1 p-0 focus:ring-0"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddTag}
+                            className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-500 transition"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        {form.tags.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {form.tags.map((tag, index) => (
+                              <Tag
+                                key={tag}
+                                label={tag}
+                                color={getTagColor(tag, index)}
+                                size="xs"
+                                rightIcon={
+                                  <X
+                                    className="w-3 h-3 cursor-pointer"
+                                    onClick={() => handleRemoveTag(tag)}
+                                  />
+                                }
+                                className="gap-1"
+                              />
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          Add one tag at a time. Use Enter or the Add button.
+                        </p>
+                      </div>
+
+                      <Textarea
+                        label="Description"
+                        rows={4}
+                        placeholder="Describe your product..."
+                        value={form.description}
+                        onChange={(e) =>
+                          updateForm("description", e.target.value)
+                        }
+                      />
                     </div>
-                  )}
-                  <div className="bg-white dark:bg-zinc-900/60 border border-gray-300/80 dark:border-zinc-700/60 rounded-xl px-3 py-2 min-h-[46px] flex items-center gap-2 shadow-sm">
-                    <input 
-                      type="text" 
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={handleTagKeyDown}
-                      placeholder="Add tag..." 
-                      className="bg-transparent border-none outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 w-24 flex-1 p-0 focus:ring-0" 
-                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/30 dark:bg-white/[0.02] overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-200/70 dark:border-white/10 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Product Operations
+                </p>
+                <span className="text-[10px] font-medium text-gray-400">
+                  Scroll inside panel
+                </span>
+              </div>
+              <div className="h-[460px] md:h-[520px] overflow-y-auto scrollbar-threadly-strong p-4 space-y-4">
+                {/* Pricing */}
+                <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
+                  <div className="flex items-center justify-between gap-4">
                     <button
                       type="button"
-                      onClick={handleAddTag}
-                      className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-500 transition"
+                      onClick={() => toggleSection("pricing")}
+                      className="flex items-center gap-2 text-left"
                     >
-                      Add
+                      <h2 className="text-base font-medium text-gray-900 dark:text-white">
+                        Pricing
+                      </h2>
+                      {collapsedSections.pricing ? (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <ChevronUp className="h-4 w-4 text-gray-500" />
+                      )}
                     </button>
-                  </div>
-                  {form.tags.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {form.tags.map((tag, index) => (
-                        <Tag
-                          key={tag}
-                          label={tag}
-                          color={getTagColor(tag, index)}
-                          size="xs"
-                          rightIcon={<X className="w-3 h-3 cursor-pointer" onClick={() => handleRemoveTag(tag)} />}
-                          className="gap-1"
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                        On Sale
+                      </span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={form.onSale}
+                          onChange={(e) =>
+                            updateForm("onSale", e.target.checked)
+                          }
+                          className="sr-only peer"
                         />
-                      ))}
+                        <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
+                      </label>
                     </div>
-                  )}
-                  <p className="text-[11px] text-gray-500 mt-1">Add one tag at a time. Use Enter or the Add button.</p>
-                </div>
-
-                <Textarea
-                  label="Description"
-                  rows={5}
-                  placeholder="Describe your product..."
-                  value={form.description}
-                  onChange={(e) => updateForm('description', e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Pricing */}
-            <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Pricing</h2>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">On Sale</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={form.onSale}
-                      onChange={(e) => updateForm('onSale', e.target.checked)}
-                      className="sr-only peer" 
-                    />
-                    <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
-                  </label>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <Input
-                  label="Price"
-                  required
-                  type="number"
-                  value={form.price || ''}
-                  onChange={(e) => updateForm('price', Number(e.target.value))}
-                  placeholder="0"
-                  startIcon={<span className="text-gray-400 dark:text-zinc-500 text-sm">₦</span>}
-                  data-testid="product-price-input"
-                />
-                <Input
-                  label="Sale Price"
-                  type="number"
-                  value={form.compareAtPrice || ''}
-                  onChange={(e) => updateForm('compareAtPrice', Number(e.target.value))}
-                  placeholder="0"
-                  disabled={!form.onSale}
-                  startIcon={<span className="text-gray-400 dark:text-zinc-500 text-sm">₦</span>}
-                />
-                <div>
-                  <Input
-                    label="Cost per Item"
-                    type="number"
-                    value={form.costPerItem || ''}
-                    onChange={(e) => updateForm('costPerItem', Number(e.target.value))}
-                    placeholder="0"
-                    startIcon={<span className="text-gray-400 dark:text-zinc-500 text-sm">₦</span>}
-                  />
-                  {profitMargin.margin > 0 && (
-                    <p className="text-[10px] text-gray-500 mt-1">
-                      Margin: {profitMargin.margin}% • Profit: {formatCurrency(profitMargin.profit, form.currency)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Variants */}
-            <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl overflow-hidden">
-              <div className="p-6 border-b border-gray-200 dark:border-white/5 flex items-center justify-between">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Variants</h2>
-                <button
-                  type="button"
-                  onClick={addVariant}
-                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition"
-                >
-                  + Add Variant
-                </button>
-              </div>
-
-              {hasDuplicateVariants && (
-                <div className="px-6 py-3 text-xs text-orange-300 bg-orange-500/10 border-b border-orange-500/20">
-                  Duplicate variants detected (same size/color). Please adjust or remove duplicates.
-                </div>
-              )}
-              
-              {form.variants.length === 0 ? (
-                <div className="p-6 text-center">
-                  <p className="text-gray-400 text-sm mb-2">No variants yet</p>
-                  <p className="text-gray-500 text-xs">Add size, color, or other options for your product</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto scrollbar-threadly" style={{ scrollbarGutter: 'stable both-edges' }}>
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-xs uppercase">
-                      <tr>
-                        <th className="px-6 py-3 font-medium">Color</th>
-                        <th className="px-6 py-3 font-medium">Size</th>
-                        <th className="px-6 py-3 font-medium">Price</th>
-                        <th className="px-6 py-3 font-medium">SKU</th>
-                        <th className="px-6 py-3 font-medium">Stock</th>
-                        <th className="px-6 py-3 font-medium text-right w-24 sticky right-0 bg-gray-50 dark:bg-white/5">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200/70 dark:divide-white/5">
-                      {form.variants.map((variant, idx) => (
-                        <tr key={variant.id || idx} className="hover:bg-gray-50/70 dark:hover:bg-white/5 transition-colors">
-                          <td className="px-6 py-3">
-                            <Input
-                              type="text"
-                              value={variant.color ?? ''}
-                              onChange={(e) => updateVariant(idx, { color: e.target.value })}
-                              placeholder="e.g. Black"
-                              inputSize="sm"
-                              fullWidth={false}
-                              className="w-32"
-                            />
-                          </td>
-                          <td className="px-6 py-3">
-                            <Input
-                              type="text"
-                              list="threadly-size-options"
-                              value={variant.size ?? ''}
-                              onChange={(e) => updateVariant(idx, { size: e.target.value })}
-                              placeholder="e.g. M"
-                              inputSize="sm"
-                              fullWidth={false}
-                              className="w-28"
-                            />
-                          </td>
-                          <td className="px-6 py-3">
-                            <Input
-                              type="number"
-                              value={typeof variant.price === 'number' ? variant.price : ''}
-                              onChange={(e) => updateVariant(idx, { price: e.target.value === '' ? undefined : Number(e.target.value) })}
-                              placeholder={String(form.price || 0)}
-                              startIcon={<span className="text-gray-400 dark:text-zinc-500 text-sm">₦</span>}
-                              inputSize="sm"
-                              fullWidth={false}
-                              className="w-28"
-                            />
-                          </td>
-                          <td className="px-6 py-3">
-                            <Input
-                              type="text"
-                              value={variant.sku ?? ''}
-                              onChange={() => {}}
-                              placeholder="Auto-generated"
-                              disabled
-                              inputSize="sm"
-                              fullWidth={false}
-                              className="w-40"
-                            />
-                          </td>
-                          <td className="px-6 py-3">
-                            <Input
-                              type="number"
-                              value={Number.isFinite(variant.stock) ? variant.stock : 0}
-                              min={0}
-                              onChange={(e) => updateVariant(idx, { stock: Number(e.target.value) })}
-                              inputSize="sm"
-                              fullWidth={false}
-                              className="w-20"
-                            />
-                          </td>
-                          <td className="px-6 py-3 text-right sticky right-0 bg-gray-50/60 dark:bg-black/20">
-                            <button
-                              type="button"
-                              onClick={() => removeVariant(idx)}
-                              className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
-                              title="Remove"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  <datalist id="threadly-size-options">
-                    <option value="XS" />
-                    <option value="S" />
-                    <option value="M" />
-                    <option value="L" />
-                    <option value="XL" />
-                    <option value="XXL" />
-                    <option value="One Size" />
-                  </datalist>
-
-                  <div className="px-6 py-4 border-t border-gray-200/70 dark:border-white/5 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
-                    <span>Total variant stock: <span className="text-gray-900 dark:text-gray-200">{variantTotalStock}</span></span>
-                    <span>Tip: leave price blank to use base price</span>
                   </div>
-                </div>
-              )}
-            </div>
 
-            {/* Inventory & Shipping Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Inventory */}
-              <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-6">
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">Inventory</h2>
-                </div>
-                <div className="space-y-4">
-                  <Input
-                    label="SKU (Stock Keeping Unit)"
-                    type="text"
-                    value={form.sku}
-                    onChange={() => {}}
-                    placeholder="Auto-generated"
-                    disabled
-                    helperText="A unique code to track inventory and sales (e.g., SHIRT-BLK-M)."
-                  />
-                  <div>
-                    <Input
-                      label="Stock Quantity"
-                      type="number"
-                      value={form.variants.length > 0 ? variantTotalStock : (form.stock || '')}
-                      onChange={(e) => updateForm('stock', Number(e.target.value))}
-                      placeholder="0"
-                      disabled={form.variants.length > 0}
-                    />
-                    {form.variants.length > 0 && (
-                      <p className="text-[10px] text-gray-500 mt-1">Derived from variants. Edit stock per variant above.</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 pt-2">
-                    <input 
-                      type="checkbox" 
-                      id="track-qty" 
-                      checked={form.trackInventory}
-                      onChange={(e) => updateForm('trackInventory', e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500" 
-                    />
-                    <label htmlFor="track-qty" className="text-sm text-gray-700 dark:text-gray-300">Track quantity</label>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <input 
-                      type="checkbox" 
-                      id="continue-selling" 
-                      checked={form.allowBackorders}
-                      onChange={(e) => updateForm('allowBackorders', e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500" 
-                    />
-                    <label htmlFor="continue-selling" className="text-sm text-gray-700 dark:text-gray-300">Continue selling when out of stock</label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Shipping */}
-              <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-6">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-5">Shipping</h2>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <input 
-                      type="checkbox" 
-                      id="physical-product" 
-                      checked={form.isPhysicalProduct}
-                      onChange={(e) => updateForm('isPhysicalProduct', e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500" 
-                    />
-                    <label htmlFor="physical-product" className="text-sm text-gray-700 dark:text-gray-300">This is a physical product</label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="relative">
+                  {!collapsedSections.pricing && (
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <Input
+                        label="Price"
+                        required
+                        type="number"
+                        value={form.price || ""}
+                        onChange={(e) =>
+                          updateForm("price", Number(e.target.value))
+                        }
+                        placeholder="0"
+                        startIcon={
+                          <span className="text-gray-400 dark:text-zinc-500 text-sm">
+                            ₦
+                          </span>
+                        }
+                        data-testid="product-price-input"
+                        inputSize="sm"
+                        className="[&_label]:text-xs [&_label]:mb-1"
+                      />
+                      <Input
+                        label="Sale Price"
+                        type="number"
+                        value={form.compareAtPrice || ""}
+                        onChange={(e) =>
+                          updateForm("compareAtPrice", Number(e.target.value))
+                        }
+                        placeholder="0"
+                        disabled={!form.onSale}
+                        startIcon={
+                          <span className="text-gray-400 dark:text-zinc-500 text-sm">
+                            ₦
+                          </span>
+                        }
+                        inputSize="sm"
+                        className="[&_label]:text-xs [&_label]:mb-1"
+                      />
+                      <div>
                         <Input
-                          label="Weight"
+                          label="Cost per Item"
                           type="number"
-                          value={form.weight || ''}
-                          onChange={(e) => updateForm('weight', Number(e.target.value))}
+                          value={form.costPerItem || ""}
+                          onChange={(e) =>
+                            updateForm("costPerItem", Number(e.target.value))
+                          }
                           placeholder="0"
-                          endIcon={<span className="text-gray-400 dark:text-zinc-500 text-xs">{form.weightUnit}</span>}
+                          startIcon={
+                            <span className="text-gray-400 dark:text-zinc-500 text-sm">
+                              ₦
+                            </span>
+                          }
+                          inputSize="sm"
+                          className="[&_label]:text-xs [&_label]:mb-1"
                         />
+                        {profitMargin.margin > 0 && (
+                          <p className="text-[10px] text-gray-500 mt-1">
+                            Margin: {profitMargin.margin}% • Profit:{" "}
+                            {formatCurrency(profitMargin.profit, form.currency)}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <div>
-                      <Select
-                        label="Region"
-                        value={form.customsRegion}
-                        onChange={(e) => updateForm('customsRegion', e.target.value)}
+                  )}
+                </div>
+
+                {/* Variants */}
+                <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl overflow-hidden">
+                  <div
+                    className={`p-4 flex items-center justify-between ${collapsedSections.variants ? "" : "border-b border-gray-200 dark:border-white/5"}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleSection("variants")}
+                      className="flex items-center gap-2 text-left"
+                    >
+                      <h2 className="text-base font-medium text-gray-900 dark:text-white">
+                        Variants
+                      </h2>
+                      {collapsedSections.variants ? (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <ChevronUp className="h-4 w-4 text-gray-500" />
+                      )}
+                    </button>
+                    {!collapsedSections.variants && (
+                      <button
+                        type="button"
+                        onClick={addVariant}
+                        className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition"
                       >
-                        {shippingRegionOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </Select>
+                        + Add Variant
+                      </button>
+                    )}
+                  </div>
+
+                  {!collapsedSections.variants && hasDuplicateVariants && (
+                    <div className="px-6 py-3 text-xs text-orange-300 bg-orange-500/10 border-b border-orange-500/20">
+                      Duplicate variants detected (same size/color). Please
+                      adjust or remove duplicates.
                     </div>
-                  </div>
+                  )}
+
+                  {!collapsedSections.variants &&
+                    (form.variants.length === 0 ? (
+                      <div className="p-6 text-center">
+                        <p className="text-gray-400 text-sm mb-2">
+                          No variants yet
+                        </p>
+                        <p className="text-gray-500 text-xs">
+                          Add size, color, or other options for your product
+                        </p>
+                      </div>
+                    ) : (
+                      <div
+                        className="overflow-x-auto scrollbar-threadly-strong"
+                        style={{ scrollbarGutter: "stable both-edges" }}
+                      >
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-xs uppercase">
+                            <tr>
+                              <th className="px-4 py-2 font-medium">Color</th>
+                              <th className="px-4 py-2 font-medium">Size</th>
+                              <th className="px-4 py-2 font-medium">Price</th>
+                              <th className="px-4 py-2 font-medium">SKU</th>
+                              <th className="px-4 py-2 font-medium">Stock</th>
+                              <th className="px-4 py-2 font-medium text-right w-20 sticky right-0 bg-gray-50 dark:bg-white/5">
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200/70 dark:divide-white/5">
+                            {form.variants.map((variant, idx) => (
+                              <tr
+                                key={variant.id || idx}
+                                className="hover:bg-gray-50/70 dark:hover:bg-white/5 transition-colors"
+                              >
+                                <td className="px-4 py-2">
+                                  <Input
+                                    type="text"
+                                    value={variant.color ?? ""}
+                                    onChange={(e) =>
+                                      updateVariant(idx, {
+                                        color: e.target.value,
+                                      })
+                                    }
+                                    placeholder="e.g. Black"
+                                    inputSize="sm"
+                                    fullWidth={false}
+                                    className="w-32"
+                                  />
+                                </td>
+                                <td className="px-4 py-2">
+                                  <Input
+                                    type="text"
+                                    list="threadly-size-options"
+                                    value={variant.size ?? ""}
+                                    onChange={(e) =>
+                                      updateVariant(idx, {
+                                        size: e.target.value,
+                                      })
+                                    }
+                                    placeholder="e.g. M"
+                                    inputSize="sm"
+                                    fullWidth={false}
+                                    className="w-28"
+                                  />
+                                </td>
+                                <td className="px-4 py-2">
+                                  <Input
+                                    type="number"
+                                    value={
+                                      typeof variant.price === "number"
+                                        ? variant.price
+                                        : ""
+                                    }
+                                    onChange={(e) =>
+                                      updateVariant(idx, {
+                                        price:
+                                          e.target.value === ""
+                                            ? undefined
+                                            : Number(e.target.value),
+                                      })
+                                    }
+                                    placeholder={String(form.price || 0)}
+                                    startIcon={
+                                      <span className="text-gray-400 dark:text-zinc-500 text-sm">
+                                        ₦
+                                      </span>
+                                    }
+                                    inputSize="sm"
+                                    fullWidth={false}
+                                    className="w-28"
+                                  />
+                                </td>
+                                <td className="px-4 py-2">
+                                  <Input
+                                    type="text"
+                                    value={variant.sku ?? ""}
+                                    onChange={() => {}}
+                                    placeholder="Auto-generated"
+                                    disabled
+                                    inputSize="sm"
+                                    fullWidth={false}
+                                    className="w-40"
+                                  />
+                                </td>
+                                <td className="px-4 py-2">
+                                  <Input
+                                    type="number"
+                                    value={
+                                      variant.stock === "" as any
+                                        ? ""
+                                        : Number.isFinite(variant.stock) ? variant.stock : ""
+                                    }
+                                    min={0}
+                                    onChange={(e) =>
+                                      updateVariant(idx, {
+                                        stock: e.target.value === "" ? ("" as any) : Number(e.target.value),
+                                      })
+                                    }
+                                    placeholder="0"
+                                    inputSize="sm"
+                                    fullWidth={false}
+                                    className="w-20"
+                                  />
+                                </td>
+                                <td className="px-4 py-2 text-right sticky right-0 bg-gray-50/60 dark:bg-black/20">
+                                  <button
+                                    type="button"
+                                    onClick={() => removeVariant(idx)}
+                                    className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                                    title="Remove"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+
+                        <datalist id="threadly-size-options">
+                          <option value="XS" />
+                          <option value="S" />
+                          <option value="M" />
+                          <option value="L" />
+                          <option value="XL" />
+                          <option value="XXL" />
+                          <option value="One Size" />
+                        </datalist>
+
+                        <div className="px-4 py-3 border-t border-gray-200/70 dark:border-white/5 text-[11px] text-gray-500 dark:text-gray-400 flex items-center justify-between">
+                          <span>
+                            Total variant stock:{" "}
+                            <span className="text-gray-900 dark:text-gray-200">
+                              {variantTotalStock}
+                            </span>
+                          </span>
+                          <span>Tip: leave price blank to use base price</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+
+                {/* Inventory & Shipping Grid */}
+                <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection("fulfillment")}
+                    className="flex items-center gap-2 text-left"
+                  >
+                    <h2 className="text-base font-medium text-gray-900 dark:text-white">
+                      Inventory & Shipping
+                    </h2>
+                    {collapsedSections.fulfillment ? (
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <ChevronUp className="h-4 w-4 text-gray-500" />
+                    )}
+                  </button>
+
+                  {!collapsedSections.fulfillment && (
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Inventory */}
+                      <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h2 className="text-base font-medium text-gray-900 dark:text-white">
+                            Inventory
+                          </h2>
+                        </div>
+                        <div className="space-y-4">
+                          <Input
+                            label="SKU (Stock Keeping Unit)"
+                            type="text"
+                            value={form.sku}
+                            onChange={() => {}}
+                            placeholder="Auto-generated"
+                            disabled
+                            helperText="A unique code to track inventory and sales (e.g., SHIRT-BLK-M)."
+                            inputSize="sm"
+                            className="[&_label]:text-xs [&_label]:mb-1"
+                          />
+                          <div>
+                            <Input
+                              label="Stock Quantity"
+                              type="number"
+                              value={
+                                form.variants.length > 0
+                                  ? variantTotalStock
+                                  : form.stock || ""
+                              }
+                              onChange={(e) =>
+                                updateForm("stock", Number(e.target.value))
+                              }
+                              placeholder="0"
+                              disabled={form.variants.length > 0}
+                              inputSize="sm"
+                              className="[&_label]:text-xs [&_label]:mb-1"
+                            />
+                            {form.variants.length > 0 && (
+                              <p className="text-[10px] text-gray-500 mt-1">
+                                Derived from variants. Edit stock per variant
+                                above.
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 pt-2">
+                            <input
+                              type="checkbox"
+                              id="track-qty"
+                              checked={form.trackInventory}
+                              onChange={(e) =>
+                                updateForm("trackInventory", e.target.checked)
+                              }
+                              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500"
+                            />
+                            <label
+                              htmlFor="track-qty"
+                              className="text-xs text-gray-700 dark:text-gray-300"
+                            >
+                              Track quantity
+                            </label>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              id="continue-selling"
+                              checked={form.allowBackorders}
+                              onChange={(e) =>
+                                updateForm("allowBackorders", e.target.checked)
+                              }
+                              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500"
+                            />
+                            <label
+                              htmlFor="continue-selling"
+                              className="text-xs text-gray-700 dark:text-gray-300"
+                            >
+                              Continue selling when out of stock
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Shipping */}
+                      <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
+                        <h2 className="text-base font-medium text-gray-900 dark:text-white mb-4">
+                          Shipping
+                        </h2>
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-3 mb-4">
+                            <input
+                              type="checkbox"
+                              id="physical-product"
+                              checked={form.isPhysicalProduct}
+                              onChange={(e) =>
+                                updateForm(
+                                  "isPhysicalProduct",
+                                  e.target.checked,
+                                )
+                              }
+                              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500"
+                            />
+                            <label
+                              htmlFor="physical-product"
+                              className="text-xs text-gray-700 dark:text-gray-300"
+                            >
+                              This is a physical product
+                            </label>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <div className="relative">
+                                <Input
+                                  label="Weight"
+                                  type="number"
+                                  value={form.weight || ""}
+                                  onChange={(e) =>
+                                    updateForm("weight", Number(e.target.value))
+                                  }
+                                  placeholder="0"
+                                  endIcon={
+                                    <span className="text-gray-400 dark:text-zinc-500 text-xs">
+                                      {form.weightUnit}
+                                    </span>
+                                  }
+                                  inputSize="sm"
+                                  className="[&_label]:text-xs [&_label]:mb-1"
+                                />
+                              </div>
+                            </div>
+                            <div className="md:col-span-2">
+                              <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                                Ship To Countries
+                              </p>
+                              <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
+                                Prefilled from Store Setup. Changes here update
+                                your store shipping regions.
+                              </p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {SHIPPING_REGION_OPTIONS.map((opt) => {
+                                  const isSelected =
+                                    normalizedShippingRegions.includes(opt.code);
+                                  return (
+                                    <label
+                                      key={opt.code}
+                                      className={`flex items-center gap-2 rounded-md border px-2 py-2 text-xs transition-colors ${
+                                        isSelected
+                                          ? "border-purple-500/60 bg-purple-500/10 text-gray-900 dark:text-white"
+                                          : "border-gray-300/70 dark:border-white/15 text-gray-700 dark:text-gray-300"
+                                      } ${!form.isPhysicalProduct ? "opacity-60" : ""}`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={() =>
+                                          toggleShippingRegion(opt.code)
+                                        }
+                                        disabled={!form.isPhysicalProduct}
+                                        className="w-3.5 h-3.5 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500"
+                                      />
+                                      <span>{opt.label}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                              {shippingRegionsLoading && (
+                                <p className="mt-2 text-[10px] text-gray-500">
+                                  Loading store shipping regions...
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Additional Details */}
+                <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection("additional")}
+                    className="flex items-center gap-2 text-left"
+                  >
+                    <h2 className="text-base font-medium text-gray-900 dark:text-white">
+                      Additional Details
+                    </h2>
+                    {collapsedSections.additional ? (
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <ChevronUp className="h-4 w-4 text-gray-500" />
+                    )}
+                  </button>
+
+                  {!collapsedSections.additional && (
+                    <>
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input
+                          label="Materials"
+                          type="text"
+                          value={form.materials}
+                          onChange={(e) =>
+                            updateForm("materials", e.target.value)
+                          }
+                          placeholder="e.g., 100% Organic Cotton"
+                          inputSize="sm"
+                          className="[&_label]:text-xs [&_label]:mb-1"
+                        />
+                        <Input
+                          label="Care Instructions"
+                          type="text"
+                          value={form.careInstructions}
+                          onChange={(e) =>
+                            updateForm("careInstructions", e.target.value)
+                          }
+                          placeholder="e.g., Machine wash cold, tumble dry low"
+                          inputSize="sm"
+                          className="[&_label]:text-xs [&_label]:mb-1"
+                        />
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-gray-200/70 dark:border-white/5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-gray-900 dark:text-white font-medium">
+                              Returns Eligible
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Allow customers to return this item within 30 days
+                            </p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={form.returnsEligible}
+                              onChange={(e) =>
+                                updateForm("returnsEligible", e.target.checked)
+                              }
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
+                          </label>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-gray-900 dark:text-white font-medium">
+                              Sustainability Claim
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Display eco-friendly badge on product page
+                            </p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={form.sustainabilityClaim}
+                              onChange={(e) =>
+                                updateForm(
+                                  "sustainabilityClaim",
+                                  e.target.checked,
+                                )
+                              }
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
+                          </label>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
-
-            {/* Additional Details */}
-            <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-6">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-5">Additional Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input
-                  label="Materials"
-                  type="text"
-                  value={form.materials}
-                  onChange={(e) => updateForm('materials', e.target.value)}
-                  placeholder="e.g., 100% Organic Cotton"
-                />
-                <Input
-                  label="Care Instructions"
-                  type="text"
-                  value={form.careInstructions}
-                  onChange={(e) => updateForm('careInstructions', e.target.value)}
-                  placeholder="e.g., Machine wash cold, tumble dry low"
-                />
-              </div>
-              <div className="mt-6 pt-6 border-t border-gray-200/70 dark:border-white/5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-900 dark:text-white font-medium">Returns Eligible</p>
-                    <p className="text-xs text-gray-500">Allow customers to return this item within 30 days</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={form.returnsEligible}
-                      onChange={(e) => updateForm('returnsEligible', e.target.checked)}
-                      className="sr-only peer" 
-                    />
-                    <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
-                  </label>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-900 dark:text-white font-medium">Sustainability Claim</p>
-                    <p className="text-xs text-gray-500">Display eco-friendly badge on product page</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={form.sustainabilityClaim}
-                      onChange={(e) => updateForm('sustainabilityClaim', e.target.checked)}
-                      className="sr-only peer" 
-                    />
-                    <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
-                  </label>
-                </div>
-              </div>
-            </div>
-
           </div>
         </div>
       </main>
@@ -1951,49 +2937,75 @@ const EditProduct: React.FC = () => {
           </div>
           <div className="flex items-center gap-4">
             {!isEditMode && !isCollectionContext && (
-              <button 
-                onClick={() => void triggerSave(true, { action: 'draft', forceStatus: 'DRAFT' })}
+              <button
+                onClick={() =>
+                  void triggerSave(true, {
+                    action: "draft",
+                    forceStatus: "DRAFT",
+                  })
+                }
                 disabled={saving}
                 className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
               >
-                {saving && saveAction === 'draft' && <Loader2 className="w-4 h-4 animate-spin" />}
+                {saving && saveAction === "draft" && (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                )}
                 Save as Draft
               </button>
             )}
             {isDraftEditMode && !isCollectionContext && (
               <button
-                onClick={() => void triggerSave(true, { action: 'draft', forceStatus: 'DRAFT' })}
+                onClick={() =>
+                  void triggerSave(true, {
+                    action: "draft",
+                    forceStatus: "DRAFT",
+                  })
+                }
                 disabled={saving}
                 className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
               >
-                {saving && saveAction === 'draft' && <Loader2 className="w-4 h-4 animate-spin" />}
+                {saving && saveAction === "draft" && (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                )}
                 Save Changes
               </button>
             )}
-            <button 
+            <button
               onClick={handleDiscard}
               className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
             >
-              {hasChanges ? 'Discard Changes' : isCollectionContext ? 'Back to Collection' : 'Cancel'}
+              {hasChanges
+                ? "Discard Changes"
+                : isCollectionContext
+                  ? "Back to Collection"
+                  : "Cancel"}
             </button>
-            <button 
-              onClick={() => void triggerSave(false, {
-                action: 'publish',
-                forceStatus: isCollectionContext ? 'ACTIVE' : isDraftEditMode ? 'ACTIVE' : undefined,
-              })}
+            <button
+              onClick={() =>
+                void triggerSave(false, {
+                  action: "publish",
+                  forceStatus: isCollectionContext
+                    ? "ACTIVE"
+                    : isDraftEditMode
+                      ? "ACTIVE"
+                      : undefined,
+                })
+              }
               disabled={saving}
               className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 text-white text-sm font-semibold rounded-lg shadow-lg shadow-purple-500/20 transition-all flex items-center gap-2"
             >
-              {saving && saveAction === 'publish' && <Loader2 className="w-4 h-4 animate-spin" />}
+              {saving && saveAction === "publish" && (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              )}
               {isDraftEditMode
-                ? 'Publish Product'
+                ? "Publish Product"
                 : isCollectionContext && isEditMode
-                  ? 'Save to Collection'
+                  ? "Save to Collection"
                   : isEditMode
-                  ? 'Save Changes'
-                  : isCollectionFlow
-                    ? 'Add to Collection'
-                    : 'Create Product'}
+                    ? "Save Changes"
+                    : isCollectionFlow
+                      ? "Add to Collection"
+                      : "Create Product"}
             </button>
           </div>
         </div>
@@ -2024,11 +3036,12 @@ const EditProduct: React.FC = () => {
           navigateBack();
         }}
         title="Discard Changes?"
-        message={!isEditMode
-          ? isCollectionContext
-            ? 'You have unsaved changes. Go back to collection without adding this product?'
-            : "You have unsaved changes. Would you like to save this as a draft before leaving?"
-          : "You have unsaved changes. Are you sure you want to discard them? This action cannot be undone."
+        message={
+          !isEditMode
+            ? isCollectionContext
+              ? "You have unsaved changes. Go back to collection without adding this product?"
+              : "You have unsaved changes. Would you like to save this as a draft before leaving?"
+            : "You have unsaved changes. Are you sure you want to discard them? This action cannot be undone."
         }
       />
     </div>

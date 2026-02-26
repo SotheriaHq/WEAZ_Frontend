@@ -1,30 +1,51 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate, useParams } from 'react-router-dom';
-import { toast } from 'sonner';
-import { 
-  FiArrowLeft, FiTrash2, FiStar, FiMove, FiMaximize2,
-  FiChevronDown, FiChevronUp, FiInfo, FiSearch, FiX, FiFile,
-  FiChevronLeft, FiChevronRight, FiZoomIn, FiZoomOut, FiPlus
-} from 'react-icons/fi';
-import { HiOutlineSparkles } from 'react-icons/hi';
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
+import {
+  FiArrowLeft,
+  FiTrash2,
+  FiStar,
+  FiMove,
+  FiMaximize2,
+  FiChevronDown,
+  FiChevronUp,
+  FiInfo,
+  FiSearch,
+  FiX,
+  FiFile,
+  FiChevronLeft,
+  FiChevronRight,
+  FiZoomIn,
+  FiZoomOut,
+  FiPlus,
+} from "react-icons/fi";
+import { HiOutlineSparkles } from "react-icons/hi";
 
 // Context & Hooks
-import TextField from '../../components/forms/TextField';
-import UniversalSelect from '@/components/forms/UniversalSelect';
-import MediaUploadZone from '../../components/upload/MediaUploadZone';
-import ThumbnailStrip from '../../components/upload/ThumbnailStrip';
-import MediaRenderer from '../../components/media/MediaRenderer';
-import useFilePicker from '../../components/upload/useFilePicker';
-import { PrePublishConfirmModal } from '@/components/modals';
-import TagsApi from '@/api/TagsApi';
-import { brandApi } from '@/api/BrandApi';
-import FilterSelector, { type FilterSelection } from '@/components/categories/FilterSelector';
-import InfoTooltip from '@/components/ui/InfoTooltip';
-import type { MediaItem } from '@/types/media';
-import { MediaProvider, useMediaStore } from '../../hooks/useMediaStore';
-import useCollectionUpload from '../../hooks/useCollectionUpload';
-import { useBrandProfile } from '../../hooks/UseBrandHook';
+import TextField from "../../components/forms/TextField";
+import UniversalSelect from "@/components/forms/UniversalSelect";
+import MediaUploadZone from "../../components/upload/MediaUploadZone";
+import ThumbnailStrip from "../../components/upload/ThumbnailStrip";
+import MediaRenderer from "../../components/media/MediaRenderer";
+import useFilePicker from "../../components/upload/useFilePicker";
+import { PrePublishConfirmModal } from "@/components/modals";
+import TagsApi from "@/api/TagsApi";
+import { brandApi } from "@/api/BrandApi";
+import FilterSelector, {
+  type FilterSelection,
+} from "@/components/categories/FilterSelector";
+import InfoTooltip from "@/components/ui/InfoTooltip";
+import type { MediaItem } from "@/types/media";
+import { MediaProvider, useMediaStore } from "../../hooks/useMediaStore";
+import useCollectionUpload from "../../hooks/useCollectionUpload";
+import { useBrandProfile } from "../../hooks/UseBrandHook";
 // ============================================================================
 
 type CategoryTypeOption = { id: string; name: string };
@@ -38,27 +59,29 @@ type CategoryOption = {
 const CreateDesignInner: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
-  
+
   const mediaStore = useMediaStore();
   const files = mediaStore.items;
   const navigate = useNavigate();
 
   // Form state
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
   const [isMadeToOrder, setIsMadeToOrder] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
-  const [tagSearch, setTagSearch] = useState('');
+  const [tagSearch, setTagSearch] = useState("");
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [categoryId, setCategoryId] = useState<string>('');
-  const [categoryTypeId, setCategoryTypeId] = useState<string>('');
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [categoryTypeId, setCategoryTypeId] = useState<string>("");
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
-  const [type, setType] = useState<'MALE' | 'FEMALE' | 'EVERYBODY'>('EVERYBODY');
-  const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+  const [type, setType] = useState<"MALE" | "FEMALE" | "EVERYBODY">(
+    "EVERYBODY",
+  );
+  const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
   const [metadataEditedAt, setMetadataEditedAt] = useState<Date | null>(null);
 
   // UI state
@@ -80,21 +103,27 @@ const CreateDesignInner: React.FC = () => {
   const [showSaveDraftConfirm, setShowSaveDraftConfirm] = useState(false);
   const tagStylePalette = useMemo(
     () => [
-      'bg-white/30 border border-white/40 text-purple-900 dark:text-white backdrop-blur-md shadow-sm',
-      'bg-gradient-to-r from-purple-500/60 to-blue-500/50 text-white shadow-md',
-      'bg-gradient-to-r from-amber-400/70 to-pink-500/70 text-white shadow-md',
-      'bg-white/20 text-white border border-white/30 backdrop-blur',
-      'bg-gradient-to-r from-emerald-400/70 to-teal-500/70 text-white shadow-md',
-      'bg-gradient-to-r from-indigo-500/70 to-cyan-500/70 text-white shadow-md',
+      "bg-white/30 border border-white/40 text-purple-900 dark:text-white backdrop-blur-md shadow-sm",
+      "bg-gradient-to-r from-purple-500/60 to-blue-500/50 text-white shadow-md",
+      "bg-gradient-to-r from-amber-400/70 to-pink-500/70 text-white shadow-md",
+      "bg-white/20 text-white border border-white/30 backdrop-blur",
+      "bg-gradient-to-r from-emerald-400/70 to-teal-500/70 text-white shadow-md",
+      "bg-gradient-to-r from-indigo-500/70 to-cyan-500/70 text-white shadow-md",
     ],
-    []
+    [],
   );
 
   // Track original items for deletion in edit mode
   const originalItemIds = useRef<Set<string>>(new Set());
   const transientObjectUrlsRef = useRef<Map<string, string>>(new Map());
 
-  const { uploadCollection, isUploading, progress, perFileProgress, cancelUploads } = useCollectionUpload();
+  const {
+    uploadCollection,
+    isUploading,
+    progress,
+    perFileProgress,
+    cancelUploads,
+  } = useCollectionUpload();
   const { user, fetchCollections } = useBrandProfile();
 
   const disabled = isSubmitting || isUploading;
@@ -109,7 +138,7 @@ const CreateDesignInner: React.FC = () => {
     return new Date(metadataEditedAt.getTime() + cooldownMs);
   }, [metadataEditedAt]);
   const picker = useFilePicker({
-    accept: ['image/*', 'video/*'],
+    accept: ["image/*", "video/*"],
     maxFiles: 20,
     onFiles: mediaStore.addFiles,
     disabled: disabled || isEditMode,
@@ -127,14 +156,14 @@ const CreateDesignInner: React.FC = () => {
         const s = await TagsApi.getSuggestions(80);
         if (mounted) setTagSuggestions(Array.isArray(s) ? s : []);
       } catch (error) {
-        console.warn('Failed to load tag suggestions', error);
+        console.warn("Failed to load tag suggestions", error);
         if (mounted) setTagSuggestions([]);
       }
     };
 
     const loadCategories = async () => {
       try {
-        const cats = await brandApi.getCategories(true);
+        const cats = await brandApi.getCategoriesWithSubCategories(true);
         if (!mounted || !Array.isArray(cats)) return;
         const mapped = cats.map((c) => ({
           id: c.id,
@@ -147,7 +176,9 @@ const CreateDesignInner: React.FC = () => {
         setCategories(mapped);
         if (mapped.length) {
           setCategoryId((prev) =>
-            prev && mapped.some((category) => category.id === prev) ? prev : mapped[0].id,
+            prev && mapped.some((category) => category.id === prev)
+              ? prev
+              : mapped[0].id,
           );
           setCategoryTypeId((prev) => {
             if (
@@ -158,11 +189,11 @@ const CreateDesignInner: React.FC = () => {
             ) {
               return prev;
             }
-            return mapped[0].types[0]?.id ?? '';
+            return mapped[0].types[0]?.id ?? "";
           });
         }
       } catch (error) {
-        console.warn('Failed to load categories', error);
+        console.warn("Failed to load categories", error);
         if (mounted) setCategories([]);
       } finally {
         if (mounted) setLoadingCategories(false);
@@ -174,23 +205,28 @@ const CreateDesignInner: React.FC = () => {
       try {
         const d = await brandApi.getCollectionDetail(id);
         if (!mounted || !d) return;
-        setTitle(d.title || '');
-        setDescription(d.description || '');
-        setMinPrice(d.minPrice ? String(d.minPrice) : '');
-        setMaxPrice(d.maxPrice ? String(d.maxPrice) : '');
+        setTitle(d.title || "");
+        setDescription(d.description || "");
+        setMinPrice(d.minPrice ? String(d.minPrice) : "");
+        setMaxPrice(d.maxPrice ? String(d.maxPrice) : "");
         setSelectedTags(Array.isArray(d.tags) ? d.tags : []);
-        setCategoryId(d.categoryId || '');
-        setCategoryTypeId(d.categoryTypeId || '');
-        setType(d.type || 'EVERYBODY');
-        setVisibility(d.visibility || 'PUBLIC');
-        setMetadataEditedAt(d.metadataEditedAt ? new Date(d.metadataEditedAt) : null);
+        setCategoryId(d.categoryId || "");
+        setCategoryTypeId(d.categoryTypeId || "");
+        setType(d.type || "EVERYBODY");
+        setVisibility(d.visibility || "PUBLIC");
+        setMetadataEditedAt(
+          d.metadataEditedAt ? new Date(d.metadataEditedAt) : null,
+        );
 
         if (d.medias && Array.isArray(d.medias)) {
           const mediaResults = await Promise.all(
             d.medias.map(async (m: any) => {
               const fileId = m.file?.id || m.fileId;
-              const remoteUrl = typeof m.file?.s3Url === 'string' ? m.file.s3Url : '';
-              const signedUrl = fileId ? await brandApi.getSignedFileUrl(fileId) : null;
+              const remoteUrl =
+                typeof m.file?.s3Url === "string" ? m.file.s3Url : "";
+              const signedUrl = fileId
+                ? await brandApi.getSignedFileUrl(fileId)
+                : null;
               originalItemIds.current.add(m.id);
               const previewUrl = signedUrl || remoteUrl;
               if (!previewUrl) return null;
@@ -198,7 +234,7 @@ const CreateDesignInner: React.FC = () => {
                 id: m.id,
                 file: undefined,
                 previewUrl,
-                kind: m.type === 'VIDEO' ? 'video' : 'image',
+                kind: m.type === "VIDEO" ? "video" : "image",
                 remoteId: m.id,
               } as MediaItem;
             }),
@@ -208,7 +244,10 @@ const CreateDesignInner: React.FC = () => {
         }
       } catch (error: any) {
         console.error(error);
-        toast.error(error?.response?.data?.message ?? 'Failed to load design for editing.');
+        toast.error(
+          error?.response?.data?.message ??
+            "Failed to load design for editing.",
+        );
       }
     };
 
@@ -225,21 +264,25 @@ const CreateDesignInner: React.FC = () => {
 
   useEffect(() => {
     if (!categoryId) {
-      setCategoryTypeId('');
+      setCategoryTypeId("");
       return;
     }
-    const selectedCategory = categories.find((category) => category.id === categoryId);
+    const selectedCategory = categories.find(
+      (category) => category.id === categoryId,
+    );
     if (!selectedCategory) {
-      setCategoryTypeId('');
+      setCategoryTypeId("");
       return;
     }
     if (
       categoryTypeId &&
-      selectedCategory.types.some((categoryType) => categoryType.id === categoryTypeId)
+      selectedCategory.types.some(
+        (categoryType) => categoryType.id === categoryTypeId,
+      )
     ) {
       return;
     }
-    setCategoryTypeId(selectedCategory.types[0]?.id ?? '');
+    setCategoryTypeId(selectedCategory.types[0]?.id ?? "");
   }, [categories, categoryId, categoryTypeId]);
 
   // Keep selected/cover indices in range when files change
@@ -288,7 +331,9 @@ const CreateDesignInner: React.FC = () => {
 
   useEffect(() => {
     const keepIds = new Set(files.map((item) => item.id));
-    for (const [id, url] of Array.from(transientObjectUrlsRef.current.entries())) {
+    for (const [id, url] of Array.from(
+      transientObjectUrlsRef.current.entries(),
+    )) {
       const item = files.find((it) => it.id === id);
       if (!keepIds.has(id) || item?.previewUrl) {
         URL.revokeObjectURL(url);
@@ -329,9 +374,14 @@ const CreateDesignInner: React.FC = () => {
   // Filter tag suggestions based on search
   const filteredSuggestions = useMemo(() => {
     const search = tagSearch.toLowerCase().trim();
-    if (!search) return tagSuggestions.filter((t) => !selectedTags.includes(t)).slice(0, 12);
+    if (!search)
+      return tagSuggestions
+        .filter((t) => !selectedTags.includes(t))
+        .slice(0, 12);
     return tagSuggestions
-      .filter((t) => t.toLowerCase().includes(search) && !selectedTags.includes(t))
+      .filter(
+        (t) => t.toLowerCase().includes(search) && !selectedTags.includes(t),
+      )
       .slice(0, 12);
   }, [tagSearch, tagSuggestions, selectedTags]);
 
@@ -346,7 +396,7 @@ const CreateDesignInner: React.FC = () => {
 
   const handleSetCover = (index: number) => {
     setCoverIndex(index);
-    toast.success('Cover image updated');
+    toast.success("Cover image updated");
   };
 
   const goToMediaIndex = useCallback(
@@ -357,7 +407,7 @@ const CreateDesignInner: React.FC = () => {
       setFullscreenIndex(bounded);
       setFullscreenZoom(1);
     },
-    [files.length]
+    [files.length],
   );
 
   const openFullscreen = useCallback(() => {
@@ -383,21 +433,26 @@ const CreateDesignInner: React.FC = () => {
     if (!isFullscreen) return;
 
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         event.preventDefault();
         closeFullscreen();
-      } else if (event.key === 'ArrowRight') {
+      } else if (event.key === "ArrowRight") {
         event.preventDefault();
         handleFullscreenNext();
-      } else if (event.key === 'ArrowLeft') {
+      } else if (event.key === "ArrowLeft") {
         event.preventDefault();
         handleFullscreenPrev();
       }
     };
 
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [closeFullscreen, handleFullscreenNext, handleFullscreenPrev, isFullscreen]);
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [
+    closeFullscreen,
+    handleFullscreenNext,
+    handleFullscreenPrev,
+    isFullscreen,
+  ]);
 
   useEffect(() => {
     if (isFullscreen && (fullscreenIndex === null || !files[fullscreenIndex])) {
@@ -411,12 +466,12 @@ const CreateDesignInner: React.FC = () => {
 
   const addTag = (tag: string) => {
     if (selectedTags.length >= 10) {
-      toast.error('Maximum 10 tags allowed');
+      toast.error("Maximum 10 tags allowed");
       return;
     }
     if (!selectedTags.includes(tag)) {
       setSelectedTags([...selectedTags, tag]);
-      setTagSearch('');
+      setTagSearch("");
     }
   };
 
@@ -425,16 +480,16 @@ const CreateDesignInner: React.FC = () => {
   };
 
   const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && tagSearch.trim()) {
+    if (e.key === "Enter" && tagSearch.trim()) {
       e.preventDefault();
-      addTag(tagSearch.trim().toLowerCase().replace(/\s+/g, '-'));
+      addTag(tagSearch.trim().toLowerCase().replace(/\s+/g, "-"));
     }
   };
 
   const handleSaveDraft = async () => {
     // Drafts require only media selection; auto-fill other fields for backend validation
     if (files.length === 0) {
-      toast.error('Please upload at least one file to save');
+      toast.error("Please upload at least one file to save");
       return;
     }
     setShowSaveDraftConfirm(true);
@@ -443,13 +498,16 @@ const CreateDesignInner: React.FC = () => {
   const executeSaveDraft = async () => {
     // Guard: prevent double submission
     if (isSubmitting) return;
-    
+
     setIsSubmitting(true);
     try {
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
       const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
-      const draftTitle = title.trim() || 'Untitled Draft';
-      const finalTags = (selectedTags.length ? selectedTags : ['draft']).slice(0, 10);
+      const draftTitle = title.trim() || "Untitled Draft";
+      const finalTags = (selectedTags.length ? selectedTags : ["draft"]).slice(
+        0,
+        10,
+      );
 
       await uploadCollection(
         files,
@@ -461,7 +519,7 @@ const CreateDesignInner: React.FC = () => {
         finalTags,
         { categoryId, categoryTypeId, type, visibility },
         undefined,
-        false // shouldPublish = false
+        false, // shouldPublish = false
       );
 
       setLastSaved(new Date());
@@ -470,12 +528,12 @@ const CreateDesignInner: React.FC = () => {
         await fetchCollections(user.id);
       }
 
-      toast.success('Draft saved successfully!');
+      toast.success("Draft saved successfully!");
       // Navigate to profile with Drafts visibility filter selected
-      navigate('/profile?tab=Content&visibility=Drafts');
+      navigate("/profile?tab=Content&visibility=Drafts");
     } catch (error) {
       console.error(error);
-      toast.error('Failed to save draft');
+      toast.error("Failed to save draft");
     } finally {
       setIsSubmitting(false);
       setShowSaveDraftConfirm(false);
@@ -485,12 +543,12 @@ const CreateDesignInner: React.FC = () => {
   const handlePublishClick = () => {
     if (!isValid) {
       const reasons: string[] = [];
-      if (title.trim().length === 0) reasons.push('a title');
-      if (files.length === 0) reasons.push('at least one file');
-      if (selectedTags.length === 0) reasons.push('at least one tag');
-      if (categoryId.trim().length === 0) reasons.push('a category');
-      if (categoryTypeId.trim().length === 0) reasons.push('a category type');
-      toast.error(`Please provide ${reasons.join(', ')}.`);
+      if (title.trim().length === 0) reasons.push("a title");
+      if (files.length === 0) reasons.push("at least one file");
+      if (selectedTags.length === 0) reasons.push("at least one tag");
+      if (categoryId.trim().length === 0) reasons.push("a category");
+      if (categoryTypeId.trim().length === 0) reasons.push("a category type");
+      toast.error(`Please provide ${reasons.join(", ")}.`);
       return;
     }
     setShowPublishModal(true);
@@ -506,10 +564,16 @@ const CreateDesignInner: React.FC = () => {
       const finalTags = selectedTags.slice(0, 10);
 
       const extractCollectionId = (res: any): string | undefined => {
-        if (!res || typeof res !== 'object') return undefined;
-        if (typeof (res as any).collectionId === 'string') return (res as any).collectionId;
-        if (typeof (res as any).id === 'string') return (res as any).id;
-        if ((res as any).data && typeof (res as any).data === 'object' && typeof (res as any).data.id === 'string') return (res as any).data.id;
+        if (!res || typeof res !== "object") return undefined;
+        if (typeof (res as any).collectionId === "string")
+          return (res as any).collectionId;
+        if (typeof (res as any).id === "string") return (res as any).id;
+        if (
+          (res as any).data &&
+          typeof (res as any).data === "object" &&
+          typeof (res as any).data.id === "string"
+        )
+          return (res as any).data.id;
         return undefined;
       };
 
@@ -531,12 +595,16 @@ const CreateDesignInner: React.FC = () => {
         } as any);
 
         const currentIds = new Set(files.map((f) => f.id));
-        const toDelete = Array.from(originalItemIds.current).filter((oid) => !currentIds.has(oid));
+        const toDelete = Array.from(originalItemIds.current).filter(
+          (oid) => !currentIds.has(oid),
+        );
         if (toDelete.length > 0) {
-          await Promise.all(toDelete.map((itemId) => brandApi.deleteCollectionItem(id, itemId)));
+          await Promise.all(
+            toDelete.map((itemId) => brandApi.deleteCollectionItem(id, itemId)),
+          );
         }
 
-        toast.success('Design updated');
+        toast.success("Design updated");
       } else {
         const response = await uploadCollection(
           files,
@@ -546,19 +614,27 @@ const CreateDesignInner: React.FC = () => {
           parsedMaxPrice,
           false,
           finalTags,
-          { categoryId, categoryTypeId, type, visibility }
+          { categoryId, categoryTypeId, type, visibility },
         );
         const newCollectionId = extractCollectionId(response);
-        const fileIdMap = (response as any)?.fileIdMap as Record<string, string> | undefined;
-        const completions = (response as any)?.completions as Array<{ fileId: string }> | undefined;
+        const fileIdMap = (response as any)?.fileIdMap as
+          | Record<string, string>
+          | undefined;
+        const completions = (response as any)?.completions as
+          | Array<{ fileId: string }>
+          | undefined;
         const coverRemoteId = coverLocalId
-          ? fileIdMap?.[coverLocalId] || completions?.[coverIndex]?.fileId || coverLocalId
+          ? fileIdMap?.[coverLocalId] ||
+            completions?.[coverIndex]?.fileId ||
+            coverLocalId
           : undefined;
 
         if (newCollectionId && coverRemoteId) {
-          await brandApi.updateCollection(newCollectionId, { coverMediaId: coverRemoteId } as any);
+          await brandApi.updateCollection(newCollectionId, {
+            coverMediaId: coverRemoteId,
+          } as any);
         }
-        toast.success('Design published');
+        toast.success("Design published");
 
         // Navigate back to profile/catalog with a publishing badge so the user is not blocked on this page
         navigate(`/profile?tab=Content`, {
@@ -576,14 +652,20 @@ const CreateDesignInner: React.FC = () => {
       setShowPublishModal(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.toLowerCase().includes('cancelled')) {
-        toast.info('Publish cancelled');
+      if (message.toLowerCase().includes("cancelled")) {
+        toast.info("Publish cancelled");
         setShowPublishModal(false);
         return;
       }
       console.error(error);
       const errMsg = (error as any)?.response?.data?.message;
-      toast.error(typeof errMsg === 'string' ? errMsg : (isEditMode ? 'Failed to update design' : 'Failed to publish design'));
+      toast.error(
+        typeof errMsg === "string"
+          ? errMsg
+          : isEditMode
+            ? "Failed to update design"
+            : "Failed to publish design",
+      );
       throw error; // Re-throw so modal can handle state
     } finally {
       setIsSubmitting(false);
@@ -595,10 +677,10 @@ const CreateDesignInner: React.FC = () => {
     setShowCancelPrompt(true);
   };
 
-  const handleCancelPromptChoice = (action: 'return' | 'cancel') => {
+  const handleCancelPromptChoice = (action: "return" | "cancel") => {
     setShowCancelPrompt(false);
-    if (action === 'cancel') {
-      navigate('/profile');
+    if (action === "cancel") {
+      navigate("/profile");
     }
   };
 
@@ -607,12 +689,15 @@ const CreateDesignInner: React.FC = () => {
     title,
     description,
     category: selectedCategory?.name,
-    priceRange: { min: minPrice ? parseFloat(minPrice) : undefined, max: maxPrice ? parseFloat(maxPrice) : undefined },
+    priceRange: {
+      min: minPrice ? parseFloat(minPrice) : undefined,
+      max: maxPrice ? parseFloat(maxPrice) : undefined,
+    },
     visibility,
     type,
     tags: selectedTags,
-    mediaCount: files.filter((f) => f.kind === 'image').length,
-    videoCount: files.filter((f) => f.kind === 'video').length,
+    mediaCount: files.filter((f) => f.kind === "image").length,
+    videoCount: files.filter((f) => f.kind === "video").length,
     coverImageUrl,
     isAvailableInStore: false,
     isMadeToOrder,
@@ -624,11 +709,15 @@ const CreateDesignInner: React.FC = () => {
       {/* Save Draft Confirmation */}
       {showSaveDraftConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setShowSaveDraftConfirm(false)} />
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setShowSaveDraftConfirm(false)}
+          />
           <div className="relative z-10 w-[420px] bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-6">
             <h3 className="text-lg font-semibold mb-2">Save as Draft?</h3>
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-              Your media will be uploaded and saved as a draft. You can continue editing later.
+              Your media will be uploaded and saved as a draft. You can continue
+              editing later.
             </p>
             <div className="flex justify-end gap-2">
               <button
@@ -643,7 +732,7 @@ const CreateDesignInner: React.FC = () => {
                 onClick={executeSaveDraft}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Saving…' : 'Confirm'}
+                {isSubmitting ? "Saving…" : "Confirm"}
               </button>
             </div>
           </div>
@@ -665,7 +754,7 @@ const CreateDesignInner: React.FC = () => {
           <div className="flex items-center gap-2">
             <HiOutlineSparkles className="w-5 h-5 text-purple-500" />
             <h1 className="text-lg sm:text-xl font-semibold">
-              {isEditMode ? 'Edit Design' : 'Create Design'}
+              {isEditMode ? "Edit Design" : "Create Design"}
             </h1>
           </div>
 
@@ -682,12 +771,14 @@ const CreateDesignInner: React.FC = () => {
             >
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-8 h-8 rounded-full border-2 border-purple-500/20 border-t-purple-500 animate-spin" />
-                <span className="text-white font-medium">Uploading files... {progress}%</span>
+                <span className="text-white font-medium">
+                  Uploading files... {progress}%
+                </span>
                 <button
                   type="button"
                   onClick={() => {
                     cancelUploads();
-                    toast.info('Upload cancelled');
+                    toast.info("Upload cancelled");
                   }}
                   className="ml-auto px-3 py-1 rounded-lg bg-white/10 text-white text-sm hover:bg-white/20"
                 >
@@ -718,9 +809,7 @@ const CreateDesignInner: React.FC = () => {
               <div className="space-y-4 h-full min-w-0">
                 {/* Main Preview - NO background; media defines layout */}
                 <div className="relative rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-sm">
-                  <div
-                    className="relative w-full flex justify-center"
-                  >
+                  <div className="relative w-full flex justify-center">
                     <AnimatePresence mode="wait">
                       {selectedFile && (
                         <motion.div
@@ -732,9 +821,11 @@ const CreateDesignInner: React.FC = () => {
                           transition={{ duration: 0.25 }}
                         >
                           <MediaRenderer
-                            kind={selectedFile.kind === 'video' ? 'video' : 'image'}
+                            kind={
+                              selectedFile.kind === "video" ? "video" : "image"
+                            }
                             src={selectedFile.url}
-                            alt={selectedFile.file?.name || 'Preview'}
+                            alt={selectedFile.file?.name || "Preview"}
                             maxHeightClassName="max-h-[620px]"
                           />
                         </motion.div>
@@ -747,12 +838,22 @@ const CreateDesignInner: React.FC = () => {
                         <ActionButton
                           icon={<FiTrash2 className="w-4 h-4" />}
                           label="Delete"
-                          onClick={() => selectedFile?.id && handleDelete(selectedFile.id)}
+                          onClick={() =>
+                            selectedFile?.id && handleDelete(selectedFile.id)
+                          }
                           disabled={disabled}
                         />
                         <ActionButton
-                          icon={<FiStar className={`w-4 h-4 ${coverIndex === selectedIndex ? 'fill-purple-400 text-purple-400' : ''}`} />}
-                          label={coverIndex === selectedIndex ? 'Cover' : 'Set as Cover'}
+                          icon={
+                            <FiStar
+                              className={`w-4 h-4 ${coverIndex === selectedIndex ? "fill-purple-400 text-purple-400" : ""}`}
+                            />
+                          }
+                          label={
+                            coverIndex === selectedIndex
+                              ? "Cover"
+                              : "Set as Cover"
+                          }
                           onClick={() => handleSetCover(selectedIndex)}
                           disabled={disabled}
                           active={coverIndex === selectedIndex}
@@ -799,9 +900,11 @@ const CreateDesignInner: React.FC = () => {
 
                 {/* Image info */}
                 <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-                  {selectedFile?.kind === 'video' ? 'Video' : 'Image'} {selectedIndex + 1} of {files.length}
+                  {selectedFile?.kind === "video" ? "Video" : "Image"}{" "}
+                  {selectedIndex + 1} of {files.length}
                   {selectedFile?.file?.name && ` • ${selectedFile.file.name}`}
-                  {selectedFile?.file?.size && ` • ${(selectedFile.file.size / (1024 * 1024)).toFixed(1)} MB`}
+                  {selectedFile?.file?.size &&
+                    ` • ${(selectedFile.file.size / (1024 * 1024)).toFixed(1)} MB`}
                 </p>
               </div>
             )}
@@ -813,160 +916,205 @@ const CreateDesignInner: React.FC = () => {
               title="Design Details"
               icon="📝"
               isOpen={expandedSections.details}
-              onToggle={() => toggleSection('details')}
+              onToggle={() => toggleSection("details")}
               className="h-full flex flex-col"
             >
               <div className="space-y-4">
                 <TextField
                   label="Design Title"
                   value={title}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setTitle(e.target.value)
+                  }
                   placeholder="e.g., Summer Breeze '24"
                   disabled={disabled || titleDescriptionLocked}
                   variant="glass"
                   required
                 />
 
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center">
-                    Tell Your Story
-                    <InfoTooltip text="Describe the inspiration, mood, and story behind this design. This is visible to buyers browsing the catalog." />
-                  </label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Inspired by the warm coastal breeze of Lagos..."
-                    rows={4}
-                    disabled={disabled || titleDescriptionLocked}
-                    className="w-full px-4 py-3 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none"
-                  />
-                  <p className="text-right text-xs text-gray-600 dark:text-gray-400">
-                    {description.length} / 500 characters
-                  </p>
-                </div>
-                {titleDescriptionLocked && (
-                  <p className="rounded-lg border border-amber-300/60 bg-amber-50/80 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-                    Title and description can only be updated once every 30 days.{nextTitleEditDate ? ` Next edit available on ${nextTitleEditDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}.` : ''}
-                  </p>
-                )}
-
-                <UniversalSelect
-                  label="Category"
-                  value={categoryId}
-                  onChange={setCategoryId}
-                  options={categories.map((c) => ({ value: c.id, label: c.name }))}
-                  placeholder={loadingCategories ? 'Loading...' : 'Select a category'}
-                  disabled={disabled}
-                />
-
-                <UniversalSelect
-                  label="Category Type"
-                  value={categoryTypeId}
-                  onChange={setCategoryTypeId}
-                  options={categoryTypeOptions.map((categoryType) => ({
-                    value: categoryType.id,
-                    label: categoryType.name,
-                  }))}
-                  placeholder={
-                    loadingCategories
-                      ? 'Loading...'
-                      : categoryTypeOptions.length
-                        ? 'Select a type'
-                        : 'No types available'
-                  }
-                  disabled={disabled || categoryTypeOptions.length === 0}
-                />
-
-                {/* Filter Selector */}
-                <FilterSelector
-                  value={filterSelection}
-                  onChange={setFilterSelection}
-                  entityType="COLLECTION"
-                  disabled={disabled}
-                  onTagSuggestions={(suggestions: string[]) => {
-                    // Merge filter-suggested tags into tag suggestions without duplicates
-                    setTagSuggestions((prev) => {
-                      const merged = new Set([...prev, ...suggestions]);
-                      return Array.from(merged);
-                    });
-                  }}
-                />
-
-                {/* Tags Section */}
-                <div className="space-y-3">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center">
-                    🏷️ Tags (up to 10)
-                    <InfoTooltip text="Tags improve catalog discoverability. Add manually or use filter-driven suggestions. Up to 10 tags per design." />
-                  </label>
-                  
-                  <div className="p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10">
-                    {/* Selected tags */}
-                    {selectedTags.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {selectedTags.map((tag, idx) => (
-                          <motion.span
-                            key={tag}
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.8, opacity: 0 }}
-                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${tagStylePalette[idx % tagStylePalette.length]}`}
-                          >
-                            {tag}
-                            <button
-                              type="button"
-                              onClick={() => removeTag(tag)}
-                              className="ml-1 hover:text-purple-200 transition-colors"
-                            >
-                              <FiX className="w-3.5 h-3.5" />
-                            </button>
-                          </motion.span>
-                        ))}
+                <div className="rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/40 dark:bg-white/[0.02] p-3 sm:p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Design Metadata
+                    </p>
+                    <span className="text-[10px] font-medium text-gray-400">
+                      Scroll inside panel
+                    </span>
+                  </div>
+                  <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center">
+                          Tell Your Story
+                          <InfoTooltip text="Describe the inspiration, mood, and story behind this design. This is visible to buyers browsing the catalog." />
+                        </label>
+                        <textarea
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="Inspired by the warm coastal breeze of Lagos..."
+                          rows={4}
+                          disabled={disabled || titleDescriptionLocked}
+                          className="w-full px-4 py-3 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none"
+                        />
+                        <p className="text-right text-xs text-gray-600 dark:text-gray-400">
+                          {description.length} / 500 characters
+                        </p>
                       </div>
-                    )}
+                      {titleDescriptionLocked && (
+                        <p className="rounded-lg border border-amber-300/60 bg-amber-50/80 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                          Title and description can only be updated once every
+                          30 days.
+                          {nextTitleEditDate
+                            ? ` Next edit available on ${nextTitleEditDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.`
+                            : ""}
+                        </p>
+                      )}
 
-                    {/* Search input */}
-                    <div className="relative">
-                      <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                      <input
-                        type="text"
-                        value={tagSearch}
-                        onChange={(e) => setTagSearch(e.target.value)}
-                        onKeyDown={handleTagInputKeyDown}
-                        placeholder="Search or create a tag..."
-                        disabled={disabled || selectedTags.length >= 10}
-                        className="threadly-search-input pl-10 pr-12"
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <UniversalSelect
+                          label="Category"
+                          value={categoryId}
+                          onChange={setCategoryId}
+                          options={categories.map((c) => ({
+                            value: c.id,
+                            label: c.name,
+                          }))}
+                          placeholder={
+                            loadingCategories
+                              ? "Loading..."
+                              : "Select a category"
+                          }
+                          disabled={disabled}
+                        />
+
+                        <UniversalSelect
+                          label="Category Type"
+                          value={categoryTypeId}
+                          onChange={setCategoryTypeId}
+                          options={categoryTypeOptions.map((categoryType) => ({
+                            value: categoryType.id,
+                            label: categoryType.name,
+                          }))}
+                          placeholder={
+                            loadingCategories
+                              ? "Loading..."
+                              : categoryTypeOptions.length
+                                ? "Select a type"
+                                : "No types available"
+                          }
+                          disabled={
+                            disabled || categoryTypeOptions.length === 0
+                          }
+                        />
+                      </div>
+
+                      {/* Filter Selector */}
+                      <FilterSelector
+                        value={filterSelection}
+                        onChange={setFilterSelection}
+                        entityType="COLLECTION"
+                        disabled={disabled}
+                        onTagSuggestions={(suggestions: string[]) => {
+                          // Merge filter-suggested tags into tag suggestions without duplicates
+                          setTagSuggestions((prev) => {
+                            const merged = new Set([...prev, ...suggestions]);
+                            return Array.from(merged);
+                          });
+                        }}
                       />
-                      <button
-                        type="button"
-                        onClick={() => tagSearch.trim() && addTag(tagSearch.trim().toLowerCase().replace(/\s+/g, '-'))}
-                        disabled={disabled || selectedTags.length >= 10 || !tagSearch.trim()}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all disabled:opacity-50 disabled:shadow-none"
-                        aria-label="Add tag"
-                      >
-                        <FiPlus className="w-4 h-4" />
-                        Add
-                      </button>
-                    </div>
 
-                    {/* Popular tags */}
-                    {filteredSuggestions.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Popular Tags:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {filteredSuggestions.map((tag) => (
+                      {/* Tags Section */}
+                      <div className="space-y-3">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center">
+                          🏷️ Tags (up to 10)
+                          <InfoTooltip text="Tags improve catalog discoverability. Add manually or use filter-driven suggestions. Up to 10 tags per design." />
+                        </label>
+
+                        <div className="p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10">
+                          {/* Selected tags */}
+                          {selectedTags.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {selectedTags.map((tag, idx) => (
+                                <motion.span
+                                  key={tag}
+                                  initial={{ scale: 0.8, opacity: 0 }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                  exit={{ scale: 0.8, opacity: 0 }}
+                                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${tagStylePalette[idx % tagStylePalette.length]}`}
+                                >
+                                  {tag}
+                                  <button
+                                    type="button"
+                                    onClick={() => removeTag(tag)}
+                                    className="ml-1 hover:text-purple-200 transition-colors"
+                                  >
+                                    <FiX className="w-3.5 h-3.5" />
+                                  </button>
+                                </motion.span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Search input */}
+                          <div className="relative">
+                            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <input
+                              type="text"
+                              value={tagSearch}
+                              onChange={(e) => setTagSearch(e.target.value)}
+                              onKeyDown={handleTagInputKeyDown}
+                              placeholder="Search or create a tag..."
+                              disabled={disabled || selectedTags.length >= 10}
+                              className="threadly-search-input pl-10 pr-12"
+                            />
                             <button
-                              key={tag}
                               type="button"
-                              onClick={() => addTag(tag)}
-                              disabled={disabled}
-                              className="tag-badge-outline px-3 py-1.5 rounded-full text-sm font-medium"
+                              onClick={() =>
+                                tagSearch.trim() &&
+                                addTag(
+                                  tagSearch
+                                    .trim()
+                                    .toLowerCase()
+                                    .replace(/\s+/g, "-"),
+                                )
+                              }
+                              disabled={
+                                disabled ||
+                                selectedTags.length >= 10 ||
+                                !tagSearch.trim()
+                              }
+                              className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all disabled:opacity-50 disabled:shadow-none"
+                              aria-label="Add tag"
                             >
-                              {tag}
+                              <FiPlus className="w-4 h-4" />
+                              Add
                             </button>
-                          ))}
+                          </div>
+
+                          {/* Popular tags */}
+                          {filteredSuggestions.length > 0 && (
+                            <div className="mt-3">
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                                Popular Tags:
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {filteredSuggestions.map((tag) => (
+                                  <button
+                                    key={tag}
+                                    type="button"
+                                    onClick={() => addTag(tag)}
+                                    disabled={disabled}
+                                    className="tag-badge-outline px-3 py-1.5 rounded-full text-sm font-medium"
+                                  >
+                                    {tag}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -981,7 +1129,7 @@ const CreateDesignInner: React.FC = () => {
             title="Pricing & Availability"
             icon="💰"
             isOpen={expandedSections.pricing}
-            onToggle={() => toggleSection('pricing')}
+            onToggle={() => toggleSection("pricing")}
           >
             <div className="space-y-4">
               <div>
@@ -991,7 +1139,9 @@ const CreateDesignInner: React.FC = () => {
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₦</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                      ₦
+                    </span>
                     <input
                       type="number"
                       value={minPrice}
@@ -1000,10 +1150,14 @@ const CreateDesignInner: React.FC = () => {
                       disabled={disabled}
                       className="w-full pl-8 pr-4 py-3 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     />
-                    <span className="absolute -bottom-5 left-0 text-xs text-gray-600 dark:text-gray-400">Minimum Price</span>
+                    <span className="absolute -bottom-5 left-0 text-xs text-gray-600 dark:text-gray-400">
+                      Minimum Price
+                    </span>
                   </div>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₦</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                      ₦
+                    </span>
                     <input
                       type="number"
                       value={maxPrice}
@@ -1012,7 +1166,9 @@ const CreateDesignInner: React.FC = () => {
                       disabled={disabled}
                       className="w-full pl-8 pr-4 py-3 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     />
-                    <span className="absolute -bottom-5 left-0 text-xs text-gray-600 dark:text-gray-400">Maximum Price</span>
+                    <span className="absolute -bottom-5 left-0 text-xs text-gray-600 dark:text-gray-400">
+                      Maximum Price
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1021,7 +1177,8 @@ const CreateDesignInner: React.FC = () => {
               <div className="mt-8 p-3 rounded-xl bg-blue-50 border border-blue-200 text-gray-800 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-100 flex items-start gap-2">
                 <FiInfo className="w-5 h-5 text-blue-500 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                 <p className="text-sm">
-                  Setting a price range helps buyers know what to expect. Leave empty if prices vary significantly.
+                  Setting a price range helps buyers know what to expect. Leave
+                  empty if prices vary significantly.
                 </p>
               </div>
 
@@ -1036,8 +1193,12 @@ const CreateDesignInner: React.FC = () => {
                     className="w-5 h-5 mt-0.5 rounded border-gray-400 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-transparent"
                   />
                   <div>
-                    <span className="text-gray-900 dark:text-white font-medium">Store availability</span>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Store collections are created in Store Studio.</p>
+                    <span className="text-gray-900 dark:text-white font-medium">
+                      Store availability
+                    </span>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Store collections are created in Store Studio.
+                    </p>
                   </div>
                 </label>
 
@@ -1050,8 +1211,12 @@ const CreateDesignInner: React.FC = () => {
                     className="w-5 h-5 mt-0.5 rounded border-gray-400 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-transparent"
                   />
                   <div>
-                    <span className="text-gray-900 dark:text-white font-medium">Made to Order</span>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Show "Custom Order" badge on design</p>
+                    <span className="text-gray-900 dark:text-white font-medium">
+                      Made to Order
+                    </span>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Show "Custom Order" badge on design
+                    </p>
                   </div>
                 </label>
               </div>
@@ -1063,14 +1228,16 @@ const CreateDesignInner: React.FC = () => {
             title="Targeting & Visibility"
             icon="🎯"
             isOpen={expandedSections.targeting}
-            onToggle={() => toggleSection('targeting')}
+            onToggle={() => toggleSection("targeting")}
           >
             <div className="space-y-6">
               {/* Target Audience */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">Target Audience</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">
+                  Target Audience
+                </label>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  {(['EVERYBODY', 'MALE', 'FEMALE'] as const).map((option) => (
+                  {(["EVERYBODY", "MALE", "FEMALE"] as const).map((option) => (
                     <button
                       key={option}
                       type="button"
@@ -1078,13 +1245,18 @@ const CreateDesignInner: React.FC = () => {
                       disabled={disabled}
                       className={`
                         flex-1 py-3 px-4 rounded-xl border-2 font-medium transition-all
-                        ${type === option
-                          ? 'border-purple-500 bg-purple-500/10 text-purple-600 dark:text-purple-400'
-                          : 'border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-200 dark:hover:border-white/20'
+                        ${
+                          type === option
+                            ? "border-purple-500 bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                            : "border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-200 dark:hover:border-white/20"
                         }
                       `}
                     >
-                      {option === 'EVERYBODY' ? 'Everybody' : option === 'MALE' ? 'Men' : 'Women'}
+                      {option === "EVERYBODY"
+                        ? "Everybody"
+                        : option === "MALE"
+                          ? "Men"
+                          : "Women"}
                     </button>
                   ))}
                 </div>
@@ -1092,19 +1264,34 @@ const CreateDesignInner: React.FC = () => {
 
               {/* Visibility */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">Who Can See This?</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">
+                  Who Can See This?
+                </label>
                 <div className="space-y-3">
-                  {([
-                    { value: 'PUBLIC', emoji: '🌍', label: 'Public', desc: 'Everyone can see this design' },
-                    { value: 'PRIVATE', emoji: '🔒', label: 'Private', desc: 'Only you and collaborators can see' },
-                  ] as const).map((option) => (
+                  {(
+                    [
+                      {
+                        value: "PUBLIC",
+                        emoji: "🌍",
+                        label: "Public",
+                        desc: "Everyone can see this design",
+                      },
+                      {
+                        value: "PRIVATE",
+                        emoji: "🔒",
+                        label: "Private",
+                        desc: "Only you and collaborators can see",
+                      },
+                    ] as const
+                  ).map((option) => (
                     <label
                       key={option.value}
                       className={`
                         flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all
-                        ${visibility === option.value
-                          ? 'border-purple-500 bg-purple-500/10'
-                          : 'border-gray-200 dark:border-white/10 glass-light hover:border-purple-200 dark:hover:border-white/20'
+                        ${
+                          visibility === option.value
+                            ? "border-purple-500 bg-purple-500/10"
+                            : "border-gray-200 dark:border-white/10 glass-light hover:border-purple-200 dark:hover:border-white/20"
                         }
                       `}
                     >
@@ -1119,10 +1306,14 @@ const CreateDesignInner: React.FC = () => {
                       />
                       <span className="text-2xl">{option.emoji}</span>
                       <div>
-                        <span className={`font-medium ${visibility === option.value ? 'text-purple-600 dark:text-purple-400' : 'text-gray-900 dark:text-white'}`}>
+                        <span
+                          className={`font-medium ${visibility === option.value ? "text-purple-600 dark:text-purple-400" : "text-gray-900 dark:text-white"}`}
+                        >
                           {option.label}
                         </span>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{option.desc}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {option.desc}
+                        </p>
                       </div>
                     </label>
                   ))}
@@ -1139,7 +1330,7 @@ const CreateDesignInner: React.FC = () => {
           <div className="text-sm text-gray-500 dark:text-gray-400">
             {lastSaved
               ? `Design saved locally • Last edit: ${formatTimeAgo(lastSaved)}`
-              : 'Unsaved changes'}
+              : "Unsaved changes"}
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
             <button
@@ -1166,7 +1357,7 @@ const CreateDesignInner: React.FC = () => {
               className="flex-1 sm:flex-none py-3 px-6 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <HiOutlineSparkles className="w-5 h-5" />
-              {isEditMode ? 'Update Design' : 'Publish Design'}
+              {isEditMode ? "Update Design" : "Publish Design"}
             </button>
           </div>
         </div>
@@ -1193,23 +1384,29 @@ const CreateDesignInner: React.FC = () => {
           >
             <div className="w-full max-w-md rounded-2xl glass-panel-dark border border-white/10 p-6 space-y-4">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-600/20 flex items-center justify-center text-purple-200 font-semibold">?</div>
+                <div className="w-10 h-10 rounded-xl bg-purple-600/20 flex items-center justify-center text-purple-200 font-semibold">
+                  ?
+                </div>
                 <div className="space-y-1">
-                  <p className="text-lg font-semibold text-white">What would you like to do?</p>
-                  <p className="text-sm text-white/70">Return to editing or cancel the entire process.</p>
+                  <p className="text-lg font-semibold text-white">
+                    What would you like to do?
+                  </p>
+                  <p className="text-sm text-white/70">
+                    Return to editing or cancel the entire process.
+                  </p>
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  onClick={() => handleCancelPromptChoice('return')}
+                  onClick={() => handleCancelPromptChoice("return")}
                   className="flex-1 px-4 py-3 rounded-xl border border-white/15 bg-white/5 text-white font-medium hover:border-purple-300/40"
                 >
                   Return to creation
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleCancelPromptChoice('cancel')}
+                  onClick={() => handleCancelPromptChoice("cancel")}
                   className="flex-1 px-4 py-3 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-400"
                 >
                   Cancel entire process
@@ -1230,7 +1427,10 @@ const CreateDesignInner: React.FC = () => {
             className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
             onClick={closeFullscreen}
           >
-            <div className="absolute top-4 right-4 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="absolute top-4 right-4 flex items-center gap-2"
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
                 className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white"
                 onClick={closeFullscreen}
@@ -1240,7 +1440,10 @@ const CreateDesignInner: React.FC = () => {
               </button>
             </div>
 
-            <div className="relative w-full h-full max-w-6xl flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="relative w-full h-full max-w-6xl flex flex-col gap-4"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="flex items-center justify-between gap-3 text-white">
                 <div className="flex items-center gap-2">
                   <button
@@ -1254,7 +1457,9 @@ const CreateDesignInner: React.FC = () => {
                   <button
                     className="p-2 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-40"
                     onClick={handleFullscreenNext}
-                    disabled={(fullscreenIndex ?? selectedIndex) >= files.length - 1}
+                    disabled={
+                      (fullscreenIndex ?? selectedIndex) >= files.length - 1
+                    }
                     aria-label="Next media"
                   >
                     <FiChevronRight className="w-5 h-5" />
@@ -1264,7 +1469,11 @@ const CreateDesignInner: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <button
                     className="px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm flex items-center gap-1 disabled:opacity-50"
-                    onClick={() => setFullscreenZoom((z) => Math.max(1, +(z - 0.25).toFixed(2)))}
+                    onClick={() =>
+                      setFullscreenZoom((z) =>
+                        Math.max(1, +(z - 0.25).toFixed(2)),
+                      )
+                    }
                     disabled={fullscreenZoom <= 1}
                   >
                     <FiZoomOut className="w-4 h-4" />
@@ -1272,7 +1481,11 @@ const CreateDesignInner: React.FC = () => {
                   </button>
                   <button
                     className="px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm flex items-center gap-1"
-                    onClick={() => setFullscreenZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
+                    onClick={() =>
+                      setFullscreenZoom((z) =>
+                        Math.min(3, +(z + 0.25).toFixed(2)),
+                      )
+                    }
                   >
                     <FiZoomIn className="w-4 h-4" />
                     <span>Zoom in</span>
@@ -1296,9 +1509,14 @@ const CreateDesignInner: React.FC = () => {
                   <FiChevronLeft className="w-5 h-5" />
                 </button>
 
-                <div style={{ transform: `scale(${fullscreenZoom})`, transition: 'transform 0.2s ease' }}>
+                <div
+                  style={{
+                    transform: `scale(${fullscreenZoom})`,
+                    transition: "transform 0.2s ease",
+                  }}
+                >
                   <MediaRenderer
-                    kind={fullscreenFile.kind === 'video' ? 'video' : 'image'}
+                    kind={fullscreenFile.kind === "video" ? "video" : "image"}
                     src={fullscreenFile.url}
                     alt="Fullscreen preview"
                     maxHeightClassName="max-h-[80vh]"
@@ -1306,94 +1524,139 @@ const CreateDesignInner: React.FC = () => {
                   />
                 </div>
 
-      {/* Draft Preview (read-only) */}
-      <AnimatePresence>
-        {showDraftPreview && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-            onClick={() => setShowDraftPreview(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.96, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl glass-panel-dark border border-white/10 p-6 space-y-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-white/60">Draft snapshot</p>
-                  <h3 className="text-xl font-semibold text-white">{title || 'Untitled design'}</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowDraftPreview(false)}
-                  className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
-                  aria-label="Close draft preview"
-                >
-                  <FiX className="w-5 h-5" />
-                </button>
-              </div>
+                {/* Draft Preview (read-only) */}
+                <AnimatePresence>
+                  {showDraftPreview && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+                      onClick={() => setShowDraftPreview(false)}
+                    >
+                      <motion.div
+                        initial={{ scale: 0.96, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.96, opacity: 0 }}
+                        className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl glass-panel-dark border border-white/10 p-6 space-y-4"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-white/60">
+                              Draft snapshot
+                            </p>
+                            <h3 className="text-xl font-semibold text-white">
+                              {title || "Untitled design"}
+                            </h3>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowDraftPreview(false)}
+                            className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
+                            aria-label="Close draft preview"
+                          >
+                            <FiX className="w-5 h-5" />
+                          </button>
+                        </div>
 
-              {selectedFile?.url && (
-                <div className="w-full rounded-xl">
-                  <MediaRenderer
-                    kind={selectedFile.kind === 'video' ? 'video' : 'image'}
-                    src={selectedFile.url}
-                    alt="Draft cover"
-                    maxHeightClassName="max-h-[420px]"
-                  />
-                </div>
-              )}
+                        {selectedFile?.url && (
+                          <div className="w-full rounded-xl">
+                            <MediaRenderer
+                              kind={
+                                selectedFile.kind === "video"
+                                  ? "video"
+                                  : "image"
+                              }
+                              src={selectedFile.url}
+                              alt="Draft cover"
+                              maxHeightClassName="max-h-[420px]"
+                            />
+                          </div>
+                        )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white/90 text-sm">
-                <div className="space-y-2">
-                  <p><span className="text-white/60">Description:</span> {description || '—'}</p>
-                  <p><span className="text-white/60">Category:</span> {selectedCategory?.name || '—'}</p>
-                  <p><span className="text-white/60">Audience:</span> {type}</p>
-                </div>
-                <div className="space-y-2">
-                  <p><span className="text-white/60">Visibility:</span> {visibility}</p>
-                  <p><span className="text-white/60">Price Range:</span> {minPrice || maxPrice ? `${minPrice || '—'} - ${maxPrice || '—'}` : '—'}</p>
-                  <p><span className="text-white/60">Tags:</span> {selectedTags.length ? selectedTags.join(', ') : '—'}</p>
-                </div>
-              </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white/90 text-sm">
+                          <div className="space-y-2">
+                            <p>
+                              <span className="text-white/60">
+                                Description:
+                              </span>{" "}
+                              {description || "—"}
+                            </p>
+                            <p>
+                              <span className="text-white/60">Category:</span>{" "}
+                              {selectedCategory?.name || "—"}
+                            </p>
+                            <p>
+                              <span className="text-white/60">Audience:</span>{" "}
+                              {type}
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <p>
+                              <span className="text-white/60">Visibility:</span>{" "}
+                              {visibility}
+                            </p>
+                            <p>
+                              <span className="text-white/60">
+                                Price Range:
+                              </span>{" "}
+                              {minPrice || maxPrice
+                                ? `${minPrice || "—"} - ${maxPrice || "—"}`
+                                : "—"}
+                            </p>
+                            <p>
+                              <span className="text-white/60">Tags:</span>{" "}
+                              {selectedTags.length
+                                ? selectedTags.join(", ")
+                                : "—"}
+                            </p>
+                          </div>
+                        </div>
 
-              <div>
-                <p className="text-white/70 text-sm mb-2">Media</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {files.map((file) => {
-                    const withUrl = resolveMediaWithUrl(file);
-                    if (!withUrl) return null;
-                    return (
-                      <div key={withUrl.id} className="rounded-xl flex items-center justify-center">
-                        <MediaRenderer
-                          kind={withUrl.kind === 'video' ? 'video' : 'image'}
-                          src={withUrl.url}
-                          alt=""
-                          maxHeightClassName="max-h-32"
-                          maxWidthClassName="max-w-[240px]"
-                        />
-                      </div>
-                    );
-                  })}
-                  {files.length === 0 && (
-                    <div className="text-white/60 text-sm">No media yet</div>
+                        <div>
+                          <p className="text-white/70 text-sm mb-2">Media</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {files.map((file) => {
+                              const withUrl = resolveMediaWithUrl(file);
+                              if (!withUrl) return null;
+                              return (
+                                <div
+                                  key={withUrl.id}
+                                  className="rounded-xl flex items-center justify-center"
+                                >
+                                  <MediaRenderer
+                                    kind={
+                                      withUrl.kind === "video"
+                                        ? "video"
+                                        : "image"
+                                    }
+                                    src={withUrl.url}
+                                    alt=""
+                                    maxHeightClassName="max-h-32"
+                                    maxWidthClassName="max-w-[240px]"
+                                  />
+                                </div>
+                              );
+                            })}
+                            {files.length === 0 && (
+                              <div className="text-white/60 text-sm">
+                                No media yet
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
                   )}
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                </AnimatePresence>
 
                 <button
                   className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-40"
                   onClick={handleFullscreenNext}
-                  disabled={(fullscreenIndex ?? selectedIndex) >= files.length - 1}
+                  disabled={
+                    (fullscreenIndex ?? selectedIndex) >= files.length - 1
+                  }
                   aria-label="Next"
                 >
                   <FiChevronRight className="w-5 h-5" />
@@ -1403,8 +1666,11 @@ const CreateDesignInner: React.FC = () => {
               <div className="text-center text-sm text-white/70">
                 {files.length > 0 && (
                   <span>
-                    Image {(fullscreenIndex ?? selectedIndex) + 1} of {files.length}
-                    {fullscreenFile.file?.name ? ` • ${fullscreenFile.file.name}` : ''}
+                    Image {(fullscreenIndex ?? selectedIndex) + 1} of{" "}
+                    {files.length}
+                    {fullscreenFile.file?.name
+                      ? ` • ${fullscreenFile.file.name}`
+                      : ""}
                   </span>
                 )}
               </div>
@@ -1431,7 +1697,9 @@ const FormSection: React.FC<{
   children: React.ReactNode;
   className?: string;
 }> = ({ title, icon, isOpen, onToggle, children, className }) => (
-  <div className={`rounded-2xl glass-panel border border-gray-200 dark:border-white/10 overflow-hidden bg-white/80 dark:bg-gray-900/60 backdrop-blur ${className ?? ''}`}>
+  <div
+    className={`rounded-2xl glass-panel border border-gray-200 dark:border-white/10 overflow-hidden bg-white/80 dark:bg-gray-900/60 backdrop-blur ${className ?? ""}`}
+  >
     <button
       type="button"
       onClick={onToggle}
@@ -1441,7 +1709,9 @@ const FormSection: React.FC<{
         <span className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center text-lg">
           {icon}
         </span>
-        <span className="text-lg font-semibold text-gray-900 dark:text-white">{title}</span>
+        <span className="text-lg font-semibold text-gray-900 dark:text-white">
+          {title}
+        </span>
       </div>
       {isOpen ? (
         <FiChevronUp className="w-5 h-5 text-gray-500 dark:text-gray-400" />
@@ -1453,7 +1723,7 @@ const FormSection: React.FC<{
       {isOpen && (
         <motion.div
           initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
+          animate={{ height: "auto", opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="overflow-hidden"
@@ -1482,8 +1752,8 @@ const ActionButton: React.FC<{
     className={`
       flex items-center gap-2 px-4 py-2 rounded-xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-gray-200 dark:border-white/10
       text-gray-900 dark:text-white text-sm font-medium transition-all
-      ${active ? 'bg-purple-500/20 border-purple-500/50' : 'hover:bg-white/10'}
-      ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+      ${active ? "bg-purple-500/20 border-purple-500/50" : "hover:bg-white/10"}
+      ${disabled ? "opacity-50 cursor-not-allowed" : ""}
     `}
   >
     {icon}
@@ -1498,13 +1768,13 @@ const formatTimeAgo = (date: Date): string => {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
-  
-  if (diffMins < 1) return 'just now';
+
+  if (diffMins < 1) return "just now";
   if (diffMins < 60) return `${diffMins}m ago`;
-  
+
   const diffHours = Math.floor(diffMins / 60);
   if (diffHours < 24) return `${diffHours}h ago`;
-  
+
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays}d ago`;
 };

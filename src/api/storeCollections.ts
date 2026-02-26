@@ -35,7 +35,7 @@ const unwrap = <T>(payload: unknown): T => {
 export async function initializeStoreCollection(
   payload: InitializeStoreCollectionPayload
 ): Promise<InitializeStoreCollectionResponse> {
-  const res = await apiClient.post('/collections/initialize', payload);
+  const res = await apiClient.post('/store-collections/initialize', payload);
   const data = unwrap<Record<string, unknown>>(res.data);
   const sessionId =
     (data?.sessionId as string | undefined) ||
@@ -51,12 +51,12 @@ export async function initializeStoreCollection(
 }
 
 export async function addProductsToCollection(collectionId: string, productIds: string[]) {
-  const res = await apiClient.post(`/collections/${collectionId}/add-products`, { productIds });
+  const res = await apiClient.post(`/store-collections/${collectionId}/add-products`, { productIds });
   return unwrap<{ success: boolean }>(res.data);
 }
 
 export async function removeProductsFromCollection(collectionId: string, productIds: string[]) {
-  const res = await apiClient.post(`/collections/${collectionId}/remove-products`, { productIds });
+  const res = await apiClient.post(`/store-collections/${collectionId}/remove-products`, { productIds });
   return unwrap<{ success: boolean }>(res.data);
 }
 
@@ -64,7 +64,7 @@ export async function reorderCollectionProducts(
   collectionId: string,
   items: Array<{ productId: string; orderIndex: number }>
 ) {
-  const res = await apiClient.patch(`/collections/${collectionId}/reorder-products`, { items });
+  const res = await apiClient.patch(`/store-collections/${collectionId}/reorder-products`, { items });
   return unwrap<{ success: boolean }>(res.data);
 }
 
@@ -84,8 +84,6 @@ export async function finalizeStoreCollection(
     };
   }
 ) {
-  const res = await apiClient.post(`/collections/${collectionId}/finalize`, payload, {
-    params: { scope: 'store' },
-  });
+  const res = await apiClient.post(`/store-collections/${collectionId}/finalize`, payload);
   return unwrap<Record<string, unknown>>(res.data);
 }

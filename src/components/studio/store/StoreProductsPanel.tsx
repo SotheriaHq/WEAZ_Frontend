@@ -22,6 +22,7 @@ import {
   PermanentDeleteProductModal,
 } from './modals';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import { Select } from '@/components/ui/Select';
 import StoreEmptyState, { type EmptyStateType } from '@/components/designs/StoreEmptyState';
 
 type StudioStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'DELETED';
@@ -1835,15 +1836,16 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex items-center gap-2">
                   <span>Items per page:</span>
-                  <select
+                  <Select
+                    variant="compact"
                     value={activeCollectionProductsLimit}
                     onChange={(e) => setActiveCollectionProductsLimit(Number(e.target.value))}
-                    className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+                    fullWidth={false}
                   >
                     <option value={4}>4</option>
                     <option value={8}>8</option>
                     <option value={12}>12</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   Showing {activeCollectionProductsTotal === 0 ? 0 : (activeCollectionProductsPage - 1) * activeCollectionProductsLimit + 1}-
@@ -2172,20 +2174,21 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <span className="text-gray-500 dark:text-gray-400 text-sm">Items per page:</span>
-              <select
+              <Select
+                variant="compact"
                 value={limit}
                 onChange={(e) => {
                   const next = parseInt(e.target.value, 10);
                   setPage(1);
                   setLimit(Number.isFinite(next) ? next : 25);
                 }}
-                className="select-threadly bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
+                fullWidth={false}
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>
-              </select>
+              </Select>
             </div>
 
             <div className="text-gray-500 dark:text-gray-400 text-sm">
