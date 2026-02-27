@@ -10,6 +10,7 @@ export interface InitializeStoreCollectionPayload {
   description?: string;
   visibility?: CollectionVisibility;
   categoryId?: string;
+  subCategoryId?: string;
   categoryTypeId?: string;
   type?: CollectionType;
   tags?: string[];
@@ -78,6 +79,7 @@ export async function finalizeStoreCollection(
       visibility?: CollectionVisibility;
       type?: CollectionType;
       categoryId?: string;
+      subCategoryId?: string;
       categoryTypeId?: string;
       tags?: string[];
       isAvailableInStore?: boolean;

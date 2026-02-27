@@ -980,7 +980,7 @@ const DesignView: React.FC = () => {
           if (status === 404 || status === 403 || status === 410) {
             setLocked(true);
           } else {
-            toast.error('Failed to load collection');
+            toast.error('Failed to load design');
             navigate(-1);
           }
         }
@@ -1227,7 +1227,7 @@ const DesignView: React.FC = () => {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-400 mb-4">Collection not found</p>
+          <p className="text-gray-400 mb-4">Design not found</p>
           <button 
             onClick={handleBack}
             className="text-purple-400 hover:text-purple-300 font-medium"

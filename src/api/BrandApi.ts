@@ -87,16 +87,22 @@ const categoriesCache: {
 } = { items: [], lastFetched: 0 };
 const CATEGORIES_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+const extractArrayPayload = (payload: unknown): any[] => {
+  if (Array.isArray(payload)) return payload;
+
+  const candidate = payload as any;
+  if (Array.isArray(candidate?.data)) return candidate.data;
+  if (Array.isArray(candidate?.data?.data)) return candidate.data.data;
+  if (Array.isArray(candidate?.items)) return candidate.items;
+  if (Array.isArray(candidate?.data?.items)) return candidate.data.items;
+
+  return [];
+};
+
 const mapCategories = (
   payload: unknown,
 ): CategoryOption[] => {
-  const items = Array.isArray(payload)
-    ? payload
-    : Array.isArray((payload as any)?.data)
-      ? (payload as any).data
-      : Array.isArray((payload as any)?.data?.data)
-        ? (payload as any).data.data
-        : [];
+  const items = extractArrayPayload(payload);
 
   return items
     .map((c: any) => ({
@@ -124,13 +130,7 @@ const mapCategories = (
 };
 
 const mapCategoriesWithSubCategories = (payload: unknown): CategoryOption[] => {
-  const items = Array.isArray(payload)
-    ? payload
-    : Array.isArray((payload as any)?.data)
-      ? (payload as any).data
-      : Array.isArray((payload as any)?.data?.data)
-        ? (payload as any).data.data
-        : [];
+  const items = extractArrayPayload(payload);
 
   return items
     .map((c: any) => ({
@@ -179,7 +179,7 @@ export const brandApi = {
         const bypassResponse = await apiClient.get(`/collections/categories`, {
           params: { _cb: Date.now() },
           headers: {
-            'Cache-Control': 'no-cache',
+            'Cache-Control': 'no-store',
             Pragma: 'no-cache',
           },
         });
@@ -195,6 +195,17 @@ export const brandApi = {
             },
           });
           mapped = mapCategoriesWithSubCategories((taxonomyResponse?.data ?? undefined) as unknown);
+
+          if (mapped.length === 0) {
+            const taxonomyBypassResponse = await apiClient.get('/categories', {
+              params: { _cb: Date.now() },
+              headers: {
+                'Cache-Control': 'no-store',
+                Pragma: 'no-cache',
+              },
+            });
+            mapped = mapCategoriesWithSubCategories((taxonomyBypassResponse?.data ?? undefined) as unknown);
+          }
         } catch {
           // Keep fallback behavior below.
         }
@@ -236,13 +247,7 @@ export const brandApi = {
       });
 
       const payload = response?.data;
-      const items = Array.isArray(payload)
-        ? payload
-        : Array.isArray((payload as any)?.data)
-          ? (payload as any).data
-          : Array.isArray((payload as any)?.data?.data)
-            ? (payload as any).data.data
-            : [];
+      const items = extractArrayPayload(payload);
 
       const mapped = items
         .map((item: any) => ({
@@ -270,7 +275,7 @@ export const brandApi = {
         categoryId ? type.categoryId === categoryId : true,
       );
     } catch (error) {
-      console.error('Error fetching category types', error);
+      console.error('Error fetching sub-categories', error);
       const categories = await this.getCategoriesWithSubCategories(force);
       const fallback = categories.flatMap((category) => category.types ?? []);
       return fallback.filter((type: CategoryTypeOption) =>
@@ -288,17 +293,37 @@ export const brandApi = {
       return categoriesCache.items;
     }
     try {
-      const response = await apiClient.get('/categories');
-      const mapped = mapCategoriesWithSubCategories((response?.data ?? undefined) as unknown);
+      const response = await apiClient.get('/categories', {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      });
+      let mapped = mapCategoriesWithSubCategories((response?.data ?? undefined) as unknown);
+
+      if (mapped.length === 0) {
+        const bypassResponse = await apiClient.get('/categories', {
+          params: { _cb: Date.now() },
+          headers: {
+            'Cache-Control': 'no-store',
+            Pragma: 'no-cache',
+          },
+        });
+        mapped = mapCategoriesWithSubCategories((bypassResponse?.data ?? undefined) as unknown);
+      }
 
       if (mapped.length > 0) {
         categoriesCache.items = mapped;
         categoriesCache.lastFetched = Date.now();
       }
-      return mapped.length > 0 ? mapped : this.getCategories(force);
+      if (mapped.length > 0) return mapped;
+
+      const fallback = await this.getCategories(force);
+      return fallback.length > 0 ? fallback : categoriesCache.items;
     } catch {
       // Fall back to existing endpoint
-      return this.getCategories(force);
+      const fallback = await this.getCategories(force);
+      return fallback.length > 0 ? fallback : categoriesCache.items;
     }
   },
 
@@ -310,11 +335,7 @@ export const brandApi = {
     try {
       const response = await apiClient.get('/categories/filters');
       const payload = response?.data;
-      const items = Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload?.data)
-          ? payload.data
-          : [];
+      const items = extractArrayPayload(payload);
 
       return items
         .map((d: any) => ({
@@ -551,7 +572,12 @@ export const brandApi = {
   // Fetch collections
   async getCollections(
     ownerId: string,
-    opts?: { visibility?: 'public' | 'private' | 'all'; scope?: CollectionScope },
+    opts?: {
+      visibility?: 'public' | 'private' | 'all';
+      scope?: CollectionScope;
+      includeDeleted?: boolean;
+      onlyDeleted?: boolean;
+    },
   ): Promise<CollectionDto[]> {
     try {
       const resolvedScope = opts?.scope ?? 'design';
@@ -565,6 +591,9 @@ export const brandApi = {
 
       const params = new URLSearchParams();
       if (opts?.visibility) params.append('visibility', opts.visibility);
+      if (opts?.includeDeleted) params.append('includeDeleted', 'true');
+      if (opts?.onlyDeleted) params.append('onlyDeleted', 'true');
+      params.append('_cb', String(Date.now()));
       const query = params.toString();
       const basePath = getCollectionBasePath(resolvedScope);
       console.debug('[BrandApi.getCollections] request', {
@@ -573,7 +602,12 @@ export const brandApi = {
         scope: resolvedScope,
         endpoint: `${basePath}/user/${ownerId}`,
       });
-      const response = await apiClient.get(`${basePath}/user/${ownerId}${query ? `?${query}` : ''}`);
+      const response = await apiClient.get(`${basePath}/user/${ownerId}${query ? `?${query}` : ''}`, {
+        headers: {
+          'Cache-Control': 'no-store',
+          Pragma: 'no-cache',
+        },
+      });
       const data = unwrapApiResponse<{ items: unknown[]; hasNextPage: boolean; endCursor?: string }>(response.data);
 
       // Transform backend data to frontend format
@@ -654,6 +688,10 @@ export const brandApi = {
           visibility,
           type: (backendItem as any).type as any,
           categoryId: (backendItem.categoryId as string) || undefined,
+          subCategoryId:
+            ((backendItem as any).subCategoryId as string) ||
+            ((backendItem as any).categoryTypeId as string) ||
+            undefined,
           categoryTypeId: ((backendItem as any).categoryTypeId as string) || undefined,
           domain:
             (backendItem as any).domain === 'STORE' || (backendItem as any).domain === 'DESIGN'
@@ -661,6 +699,14 @@ export const brandApi = {
               : undefined,
           coverImage: resolvedCoverImage,
           coverFileId,
+          deletedAt:
+            typeof (backendItem as any).deletedAt === 'string'
+              ? ((backendItem as any).deletedAt as string)
+              : null,
+          deleteExpiresAt:
+            typeof (backendItem as any).deleteExpiresAt === 'string'
+              ? ((backendItem as any).deleteExpiresAt as string)
+              : null,
           itemCount: mediaCount,
           postsCount: mediaCount,
           threadsCount: totalThreads,
@@ -689,15 +735,43 @@ export const brandApi = {
         };
         return out;
       });
+      const dedupedByCollectionId = new Map<string, CollectionDto>();
+      (mapped as CollectionDto[]).forEach((collection) => {
+        if (!collection?.id) return;
+        const existing = dedupedByCollectionId.get(collection.id);
+        if (!existing) {
+          dedupedByCollectionId.set(collection.id, collection);
+          return;
+        }
+
+        const mergedTags = Array.from(
+          new Set([...(existing.tags ?? []), ...(collection.tags ?? [])]),
+        );
+
+        dedupedByCollectionId.set(collection.id, {
+          ...existing,
+          ...collection,
+          coverImage: existing.coverImage || collection.coverImage || '',
+          coverFileId: existing.coverFileId || collection.coverFileId,
+          itemCount: Math.max(existing.itemCount ?? 0, collection.itemCount ?? 0),
+          postsCount: Math.max(existing.postsCount ?? 0, collection.postsCount ?? 0),
+          threadsCount: Math.max(existing.threadsCount ?? 0, collection.threadsCount ?? 0),
+          commentsCount: Math.max(existing.commentsCount ?? 0, collection.commentsCount ?? 0),
+          tags: mergedTags,
+        });
+      });
+
+      const uniqueMapped = Array.from(dedupedByCollectionId.values());
+
       try {
-        const totals = mapped.reduce((acc, c) => {
+        const totals = uniqueMapped.reduce((acc, c) => {
           acc.all += 1;
           if ((c as any).visibility === 'PRIVATE') acc.private += 1; else acc.public += 1;
           return acc;
         }, { all: 0, public: 0, private: 0 } as any);
-        console.debug('[BrandApi.getCollections] response', { count: mapped.length, ...totals });
+        console.debug('[BrandApi.getCollections] response', { count: uniqueMapped.length, ...totals });
       } catch { }
-      return mapped;
+      return uniqueMapped;
     } catch (error) {
       console.error('Error fetching collections:', error);
       return [];
@@ -736,6 +810,7 @@ export const brandApi = {
         type: 'EVERYBODY', // Default
         domain: 'DESIGN',
         categoryId: '',
+        subCategoryId: '',
         categoryTypeId: '',
         coverImage: item.coverImage || '',
         coverFileId: undefined,
@@ -768,7 +843,7 @@ export const brandApi = {
   },
 
   // Create collection
-  async createCollection(data: { name: string; description?: string; isPublic?: boolean; categoryId?: string; categoryTypeId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY' }): Promise<CollectionDto | null> {
+  async createCollection(data: { name: string; description?: string; isPublic?: boolean; categoryId?: string; subCategoryId?: string; categoryTypeId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY' }): Promise<CollectionDto | null> {
     try {
       const init = await apiClient.post('/designs/initialize', {
         mode: 'existing',
@@ -776,7 +851,8 @@ export const brandApi = {
         description: data.description,
         visibility: data.isPublic === false ? 'PRIVATE' : 'PUBLIC',
         categoryId: data.categoryId,
-        categoryTypeId: data.categoryTypeId,
+        subCategoryId: data.subCategoryId ?? data.categoryTypeId,
+        categoryTypeId: data.subCategoryId ?? data.categoryTypeId,
         type: data.type ?? 'EVERYBODY',
       });
       const sessionId = (init.data as any)?.sessionId ?? (init.data as any)?.collectionId ?? (init.data as any)?.id;
@@ -789,7 +865,8 @@ export const brandApi = {
           description: data.description,
           visibility: data.isPublic === false ? 'PRIVATE' : 'PUBLIC',
           categoryId: data.categoryId,
-          categoryTypeId: data.categoryTypeId,
+          subCategoryId: data.subCategoryId ?? data.categoryTypeId,
+          categoryTypeId: data.subCategoryId ?? data.categoryTypeId,
           type: data.type ?? 'EVERYBODY',
         },
       });
@@ -875,6 +952,34 @@ export const brandApi = {
       return true;
     } catch (error) {
       console.error('Error deleting collection:', error);
+      return false;
+    }
+  },
+
+  async restoreCollection(
+    collectionId: string,
+    opts?: { scope?: CollectionScope },
+  ): Promise<boolean> {
+    try {
+      const basePath = getCollectionBasePath(opts?.scope);
+      await apiClient.post(`${basePath}/${collectionId}/restore`, null);
+      return true;
+    } catch (error) {
+      console.error('Error restoring collection:', error);
+      return false;
+    }
+  },
+
+  async permanentlyDeleteCollection(
+    collectionId: string,
+    opts?: { scope?: CollectionScope },
+  ): Promise<boolean> {
+    try {
+      const basePath = getCollectionBasePath(opts?.scope);
+      await apiClient.delete(`${basePath}/${collectionId}/permanent`);
+      return true;
+    } catch (error) {
+      console.error('Error permanently deleting collection:', error);
       return false;
     }
   },
@@ -1040,7 +1145,13 @@ export const brandApi = {
   ): Promise<any> {
     try {
       const basePath = getCollectionBasePath(opts?.scope);
-      const response = await apiClient.get(`${basePath}/${collectionId}`);
+      const response = await apiClient.get(`${basePath}/${collectionId}`, {
+        params: { _cb: Date.now() },
+        headers: {
+          'Cache-Control': 'no-store',
+          Pragma: 'no-cache',
+        },
+      });
       return unwrapApiResponse<any>(response.data);
     } catch (error: any) {
       console.error('Error fetching collection detail:', error);

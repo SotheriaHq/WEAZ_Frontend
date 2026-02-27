@@ -359,39 +359,6 @@ export default function StoreManagement() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-        {[
-          {
-            label: 'Orders',
-            value: formatNumber(kpis.totalOrders),
-            meta: 'Last 30 days',
-          },
-          {
-            label: 'Revenue',
-            value: formatCurrency(kpis.totalRevenue),
-            meta: 'Last 30 days',
-          },
-          {
-            label: 'Page Views',
-            value: formatNumber(kpis.storeViews),
-            meta: 'Last 30 days',
-          },
-          {
-            label: 'Conversion',
-            value: `${kpis.conversionRate || 0}%`,
-            meta: 'Shop conversion',
-          },
-        ].map((card) => (
-          <div key={card.label} className="rounded-xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 p-5 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              {card.label}
-            </div>
-            <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{card.value}</div>
-            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{card.meta}</div>
-          </div>
-        ))}
-      </div>
-
       <StoreProductsPanel
         layoutMode={layoutMode}
         onToggleLayoutMode={() => setLayoutMode((prev) => !prev)}

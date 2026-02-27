@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { toast } from "sonner";
@@ -39,6 +39,61 @@ type CategoryOption = {
   id: string;
   name: string;
   types: CategoryTypeOption[];
+};
+
+const FILTER_SELECTION_STORAGE_PREFIX = "storeCollectionFilterSelection:";
+
+const normalizeFilterSelectionFromDetail = (detail: any): FilterSelection => {
+  if (!detail || typeof detail !== "object") return {};
+
+  const mapSelection = (input: unknown): FilterSelection => {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      return {};
+    }
+    const next: FilterSelection = {};
+    Object.entries(input as Record<string, unknown>).forEach(
+      ([dimensionId, value]) => {
+        if (!dimensionId) return;
+        const values = Array.isArray(value)
+          ? value.filter((item): item is string => typeof item === "string")
+          : [];
+        if (values.length > 0) {
+          next[dimensionId] = Array.from(new Set(values));
+        }
+      },
+    );
+    return next;
+  };
+
+  const directSelection = mapSelection((detail as any).filterSelection);
+  if (Object.keys(directSelection).length > 0) return directSelection;
+
+  const rows = Array.isArray((detail as any).filters)
+    ? ((detail as any).filters as any[])
+    : [];
+  if (rows.length === 0) return {};
+
+  const next: FilterSelection = {};
+  rows.forEach((row) => {
+    const dimensionId =
+      (typeof row?.dimensionId === "string" && row.dimensionId) ||
+      (typeof row?.dimension?.id === "string" && row.dimension.id) ||
+      (typeof row?.filterValue?.dimensionId === "string" &&
+        row.filterValue.dimensionId) ||
+      "";
+    const valueId =
+      (typeof row?.valueId === "string" && row.valueId) ||
+      (typeof row?.filterValueId === "string" && row.filterValueId) ||
+      (typeof row?.filterValue?.id === "string" && row.filterValue.id) ||
+      "";
+    if (!dimensionId || !valueId) return;
+    const current = next[dimensionId] ?? [];
+    if (!current.includes(valueId)) {
+      next[dimensionId] = [...current, valueId];
+    }
+  });
+
+  return next;
 };
 
 const normalizeLinkedProduct = (raw: any): StoreProduct | null => {
@@ -159,6 +214,8 @@ const StoreCollectionCreate: React.FC = () => {
   const [existingLinkedProductIds, setExistingLinkedProductIds] = useState<
     string[]
   >([]);
+  const hydratedSessionRef = useRef<string | null>(null);
+  const submitLockRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -207,9 +264,19 @@ const StoreCollectionCreate: React.FC = () => {
   }, [prefillCollectionId]);
 
   useEffect(() => {
+    if (!collectionSessionId) {
+      hydratedSessionRef.current = null;
+      return;
+    }
+    if (hydratedSessionRef.current === collectionSessionId) return;
+    hydratedSessionRef.current = null;
+  }, [collectionSessionId]);
+
+  useEffect(() => {
     let mounted = true;
     const loadDraftDetails = async () => {
       if (!collectionSessionId) return;
+      if (hydratedSessionRef.current === collectionSessionId) return;
       let detail: any = null;
       try {
         detail = await brandApi.getCollectionDetail(collectionSessionId, {
@@ -223,6 +290,7 @@ const StoreCollectionCreate: React.FC = () => {
         return;
       }
       if (!mounted || !detail) return;
+      hydratedSessionRef.current = collectionSessionId;
       setExistingCollectionStatus(
         detail.status === "DRAFT" ||
           detail.status === "PUBLISHED" ||
@@ -277,16 +345,54 @@ const StoreCollectionCreate: React.FC = () => {
       }
 
       if (!preselectProductId) {
-        if (!title && detail.title) setTitle(detail.title);
-        if (!description && detail.description)
-          setDescription(detail.description);
-        if (!categoryId && detail.categoryId) setCategoryId(detail.categoryId);
-        if (!categoryTypeId && detail.categoryTypeId)
-          setCategoryTypeId(detail.categoryTypeId);
+        setTitle(typeof detail.title === "string" ? detail.title : "");
+        setDescription(
+          typeof detail.description === "string" ? detail.description : "",
+        );
+        if (typeof detail.categoryId === "string" && detail.categoryId) {
+          setCategoryId(detail.categoryId);
+        }
+        const hydratedSubCategoryId =
+          (detail as any).subCategoryId || detail.categoryTypeId;
+        if (
+          typeof hydratedSubCategoryId === "string" &&
+          hydratedSubCategoryId
+        ) {
+          setCategoryTypeId(hydratedSubCategoryId);
+        }
         if (detail.visibility) setVisibility(detail.visibility);
         if (detail.type) setType(detail.type);
-        if (Array.isArray(detail.tags) && tags.length === 0) {
-          setTags(detail.tags.filter((tag: any) => typeof tag === "string"));
+        setTags(
+          Array.isArray(detail.tags)
+            ? detail.tags.filter((tag: any) => typeof tag === "string")
+            : [],
+        );
+
+        const detailFilterSelection = normalizeFilterSelectionFromDetail(detail);
+        if (Object.keys(detailFilterSelection).length > 0) {
+          setFilterSelection(detailFilterSelection);
+          try {
+            localStorage.setItem(
+              `${FILTER_SELECTION_STORAGE_PREFIX}${collectionSessionId}`,
+              JSON.stringify(detailFilterSelection),
+            );
+          } catch {
+            // Ignore localStorage errors
+          }
+        } else {
+          try {
+            const raw = localStorage.getItem(
+              `${FILTER_SELECTION_STORAGE_PREFIX}${collectionSessionId}`,
+            );
+            if (raw) {
+              const parsed = JSON.parse(raw) as FilterSelection;
+              if (parsed && typeof parsed === "object") {
+                setFilterSelection(parsed);
+              }
+            }
+          } catch {
+            // Ignore localStorage errors
+          }
         }
       }
     };
@@ -298,12 +404,19 @@ const StoreCollectionCreate: React.FC = () => {
   }, [
     collectionSessionId,
     preselectProductId,
-    title,
-    description,
-    categoryId,
-    categoryTypeId,
-    tags.length,
   ]);
+
+  useEffect(() => {
+    if (!collectionSessionId) return;
+    try {
+      localStorage.setItem(
+        `${FILTER_SELECTION_STORAGE_PREFIX}${collectionSessionId}`,
+        JSON.stringify(filterSelection),
+      );
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [collectionSessionId, filterSelection]);
 
   const loadProducts = useCallback(async () => {
     if (!user?.id) {
@@ -552,6 +665,7 @@ const StoreCollectionCreate: React.FC = () => {
       type,
       tags: normalizedTags,
       isAvailableInStore: true,
+      subCategoryId: categoryTypeId || undefined,
     });
     setCollectionSessionId(init.sessionId);
     return init.sessionId;
@@ -577,6 +691,8 @@ const StoreCollectionCreate: React.FC = () => {
   };
 
   const handleSubmit = async (action: "publish" | "draft") => {
+    if (submitLockRef.current || submitting) return;
+
     if (!title.trim()) {
       toast.error("Please enter a collection title.");
       return;
@@ -600,7 +716,7 @@ const StoreCollectionCreate: React.FC = () => {
         return;
       }
       if (!categoryTypeId) {
-        toast.error("Please select a category type to publish.");
+        toast.error("Please select a sub-category to publish.");
         return;
       }
       if (normalizedTags.length === 0) {
@@ -623,10 +739,19 @@ const StoreCollectionCreate: React.FC = () => {
       }
     }
 
+    submitLockRef.current = true;
     setSubmitting(true);
     setSubmitAction(action);
     try {
       const sessionId = await ensureCollectionSession();
+      try {
+        localStorage.setItem(
+          `${FILTER_SELECTION_STORAGE_PREFIX}${sessionId}`,
+          JSON.stringify(filterSelection),
+        );
+      } catch {
+        // Ignore localStorage errors
+      }
       const metadataPayload = {
         title: title.trim(),
         description: description.trim() || undefined,
@@ -636,6 +761,7 @@ const StoreCollectionCreate: React.FC = () => {
         categoryTypeId: categoryTypeId || undefined,
         tags: normalizedTags,
         isAvailableInStore: true,
+        subCategoryId: categoryTypeId || undefined,
       };
 
       if (isExistingCollectionEditMode) {
@@ -718,6 +844,7 @@ const StoreCollectionCreate: React.FC = () => {
               : "Failed to save draft."),
       );
     } finally {
+      submitLockRef.current = false;
       setSubmitting(false);
       setSubmitAction(null);
     }

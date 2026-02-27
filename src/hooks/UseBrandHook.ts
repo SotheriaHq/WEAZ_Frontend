@@ -23,7 +23,7 @@ export const useBrandProfile = () => {
 
   // Collections state
   const [collections, setCollections] = useState<CollectionDto[]>([]);
-  const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const [collectionsLoading, setCollectionsLoading] = useState(true);
   const [collectionsError, setCollectionsError] = useState<string | null>(null);
 
   // Reviews state
@@ -123,7 +123,10 @@ export const useBrandProfile = () => {
 
   // Initial data fetch
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setCollectionsLoading(false);
+      return;
+    }
 
     // Fetch collections for all users
     void fetchCollections(user.id);

@@ -65,6 +65,8 @@ interface CollectionOption {
   name: string;
   description?: string;
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  deletedAt?: string | null;
+  deleteExpiresAt?: string | null;
   isAvailableInStore?: boolean;
   isSystemGenerated?: boolean;
   coverImage?: string;
@@ -110,6 +112,29 @@ const isSystemStoreCollection = (collection: Pick<CollectionOption, 'name' | 'de
     normalizedName === 'store products' &&
     (normalizedDescription === '' || normalizedDescription === 'system bucket for standalone products.')
   );
+};
+
+const isRemoteMediaValue = (value: string): boolean => {
+  const normalized = String(value || '').trim();
+  if (!normalized) return false;
+  return (
+    normalized.startsWith('http') ||
+    normalized.startsWith('/') ||
+    normalized.startsWith('data:') ||
+    normalized.includes('://') ||
+    normalized.includes('?')
+  );
+};
+
+const toRenderableMediaSource = (
+  value: string | null | undefined,
+): { src: string | null; fileId: string | null } => {
+  if (!value || String(value).trim().length === 0) {
+    return { src: null, fileId: null };
+  }
+  return isRemoteMediaValue(value)
+    ? { src: value, fileId: null }
+    : { src: null, fileId: value };
 };
 
 const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
@@ -246,13 +271,21 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   );
 
   const previewCollections = useMemo(
-    () => visibleCollections.filter((collection) => collection.isAvailableInStore !== false),
+    () =>
+      visibleCollections.filter((collection) => {
+        const status = String(collection.status || '').toUpperCase();
+        return (
+          collection.isAvailableInStore !== false &&
+          status === 'PUBLISHED' &&
+          !collection.deletedAt
+        );
+      }),
     [visibleCollections],
   );
 
   const quickAccessCollections = useMemo(
-    () => (previewCollections.length > 0 ? previewCollections : visibleCollections),
-    [previewCollections, visibleCollections],
+    () => previewCollections,
+    [previewCollections],
   );
 
   const quickAccessCarouselItems = useMemo(
@@ -407,6 +440,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             name: String(c.title || c.name || 'Untitled collection'),
             description: typeof c.description === 'string' ? c.description : '',
             status: c.status,
+            deletedAt: c.deletedAt ?? null,
+            deleteExpiresAt: c.deleteExpiresAt ?? null,
             isAvailableInStore: c.isAvailableInStore,
             isSystemGenerated: c.isSystemGenerated === true,
             coverImage: typeof c.coverImage === 'string' ? c.coverImage : undefined,
@@ -1153,6 +1188,94 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
   return (
     <div className="space-y-6">
+      {outletView === 'products' && (
+      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
+        <div className="p-4 sm:p-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Collections Quick Access</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Slow carousel preview with cover images always visible.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/studio/store/collections/new')}
+                className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+              >
+                Create collection
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/studio/store?view=collections')}
+                className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+              >
+                Manage collections
+              </button>
+            </div>
+          </div>
+
+          {collectionsLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div key={idx} className="h-44 animate-pulse rounded-xl bg-gray-200/70 dark:bg-white/10" />
+              ))}
+            </div>
+          ) : quickAccessCollections.length > 0 ? (
+            <div
+              ref={quickCollectionsRef}
+              className="overflow-x-hidden rounded-xl border border-gray-200/80 bg-gray-50/60 dark:border-white/10 dark:bg-white/5"
+            >
+              <div className="flex min-w-max gap-3 p-3">
+                {quickAccessCarouselItems.map((collection, idx) => (
+                    <button
+                      key={`${collection.id}-${idx}`}
+                      type="button"
+                      onClick={() => openCollectionWorkspace(collection.id)}
+                      className="group w-64 shrink-0 snap-start overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 text-left transition-all hover:shadow-md bg-white dark:bg-zinc-900/80"
+                    >
+                      <div className="relative h-28 w-full bg-gray-100 dark:bg-white/5">
+                        <ImageWithFallback
+                          src={collection.coverImage ?? null}
+                          fileId={collection.coverFileId ?? null}
+                          alt={collection.name}
+                          fit="cover"
+                          rounded="none"
+                          containerClassName="h-full w-full"
+                          className="h-full w-full transition-transform duration-300 group-hover:scale-105"
+                          fallbackName={collection.name}
+                        />
+                      </div>
+                      <div className="p-3">
+                        <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
+                          {collection.name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {collection.itemCount ?? 0} items
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-gray-300/80 bg-gray-50/70 p-5 text-center dark:border-white/10 dark:bg-white/5">
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">No collections yet</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Create a collection to see quick access previews here.</p>
+              <button
+                type="button"
+                onClick={() => navigate('/studio/store/collections/new')}
+                className="mt-3 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700"
+              >
+                Create collection
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      )}
+
       {/* ═══ UNIFIED COMMAND CENTER ═══ */}
       {outletView === 'products' && (
       <div className="mb-6 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/95 dark:bg-[#111118]/95 backdrop-blur-xl shadow-lg overflow-hidden">
@@ -1161,7 +1284,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         <div className="relative p-5 pb-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Your Products</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Your Catalog</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage catalog, collections, and drafts in one place.</p>
             </div>
             <div className="flex items-center gap-2">
@@ -1368,88 +1491,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       </div>
       )}
 
-      {outletView === 'products' && (
-      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
-        <div className="p-4 sm:p-6 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Collections Quick Access</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Slow carousel preview with cover images always visible.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => navigate('/studio/store/collections/new')}
-                className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
-              >
-                Create collection
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/studio/store?view=collections')}
-                className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
-              >
-                Manage collections
-              </button>
-            </div>
-          </div>
-
-          {collectionsLoading ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, idx) => (
-                <div key={idx} className="h-44 animate-pulse rounded-xl bg-gray-200/70 dark:bg-white/10" />
-              ))}
-            </div>
-          ) : quickAccessCollections.length > 0 ? (
-            <div
-              ref={quickCollectionsRef}
-              className="overflow-x-hidden rounded-xl border border-gray-200/80 bg-gray-50/60 dark:border-white/10 dark:bg-white/5"
-            >
-              <div className="flex min-w-max gap-3 p-3">
-                {quickAccessCarouselItems.map((collection, idx) => (
-                    <button
-                      key={`${collection.id}-${idx}`}
-                      type="button"
-                      onClick={() => openCollectionWorkspace(collection.id)}
-                      className="group w-64 shrink-0 snap-start overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 text-left transition-all hover:shadow-md bg-white dark:bg-zinc-900/80"
-                    >
-                      <div className="relative h-28 w-full bg-gray-100 dark:bg-white/5">
-                        <ImageWithFallback
-                          src={collection.coverImage ?? null}
-                          fileId={collection.coverFileId ?? null}
-                          alt={collection.name}
-                          fit="cover"
-                          rounded="none"
-                          containerClassName="h-full w-full"
-                          className="h-full w-full transition-transform duration-300 group-hover:scale-105"
-                          fallbackName={collection.name}
-                        />
-                      </div>
-                      <div className="p-3">
-                        <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
-                          {collection.name}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {collection.itemCount ?? 0} items
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-              </div>
-            </div>
-          ) : (
-            <StoreEmptyState
-              type="no-collections"
-              isOwner={true}
-              onAction={() => navigate('/studio/store/collections/new')}
-            />
-          )}
-        </div>
-      </div>
-      )}
-
       {outletView === 'collections' && (
         <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
           <div className="border-b border-gray-200/80 dark:border-white/10 p-4 sm:p-6">
@@ -1459,7 +1500,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 onClick={() => navigate('/studio/store')}
                 className="rounded-md px-2 py-1 hover:bg-gray-100 dark:hover:bg-white/10"
               >
-                Products
+                Store
               </button>
               <span>/</span>
               {activeCollection ? (
@@ -1898,7 +1939,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             }}
             className={`transition-opacity duration-300 ease-out ${loading ? 'opacity-50' : 'opacity-100'}`}
           >
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 transition-all duration-300">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 transition-all duration-300">
             {filteredProducts.map((product) => {
               const collectionLabel =
                 product.collection?.title ||
@@ -1911,7 +1952,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               return (
                 <div
                   key={product.id}
-                  className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-white dark:bg-zinc-900/80 shadow-sm transition-all duration-300 ease-out ${
+                  className={`group relative flex flex-col rounded-2xl border bg-white dark:bg-zinc-900/80 shadow-sm transition-all duration-300 ease-out ${
                     selectedProducts.includes(product.id)
                       ? 'ring-2 ring-purple-500 border-purple-300 dark:border-purple-500/30'
                       : 'border-gray-100 dark:border-white/[0.08] hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30 hover:border-gray-200 dark:hover:border-white/[0.12]'
@@ -2008,17 +2049,29 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   )}
 
                   {/* Image Container - 4:5 aspect ratio */}
-                  <div className="relative aspect-[4/5] overflow-hidden bg-gray-50 dark:bg-zinc-800/50">
+                  <div className="relative aspect-[4/5] overflow-hidden rounded-t-2xl bg-gray-50 dark:bg-zinc-800/50">
                     {(() => {
                       const primaryMedia = product.media?.find((m) => m.isPrimary) ?? product.media?.[0];
-                      const fallbackUrl = product.thumbnail || product.images?.[0] || null;
-                      const fileId = typeof primaryMedia?.id === 'string' && !primaryMedia.id.startsWith('http')
-                        ? primaryMedia.id
-                        : undefined;
-                      return primaryMedia || fallbackUrl ? (
+                      const fallbackValue = product.thumbnail || product.images?.[0] || null;
+                      const primarySource = toRenderableMediaSource(primaryMedia?.url ?? null);
+                      const fallbackSource = toRenderableMediaSource(fallbackValue);
+                      const mediaIdCandidates = [
+                        typeof primaryMedia?.id === 'string' ? primaryMedia.id : null,
+                        ...(Array.isArray(product.mediaIds)
+                          ? product.mediaIds.filter((id): id is string => typeof id === 'string')
+                          : []),
+                      ];
+                      const fallbackFileId = mediaIdCandidates.find(
+                        (candidate) => candidate && !isRemoteMediaValue(candidate),
+                      ) ?? null;
+                      const resolvedSrc = primarySource.src ?? fallbackSource.src;
+                      const resolvedFileId =
+                        primarySource.fileId ?? fallbackSource.fileId ?? fallbackFileId;
+
+                      return resolvedSrc || resolvedFileId ? (
                         <ImageWithFallback
-                          src={primaryMedia?.url ?? fallbackUrl}
-                          fileId={fileId}
+                          src={resolvedSrc}
+                          fileId={resolvedFileId ?? undefined}
                           alt={product.name}
                           fit="cover"
                           className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
@@ -2307,41 +2360,82 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             onClick={() => setCollectionConfirm(null)}
             aria-label="Close collection action confirmation"
           />
-          <div className="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-zinc-900">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+          <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/85 p-8 text-center shadow-2xl backdrop-blur-xl">
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full shadow-inner ring-1
+              ring-white/10
+              bg-zinc-800/70
+              ">
+              <span aria-hidden className="text-4xl">
+                {collectionConfirm.mode === 'archive'
+                  ? '📦'
+                  : collectionConfirm.mode === 'unarchive'
+                    ? '📤'
+                    : '🗑️'}
+              </span>
+            </div>
+
+            <h3 className="text-xl font-bold tracking-tight text-white">
               {collectionConfirm.mode === 'archive'
-                ? 'Archive collection?'
+                ? 'Archive this collection?'
                 : collectionConfirm.mode === 'unarchive'
-                  ? 'Unarchive collection?'
-                  : 'Delete collection?'}
+                  ? 'Restore this collection?'
+                  : 'Delete this collection?'}
             </h3>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              {collectionConfirm.mode === 'delete'
-                ? `Delete "${collectionConfirm.collection.name}". Products will remain in store.`
-                : `Confirm ${collectionConfirm.mode} for "${collectionConfirm.collection.name}".`}
+
+            <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-zinc-400">
+              {collectionConfirm.mode === 'archive'
+                ? 'This collection will be hidden from your main view but can be restored later at any time.'
+                : collectionConfirm.mode === 'unarchive'
+                  ? 'This collection will be moved back to your Drafts folder and become fully editable again.'
+                  : 'This action is permanent and cannot be undone. All associated data will be lost.'}
             </p>
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setCollectionConfirm(null)}
-                disabled={collectionConfirmBusy}
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 disabled:opacity-60 dark:border-white/10 dark:text-gray-200"
-              >
-                Cancel
-              </button>
+
+            <div className="mt-8 flex flex-col gap-3">
               <button
                 type="button"
                 onClick={() => void handleConfirmCollectionAction()}
                 disabled={collectionConfirmBusy}
-                className="rounded-lg bg-purple-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-lg transition-colors duration-200 disabled:opacity-60 ${
+                  collectionConfirm.mode === 'archive'
+                    ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-900/20'
+                    : collectionConfirm.mode === 'unarchive'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20'
+                      : 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/20'
+                }`}
               >
+                {collectionConfirmBusy ? (
+                  <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                ) : (
+                  <span aria-hidden>
+                    {collectionConfirm.mode === 'archive'
+                      ? '📦'
+                      : collectionConfirm.mode === 'unarchive'
+                        ? '📤'
+                        : '🗑️'}
+                  </span>
+                )}
                 {collectionConfirmBusy
-                  ? 'Processing...'
+                  ? 'Processing'
                   : collectionConfirm.mode === 'unarchive'
-                    ? 'Unarchive'
+                    ? 'Restore'
                     : collectionConfirm.mode === 'archive'
                       ? 'Archive'
                       : 'Delete'}
+                {collectionConfirmBusy && (
+                  <span className="inline-flex items-center gap-1" aria-hidden>
+                    <span className="h-1 w-1 rounded-full bg-white/90 animate-bounce [animation-delay:-0.3s]" />
+                    <span className="h-1 w-1 rounded-full bg-white/90 animate-bounce [animation-delay:-0.15s]" />
+                    <span className="h-1 w-1 rounded-full bg-white/90 animate-bounce" />
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCollectionConfirm(null)}
+                disabled={collectionConfirmBusy}
+                className="w-full rounded-xl border border-zinc-700 bg-transparent px-4 py-3 text-sm font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/5 disabled:opacity-60"
+              >
+                Cancel
               </button>
             </div>
           </div>

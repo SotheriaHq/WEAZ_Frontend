@@ -163,7 +163,7 @@ const CreateCollectionInner: React.FC = () => {
           setIsAvailableInStore(!!d.isAvailableInStore);
           setSelectedTags(Array.isArray(d.tags) ? d.tags : []);
           setCategoryId(d.categoryId || '');
-          setCategoryTypeId(d.categoryTypeId || '');
+          setCategoryTypeId((d as any).subCategoryId || d.categoryTypeId || '');
           setType(d.type || 'EVERYBODY');
           setVisibility(d.visibility || 'PUBLIC');
           setCollectionCreatedAt(d.createdAt ? new Date(d.createdAt) : null);
@@ -245,7 +245,7 @@ const CreateCollectionInner: React.FC = () => {
       const hasTags = selectedTags.length > 0;
       if (!hasTags) reasons.push('at least one tag');
       if (categoryId.trim().length === 0) reasons.push('a category');
-      if (categoryTypeId.trim().length === 0) reasons.push('a category type');
+      if (categoryTypeId.trim().length === 0) reasons.push('a sub-category');
       toast.error(`Please provide ${reasons.join(', ')}.`);
       return;
     }
@@ -291,7 +291,13 @@ const CreateCollectionInner: React.FC = () => {
             parsedMaxPrice,
             isAvailableInStore,
             finalTags,
-            { categoryId, categoryTypeId, type, visibility },
+            {
+              categoryId,
+              subCategoryId: categoryTypeId,
+              categoryTypeId,
+              type,
+              visibility,
+            },
           );
           toast.success('Design created');
       }
@@ -405,7 +411,7 @@ const CreateCollectionInner: React.FC = () => {
         </div>
         <div className="space-y-1">
           <UniversalSelect
-            label="Category Type"
+            label="Sub-Category"
             value={categoryTypeId}
             onChange={setCategoryTypeId}
             options={categoryTypeOptions.map((categoryType) => ({
@@ -416,8 +422,8 @@ const CreateCollectionInner: React.FC = () => {
               loadingCategories
                 ? 'Loading...'
                 : categoryTypeOptions.length
-                  ? 'Select a type'
-                  : 'No types available'
+                  ? 'Select a sub-category'
+                  : 'No sub-categories available'
             }
             disabled={disabled || categoryTypeOptions.length === 0}
           />
@@ -536,7 +542,7 @@ const CreateCollectionInner: React.FC = () => {
               const hasTags = selectedTags.length > 0;
               if (!hasTags) reasons.push('at least one tag');
               if (categoryId.trim().length === 0) reasons.push('a category');
-              if (categoryTypeId.trim().length === 0) reasons.push('a category type');
+              if (categoryTypeId.trim().length === 0) reasons.push('a sub-category');
               toast.error(`Please provide ${reasons.join(', ')}.`);
               return;
             }
@@ -555,7 +561,13 @@ const CreateCollectionInner: React.FC = () => {
                 parsedMaxPrice,
                 isAvailableInStore,
                 finalTags,
-                { categoryId, categoryTypeId, type, visibility },
+                {
+                  categoryId,
+                  subCategoryId: categoryTypeId,
+                  categoryTypeId,
+                  type,
+                  visibility,
+                },
                 undefined,
                 false // shouldPublish = false -> Save as Draft
               );

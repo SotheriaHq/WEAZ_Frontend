@@ -20,15 +20,20 @@ export interface ProductVariant {
 function buildStoreProductPayload(data: Partial<ProductCreateDto>) {
   const payload: any = {};
 
-  // Backend expects: collectionId, name, categoryTypeId, price, salePrice, sizes, sizeStock, colors, images, thumbnail,
+  // Backend expects: collectionId, name, subCategoryId/categoryTypeId, price, salePrice, sizes, sizeStock, colors, images, thumbnail,
   // totalStock, lowStockThreshold, tags, gender, isActive, isFeatured
 
   if (data.title !== undefined) payload.name = data.title;
   if (data.description !== undefined) payload.description = data.description;
   if (data.currency !== undefined) payload.currency = data.currency;
   if (data.collectionId !== undefined) payload.collectionId = data.collectionId;
-  if (data.categoryTypeId !== undefined)
+  if (data.subCategoryId !== undefined) {
+    payload.subCategoryId = data.subCategoryId;
+    payload.categoryTypeId = data.subCategoryId;
+  } else if (data.categoryTypeId !== undefined) {
+    payload.subCategoryId = data.categoryTypeId;
     payload.categoryTypeId = data.categoryTypeId;
+  }
   if (data.price !== undefined) payload.price = data.price;
 
   // Frontend uses compareAtPrice+onSale; backend uses salePrice.
@@ -130,6 +135,8 @@ export interface ProductCreateDto {
   title: string;
   description?: string;
   collectionId?: string;
+  subCategoryId?: string;
+  /** @deprecated Use subCategoryId */
   categoryTypeId?: string;
   tags?: string[];
   price: number;
@@ -165,6 +172,8 @@ export interface ProductDto {
   description?: string;
   collectionId?: string;
   collectionIds?: string[];
+  subCategoryId?: string;
+  /** @deprecated Use subCategoryId */
   categoryTypeId?: string;
   tags?: string[];
   price: number;

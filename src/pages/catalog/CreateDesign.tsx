@@ -46,6 +46,7 @@ import type { MediaItem } from "@/types/media";
 import { MediaProvider, useMediaStore } from "../../hooks/useMediaStore";
 import useCollectionUpload from "../../hooks/useCollectionUpload";
 import { useBrandProfile } from "../../hooks/UseBrandHook";
+import { finalizeCollectionUploads } from "@/api/collectionUploads";
 // ============================================================================
 
 type CategoryTypeOption = { id: string; name: string };
@@ -101,6 +102,10 @@ const CreateDesignInner: React.FC = () => {
   const [showCancelPrompt, setShowCancelPrompt] = useState(false);
   const [showDraftPreview, setShowDraftPreview] = useState(false);
   const [showSaveDraftConfirm, setShowSaveDraftConfirm] = useState(false);
+  const [showDraftSavedChoices, setShowDraftSavedChoices] = useState(false);
+  const [submitIntent, setSubmitIntent] = useState<"draft" | "publish" | null>(
+    null,
+  );
   const tagStylePalette = useMemo(
     () => [
       "bg-white/30 border border-white/40 text-purple-900 dark:text-white backdrop-blur-md shadow-sm",
@@ -143,6 +148,16 @@ const CreateDesignInner: React.FC = () => {
     onFiles: mediaStore.addFiles,
     disabled: disabled || isEditMode,
   });
+
+  const getSelectedFilterValueIds = useCallback(() => {
+    return Array.from(
+      new Set(
+        Object.values(filterSelection)
+          .flatMap((ids) => ids)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    );
+  }, [filterSelection]);
 
   // Load initial data
   // Load initial data (tags, categories, and collection when editing)
@@ -211,12 +226,27 @@ const CreateDesignInner: React.FC = () => {
         setMaxPrice(d.maxPrice ? String(d.maxPrice) : "");
         setSelectedTags(Array.isArray(d.tags) ? d.tags : []);
         setCategoryId(d.categoryId || "");
-        setCategoryTypeId(d.categoryTypeId || "");
+        setCategoryTypeId((d as any).subCategoryId || d.categoryTypeId || "");
         setType(d.type || "EVERYBODY");
         setVisibility(d.visibility || "PUBLIC");
         setMetadataEditedAt(
           d.metadataEditedAt ? new Date(d.metadataEditedAt) : null,
         );
+
+        const draftFilters = Array.isArray((d as any).filters)
+          ? ((d as any).filters as Array<{ dimensionId?: string; valueId?: string }>).reduce(
+              (acc, item) => {
+                if (!item?.dimensionId || !item?.valueId) return acc;
+                if (!acc[item.dimensionId]) acc[item.dimensionId] = [];
+                if (!acc[item.dimensionId].includes(item.valueId)) {
+                  acc[item.dimensionId].push(item.valueId);
+                }
+                return acc;
+              },
+              {} as FilterSelection,
+            )
+          : {};
+        setFilterSelection(draftFilters);
 
         if (d.medias && Array.isArray(d.medias)) {
           const mediaResults = await Promise.all(
@@ -385,6 +415,26 @@ const CreateDesignInner: React.FC = () => {
       .slice(0, 12);
   }, [tagSearch, tagSuggestions, selectedTags]);
 
+  const handleFilterTagSuggestions = useCallback((suggestions: string[]) => {
+    if (!Array.isArray(suggestions) || suggestions.length === 0) {
+      return;
+    }
+
+    setTagSuggestions((prev) => {
+      const merged = new Set(prev);
+      let changed = false;
+
+      suggestions.forEach((tag) => {
+        if (!merged.has(tag)) {
+          merged.add(tag);
+          changed = true;
+        }
+      });
+
+      return changed ? Array.from(merged) : prev;
+    });
+  }, []);
+
   // Get category name for summary
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const categoryTypeOptions = selectedCategory?.types ?? [];
@@ -499,6 +549,7 @@ const CreateDesignInner: React.FC = () => {
     // Guard: prevent double submission
     if (isSubmitting) return;
 
+    setSubmitIntent("draft");
     setIsSubmitting(true);
     try {
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
@@ -509,18 +560,42 @@ const CreateDesignInner: React.FC = () => {
         10,
       );
 
-      await uploadCollection(
-        files,
-        draftTitle,
-        description,
-        parsedMinPrice,
-        parsedMaxPrice,
-        false,
-        finalTags,
-        { categoryId, categoryTypeId, type, visibility },
-        undefined,
-        false, // shouldPublish = false
-      );
+      if (isEditMode && id) {
+        await brandApi.updateCollection(id, {
+          title: draftTitle,
+          description,
+          minPrice: parsedMinPrice,
+          maxPrice: parsedMaxPrice,
+          isAvailableInStore: false,
+          tags: finalTags,
+          categoryId,
+          categoryTypeId,
+          type,
+          visibility,
+          filterValueIds: getSelectedFilterValueIds(),
+        } as any);
+      } else {
+        await uploadCollection(
+          files,
+          draftTitle,
+          description,
+          parsedMinPrice,
+          parsedMaxPrice,
+          false,
+          finalTags,
+          {
+            categoryId,
+            subCategoryId: categoryTypeId,
+            categoryTypeId,
+            type,
+            visibility,
+            filterValueIds: getSelectedFilterValueIds(),
+            coverIndex,
+          },
+          undefined,
+          false, // shouldPublish = false
+        );
+      }
 
       setLastSaved(new Date());
 
@@ -529,13 +604,13 @@ const CreateDesignInner: React.FC = () => {
       }
 
       toast.success("Draft saved successfully!");
-      // Navigate to profile with Drafts visibility filter selected
-      navigate("/profile?tab=Content&visibility=Drafts");
+      setShowDraftSavedChoices(true);
     } catch (error) {
       console.error(error);
       toast.error("Failed to save draft");
     } finally {
       setIsSubmitting(false);
+      setSubmitIntent(null);
       setShowSaveDraftConfirm(false);
     }
   };
@@ -547,7 +622,8 @@ const CreateDesignInner: React.FC = () => {
       if (files.length === 0) reasons.push("at least one file");
       if (selectedTags.length === 0) reasons.push("at least one tag");
       if (categoryId.trim().length === 0) reasons.push("a category");
-      if (categoryTypeId.trim().length === 0) reasons.push("a category type");
+      if (categoryTypeId.trim().length === 0)
+        reasons.push("a sub-category");
       toast.error(`Please provide ${reasons.join(", ")}.`);
       return;
     }
@@ -555,9 +631,8 @@ const CreateDesignInner: React.FC = () => {
   };
 
   const handlePublishConfirm = async () => {
+    setSubmitIntent("publish");
     setIsSubmitting(true);
-    // Close modal immediately so user can keep browsing and see inline progress
-    setShowPublishModal(false);
     try {
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
       const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
@@ -577,8 +652,6 @@ const CreateDesignInner: React.FC = () => {
         return undefined;
       };
 
-      const coverLocalId = files[coverIndex]?.id;
-
       if (isEditMode && id) {
         await brandApi.updateCollection(id, {
           title,
@@ -591,7 +664,8 @@ const CreateDesignInner: React.FC = () => {
           categoryTypeId,
           type,
           visibility,
-          coverMediaId: files[coverIndex]?.remoteId || coverLocalId,
+          coverMediaId: files[coverIndex]?.remoteId || undefined,
+          filterValueIds: getSelectedFilterValueIds(),
         } as any);
 
         const currentIds = new Set(files.map((f) => f.id));
@@ -604,7 +678,31 @@ const CreateDesignInner: React.FC = () => {
           );
         }
 
-        toast.success("Design updated");
+        await finalizeCollectionUploads(
+          id,
+          [],
+          true,
+          {
+            action: "publish",
+            coverIndex,
+            collectionMetadata: {
+              title,
+              description,
+              visibility,
+              type,
+              categoryId,
+              subCategoryId: categoryTypeId,
+              categoryTypeId,
+              tags: finalTags,
+              filterValueIds: getSelectedFilterValueIds(),
+            },
+          },
+        );
+
+        toast.success("Design published");
+        setShowPublishModal(false);
+        navigate(`/profile?tab=Content&visibility=Public`, { replace: true });
+        return;
       } else {
         const response = await uploadCollection(
           files,
@@ -614,42 +712,29 @@ const CreateDesignInner: React.FC = () => {
           parsedMaxPrice,
           false,
           finalTags,
-          { categoryId, categoryTypeId, type, visibility },
+          {
+            categoryId,
+            subCategoryId: categoryTypeId,
+            categoryTypeId,
+            type,
+            visibility,
+            filterValueIds: getSelectedFilterValueIds(),
+            coverIndex,
+          },
         );
         const newCollectionId = extractCollectionId(response);
-        const fileIdMap = (response as any)?.fileIdMap as
-          | Record<string, string>
-          | undefined;
-        const completions = (response as any)?.completions as
-          | Array<{ fileId: string }>
-          | undefined;
-        const coverRemoteId = coverLocalId
-          ? fileIdMap?.[coverLocalId] ||
-            completions?.[coverIndex]?.fileId ||
-            coverLocalId
-          : undefined;
-
-        if (newCollectionId && coverRemoteId) {
-          await brandApi.updateCollection(newCollectionId, {
-            coverMediaId: coverRemoteId,
-          } as any);
-        }
         toast.success("Design published");
-
-        // Navigate back to profile/catalog with a publishing badge so the user is not blocked on this page
-        navigate(`/profile?tab=Content`, {
+        setShowPublishModal(false);
+        navigate(`/profile?tab=Content&visibility=Public`, {
+          replace: true,
           state: {
             publishingCollectionId: newCollectionId,
             publishingTitle: title,
             publishingStartedAt: Date.now(),
           },
         });
+        return;
       }
-
-      if (user?.id) {
-        await fetchCollections(user.id);
-      }
-      setShowPublishModal(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.toLowerCase().includes("cancelled")) {
@@ -669,7 +754,34 @@ const CreateDesignInner: React.FC = () => {
       throw error; // Re-throw so modal can handle state
     } finally {
       setIsSubmitting(false);
+      setSubmitIntent(null);
     }
+  };
+
+  const handleViewPublishedDesign = () => {
+    setShowPublishModal(false);
+    navigate(`/profile?tab=Content&visibility=Public`, { replace: true });
+  };
+
+  const handleGoToDrafts = () => {
+    setShowDraftSavedChoices(false);
+    navigate("/profile?tab=Content&visibility=Drafts");
+  };
+
+  const handleCreateNewDesign = () => {
+    setShowDraftSavedChoices(false);
+    setTitle("");
+    setDescription("");
+    setMinPrice("");
+    setMaxPrice("");
+    setSelectedTags([]);
+    setTagSearch("");
+    setType("EVERYBODY");
+    setVisibility("PUBLIC");
+    setCoverIndex(0);
+    setSelectedIndex(0);
+    mediaStore.clear();
+    navigate("/profile/collections/create");
   };
 
   const handleModalCloseRequest = () => {
@@ -733,6 +845,32 @@ const CreateDesignInner: React.FC = () => {
                 disabled={isSubmitting}
               >
                 {isSubmitting ? "Saving…" : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDraftSavedChoices && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" />
+          <div className="relative z-10 w-[460px] bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-6">
+            <h3 className="text-lg font-semibold mb-2">Draft saved</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-5">
+              Choose what you want to do next.
+            </p>
+            <div className="flex flex-col sm:flex-row justify-end gap-2">
+              <button
+                className="px-4 py-2 rounded-lg border"
+                onClick={handleCreateNewDesign}
+              >
+                Create New Design
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-purple-600 text-white"
+                onClick={handleGoToDrafts}
+              >
+                Go to Drafts
               </button>
             </div>
           </div>
@@ -988,7 +1126,7 @@ const CreateDesignInner: React.FC = () => {
                         />
 
                         <UniversalSelect
-                          label="Category Type"
+                          label="Sub-Category"
                           value={categoryTypeId}
                           onChange={setCategoryTypeId}
                           options={categoryTypeOptions.map((categoryType) => ({
@@ -999,7 +1137,7 @@ const CreateDesignInner: React.FC = () => {
                             loadingCategories
                               ? "Loading..."
                               : categoryTypeOptions.length
-                                ? "Select a type"
+                                ? "Select a sub-category"
                                 : "No types available"
                           }
                           disabled={
@@ -1014,13 +1152,7 @@ const CreateDesignInner: React.FC = () => {
                         onChange={setFilterSelection}
                         entityType="COLLECTION"
                         disabled={disabled}
-                        onTagSuggestions={(suggestions: string[]) => {
-                          // Merge filter-suggested tags into tag suggestions without duplicates
-                          setTagSuggestions((prev) => {
-                            const merged = new Set([...prev, ...suggestions]);
-                            return Array.from(merged);
-                          });
-                        }}
+                        onTagSuggestions={handleFilterTagSuggestions}
                       />
 
                       {/* Tags Section */}
@@ -1356,8 +1488,16 @@ const CreateDesignInner: React.FC = () => {
               disabled={disabled}
               className="flex-1 sm:flex-none py-3 px-6 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              <HiOutlineSparkles className="w-5 h-5" />
-              {isEditMode ? "Update Design" : "Publish Design"}
+              {isSubmitting && submitIntent === "publish" ? (
+                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : (
+                <HiOutlineSparkles className="w-5 h-5" />
+              )}
+              {isSubmitting && submitIntent === "publish"
+                ? "Publishing..."
+                : isEditMode
+                  ? "Update Design"
+                  : "Publish Design"}
             </button>
           </div>
         </div>
@@ -1371,6 +1511,8 @@ const CreateDesignInner: React.FC = () => {
         onConfirm={handlePublishConfirm}
         onEdit={() => setShowPublishModal(false)}
         summary={collectionSummary}
+        entityLabel="Design"
+        onViewPublished={handleViewPublishedDesign}
       />
 
       {/* Cancel/Exit prompt */}

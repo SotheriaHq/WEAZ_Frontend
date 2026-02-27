@@ -86,9 +86,11 @@ export async function initializeCollectionUploads(
     files: { name: string; type: string; size: number }[];
     // New metadata required by backend
     categoryId?: string;
+    subCategoryId?: string;
     categoryTypeId?: string;
     type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
     visibility?: 'PUBLIC' | 'PRIVATE';
+    filterValueIds?: string[];
   },
 ): Promise<InitializeCollectionResponse> {
   const resp = await apiClient.post('/collections/initialize', dto);
@@ -105,10 +107,38 @@ export async function initializeCollectionUploads(
 
 export type CompletionDto = { fileId: string; s3Key: string; actualSize: number; actualMimeType: string };
 
-export async function finalizeCollectionUploads(collectionId: string, completions: CompletionDto[], shouldPublish = true) {
+export async function finalizeCollectionUploads(
+  collectionId: string,
+  completions: CompletionDto[],
+  shouldPublish = true,
+  options?: {
+    action?: 'publish' | 'draft';
+    collectionMetadata?: {
+      title?: string;
+      description?: string;
+      visibility?: 'PUBLIC' | 'PRIVATE';
+      type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
+      categoryId?: string;
+      subCategoryId?: string;
+      categoryTypeId?: string;
+      tags?: string[];
+      filterValueIds?: string[];
+    };
+    coverMediaId?: string;
+    coverIndex?: number;
+  },
+) {
   const resp = await apiClient.post(
     `/collections/${collectionId}/finalize`,
-    { completions, shouldPublish },
+    {
+      completions,
+      shouldPublish,
+      action: options?.action,
+      collectionMetadata: options?.collectionMetadata,
+      coverMediaId: options?.coverMediaId,
+      coverIndex:
+        typeof options?.coverIndex === 'number' ? options.coverIndex : undefined,
+    },
     { headers: { 'Idempotency-Key': createIdempotencyKey() } },
   );
   // Unwrap interceptor-wrapped response

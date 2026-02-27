@@ -52,6 +52,12 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
   const mapped: MarketItem = {
     id: String(raw.id ?? mediaFileId ?? ''),
     collectionId: String(raw.collectionId ?? collection.id ?? ''),
+    coverMediaId:
+      typeof raw.coverMediaId === 'string'
+        ? (raw.coverMediaId as string)
+        : typeof (collection as { coverMediaId?: unknown }).coverMediaId === 'string'
+          ? ((collection as { coverMediaId?: string }).coverMediaId ?? null)
+          : null,
     collectionTitle: String(collection.title ?? raw.collectionTitle ?? ''),
     collectionDescription:
       typeof collection.description === 'string'
@@ -150,13 +156,34 @@ export const marketApi = {
       };
 
     const rawItems = (data as { items?: RawMarketItem[] }).items;
-    const items = Array.isArray(rawItems) ? rawItems.map((item) => {
+    const mappedItems = Array.isArray(rawItems) ? rawItems.map((item) => {
       const mapped = toMarketItem(item);
       if (typeof (item as any).combinedCommentsCount === 'number') {
         mapped.commentsCount = (item as any).combinedCommentsCount as number;
       }
       return mapped;
     }) : [];
+
+    // Safety net: collapse any duplicate media rows so every design collection
+    // renders as a single card using its cover media.
+    const byCollection = new Map<string, MarketItem>();
+    mappedItems.forEach((entry) => {
+      if (!entry.collectionId) return;
+      const existing = byCollection.get(entry.collectionId);
+      if (!existing) {
+        byCollection.set(entry.collectionId, entry);
+        return;
+      }
+
+      const preferredId = entry.coverMediaId ?? existing.coverMediaId ?? null;
+      const existingIsCover = preferredId ? existing.id === preferredId : false;
+      const entryIsCover = preferredId ? entry.id === preferredId : false;
+      if (!existingIsCover && entryIsCover) {
+        byCollection.set(entry.collectionId, entry);
+      }
+    });
+    const items = Array.from(byCollection.values());
+
     return {
       items,
       hasNextPage: Boolean((data as MarketFeedResponse)?.hasNextPage ?? items.length > 0),

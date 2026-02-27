@@ -26,6 +26,8 @@ interface PrePublishConfirmModalProps {
   onConfirm: () => Promise<void>;
   onEdit: () => void;
   summary: CollectionSummary;
+  entityLabel?: 'Collection' | 'Design';
+  onViewPublished?: () => void;
 }
 
 type ModalState = 'confirm' | 'loading' | 'success';
@@ -47,6 +49,8 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
   onConfirm,
   onEdit,
   summary,
+  entityLabel = 'Collection',
+  onViewPublished,
 }) => {
   const [state, setState] = useState<ModalState>('confirm');
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
@@ -72,6 +76,12 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
       return () => clearTimeout(timer);
     }
   }, [state, redirectCountdown]);
+
+  useEffect(() => {
+    if (state === 'success' && redirectCountdown === 0) {
+      onViewPublished?.();
+    }
+  }, [state, redirectCountdown, onViewPublished]);
 
   // Scroll Locking
   useEffect(() => {
@@ -164,17 +174,17 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
                 ref={panelRef}
                 role="dialog"
                 aria-modal="true"
-                aria-label="Review before publishing"
+                aria-label={`Review before publishing ${entityLabel.toLowerCase()}`}
                 tabIndex={-1}
-                className="relative flex w-full max-w-[600px] max-h-[90vh] neu-modal-surface flex-col overflow-hidden rounded-3xl glass-panel-dark outline-none"
+                className="relative flex w-full max-w-[600px] max-h-[90vh] neu-modal-surface flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white/95 dark:border-white/10 dark:bg-gray-900/95 outline-none"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Header (always visible) */}
-                <div className="shrink-0 border-b border-white/10 px-6 py-5">
+                <div className="shrink-0 border-b border-gray-200 dark:border-white/10 px-6 py-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h2 className="text-2xl font-bold text-white font-serif">Review Your Collection</h2>
-                      <p className="text-sm text-gray-400 mt-1">Please review before publishing</p>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white font-serif">Review Your {entityLabel}</h2>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Please review before publishing</p>
                     </div>
 
                     {state === 'confirm' && (
@@ -182,7 +192,7 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
                         type="button"
                         data-initial-focus="true"
                         onClick={onClose}
-                        className="w-9 h-9 rounded-full glass-light flex items-center justify-center text-gray-200 hover:text-white transition-colors"
+                        className="w-9 h-9 rounded-full glass-light flex items-center justify-center text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
                         aria-label="Close"
                       >
                         ✖️
@@ -198,6 +208,7 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
                       <ConfirmContent
                         key="confirm"
                         summary={summary}
+                        entityLabel={entityLabel}
                         truncatedDescription={truncatedDescription}
                         descriptionExpanded={descriptionExpanded}
                         setDescriptionExpanded={setDescriptionExpanded}
@@ -213,8 +224,10 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
                       <SuccessContent
                         key="success"
                         title={summary.title}
+                        entityLabel={entityLabel}
                         redirectCountdown={redirectCountdown}
                         onClose={onClose}
+                        onViewPublished={onViewPublished}
                       />
                     )}
                   </AnimatePresence>
@@ -222,14 +235,14 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
 
                 {/* Footer (confirm actions always visible) */}
                 {state === 'confirm' && (
-                  <div className="shrink-0 border-t border-white/10 px-6 py-5">
+                  <div className="shrink-0 border-t border-gray-200 dark:border-white/10 px-6 py-5">
                     <div className="flex gap-3">
                       <button
                         type="button"
                         onClick={onEdit}
-                        className="flex-1 py-3 px-4 rounded-xl glass-light border border-white/10 text-white font-medium hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
+                        className="flex-1 py-3 px-4 rounded-xl glass-light border border-gray-300 dark:border-white/10 text-gray-900 dark:text-white font-medium hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
                       >
-                        ← Edit Collection
+                        ← Edit {entityLabel}
                       </button>
                       <button
                         type="button"
@@ -255,6 +268,7 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
  */
 const ConfirmContent: React.FC<{
   summary: CollectionSummary;
+  entityLabel: 'Collection' | 'Design';
   truncatedDescription: string | null;
   descriptionExpanded: boolean;
   setDescriptionExpanded: (v: boolean) => void;
@@ -263,6 +277,7 @@ const ConfirmContent: React.FC<{
   audienceLabel: Record<string, string>;
 }> = ({
   summary,
+  entityLabel,
   truncatedDescription,
   descriptionExpanded,
   setDescriptionExpanded,
@@ -299,7 +314,7 @@ const ConfirmContent: React.FC<{
     )}
 
     {/* Summary details */}
-    <div className="glass-light rounded-xl p-4 space-y-3">
+    <div className="glass-light rounded-xl p-4 space-y-3 border border-gray-200 dark:border-white/10">
       <SummaryRow label="Title" value={summary.title} />
       
       {summary.category && (
@@ -352,12 +367,12 @@ const ConfirmContent: React.FC<{
     {(summary.isAvailableInStore || summary.isMadeToOrder) && (
       <div className="flex flex-wrap gap-2 mt-3">
         {summary.isAvailableInStore && (
-          <span className="glass-light border border-white/10 px-3 py-1 rounded-full text-sm text-white">
+          <span className="glass-light border border-gray-200 dark:border-white/10 px-3 py-1 rounded-full text-sm text-gray-900 dark:text-white">
             🏪 Physical Store
           </span>
         )}
         {summary.isMadeToOrder && (
-          <span className="glass-light border border-white/10 px-3 py-1 rounded-full text-sm text-white">
+          <span className="glass-light border border-gray-200 dark:border-white/10 px-3 py-1 rounded-full text-sm text-gray-900 dark:text-white">
             ✂️ Made to Order
           </span>
         )}
@@ -368,7 +383,7 @@ const ConfirmContent: React.FC<{
     {truncatedDescription && (
       <div className="mt-4">
         <span className="text-xs text-gray-500 uppercase tracking-wide">Description</span>
-        <p className="text-sm text-gray-300 mt-1">
+        <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
           {descriptionExpanded ? summary.description : truncatedDescription}
         </p>
         {summary.description && summary.description.length > 100 && (
@@ -396,7 +411,7 @@ const ConfirmContent: React.FC<{
       <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
         <span className="text-amber-300 flex-shrink-0 mt-0.5" aria-hidden="true">⚠️</span>
         <p className="text-sm text-amber-300">
-          💡 Tip: Adding more tags can help your collection get discovered
+          💡 Tip: Adding more tags can help your {entityLabel.toLowerCase()} get discovered
         </p>
       </div>
     )}
@@ -409,7 +424,7 @@ const ConfirmContent: React.FC<{
 const SummaryRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className="flex justify-between items-center">
     <span className="text-xs text-gray-500 uppercase tracking-wide">{label}</span>
-    <span className="text-sm text-white font-medium">{value}</span>
+    <span className="text-sm text-gray-900 dark:text-white font-medium">{value}</span>
   </div>
 );
 
@@ -426,7 +441,7 @@ const LoadingContent: React.FC = () => (
     {/* Spinner */}
     <div className="w-12 h-12 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin mb-6" />
     
-    <h3 className="text-lg text-white font-medium mb-1">Publishing your collection...</h3>
+    <h3 className="text-lg text-gray-900 dark:text-white font-medium mb-1">Publishing your design...</h3>
     <p className="text-sm text-gray-400 mb-4">This may take a moment</p>
     
     {/* Animated dots */}
@@ -443,9 +458,11 @@ const LoadingContent: React.FC = () => (
  */
 const SuccessContent: React.FC<{ 
   title: string; 
+  entityLabel: 'Collection' | 'Design';
   redirectCountdown: number;
   onClose: () => void;
-}> = ({ title, redirectCountdown, onClose }) => (
+  onViewPublished?: () => void;
+}> = ({ title, entityLabel, redirectCountdown, onClose, onViewPublished }) => (
   <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
@@ -468,21 +485,21 @@ const SuccessContent: React.FC<{
       </motion.div>
     </motion.div>
 
-    <h2 className="text-2xl font-bold text-white font-serif mb-2">
-      Your Collection is Live! 🎉
+    <h2 className="text-2xl font-bold text-gray-900 dark:text-white font-serif mb-2">
+      Your {entityLabel} is Live! 🎉
     </h2>
-    <p className="text-gray-400 mb-6">
-      <span className="text-white font-medium">{title}</span> has been published
+    <p className="text-gray-500 dark:text-gray-400 mb-6">
+      <span className="text-gray-900 dark:text-white font-medium">{title}</span> has been published
     </p>
 
     {/* Action buttons */}
     <div className="flex gap-3 w-full max-w-xs">
       <button
         type="button"
-        onClick={onClose}
+        onClick={() => (onViewPublished ? onViewPublished() : onClose())}
         className="flex-1 py-3 px-4 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2"
       >
-        🔗 View Collection
+        🔗 View {entityLabel}
       </button>
       <button
         type="button"

@@ -11,8 +11,11 @@ interface CollectionsGridProps {
   collections: CollectionDto[];
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onRestore?: (id: string) => void;
+  onPermanentDelete?: (id: string) => void;
   onCollectionClick?: (id: string) => void;
   isDraft?: boolean;
+  isDeleted?: boolean;
   onRetryPublish?: (id: string) => void;
 }
 
@@ -20,8 +23,11 @@ const CollectionsGrid: React.FC<CollectionsGridProps> = ({
   collections, 
   onEdit, 
   onDelete,
+  onRestore,
+  onPermanentDelete,
   onCollectionClick,
   isDraft,
+  isDeleted,
   onRetryPublish,
 }) => {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
@@ -113,7 +119,10 @@ const CollectionsGrid: React.FC<CollectionsGridProps> = ({
             onClick={() => onCollectionClick?.(collection.id)}
             onEdit={onEdit} 
             onDelete={onDelete}
+            onRestore={onRestore}
+            onPermanentDelete={onPermanentDelete}
             isDraft={isDraft}
+            isDeleted={isDeleted}
             onRetryPublish={onRetryPublish}
             isSaved={savedMap[collection.id] ?? false}
             onToggleSave={handleToggleSave}

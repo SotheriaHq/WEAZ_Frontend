@@ -12,6 +12,7 @@ export interface MarketMedia {
 export interface MarketItem {
   id: string;
   collectionId: string;
+  coverMediaId?: string | null;
   collectionTitle: string;
   collectionDescription?: string | null;
   brandId: string;

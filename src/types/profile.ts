@@ -11,9 +11,12 @@ export interface CollectionDto {
   type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
   domain?: 'DESIGN' | 'STORE';
   categoryId?: string;
+  subCategoryId?: string;
   categoryTypeId?: string;
   coverImage?: string;
   coverFileId?: string;
+  deletedAt?: string | null;
+  deleteExpiresAt?: string | null;
   itemCount?: number;
   createdAt: string;
   updatedAt: string;

@@ -96,7 +96,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
           if (status === 404 || status === 410) {
             setLocked(false);
             setNotFound(true);
-            toast.error('Collection not found.');
+            toast.error('Design not found.');
             onBack();
           } else if (status === 403 || status === 401) {
             console.log('[InlineCollectionViewer] Setting locked state - permission denied');
@@ -104,7 +104,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
             setNotFound(false);
           } else {
             // Other error - show toast and go back
-            toast.error('Failed to load collection');
+            toast.error('Failed to load design');
             onBack();
           }
         }
@@ -526,7 +526,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   if (notFound || !detail) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Collection not found</p>
+        <p className="text-gray-500">Design not found</p>
         <button onClick={onBack} className="mt-4 text-purple-600 hover:text-purple-700 font-medium">
           Go back
         </button>
@@ -716,7 +716,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                       ? [{ label: 'Cancel Discount Sale', onClick: handleCancelSale }]
                       : [{ label: 'Discount Sale', onClick: () => setShowDiscountModal(true) }]
                     ),
-                    { label: 'Edit Collection Details', onClick: () => { navigate(`/profile/edit/${collectionId}`); } },
+                    { label: 'Edit Collection Details', onClick: () => { navigate(`/profile/collections/edit/${collectionId}`); } },
                   ]}
                 />
               ) : undefined}

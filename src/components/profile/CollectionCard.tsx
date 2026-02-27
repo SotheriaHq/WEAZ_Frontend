@@ -18,8 +18,11 @@ interface CollectionCardProps {
   onClick?: () => void;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onRestore?: (id: string) => void;
+  onPermanentDelete?: (id: string) => void;
   showActions?: boolean;
   isDraft?: boolean;
+  isDeleted?: boolean;
   onRetryPublish?: (id: string) => void;
   isSaved?: boolean;
   onToggleSave?: (id: string) => void;
@@ -31,8 +34,11 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   onClick,
   onEdit, 
   onDelete,
+  onRestore,
+  onPermanentDelete,
   showActions = true,
   isDraft = false,
+  isDeleted = false,
   onRetryPublish,
   isSaved: isSavedProp,
   onToggleSave,
@@ -193,8 +199,10 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   return (
     <>
     <div 
-      className="relative group w-full overflow-hidden cursor-pointer shadow-md transition-transform duration-200 hover:scale-[1.02] rounded-xl"
-      onClick={isPublishing ? undefined : onClick}
+      className={`relative group w-full overflow-hidden shadow-md transition-transform duration-200 rounded-xl ${
+        isDeleted ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'
+      }`}
+      onClick={isPublishing || isDeleted ? undefined : onClick}
     >
       {/* Background Media */}
       <div className="relative w-full overflow-hidden">
@@ -291,13 +299,24 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
         )}
         
         {/* Three-dot menu for owners (top right) */}
-        {showActions && (onEdit || onDelete) && (
+        {showActions && (onEdit || onDelete || onRestore || onPermanentDelete) && (
           <div className="absolute top-3 right-3 z-50" onClick={(e) => e.stopPropagation()}>
             <Dropdown>
               <DropdownTrigger className="btn-tight-xs">
                 <MoreVertical className="w-4 h-4" />
               </DropdownTrigger>
               <DropdownMenu className="glass-menu-soft">
+                {isDeleted ? (
+                  <>
+                    {onRestore && (
+                      <DropdownItem onClick={() => onRestore(collection.id)}>Restore</DropdownItem>
+                    )}
+                    {onPermanentDelete && (
+                      <DropdownItem onClick={() => onPermanentDelete(collection.id)}>Delete Permanently</DropdownItem>
+                    )}
+                  </>
+                ) : (
+                  <>
                 {/* For drafts: only show Delete. For published: show Edit, Delete, Manage Access */}
                 {!isDraft && onEdit && (
                   <DropdownItem onClick={() => onEdit(collection.id)}>Edit</DropdownItem>
@@ -308,13 +327,15 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
                 {!isDraft && (
                   <DropdownItem onClick={() => setAccessOpen(true)}>Manage Access</DropdownItem>
                 )}
+                  </>
+                )}
               </DropdownMenu>
             </Dropdown>
           </div>
         )}
 
         {/* Vertical Action Bar (like in Reels) - Right side */}
-        {!isDraft && (
+        {!isDraft && !isDeleted && (
         <div className="absolute bottom-28 right-2 z-10 flex flex-col items-center gap-3">
           <ThreadButton contentType="COLLECTION" contentId={collection.id} initialCount={threadsCount} ownerId={collection.ownerId} />
           <button
@@ -393,7 +414,24 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
 
           {/* Footer row - hide comment input for drafts, show completion status instead */}
           <div className="flex items-center gap-2">
-            {isDraft ? (
+            {isDeleted ? (
+              <>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-rose-500/20 border border-rose-400/30 backdrop-blur-sm">
+                    <div className="w-2 h-2 rounded-full bg-rose-400" />
+                    <span className="text-[10px] font-medium text-rose-200">Deleted</span>
+                  </div>
+                </div>
+                {onRestore && (
+                  <button
+                    className="shrink-0 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-[11px] font-medium hover:bg-emerald-700 transition-all shadow-md"
+                    onClick={(e) => { e.stopPropagation(); onRestore(collection.id); }}
+                  >
+                    Restore
+                  </button>
+                )}
+              </>
+            ) : isDraft ? (
               /* Draft completion indicator */
               <>
                 <div className="flex-1 min-w-0">
@@ -433,7 +471,9 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
         </div>
       </div>
     </div>
-    <ManageAccessModal open={accessOpen} collectionId={collection.id} onClose={() => setAccessOpen(false)} />
+    {!isDeleted && (
+      <ManageAccessModal open={accessOpen} collectionId={collection.id} onClose={() => setAccessOpen(false)} />
+    )}
     </>
   );
 };

@@ -1,10 +1,4 @@
-import React, { useRef, useEffect } from 'react';
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// PRODUCT ACTIONS MENU
-// Dropdown menu for product card actions: Feature, Duplicate, Archive, Delete
-// Uses emoji instead of icons per design requirements
-// ═══════════════════════════════════════════════════════════════════════════════
+import React, { useEffect, useRef } from 'react';
 
 export interface ProductAction {
   id: string;
@@ -25,10 +19,14 @@ interface ProductActionsMenuProps {
 }
 
 const variantStyles = {
-  default: 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10',
-  danger: 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10',
-  warning: 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10',
-  success: 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10',
+  default:
+    'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10',
+  danger:
+    'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10',
+  warning:
+    'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10',
+  success:
+    'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10',
 };
 
 const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
@@ -41,7 +39,6 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
 
@@ -49,21 +46,19 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
       if (
         menuRef.current &&
         !menuRef.current.contains(event.target as Node) &&
-        (!triggerRef?.current || !triggerRef.current.contains(event.target as Node))
+        (!triggerRef?.current ||
+          !triggerRef.current.contains(event.target as Node))
       ) {
         onClose();
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
+      if (event.key === 'Escape') onClose();
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
-    
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
@@ -82,16 +77,14 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
   return (
     <div
       ref={menuRef}
-      className={`absolute ${positionStyles[position]} z-50 w-72 max-w-[calc(100vw-2rem)] py-2 bg-white dark:bg-zinc-800 rounded-xl shadow-2xl border border-gray-200 dark:border-zinc-700 animate-in fade-in zoom-in-95 duration-150`}
+      className={`absolute ${positionStyles[position]} z-50 w-[min(20rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] rounded-xl border border-gray-200 bg-white py-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150 dark:border-zinc-700 dark:bg-zinc-800`}
       onClick={(e) => e.stopPropagation()}
     >
       {actions.map((action, index) => (
         <React.Fragment key={action.id}>
-          {/* Add divider before danger actions */}
           {index > 0 && action.variant === 'danger' && (
             <div className="my-2 border-t border-gray-100 dark:border-zinc-700" />
           )}
-          
           <button
             type="button"
             onClick={() => {
@@ -101,18 +94,15 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
               }
             }}
             disabled={action.disabled}
-            className={`
-              group
-              w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors
-              ${variantStyles[action.variant || 'default']}
-              ${action.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-            `}
+            className={`w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left transition-colors group flex ${
+              variantStyles[action.variant || 'default']
+            } ${action.disabled ? 'cursor-not-allowed opacity-50' : ''}`}
           >
-            <span className="text-lg flex-shrink-0">{action.emoji}</span>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-sm">{action.label}</div>
+            <span className="text-base leading-none">{action.emoji}</span>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium">{action.label}</div>
               {action.description && (
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-4 whitespace-normal">
+                <div className="mt-0.5 whitespace-normal text-xs leading-4 text-gray-500 dark:text-gray-400">
                   {action.description}
                 </div>
               )}
@@ -124,10 +114,6 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// DEFAULT PRODUCT ACTIONS
-// ═══════════════════════════════════════════════════════════════════════════════
-
 export const getDefaultProductActions = (product: {
   isFeatured?: boolean;
   archivedAt?: string | null;
@@ -135,7 +121,7 @@ export const getDefaultProductActions = (product: {
 }): ProductAction[] => {
   const isArchived = !!product.archivedAt;
   const isDeleted = !!product.deletedAt;
-  
+
   if (isDeleted) {
     return [
       {
@@ -167,7 +153,9 @@ export const getDefaultProductActions = (product: {
       id: 'feature',
       label: product.isFeatured ? 'Remove from Featured' : 'Add to Featured',
       emoji: product.isFeatured ? '⭐' : '☆',
-      description: product.isFeatured ? 'Currently featured' : 'Show in featured section',
+      description: product.isFeatured
+        ? 'Currently featured'
+        : 'Show in featured section',
       variant: product.isFeatured ? 'success' : 'default',
     },
     {
@@ -195,7 +183,6 @@ export const getDefaultProductActions = (product: {
             variant: 'warning' as const,
           },
         ]),
-    // Note: Edit and Delete removed from menu - they're always visible as buttons on the card
   ];
 };
 

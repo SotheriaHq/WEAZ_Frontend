@@ -35,11 +35,27 @@ export const FrostedButton: React.FC<FrostedButtonProps> = ({
       className,
     )}
     disabled={disabled || loading}
+    aria-busy={loading ? true : undefined}
     {...props}
   >
-    {leftIcon}
+    {loading ? (
+      <span
+        className="inline-block h-4 w-4 rounded-full border-2 border-current/35 border-t-current animate-spin"
+        aria-hidden
+      />
+    ) : (
+      leftIcon
+    )}
     {children}
-    {rightIcon}
+    {loading ? (
+      <span className="inline-flex items-center gap-0.5" aria-hidden>
+        <span className="h-1 w-1 rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
+        <span className="h-1 w-1 rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
+        <span className="h-1 w-1 rounded-full bg-current animate-bounce" />
+      </span>
+    ) : (
+      rightIcon
+    )}
   </button>
 );
 

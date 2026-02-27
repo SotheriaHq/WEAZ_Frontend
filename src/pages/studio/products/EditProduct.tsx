@@ -309,6 +309,8 @@ const EditProduct: React.FC = () => {
   const [saveAction, setSaveAction] = useState<"draft" | "publish" | null>(
     null,
   );
+  const [submitLocked, setSubmitLocked] = useState(false);
+  const submitLockRef = useRef(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
   const [tagInput, setTagInput] = useState("");
@@ -566,7 +568,7 @@ const EditProduct: React.FC = () => {
             setCategoryTypes(resolvedTypes);
           }
         } catch (error) {
-          console.error("Failed to load category types", error);
+          console.error("Failed to load sub-categories", error);
           if (mounted) setCategoryTypes([]);
         }
       };
@@ -682,7 +684,10 @@ const EditProduct: React.FC = () => {
             (product as any).categoryType?.categoryId ||
             (product as any).categoryId ||
             "",
-          categoryTypeId: (product as any).categoryTypeId || "",
+          categoryTypeId:
+            (product as any).subCategoryId ||
+            (product as any).categoryTypeId ||
+            "",
           tags: product.tags || [],
           price: product.price || 0,
           compareAtPrice:
@@ -838,11 +843,6 @@ const EditProduct: React.FC = () => {
           }
           return next;
         }
-
-        if (nextCollectionId) {
-          // Collection has no category, so categoryType must not be carried forward.
-          next.categoryTypeId = "";
-        }
         return next;
       });
       setHasChanges(true);
@@ -857,6 +857,8 @@ const EditProduct: React.FC = () => {
   );
 
   useEffect(() => {
+    if (categoriesLoading) return;
+
     setForm((prev) => {
       const scopedTypes = prev.taxonomyCategoryId
         ? selectedTaxonomyCategoryTypes
@@ -865,8 +867,7 @@ const EditProduct: React.FC = () => {
           : categoryTypes;
 
       if (scopedTypes.length === 0) {
-        if (!prev.categoryTypeId) return prev;
-        return { ...prev, categoryTypeId: "" };
+        return prev;
       }
 
       if (
@@ -879,7 +880,12 @@ const EditProduct: React.FC = () => {
       }
       return { ...prev, categoryTypeId: scopedTypes[0]?.id ?? "" };
     });
-  }, [availableCategoryTypes, categoryTypes, selectedTaxonomyCategoryTypes]);
+  }, [
+    availableCategoryTypes,
+    categoriesLoading,
+    categoryTypes,
+    selectedTaxonomyCategoryTypes,
+  ]);
 
   // =====================
   // Form Handlers
@@ -1023,7 +1029,7 @@ const EditProduct: React.FC = () => {
           !form.categoryTypeId
         ) {
           toast.error(
-            "Please select a category type for the selected collection.",
+            "Please select a sub-category for the selected collection.",
           );
           return;
         }
@@ -1120,13 +1126,6 @@ const EditProduct: React.FC = () => {
         ? categoryTypeParentById.get(form.categoryTypeId)
         : undefined;
 
-      if (selectedCollectionId && !selectedCollectionCategory) {
-        toast.error(
-          "Selected collection has no category. Update that collection category first or choose no collection.",
-        );
-        return;
-      }
-
       if (
         selectedCollectionId &&
         selectedCollectionCategory &&
@@ -1139,10 +1138,7 @@ const EditProduct: React.FC = () => {
         return;
       }
 
-      const payloadCategoryTypeId =
-        selectedCollectionId && !selectedCollectionCategory
-          ? undefined
-          : form.categoryTypeId || undefined;
+      const payloadCategoryTypeId = form.categoryTypeId || undefined;
 
       setSaving(true);
       try {
@@ -1160,6 +1156,7 @@ const EditProduct: React.FC = () => {
             : form.title.trim(),
           description: form.description.trim() || undefined,
           collectionId: selectedCollectionId,
+          subCategoryId: payloadCategoryTypeId,
           categoryTypeId: payloadCategoryTypeId,
           tags: form.tags,
           price: effectiveDraft
@@ -1338,14 +1335,6 @@ const EditProduct: React.FC = () => {
         ? categoryTypeParentById.get(form.categoryTypeId)
         : undefined;
 
-      if (selectedCollectionId && !selectedCollectionCategory) {
-        toast.error(
-          "Selected collection has no category. Update that collection category first or choose no collection.",
-        );
-        setSaving(false);
-        return;
-      }
-
       if (
         selectedCollectionId &&
         selectedCollectionCategory &&
@@ -1359,10 +1348,7 @@ const EditProduct: React.FC = () => {
         return;
       }
 
-      const payloadCategoryTypeId =
-        selectedCollectionId && !selectedCollectionCategory
-          ? undefined
-          : form.categoryTypeId || undefined;
+      const payloadCategoryTypeId = form.categoryTypeId || undefined;
       const resolvedCustomsRegion = await syncShippingRegions();
 
       const payload: ProductCreateDto = {
@@ -1371,6 +1357,7 @@ const EditProduct: React.FC = () => {
           : form.title.trim(),
         description: form.description.trim() || undefined,
         collectionId: selectedCollectionId,
+        subCategoryId: payloadCategoryTypeId,
         categoryTypeId: payloadCategoryTypeId,
         tags: form.tags,
         price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
@@ -1462,14 +1449,19 @@ const EditProduct: React.FC = () => {
         forceStatus?: FormState["status"];
       },
     ) => {
+      if (submitLockRef.current || saving || submitLocked) return;
+      submitLockRef.current = true;
+      setSubmitLocked(true);
       setSaveAction(options.action);
       try {
         await handleSave(asDraft, { forceStatus: options.forceStatus });
       } finally {
+        submitLockRef.current = false;
         setSaveAction(null);
+        setSubmitLocked(false);
       }
     },
-    [handleSave],
+    [handleSave, saving, submitLocked],
   );
 
   // Auto-generate SKU (product + variants). Users shouldn't type SKUs manually.
@@ -2944,10 +2936,10 @@ const EditProduct: React.FC = () => {
                     forceStatus: "DRAFT",
                   })
                 }
-                disabled={saving}
+                disabled={saving || submitLocked}
                 className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
               >
-                {saving && saveAction === "draft" && (
+                {(saving || submitLocked) && saveAction === "draft" && (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 )}
                 Save as Draft
@@ -2961,10 +2953,10 @@ const EditProduct: React.FC = () => {
                     forceStatus: "DRAFT",
                   })
                 }
-                disabled={saving}
+                disabled={saving || submitLocked}
                 className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
               >
-                {saving && saveAction === "draft" && (
+                {(saving || submitLocked) && saveAction === "draft" && (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 )}
                 Save Changes
@@ -2991,10 +2983,10 @@ const EditProduct: React.FC = () => {
                       : undefined,
                 })
               }
-              disabled={saving}
+                disabled={saving || submitLocked}
               className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 text-white text-sm font-semibold rounded-lg shadow-lg shadow-purple-500/20 transition-all flex items-center gap-2"
             >
-              {saving && saveAction === "publish" && (
+                {(saving || submitLocked) && saveAction === "publish" && (
                 <Loader2 className="w-4 h-4 animate-spin" />
               )}
               {isDraftEditMode

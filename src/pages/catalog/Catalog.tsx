@@ -54,6 +54,7 @@ const ProfilePage: React.FC = () => {
     fetchReviews,
     fetchBrandProfile,
     brandProfileError,
+    deleteCollection: deleteOwnedCollection,
   } = useBrandProfile();
   
   const [drafts, setDrafts] = useState<CollectionDto[]>([]);
@@ -92,16 +93,23 @@ const ProfilePage: React.FC = () => {
     }
     // Handle visibility filter from URL (e.g., after draft save redirect)
     const visibility = searchParams.get('visibility');
-    if (visibility && ['Public', 'Private', 'Drafts'].includes(visibility)) {
-      setVisibilityFilter(visibility as 'Public' | 'Private' | 'Drafts');
+    if (visibility && ['Public', 'Private', 'Drafts', 'Deleted'].includes(visibility)) {
+      setVisibilityFilter(visibility as 'Public' | 'Private' | 'Drafts' | 'Deleted');
     }
   }, [searchParams]);
 
   const [activeTab, setActiveTab] = useState<TabType>('Content');
-  const [visibilityFilter, setVisibilityFilter] = useState<'Public' | 'Private' | 'Drafts'>('Public');
+  const [visibilityFilter, setVisibilityFilter] = useState<'Public' | 'Private' | 'Drafts' | 'Deleted'>('Public');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [pendingAccessConfirm, setPendingAccessConfirm] = useState<string | null>(null);
   const [collectionToDelete, setCollectionToDelete] = useState<string | null>(null);
+  const [collectionToRestore, setCollectionToRestore] = useState<string | null>(null);
+  const [collectionToPermanentDelete, setCollectionToPermanentDelete] = useState<string | null>(null);
+  const [recentlyDeletedDesign, setRecentlyDeletedDesign] = useState<{ isDraft: boolean } | null>(null);
+  const [locallyRemovedCollectionIds, setLocallyRemovedCollectionIds] = useState<Set<string>>(new Set());
+  const [deletedDesigns, setDeletedDesigns] = useState<CollectionDto[]>([]);
+  const [deletedDesignsLoading, setDeletedDesignsLoading] = useState(false);
+  const [deletedDesignsError, setDeletedDesignsError] = useState<string | null>(null);
   // collectionType state removed; modal is opened with the selected type via handler
   const [storeStatus, setStoreStatus] = useState<StoreStatusResponse | null>(null);
   const [storeStatusLoading, setStoreStatusLoading] = useState(false);
@@ -215,6 +223,9 @@ const ProfilePage: React.FC = () => {
           message: navState.publishingTitle ? `Publishing "${navState.publishingTitle}"` : 'Publishing your design',
         },
       }));
+      if (isOwner && user?.id) {
+        void fetchCollections(user.id);
+      }
       // Clear state so refresh/back does not re-run
       navigate(`${location.pathname}${location.search}`, { replace: true });
       return;
@@ -229,7 +240,7 @@ const ProfilePage: React.FC = () => {
       else toast.info(message);
       navigate(`${location.pathname}${location.search}`, { replace: true });
     }
-  }, [location.pathname, location.search, location.state, navigate]);
+  }, [fetchCollections, isOwner, location.pathname, location.search, location.state, navigate, user?.id]);
 
   const isEditModalOpen = searchParams.get('modal') === 'brand-setup';
 
@@ -277,6 +288,34 @@ const ProfilePage: React.FC = () => {
         .finally(() => setDraftsLoading(false));
     }
   }, [visibilityFilter, isOwner]);
+
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      if (visibilityFilter !== 'Deleted' || !isOwner || !user?.id) return;
+      setDeletedDesignsLoading(true);
+      setDeletedDesignsError(null);
+      try {
+        const items = await brandApi.getCollections(user.id, {
+          scope: 'design',
+          visibility: 'all',
+          onlyDeleted: true,
+        });
+        if (!mounted) return;
+        setDeletedDesigns(items);
+      } catch (error) {
+        if (!mounted) return;
+        console.error(error);
+        setDeletedDesignsError('Unable to load deleted designs.');
+      } finally {
+        if (mounted) setDeletedDesignsLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      mounted = false;
+    };
+  }, [visibilityFilter, isOwner, user?.id]);
 
   const requiresProfileSetup = useMemo(() => {
     if (!isOwner || !user) {
@@ -594,7 +633,7 @@ const ProfilePage: React.FC = () => {
   // ---------------- Visitor data fetch ----------------
   const [visitorProfile, setVisitorProfile] = useState<BrandProfileDto | null>(null);
   const [visitorCollections, setVisitorCollections] = useState<CollectionDto[]>([]);
-  const [visitorLoading, setVisitorLoading] = useState(false);
+  const [visitorLoading, setVisitorLoading] = useState<boolean>(() => Boolean(isVisitorView));
   const [visitorError, setVisitorError] = useState<string | null>(null);
   const [isPatched, setIsPatched] = useState(false);
   const [patchLoading, setPatchLoading] = useState(false);
@@ -708,16 +747,64 @@ const ProfilePage: React.FC = () => {
     () => (isVisitorView ? visitorCollections : collections) ?? [],
     [isVisitorView, visitorCollections, collections]
   );
+
+  const handleCollectionViewerBack = useCallback(() => {
+    setSelectedCollectionId(null);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('collectionId');
+      return next;
+    });
+  }, [setSearchParams]);
+
+  const removeCollectionFromView = useCallback((collectionId: string) => {
+    if (!collectionId) return;
+
+    setLocallyRemovedCollectionIds((prev) => {
+      if (prev.has(collectionId)) return prev;
+      const next = new Set(prev);
+      next.add(collectionId);
+      return next;
+    });
+    setDrafts((prev) => prev.filter((item) => item.id !== collectionId));
+    setVisitorCollections((prev) => prev.filter((item) => item.id !== collectionId));
+    setPublishingStates((prev) => {
+      if (!prev[collectionId]) return prev;
+      const next = { ...prev };
+      delete next[collectionId];
+      return next;
+    });
+    setSelectedCollectionId((prev) => (prev === collectionId ? null : prev));
+    setSearchParams((prev) => {
+      if (prev.get('collectionId') !== collectionId) return prev;
+      const next = new URLSearchParams(prev);
+      next.delete('collectionId');
+      return next;
+    });
+  }, [setSearchParams]);
+
+  const restoreCollectionInView = useCallback((collectionId: string) => {
+    if (!collectionId) return;
+    setLocallyRemovedCollectionIds((prev) => {
+      if (!prev.has(collectionId)) return prev;
+      const next = new Set(prev);
+      next.delete(collectionId);
+      return next;
+    });
+  }, []);
   
   // Filter logic updated to handle Drafts
   let displayCollections: CollectionDto[] = [];
   if (visibilityFilter === 'Drafts') {
     displayCollections = drafts;
+  } else if (visibilityFilter === 'Deleted') {
+    displayCollections = deletedDesigns;
   } else {
     displayCollections = activeCollections.filter((c) =>
       visibilityFilter === 'Public' ? (c.isPublic || c.visibility === 'PUBLIC') : (!c.isPublic || c.visibility === 'PRIVATE')
     );
   }
+  displayCollections = displayCollections.filter((collection) => !locallyRemovedCollectionIds.has(collection.id));
 
   const filteredDisplayCollections = displayCollections.filter((c) => {
     const title = String(c.name || c.title || '').trim();
@@ -741,6 +828,21 @@ const ProfilePage: React.FC = () => {
       } as CollectionDto;
     });
   }, [publishingStates, searchAndVisibilityFiltered]);
+
+  const ownerContentError =
+    visibilityFilter === 'Drafts'
+      ? draftsError
+      : visibilityFilter === 'Deleted'
+        ? deletedDesignsError
+        : collectionsError;
+  const ownerContentLoading =
+    visibilityFilter === 'Drafts'
+      ? draftsLoading || !draftsInitialized
+      : visibilityFilter === 'Deleted'
+        ? deletedDesignsLoading
+        : collectionsLoading;
+  const isDraftVisibility = visibilityFilter === 'Drafts';
+  const isDeletedVisibility = visibilityFilter === 'Deleted';
 
   const handleRetryPublishCheck = useCallback(async (collectionId: string) => {
     if (!collectionId) return;
@@ -1087,9 +1189,10 @@ const ProfilePage: React.FC = () => {
             activeTab={activeTab}
             onTabChange={(tab) => {
                 setActiveTab(tab as TabType);
-                setSearchParams(prev => {
-                  prev.set('tab', tab);
-                  return prev;
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.set('tab', tab);
+                  return next;
                 });
             }}
           />
@@ -1110,13 +1213,7 @@ const ProfilePage: React.FC = () => {
                   // Show inline collection viewer
                   <InlineCollectionViewer
                     collectionId={selectedCollectionId}
-                    onBack={() => {
-                      setSelectedCollectionId(null);
-                      setSearchParams(prev => {
-                        prev.delete('collectionId');
-                        return prev;
-                      });
-                    }}
+                    onBack={handleCollectionViewerBack}
                     brandName={displayData?.brandName || displayData?.username || 'Brand'}
                     onPriceUpdated={async () => {
                       // Refresh collections to show updated prices on cards
@@ -1146,7 +1243,11 @@ const ProfilePage: React.FC = () => {
                     {/* Visibility filter chips */}
                     <div className="mb-6">
                       <div className="inline-flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
-                        {(['Public','Private', ...(isOwner ? ['Drafts'] : [])] as const).map((opt) => (
+                        {([
+                            'Public',
+                            'Private',
+                            ...(isOwner ? ['Drafts', 'Deleted'] : []),
+                          ] as const).map((opt) => (
                           <button
                             key={opt}
                             onClick={() => setVisibilityFilter(opt as any)}
@@ -1156,7 +1257,15 @@ const ProfilePage: React.FC = () => {
                                 : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                             }`}
                           >
-                            <span>{opt === 'Public' ? '🌍' : opt === 'Private' ? '🔒' : '📝'}</span>
+                            <span>
+                              {opt === 'Public'
+                                ? '🌍'
+                                : opt === 'Private'
+                                  ? '🔒'
+                                  : opt === 'Drafts'
+                                    ? '📝'
+                                    : '🗑️'}
+                            </span>
                             {opt}
                           </button>
                         ))}
@@ -1188,9 +1297,10 @@ const ProfilePage: React.FC = () => {
                                     collection={collection}
                                     onClick={() => {
                                       setSelectedCollectionId(collection.id);
-                                      setSearchParams(prev => {
-                                        prev.set('collectionId', collection.id);
-                                        return prev;
+                                      setSearchParams((prev) => {
+                                        const next = new URLSearchParams(prev);
+                                        next.set('collectionId', collection.id);
+                                        return next;
                                       });
                                     }}
                                     showActions={false}
@@ -1308,7 +1418,7 @@ const ProfilePage: React.FC = () => {
                         );
                       })()
                     ) : (
-                      (isOwner ? (visibilityFilter === 'Drafts' ? !!draftsError : !!collectionsError) : !!visitorError) ? (
+                      (isOwner ? !!ownerContentError : !!visitorError) ? (
                         <div className="relative h-[60vh] min-h-[400px] w-full rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800">
                           <ComingSoon
                             title="Connection Issue"
@@ -1321,22 +1431,28 @@ const ProfilePage: React.FC = () => {
                             className="bg-gray-50 dark:bg-[#0a0a0a]"
                           />
                         </div>
-                      ) : (isOwner ? (visibilityFilter === 'Drafts' ? (draftsLoading || !draftsInitialized) : collectionsLoading) : visitorLoading) ? (
+                      ) : (isOwner ? ownerContentLoading : visitorLoading) ? (
                         <CollectionsSkeleton />
                       ) : searchAndVisibilityFiltered.length > 0 ? (
                         <CollectionsGrid
                           collections={decoratedCollections}
-                          isDraft={visibilityFilter === 'Drafts'}
-                          onEdit={isOwner ? (id) => navigate(`/profile/edit/${id}`) : undefined}
+                          isDraft={isDraftVisibility}
+                          isDeleted={isDeletedVisibility}
+                          onEdit={isOwner ? (id) => navigate(`/profile/collections/edit/${id}`) : undefined}
                           onDelete={isOwner ? (id) => setCollectionToDelete(id) : undefined}
+                          onRestore={isOwner ? (id) => setCollectionToRestore(id) : undefined}
+                          onPermanentDelete={isOwner ? (id) => setCollectionToPermanentDelete(id) : undefined}
                           onCollectionClick={(id) => {
-                            if (visibilityFilter === 'Drafts') {
-                              navigate(`/profile/edit/${id}`);
+                            if (isDraftVisibility) {
+                              navigate(`/profile/collections/edit/${id}`);
+                            } else if (isDeletedVisibility) {
+                              return;
                             } else {
                               setSelectedCollectionId(id);
-                              setSearchParams(prev => {
-                                prev.set('collectionId', id);
-                                return prev;
+                              setSearchParams((prev) => {
+                                const next = new URLSearchParams(prev);
+                                next.set('collectionId', id);
+                                return next;
                               });
                             }
                           }}
@@ -1345,8 +1461,20 @@ const ProfilePage: React.FC = () => {
                       ) : (
                         isOwner ? (
                           <EmptyState
-                            title={visibilityFilter === 'Drafts' ? "No drafts" : "No designs yet"}
-                            description={visibilityFilter === 'Drafts' ? "You don't have any unfinished designs." : "Create a design to showcase your work."}
+                            title={
+                              isDraftVisibility
+                                ? 'No drafts'
+                                : isDeletedVisibility
+                                  ? 'No deleted designs'
+                                  : 'No designs yet'
+                            }
+                            description={
+                              isDraftVisibility
+                                ? "You don't have any unfinished designs."
+                                : isDeletedVisibility
+                                  ? 'Deleted designs will appear here until permanently removed.'
+                                  : 'Create a design to showcase your work.'
+                            }
                             // Removed redundant CTA button as requested
                           />
                         ) : (
@@ -1467,10 +1595,14 @@ const ProfilePage: React.FC = () => {
           const id = collectionToDelete;
           const isDraft = drafts.some(d => d.id === id);
           setCollectionToDelete(null);
+          removeCollectionFromView(id);
           try {
-            const success = await brandApi.deleteCollection(id);
+            const success = isDraft
+              ? await brandApi.deleteCollection(id)
+              : await deleteOwnedCollection(id);
             if (success) {
               toast.success(isDraft ? 'Draft discarded' : 'Design deleted');
+              setRecentlyDeletedDesign({ isDraft });
               if (isDraft) {
                 // Refresh drafts list
                 setDraftsLoading(true);
@@ -1479,16 +1611,89 @@ const ProfilePage: React.FC = () => {
                   .catch(err => console.error(err))
                   .finally(() => setDraftsLoading(false));
               } else {
-                // Refresh published collections
-                await fetchCollections(user.id);
+                // Keep local list in sync with server-side counters and any eventual consistency updates.
+                void fetchCollections(user.id);
+                void brandApi
+                  .getCollections(user.id, {
+                    scope: 'design',
+                    visibility: 'all',
+                    onlyDeleted: true,
+                  })
+                  .then((items) => setDeletedDesigns(items))
+                  .catch((err) => console.error(err));
               }
             } else {
+              restoreCollectionInView(id);
               toast.error(isDraft ? 'Failed to discard draft' : 'Failed to delete design');
             }
           } catch (error) {
+            restoreCollectionInView(id);
             console.error('Error deleting collection:', error);
             toast.error('An error occurred');
           }
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(collectionToRestore)}
+        title="Restore Design"
+        message="Restore this design back to your content feed?"
+        confirmText="Restore"
+        cancelText="Cancel"
+        onCancel={() => setCollectionToRestore(null)}
+        onConfirm={async () => {
+          if (!collectionToRestore || !user?.id) return;
+          const targetId = collectionToRestore;
+          setCollectionToRestore(null);
+          const success = await brandApi.restoreCollection(targetId, { scope: 'design' });
+          if (!success) {
+            toast.error('Failed to restore design');
+            return;
+          }
+          toast.success('Design restored');
+          setDeletedDesigns((prev) => prev.filter((item) => item.id !== targetId));
+          void fetchCollections(user.id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(collectionToPermanentDelete)}
+        title="Delete Permanently"
+        message="This permanently removes the design and cannot be undone."
+        confirmText="Delete Permanently"
+        cancelText="Cancel"
+        isDestructive
+        onCancel={() => setCollectionToPermanentDelete(null)}
+        onConfirm={async () => {
+          if (!collectionToPermanentDelete) return;
+          const targetId = collectionToPermanentDelete;
+          setCollectionToPermanentDelete(null);
+          const success = await brandApi.permanentlyDeleteCollection(targetId, {
+            scope: 'design',
+          });
+          if (!success) {
+            toast.error('Failed to permanently delete design');
+            return;
+          }
+          toast.success('Design permanently deleted');
+          setDeletedDesigns((prev) => prev.filter((item) => item.id !== targetId));
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(recentlyDeletedDesign)}
+        title={recentlyDeletedDesign?.isDraft ? 'Draft Deleted' : 'Design Deleted'}
+        message="Where do you want to go next?"
+        confirmText="Create New Design"
+        cancelText="Go To Content"
+        onCancel={() => {
+          const nextVisibility = recentlyDeletedDesign?.isDraft ? 'Drafts' : 'Public';
+          setRecentlyDeletedDesign(null);
+          navigate(`/profile?tab=Content&visibility=${nextVisibility}`);
+        }}
+        onConfirm={() => {
+          setRecentlyDeletedDesign(null);
+          navigate('/profile/collections/create');
         }}
       />
 
@@ -1497,3 +1702,4 @@ const ProfilePage: React.FC = () => {
 };
 
 export default ProfilePage;
+

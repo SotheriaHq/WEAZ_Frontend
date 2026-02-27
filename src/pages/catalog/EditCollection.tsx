@@ -9,7 +9,7 @@ const EditCollection: React.FC = () => {
 
   useEffect(() => {
     if (id) {
-      navigate(`/profile/edit/${id}`, { replace: true });
+      navigate(`/profile/collections/edit/${id}`, { replace: true });
     } else {
       navigate('/profile', { replace: true });
     }

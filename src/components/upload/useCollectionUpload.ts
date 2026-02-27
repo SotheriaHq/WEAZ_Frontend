@@ -33,6 +33,7 @@ export function useCollectionUpload() {
     opts?: {
       visibility?: 'PUBLIC' | 'PRIVATE';
       categoryId?: string;
+      subCategoryId?: string;
       categoryTypeId?: string;
       type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
     }
@@ -49,7 +50,13 @@ export function useCollectionUpload() {
     };
     if (opts?.visibility) (dto as any).visibility = opts.visibility;
     if (opts?.categoryId) (dto as any).categoryId = opts.categoryId;
-    if (opts?.categoryTypeId) (dto as any).categoryTypeId = opts.categoryTypeId;
+    if (opts?.subCategoryId) {
+      (dto as any).subCategoryId = opts.subCategoryId;
+      (dto as any).categoryTypeId = opts.subCategoryId;
+    } else if (opts?.categoryTypeId) {
+      (dto as any).subCategoryId = opts.categoryTypeId;
+      (dto as any).categoryTypeId = opts.categoryTypeId;
+    }
     if (opts?.type) (dto as any).type = opts.type;
 
     const initResp = await apiClient.post('/collections/initialize', dto);

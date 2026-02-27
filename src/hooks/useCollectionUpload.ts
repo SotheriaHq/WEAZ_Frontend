@@ -100,9 +100,12 @@ export function useCollectionUpload() {
       tags?: string[],
       meta?: {
         categoryId?: string;
+        subCategoryId?: string;
         categoryTypeId?: string;
         type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
         visibility?: 'PUBLIC' | 'PRIVATE';
+        filterValueIds?: string[];
+        coverIndex?: number;
       },
       onProgress?: (value: number) => void,
       shouldPublish: boolean = true
@@ -131,12 +134,13 @@ export function useCollectionUpload() {
       if (!UUID_V4_REGEX.test(normalizedCategoryId)) {
         throw new Error('Selected category is invalid. Please reselect a category and try again.');
       }
-      const normalizedCategoryTypeId = meta?.categoryTypeId?.trim();
-      if (shouldPublish && !normalizedCategoryTypeId) {
-        throw new Error('Please select a category type before publishing.');
+      const normalizedSubCategoryId =
+        meta?.subCategoryId?.trim() || meta?.categoryTypeId?.trim();
+      if (shouldPublish && !normalizedSubCategoryId) {
+        throw new Error('Please select a sub-category before publishing.');
       }
-      if (normalizedCategoryTypeId && !UUID_V4_REGEX.test(normalizedCategoryTypeId)) {
-        throw new Error('Selected category type is invalid. Please reselect and try again.');
+      if (normalizedSubCategoryId && !UUID_V4_REGEX.test(normalizedSubCategoryId)) {
+        throw new Error('Selected sub-category is invalid. Please reselect and try again.');
       }
 
       // Allow saving drafts without tags when shouldPublish is false.
@@ -170,9 +174,13 @@ export function useCollectionUpload() {
           tags: normalizedTags.slice(0, 20),
           files: filesPayload,
           categoryId: normalizedCategoryId,
-          categoryTypeId: normalizedCategoryTypeId,
+          subCategoryId: normalizedSubCategoryId,
+          categoryTypeId: normalizedSubCategoryId,
           type: meta?.type,
           visibility: meta?.visibility,
+          filterValueIds: Array.isArray(meta?.filterValueIds)
+            ? meta?.filterValueIds
+            : undefined,
         }) as InitializeCollectionResponse & { id?: string };
         const collectionId = init.collectionId ?? init.id;
         if (!collectionId) {
@@ -272,7 +280,24 @@ export function useCollectionUpload() {
         const workers = Array.from({ length: Math.min(MAX_PARALLEL_UPLOADS, queue.length) }, () => worker());
         await Promise.all(workers);
 
-        const finalizeResp = (await finalizeCollectionUploads(collectionId, completions, shouldPublish)) as
+        const finalizeResp = (await finalizeCollectionUploads(collectionId, completions, shouldPublish, {
+          action: shouldPublish ? 'publish' : 'draft',
+          coverIndex:
+            typeof meta?.coverIndex === 'number' ? meta.coverIndex : undefined,
+          collectionMetadata: {
+            title,
+            description,
+            visibility: meta?.visibility,
+            type: meta?.type,
+            categoryId: normalizedCategoryId,
+            subCategoryId: normalizedSubCategoryId,
+            categoryTypeId: normalizedSubCategoryId,
+            tags: normalizedTags.slice(0, 20),
+            filterValueIds: Array.isArray(meta?.filterValueIds)
+              ? meta?.filterValueIds
+              : undefined,
+          },
+        })) as
           | { data?: unknown }
           | unknown;
         const finalizeResponse = finalizeResp && typeof finalizeResp === 'object' && 'data' in finalizeResp
