@@ -776,10 +776,17 @@ const EditProduct: React.FC = () => {
     };
   }, [isEditMode, productId, navigate]);
 
+  const effectiveCollectionId = useMemo(
+    () => (isCollectionFlow ? collectionContextId || form.categoryId : form.categoryId),
+    [collectionContextId, form.categoryId, isCollectionFlow],
+  );
+
   const selectedCollectionCategoryId = useMemo(
     () =>
-      form.categoryId ? collectionCategoryById[form.categoryId] : undefined,
-    [collectionCategoryById, form.categoryId],
+      effectiveCollectionId
+        ? collectionCategoryById[effectiveCollectionId]
+        : undefined,
+    [collectionCategoryById, effectiveCollectionId],
   );
 
   const availableCategoryTypes = useMemo(() => {
@@ -803,22 +810,48 @@ const EditProduct: React.FC = () => {
     );
   }, [categoryTypes, form.taxonomyCategoryId, taxonomyCategories]);
 
-  const categoryTypeParentById = useMemo(() => {
-    const map = new Map<string, string>();
-    categoryTypes.forEach((type) => {
-      if (type?.id && type?.categoryId) {
-        map.set(type.id, type.categoryId);
+  useEffect(() => {
+    if (!isCollectionFlow || !collectionContextId || categoriesLoading) return;
+    const contextCategoryId = collectionCategoryById[collectionContextId];
+
+    setForm((prev) => {
+      let changed = false;
+      const next: FormState = { ...prev };
+
+      if (next.categoryId !== collectionContextId) {
+        next.categoryId = collectionContextId;
+        changed = true;
       }
-    });
-    taxonomyCategories.forEach((category) => {
-      (category.types || []).forEach((type) => {
-        if (type?.id) {
-          map.set(type.id, category.id);
+
+      if (contextCategoryId && !next.taxonomyCategoryId) {
+        next.taxonomyCategoryId = contextCategoryId;
+        changed = true;
+      }
+
+      if (contextCategoryId && !next.categoryTypeId) {
+        const scopedTypes =
+          taxonomyCategories.find((category) => category.id === contextCategoryId)
+            ?.types ??
+          categoryTypes.filter(
+            (categoryType) => categoryType.categoryId === contextCategoryId,
+          );
+
+        if (scopedTypes.length > 0) {
+          next.categoryTypeId = scopedTypes[0].id;
+          changed = true;
         }
-      });
+      }
+
+      return changed ? next : prev;
     });
-    return map;
-  }, [categoryTypes, taxonomyCategories]);
+  }, [
+    categoriesLoading,
+    categoryTypes,
+    collectionCategoryById,
+    collectionContextId,
+    isCollectionFlow,
+    taxonomyCategories,
+  ]);
 
   const handleCollectionChange = useCallback(
     (nextCollectionId: string) => {
@@ -976,9 +1009,13 @@ const EditProduct: React.FC = () => {
       options?: { forceStatus?: FormState["status"] },
     ) => {
       const forcedStatus = options?.forceStatus;
-      const effectiveDraft = forcedStatus ? forcedStatus === "DRAFT" : asDraft;
-      const shouldValidatePublish = forcedStatus
-        ? forcedStatus === "ACTIVE"
+      const normalizedForcedStatus: FormState["status"] | undefined =
+        isCollectionFlow ? "DRAFT" : forcedStatus;
+      const effectiveDraft = normalizedForcedStatus
+        ? normalizedForcedStatus === "DRAFT"
+        : asDraft;
+      const shouldValidatePublish = normalizedForcedStatus
+        ? normalizedForcedStatus === "ACTIVE"
         : !asDraft;
       const hasDraftContent = Boolean(
         form.title.trim() ||
@@ -1099,7 +1136,7 @@ const EditProduct: React.FC = () => {
               newPrice: form.price,
             });
             setPendingSaveDraft(effectiveDraft);
-            setPendingStatusOverride(forcedStatus ?? null);
+            setPendingStatusOverride(normalizedForcedStatus ?? null);
             setShowPricePreview(true);
             return; // Wait for user confirmation
           }
@@ -1119,24 +1156,6 @@ const EditProduct: React.FC = () => {
       const selectedCollectionId = isCollectionFlow
         ? collectionContextId || undefined
         : form.categoryId || undefined;
-      const selectedCollectionCategory = selectedCollectionId
-        ? collectionCategoryById[selectedCollectionId]
-        : undefined;
-      const selectedTypeParentCategory = form.categoryTypeId
-        ? categoryTypeParentById.get(form.categoryTypeId)
-        : undefined;
-
-      if (
-        selectedCollectionId &&
-        selectedCollectionCategory &&
-        selectedTypeParentCategory &&
-        selectedTypeParentCategory !== selectedCollectionCategory
-      ) {
-        toast.error(
-          "Selected sub-category does not belong to the selected collection category.",
-        );
-        return;
-      }
 
       const payloadCategoryTypeId = form.categoryTypeId || undefined;
 
@@ -1181,7 +1200,8 @@ const EditProduct: React.FC = () => {
           allowBackorders: form.allowBackorders,
           stock: form.variants.length > 0 ? variantTotalStock : form.stock,
           lowStockThreshold: form.lowStockThreshold,
-          status: forcedStatus ?? (effectiveDraft ? "DRAFT" : form.status),
+          status:
+            normalizedForcedStatus ?? (effectiveDraft ? "DRAFT" : form.status),
           isPhysicalProduct: form.isPhysicalProduct,
           customsRegion: resolvedCustomsRegion,
           mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
@@ -1256,8 +1276,10 @@ const EditProduct: React.FC = () => {
             }
           }
 
-          const successMessage = isCollectionContext
-            ? "Product added to collection."
+          const successMessage = isCollectionFlow
+            ? "Product added to collection draft."
+            : isCollectionContext
+              ? "Product added to collection."
             : effectiveDraft
               ? "Draft saved successfully"
               : "Product created successfully";
@@ -1292,7 +1314,6 @@ const EditProduct: React.FC = () => {
       isCollectionContext,
       collectionCategoryById,
       collectionContextId,
-      categoryTypeParentById,
       maxMediaCount,
       mediaUrls,
       navigate,
@@ -1313,11 +1334,13 @@ const EditProduct: React.FC = () => {
     // Continue with save
     setSaving(true);
     try {
-      const effectiveDraft = pendingStatusOverride
-        ? pendingStatusOverride === "DRAFT"
+      const normalizedPendingStatus: FormState["status"] | null =
+        isCollectionFlow ? "DRAFT" : pendingStatusOverride;
+      const effectiveDraft = normalizedPendingStatus
+        ? normalizedPendingStatus === "DRAFT"
         : pendingSaveDraft;
       const statusToPersist =
-        pendingStatusOverride ?? (effectiveDraft ? "DRAFT" : form.status);
+        normalizedPendingStatus ?? (effectiveDraft ? "DRAFT" : form.status);
       const ensuredSku =
         form.sku?.trim() ||
         buildBaseSku({
@@ -1328,25 +1351,6 @@ const EditProduct: React.FC = () => {
       const selectedCollectionId = isCollectionFlow
         ? collectionContextId || undefined
         : form.categoryId || undefined;
-      const selectedCollectionCategory = selectedCollectionId
-        ? collectionCategoryById[selectedCollectionId]
-        : undefined;
-      const selectedTypeParentCategory = form.categoryTypeId
-        ? categoryTypeParentById.get(form.categoryTypeId)
-        : undefined;
-
-      if (
-        selectedCollectionId &&
-        selectedCollectionCategory &&
-        selectedTypeParentCategory &&
-        selectedTypeParentCategory !== selectedCollectionCategory
-      ) {
-        toast.error(
-          "Selected sub-category does not belong to the selected collection category.",
-        );
-        setSaving(false);
-        return;
-      }
 
       const payloadCategoryTypeId = form.categoryTypeId || undefined;
       const resolvedCustomsRegion = await syncShippingRegions();
@@ -1430,7 +1434,6 @@ const EditProduct: React.FC = () => {
     isCollectionFlow,
     collectionContextId,
     collectionCategoryById,
-    categoryTypeParentById,
     pendingSaveDraft,
     pendingStatusOverride,
     variantTotalStock,
@@ -1805,7 +1808,7 @@ const EditProduct: React.FC = () => {
               {isCollectionContext ? (
                 <>
                   <button
-                    onClick={() => navigate("/studio/store/collections")}
+                    onClick={() => navigate("/studio/store?view=collections")}
                     className="hover:text-gray-900 dark:hover:text-white transition-colors flex items-center"
                   >
                     <ArrowLeft className="w-3 h-3 mr-1" /> Collections
@@ -1828,7 +1831,7 @@ const EditProduct: React.FC = () => {
                     onClick={() => navigate("/studio/store")}
                     className="hover:text-gray-900 dark:hover:text-white transition-colors flex items-center"
                   >
-                    <ArrowLeft className="w-3 h-3 mr-1" /> Products
+                    <ArrowLeft className="w-3 h-3 mr-1" /> Store
                   </button>
                   <span>/</span>
                   <span>{pageTitle}</span>
@@ -2107,7 +2110,7 @@ const EditProduct: React.FC = () => {
                             onChange={(e) =>
                               handleCollectionChange(e.target.value)
                             }
-                            disabled={categoriesLoading}
+                            disabled={categoriesLoading || isCollectionFlow}
                           >
                             <option value="">No collection (standalone)</option>
                             {categories.map((cat) => (
@@ -2976,7 +2979,9 @@ const EditProduct: React.FC = () => {
               onClick={() =>
                 void triggerSave(false, {
                   action: "publish",
-                  forceStatus: isCollectionContext
+                  forceStatus: isCollectionFlow
+                    ? "DRAFT"
+                    : isCollectionContext
                     ? "ACTIVE"
                     : isDraftEditMode
                       ? "ACTIVE"

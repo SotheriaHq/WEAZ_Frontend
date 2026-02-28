@@ -27,6 +27,7 @@ import StoreEmptyState, { type EmptyStateType } from '@/components/designs/Store
 
 type StudioStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'DELETED';
 type OutletView = 'products' | 'collections';
+type ProductStatusFilter = 'all' | 'active' | 'draft' | 'featured' | 'archived' | 'deleted';
 type CollectionStatusFilter = 'all' | 'published' | 'draft' | 'archived';
 type CollectionSortBy = 'newest' | 'oldest' | 'title_asc' | 'title_desc' | 'items_desc';
 
@@ -71,6 +72,7 @@ interface CollectionOption {
   isSystemGenerated?: boolean;
   coverImage?: string;
   coverFileId?: string;
+  previewImages?: Array<{ url?: string | null; fileId?: string | null }>;
   itemCount?: number;
   updatedAt?: string;
   createdAt?: string;
@@ -114,6 +116,17 @@ const isSystemStoreCollection = (collection: Pick<CollectionOption, 'name' | 'de
   );
 };
 
+const isGhostUntitledDraft = (collection: CollectionOption): boolean => {
+  const status = String(collection.status || '').toUpperCase();
+  if (status !== 'DRAFT') return false;
+
+  const normalizedName = String(collection.name || '').trim().toLowerCase();
+  const normalizedDescription = String(collection.description || '').trim();
+  const itemCount = typeof collection.itemCount === 'number' ? collection.itemCount : 0;
+
+  return normalizedName === 'untitled collection' && normalizedDescription.length === 0 && itemCount === 0;
+};
+
 const isRemoteMediaValue = (value: string): boolean => {
   const normalized = String(value || '').trim();
   if (!normalized) return false;
@@ -137,6 +150,49 @@ const toRenderableMediaSource = (
     : { src: null, fileId: value };
 };
 
+const getCollectionPreviewSources = (
+  collection: Pick<CollectionOption, 'id' | 'name' | 'coverImage' | 'coverFileId' | 'previewImages'>,
+): Array<{ src: string | null; fileId: string | null; alt: string; productName?: string }> => {
+  const seen = new Set<string>();
+  const out: Array<{ src: string | null; fileId: string | null; alt: string; productName?: string }> = [];
+
+  const pushSource = (src: string | null | undefined, fileId: string | null | undefined, productName?: string) => {
+    const normalizedSrc = typeof src === 'string' && src.trim().length > 0 ? src.trim() : null;
+    const normalizedFileId =
+      typeof fileId === 'string' && fileId.trim().length > 0 ? fileId.trim() : null;
+    if (!normalizedSrc && !normalizedFileId) return;
+    const key = `${normalizedSrc ?? ''}|${normalizedFileId ?? ''}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({
+      src: normalizedSrc,
+      fileId: normalizedFileId,
+      alt: productName || `${collection.name} image ${out.length + 1}`,
+      productName,
+    });
+  };
+
+  (collection.previewImages ?? []).forEach((image) => {
+    const url = typeof image?.url === 'string' ? image.url : null;
+    const fileId = typeof image?.fileId === 'string' ? image.fileId : null;
+    const productName = typeof (image as any)?.productName === 'string' ? (image as any).productName : undefined;
+    if (url || fileId) {
+      pushSource(url, fileId, productName);
+      return;
+    }
+    if (typeof image?.url === 'string') {
+      const renderable = toRenderableMediaSource(image.url);
+      pushSource(renderable.src, renderable.fileId, productName);
+    }
+  });
+
+  if (out.length === 0) {
+    pushSource(collection.coverImage ?? null, collection.coverFileId ?? null);
+  }
+
+  return out;
+};
+
 const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   layoutMode = false,
   onToggleLayoutMode,
@@ -148,7 +204,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const user = useSelector((state: RootState) => state.user.profile);
   const dropdownManager = useDropdownManager();
 
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'draft' | 'archived' | 'deleted'>('all');
+  const [filterStatus, setFilterStatus] = useState<ProductStatusFilter>('all');
   const [filterCollection, setFilterCollection] = useState<'all' | string>('all');
   const [filterStock, setFilterStock] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -176,6 +232,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const listRef = useRef<HTMLDivElement | null>(null);
   const [listMinHeight, setListMinHeight] = useState<number | undefined>(undefined);
   const galleryTouchRef = useRef({ startX: 0, startY: 0 });
+  const productMenuTriggerRefs = useRef<
+    Record<string, HTMLButtonElement | null>
+  >({});
 
   // Expandable search (emoji pattern reused from CatalogShopTab)
   const [searchCollapsed, setSearchCollapsed] = useState(true);
@@ -216,6 +275,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const [collectionGalleryImages, setCollectionGalleryImages] = useState<CollectionGalleryImage[]>([]);
   const [collectionGalleryIndex, setCollectionGalleryIndex] = useState(0);
   const [collectionGallerySourceName, setCollectionGallerySourceName] = useState('');
+  const [hoveredCollectionId, setHoveredCollectionId] = useState<string | null>(null);
+  const [hoverPreviewFrame, setHoverPreviewFrame] = useState<Record<string, number>>({});
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -241,6 +302,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         items = items.filter((p) => resolveProductStatus(p) === 'ACTIVE');
       } else if (filterStatus === 'draft') {
         items = items.filter((p) => resolveProductStatus(p) === 'DRAFT');
+      } else if (filterStatus === 'featured') {
+        items = items.filter((p) => p.isFeatured === true);
       }
     }
 
@@ -296,6 +359,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     [quickAccessCollections],
   );
 
+  const previewSourcesByCollectionId = useMemo(() => {
+    const map = new Map<string, Array<{ src: string | null; fileId: string | null; alt: string }>>();
+    visibleCollections.forEach((collection) => {
+      map.set(collection.id, getCollectionPreviewSources(collection));
+    });
+    return map;
+  }, [visibleCollections]);
+
   const managedCollections = useMemo(() => {
     let items = [...visibleCollections];
     const q = collectionSearch.trim().toLowerCase();
@@ -316,6 +387,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         if (collectionStatusFilter === 'archived') return status === 'ARCHIVED';
         return true;
       });
+    } else {
+      items = items.filter((collection) => !isGhostUntitledDraft(collection));
     }
 
     items.sort((a, b) => {
@@ -418,6 +491,24 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   }, [activeCollectionId]);
 
   useEffect(() => {
+    if (!hoveredCollectionId) return;
+    const previewSources = previewSourcesByCollectionId.get(hoveredCollectionId) ?? [];
+    if (previewSources.length <= 1) return;
+
+    const timer = window.setInterval(() => {
+      setHoverPreviewFrame((prev) => {
+        const current = prev[hoveredCollectionId] ?? 0;
+        return {
+          ...prev,
+          [hoveredCollectionId]: (current + 1) % previewSources.length,
+        };
+      });
+    }, 1200);
+
+    return () => window.clearInterval(timer);
+  }, [hoveredCollectionId, previewSourcesByCollectionId]);
+
+  useEffect(() => {
     let mounted = true;
 
     const run = async () => {
@@ -444,8 +535,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             deleteExpiresAt: c.deleteExpiresAt ?? null,
             isAvailableInStore: c.isAvailableInStore,
             isSystemGenerated: c.isSystemGenerated === true,
-            coverImage: typeof c.coverImage === 'string' ? c.coverImage : undefined,
+            coverImage: typeof c.coverImage === 'string' && c.coverImage.length > 0 ? c.coverImage : undefined,
             coverFileId: typeof c.coverFileId === 'string' ? c.coverFileId : undefined,
+            previewImages: Array.isArray((c as any).previewImages)
+              ? ((c as any).previewImages as Array<{ url?: string | null; fileId?: string | null }>)
+              : undefined,
             itemCount: typeof c.itemCount === 'number' ? c.itemCount : c.postsCount,
             updatedAt: typeof c.updatedAt === 'string' ? c.updatedAt : undefined,
             createdAt: typeof c.createdAt === 'string' ? c.createdAt : undefined,
@@ -485,8 +579,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           status: 'DRAFT',
           isAvailableInStore: false,
           isSystemGenerated: draft?.isSystemGenerated === true,
-          coverImage: typeof draft.coverImage === 'string' ? draft.coverImage : undefined,
+          coverImage: typeof draft.coverImage === 'string' && draft.coverImage.length > 0 ? draft.coverImage : undefined,
           coverFileId: typeof draft.coverFileId === 'string' ? draft.coverFileId : undefined,
+          previewImages: Array.isArray(draft?.previewImages)
+            ? (draft.previewImages as Array<{ url?: string | null; fileId?: string | null }>)
+            : undefined,
           itemCount:
             typeof draft.itemCount === 'number'
               ? draft.itemCount
@@ -535,6 +632,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 : filterStatus === 'draft'
                   ? false
                   : undefined,
+            isFeatured: filterStatus === 'featured' ? true : undefined,
             includeDeleted: filterStatus === 'deleted' ? true : undefined,
             onlyDeleted: filterStatus === 'deleted' ? true : undefined,
           },
@@ -760,6 +858,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             : filterStatus === 'draft'
               ? false
               : undefined,
+        isFeatured: filterStatus === 'featured' ? true : undefined,
         includeDeleted: filterStatus === 'deleted' ? true : undefined,
         onlyDeleted: filterStatus === 'deleted' ? true : undefined,
       },
@@ -967,6 +1066,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         isSystemGenerated: duplicated.isSystemGenerated === true,
         coverImage: typeof duplicated.coverImage === 'string' ? duplicated.coverImage : undefined,
         coverFileId: typeof duplicated.coverFileId === 'string' ? duplicated.coverFileId : undefined,
+        previewImages: Array.isArray((duplicated as any)?.previewImages)
+          ? (((duplicated as any).previewImages as Array<{ url?: string | null; fileId?: string | null }>).slice(0, 8))
+          : undefined,
         itemCount:
           typeof duplicated.itemCount === 'number'
             ? duplicated.itemCount
@@ -1080,10 +1182,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       });
     };
 
-    pushCandidate(product.thumbnail ?? null, null);
+    const thumbnailSource = toRenderableMediaSource(product.thumbnail ?? null);
+    pushCandidate(thumbnailSource.src, thumbnailSource.fileId);
 
     (product.images ?? []).forEach((imageUrl) => {
-      pushCandidate(imageUrl, null);
+      const imageSource = toRenderableMediaSource(imageUrl);
+      pushCandidate(imageSource.src, imageSource.fileId);
     });
 
     (product.media ?? []).forEach((media) => {
@@ -1229,17 +1333,35 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             >
               <div className="flex min-w-max gap-3 p-3">
                 {quickAccessCarouselItems.map((collection, idx) => (
+                    (() => {
+                      const previewSources = previewSourcesByCollectionId.get(collection.id) ?? getCollectionPreviewSources(collection);
+                      const previewFrame = hoverPreviewFrame[collection.id] ?? 0;
+                      const activePreview =
+                        previewSources.length > 0
+                          ? previewSources[previewFrame % previewSources.length]
+                          : {
+                              src: collection.coverImage ?? null,
+                              fileId: collection.coverFileId ?? null,
+                              alt: collection.name,
+                            };
+
+                      return (
                     <button
                       key={`${collection.id}-${idx}`}
                       type="button"
                       onClick={() => openCollectionWorkspace(collection.id)}
+                      onMouseEnter={() => setHoveredCollectionId(collection.id)}
+                      onMouseLeave={() => {
+                        setHoveredCollectionId((prev) => (prev === collection.id ? null : prev));
+                        setHoverPreviewFrame((prev) => ({ ...prev, [collection.id]: 0 }));
+                      }}
                       className="group w-64 shrink-0 snap-start overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 text-left transition-all hover:shadow-md bg-white dark:bg-zinc-900/80"
                     >
                       <div className="relative h-28 w-full bg-gray-100 dark:bg-white/5">
                         <ImageWithFallback
-                          src={collection.coverImage ?? null}
-                          fileId={collection.coverFileId ?? null}
-                          alt={collection.name}
+                          src={activePreview.src}
+                          fileId={activePreview.fileId}
+                          alt={activePreview.alt}
                           fit="cover"
                           rounded="none"
                           containerClassName="h-full w-full"
@@ -1256,6 +1378,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         </p>
                       </div>
                     </button>
+                      );
+                    })()
                   ))}
               </div>
             </div>
@@ -1348,6 +1472,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     { value: 'all', label: 'All', icon: '📦' },
                     { value: 'active', label: 'Published', icon: '✨' },
                     { value: 'draft', label: 'Product Drafts', icon: '📝' },
+                    { value: 'featured', label: 'Featured', icon: '⭐' },
                     { value: 'archived', label: 'Archived', icon: '📁' },
                     { value: 'deleted', label: 'Deleted', icon: '🗑️' },
                   ] as const
@@ -1654,6 +1779,18 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   {pagedManagedCollections.map((collection) => {
                     const status = String(collection.status || 'PUBLISHED').toUpperCase();
                     const isArchived = status === 'ARCHIVED';
+                    const previewSources =
+                      previewSourcesByCollectionId.get(collection.id) ??
+                      getCollectionPreviewSources(collection);
+                    const previewFrame = hoverPreviewFrame[collection.id] ?? 0;
+                    const activePreview =
+                      previewSources.length > 0
+                        ? previewSources[previewFrame % previewSources.length]
+                        : {
+                            src: collection.coverImage ?? null,
+                            fileId: collection.coverFileId ?? null,
+                            alt: collection.name,
+                          };
 
                     const collectionMenuId = `collection-menu-${collection.id}`;
                     const isMenuOpen = dropdownManager.openId === collectionMenuId;
@@ -1666,6 +1803,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         onClick={() => {
                           handleOpenCollectionView(collection.id);
                         }}
+                        onMouseEnter={() => setHoveredCollectionId(collection.id)}
+                        onMouseLeave={() => {
+                          setHoveredCollectionId((prev) => (prev === collection.id ? null : prev));
+                          setHoverPreviewFrame((prev) => ({ ...prev, [collection.id]: 0 }));
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
@@ -1676,13 +1818,13 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       >
                         <div className="relative h-36 w-full bg-gray-100 dark:bg-white/5">
                           <ImageWithFallback
-                            src={collection.coverImage ?? null}
-                            fileId={collection.coverFileId ?? null}
-                            alt={collection.name}
+                            src={activePreview.src}
+                            fileId={activePreview.fileId}
+                            alt={activePreview.alt}
                             fit="cover"
                             rounded="none"
                             containerClassName="h-full w-full"
-                            className="h-full w-full"
+                            className="h-full w-full transition-transform duration-300 hover:scale-[1.02]"
                             fallbackName={collection.name}
                           />
                           <div className="collection-menu-host absolute right-3 top-3 z-20">
@@ -1928,7 +2070,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
       {/* Products - with CSS containment for smooth tab transitions */}
       {outletView === 'products' && (
-      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
+      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg">
         <div className="p-4 sm:p-6">
           <div
             ref={listRef}
@@ -1952,11 +2094,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               return (
                 <div
                   key={product.id}
-                  className={`group relative flex flex-col rounded-2xl border bg-white dark:bg-zinc-900/80 shadow-sm transition-all duration-300 ease-out ${
+                  className={[
+                    'group relative flex flex-col rounded-2xl border bg-white dark:bg-zinc-900/80 shadow-sm transition-all duration-300 ease-out',
                     selectedProducts.includes(product.id)
                       ? 'ring-2 ring-purple-500 border-purple-300 dark:border-purple-500/30'
-                      : 'border-gray-100 dark:border-white/[0.08] hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30 hover:border-gray-200 dark:hover:border-white/[0.12]'
-                  } ${layoutMode ? 'cursor-move' : 'cursor-pointer'}`}
+                      : 'border-gray-100 dark:border-white/[0.08] hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30 hover:border-gray-200 dark:hover:border-white/[0.12]',
+                    layoutMode ? 'cursor-move' : 'cursor-pointer',
+                    dropdownManager.openId === ('product-menu-' + product.id) ? 'z-50' : 'z-10'
+                  ].join(' ')}
                   onClick={() => {
                     if (layoutMode) return;
                     navigateToStudioProductDetails(product.id);
@@ -1978,6 +2123,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   <div className="absolute right-3 top-3 z-20">
                     <button
                       type="button"
+                      ref={(el) => {
+                        productMenuTriggerRefs.current[product.id] = el;
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         const menuId = `product-menu-${product.id}`;
@@ -2002,6 +2150,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         onClose={() => dropdownManager.setOpenId(null)}
                         onAction={(actionId) => handleProductAction(actionId, product)}
                         actions={getDefaultProductActions(product)}
+                        triggerElement={
+                          productMenuTriggerRefs.current[product.id] ?? null
+                        }
                       />
                     )}
                     

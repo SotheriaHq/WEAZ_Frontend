@@ -596,12 +596,6 @@ export const brandApi = {
       params.append('_cb', String(Date.now()));
       const query = params.toString();
       const basePath = getCollectionBasePath(resolvedScope);
-      console.debug('[BrandApi.getCollections] request', {
-        ownerId,
-        visibility: opts?.visibility ?? 'all',
-        scope: resolvedScope,
-        endpoint: `${basePath}/user/${ownerId}`,
-      });
       const response = await apiClient.get(`${basePath}/user/${ownerId}${query ? `?${query}` : ''}`, {
         headers: {
           'Cache-Control': 'no-store',
@@ -622,10 +616,38 @@ export const brandApi = {
           (fileObj?.s3Url && typeof fileObj.s3Url === 'string' ? fileObj.s3Url : undefined) ||
           (fileObj?.url && typeof fileObj.url === 'string' ? fileObj.url : undefined) ||
           '';
+        const backendCoverImageRaw =
+          (typeof (backendItem as any)?.coverImageUrl === 'string'
+            ? ((backendItem as any).coverImageUrl as string)
+            : '') ||
+          (typeof (backendItem as any)?.coverImage === 'string'
+            ? ((backendItem as any).coverImage as string)
+            : '');
+        const backendCoverFileId =
+          typeof (backendItem as any)?.coverFileId === 'string'
+            ? ((backendItem as any).coverFileId as string)
+            : undefined;
         const productLinks = Array.isArray((backendItem as any).products)
           ? ((backendItem as any).products as Array<any>)
           : [];
-        const productCandidates = productLinks
+        const sortedProductLinks = [...productLinks].sort((a: any, b: any) => {
+          const aOrder =
+            typeof a?.orderIndex === 'number' ? a.orderIndex : Number.MAX_SAFE_INTEGER;
+          const bOrder =
+            typeof b?.orderIndex === 'number' ? b.orderIndex : Number.MAX_SAFE_INTEGER;
+          return aOrder - bOrder;
+        });
+        const isRemoteMediaValue = (value: unknown): value is string => {
+          if (typeof value !== 'string') return false;
+          return (
+            value.startsWith('http') ||
+            value.startsWith('/') ||
+            value.startsWith('data:') ||
+            value.includes('://') ||
+            value.includes('?')
+          );
+        };
+        const productCandidates = sortedProductLinks
           .map((link: any) => link?.product ?? link)
           .filter(Boolean);
         const firstProductWithCover = productCandidates.find((product: any) => {
@@ -634,12 +656,15 @@ export const brandApi = {
             ? product.images.some((img: any) => typeof img === 'string' && img.length > 0)
             : false;
         });
-        const productCoverUrl =
+        const rawProductCoverValue =
           typeof firstProductWithCover?.thumbnail === 'string'
             ? firstProductWithCover.thumbnail
             : Array.isArray(firstProductWithCover?.images)
               ? firstProductWithCover.images.find((img: any) => typeof img === 'string' && img.length > 0)
               : undefined;
+        const productCoverUrl = isRemoteMediaValue(rawProductCoverValue)
+          ? rawProductCoverValue
+          : undefined;
         const productMedia = Array.isArray(firstProductWithCover?.media)
           ? (firstProductWithCover.media as Array<{ id?: string; isPrimary?: boolean }>)
           : [];
@@ -650,13 +675,70 @@ export const brandApi = {
             : undefined) ||
           (Array.isArray(firstProductWithCover?.mediaIds)
             ? firstProductWithCover.mediaIds.find((id: unknown) => typeof id === 'string' && !id.startsWith('http'))
+            : undefined) ||
+          (typeof rawProductCoverValue === 'string' && !isRemoteMediaValue(rawProductCoverValue)
+            ? rawProductCoverValue
             : undefined);
-        const resolvedCoverImage = coverImageUrl || productCoverUrl || '';
+        const previewFromBackend = Array.isArray((backendItem as any)?.previewImages)
+          ? ((backendItem as any).previewImages as Array<{ url?: string | null; fileId?: string | null }>)
+          : [];
+        const derivedPreviewImages: Array<{ url?: string; fileId?: string; productName?: string }> = [];
+        previewFromBackend.forEach((entry) => {
+          const url = typeof entry?.url === 'string' && entry.url.length > 0 ? entry.url : undefined;
+          const fileId =
+            typeof entry?.fileId === 'string' && entry.fileId.length > 0 ? entry.fileId : undefined;
+          if (!url && !fileId) return;
+          derivedPreviewImages.push({ url, fileId, productName: (entry as any)?.productName });
+        });
+
+        if (derivedPreviewImages.length === 0) {
+          const seenPreviewValues = new Set<string>();
+          productCandidates.forEach((product: any) => {
+            const pName = typeof product?.name === 'string' ? product.name : undefined;
+            const thumbnail =
+              typeof product?.thumbnail === 'string' && product.thumbnail.length > 0
+                ? product.thumbnail
+                : undefined;
+            const images = Array.isArray(product?.images)
+              ? (product.images as unknown[])
+                .filter((img) => typeof img === 'string' && img.length > 0)
+                .map((img) => img as string)
+              : [];
+            [thumbnail, ...images].filter(Boolean).forEach((rawValue) => {
+              const value = String(rawValue);
+              if (seenPreviewValues.has(value)) return;
+              seenPreviewValues.add(value);
+              if (isRemoteMediaValue(value)) {
+                derivedPreviewImages.push({ url: value, productName: pName });
+              } else {
+                derivedPreviewImages.push({ fileId: value, productName: pName });
+              }
+            });
+          });
+        }
+
+        const resolvedCoverImage =
+          (backendCoverImageRaw && isRemoteMediaValue(backendCoverImageRaw)
+            ? backendCoverImageRaw
+            : undefined) ||
+          coverImageUrl ||
+          productCoverUrl ||
+          undefined;
         const coverFileId =
+          (backendCoverImageRaw && !isRemoteMediaValue(backendCoverImageRaw)
+            ? backendCoverImageRaw
+            : undefined) ||
+          backendCoverFileId ||
           (typeof fileObj?.id === 'string' ? fileObj.id : undefined) ||
           productCoverFileId;
-        const countObj = (backendItem._count as { medias?: number } | undefined) ?? undefined;
+        const countObj = (backendItem._count as { medias?: number; products?: number } | undefined) ?? undefined;
         const mediaCount = typeof countObj?.medias === 'number' ? countObj!.medias! : ((backendItem.medias as unknown[])?.length || 0);
+        const productCount =
+          typeof (backendItem as any)?.itemCount === 'number'
+            ? ((backendItem as any).itemCount as number)
+            : typeof countObj?.products === 'number'
+              ? countObj.products
+              : productLinks.length;
         // Aggregate total threads/comments: include media-level counts if available
         const baseThreads = (backendItem as any)?.threadsCount as number | undefined;
         const baseComments = (backendItem as any)?.commentsCount as number | undefined;
@@ -675,6 +757,7 @@ export const brandApi = {
 
         const rawStoreAvailability = (backendItem as any).isAvailableInStore;
         const isAvailableInStore = rawStoreAvailability === true;
+        const resolvedItemCount = isAvailableInStore ? productCount : mediaCount;
 
         const out = {
           id: backendItem.id as string,
@@ -697,8 +780,9 @@ export const brandApi = {
             (backendItem as any).domain === 'STORE' || (backendItem as any).domain === 'DESIGN'
               ? ((backendItem as any).domain as 'STORE' | 'DESIGN')
               : undefined,
-          coverImage: resolvedCoverImage,
+          coverImage: resolvedCoverImage || undefined,
           coverFileId,
+          previewImages: derivedPreviewImages.slice(0, 8),
           deletedAt:
             typeof (backendItem as any).deletedAt === 'string'
               ? ((backendItem as any).deletedAt as string)
@@ -707,8 +791,8 @@ export const brandApi = {
             typeof (backendItem as any).deleteExpiresAt === 'string'
               ? ((backendItem as any).deleteExpiresAt as string)
               : null,
-          itemCount: mediaCount,
-          postsCount: mediaCount,
+          itemCount: resolvedItemCount,
+          postsCount: resolvedItemCount,
           threadsCount: totalThreads,
           commentsCount: totalComments,
           minPrice: (backendItem.minPrice as number) || 0,
@@ -753,6 +837,11 @@ export const brandApi = {
           ...collection,
           coverImage: existing.coverImage || collection.coverImage || '',
           coverFileId: existing.coverFileId || collection.coverFileId,
+          previewImages:
+            (Array.isArray((existing as any).previewImages) &&
+              (existing as any).previewImages.length > 0
+              ? (existing as any).previewImages
+              : (collection as any).previewImages) ?? [],
           itemCount: Math.max(existing.itemCount ?? 0, collection.itemCount ?? 0),
           postsCount: Math.max(existing.postsCount ?? 0, collection.postsCount ?? 0),
           threadsCount: Math.max(existing.threadsCount ?? 0, collection.threadsCount ?? 0),
@@ -763,14 +852,7 @@ export const brandApi = {
 
       const uniqueMapped = Array.from(dedupedByCollectionId.values());
 
-      try {
-        const totals = uniqueMapped.reduce((acc, c) => {
-          acc.all += 1;
-          if ((c as any).visibility === 'PRIVATE') acc.private += 1; else acc.public += 1;
-          return acc;
-        }, { all: 0, public: 0, private: 0 } as any);
-        console.debug('[BrandApi.getCollections] response', { count: uniqueMapped.length, ...totals });
-      } catch { }
+
       return uniqueMapped;
     } catch (error) {
       console.error('Error fetching collections:', error);
@@ -1136,6 +1218,60 @@ export const brandApi = {
     })();
 
     signedUrlPending.set(fileId, request);
+    return request;
+  },
+
+  /**
+   * Resolve a raw unsigned S3 URL into a signed/accessible URL.
+   * Extracts the S3 key from the URL and calls the public-url-by-key endpoint.
+   * Falls back to returning the original URL if signing fails.
+   */
+  async getSignedS3Url(rawS3Url: string): Promise<string | null> {
+    if (!rawS3Url || typeof rawS3Url !== 'string') return null;
+
+    // Check cache using the raw URL as key
+    const existing = signedUrlCache.get(rawS3Url);
+    if (existing && existing.expiresAt > Date.now()) {
+      return existing.url;
+    }
+
+    const inflight = signedUrlPending.get(rawS3Url);
+    if (inflight) return inflight;
+
+    const request = (async (): Promise<string | null> => {
+      try {
+        // Extract the S3 key from the URL (path after the bucket hostname)
+        const parsed = new URL(rawS3Url);
+        const s3Key = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+        if (!s3Key) return rawS3Url;
+
+        // Use the key-based signing endpoint (query param, not path param)
+        const response = await apiClient.get('/uploads/public-url-by-key', {
+          params: { key: s3Key },
+        });
+        const payload = unwrapApiResponse<{ url?: string }>(response.data);
+        const signedUrl =
+          (payload as { url?: string })?.url ??
+          (response.data as { url?: string })?.url ??
+          null;
+        if (typeof signedUrl === 'string' && signedUrl.length > 0) {
+          signedUrlCache.set(rawS3Url, {
+            url: signedUrl,
+            expiresAt: Date.now() + SIGNED_URL_TTL_MS,
+          });
+          return signedUrl;
+        }
+        // Fall back to raw URL
+        return rawS3Url;
+      } catch {
+        // If signing fails, return the original raw URL as a best-effort fallback
+        return rawS3Url;
+      } finally {
+        signedUrlPending.delete(rawS3Url);
+      }
+    })();
+
+    signedUrlPending.set(rawS3Url, request);
     return request;
   },
   // Get one collection with medias

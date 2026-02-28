@@ -97,10 +97,10 @@ const ArchiveProductModal: React.FC<ArchiveProductModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-24 sm:pt-20">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-24 sm:pt-20">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-zinc-900 max-h-[calc(100vh-8rem)] overflow-y-auto">
+      <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-zinc-900 max-h-[calc(100vh-8rem)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
         <div className="border-b border-gray-100 p-6 dark:border-white/10">
           <div className="flex items-start gap-4">
             <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl">

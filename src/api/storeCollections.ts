@@ -1,5 +1,6 @@
-import { apiClient } from './httpClient';
+import { apiClient, getStoredAccessToken } from './httpClient';
 import { unwrapApiResponse } from '../types/auth';
+import { env } from '../config/env';
 
 export type CollectionVisibility = 'PUBLIC' | 'PRIVATE';
 export type CollectionType = 'MALE' | 'FEMALE' | 'EVERYBODY';
@@ -88,4 +89,55 @@ export async function finalizeStoreCollection(
 ) {
   const res = await apiClient.post(`/store-collections/${collectionId}/finalize`, payload);
   return unwrap<Record<string, unknown>>(res.data);
+}
+
+const buildStoreCollectionUrl = (path: string): string => {
+  try {
+    return new URL(path, env.apiBaseUrl).toString();
+  } catch {
+    return `${env.apiBaseUrl}${path}`;
+  }
+};
+
+export async function abandonStoreCollection(
+  collectionId: string,
+  options?: { permanent?: boolean; keepalive?: boolean },
+) {
+  if (!collectionId) return;
+
+  const shouldPermanentlyDelete = options?.permanent === true;
+  const shouldUseKeepalive = options?.keepalive === true;
+
+  if (shouldUseKeepalive && typeof window !== 'undefined' && typeof fetch === 'function') {
+    const token = getStoredAccessToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    try {
+      void fetch(buildStoreCollectionUrl(`/store-collections/${collectionId}`), {
+        method: 'DELETE',
+        headers,
+        credentials: 'include',
+        keepalive: true,
+      });
+      if (shouldPermanentlyDelete) {
+        void fetch(buildStoreCollectionUrl(`/store-collections/${collectionId}/permanent`), {
+          method: 'DELETE',
+          headers,
+          credentials: 'include',
+          keepalive: true,
+        });
+      }
+      return;
+    } catch {
+      // Fall through to axios call when keepalive fetch fails.
+    }
+  }
+
+  await apiClient.delete(`/store-collections/${collectionId}`);
+  if (shouldPermanentlyDelete) {
+    await apiClient.delete(`/store-collections/${collectionId}/permanent`);
+  }
 }

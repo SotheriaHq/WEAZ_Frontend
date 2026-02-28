@@ -13,6 +13,7 @@ import {
 import { unwrapApiResponse } from "@/types/auth";
 import {
   addProductsToCollection,
+  abandonStoreCollection,
   finalizeStoreCollection,
   initializeStoreCollection,
   removeProductsFromCollection,
@@ -70,6 +71,59 @@ const normalizeFilterSelectionFromDetail = (detail: any): FilterSelection => {
 
   const rows = Array.isArray((detail as any).filters)
     ? ((detail as any).filters as any[])
+    : [];
+  if (rows.length === 0) return {};
+
+  const next: FilterSelection = {};
+  rows.forEach((row) => {
+    const dimensionId =
+      (typeof row?.dimensionId === "string" && row.dimensionId) ||
+      (typeof row?.dimension?.id === "string" && row.dimension.id) ||
+      (typeof row?.filterValue?.dimensionId === "string" &&
+        row.filterValue.dimensionId) ||
+      "";
+    const valueId =
+      (typeof row?.valueId === "string" && row.valueId) ||
+      (typeof row?.filterValueId === "string" && row.filterValueId) ||
+      (typeof row?.filterValue?.id === "string" && row.filterValue.id) ||
+      "";
+    if (!dimensionId || !valueId) return;
+    const current = next[dimensionId] ?? [];
+    if (!current.includes(valueId)) {
+      next[dimensionId] = [...current, valueId];
+    }
+  });
+
+  return next;
+};
+
+const normalizeFilterSelectionFromProduct = (raw: any): FilterSelection => {
+  if (!raw || typeof raw !== "object") return {};
+
+  const mapSelection = (input: unknown): FilterSelection => {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      return {};
+    }
+    const next: FilterSelection = {};
+    Object.entries(input as Record<string, unknown>).forEach(
+      ([dimensionId, value]) => {
+        if (!dimensionId) return;
+        const values = Array.isArray(value)
+          ? value.filter((item): item is string => typeof item === "string")
+          : [];
+        if (values.length > 0) {
+          next[dimensionId] = Array.from(new Set(values));
+        }
+      },
+    );
+    return next;
+  };
+
+  const directSelection = mapSelection((raw as any).filterSelection);
+  if (Object.keys(directSelection).length > 0) return directSelection;
+
+  const rows = Array.isArray((raw as any).filters)
+    ? ((raw as any).filters as any[])
     : [];
   if (rows.length === 0) return {};
 
@@ -202,12 +256,16 @@ const StoreCollectionCreate: React.FC = () => {
   const preselectProductId = searchParams.get("productId");
   const prefillCollectionId = searchParams.get("collectionId");
   const returnMode = searchParams.get("mode");
+  const autoCleanupParam = searchParams.get("autoclean");
   const [collectionSessionId, setCollectionSessionId] = useState<string | null>(
     null,
   );
   const [sessionDraftProductIds, setSessionDraftProductIds] = useState<
     string[]
   >([]);
+  const [sessionFlowProductIds, setSessionFlowProductIds] = useState<string[]>(
+    [],
+  );
   const [existingCollectionStatus, setExistingCollectionStatus] = useState<
     "DRAFT" | "PUBLISHED" | "ARCHIVED" | null
   >(null);
@@ -216,6 +274,57 @@ const StoreCollectionCreate: React.FC = () => {
   >([]);
   const hydratedSessionRef = useRef<string | null>(null);
   const submitLockRef = useRef(false);
+  const autoCleanupSessionRef = useRef(
+    autoCleanupParam === "1" || returnMode === "new" || returnMode === "existing",
+  );
+  const abandoningSessionRef = useRef(false);
+  const skipAbandonOnUnmountRef = useRef(false);
+
+  const clearSessionFilterCache = useCallback((sessionId?: string | null) => {
+    if (!sessionId) return;
+    try {
+      localStorage.removeItem(`${FILTER_SELECTION_STORAGE_PREFIX}${sessionId}`);
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
+
+  const abandonSessionIfNeeded = useCallback(
+    async (options?: { keepalive?: boolean }) => {
+      if (!collectionSessionId) return false;
+      if (!autoCleanupSessionRef.current) return false;
+      if (submitLockRef.current) return false;
+      if (abandoningSessionRef.current) return false;
+
+      abandoningSessionRef.current = true;
+      try {
+        await abandonStoreCollection(collectionSessionId, {
+          permanent: true,
+          keepalive: options?.keepalive,
+        });
+        clearSessionFilterCache(collectionSessionId);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        abandoningSessionRef.current = false;
+      }
+    },
+    [clearSessionFilterCache, collectionSessionId],
+  );
+
+  const navigateAway = useCallback(
+    async (target: string | number) => {
+      await abandonSessionIfNeeded();
+      skipAbandonOnUnmountRef.current = false;
+      if (typeof target === "number") {
+        navigate(target);
+        return;
+      }
+      navigate(target);
+    },
+    [abandonSessionIfNeeded, navigate],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -264,6 +373,12 @@ const StoreCollectionCreate: React.FC = () => {
   }, [prefillCollectionId]);
 
   useEffect(() => {
+    if (autoCleanupParam === "1" || returnMode === "new" || returnMode === "existing") {
+      autoCleanupSessionRef.current = true;
+    }
+  }, [autoCleanupParam, returnMode]);
+
+  useEffect(() => {
     if (!collectionSessionId) {
       hydratedSessionRef.current = null;
       return;
@@ -300,8 +415,15 @@ const StoreCollectionCreate: React.FC = () => {
       );
 
       const links = Array.isArray(detail.products) ? detail.products : [];
-      const primaryLink = links.find((link: any) => Boolean(link?.isPrimary));
-      const linkedIds = links
+      const orderedLinks = [...links].sort((a: any, b: any) => {
+        const aOrder =
+          typeof a?.orderIndex === "number" ? a.orderIndex : Number.MAX_SAFE_INTEGER;
+        const bOrder =
+          typeof b?.orderIndex === "number" ? b.orderIndex : Number.MAX_SAFE_INTEGER;
+        return aOrder - bOrder;
+      });
+      const primaryLink = orderedLinks[0] ?? null;
+      const linkedIds = orderedLinks
         .map((link: any) =>
           String(link?.product?.id || link?.productId || link?.id || ""),
         )
@@ -310,6 +432,8 @@ const StoreCollectionCreate: React.FC = () => {
         .map((link: any) => normalizeLinkedProduct(link?.product))
         .filter(Boolean) as StoreProduct[];
       setExistingLinkedProductIds(linkedIds);
+      const shouldTreatLinkedAsFlowProducts =
+        autoCleanupSessionRef.current || returnMode === "new";
       const draftIds = linkedProducts
         .filter((product) => product.isActive === false)
         .map((product) => String(product.id || ""))
@@ -331,6 +455,12 @@ const StoreCollectionCreate: React.FC = () => {
         setSelectedProductIds((prev) =>
           Array.from(new Set([...prev, ...linkedIds])),
         );
+        if (shouldTreatLinkedAsFlowProducts) {
+          setSessionFlowProductIds((prev) =>
+            Array.from(new Set([...prev, ...linkedIds])),
+          );
+          setCreationMode("new");
+        }
         const nextPrimaryId =
           primaryLink?.product?.id || primaryLink?.productId || null;
         if (nextPrimaryId) {
@@ -341,7 +471,12 @@ const StoreCollectionCreate: React.FC = () => {
         setSessionDraftProductIds((prev) =>
           Array.from(new Set([...prev, ...draftIds])),
         );
-        setCreationMode("new");
+        setSessionFlowProductIds((prev) =>
+          Array.from(new Set([...prev, ...draftIds])),
+        );
+        if (shouldTreatLinkedAsFlowProducts) {
+          setCreationMode("new");
+        }
       }
 
       if (!preselectProductId) {
@@ -404,6 +539,7 @@ const StoreCollectionCreate: React.FC = () => {
   }, [
     collectionSessionId,
     preselectProductId,
+    returnMode,
   ]);
 
   useEffect(() => {
@@ -456,6 +592,9 @@ const StoreCollectionCreate: React.FC = () => {
     setSessionDraftProductIds((prev) =>
       prev.includes(preselectProductId) ? prev : [...prev, preselectProductId],
     );
+    setSessionFlowProductIds((prev) =>
+      prev.includes(preselectProductId) ? prev : [...prev, preselectProductId],
+    );
     setSelectedProductIds((prev) => {
       if (prev.includes(preselectProductId)) return prev;
       if (prev.length >= MAX_PRODUCTS) return prev;
@@ -469,6 +608,24 @@ const StoreCollectionCreate: React.FC = () => {
       setCreationMode("new");
     }
   }, [returnMode]);
+
+  useEffect(() => {
+    if (!collectionSessionId) return;
+
+    const handlePageExit = () => {
+      void abandonSessionIfNeeded({ keepalive: true });
+    };
+
+    window.addEventListener("beforeunload", handlePageExit);
+    window.addEventListener("pagehide", handlePageExit);
+
+    return () => {
+      window.removeEventListener("beforeunload", handlePageExit);
+      window.removeEventListener("pagehide", handlePageExit);
+      if (skipAbandonOnUnmountRef.current) return;
+      void abandonSessionIfNeeded();
+    };
+  }, [abandonSessionIfNeeded, collectionSessionId]);
 
   useEffect(() => {
     if (!categoryId) {
@@ -552,8 +709,8 @@ const StoreCollectionCreate: React.FC = () => {
   }, [products, search]);
 
   const sessionProducts = useMemo(
-    () => products.filter((p) => sessionDraftProductIds.includes(p.id)),
-    [products, sessionDraftProductIds],
+    () => products.filter((p) => sessionFlowProductIds.includes(p.id)),
+    [products, sessionFlowProductIds],
   );
 
   const visibleProducts = useMemo(() => {
@@ -561,9 +718,9 @@ const StoreCollectionCreate: React.FC = () => {
       return sessionProducts;
     }
     return filteredProducts.filter(
-      (p) => p.isActive !== false && !sessionDraftProductIds.includes(p.id),
+      (p) => p.isActive !== false && !sessionFlowProductIds.includes(p.id),
     );
-  }, [creationMode, filteredProducts, sessionDraftProductIds, sessionProducts]);
+  }, [creationMode, filteredProducts, sessionFlowProductIds, sessionProducts]);
 
   const displayedProducts = useMemo(() => {
     const selectedSet = new Set(selectedProductIds);
@@ -583,6 +740,60 @@ const StoreCollectionCreate: React.FC = () => {
     () => products.filter((p) => selectedProductIds.includes(p.id)),
     [products, selectedProductIds],
   );
+
+  useEffect(() => {
+    if (selectedProducts.length === 0) return;
+
+    if (tags.length === 0) {
+      const inferredTags = Array.from(
+        new Set(
+          selectedProducts.flatMap((product) =>
+            Array.isArray(product.tags)
+              ? product.tags.filter(
+                  (tag): tag is string =>
+                    typeof tag === "string" && tag.trim().length > 0,
+                )
+              : [],
+          ),
+        ),
+      ).slice(0, MAX_TAGS);
+      if (inferredTags.length > 0) {
+        setTags(inferredTags);
+      }
+    }
+
+    if (Object.keys(filterSelection).length === 0) {
+      const inferredSelection: FilterSelection = {};
+      selectedProducts.forEach((product) => {
+        const fromProduct = normalizeFilterSelectionFromProduct(product as any);
+        Object.entries(fromProduct).forEach(([dimensionId, valueIds]) => {
+          const current = inferredSelection[dimensionId] ?? [];
+          inferredSelection[dimensionId] = Array.from(
+            new Set([...current, ...valueIds]),
+          );
+        });
+      });
+      if (Object.keys(inferredSelection).length > 0) {
+        setFilterSelection(inferredSelection);
+      }
+    }
+
+    const firstProduct = selectedProducts[0] as any;
+    if (!categoryId && typeof firstProduct?.categoryId === "string") {
+      setCategoryId(firstProduct.categoryId);
+    }
+    if (!categoryTypeId) {
+      const inferredCategoryTypeId =
+        (typeof firstProduct?.subCategoryId === "string" &&
+          firstProduct.subCategoryId) ||
+        (typeof firstProduct?.categoryTypeId === "string" &&
+          firstProduct.categoryTypeId) ||
+        "";
+      if (inferredCategoryTypeId) {
+        setCategoryTypeId(inferredCategoryTypeId);
+      }
+    }
+  }, [categoryId, categoryTypeId, filterSelection, selectedProducts, tags.length]);
 
   const orderedSelectedProductIds = useMemo(() => {
     if (!primaryProductId || !selectedProductIds.includes(primaryProductId)) {
@@ -605,6 +816,10 @@ const StoreCollectionCreate: React.FC = () => {
         existingCollectionStatus &&
         existingCollectionStatus !== "DRAFT",
       ),
+    [existingCollectionStatus, prefillCollectionId],
+  );
+  const isDraftCollectionEditMode = useMemo(
+    () => Boolean(prefillCollectionId && existingCollectionStatus === "DRAFT"),
     [existingCollectionStatus, prefillCollectionId],
   );
 
@@ -654,7 +869,32 @@ const StoreCollectionCreate: React.FC = () => {
   }, [primaryProductId, selectedProductIds]);
 
   const ensureCollectionSession = async () => {
-    if (collectionSessionId) return collectionSessionId;
+    if (collectionSessionId) {
+      try {
+        await brandApi.getCollectionDetail(collectionSessionId, {
+          scope: "store",
+        });
+        return collectionSessionId;
+      } catch (error: any) {
+        const statusCode = Number(error?.response?.status ?? 0);
+        const rawMessage = error?.response?.data?.message;
+        const message =
+          typeof rawMessage === "string"
+            ? rawMessage
+            : typeof rawMessage?.message === "string"
+              ? rawMessage.message
+              : "";
+        const sessionMissing =
+          statusCode === 404 ||
+          /collection not found|does not belong to you/i.test(message);
+        if (!sessionMissing) {
+          throw error;
+        }
+        clearSessionFilterCache(collectionSessionId);
+        setCollectionSessionId(null);
+      }
+    }
+
     const init = await initializeStoreCollection({
       mode: creationMode === "new" ? "new-individual" : "existing",
       title: title.trim() || undefined,
@@ -667,6 +907,7 @@ const StoreCollectionCreate: React.FC = () => {
       isAvailableInStore: true,
       subCategoryId: categoryTypeId || undefined,
     });
+    autoCleanupSessionRef.current = true;
     setCollectionSessionId(init.sessionId);
     return init.sessionId;
   };
@@ -675,14 +916,18 @@ const StoreCollectionCreate: React.FC = () => {
     try {
       const sessionId = await ensureCollectionSession();
       const mode = creationMode === "new" ? "new" : "existing";
-      const returnPath = `/studio/store/collections/new?collectionId=${sessionId}&mode=${mode}`;
+      const returnPath = `/studio/store/collections/new?collectionId=${sessionId}&mode=${mode}${
+        autoCleanupSessionRef.current ? "&autoclean=1" : ""
+      }`;
       const basePath = productId
         ? `/studio/store/products/${productId}/edit`
         : "/studio/store/products/new";
+      skipAbandonOnUnmountRef.current = true;
       navigate(
         `${basePath}?returnTo=${encodeURIComponent(returnPath)}&returnContext=collection&collectionId=${sessionId}`,
       );
     } catch (error: any) {
+      skipAbandonOnUnmountRef.current = false;
       toast.error(
         error?.response?.data?.message ??
           "Failed to start product flow for this collection.",
@@ -729,12 +974,6 @@ const StoreCollectionCreate: React.FC = () => {
       }
       if (!hasAnyMedia) {
         toast.error("At least one selected product needs an image to publish.");
-        return;
-      }
-      if (selectedProducts.some((product) => product.isActive === false)) {
-        toast.error(
-          "One or more selected products are still drafts. Edit and publish those products first.",
-        );
         return;
       }
     }
@@ -801,12 +1040,38 @@ const StoreCollectionCreate: React.FC = () => {
         }
 
         setExistingLinkedProductIds(nextIds);
+        autoCleanupSessionRef.current = false;
+        clearSessionFilterCache(sessionId);
         toast.success("Collection updated.");
         navigate("/studio/store?view=collections");
         return;
       }
 
-      if (orderedSelectedProductIds.length > 0) {
+      if (isDraftCollectionEditMode) {
+        const previousIds = existingLinkedProductIds;
+        const nextIds = orderedSelectedProductIds;
+        const previousSet = new Set(previousIds);
+        const nextSet = new Set(nextIds);
+
+        const toRemove = previousIds.filter(
+          (productId) => !nextSet.has(productId),
+        );
+        const toAdd = nextIds.filter((productId) => !previousSet.has(productId));
+
+        if (toRemove.length > 0) {
+          await removeProductsFromCollection(sessionId, toRemove);
+        }
+        if (toAdd.length > 0) {
+          await addProductsToCollection(sessionId, toAdd);
+        }
+        if (nextIds.length > 0) {
+          await reorderCollectionProducts(
+            sessionId,
+            nextIds.map((productId, orderIndex) => ({ productId, orderIndex })),
+          );
+        }
+        setExistingLinkedProductIds(nextIds);
+      } else if (orderedSelectedProductIds.length > 0) {
         await addProductsToCollection(sessionId, orderedSelectedProductIds);
       }
 
@@ -815,6 +1080,8 @@ const StoreCollectionCreate: React.FC = () => {
         collectionMetadata: metadataPayload,
       });
 
+      autoCleanupSessionRef.current = false;
+      clearSessionFilterCache(sessionId);
       toast.success(
         action === "publish" ? "Collection published." : "Draft saved.",
       );
@@ -851,14 +1118,14 @@ const StoreCollectionCreate: React.FC = () => {
   };
 
   const formatCurrency = (price?: number | null) => {
-    if (!price && price !== 0) return "—";
+    if (!price && price !== 0) return "-";
     try {
       return new Intl.NumberFormat("en-NG", {
         style: "currency",
         currency: "NGN",
       }).format(price);
     } catch {
-      return `₦${price}`;
+      return `NGN ${price}`;
     }
   };
 
@@ -1033,6 +1300,165 @@ const StoreCollectionCreate: React.FC = () => {
 
   const activePreviewImage = previewImages[previewImageIndex] ?? null;
 
+  const renderProductSelectionCard = (
+    product: StoreProduct,
+    options?: {
+      showLinkedBadge?: boolean;
+      showSessionBadge?: boolean;
+    },
+  ) => {
+    const image = getProductImageSource(product);
+    const selected = selectedProductIds.includes(product.id);
+    const isPrimary = primaryProductId === product.id;
+    const isSession = sessionFlowProductIds.includes(product.id);
+    const isLinked = existingLinkedProductIds.includes(product.id);
+
+    const showLinkedBadge = options?.showLinkedBadge ?? isLinked;
+    const showSessionBadge = options?.showSessionBadge ?? isSession;
+
+    const actionButtonBase =
+      "h-7 w-full rounded-md px-1.5 text-[10px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400";
+
+    return (
+      <article
+        key={product.id}
+        onClick={() => toggleProduct(product.id)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleProduct(product.id);
+          }
+        }}
+        role="button"
+        aria-pressed={selected}
+        tabIndex={0}
+        className={`group relative rounded-lg border p-2.5 text-left transition-all duration-200 cursor-pointer ${
+          selected
+            ? "border-purple-300 bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:border-purple-400/60 dark:from-purple-600/20 dark:via-fuchsia-600/10 dark:to-pink-600/10 shadow-lg shadow-purple-500/10"
+            : "border-gray-200/80 dark:border-white/10 bg-white/90 dark:bg-white/5 hover:border-purple-300/70 hover:shadow-md"
+        }`}
+      >
+        <div className="relative mb-2 aspect-[5/4] w-full overflow-hidden rounded-lg border border-gray-200/70 bg-gray-100 dark:border-white/10 dark:bg-white/10">
+          {selected && (
+            <span className="absolute right-2 top-2 z-10 rounded-full bg-purple-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+              Selected
+            </span>
+          )}
+          {image.src || image.fileId ? (
+            <ImageWithFallback
+              src={image.src}
+              fileId={image.fileId}
+              alt={product.name}
+              fit="cover"
+              className="h-full w-full object-cover"
+              containerClassName="h-full w-full"
+              rounded="none"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-[11px] text-gray-400">
+              No image
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0">
+          <div className="min-w-0">
+            <p className="line-clamp-1 text-xs font-semibold text-gray-900 dark:text-white">
+              {product.name}
+            </p>
+            <div className="mt-0.5 flex items-center justify-between gap-2 text-[10px]">
+              <p className="font-semibold text-gray-700 dark:text-gray-200">
+                {formatCurrency(product.price)}
+              </p>
+              <p className="text-gray-500">
+                Stock:{" "}
+                {typeof product.totalStock === "number"
+                  ? product.totalStock
+                  : "-"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {isPrimary && (
+              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200">
+                Primary cover
+              </span>
+            )}
+            {showLinkedBadge && (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200">
+                Already in collection
+              </span>
+            )}
+            {showSessionBadge && (
+              <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-500/20 dark:text-purple-200">
+                New / Collection Flow
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleProduct(product.id);
+            }}
+            className={`${actionButtonBase} ${
+              selected
+                ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            }`}
+          >
+            {selected ? "Selected" : "Select"}
+          </button>
+
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleSetPrimary(product.id);
+            }}
+            disabled={!selected}
+            className={`${actionButtonBase} ${
+              isPrimary
+                ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-sm"
+                : selected
+                  ? "bg-slate-700 text-white hover:bg-slate-600"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
+            }`}
+          >
+            {isPrimary ? "Primary" : "Set Primary"}
+          </button>
+
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setPreviewImageIndex(0);
+              setPreviewProduct(product);
+            }}
+            className={`${actionButtonBase} bg-indigo-600 text-white hover:bg-indigo-500 shadow-sm`}
+          >
+            View
+          </button>
+
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              void openCollectionProductEditor(product.id);
+            }}
+            className={`${actionButtonBase} bg-violet-600 text-white hover:bg-violet-500 shadow-sm`}
+          >
+            Edit
+          </button>
+        </div>
+      </article>
+    );
+  };
+
   return (
     <div className="space-y-8">
       <nav
@@ -1041,7 +1467,7 @@ const StoreCollectionCreate: React.FC = () => {
       >
         <button
           type="button"
-          onClick={() => navigate("/studio")}
+          onClick={() => void navigateAway("/studio")}
           className="font-medium hover:text-purple-600 dark:hover:text-purple-300"
         >
           Studio
@@ -1049,7 +1475,7 @@ const StoreCollectionCreate: React.FC = () => {
         <span>/</span>
         <button
           type="button"
-          onClick={() => navigate("/studio/store")}
+          onClick={() => void navigateAway("/studio/store")}
           className="font-medium hover:text-purple-600 dark:hover:text-purple-300"
         >
           Store
@@ -1057,7 +1483,7 @@ const StoreCollectionCreate: React.FC = () => {
         <span>/</span>
         <button
           type="button"
-          onClick={() => navigate("/studio/store?view=collections")}
+          onClick={() => void navigateAway("/studio/store?view=collections")}
           className="font-medium hover:text-purple-600 dark:hover:text-purple-300"
         >
           Manage Collections
@@ -1216,150 +1642,10 @@ const StoreCollectionCreate: React.FC = () => {
                     No products found.
                   </div>
                 ) : (
-                  <div className="mt-4 max-h-[620px] overflow-y-auto pr-1 sm:pr-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {displayedProducts.map((product) => {
-                        const image = getProductImageSource(product);
-                        const selected = selectedProductIds.includes(
-                          product.id,
-                        );
-                        const isPrimary = primaryProductId === product.id;
-                        const isSession = sessionDraftProductIds.includes(
-                          product.id,
-                        );
-                        const isLinked = existingLinkedProductIds.includes(
-                          product.id,
-                        );
-                        return (
-                          <div
-                            key={product.id}
-                            onClick={() => toggleProduct(product.id)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                toggleProduct(product.id);
-                              }
-                            }}
-                            role="button"
-                            tabIndex={0}
-                            className={`relative flex gap-4 rounded-2xl border-2 p-4 text-left transition-all duration-300 cursor-pointer group ${
-                              selected
-                                ? "border-transparent bg-gradient-to-br from-purple-100 via-white to-pink-100 dark:from-purple-600/30 dark:via-fuchsia-600/20 dark:to-pink-600/20 ring-2 ring-purple-500/60 shadow-xl shadow-purple-500/20 scale-[1.02]"
-                                : "border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/5 hover:border-purple-400/60 hover:shadow-lg hover:shadow-purple-500/10 hover:scale-[1.01] hover:bg-gradient-to-br hover:from-purple-50/50 hover:to-pink-50/50 dark:hover:from-purple-900/20 dark:hover:to-pink-900/20"
-                            }`}
-                          >
-                            <div className="shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-gray-100 dark:bg-white/10 border border-gray-200/70 dark:border-white/10">
-                              {image.src || image.fileId ? (
-                                <ImageWithFallback
-                                  src={image.src}
-                                  fileId={image.fileId}
-                                  alt={product.name}
-                                  fit="cover"
-                                  className="w-full h-full object-cover"
-                                  containerClassName="w-full h-full"
-                                  rounded="lg"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <span className="text-xs text-gray-400">
-                                    No image
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1">
-                                    {product.name}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    {formatCurrency(product.price)}
-                                  </div>
-                                  {isPrimary && (
-                                    <div className="mt-1 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
-                                      Primary cover
-                                    </div>
-                                  )}
-                                  {isLinked && (
-                                    <div className="mt-1 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                                      Already in collection
-                                    </div>
-                                  )}
-                                  {isSession && (
-                                    <div className="mt-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
-                                      New • Collection Flow
-                                    </div>
-                                  )}
-                                  <div className="mt-1 text-[11px] text-gray-500">
-                                    Stock:{" "}
-                                    {typeof product.totalStock === "number"
-                                      ? product.totalStock
-                                      : "—"}
-                                  </div>
-                                </div>
-                                <div className="mt-3 flex flex-wrap items-center gap-2 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleProduct(product.id);
-                                    }}
-                                    className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 ${
-                                      selected
-                                        ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm"
-                                        : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                                    }`}
-                                  >
-                                    {selected ? "Selected" : "Select"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleSetPrimary(product.id);
-                                    }}
-                                    disabled={!selected}
-                                    className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 ${
-                                      isPrimary
-                                        ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-sm"
-                                        : selected
-                                          ? "bg-gradient-to-r from-slate-500 to-slate-600 text-white shadow-sm"
-                                          : "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                                    }`}
-                                  >
-                                    {isPrimary ? "Primary" : "Set Primary"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setPreviewImageIndex(0);
-                                      setPreviewProduct(product);
-                                    }}
-                                    className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
-                                  >
-                                    View
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      void openCollectionProductEditor(
-                                        product.id,
-                                      );
-                                    }}
-                                    className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
-                                  >
-                                    Edit
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    {displayedProducts.map((product) =>
+                      renderProductSelectionCard(product),
+                    )}
                   </div>
                 )}
               </>
@@ -1373,133 +1659,13 @@ const StoreCollectionCreate: React.FC = () => {
                     items to this collection.
                   </div>
                 ) : (
-                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {sessionProducts.map((product) => {
-                      const image = getProductImageSource(product);
-                      const selected = selectedProductIds.includes(product.id);
-                      const isPrimary = primaryProductId === product.id;
-                      return (
-                        <div
-                          key={product.id}
-                          onClick={() => toggleProduct(product.id)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              toggleProduct(product.id);
-                            }
-                          }}
-                          role="button"
-                          tabIndex={0}
-                          className={`relative flex gap-4 rounded-2xl border-2 p-4 text-left transition-all duration-300 cursor-pointer group ${
-                            selected
-                              ? "border-transparent bg-gradient-to-br from-purple-100 via-white to-pink-100 dark:from-purple-600/30 dark:via-fuchsia-600/20 dark:to-pink-600/20 ring-2 ring-purple-500/60 shadow-xl shadow-purple-500/20 scale-[1.02]"
-                              : "border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/5 hover:border-purple-400/60 hover:shadow-lg hover:shadow-purple-500/10 hover:scale-[1.01] hover:bg-gradient-to-br hover:from-purple-50/50 hover:to-pink-50/50 dark:hover:from-purple-900/20 dark:hover:to-pink-900/20"
-                          }`}
-                        >
-                          <div className="shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-gray-100 dark:bg-white/10 border border-gray-200/70 dark:border-white/10">
-                            {image.src || image.fileId ? (
-                              <ImageWithFallback
-                                src={image.src}
-                                fileId={image.fileId}
-                                alt={product.name}
-                                fit="cover"
-                                className="w-full h-full object-cover"
-                                containerClassName="w-full h-full"
-                                rounded="lg"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span className="text-xs text-gray-400">
-                                  No image
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0 flex-1">
-                                <div className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1">
-                                  {product.name}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {formatCurrency(product.price)}
-                                </div>
-                                {isPrimary && (
-                                  <div className="mt-1 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
-                                    Primary cover
-                                  </div>
-                                )}
-                                <div className="mt-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
-                                  New • Collection Flow
-                                </div>
-                                <div className="mt-1 text-[11px] text-gray-500">
-                                  Stock:{" "}
-                                  {typeof product.totalStock === "number"
-                                    ? product.totalStock
-                                    : "—"}
-                                </div>
-                              </div>
-                              <div className="mt-3 flex flex-wrap items-center gap-2 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleProduct(product.id);
-                                  }}
-                                  className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 ${
-                                    selected
-                                      ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm"
-                                      : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                                  }`}
-                                >
-                                  {selected ? "Selected" : "Select"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSetPrimary(product.id);
-                                  }}
-                                  disabled={!selected}
-                                  className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all duration-200 ${
-                                    isPrimary
-                                      ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-sm"
-                                      : selected
-                                        ? "bg-gradient-to-r from-slate-500 to-slate-600 text-white shadow-sm"
-                                        : "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                                  }`}
-                                >
-                                  {isPrimary ? "Primary" : "Set Primary"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPreviewImageIndex(0);
-                                    setPreviewProduct(product);
-                                  }}
-                                  className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
-                                >
-                                  View
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void openCollectionProductEditor(
-                                      product.id,
-                                    );
-                                  }}
-                                  className="text-[10px] px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
-                                >
-                                  Edit
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    {sessionProducts.map((product) =>
+                      renderProductSelectionCard(product, {
+                        showLinkedBadge: false,
+                        showSessionBadge: true,
+                      }),
+                    )}
                   </div>
                 )}
               </>
@@ -1520,10 +1686,10 @@ const StoreCollectionCreate: React.FC = () => {
                   Collection Metadata
                 </p>
                 <span className="text-[10px] font-medium text-gray-400">
-                  Scroll inside panel
+                  Complete all fields
                 </span>
               </div>
-              <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
+              <div className="space-y-4">
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
@@ -1754,7 +1920,7 @@ const StoreCollectionCreate: React.FC = () => {
             {selectedProducts.length === 0 ? (
               <p className="text-xs text-gray-500">No products selected yet.</p>
             ) : (
-              <div className="max-h-64 overflow-y-auto pr-1">
+              <div className="space-y-2">
                 <div className="space-y-2">
                   {selectedProducts.map((product) => {
                     const isDraft =
@@ -1817,13 +1983,13 @@ const StoreCollectionCreate: React.FC = () => {
       <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
         <button
           type="button"
-          onClick={() => {
+          onClick={() => void (async () => {
             if (isExistingCollectionEditMode) {
-              navigate("/studio/store?view=collections");
+              await navigateAway("/studio/store?view=collections");
               return;
             }
-            navigate(-1);
-          }}
+            await navigateAway("/studio/store?view=collections");
+          })()}
           className="rounded-lg border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-purple-300"
         >
           {isExistingCollectionEditMode ? "Discard changes" : "Back"}
@@ -1984,7 +2150,7 @@ const StoreCollectionCreate: React.FC = () => {
                         Stock
                       </div>
                       <div className="font-bold text-indigo-900 dark:text-indigo-100 text-base mt-0.5">
-                        {previewProduct.totalStock ?? "—"}
+                        {previewProduct.totalStock ?? "-"}
                       </div>
                     </div>
                     <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/30 dark:to-green-900/30 border border-emerald-200/50 dark:border-emerald-500/20 px-4 py-3 shadow-sm">
@@ -2004,7 +2170,7 @@ const StoreCollectionCreate: React.FC = () => {
                       <div className="font-bold text-purple-900 dark:text-purple-100 text-base mt-0.5">
                         {previewProduct.sizes?.length
                           ? previewProduct.sizes.join(", ")
-                          : "—"}
+                          : "-"}
                       </div>
                     </div>
                     <div className="rounded-xl bg-gradient-to-br from-pink-50 to-rose-50 dark:from-pink-900/30 dark:to-rose-900/30 border border-pink-200/50 dark:border-pink-500/20 px-4 py-3 shadow-sm">
@@ -2014,7 +2180,7 @@ const StoreCollectionCreate: React.FC = () => {
                       <div className="font-bold text-pink-900 dark:text-pink-100 text-base mt-0.5">
                         {previewProduct.colors?.length
                           ? previewProduct.colors.join(", ")
-                          : "—"}
+                          : "-"}
                       </div>
                     </div>
                   </div>
@@ -2029,3 +2195,4 @@ const StoreCollectionCreate: React.FC = () => {
 };
 
 export default StoreCollectionCreate;
+

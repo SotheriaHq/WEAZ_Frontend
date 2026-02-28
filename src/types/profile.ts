@@ -15,6 +15,7 @@ export interface CollectionDto {
   categoryTypeId?: string;
   coverImage?: string;
   coverFileId?: string;
+  previewImages?: Array<{ url?: string | null; fileId?: string | null }>;
   deletedAt?: string | null;
   deleteExpiresAt?: string | null;
   itemCount?: number;

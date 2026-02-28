@@ -113,7 +113,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
   const productImage = product.thumbnail || product.images?.[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 py-6">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -121,7 +121,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
       />
       
       {/* Modal */}
-      <div className="relative w-full max-w-md mx-4 neu-modal-surface bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
+      <div className="relative w-full max-w-md neu-modal-surface bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200 max-h-[calc(100vh-7rem)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         
         {/* ═══════════════════════════════════════════════════════════════════════ */}
         {/* SCREEN 1: Impact Preview */}

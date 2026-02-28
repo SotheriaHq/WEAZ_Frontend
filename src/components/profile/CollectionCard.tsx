@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MessageCircle, Share2, MoreVertical, Store, AlertTriangle, Loader2, Bookmark } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import ThreadButton from '@/components/ui/ThreadButton';
@@ -48,6 +48,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
     title,
     coverImage,
     coverFileId,
+    previewImages,
     threadsCount = 0,
     commentsCount = 0,
     itemCount = 0,
@@ -70,16 +71,26 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   const statusMessage = collection.clientStatusMessage || (isPublishing ? 'Publishing...' : publishFailed ? 'Publish failed' : undefined);
 
   const displayItemCount = itemCount || postsCount;
-  const [resolvedCover, setResolvedCover] = useState<string | undefined>(coverImage || undefined);
+  const [resolvedCover, setResolvedCover] = useState<string | undefined>(coverImage && coverImage.length > 0 ? coverImage : undefined);
   const [imgLoaded, setImgLoaded] = useState(false);
   useEffect(() => {
     let mounted = true;
     const maybeResolve = async () => {
-      // Optimization: If coverImage is already a signed URL (has query params), use it directly.
-      // This avoids an extra network request on initial load and fixes "barely loaded" issues.
-      if (coverImage && (coverImage.includes('?') || !coverImage.includes('s3'))) {
+      // Guard: skip empty-string coverImage so coverFileId branch is reached
+      if (coverImage && coverImage.length > 0 && (coverImage.includes('?') || !coverImage.includes('s3'))) {
          setResolvedCover(coverImage);
          return;
+      }
+
+      // Handle raw unsigned S3 URLs (contain '.s3.' but no '?' query params)
+      if (coverImage && coverImage.length > 0 && coverImage.includes('.s3.') && !coverImage.includes('?')) {
+        try {
+          const signedUrl = await brandApi.getSignedS3Url(coverImage);
+          if (mounted && signedUrl) setResolvedCover(signedUrl);
+        } catch {
+          if (mounted) setResolvedCover(coverImage);
+        }
+        return;
       }
 
       if (coverFileId) {
@@ -102,6 +113,70 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   useEffect(() => {
     setImgLoaded(false);
   }, [resolvedCover]);
+
+  // ─── Preview images & hover cycling ───────────────────────────────
+  const previewSources = useMemo(() => {
+    const sources: Array<{ src: string | null; fileId: string | null }> = [];
+    const seen = new Set<string>();
+    const push = (src: string | null | undefined, fileId: string | null | undefined) => {
+      const s = typeof src === 'string' && src.length > 0 ? src : null;
+      const f = typeof fileId === 'string' && fileId.length > 0 ? fileId : null;
+      if (!s && !f) return;
+      const key = `${s ?? ''}|${f ?? ''}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      sources.push({ src: s, fileId: f });
+    };
+    (previewImages ?? []).forEach((img) => push(img.url ?? null, img.fileId ?? null));
+    if (sources.length === 0) push(coverImage ?? null, coverFileId ?? null);
+    return sources;
+  }, [previewImages, coverImage, coverFileId]);
+
+  const [hoverFrame, setHoverFrame] = useState(0);
+  const hoverTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    if (previewSources.length <= 1) return;
+    setHoverFrame(0);
+    hoverTimerRef.current = setInterval(() => {
+      setHoverFrame((prev) => (prev + 1) % previewSources.length);
+    }, 1200);
+  }, [previewSources.length]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearInterval(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoverFrame(0);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) clearInterval(hoverTimerRef.current);
+    };
+  }, []);
+
+  const [resolvedHoverSrc, setResolvedHoverSrc] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (previewSources.length <= 1 || hoverFrame === 0) {
+      setResolvedHoverSrc(undefined);
+      return;
+    }
+    let mounted = true;
+    const source = previewSources[hoverFrame];
+    if (source?.src && source.src.length > 0) {
+      setResolvedHoverSrc(source.src);
+    } else if (source?.fileId) {
+      void brandApi.getSignedFileUrl(source.fileId).then((url) => {
+        if (mounted && url) setResolvedHoverSrc(url);
+      });
+    }
+    return () => { mounted = false; };
+  }, [hoverFrame, previewSources]);
+
+  // The image to actually display: hover preview takes priority over resolved cover
+  const displaySrc = resolvedHoverSrc || resolvedCover;
   const [accessOpen, setAccessOpen] = useState(false);
 
   // Compute compact price bands (align with MarketCard)
@@ -203,6 +278,8 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
         isDeleted ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'
       }`}
       onClick={isPublishing || isDeleted ? undefined : onClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {/* Background Media */}
       <div className="relative w-full overflow-hidden">
@@ -232,7 +309,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
             )}
           </div>
         )}
-        {resolvedCover ? (
+        {displaySrc ? (
           <>
             {!imgLoaded && (
               <div className="absolute inset-0 animate-pulse bg-white/10 dark:bg-white/5" />
@@ -240,12 +317,12 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
             
             {/* Check if video based on extension */}
             {(() => {
-              const isVideo = resolvedCover.match(/\.(mp4|webm|mov|m4v)($|\?)/i);
+              const isVideo = displaySrc.match(/\.(mp4|webm|mov|m4v)($|\?)/i);
               if (isVideo) {
                 return (
                   <MediaRenderer
                     kind="video"
-                    src={resolvedCover}
+                    src={displaySrc}
                     controls={false}
                     autoPlay
                     muted
@@ -262,7 +339,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
               return (
                 <MediaRenderer
                   kind="image"
-                  src={resolvedCover}
+                  src={displaySrc}
                   alt={title}
                   fit="contain"
                   maxHeightClassName="max-h-none"
@@ -272,6 +349,19 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
                 />
               );
             })()}
+            {/* Hover preview dots indicator */}
+            {previewSources.length > 1 && (
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1">
+                {previewSources.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
+                      idx === hoverFrame ? 'bg-white scale-125' : 'bg-white/40'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
           </>
           ) : (
             <div className="relative flex min-h-[320px] w-full items-center justify-center glass-panel">

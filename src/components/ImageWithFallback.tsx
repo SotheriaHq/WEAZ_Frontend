@@ -121,6 +121,22 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         return;
       }
 
+      // Handle raw unsigned S3 URLs (contain '.s3.' but no '?' query params)
+      if (src && src.includes('.s3.') && !src.includes('?')) {
+        setLoaded(false);
+        try {
+          const signedUrl = await brandApi.getSignedS3Url(src);
+          if (mounted && signedUrl) {
+            setCachedUrl(src, signedUrl);
+            setResolved(signedUrl);
+          }
+        } catch {
+          // Fall back to raw URL as last resort
+          if (mounted) setResolved(src);
+        }
+        return;
+      }
+
       if (fileId) {
         // Check cache first
         const cachedUrl = getCachedUrl(fileId);
