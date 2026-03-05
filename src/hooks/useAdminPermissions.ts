@@ -3,6 +3,35 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { getStoredAccessToken } from '../api/httpClient';
 
+const PERMISSION_ALIASES: Record<string, string> = {
+  USERS_READ: 'users.read',
+  USERS_WRITE: 'users.update',
+  USERS_DEACTIVATE: 'users.deactivate',
+  USERS_NOTIFY: 'notifications.send',
+  BRANDS_READ: 'brands.read',
+  BRANDS_SUSPEND: 'brands.suspend',
+  BRANDS_STORE_OVERRIDE: 'brands.store_override',
+  PRODUCTS_READ: 'products.read',
+  PRODUCTS_MODERATE: 'products.moderate',
+  COLLECTIONS_READ: 'collections.read',
+  COLLECTIONS_MODERATE: 'collections.moderate',
+  TAXONOMY_READ: 'taxonomy.read',
+  TAXONOMY_WRITE: 'taxonomy.write',
+  TAGS_READ: 'tags.read',
+  TAGS_MODERATE: 'tags.moderate',
+  MEASUREMENTS_READ: 'measurements.read',
+  MEASUREMENTS_REVIEW: 'measurements.review',
+  PAYOUTS_READ: 'payouts.read',
+  PAYOUTS_PROCESS: 'payouts.process',
+  DISPUTES_READ: 'disputes.read',
+  DISPUTES_RESOLVE: 'disputes.resolve',
+  MODERATION_READ: 'moderation.read',
+  MODERATION_REVIEW: 'moderation.write',
+  AUDIT_READ: 'audit.read',
+  SYSTEM_SLA_READ: 'system.sla.read',
+  SYSTEM_SLA_WRITE: 'system.sla.write',
+};
+
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const base64 = token.split('.')[1];
@@ -35,7 +64,8 @@ export function useAdminPermissions() {
   const hasPermission = (code: string): boolean => {
     if (!isAdmin) return false;
     if (isSuperAdmin) return true;
-    return permissions.includes(code);
+    const normalized = PERMISSION_ALIASES[code] ?? code;
+    return permissions.includes(normalized);
   };
 
   return { permissions, isAdmin, isSuperAdmin, hasPermission };

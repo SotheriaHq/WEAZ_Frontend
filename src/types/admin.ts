@@ -29,16 +29,15 @@ export interface AdminUser {
 
 export interface AdminBrand {
   id: string;
-  brandName: string | null;
-  brandFullName: string | null;
-  email: string;
-  isStoreOpen: boolean;
-  status: string;
-  createdAt: string;
-  brand?: {
+  name: string | null;
+  ownerId?: string;
+  isStoreOpen?: boolean;
+  owner?: {
     id: string;
-    name: string | null;
-    isStoreOpen: boolean;
+    email: string;
+    firstName: string;
+    lastName: string;
+    status?: string;
   };
 }
 
@@ -50,7 +49,48 @@ export interface AdminPayout {
   status: 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED';
   reference: string | null;
   createdAt: string;
-  brand?: { id: string; brandName: string };
+  brand?: { id: string; name: string };
+}
+
+export interface AdminProduct {
+  id: string;
+  name: string;
+  description: string | null;
+  brandId: string;
+  isActive: boolean;
+  isFeatured: boolean;
+  price: string;
+  salePrice: string | null;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+  brand?: { id: string; name: string | null };
+}
+
+export interface AdminCollection {
+  id: string;
+  title: string | null;
+  description: string | null;
+  status: string;
+  visibility: string;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+  owner?: { id: string; email: string; firstName: string; lastName: string };
+}
+
+export interface AdminCategory {
+  id: string;
+  name: string;
+  slug?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AdminTagItem {
+  name: string;
+  usageCount: number;
 }
 
 export interface AdminDispute {

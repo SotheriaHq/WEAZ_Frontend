@@ -45,6 +45,8 @@ export interface AuthUserDto {
   isEmailVerified: boolean;
   storeId: string | null;
   isActive: string;
+  status?: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED' | null;
+  mustResetPassword?: boolean;
   createdAt: string;
   updatedAt: string;
 }

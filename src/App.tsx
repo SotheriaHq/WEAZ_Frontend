@@ -67,6 +67,8 @@ const AdminDisputesPage = lazy(() => import('./pages/admin/AdminDisputesPage'));
 const AdminModerationPage = lazy(() => import('./pages/admin/AdminModerationPage'));
 const AdminAuditPage = lazy(() => import('./pages/admin/AdminAuditPage'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'));
+const AdminForceResetPasswordPage = lazy(() => import('./pages/admin/AdminForceResetPasswordPage'));
+const AdminResetPasswordPage = lazy(() => import('./pages/admin/AdminResetPasswordPage'));
 
 /**
  * Root layout component that wraps all routes
@@ -334,6 +336,24 @@ const router = createBrowserRouter([
         path: '/products/:id',
         element: <Layout><ProductDetailsPage /></Layout>,
       },
+      {
+        path: '/admin/reset-password',
+        element: (
+          <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-gray-500 text-sm">Loading reset page...</div>}>
+            <AdminResetPasswordPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/admin/force-reset-password',
+        element: (
+          <RequireAdmin>
+            <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-gray-500 text-sm">Loading reset page...</div>}>
+              <AdminForceResetPasswordPage />
+            </Suspense>
+          </RequireAdmin>
+        ),
+      },
       // ── Admin Console (lazy-loaded, guarded) ──
       {
         path: '/admin',
@@ -358,6 +378,7 @@ const router = createBrowserRouter([
           { path: 'moderation', element: <AdminModerationPage /> },
           { path: 'audit', element: <AdminAuditPage /> },
           { path: 'settings', element: <AdminSettingsPage /> },
+          { path: 'settings/sla', element: <AdminSettingsPage /> },
         ],
       },
       // Catch-all 404 route - must be last

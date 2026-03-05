@@ -2,13 +2,19 @@ import { apiClient } from './httpClient';
 import type {
   AdminUser,
   AdminBrand,
+  AdminProduct,
+  AdminCollection,
   AdminPayout,
   AdminDispute,
   AdminAuditLog,
   AdminSlaConfig,
   FeatureFlag,
   NotificationTemplate,
+  AdminCategory,
+  AdminTagItem,
 } from '../types/admin';
+
+type Paginated<T> = { items: T[]; nextCursor?: string };
 
 // ── Users ──
 export const adminUsersApi = {
@@ -31,19 +37,46 @@ export const adminUsersApi = {
 // ── Brands ──
 export const adminBrandsApi = {
   list: (params?: Record<string, string>) =>
-    apiClient.get<AdminBrand[]>('/admin/brands', { params }),
+    apiClient.get<Paginated<AdminBrand>>('/admin/brands', { params }),
   getById: (id: string) =>
     apiClient.get<AdminBrand>(`/admin/brands/${id}`),
   overrideStoreOpen: (id: string, isOpen: boolean) =>
-    apiClient.patch(`/admin/brands/${id}/store-open`, { isStoreOpen: isOpen }),
+    apiClient.patch(`/admin/brands/${id}/open-close`, { isStoreOpen: isOpen }),
   suspend: (id: string, reason: string) =>
-    apiClient.post(`/admin/brands/${id}/suspend`, { reason }),
+    apiClient.patch(`/admin/brands/${id}/suspend`, { reason }),
+};
+
+// ── Products ──
+export const adminProductsApi = {
+  list: (params?: Record<string, string>) =>
+    apiClient.get<Paginated<AdminProduct>>('/admin/products', { params }),
+  moderate: (id: string, data: { isActive?: boolean; isFeatured?: boolean }) =>
+    apiClient.patch(`/admin/products/${id}/moderate`, data),
+};
+
+// ── Collections ──
+export const adminCollectionsApi = {
+  list: (params?: Record<string, string>) =>
+    apiClient.get<Paginated<AdminCollection>>('/admin/collections', { params }),
+  moderate: (id: string, data: { status?: string; visibility?: 'PUBLIC' | 'PRIVATE' }) =>
+    apiClient.patch(`/admin/collections/${id}/moderate`, data),
+};
+
+// ── Taxonomy ──
+export const adminTaxonomyApi = {
+  listCategories: () => apiClient.get<AdminCategory[]>('/admin/categories'),
+};
+
+// ── Tags ──
+export const adminTagsApi = {
+  list: (limit = 100) => apiClient.get<AdminTagItem[]>('/tags', { params: { limit } }),
+  search: (q: string, limit = 20) => apiClient.get<{ items: AdminTagItem[] }>('/tags/search', { params: { q, limit } }),
 };
 
 // ── Payouts ──
 export const adminPayoutsApi = {
   list: (params?: Record<string, string>) =>
-    apiClient.get<AdminPayout[]>('/admin/payouts', { params }),
+    apiClient.get<AdminPayout[] | Paginated<AdminPayout>>('/admin/payouts', { params }),
   updateStatus: (id: string, status: string) =>
     apiClient.patch(`/admin/payouts/${id}/status`, { status }),
 };
@@ -51,7 +84,7 @@ export const adminPayoutsApi = {
 // ── Disputes ──
 export const adminDisputesApi = {
   list: (params?: Record<string, string>) =>
-    apiClient.get<AdminDispute[]>('/admin/disputes', { params }),
+    apiClient.get<Paginated<AdminDispute>>('/admin/disputes', { params }),
   create: (data: { type: string; reporterId: string; targetType: string; targetId: string; description: string }) =>
     apiClient.post<AdminDispute>('/admin/disputes', data),
   update: (id: string, data: Record<string, unknown>) =>
@@ -71,7 +104,7 @@ export const adminModerationApi = {
 // ── Audit Logs ──
 export const adminAuditApi = {
   list: (params?: Record<string, string>) =>
-    apiClient.get<AdminAuditLog[]>('/admin/audit-logs', { params }),
+    apiClient.get<Paginated<AdminAuditLog>>('/admin/audit-logs', { params }),
 };
 
 // ── SLA Config ──

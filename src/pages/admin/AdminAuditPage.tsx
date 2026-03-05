@@ -16,7 +16,8 @@ const AdminAuditPage: React.FC = () => {
       const params: Record<string, string> = {};
       if (actionFilter) params.action = actionFilter;
       const res = await adminAuditApi.list(params);
-      setLogs(Array.isArray(res.data) ? res.data : []);
+      const data = res.data as { items?: AdminAuditLog[] } | AdminAuditLog[];
+      setLogs(Array.isArray(data) ? data : data.items ?? []);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load audit logs');
     } finally {

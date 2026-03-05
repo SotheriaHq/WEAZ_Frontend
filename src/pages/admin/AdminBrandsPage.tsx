@@ -15,7 +15,8 @@ const AdminBrandsPage: React.FC = () => {
       const params: Record<string, string> = {};
       if (search) params.search = search;
       const res = await adminBrandsApi.list(params);
-      setBrands(Array.isArray(res.data) ? res.data : []);
+      const data = res.data as { items?: AdminBrand[] } | AdminBrand[];
+      setBrands(Array.isArray(data) ? data : data.items ?? []);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load brands');
     } finally {
@@ -58,12 +59,12 @@ const AdminBrandsPage: React.FC = () => {
             <tbody>
               {brands.map((brand) => (
                 <tr key={brand.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/50">
-                  <td className="py-2.5 px-3 font-medium text-gray-900 dark:text-white">{brand.brandFullName || brand.brandName || '—'}</td>
-                  <td className="py-2.5 px-3 text-gray-600 dark:text-gray-400">{brand.email}</td>
+                  <td className="py-2.5 px-3 font-medium text-gray-900 dark:text-white">{brand.name || '—'}</td>
+                  <td className="py-2.5 px-3 text-gray-600 dark:text-gray-400">{brand.owner?.email ?? '—'}</td>
                   <td className="py-2.5 px-3">
-                    {brand.brand?.isStoreOpen ? '🟢 Open' : '🔴 Closed'}
+                    {brand.isStoreOpen ? '🟢 Open' : '🔴 Closed'}
                   </td>
-                  <td className="py-2.5 px-3">{brand.status}</td>
+                  <td className="py-2.5 px-3">{brand.owner?.status ?? '—'}</td>
                   <td className="py-2.5 px-3">
                     <button className="text-primary hover:underline text-xs">View</button>
                   </td>

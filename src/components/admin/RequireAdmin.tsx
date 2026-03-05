@@ -1,12 +1,13 @@
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import type { RootState } from '../store';
+import type { RootState } from '../../store';
 import { useAuth } from '@/context/AuthContext';
 
 const RequireAdmin: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { profile: user } = useSelector((state: RootState) => state.user);
   const { loading } = useAuth();
+  const location = useLocation();
 
   if (!user) {
     return <Navigate to="/login" state={{ from: '/admin' }} replace />;
@@ -23,6 +24,14 @@ const RequireAdmin: React.FC<{ children?: React.ReactNode }> = ({ children }) =>
 
   if (user.role !== 'SuperAdmin' && user.role !== 'Admin') {
     return <Navigate to="/" replace />;
+  }
+
+  if (
+    user.mustResetPassword === true &&
+    location.pathname !== '/admin/force-reset-password' &&
+    location.pathname !== '/admin/reset-password'
+  ) {
+    return <Navigate to="/admin/force-reset-password" replace />;
   }
 
   return children ? <>{children}</> : <Outlet />;

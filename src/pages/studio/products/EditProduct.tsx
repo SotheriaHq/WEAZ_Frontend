@@ -2311,7 +2311,7 @@ const EditProduct: React.FC = () => {
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                         <div className="md:col-span-6">
-                          <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                          <label className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
                             Collection (optional)
                             <InfoTooltip text="Link this product to a Store Collection for grouped merchandising. Products can also exist standalone." />
                           </label>
@@ -2332,7 +2332,7 @@ const EditProduct: React.FC = () => {
                         </div>
 
                         <div className="md:col-span-6">
-                          <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                          <label className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
                             Category
                             <InfoTooltip text="The primary taxonomy category for this product (e.g., Women's Wear, Men's Wear). Helps with discovery and filtering." />
                           </label>
@@ -2354,7 +2354,7 @@ const EditProduct: React.FC = () => {
                         </div>
 
                         <div className="md:col-span-6">
-                          <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                          <label className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
                             Sub-Category
                             <InfoTooltip text="A more specific type within the selected category (e.g., Evening Wear, Casual Tops)." />
                           </label>
@@ -2421,7 +2421,7 @@ const EditProduct: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-2 flex items-center">
+                        <label className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-2 flex items-center">
                           Filters
                           <InfoTooltip text="Select filter dimensions (fabric, occasion, season, etc.) to generate relevant tag suggestions for your product." />
                         </label>
@@ -2434,7 +2434,7 @@ const EditProduct: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                        <label className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
                           Tags
                           <InfoTooltip text="Tags improve discoverability. Add them manually or click suggested tags from the filter selections above." />
                         </label>

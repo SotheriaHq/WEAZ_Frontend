@@ -21,7 +21,8 @@ const AdminDisputesPage: React.FC = () => {
     setError(null);
     try {
       const res = await adminDisputesApi.list();
-      setDisputes(Array.isArray(res.data) ? res.data : []);
+      const data = res.data as { items?: AdminDispute[] } | AdminDispute[];
+      setDisputes(Array.isArray(data) ? data : data.items ?? []);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load disputes');
     } finally {

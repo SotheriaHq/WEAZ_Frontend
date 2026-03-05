@@ -24,7 +24,8 @@ const AdminPayoutsPage: React.FC = () => {
       const params: Record<string, string> = {};
       if (statusFilter) params.status = statusFilter;
       const res = await adminPayoutsApi.list(params);
-      setPayouts(Array.isArray(res.data) ? res.data : []);
+      const data = res.data as { items?: AdminPayout[] } | AdminPayout[];
+      setPayouts(Array.isArray(data) ? data : data.items ?? []);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load payouts');
     } finally {
@@ -73,7 +74,7 @@ const AdminPayoutsPage: React.FC = () => {
               {payouts.map((payout) => (
                 <tr key={payout.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/50">
                   <td className="py-2.5 px-3">{STATUS_EMOJI[payout.status] ?? '⚪'} {payout.status}</td>
-                  <td className="py-2.5 px-3 font-medium">{payout.brand?.brandName ?? payout.brandId}</td>
+                  <td className="py-2.5 px-3 font-medium">{payout.brand?.name ?? payout.brandId}</td>
                   <td className="py-2.5 px-3">{payout.amount}</td>
                   <td className="py-2.5 px-3">{payout.currency}</td>
                   <td className="py-2.5 px-3 text-gray-500">{new Date(payout.createdAt).toLocaleDateString()}</td>
