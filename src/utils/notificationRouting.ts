@@ -33,26 +33,55 @@ export function determineNotificationRoute(notification: NormalizedNotification)
         if (route) return route;
     }
 
+    const payloadCollectionId = typeof payload?.collectionId === 'string' ? payload.collectionId : null;
+    const payloadProductId = typeof payload?.productId === 'string' ? payload.productId : null;
+
+    if (target?.type === 'COLLECTION_MEDIA') {
+        const collectionId = payloadCollectionId || null;
+        if (collectionId) {
+            const commentParam = subTargetId ? `&commentId=${subTargetId}` : '';
+            return `/market?openDesign=${collectionId}&openMedia=${target.id}${commentParam}`;
+        }
+        return `/market?openMedia=${target.id}${subTargetId ? `&commentId=${subTargetId}` : ''}`;
+    }
+
+    if (target?.type === 'COLLECTION' && (type === NotificationTypes.COMMENT || type === NotificationTypes.THREAD || type === NotificationTypes.COLLECTION_UPLOAD)) {
+        const commentParam = subTargetId ? `&commentId=${subTargetId}` : '';
+        return `/market?openDesign=${target.id}${commentParam}`;
+    }
+
+    if (target?.type === 'PRODUCT') {
+        return `/products/${target.id}`;
+    }
+
+    if (!target && payloadProductId) {
+        return `/products/${payloadProductId}`;
+    }
+
+    if (!target && payloadCollectionId && (type === NotificationTypes.COMMENT || type === NotificationTypes.THREAD || type === NotificationTypes.COLLECTION_UPLOAD)) {
+        return `/market?openDesign=${payloadCollectionId}${subTargetId ? `&commentId=${subTargetId}` : ''}`;
+    }
+
     // Fallback: type-specific routing for edge cases
     switch (type) {
         case NotificationTypes.THREAD:
             if (target?.type === 'COLLECTION') {
-                return `/collections/${target.id}`;
+                return `/market?openDesign=${target.id}`;
             }
             if (target?.type === 'POST') {
-                return `/posts/${target.id}`;
+                return '/market';
             }
             return fallbackUrl;
 
         case NotificationTypes.COMMENT:
             if (target?.type === 'COLLECTION' && subTargetId) {
-                return `/collections/${target.id}#comment-${subTargetId}`;
+                return `/market?openDesign=${target.id}&commentId=${subTargetId}`;
             }
             if (target?.type === 'COLLECTION') {
-                return `/collections/${target.id}`;
+                return `/market?openDesign=${target.id}`;
             }
             if (target?.type === 'POST' && subTargetId) {
-                return `/posts/${target.id}#comment-${subTargetId}`;
+                return '/market';
             }
             return fallbackUrl;
 
@@ -62,7 +91,8 @@ export function determineNotificationRoute(notification: NormalizedNotification)
         case NotificationTypes.LOGIN:
         case NotificationTypes.LOGOUT:
         case NotificationTypes.LOGOUT_ALL:
-            return '/settings?tab=notifications';
+        case NotificationTypes.SIGNUP:
+            return '/profile';
 
         case NotificationTypes.PRIVATE_ACCESS_APPROVED:
         case NotificationTypes.CONTRIBUTION_ACCEPTED:

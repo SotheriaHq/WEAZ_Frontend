@@ -106,6 +106,13 @@ export function useCollectionUpload() {
         visibility?: 'PUBLIC' | 'PRIVATE';
         filterValueIds?: string[];
         coverIndex?: number;
+        sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+        rtwSizeSystem?: string;
+        rtwSizeType?: 'PREDEFINED' | 'FREEFORM' | 'MIXED';
+        customGender?: 'MEN' | 'WOMEN' | 'UNISEX';
+        customMeasurementKeys?: string[];
+        fitPreference?: 'SLIM' | 'REGULAR' | 'LOOSE' | 'OVERSIZED';
+        targetAgeGroup?: 'ADULT' | 'CHILD';
       },
       onProgress?: (value: number) => void,
       shouldPublish: boolean = true
@@ -181,6 +188,15 @@ export function useCollectionUpload() {
           filterValueIds: Array.isArray(meta?.filterValueIds)
             ? meta?.filterValueIds
             : undefined,
+          sizingMode: meta?.sizingMode,
+          rtwSizeSystem: meta?.rtwSizeSystem,
+          rtwSizeType: meta?.rtwSizeType,
+          customGender: meta?.customGender,
+          customMeasurementKeys: Array.isArray(meta?.customMeasurementKeys)
+            ? meta.customMeasurementKeys
+            : undefined,
+          fitPreference: meta?.fitPreference,
+          targetAgeGroup: meta?.targetAgeGroup,
         }) as InitializeCollectionResponse & { id?: string };
         const collectionId = init.collectionId ?? init.id;
         if (!collectionId) {

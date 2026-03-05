@@ -26,6 +26,7 @@ export interface WishlistProduct {
     name: string;
     logo?: string;
     currency: string;
+    ownerId?: string;
   };
 }
 
@@ -33,6 +34,24 @@ export interface WishlistItem {
   id: string;
   addedAt: string;
   product: WishlistProduct;
+  availabilityStatus:
+    | 'AVAILABLE'
+    | 'OUT_OF_STOCK'
+    | 'ARCHIVED'
+    | 'DELETED'
+    | 'UNPUBLISHED'
+    | 'STORE_CLOSED'
+    | 'OWN_PRODUCT';
+  availabilityReason:
+    | 'available'
+    | 'out_of_stock'
+    | 'archived'
+    | 'deleted'
+    | 'not_in_store'
+    | 'store_closed'
+    | 'own_product';
+  isAvailable: boolean;
+  canAddToCart: boolean;
 }
 
 export interface WishlistState {
@@ -43,7 +62,6 @@ export interface WishlistState {
   error: string | null;
   // Track wishlisted product IDs for quick lookup
   wishlistedIds: Set<string>;
-  removedItemNotices: Array<{ productId: string; name: string; reason: 'out_of_stock' | 'unavailable' }>;
   priceChangeNotices: Array<{ productId: string; name: string; oldPrice: number; newPrice: number; currency?: string }>;
 }
 
@@ -54,7 +72,6 @@ const initialState: WishlistState = {
   isDrawerOpen: false,
   error: null,
   wishlistedIds: new Set(),
-  removedItemNotices: [],
   priceChangeNotices: [],
 };
 
@@ -91,6 +108,9 @@ export const removeFromWishlist = createAsyncThunk(
       await apiClient.delete(`/store/wishlist/${productId}`);
       return productId;
     } catch (error: any) {
+      if (error?.response?.status === 404) {
+        return productId;
+      }
       return rejectWithValue(error.response?.data?.message || 'Failed to remove from wishlist');
     }
   }
@@ -123,7 +143,6 @@ export const wishlistSlice = createSlice({
       state.isDrawerOpen = !state.isDrawerOpen;
     },
     clearWishlistNotices: (state) => {
-      state.removedItemNotices = [];
       state.priceChangeNotices = [];
     },
     resetWishlistState: () => initialState,
@@ -164,23 +183,6 @@ export const wishlistSlice = createSlice({
             previousByProductId.set(productId, item);
           }
         });
-        const incomingProductIds = new Set(
-          items
-            .map((item) => item?.product?.id)
-            .filter((id): id is string => typeof id === 'string')
-        );
-
-        state.removedItemNotices = previousItems
-          .filter((item) => item?.product?.id && !incomingProductIds.has(item.product.id))
-          .map((item) => ({
-            productId: item.product.id,
-            name: item.product.name,
-            reason:
-              (item.product.totalStock ?? 0) <= 0 || item.product.isOutOfStock
-                ? 'out_of_stock'
-                : 'unavailable',
-          }));
-
         state.priceChangeNotices = items
           .map((item) => {
             const productId = item?.product?.id;
@@ -269,8 +271,6 @@ export const selectWishlistItems = (state: { wishlist: WishlistState }) => state
 export const selectWishlistTotal = (state: { wishlist: WishlistState }) => state.wishlist.total;
 export const selectWishlistIsLoading = (state: { wishlist: WishlistState }) => state.wishlist.isLoading;
 export const selectWishlistIsDrawerOpen = (state: { wishlist: WishlistState }) => state.wishlist.isDrawerOpen;
-export const selectWishlistRemovedItemNotices = (state: { wishlist: WishlistState }) =>
-  state.wishlist.removedItemNotices;
 export const selectWishlistPriceChangeNotices = (state: { wishlist: WishlistState }) =>
   state.wishlist.priceChangeNotices;
 export const selectIsProductWishlisted = (state: { wishlist: WishlistState }, productId: string) =>

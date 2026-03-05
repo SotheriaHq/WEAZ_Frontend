@@ -243,7 +243,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
 
   const handleWishlist = async () => {
     setIsWishlisted((prev) => !prev);
-    toast.success(!isWishlisted ? 'Added to wishlist' : 'Removed from wishlist');
+    toast.success(!isWishlisted ? 'Added to saved items' : 'Removed from saved items');
   };
 
   const handleShare = async () => {

@@ -47,6 +47,7 @@ import { getTagColor } from "@/utils/tagColors";
 import FilterSelector, {
   type FilterSelection,
 } from "@/components/categories/FilterSelector";
+import SizingConfigurator from "@/components/sizing/SizingConfigurator";
 import { PriceChangePreviewModal } from "@/components/collections/PriceChangePreviewModal";
 import {
   getProductPriceChangePreview,
@@ -173,6 +174,59 @@ const areShippingRegionSetsEqual = (a: string[], b: string[]): boolean => {
   return true;
 };
 
+const normalizeFilterSelectionFromProduct = (raw: any): FilterSelection => {
+  if (!raw || typeof raw !== "object") return {};
+
+  const mapSelection = (input: unknown): FilterSelection => {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      return {};
+    }
+    const next: FilterSelection = {};
+    Object.entries(input as Record<string, unknown>).forEach(
+      ([dimensionId, value]) => {
+        if (!dimensionId) return;
+        const values = Array.isArray(value)
+          ? value.filter((item): item is string => typeof item === "string")
+          : [];
+        if (values.length > 0) {
+          next[dimensionId] = Array.from(new Set(values));
+        }
+      },
+    );
+    return next;
+  };
+
+  const directSelection = mapSelection((raw as any).filterSelection);
+  if (Object.keys(directSelection).length > 0) return directSelection;
+
+  const rows = Array.isArray((raw as any).filters)
+    ? ((raw as any).filters as any[])
+    : [];
+  if (rows.length === 0) return {};
+
+  const next: FilterSelection = {};
+  rows.forEach((row) => {
+    const dimensionId =
+      (typeof row?.dimensionId === "string" && row.dimensionId) ||
+      (typeof row?.dimension?.id === "string" && row.dimension.id) ||
+      (typeof row?.filterValue?.dimensionId === "string" &&
+        row.filterValue.dimensionId) ||
+      "";
+    const valueId =
+      (typeof row?.valueId === "string" && row.valueId) ||
+      (typeof row?.filterValueId === "string" && row.filterValueId) ||
+      (typeof row?.filterValue?.id === "string" && row.filterValue.id) ||
+      "";
+    if (!dimensionId || !valueId) return;
+    const current = next[dimensionId] ?? [];
+    if (!current.includes(valueId)) {
+      next[dimensionId] = [...current, valueId];
+    }
+  });
+
+  return next;
+};
+
 // =====================
 // Types
 // =====================
@@ -205,6 +259,11 @@ interface FormState {
   onSale: boolean;
   mediaIds: string[];
   variants: ProductVariant[];
+  sizingMode: "NONE" | "RTW" | "CUSTOM" | "RTW_PLUS_CUSTOM";
+  rtwSizeSystem: string;
+  customMeasurementKeys: string[];
+  fitPreference: "SLIM" | "REGULAR" | "LOOSE" | "OVERSIZED" | "";
+  targetAgeGroup: "ADULT" | "CHILD";
 }
 
 const defaultFormState: FormState = {
@@ -235,6 +294,11 @@ const defaultFormState: FormState = {
   onSale: false,
   mediaIds: [],
   variants: [],
+  sizingMode: "NONE",
+  rtwSizeSystem: "ALPHA",
+  customMeasurementKeys: [],
+  fitPreference: "",
+  targetAgeGroup: "ADULT",
 };
 
 // =====================
@@ -418,6 +482,25 @@ const EditProduct: React.FC = () => {
     [shippingRegions],
   );
 
+  const selectedFilterValueIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          Object.values(filterSelection)
+            .flatMap((values) =>
+              Array.isArray(values)
+                ? values.filter(
+                    (value): value is string =>
+                      typeof value === "string" && value.trim().length > 0,
+                  )
+                : [],
+            )
+            .filter((value) => value.trim().length > 0),
+        ),
+      ),
+    [filterSelection],
+  );
+
   const hasShippingRegionPolicyChanges = useMemo(
     () =>
       !areShippingRegionSetsEqual(
@@ -442,7 +525,9 @@ const EditProduct: React.FC = () => {
     });
   }, []);
 
-  const syncShippingRegions = useCallback(async (): Promise<string | undefined> => {
+  const syncShippingRegions = useCallback(async (
+    options?: { persistPolicy?: boolean },
+  ): Promise<string | undefined> => {
     if (!form.isPhysicalProduct) {
       return undefined;
     }
@@ -451,7 +536,8 @@ const EditProduct: React.FC = () => {
       throw new Error("MISSING_SHIPPING_REGION");
     }
 
-    if (hasShippingRegionPolicyChanges) {
+    const shouldPersistPolicy = options?.persistPolicy ?? true;
+    if (shouldPersistPolicy && hasShippingRegionPolicyChanges) {
       await updateStorePolicies({
         shippingRegions: normalizedShippingRegions.map(toPolicyShippingRegion),
       });
@@ -728,7 +814,19 @@ const EditProduct: React.FC = () => {
                     stock: typeof stock === "number" ? stock : 0,
                   })) as ProductVariant[];
                 })(),
+          sizingMode: (product.sizingMode || "NONE") as FormState["sizingMode"],
+          rtwSizeSystem: product.rtwSizeSystem || "ALPHA",
+          customMeasurementKeys: Array.isArray(product.customMeasurementKeys)
+            ? product.customMeasurementKeys
+            : [],
+          fitPreference:
+            (product.fitPreference as FormState["fitPreference"]) || "",
+          targetAgeGroup:
+            (product.targetAgeGroup as FormState["targetAgeGroup"]) ||
+            "ADULT",
         });
+
+        setFilterSelection(normalizeFilterSelectionFromProduct(product));
 
         // Set media for display - resolve signed URLs
         if (product.media?.length) {
@@ -943,6 +1041,51 @@ const EditProduct: React.FC = () => {
     updateForm("variants", [...form.variants, next]);
   }, [form.variants, updateForm]);
 
+  const addVariantForColor = useCallback(
+    (color: string) => {
+      const next: ProductVariant = {
+        size: "",
+        color,
+        sku: "",
+        price: undefined,
+        stock: 0,
+      };
+      updateForm("variants", [...form.variants, next]);
+    },
+    [form.variants, updateForm],
+  );
+
+  const addMultipleSizesForColor = useCallback(
+    (color: string, sizesStr: string) => {
+      const sizes = sizesStr
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (sizes.length === 0) return;
+      const existing = form.variants.filter(
+        (v) => (v.color ?? "").trim().toLowerCase() === color.trim().toLowerCase(),
+      );
+      const existingSizes = new Set(
+        existing.map((v) => (v.size ?? "").trim().toLowerCase()),
+      );
+      const newVariants = sizes
+        .filter((s) => !existingSizes.has(s.toLowerCase()))
+        .map((size) => ({
+          size,
+          color,
+          sku: "",
+          price: undefined as number | undefined,
+          stock: 0,
+        }));
+      if (newVariants.length === 0) {
+        toast.warning("All sizes already exist for this color");
+        return;
+      }
+      updateForm("variants", [...form.variants, ...newVariants]);
+    },
+    [form.variants, updateForm],
+  );
+
   const updateVariant = useCallback(
     (index: number, patch: Partial<ProductVariant>) => {
       const next = form.variants.map((v, i) =>
@@ -960,6 +1103,46 @@ const EditProduct: React.FC = () => {
     },
     [form.variants, updateForm],
   );
+
+  const removeColorGroup = useCallback(
+    (color: string) => {
+      const next = form.variants.filter(
+        (v) =>
+          (v.color ?? "").trim().toLowerCase() !== color.trim().toLowerCase(),
+      );
+      updateForm("variants", next);
+    },
+    [form.variants, updateForm],
+  );
+
+  /** Group variants by color for the grouped editor view */
+  const variantColorGroups = useMemo(() => {
+    const groups: Array<{
+      stableKey: string;
+      color: string;
+      variants: Array<{ variant: ProductVariant; originalIndex: number }>;
+    }> = [];
+    const colorMap = new Map<string, typeof groups[number]>();
+    form.variants.forEach((v, idx) => {
+      const colorKey = (v.color ?? "").trim().toLowerCase() || "__no_color__";
+      let group = colorMap.get(colorKey);
+      if (!group) {
+        const stableId =
+          typeof v.id === "string" && v.id.trim().length > 0
+            ? v.id
+            : String(idx);
+        group = {
+          stableKey: `group-${stableId}`,
+          color: v.color ?? "",
+          variants: [],
+        };
+        colorMap.set(colorKey, group);
+        groups.push(group);
+      }
+      group.variants.push({ variant: v, originalIndex: idx });
+    });
+    return groups;
+  }, [form.variants]);
 
   const handleAddTag = useCallback(() => {
     const raw = tagInput.trim();
@@ -1167,7 +1350,10 @@ const EditProduct: React.FC = () => {
             brandInitials: brandInitialsFromProfile(user),
             title: form.title,
           });
-        const resolvedCustomsRegion = await syncShippingRegions();
+        const resolvedCustomsRegion = await syncShippingRegions({
+          // Collection flow should not block on store policy updates.
+          persistPolicy: !isCollectionContext,
+        });
 
         const payload: ProductCreateDto = {
           title: effectiveDraft
@@ -1178,6 +1364,7 @@ const EditProduct: React.FC = () => {
           subCategoryId: payloadCategoryTypeId,
           categoryTypeId: payloadCategoryTypeId,
           tags: form.tags,
+          filterValueIds: selectedFilterValueIds,
           price: effectiveDraft
             ? form.price > 0
               ? form.price
@@ -1205,6 +1392,18 @@ const EditProduct: React.FC = () => {
           isPhysicalProduct: form.isPhysicalProduct,
           customsRegion: resolvedCustomsRegion,
           mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
+          sizingMode: form.sizingMode,
+          rtwSizeSystem:
+            form.sizingMode === "RTW" || form.sizingMode === "RTW_PLUS_CUSTOM"
+              ? form.rtwSizeSystem || "ALPHA"
+              : undefined,
+          customMeasurementKeys:
+            form.sizingMode === "CUSTOM" ||
+            form.sizingMode === "RTW_PLUS_CUSTOM"
+              ? form.customMeasurementKeys
+              : [],
+          fitPreference: form.fitPreference || undefined,
+          targetAgeGroup: form.targetAgeGroup,
           variants:
             form.variants.length > 0
               ? form.variants.map((v, idx) => ({
@@ -1259,21 +1458,16 @@ const EditProduct: React.FC = () => {
               }));
             const uploads = normalizePrimary(orderedPending);
 
-            const uploadedIds: string[] = [];
-            for (const u of uploads) {
-              const uploaded = await productApi.uploadProductMedia(
-                created.id,
-                u.file,
-                u.isPrimary,
-              );
-              uploadedIds.push(uploaded.id);
-            }
-
-            if (uploadedIds.length > 0) {
-              await productApi.updateProduct(created.id, {
-                mediaIds: uploadedIds,
-              });
-            }
+            // Upload media in parallel for faster product creation
+            await Promise.all(
+              uploads.map((u) =>
+                productApi.uploadProductMedia(
+                  created.id,
+                  u.file,
+                  u.isPrimary,
+                ),
+              ),
+            );
           }
 
           const successMessage = isCollectionFlow
@@ -1308,6 +1502,7 @@ const EditProduct: React.FC = () => {
     },
     [
       form,
+      selectedFilterValueIds,
       hasDuplicateVariants,
       isEditMode,
       isCollectionFlow,
@@ -1353,7 +1548,9 @@ const EditProduct: React.FC = () => {
         : form.categoryId || undefined;
 
       const payloadCategoryTypeId = form.categoryTypeId || undefined;
-      const resolvedCustomsRegion = await syncShippingRegions();
+      const resolvedCustomsRegion = await syncShippingRegions({
+        persistPolicy: !isCollectionContext,
+      });
 
       const payload: ProductCreateDto = {
         title: effectiveDraft
@@ -1364,6 +1561,7 @@ const EditProduct: React.FC = () => {
         subCategoryId: payloadCategoryTypeId,
         categoryTypeId: payloadCategoryTypeId,
         tags: form.tags,
+        filterValueIds: selectedFilterValueIds,
         price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
         compareAtPrice:
           form.onSale && form.compareAtPrice > 0
@@ -1386,6 +1584,17 @@ const EditProduct: React.FC = () => {
         isPhysicalProduct: form.isPhysicalProduct,
         customsRegion: resolvedCustomsRegion,
         mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
+        sizingMode: form.sizingMode,
+        rtwSizeSystem:
+          form.sizingMode === "RTW" || form.sizingMode === "RTW_PLUS_CUSTOM"
+            ? form.rtwSizeSystem || "ALPHA"
+            : undefined,
+        customMeasurementKeys:
+          form.sizingMode === "CUSTOM" || form.sizingMode === "RTW_PLUS_CUSTOM"
+            ? form.customMeasurementKeys
+            : [],
+        fitPreference: form.fitPreference || undefined,
+        targetAgeGroup: form.targetAgeGroup,
         variants:
           form.variants.length > 0
             ? form.variants.map((v, idx) => ({
@@ -1430,6 +1639,7 @@ const EditProduct: React.FC = () => {
     }
   }, [
     form,
+    selectedFilterValueIds,
     user,
     isCollectionFlow,
     collectionContextId,
@@ -2450,7 +2660,7 @@ const EditProduct: React.FC = () => {
                         onClick={addVariant}
                         className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition"
                       >
-                        + Add Variant
+                        + Add Color Group
                       </button>
                     )}
                   </div>
@@ -2469,137 +2679,185 @@ const EditProduct: React.FC = () => {
                           No variants yet
                         </p>
                         <p className="text-gray-500 text-xs">
-                          Add size, color, or other options for your product
+                          Add a color group, then add multiple sizes to it
                         </p>
                       </div>
                     ) : (
-                      <div
-                        className="overflow-x-auto scrollbar-threadly-strong"
-                        style={{ scrollbarGutter: "stable both-edges" }}
-                      >
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-xs uppercase">
-                            <tr>
-                              <th className="px-4 py-2 font-medium">Color</th>
-                              <th className="px-4 py-2 font-medium">Size</th>
-                              <th className="px-4 py-2 font-medium">Price</th>
-                              <th className="px-4 py-2 font-medium">SKU</th>
-                              <th className="px-4 py-2 font-medium">Stock</th>
-                              <th className="px-4 py-2 font-medium text-right w-20 sticky right-0 bg-gray-50 dark:bg-white/5">
-                                Actions
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200/70 dark:divide-white/5">
-                            {form.variants.map((variant, idx) => (
-                              <tr
-                                key={variant.id || idx}
-                                className="hover:bg-gray-50/70 dark:hover:bg-white/5 transition-colors"
-                              >
-                                <td className="px-4 py-2">
+                      <div className="p-3 space-y-3">
+                        {variantColorGroups.map((group) => {
+                          return (
+                            <div
+                              key={group.stableKey}
+                              className="rounded-lg border border-gray-200/70 dark:border-white/10 overflow-hidden"
+                            >
+                              {/* Color group header */}
+                              <div className="px-3 py-2 bg-gray-50/80 dark:bg-white/5 flex items-center gap-2 justify-between">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <span className="text-[10px] font-semibold uppercase text-gray-500 dark:text-gray-400 shrink-0">
+                                    Color:
+                                  </span>
                                   <Input
                                     type="text"
-                                    value={variant.color ?? ""}
-                                    onChange={(e) =>
-                                      updateVariant(idx, {
-                                        color: e.target.value,
-                                      })
-                                    }
-                                    placeholder="e.g. Black"
-                                    inputSize="sm"
-                                    fullWidth={false}
-                                    className="w-32"
-                                  />
-                                </td>
-                                <td className="px-4 py-2">
-                                  <Input
-                                    type="text"
-                                    list="threadly-size-options"
-                                    value={variant.size ?? ""}
-                                    onChange={(e) =>
-                                      updateVariant(idx, {
-                                        size: e.target.value,
-                                      })
-                                    }
-                                    placeholder="e.g. M"
+                                    value={group.color}
+                                    onChange={(e) => {
+                                      const newColor = e.target.value;
+                                      group.variants.forEach(({ originalIndex }) => {
+                                        updateVariant(originalIndex, {
+                                          color: newColor,
+                                        });
+                                      });
+                                    }}
+                                    placeholder="e.g. Green"
                                     inputSize="sm"
                                     fullWidth={false}
                                     className="w-28"
                                   />
-                                </td>
-                                <td className="px-4 py-2">
-                                  <Input
-                                    type="number"
-                                    value={
-                                      typeof variant.price === "number"
-                                        ? variant.price
-                                        : ""
-                                    }
-                                    onChange={(e) =>
-                                      updateVariant(idx, {
-                                        price:
-                                          e.target.value === ""
-                                            ? undefined
-                                            : Number(e.target.value),
-                                      })
-                                    }
-                                    placeholder={String(form.price || 0)}
-                                    startIcon={
-                                      <span className="text-gray-400 dark:text-zinc-500 text-sm">
-                                        ₦
-                                      </span>
-                                    }
-                                    inputSize="sm"
-                                    fullWidth={false}
-                                    className="w-28"
-                                  />
-                                </td>
-                                <td className="px-4 py-2">
-                                  <Input
-                                    type="text"
-                                    value={variant.sku ?? ""}
-                                    onChange={() => {}}
-                                    placeholder="Auto-generated"
-                                    disabled
-                                    inputSize="sm"
-                                    fullWidth={false}
-                                    className="w-40"
-                                  />
-                                </td>
-                                <td className="px-4 py-2">
-                                  <Input
-                                    type="number"
-                                    value={
-                                      variant.stock === "" as any
-                                        ? ""
-                                        : Number.isFinite(variant.stock) ? variant.stock : ""
-                                    }
-                                    min={0}
-                                    onChange={(e) =>
-                                      updateVariant(idx, {
-                                        stock: e.target.value === "" ? ("" as any) : Number(e.target.value),
-                                      })
-                                    }
-                                    placeholder="0"
-                                    inputSize="sm"
-                                    fullWidth={false}
-                                    className="w-20"
-                                  />
-                                </td>
-                                <td className="px-4 py-2 text-right sticky right-0 bg-gray-50/60 dark:bg-black/20">
+                                  <span className="text-[10px] text-gray-400">
+                                    {group.variants.length} size
+                                    {group.variants.length !== 1 ? "s" : ""}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
                                   <button
                                     type="button"
-                                    onClick={() => removeVariant(idx)}
-                                    className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
-                                    title="Remove"
+                                    onClick={() =>
+                                      addVariantForColor(group.color)
+                                    }
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition"
                                   >
-                                    <X className="w-4 h-4" />
+                                    <Plus className="w-3 h-3" /> Size
                                   </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      removeColorGroup(group.color)
+                                    }
+                                    className="inline-flex items-center justify-center h-6 w-6 rounded-full text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition"
+                                    title="Remove all sizes for this color"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Quick-add sizes */}
+                              <div className="px-3 py-1.5 border-b border-gray-200/50 dark:border-white/5 bg-gray-50/40 dark:bg-white/[0.02]">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-gray-500 shrink-0">
+                                    Quick add:
+                                  </span>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. S, M, L, XL, 6XL"
+                                    className="flex-1 text-xs bg-transparent border-none outline-none text-gray-700 dark:text-gray-300 placeholder:text-gray-400"
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        const input = e.currentTarget;
+                                        addMultipleSizesForColor(
+                                          group.color,
+                                          input.value,
+                                        );
+                                        input.value = "";
+                                      }
+                                    }}
+                                  />
+                                  <span className="text-[9px] text-gray-400 shrink-0">
+                                    Enter to add
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Size rows */}
+                              <div className="divide-y divide-gray-100 dark:divide-white/5">
+                                {group.variants.map(
+                                  ({ variant, originalIndex }) => (
+                                    <div
+                                      key={variant.id || originalIndex}
+                                      className="px-3 py-1.5 flex items-center gap-2 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors"
+                                    >
+                                      <Input
+                                        type="text"
+                                        list="threadly-size-options"
+                                        value={variant.size ?? ""}
+                                        onChange={(e) =>
+                                          updateVariant(originalIndex, {
+                                            size: e.target.value,
+                                          })
+                                        }
+                                        placeholder="Size"
+                                        inputSize="sm"
+                                        fullWidth={false}
+                                        className="w-20"
+                                      />
+                                      <Input
+                                        type="number"
+                                        value={
+                                          typeof variant.price === "number"
+                                            ? variant.price
+                                            : ""
+                                        }
+                                        onChange={(e) =>
+                                          updateVariant(originalIndex, {
+                                            price:
+                                              e.target.value === ""
+                                                ? undefined
+                                                : Number(e.target.value),
+                                          })
+                                        }
+                                        placeholder={String(form.price || 0)}
+                                        startIcon={
+                                          <span className="text-gray-400 dark:text-zinc-500 text-[10px]">
+                                            ₦
+                                          </span>
+                                        }
+                                        inputSize="sm"
+                                        fullWidth={false}
+                                        className="w-24"
+                                      />
+                                      <Input
+                                        type="number"
+                                        value={
+                                          variant.stock === ("" as any)
+                                            ? ""
+                                            : Number.isFinite(variant.stock)
+                                              ? variant.stock
+                                              : ""
+                                        }
+                                        min={0}
+                                        onChange={(e) =>
+                                          updateVariant(originalIndex, {
+                                            stock:
+                                              e.target.value === ""
+                                                ? ("" as any)
+                                                : Number(e.target.value),
+                                          })
+                                        }
+                                        placeholder="Stock"
+                                        inputSize="sm"
+                                        fullWidth={false}
+                                        className="w-16"
+                                      />
+                                      <span className="text-[9px] text-gray-400 truncate flex-1 min-w-0">
+                                        {variant.sku || "auto-SKU"}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          removeVariant(originalIndex)
+                                        }
+                                        className="inline-flex items-center justify-center h-6 w-6 rounded-full text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition shrink-0"
+                                        title="Remove size"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
 
                         <datalist id="threadly-size-options">
                           <option value="XS" />
@@ -2608,10 +2866,14 @@ const EditProduct: React.FC = () => {
                           <option value="L" />
                           <option value="XL" />
                           <option value="XXL" />
+                          <option value="3XL" />
+                          <option value="4XL" />
+                          <option value="5XL" />
+                          <option value="6XL" />
                           <option value="One Size" />
                         </datalist>
 
-                        <div className="px-4 py-3 border-t border-gray-200/70 dark:border-white/5 text-[11px] text-gray-500 dark:text-gray-400 flex items-center justify-between">
+                        <div className="px-3 py-2 text-[11px] text-gray-500 dark:text-gray-400 flex items-center justify-between">
                           <span>
                             Total variant stock:{" "}
                             <span className="text-gray-900 dark:text-gray-200">
@@ -2625,6 +2887,28 @@ const EditProduct: React.FC = () => {
                 </div>
 
                 {/* Inventory & Shipping Grid */}
+                <SizingConfigurator
+                  contentType="product"
+                  sizingMode={form.sizingMode}
+                  onSizingModeChange={(value) => updateForm("sizingMode", value)}
+                  rtwSizeSystem={form.rtwSizeSystem}
+                  onRtwSizeSystemChange={(value) =>
+                    updateForm("rtwSizeSystem", value)
+                  }
+                  customMeasurementKeys={form.customMeasurementKeys}
+                  onCustomMeasurementKeysChange={(keys) =>
+                    updateForm("customMeasurementKeys", keys)
+                  }
+                  fitPreference={form.fitPreference}
+                  onFitPreferenceChange={(value) =>
+                    updateForm("fitPreference", value)
+                  }
+                  targetAgeGroup={form.targetAgeGroup}
+                  onTargetAgeGroupChange={(value) =>
+                    updateForm("targetAgeGroup", value)
+                  }
+                />
+
                 <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
                   <button
                     type="button"

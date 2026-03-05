@@ -1,0 +1,385 @@
+import React, { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import Select from '@/components/ui/Select';
+import { MeasurementPointsApi } from '@/api/MeasurementPointsApi';
+import { useMeasurementPoints } from '@/hooks/useMeasurementPoints';
+import type {
+  AgeGroup,
+  FitPreference,
+  MeasurementPoint,
+  MeasurementPointCategory,
+  SizingMode,
+} from '@/types/sizing';
+
+interface SizingConfiguratorProps {
+  contentType: 'product' | 'design';
+  sizingMode: SizingMode;
+  onSizingModeChange: (value: SizingMode) => void;
+  rtwSizeSystem?: string;
+  onRtwSizeSystemChange: (value: string) => void;
+  customMeasurementKeys: string[];
+  onCustomMeasurementKeysChange: (keys: string[]) => void;
+  fitPreference?: FitPreference | '';
+  onFitPreferenceChange: (value: FitPreference | '') => void;
+  targetAgeGroup: AgeGroup;
+  onTargetAgeGroupChange: (value: AgeGroup) => void;
+  measurementGender?: 'MEN' | 'WOMEN' | 'UNISEX';
+  disabled?: boolean;
+}
+
+const SIZE_SYSTEM_OPTIONS = ['ALPHA', 'US', 'UK', 'EU', 'IT', 'FR', 'AU', 'JP', 'KR'];
+const CATEGORY_OPTIONS: MeasurementPointCategory[] = [
+  'UPPER_BODY',
+  'ARMS',
+  'LOWER_BODY',
+  'LENGTH',
+  'GENERAL',
+  'ACCESSORIES',
+];
+
+export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
+  contentType,
+  sizingMode,
+  onSizingModeChange,
+  rtwSizeSystem,
+  onRtwSizeSystemChange,
+  customMeasurementKeys,
+  onCustomMeasurementKeysChange,
+  fitPreference,
+  onFitPreferenceChange,
+  targetAgeGroup,
+  onTargetAgeGroupChange,
+  measurementGender,
+  disabled = false,
+}) => {
+  const measurementFilter = useMemo(
+    () => (measurementGender ? { gender: measurementGender } : undefined),
+    [measurementGender],
+  );
+  const { points, isLoading } = useMeasurementPoints(measurementFilter);
+  const [freeformLabel, setFreeformLabel] = useState('');
+  const [freeformDescription, setFreeformDescription] = useState('');
+  const [freeformCategory, setFreeformCategory] =
+    useState<MeasurementPointCategory>('GENERAL');
+  const [isSubmittingFreeform, setIsSubmittingFreeform] = useState(false);
+  const [addedPoints, setAddedPoints] = useState<MeasurementPoint[]>([]);
+
+  const modeLabel = contentType === 'design' ? 'Design Sizing Mode' : 'Product Sizing Mode';
+  const customBehaviorHint =
+    contentType === 'design'
+      ? 'Custom/Hybrid on designs is used for custom-order intake and fit communication.'
+      : 'Custom/Hybrid on products requires buyer measurements at add-to-bag.';
+
+  const toggleMeasurementKey = (key: string) => {
+    if (customMeasurementKeys.includes(key)) {
+      onCustomMeasurementKeysChange(customMeasurementKeys.filter((existing) => existing !== key));
+      return;
+    }
+    onCustomMeasurementKeysChange([...customMeasurementKeys, key]);
+  };
+
+  const mergedPoints = useMemo(() => {
+    const map = new Map<string, MeasurementPoint>();
+    for (const point of points) {
+      map.set(point.key, point);
+    }
+    for (const point of addedPoints) {
+      map.set(point.key, point);
+    }
+    return Array.from(map.values());
+  }, [addedPoints, points]);
+
+  /** Points the user has already selected */
+  const selectedPoints = useMemo(() => {
+    const pointsByKey = new Map(mergedPoints.map((point) => [point.key, point]));
+    return customMeasurementKeys.map((key) => {
+      const existing = pointsByKey.get(key);
+      if (existing) return existing;
+
+      const fallbackLabel = key
+        .replace(/^BRAND_[^_]+_/, '')
+        .replace(/_/g, ' ')
+        .trim();
+
+      return {
+        id: key,
+        key,
+        label: fallbackLabel.length > 0 ? fallbackLabel : key,
+        description: null,
+        category: 'GENERAL' as MeasurementPointCategory,
+        gender: measurementGender ?? null,
+        source: 'BRAND_FREEFORM' as const,
+        status: 'BRAND_ONLY' as const,
+        brandId: null,
+        minValueCm: null,
+        maxValueCm: null,
+        minValueChildCm: null,
+        maxValueChildCm: null,
+        sortOrder: 999,
+        isActive: true,
+      } as MeasurementPoint;
+    });
+  }, [mergedPoints, customMeasurementKeys, measurementGender]);
+
+  /** Points the user has NOT yet selected — shown as available chips */
+  const unselectedPoints = useMemo(
+    () => mergedPoints.filter((p) => !customMeasurementKeys.includes(p.key)),
+    [mergedPoints, customMeasurementKeys],
+  );
+
+  const handleAddFreeformPoint = async () => {
+    const label = freeformLabel.trim();
+    const description = freeformDescription.trim();
+
+    if (!label) {
+      toast.error('Enter a measurement label');
+      return;
+    }
+
+    // Client-side duplicate check
+    const existing = mergedPoints.find(
+      (p) => p.label.trim().toLowerCase() === label.toLowerCase(),
+    );
+    if (existing) {
+      // Auto-select the existing point instead of showing an error
+      if (!customMeasurementKeys.includes(existing.key)) {
+        onCustomMeasurementKeysChange([...customMeasurementKeys, existing.key]);
+        toast.info(`"${existing.label}" already exists — selected it for you`);
+      } else {
+        toast.info(`"${existing.label}" is already selected`);
+      }
+      setFreeformLabel('');
+      return;
+    }
+
+    setIsSubmittingFreeform(true);
+    try {
+      const response = await MeasurementPointsApi.submitFreeform({
+        label,
+        description: description || undefined,
+        category: freeformCategory,
+        gender: measurementGender,
+      });
+
+      setAddedPoints((prev) => {
+        if (prev.some((point) => point.key === response.point.key)) return prev;
+        return [...prev, response.point];
+      });
+
+      if (!customMeasurementKeys.includes(response.point.key)) {
+        onCustomMeasurementKeysChange([...customMeasurementKeys, response.point.key]);
+      }
+
+      setFreeformLabel('');
+      setFreeformDescription('');
+      setFreeformCategory('GENERAL');
+
+      toast.success('Custom measurement point added');
+    } catch (error: any) {
+      const message =
+        typeof error?.response?.data?.message === 'string'
+          ? error.response.data.message
+          : 'Failed to add custom measurement point';
+      toast.error(message);
+    } finally {
+      setIsSubmittingFreeform(false);
+    }
+  };
+
+  return (
+    <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4 space-y-4">
+      <div>
+        <h2 className="text-base font-medium text-gray-900 dark:text-white">Sizing</h2>
+        <p className="text-xs text-gray-500 mt-1">{customBehaviorHint}</p>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
+          {modeLabel}
+        </label>
+        <Select
+          value={sizingMode}
+          onChange={(event) => onSizingModeChange(event.target.value as SizingMode)}
+          disabled={disabled}
+        >
+          <option value="NONE">No Sizing</option>
+          <option value="RTW">RTW</option>
+          <option value="CUSTOM">Custom</option>
+          <option value="RTW_PLUS_CUSTOM">RTW + Custom</option>
+        </Select>
+      </div>
+
+      {(sizingMode === 'RTW' || sizingMode === 'RTW_PLUS_CUSTOM') && (
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
+            RTW Size System
+          </label>
+          <Select
+            value={rtwSizeSystem || 'ALPHA'}
+            onChange={(event) => onRtwSizeSystemChange(event.target.value)}
+            disabled={disabled}
+          >
+            {SIZE_SYSTEM_OPTIONS.map((system) => (
+              <option key={system} value={system}>
+                {system}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
+
+      {(sizingMode === 'CUSTOM' || sizingMode === 'RTW_PLUS_CUSTOM') && (
+        <div className="space-y-3">
+          {/* Selected measurement points — compact chips */}
+          {selectedPoints.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
+                Selected Points ({selectedPoints.length})
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedPoints.map((point) => (
+                  <button
+                    key={point.id}
+                    type="button"
+                    onClick={() => toggleMeasurementKey(point.key)}
+                    disabled={disabled}
+                    className="inline-flex items-center gap-1 rounded-full border border-purple-500/60 bg-purple-500/10 px-2.5 py-1 text-[11px] text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 transition"
+                  >
+                    <span className="truncate max-w-[120px]">{point.label}</span>
+                    <span className="text-purple-400 text-[9px]">✕</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Available measurement points — selectable chips */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
+              Available Points
+            </label>
+            <div className="rounded-lg border border-gray-200/70 dark:border-white/10 p-2">
+              {isLoading ? (
+                <p className="text-xs text-gray-500">Loading measurement points...</p>
+              ) : unselectedPoints.length === 0 ? (
+                <p className="text-[11px] text-gray-400">All available points are selected</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {unselectedPoints.map((point) => (
+                    <button
+                      key={point.id}
+                      type="button"
+                      onClick={() => toggleMeasurementKey(point.key)}
+                      disabled={disabled}
+                      className="inline-flex items-center gap-1 rounded-full border border-gray-300/70 dark:border-white/15 bg-white dark:bg-white/5 px-2.5 py-1 text-[11px] text-gray-700 dark:text-gray-300 hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition"
+                    >
+                      <span className="truncate max-w-[120px]">{point.label}</span>
+                      <span className="text-[9px] text-gray-400">
+                        {point.gender === 'MEN' ? '♂' : point.gender === 'WOMEN' ? '♀' : '⚥'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Add Custom Measurement Point — compact form */}
+          <div className="rounded-lg border border-gray-200/70 dark:border-white/10 p-2.5 space-y-2">
+            <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">
+              Add Custom Point
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                value={freeformLabel}
+                onChange={(event) => setFreeformLabel(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleAddFreeformPoint();
+                  }
+                }}
+                disabled={disabled || isSubmittingFreeform}
+                placeholder="Label (e.g. Round Sleeve)"
+                className="flex-1 min-w-[120px] rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-white/5 px-2.5 py-1.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400"
+              />
+              <Select
+                value={freeformCategory}
+                onChange={(event) =>
+                  setFreeformCategory(event.target.value as MeasurementPointCategory)
+                }
+                disabled={disabled || isSubmittingFreeform}
+                fullWidth={false}
+              >
+                {CATEGORY_OPTIONS.map((category) => (
+                  <option key={category} value={category}>
+                    {category.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                value={freeformDescription}
+                onChange={(event) => setFreeformDescription(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleAddFreeformPoint();
+                  }
+                }}
+                disabled={disabled || isSubmittingFreeform}
+                placeholder="Optional description"
+                className="flex-1 min-w-0 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-white/5 px-2.5 py-1.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400"
+              />
+              <button
+                type="button"
+                onClick={handleAddFreeformPoint}
+                disabled={disabled || isSubmittingFreeform}
+                className="inline-flex h-8 items-center justify-center rounded-lg bg-purple-600 px-3 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-60 shrink-0"
+              >
+                {isSubmittingFreeform ? '...' : 'Add'}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400">Press Enter to add quickly</p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
+            Fit Preference
+          </label>
+          <Select
+            value={fitPreference || ''}
+            onChange={(event) => onFitPreferenceChange(event.target.value as FitPreference | '')}
+            disabled={disabled}
+          >
+            <option value="">Not set</option>
+            <option value="SLIM">Slim</option>
+            <option value="REGULAR">Regular</option>
+            <option value="LOOSE">Loose</option>
+            <option value="OVERSIZED">Oversized</option>
+          </Select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
+            Target Age Group
+          </label>
+          <Select
+            value={targetAgeGroup}
+            onChange={(event) => onTargetAgeGroupChange(event.target.value as AgeGroup)}
+            disabled={disabled}
+          >
+            <option value="ADULT">Adult</option>
+            <option value="CHILD">Child</option>
+          </Select>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SizingConfigurator;

@@ -51,6 +51,7 @@ export interface AuthUserDto {
 export interface AuthTokensResponse {
   user: AuthUserDto;
   accessToken?: string | null;
+  refreshToken?: string | null;
   message?: string;
 }
 

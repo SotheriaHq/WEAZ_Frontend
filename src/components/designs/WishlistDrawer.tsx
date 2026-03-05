@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { X, Heart, ShoppingCart, Trash2, Sparkles, ChevronRight, AlertTriangle, AlertCircle } from 'lucide-react';
+import { X, Heart, ShoppingCart, Trash2, Sparkles, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -13,13 +13,12 @@ import {
   selectWishlistTotal,
   selectWishlistIsDrawerOpen,
   selectWishlistIsLoading,
-  selectWishlistRemovedItemNotices,
   selectWishlistPriceChangeNotices,
   clearWishlistNotices,
 } from '@/features/wishlistSlice';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
-import MediaRenderer from '@/components/media/MediaRenderer';
+import ImageWithFallback from '@/components/ImageWithFallback';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 
 const WishlistDrawer: React.FC = () => {
@@ -31,7 +30,6 @@ const WishlistDrawer: React.FC = () => {
   const items = useSelector(selectWishlistItems);
   const total = useSelector(selectWishlistTotal);
   const isLoading = useSelector(selectWishlistIsLoading);
-  const removedItemNotices = useSelector(selectWishlistRemovedItemNotices);
   const priceChangeNotices = useSelector(selectWishlistPriceChangeNotices);
   const user = useSelector((state: RootState) => state.user.profile);
   const isAuthenticated = !!user;
@@ -44,8 +42,17 @@ const WishlistDrawer: React.FC = () => {
 
   useEffect(() => {
     if (isOpen && isAuthenticated) {
-      void dispatch(fetchWishlist({ page: 1, limit: 50 }));
+      void dispatch(fetchWishlist({ page: 1, limit: 200 }));
     }
+  }, [dispatch, isAuthenticated, isOpen]);
+
+  // Periodically refresh while drawer is open to catch availability changes
+  useEffect(() => {
+    if (!isOpen || !isAuthenticated) return;
+    const interval = setInterval(() => {
+      void dispatch(fetchWishlist({ page: 1, limit: 200 }));
+    }, 30_000);
+    return () => clearInterval(interval);
   }, [dispatch, isAuthenticated, isOpen]);
 
   const formatPrice = (price: number, currency: string = 'NGN') =>
@@ -99,7 +106,55 @@ const WishlistDrawer: React.FC = () => {
     return '/profile?tab=Store';
   };
 
-  const handleAddToCart = async (product: any) => {
+  const availabilityCopy = (status?: string) => {
+    switch (status) {
+      case 'OUT_OF_STOCK':
+        return {
+          chip: 'Out of stock',
+          detail: 'This product is out of stock right now.',
+        };
+      case 'ARCHIVED':
+        return {
+          chip: 'Unavailable',
+          detail: 'This product is currently unavailable.',
+        };
+      case 'DELETED':
+        return {
+          chip: 'Deleted',
+          detail: 'This product has been deleted by the brand.',
+        };
+      case 'UNPUBLISHED':
+        return {
+          chip: 'Unavailable',
+          detail: 'This product is no longer available in store.',
+        };
+      case 'STORE_CLOSED':
+        return {
+          chip: 'Store closed',
+          detail: 'This brand store is currently closed.',
+        };
+      case 'OWN_PRODUCT':
+        return {
+          chip: 'Your product',
+          detail: 'You cannot order your own brand product.',
+        };
+      default:
+        return {
+          chip: 'Available',
+          detail: 'Available for checkout.',
+        };
+    }
+  };
+
+  const handleAddToCart = async (item: any) => {
+    const product = item?.product;
+    if (!product) return;
+
+    if (item?.canAddToCart === false) {
+      toast.error(availabilityCopy(item?.availabilityStatus).detail);
+      return;
+    }
+
     if (requiresOptionSelection(product)) {
       dispatch(closeWishlistDrawer());
       navigate(resolveStoreProductRoute(product));
@@ -125,6 +180,8 @@ const WishlistDrawer: React.FC = () => {
   const handleClose = () => {
     dispatch(closeWishlistDrawer());
   };
+
+  const unavailableCount = items.filter((item) => item?.isAvailable === false).length;
 
   const drawerVariants = {
     hidden: { x: '100%', opacity: 0 },
@@ -205,7 +262,7 @@ const WishlistDrawer: React.FC = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
-                  {(removedItemNotices.length > 0 || priceChangeNotices.length > 0) && (
+                  {(unavailableCount > 0 || priceChangeNotices.length > 0) && (
                     <div className="p-4 pb-0">
                       <div className="rounded-2xl border border-amber-200/70 dark:border-amber-700/40 bg-amber-50/70 dark:bg-amber-900/20 p-4">
                         <div className="flex items-start gap-3">
@@ -223,15 +280,11 @@ const WishlistDrawer: React.FC = () => {
                               </button>
                             </div>
 
-                            {removedItemNotices.length > 0 && (
-                              <div className="space-y-1">
-                                {removedItemNotices.map((notice) => (
-                                  <p key={notice.productId} className="text-xs text-amber-800 dark:text-amber-200">
-                                    {notice.name} was removed because it is{' '}
-                                    {notice.reason === 'out_of_stock' ? 'out of stock' : 'no longer available'}.
-                                  </p>
-                                ))}
-                              </div>
+                            {unavailableCount > 0 && (
+                              <p className="text-xs text-amber-800 dark:text-amber-200">
+                                {unavailableCount} saved {unavailableCount === 1 ? 'item is' : 'items are'} currently unavailable.
+                                You can still remove them anytime.
+                              </p>
                             )}
 
                             {priceChangeNotices.length > 0 && (
@@ -284,6 +337,7 @@ const WishlistDrawer: React.FC = () => {
                         const discountPercent = isOnSale
                           ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
                           : 0;
+                        const availability = availabilityCopy(item.availabilityStatus);
 
                         return (
                           <motion.div
@@ -293,94 +347,98 @@ const WishlistDrawer: React.FC = () => {
                             initial="hidden"
                             animate="visible"
                             layout
-                            className="relative group rounded-2xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 p-3 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-300"
+                            className={`relative group rounded-xl border p-2.5 shadow-sm transition-all duration-300 ${
+                              item.isAvailable === false
+                                ? 'bg-gray-50 dark:bg-zinc-900/60 border-gray-200/60 dark:border-white/5'
+                                : 'bg-white dark:bg-zinc-900 border-slate-100 dark:border-white/5 hover:shadow-md'
+                            }`}
                           >
-                            <motion.button
-                              initial={{ opacity: 0.7, scale: 0.95 }}
-                              whileHover={{ scale: 1.1 }}
-                              onClick={() => handleRemoveItem(product.id)}
-                              className="absolute top-3 right-3 z-10 p-2 rounded-full bg-white/90 dark:bg-gray-900/90 text-red-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-lg backdrop-blur-sm"
-                            >
-                              <Trash2 size={14} />
-                            </motion.button>
-
+                            {/* Frosted overlay for unavailable items */}
+                            {item.isAvailable === false && (
+                              <div className="absolute inset-0 z-10 rounded-xl bg-white/50 dark:bg-black/30 backdrop-blur-[1.5px] pointer-events-none" />
+                            )}
                             <div className="flex gap-3">
                               <div
-                                className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl cursor-pointer"
+                                className="relative size-[4.5rem] shrink-0 overflow-hidden rounded-lg cursor-pointer bg-gray-100 dark:bg-zinc-800"
                                 onClick={() => handleViewProduct(product)}
                               >
                                 {product.thumbnail ? (
-                                  <MediaRenderer
-                                    kind="image"
+                                  <ImageWithFallback
                                     src={product.thumbnail}
                                     alt={product.name}
-                                    maxHeightClassName="max-h-24"
-                                    maxWidthClassName="max-w-24"
-                                    className="h-full w-full"
-                                    mediaClassName="h-full w-full object-cover"
+                                    className="h-full w-full object-cover rounded-lg"
                                   />
                                 ) : (
-                                  <div className="h-full w-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center">
+                                  <div className="h-full w-full flex items-center justify-center">
                                     <Heart size={20} className="text-gray-400" />
                                   </div>
                                 )}
 
                                 {isOnSale && (
-                                  <div className="absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-full bg-gradient-to-r from-red-500 to-orange-500 text-white text-[10px] font-bold shadow-lg">
+                                  <div className="absolute top-1 left-1 z-10 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-bold shadow-sm">
                                     -{discountPercent}%
                                   </div>
                                 )}
                               </div>
 
-                              <div className="min-w-0 flex-1 pr-10">
-                                {product.brand?.name && (
-                                  <p className="text-[11px] text-purple-600 dark:text-purple-400 font-medium mb-0.5 truncate">
-                                    {product.brand.name}
-                                  </p>
-                                )}
+                              <div className="min-w-0 flex-1 flex flex-col justify-between py-0.5">
+                                <div>
+                                  <div className="flex justify-between items-start gap-2">
+                                    <div className="min-w-0 flex-1">
+                                      {product.brand?.name && (
+                                        <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium mb-0.5 truncate">
+                                          {product.brand.name}
+                                        </p>
+                                      )}
+                                      <h4
+                                        className="text-sm font-semibold text-gray-900 dark:text-white truncate cursor-pointer hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                                        onClick={() => handleViewProduct(product)}
+                                      >
+                                        {product.name}
+                                      </h4>
+                                    </div>
+                                    <button
+                                      onClick={() => handleRemoveItem(product.id)}
+                                      className="relative z-20 p-1.5 -mt-1 -mr-1 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
+                                      aria-label="Remove from wishlist"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
 
-                                <h4
-                                  className="text-lg font-semibold text-gray-900 dark:text-white line-clamp-1 cursor-pointer hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
-                                  onClick={() => handleViewProduct(product)}
-                                >
-                                  {product.name}
-                                </h4>
-
-                                <div className="flex items-center gap-1.5 mt-1.5 mb-3">
-                                  <span className="text-2xl font-bold text-gray-900 dark:text-white leading-none">
-                                    {formatPrice(product.effectivePrice, product.brand?.currency)}
-                                  </span>
-                                  {isOnSale && (
-                                    <span className="text-xs text-gray-400 line-through">
-                                      {formatPrice(product.price, product.brand?.currency)}
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white leading-none">
+                                      {formatPrice(product.effectivePrice, product.brand?.currency)}
                                     </span>
-                                  )}
+                                    {isOnSale && (
+                                      <span className="text-[10px] text-gray-400 line-through">
+                                        {formatPrice(product.price, product.brand?.currency)}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
 
-                                {product.isOutOfStock && (
-                                  <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/80 text-white text-xs mb-3">
-                                    <AlertTriangle size={12} className="text-orange-400" />
-                                    Out of Stock
-                                  </div>
-                                )}
-
-                                <button
-                                  onClick={() => handleAddToCart(product)}
-                                  disabled={product.isOutOfStock || isLoading}
-                                  className={`w-full py-2.5 px-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 ${
-                                    product.isOutOfStock
-                                      ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
-                                      : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md shadow-purple-500/20 hover:shadow-purple-500/40'
-                                  }`}
-                                >
-                                  <ShoppingCart size={14} />
-                                  {product.isOutOfStock
-                                    ? 'Unavailable'
-                                    : requiresOptionSelection(product)
-                                      ? 'Select Options'
-                                      : 'Add to Cart'}
-                                  {requiresOptionSelection(product) && !product.isOutOfStock && <ChevronRight size={14} />}
-                                </button>
+                                <div className="mt-2 flex items-center gap-2">
+                                  {item.isAvailable === false ? (
+                                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400 text-[10px] font-medium truncate">
+                                      <AlertTriangle size={10} className="shrink-0" />
+                                      <span className="truncate">{availability.chip}</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex-1" /> // spacer
+                                  )}
+                                  
+                                  {item.canAddToCart !== false && (
+                                    <button
+                                      onClick={() => handleAddToCart(item)}
+                                      disabled={isLoading}
+                                      className={`ml-auto shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20 border border-indigo-100 dark:border-indigo-500/20`}
+                                    >
+                                      <ShoppingCart size={12} />
+                                      {requiresOptionSelection(product) ? 'Select Options' : 'Add to Cart'}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </motion.div>

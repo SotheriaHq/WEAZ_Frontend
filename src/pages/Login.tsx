@@ -211,8 +211,6 @@ const LoginPage = () => {
 
       if (accessToken) {
         persistAccessToken(accessToken);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('accessToken');
       }
 
       if (rememberMe) {
@@ -526,7 +524,6 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
-
 
 
 

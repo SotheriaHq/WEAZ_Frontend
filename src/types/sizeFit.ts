@@ -1,6 +1,9 @@
 export type SizeFitVisibility = 'PUBLIC' | 'PRIVATE';
 export type SizeFitSharePolicy = 'OWNER_ONLY' | 'REQUIRE_PERMISSION' | 'ALLOW_ANYONE';
 export type SizeFitShareStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REVOKED';
+export type LengthUnit = 'CM' | 'IN';
+export type WeightUnit = 'KG' | 'LBS';
+export type FitPreference = 'SLIM' | 'REGULAR' | 'LOOSE' | 'OVERSIZED';
 
 export interface SizeFitProfile {
   id: string;
@@ -9,6 +12,11 @@ export interface SizeFitProfile {
   sharePolicy: SizeFitSharePolicy;
   notifyOnShare: boolean;
   requireUpdateEveryDays: number;
+  version: number;
+  preferredLengthUnit: LengthUnit;
+  preferredWeightUnit: WeightUnit;
+  fitPreference: FitPreference | null;
+  label: string;
   measurements: Record<string, unknown>;
   notes: string;
   lastUpdatedAt: string | null;

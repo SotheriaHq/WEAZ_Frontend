@@ -23,11 +23,10 @@ import { getActorDisplayName, normalizeNotification } from '@/utils/notification
 import type { NormalizedNotification } from '@/utils/notificationAdapter';
 import { determineActorRoute, determineNotificationRoute } from '@/utils/notificationRouting';
 import { trackDropdownOpen, trackDropdownClose, trackMarkAllRead } from '@/utils/notificationTelemetry';
-import { NotificationTypes } from '@/types/notificationTypes';
+import { NotificationTypes, getActionText } from '@/types/notificationTypes';
 import { NotificationIcon } from '@/components/notifications/NotificationIcon';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
-import { Bell, Check, Loader2, Settings, Trash2 } from 'lucide-react';
 
 interface Props { 
   open: boolean; 
@@ -220,59 +219,60 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   };
 
 
-  const titleFor = (n: NormalizedNotification): string => {
-    switch (n.type) {
-      case NotificationTypes.ORDER_PLACED:
-        return 'New order received';
-      case NotificationTypes.ORDER_STATUS_UPDATED:
-        return 'Order updated';
-      case NotificationTypes.FOLLOW:
-        return 'New patch';
-      case NotificationTypes.THREAD:
-        return 'New thread';
-      case NotificationTypes.COMMENT:
-        return 'New comment';
-      case NotificationTypes.PATCH:
-        if ((n.payload as any)?.action === 'PROFILE_PATCHED') return 'New patch';
-        if ((n.payload as any)?.action === 'PROFILE_UNPATCHED') return 'Patch removed';
-        return (n.payload as any)?.action === 'COLLECTION_COLLAB' ? 'New collab' : 'Patch update';
-      case NotificationTypes.TAG_MENTION:
-        return 'Tag mention';
-      case NotificationTypes.PRIVATE_ACCESS_REQUESTED:
-        return 'Access request pending';
-      case NotificationTypes.PRIVATE_ACCESS_APPROVED:
-        return 'Access granted';
-      case NotificationTypes.PRIVATE_ACCESS_REJECTED:
-        return 'Access request declined';
-      case NotificationTypes.BRAND_PATCH_REQUEST:
-        return 'Patch request';
-      case NotificationTypes.CONTRIBUTION_REQUEST:
-        return 'Contribution request';
-      case NotificationTypes.PRODUCT_UPLOAD:
-        return 'New product';
-      default:
-        return n.message || 'Notification';
-    }
+  const contentTitleFor = (n: NormalizedNotification): string => {
+    const payload = (n.payload as Record<string, unknown> | undefined) ?? {};
+    const fromTarget = typeof n.target?.preview === 'string' ? n.target.preview.trim() : '';
+    if (fromTarget) return fromTarget;
+
+    const fromPayload =
+      (typeof payload.collectionTitle === 'string' && payload.collectionTitle) ||
+      (typeof payload.collectionName === 'string' && payload.collectionName) ||
+      (typeof payload.productName === 'string' && payload.productName) ||
+      (typeof payload.title === 'string' && payload.title) ||
+      '';
+    if (fromPayload.trim()) return String(fromPayload).trim();
+
+    if (n.target?.type === 'PRODUCT') return 'product';
+    if (n.target?.type === 'COLLECTION' || n.target?.type === 'COLLECTION_MEDIA') return 'design';
+    if (n.target?.type === 'USER') return 'profile';
+
+    return 'content';
   };
 
-  const primaryActionLabel = (n: NormalizedNotification): string | null => {
-    switch (n.type) {
-      case NotificationTypes.ORDER_PLACED:
-      case NotificationTypes.ORDER_STATUS_UPDATED:
-        return 'View Order';
-      case NotificationTypes.FOLLOW:
-        return 'View Profile';
-      case NotificationTypes.PRIVATE_ACCESS_REQUESTED:
-      case NotificationTypes.BRAND_PATCH_REQUEST:
-      case NotificationTypes.CONTRIBUTION_REQUEST:
-        return 'View Request';
-      case NotificationTypes.LOGIN:
-      case NotificationTypes.LOGOUT:
-      case NotificationTypes.LOGOUT_ALL:
-        return 'Security Settings';
-      default:
-        return null;
+  const actionTextFor = (n: NormalizedNotification): string => {
+    const action = getActionText(n.type).trim() || 'updated your';
+    const title = contentTitleFor(n);
+    const payload = (n.payload as Record<string, unknown> | undefined) ?? {};
+
+    const lowerMessage = (n.message || '').toLowerCase();
+    const hasExplicitTitle = lowerMessage.includes(title.toLowerCase());
+    if (hasExplicitTitle && n.message.trim()) {
+      return n.message.trim();
     }
+
+    if (
+      n.type === NotificationTypes.LOGIN ||
+      n.type === NotificationTypes.LOGOUT ||
+      n.type === NotificationTypes.LOGOUT_ALL ||
+      n.type === NotificationTypes.SIGNUP
+    ) {
+      const location = typeof payload.location === 'object' && payload.location
+        ? [
+            (payload.location as Record<string, unknown>).city,
+            (payload.location as Record<string, unknown>).region,
+            (payload.location as Record<string, unknown>).country,
+          ]
+            .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+            .join(', ')
+        : '';
+      if (location) {
+        return `${action} ${location}`;
+      }
+      return action;
+    }
+
+    if (!title) return action;
+    return `${action} ${title}`;
   };
 
   if (!open) return null;
@@ -301,9 +301,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
       <div className="px-4 pt-4 pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="inline-flex min-w-0 items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-[color:var(--brand-primary)]/15 flex items-center justify-center border border-white/20 dark:border-white/10">
-              <Bell className="h-4.5 w-4.5 text-[color:var(--brand-primary)]" aria-hidden="true" />
-            </div>
+            <div className="w-9 h-9 rounded-xl bg-[color:var(--brand-primary)]/15 flex items-center justify-center border border-white/20 dark:border-white/10 text-base" aria-hidden="true">🔔</div>
             <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">
               Notifications {unreadCount > 0 ? `(${unreadCount})` : ''}
             </p>
@@ -314,15 +312,16 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
               disabled={unreadCount === 0}
               className="text-[11px] font-semibold text-[color:var(--brand-primary)] hover:opacity-80 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
             >
-              <Check className="h-3.5 w-3.5" aria-hidden="true" />
+              <span aria-hidden="true">✅</span>
               Read
             </button>
             <button
               onClick={handleSettings}
               className="p-2 rounded-full hover:bg-white/10 transition-colors"
               aria-label="Notification settings"
+              title="Notification settings"
             >
-              <Settings className="h-4 w-4" aria-hidden="true" />
+              <span aria-hidden="true">⚙️</span>
             </button>
           </div>
         </div>
@@ -334,12 +333,11 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         {showLoading && (
           <div className="space-y-2">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="rounded-2xl border border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 backdrop-blur p-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white/50 dark:bg-white/10" />
+              <div key={i} className="rounded-xl border border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 backdrop-blur p-2.5">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-white/50 dark:bg-white/10" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-3 w-2/5 rounded bg-black/10 dark:bg-white/10" />
-                    <div className="h-3 w-4/5 rounded bg-black/10 dark:bg-white/10" />
+                    <div className="h-2.5 w-4/5 rounded bg-black/10 dark:bg-white/10" />
                     <div className="h-2.5 w-1/4 rounded bg-black/10 dark:bg-white/10" />
                   </div>
                 </div>
@@ -351,8 +349,8 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         {/* Empty State */}
         {showEmpty && (
           <div className="rounded-2xl border border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 backdrop-blur p-8 text-center">
-            <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center text-white">
-              <Bell className="h-6 w-6" aria-hidden="true" />
+            <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center text-white text-xl" aria-hidden="true">
+              🔔
             </div>
             <h4 className="mt-4 text-sm font-semibold text-[color:var(--text-primary)]">You're all caught up!</h4>
             <p className="mt-1 text-xs text-[color:var(--text-secondary)]">No new notifications</p>
@@ -373,17 +371,14 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
           <ul className="space-y-2" role="list">
             {normalizedItems.map((n) => {
               const isUnread = !n.isRead;
-              const title = titleFor(n);
-              const detail = n.message;
-              const action = primaryActionLabel(n);
-              const route = determineNotificationRoute(n);
               const actorDisplayName = n.actor ? getActorDisplayName(n) : null;
+              const actionText = actionTextFor(n);
 
               return (
                 <li key={n.id} role="listitem">
                   <div
                     className={
-                      'group rounded-2xl border backdrop-blur p-4 cursor-pointer transition ' +
+                      'group rounded-xl border backdrop-blur p-2.5 cursor-pointer transition ' +
                       (isUnread
                         ? 'border-purple-300/50 dark:border-purple-500/20 bg-purple-50/40 dark:bg-purple-500/5'
                         : 'border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/8')
@@ -401,38 +396,41 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                     }}
                     role="button"
                     tabIndex={0}
-                    aria-label={`${isUnread ? 'Unread' : 'Read'} notification: ${detail}. ${timeAgo(n.createdAt)}`}
+                    aria-label={`${isUnread ? 'Unread' : 'Read'} notification: ${actionText}. ${timeAgo(n.createdAt)}`}
                   >
-                    <div className="flex gap-3">
-                      <div className="w-11 h-11 rounded-2xl bg-[color:var(--brand-primary)]/15 flex items-center justify-center shrink-0 border border-white/20 dark:border-white/10">
-                        <NotificationIcon type={n.type} size="lg" className="text-[color:var(--brand-primary)]" />
+                    <div className="flex gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-[color:var(--brand-primary)]/15 flex items-center justify-center shrink-0 border border-white/20 dark:border-white/10">
+                        <NotificationIcon type={n.type} size="md" className="text-[color:var(--brand-primary)]" />
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-[color:var(--text-primary)] truncate">{title}</p>
-                            {actorDisplayName && (
-                              <button
-                                type="button"
-                                className="mt-1 text-xs font-medium text-[color:var(--brand-primary)] hover:underline underline-offset-2"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void handleActorClick(n);
-                                }}
-                                aria-label={`View ${actorDisplayName}'s profile`}
-                              >
-                                {actorDisplayName}
-                              </button>
-                            )}
-                            <p className="mt-1 text-xs text-[color:var(--text-secondary)] line-clamp-2">{detail}</p>
-                            <p className="mt-2 text-[11px] text-[color:var(--text-secondary)]">{timeAgo(n.createdAt)}</p>
+                            <p className="text-xs text-gray-800 dark:text-gray-200 line-clamp-2 leading-5">
+                              {actorDisplayName ? (
+                                <button
+                                  type="button"
+                                  className="font-semibold text-purple-600 dark:text-purple-400 hover:underline underline-offset-2 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleActorClick(n);
+                                  }}
+                                  aria-label={`View ${actorDisplayName}'s profile`}
+                                >
+                                  @{actorDisplayName}
+                                </button>
+                              ) : (
+                                <span className="font-semibold text-[color:var(--text-primary)]">System</span>
+                              )}
+                              <span className="ml-1">{actionText}</span>
+                            </p>
+                            <p className="mt-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">{timeAgo(n.createdAt)}</p>
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
                             <button
                               type="button"
-                              className="opacity-70 hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
+                              className="opacity-70 hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDelete(n.id);
@@ -440,29 +438,13 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                               aria-label="Delete notification"
                               title="Delete notification"
                             >
-                              <Trash2 className="h-3.5 w-3.5 text-[color:var(--text-secondary)]" aria-hidden="true" />
+                              <span className="text-xs" aria-hidden="true">🗑️</span>
                             </button>
                             {isUnread && (
-                              <div className="w-2 h-2 rounded-full bg-purple-500 mt-1" aria-hidden="true" />
+                              <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1" aria-hidden="true" />
                             )}
                           </div>
                         </div>
-
-                        {action && route !== '/settings?tab=notifications' && (
-                          <div className="mt-3">
-                            <button
-                              className="btn-frost-primary btn-tight-sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMarkRead(n.id);
-                                navigate(route);
-                                onClose();
-                              }}
-                            >
-                              {action}
-                            </button>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -484,7 +466,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         {/* Loading more indicator */}
         {loadingList && items.length > 0 && (
           <div className="pt-2 flex items-center justify-center gap-1 text-xs text-[color:var(--text-secondary)]">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            <span className="animate-pulse" aria-hidden="true">⏳</span>
             Loading...
           </div>
         )}

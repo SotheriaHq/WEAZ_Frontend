@@ -47,6 +47,7 @@ import { MediaProvider, useMediaStore } from "../../hooks/useMediaStore";
 import useCollectionUpload from "../../hooks/useCollectionUpload";
 import { useBrandProfile } from "../../hooks/UseBrandHook";
 import { finalizeCollectionUploads } from "@/api/collectionUploads";
+import SizingConfigurator from "@/components/sizing/SizingConfigurator";
 // ============================================================================
 
 type CategoryTypeOption = { id: string; name: string };
@@ -84,6 +85,19 @@ const CreateDesignInner: React.FC = () => {
   );
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
   const [metadataEditedAt, setMetadataEditedAt] = useState<Date | null>(null);
+  const [sizingMode, setSizingMode] = useState<
+    "NONE" | "RTW" | "CUSTOM" | "RTW_PLUS_CUSTOM"
+  >("NONE");
+  const [rtwSizeSystem, setRtwSizeSystem] = useState<string>("ALPHA");
+  const [customMeasurementKeys, setCustomMeasurementKeys] = useState<string[]>(
+    [],
+  );
+  const [fitPreference, setFitPreference] = useState<
+    "SLIM" | "REGULAR" | "LOOSE" | "OVERSIZED" | ""
+  >("");
+  const [targetAgeGroup, setTargetAgeGroup] = useState<"ADULT" | "CHILD">(
+    "ADULT",
+  );
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -229,6 +243,13 @@ const CreateDesignInner: React.FC = () => {
         setCategoryTypeId((d as any).subCategoryId || d.categoryTypeId || "");
         setType(d.type || "EVERYBODY");
         setVisibility(d.visibility || "PUBLIC");
+        setSizingMode(d.sizingMode || "NONE");
+        setRtwSizeSystem(d.rtwSizeSystem || "ALPHA");
+        setCustomMeasurementKeys(
+          Array.isArray(d.customMeasurementKeys) ? d.customMeasurementKeys : [],
+        );
+        setFitPreference(d.fitPreference || "");
+        setTargetAgeGroup(d.targetAgeGroup || "ADULT");
         setMetadataEditedAt(
           d.metadataEditedAt ? new Date(d.metadataEditedAt) : null,
         );
@@ -573,6 +594,17 @@ const CreateDesignInner: React.FC = () => {
           type,
           visibility,
           filterValueIds: getSelectedFilterValueIds(),
+          sizingMode,
+          rtwSizeSystem:
+            sizingMode === "RTW" || sizingMode === "RTW_PLUS_CUSTOM"
+              ? rtwSizeSystem
+              : null,
+          customMeasurementKeys:
+            sizingMode === "CUSTOM" || sizingMode === "RTW_PLUS_CUSTOM"
+              ? customMeasurementKeys
+              : [],
+          fitPreference: fitPreference || null,
+          targetAgeGroup,
         } as any);
       } else {
         await uploadCollection(
@@ -591,6 +623,17 @@ const CreateDesignInner: React.FC = () => {
             visibility,
             filterValueIds: getSelectedFilterValueIds(),
             coverIndex,
+            sizingMode,
+            rtwSizeSystem:
+              sizingMode === "RTW" || sizingMode === "RTW_PLUS_CUSTOM"
+                ? rtwSizeSystem
+                : undefined,
+            customMeasurementKeys:
+              sizingMode === "CUSTOM" || sizingMode === "RTW_PLUS_CUSTOM"
+                ? customMeasurementKeys
+                : [],
+            fitPreference: fitPreference || undefined,
+            targetAgeGroup,
           },
           undefined,
           false, // shouldPublish = false
@@ -666,6 +709,17 @@ const CreateDesignInner: React.FC = () => {
           visibility,
           coverMediaId: files[coverIndex]?.remoteId || undefined,
           filterValueIds: getSelectedFilterValueIds(),
+          sizingMode,
+          rtwSizeSystem:
+            sizingMode === "RTW" || sizingMode === "RTW_PLUS_CUSTOM"
+              ? rtwSizeSystem
+              : null,
+          customMeasurementKeys:
+            sizingMode === "CUSTOM" || sizingMode === "RTW_PLUS_CUSTOM"
+              ? customMeasurementKeys
+              : [],
+          fitPreference: fitPreference || null,
+          targetAgeGroup,
         } as any);
 
         const currentIds = new Set(files.map((f) => f.id));
@@ -695,6 +749,17 @@ const CreateDesignInner: React.FC = () => {
               categoryTypeId,
               tags: finalTags,
               filterValueIds: getSelectedFilterValueIds(),
+              sizingMode,
+              rtwSizeSystem:
+                sizingMode === "RTW" || sizingMode === "RTW_PLUS_CUSTOM"
+                  ? rtwSizeSystem
+                  : undefined,
+              customMeasurementKeys:
+                sizingMode === "CUSTOM" || sizingMode === "RTW_PLUS_CUSTOM"
+                  ? customMeasurementKeys
+                  : [],
+              fitPreference: fitPreference || undefined,
+              targetAgeGroup,
             },
           },
         );
@@ -720,6 +785,17 @@ const CreateDesignInner: React.FC = () => {
             visibility,
             filterValueIds: getSelectedFilterValueIds(),
             coverIndex,
+            sizingMode,
+            rtwSizeSystem:
+              sizingMode === "RTW" || sizingMode === "RTW_PLUS_CUSTOM"
+                ? rtwSizeSystem
+                : undefined,
+            customMeasurementKeys:
+              sizingMode === "CUSTOM" || sizingMode === "RTW_PLUS_CUSTOM"
+                ? customMeasurementKeys
+                : [],
+            fitPreference: fitPreference || undefined,
+            targetAgeGroup,
           },
         );
         const newCollectionId = extractCollectionId(response);
@@ -1075,14 +1151,11 @@ const CreateDesignInner: React.FC = () => {
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       Design Metadata
                     </p>
-                    <span className="text-[10px] font-medium text-gray-400">
-                      Scroll inside panel
-                    </span>
                   </div>
-                  <div className="max-h-[420px] overflow-y-auto pr-1 sm:pr-2">
+                  <div className="pr-1 sm:pr-2">
                     <div className="space-y-4">
                       <div className="space-y-1">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center">
                           Tell Your Story
                           <InfoTooltip text="Describe the inspiration, mood, and story behind this design. This is visible to buyers browsing the catalog." />
                         </label>
@@ -1157,7 +1230,7 @@ const CreateDesignInner: React.FC = () => {
 
                       {/* Tags Section */}
                       <div className="space-y-3">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center">
                           🏷️ Tags (up to 10)
                           <InfoTooltip text="Tags improve catalog discoverability. Add manually or use filter-driven suggestions. Up to 10 tags per design." />
                         </label>
@@ -1265,7 +1338,7 @@ const CreateDesignInner: React.FC = () => {
           >
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 flex items-center">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 flex items-center">
                   Price Range
                   <InfoTooltip text="An indicative price range for this design. This is NOT a checkout price — it helps buyers understand the expected cost." />
                 </label>
@@ -1352,6 +1425,24 @@ const CreateDesignInner: React.FC = () => {
                   </div>
                 </label>
               </div>
+
+              <SizingConfigurator
+                contentType="design"
+                sizingMode={sizingMode}
+                onSizingModeChange={setSizingMode}
+                rtwSizeSystem={rtwSizeSystem}
+                onRtwSizeSystemChange={setRtwSizeSystem}
+                customMeasurementKeys={customMeasurementKeys}
+                onCustomMeasurementKeysChange={setCustomMeasurementKeys}
+                fitPreference={fitPreference}
+                onFitPreferenceChange={setFitPreference}
+                targetAgeGroup={targetAgeGroup}
+                onTargetAgeGroupChange={setTargetAgeGroup}
+                measurementGender={
+                  type === "MALE" ? "MEN" : type === "FEMALE" ? "WOMEN" : undefined
+                }
+                disabled={disabled}
+              />
             </div>
           </FormSection>
 

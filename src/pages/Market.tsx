@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { RefreshCcw, WifiOff, ServerCrash, SearchX, Sparkles, TrendingUp, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Masonry from 'react-masonry-css';
 import marketApi from '@/api/MarketApi';
+import { brandApi } from '@/api/BrandApi';
 import type { MarketItem } from '@/types/market';
 import DesignCard from '@/components/designs/DesignCard';
 import DesignSkeleton from '@/components/designs/DesignSkeleton';
@@ -229,6 +230,7 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
 
 const Market: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
   const [items, setItems] = useState<MarketItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -246,6 +248,20 @@ const Market: React.FC = () => {
   const [patchMap, setPatchMap] = useState<Record<string, boolean>>({});
   const [patchingIds, setPatchingIds] = useState<Set<string>>(new Set());
   const isRegular = user?.type === 'REGULAR';
+  const openDesignId = searchParams.get('openDesign');
+  const openMediaId = searchParams.get('openMedia');
+
+  const closeViewModal = useCallback(() => {
+    setViewItem(null);
+    if (!searchParams.has('openDesign') && !searchParams.has('openMedia') && !searchParams.has('commentId')) {
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('openDesign');
+    next.delete('openMedia');
+    next.delete('commentId');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const loadFeed = useCallback(async () => {
     // First load shows skeleton; subsequent loads use a soft overlay
@@ -289,6 +305,97 @@ const Market: React.FC = () => {
   useEffect(() => {
     void loadFeed();
   }, [loadFeed]);
+
+  useEffect(() => {
+    const shouldResolveFromRoute = Boolean(openDesignId || openMediaId);
+    if (!shouldResolveFromRoute || loading) return;
+
+    let cancelled = false;
+
+    const toMarketItem = (detail: any, mediaOverrideId?: string | null): MarketItem | null => {
+      if (!detail) return null;
+      const medias = Array.isArray(detail.medias) ? detail.medias : [];
+      const selectedMedia =
+        medias.find((m: any) => m?.id === mediaOverrideId) ||
+        medias.find((m: any) => m?.id === detail.coverMediaId) ||
+        medias[0] ||
+        null;
+
+      if (!selectedMedia) return null;
+
+      const file = selectedMedia.file ?? {};
+      const mediaUrl =
+        (typeof file.s3Url === 'string' && file.s3Url) ||
+        (typeof file.url === 'string' && file.url) ||
+        (typeof selectedMedia.url === 'string' && selectedMedia.url) ||
+        '';
+
+      return {
+        id: String(selectedMedia.id),
+        collectionId: String(detail.id),
+        coverMediaId: detail.coverMediaId ?? null,
+        collectionTitle: String(detail.title ?? 'Design'),
+        collectionDescription: typeof detail.description === 'string' ? detail.description : null,
+        brandId: String(detail.owner?.id ?? ''),
+        brandName: detail.owner?.brand?.brandName ?? detail.owner?.username ?? null,
+        username: detail.owner?.username ?? null,
+        brandLogo: detail.owner?.brand?.logo ?? null,
+        brandLogoFileId: detail.owner?.brand?.logoFileId ?? null,
+        minPrice: typeof detail.minPrice === 'number' ? detail.minPrice : null,
+        maxPrice: typeof detail.maxPrice === 'number' ? detail.maxPrice : null,
+        saleMinPrice: typeof detail.saleMinPrice === 'number' ? detail.saleMinPrice : null,
+        saleMaxPrice: typeof detail.saleMaxPrice === 'number' ? detail.saleMaxPrice : null,
+        saleStartAt: typeof detail.saleStartAt === 'string' ? detail.saleStartAt : null,
+        saleEndAt: typeof detail.saleEndAt === 'string' ? detail.saleEndAt : null,
+        threadsCount: typeof detail.totalThreads === 'number' ? detail.totalThreads : null,
+        commentsCount: typeof detail.commentsCount === 'number' ? detail.commentsCount : null,
+        collectionCollabCount: null,
+        tags: Array.isArray(detail.tags) ? detail.tags : [],
+        media: {
+          fileId: String(file.id ?? selectedMedia.id ?? ''),
+          url: mediaUrl,
+          previewUrl: mediaUrl,
+          type: String(selectedMedia.mediaType ?? file.mimeType ?? 'POST_IMAGE').toUpperCase().includes('VIDEO')
+            ? 'POST_VIDEO'
+            : 'POST_IMAGE',
+          aspectRatio: null,
+          createdAt: null,
+        },
+        isThreaded: false,
+      };
+    };
+
+    const resolveRoutedItem = async () => {
+      const fromFeed = items.find((item) => {
+        if (openMediaId) return item.id === openMediaId;
+        if (openDesignId) return item.collectionId === openDesignId;
+        return false;
+      });
+
+      if (fromFeed) {
+        if (!cancelled) setViewItem(fromFeed);
+        return;
+      }
+
+      if (!openDesignId) return;
+
+      try {
+        const detail = await brandApi.getCollectionDetail(openDesignId, { scope: 'design' });
+        const fallbackItem = toMarketItem(detail, openMediaId);
+        if (!cancelled && fallbackItem) {
+          setViewItem(fallbackItem);
+        }
+      } catch {
+        // Keep current state if lookup fails; user can still browse feed.
+      }
+    };
+
+    void resolveRoutedItem();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items, loading, openDesignId, openMediaId]);
 
   useEffect(() => {
     let mounted = true;
@@ -596,7 +703,7 @@ const Market: React.FC = () => {
       <DesignViewModal
         open={Boolean(viewItem)}
         item={viewItem}
-        onClose={() => setViewItem(null)}
+        onClose={closeViewModal}
         onCommentCountChange={(newCount) => {
           if (viewItem) {
             handleCommentCountChange(viewItem.id, newCount);

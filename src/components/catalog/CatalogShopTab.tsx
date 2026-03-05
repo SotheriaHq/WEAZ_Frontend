@@ -21,6 +21,7 @@ import { brandApi } from '@/api/BrandApi';
 import type { CollectionDto } from '@/types/profile';
 import SearchField from '@/components/SearchField';
 import InlineProductDetail from './InlineProductDetail';
+import InlineStoreCollectionView from './InlineStoreCollectionView';
 import type { RootState } from '@/store';
 import ImageWithFallback from '@/components/ImageWithFallback';
 
@@ -154,17 +155,22 @@ export default function CatalogShopTab({
   
   // Inline product detail state - when set, shows product detail instead of grid
   const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
+  // Inline collection view state — when set, shows collection detail instead of grid
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  // Track navigation context so the back button from product returns correctly
+  const [viewContext, setViewContext] = useState<'store' | 'collection'>('store');
   const requestedProductId = searchParams.get('productId')?.trim() || null;
+  const requestedCollectionId = searchParams.get('collectionId')?.trim() || null;
   const storeView = searchParams.get('storeView') === 'collections' ? 'collections' : 'products';
 
-  // Auto-collapse filters when entering product view, expand when leaving
+  // Auto-collapse filters when entering product/collection view, expand when leaving
   useEffect(() => {
-    if (selectedProduct) {
+    if (selectedProduct || selectedCollectionId) {
       setFiltersCollapsed(true);
     } else {
       setFiltersCollapsed(false);
     }
-  }, [selectedProduct]);
+  }, [selectedProduct, selectedCollectionId]);
 
   useEffect(() => {
     if (!requestedProductId || selectedProduct || loading) return;
@@ -175,11 +181,22 @@ export default function CatalogShopTab({
     }
 
     setSelectedProduct(match);
+    setViewContext('store');
 
     const next = new URLSearchParams(searchParams);
     next.delete('productId');
     setSearchParams(next, { replace: true });
   }, [loading, navigate, products, requestedProductId, searchParams, selectedProduct, setSearchParams]);
+
+  // Deep-link: ?collectionId=xxx opens the inline collection view
+  useEffect(() => {
+    if (!requestedCollectionId || selectedCollectionId) return;
+    setSelectedCollectionId(requestedCollectionId);
+    setViewContext('store');
+    const next = new URLSearchParams(searchParams);
+    next.delete('collectionId');
+    setSearchParams(next, { replace: true });
+  }, [requestedCollectionId, searchParams, selectedCollectionId, setSearchParams]);
 
 
 
@@ -203,7 +220,7 @@ export default function CatalogShopTab({
       if (!brandId) return;
       setCollectionsLoading(true);
       try {
-        const result = await brandApi.getCollections(brandId, { visibility: 'public' });
+        const result = await brandApi.getCollections(brandId, { visibility: 'public', scope: 'store' });
         if (mounted) {
           setCollections(Array.isArray(result) ? result : []);
         }
@@ -414,9 +431,11 @@ export default function CatalogShopTab({
 
   const handleOpenCollection = useCallback(
     (collectionId: string) => {
-      navigate(`/collections/${collectionId}`);
+      setSelectedProduct(null);
+      setSelectedCollectionId(collectionId);
+      setViewContext('store');
     },
-    [navigate],
+    [],
   );
 
   const handleToggleSave = useCallback(
@@ -790,14 +809,37 @@ export default function CatalogShopTab({
           </div>
         </aside>
 
-        {/* Product Grid or Inline Detail */}
+        {/* Product Grid / Inline Collection / Inline Product Detail */}
         <div className="flex-1 min-w-0">
           {selectedProduct ? (
             <div className="w-full">
               <InlineProductDetail
                 product={selectedProduct}
-                onBack={() => setSelectedProduct(null)}
+                onBack={() => {
+                  setSelectedProduct(null);
+                  // If the product was opened from a collection, return to collection view
+                  // Otherwise return to the product grid
+                  if (viewContext !== 'collection') {
+                    setViewContext('store');
+                  }
+                }}
                 brandName={selectedProduct.brand?.name}
+              />
+            </div>
+          ) : selectedCollectionId ? (
+            <div className="w-full">
+              <InlineStoreCollectionView
+                collectionId={selectedCollectionId}
+                onBack={() => {
+                  setSelectedCollectionId(null);
+                  setViewContext('store');
+                }}
+                onViewProduct={(product) => {
+                  setViewContext('collection');
+                  setSelectedProduct(product);
+                }}
+                brandName={undefined}
+                brandId={brandId}
               />
             </div>
           ) : (
@@ -812,7 +854,7 @@ export default function CatalogShopTab({
                 <StoreEmptyState type="no-products" isOwner={isOwner} />
               ) : null}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 sm:gap-5">
                 {loading
                   ? Array.from({ length: 8 }).map((_, idx) => <ProductCardSkeleton key={idx} />)
                   : products.map((p) => (
@@ -820,7 +862,10 @@ export default function CatalogShopTab({
                       key={p.id} 
                       product={p} 
                       isOwnerView={isOwner}
-                      onViewProduct={(product) => setSelectedProduct(product)}
+                      onViewProduct={(product) => {
+                        setViewContext('store');
+                        setSelectedProduct(product);
+                      }}
                     />
                   ))}
               </div>

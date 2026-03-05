@@ -211,8 +211,6 @@ const SignUpPage = () => {
 
       if (accessToken) {
         persistAccessToken(accessToken);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('accessToken');
       }
 
       dispatch(setUser(user));

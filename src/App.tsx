@@ -19,7 +19,7 @@ import { ProfileLayout } from './components/catalog/ProfileLayout';
 import CreateDesignPage from './pages/catalog/CreateDesign';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
-import DesignView from './pages/catalog/DesignView';
+import CollectionRouter from './pages/catalog/CollectionRouter';
 import ErrorPage from './pages/ErrorPage';
 import StudioHome from './pages/studio/StudioHome';
 import EditProduct from './pages/studio/products/EditProduct';
@@ -46,6 +46,7 @@ import StudioScaffold from './components/studio/StudioScaffold';
 import StoreManagement from './pages/studio/store/StoreManagement';
 import StoreCollectionCreate from './pages/studio/store/StoreCollectionCreate';
 import RequireStoreSetup from './components/store/RequireStoreSetup';
+import SizeChartsPage from './pages/size-charts/SizeChartsPage';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { setViewportWidth } from '@/features/uiSlice';
@@ -141,6 +142,7 @@ const router = createBrowserRouter([
           { path: 'history', element: <HistoryPlaceholder /> },
           { path: 'watch-later', element: <WatchLaterPlaceholder /> },
           { path: 'trending', element: <TrendingPlaceholder /> },
+          { path: 'size-charts', element: <SizeChartsPage /> },
           { path: 'settings', element: <SettingsHome /> },
           { path: 'settings/collections', element: <CollectionsSettings /> },
         ],
@@ -310,7 +312,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/collections/:id',
-        element: <DesignView />,
+        element: <CollectionRouter />,
       },
       {
         path: '/products/:id',

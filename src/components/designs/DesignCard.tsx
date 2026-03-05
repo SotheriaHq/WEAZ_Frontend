@@ -204,6 +204,12 @@ export const DesignCard: React.FC<DesignCardProps> = ({
 
   if (isHidden) return null;
 
+  const isCustomAvailable =
+    item.customAvailable === true ||
+    item.sizingMode === 'CUSTOM' ||
+    item.sizingMode === 'RTW_PLUS_CUSTOM' ||
+    (Array.isArray(item.customMeasurementKeys) && item.customMeasurementKeys.length > 0);
+
   const brandAvatar = resolveProfileImageSource({
     brandLogo: item.brandLogo,
     brandLogoFileId: item.brandLogoFileId,
@@ -284,6 +290,11 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                  </span>
                ))}
             </div>
+          )}
+          {isCustomAvailable && (
+            <span className="mt-2 inline-flex items-center rounded-full border border-purple-300/50 bg-purple-500/25 px-2 py-1 text-[10px] font-semibold text-white shadow-md">
+              ✂️ Custom Available
+            </span>
           )}
         </div>
 

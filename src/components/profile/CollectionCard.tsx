@@ -116,18 +116,18 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
 
   // ─── Preview images & hover cycling ───────────────────────────────
   const previewSources = useMemo(() => {
-    const sources: Array<{ src: string | null; fileId: string | null }> = [];
+    const sources: Array<{ src: string | null; fileId: string | null; productName?: string }> = [];
     const seen = new Set<string>();
-    const push = (src: string | null | undefined, fileId: string | null | undefined) => {
+    const push = (src: string | null | undefined, fileId: string | null | undefined, productName?: string) => {
       const s = typeof src === 'string' && src.length > 0 ? src : null;
       const f = typeof fileId === 'string' && fileId.length > 0 ? fileId : null;
       if (!s && !f) return;
       const key = `${s ?? ''}|${f ?? ''}`;
       if (seen.has(key)) return;
       seen.add(key);
-      sources.push({ src: s, fileId: f });
+      sources.push({ src: s, fileId: f, productName });
     };
-    (previewImages ?? []).forEach((img) => push(img.url ?? null, img.fileId ?? null));
+    (previewImages ?? []).forEach((img) => push(img.url ?? null, img.fileId ?? null, (img as any)?.productName));
     if (sources.length === 0) push(coverImage ?? null, coverFileId ?? null);
     return sources;
   }, [previewImages, coverImage, coverFileId]);
@@ -309,7 +309,49 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
             )}
           </div>
         )}
-        {displaySrc ? (
+        {previewSources.length > 1 ? (
+          <>
+            {/* Opacity-based crossfade stack — prevents shaking/layout shift */}
+            {previewSources.map((source, sIdx) => (
+              <div
+                key={`${source.src ?? source.fileId ?? sIdx}`}
+                className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${
+                  sIdx === hoverFrame ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                }`}
+              >
+                <ImageWithFallback
+                  src={source.src}
+                  fileId={source.fileId}
+                  alt={title}
+                  fit="cover"
+                  rounded="none"
+                  containerClassName="h-full w-full"
+                  className="h-full w-full"
+                  fallbackName={title}
+                />
+              </div>
+            ))}
+            {/* Product name overlay */}
+            {previewSources[hoverFrame]?.productName && (
+              <div className="absolute bottom-2 left-3 z-20 max-w-[calc(100%-4rem)]">
+                <span className="inline-block rounded-full bg-white/15 dark:bg-black/25 backdrop-blur-md border border-white/20 dark:border-white/10 px-3 py-1 text-xs font-medium text-white truncate shadow-sm transition-opacity duration-300">
+                  {previewSources[hoverFrame].productName}
+                </span>
+              </div>
+            )}
+            {/* Hover preview dots indicator */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1">
+              {previewSources.map((_, idx) => (
+                <div
+                  key={idx}
+                  className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
+                    idx === hoverFrame ? 'bg-white scale-125' : 'bg-white/40'
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        ) : displaySrc ? (
           <>
             {!imgLoaded && (
               <div className="absolute inset-0 animate-pulse bg-white/10 dark:bg-white/5" />
@@ -349,19 +391,6 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
                 />
               );
             })()}
-            {/* Hover preview dots indicator */}
-            {previewSources.length > 1 && (
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1">
-                {previewSources.map((_, idx) => (
-                  <div
-                    key={idx}
-                    className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
-                      idx === hoverFrame ? 'bg-white scale-125' : 'bg-white/40'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
           </>
           ) : (
             <div className="relative flex min-h-[320px] w-full items-center justify-center glass-panel">

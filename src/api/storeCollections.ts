@@ -1,4 +1,4 @@
-import { apiClient, getStoredAccessToken } from './httpClient';
+import { apiClient } from './httpClient';
 import { unwrapApiResponse } from '../types/auth';
 import { env } from '../config/env';
 
@@ -83,6 +83,7 @@ export async function finalizeStoreCollection(
       subCategoryId?: string;
       categoryTypeId?: string;
       tags?: string[];
+      filterValueIds?: string[];
       isAvailableInStore?: boolean;
     };
   }
@@ -109,23 +110,15 @@ export async function abandonStoreCollection(
   const shouldUseKeepalive = options?.keepalive === true;
 
   if (shouldUseKeepalive && typeof window !== 'undefined' && typeof fetch === 'function') {
-    const token = getStoredAccessToken();
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
     try {
       void fetch(buildStoreCollectionUrl(`/store-collections/${collectionId}`), {
         method: 'DELETE',
-        headers,
         credentials: 'include',
         keepalive: true,
       });
       if (shouldPermanentlyDelete) {
         void fetch(buildStoreCollectionUrl(`/store-collections/${collectionId}/permanent`), {
           method: 'DELETE',
-          headers,
           credentials: 'include',
           keepalive: true,
         });

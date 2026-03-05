@@ -438,8 +438,8 @@ html {
   }
 
   .media-intrinsic {
-    /* Image/video scales to fit within max constraints while maintaining aspect ratio */
-    @apply block w-auto h-auto max-w-full;
+    /* Image/video fills container width; height scales proportionally */
+    @apply block w-full h-auto max-w-full;
     /* height determined by max-h-* passed to MediaRenderer */
   }
 }

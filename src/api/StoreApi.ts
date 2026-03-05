@@ -32,6 +32,16 @@ export interface Product {
   totalStock: number;
   lowStockThreshold: number;
   tags: string[];
+  filterValueIds?: string[];
+  filterSelection?: Record<string, string[]>;
+  filters?: Array<{
+    dimensionId: string;
+    dimensionSlug: string;
+    dimensionName: string;
+    valueId: string;
+    valueSlug: string;
+    valueName: string;
+  }>;
   gender: 'MALE' | 'FEMALE' | 'EVERYBODY';
   isActive: boolean;
   isFeatured: boolean;
@@ -39,6 +49,15 @@ export interface Product {
   threadsCount: number;
   createdAt: string;
   updatedAt: string;
+  categoryId?: string;
+  categoryTypeId?: string;
+  subCategoryId?: string;
+  categoryType?: {
+    id: string;
+    categoryId: string;
+    slug: string;
+    name: string;
+  };
   collection?: {
     id: string;
     name: string;
@@ -70,10 +89,26 @@ export interface CartItem {
 
 export interface WishlistItem {
   id: string;
-  userId: string;
-  productId: string;
-  createdAt: string;
+  addedAt: string;
   product: Product;
+  availabilityStatus?:
+    | 'AVAILABLE'
+    | 'OUT_OF_STOCK'
+    | 'ARCHIVED'
+    | 'DELETED'
+    | 'UNPUBLISHED'
+    | 'STORE_CLOSED'
+    | 'OWN_PRODUCT';
+  availabilityReason?:
+    | 'available'
+    | 'out_of_stock'
+    | 'archived'
+    | 'deleted'
+    | 'not_in_store'
+    | 'store_closed'
+    | 'own_product';
+  isAvailable?: boolean;
+  canAddToCart?: boolean;
 }
 
 export interface OrderItem {
@@ -192,7 +227,11 @@ export const getProductById = async (productId: string): Promise<Product> => {
 export const getFeaturedProducts = async (brandId: string, limit = 6): Promise<Product[]> => {
   const res = await apiClient.get(`/store/brands/${brandId}/products?isFeatured=true&limit=${limit}`);
   const data = extractData<PaginatedResponse<Product>>(res);
-  return data.data;
+  return Array.isArray((data as any)?.items)
+    ? ((data as any).items as Product[])
+    : Array.isArray(data as any)
+      ? ((data as any) as Product[])
+      : [];
 };
 
 // ============= Cart API =============

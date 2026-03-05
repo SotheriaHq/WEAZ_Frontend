@@ -101,11 +101,15 @@ const normalizeCartPayload = (payload: Partial<CartState> | null | undefined): C
   };
 };
 
+// Helper: unwrap NestJS TransformInterceptor response wrapper
+// The interceptor wraps responses as { statusCode, message, data: actualPayload }
+const unwrapResponse = (responseData: any) => responseData?.data ?? responseData;
+
 // Async thunks
 export const fetchCart = createAsyncThunk('cart/fetchCart', async (_, { rejectWithValue }) => {
   try {
     const response = await apiClient.get('/store/cart');
-    return response.data;
+    return unwrapResponse(response.data);
   } catch (error: any) {
     return rejectWithValue(error.response?.data?.message || 'Failed to fetch cart');
   }
@@ -114,14 +118,44 @@ export const fetchCart = createAsyncThunk('cart/fetchCart', async (_, { rejectWi
 export const addToCart = createAsyncThunk(
   'cart/addToCart',
   async (
-    payload: { productId: string; quantity?: number; selectedSize?: string; selectedColor?: string },
+    payload: {
+      productId: string;
+      quantity?: number;
+      selectedSize?: string;
+      selectedColor?: string;
+      sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+      sizeFitData?: Record<string, any>;
+      requiredMeasurementKeys?: string[];
+    },
     { rejectWithValue }
   ) => {
     try {
       const response = await apiClient.post('/store/cart', payload);
-      return response.data;
+      return unwrapResponse(response.data);
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to add to cart');
+      const serverMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to add to cart';
+
+      if (
+        typeof serverMessage === 'string' &&
+        serverMessage.toLowerCase().includes('missing required measurements') &&
+        payload?.productId
+      ) {
+        try {
+          await apiClient.post('/store/wishlist', { productId: payload.productId });
+          return rejectWithValue(
+            'Required measurements are incomplete. We saved this item to your wishlist. Update your measurements in your profile, then add to bag again.',
+          );
+        } catch {
+          return rejectWithValue(
+            'Required measurements are incomplete. Update your measurements in your profile before adding to bag.',
+          );
+        }
+      }
+
+      return rejectWithValue(serverMessage);
     }
   }
 );
@@ -133,7 +167,7 @@ export const updateCartItem = createAsyncThunk(
       const response = await apiClient.patch(`/store/cart/${payload.itemId}`, {
         quantity: payload.quantity,
       });
-      return response.data;
+      return unwrapResponse(response.data);
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to update cart');
     }
@@ -145,7 +179,7 @@ export const removeFromCart = createAsyncThunk(
   async (itemId: string, { rejectWithValue }) => {
     try {
       const response = await apiClient.delete(`/store/cart/${itemId}`);
-      return response.data;
+      return unwrapResponse(response.data);
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to remove from cart');
     }

@@ -50,13 +50,14 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const dialogRef = React.useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const fallbackMedia: ModalMedia | null = item
-    ? {
-        id: item.id,
-        type: item.media?.type?.toUpperCase().includes('VIDEO') ? 'POST_VIDEO' : 'POST_IMAGE',
-        url: item.media?.url || '',
-      }
-    : null;
+  const fallbackMedia = React.useMemo<ModalMedia | null>(() => {
+    if (!item) return null;
+    return {
+      id: item.id,
+      type: item.media?.type?.toUpperCase().includes('VIDEO') ? 'POST_VIDEO' : 'POST_IMAGE',
+      url: item.media?.url || '',
+    };
+  }, [item?.id, item?.media?.type, item?.media?.url]);
 
   const activeMedia = mediaItems[activeMediaIndex] ?? fallbackMedia;
   const activeMediaId = activeMedia?.id ?? item?.id ?? null;
@@ -151,10 +152,15 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     };
   }, [open, item?.collectionId, item?.id, fallbackMedia]);
 
+  const onCommentCountChangeRef = React.useRef(onCommentCountChange);
+  React.useEffect(() => {
+    onCommentCountChangeRef.current = onCommentCountChange;
+  }, [onCommentCountChange]);
+
   React.useEffect(() => {
     if (!open) return;
-    onCommentCountChange?.(commentCount);
-  }, [commentCount, onCommentCountChange, open]);
+    onCommentCountChangeRef.current?.(commentCount);
+  }, [commentCount, open]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -320,7 +326,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
       } else {
         await apiClient.post('/saved', { targetType: 'COLLECTION_MEDIA', targetId: activeMediaId });
         setIsSaved(true);
-        toast.success('Saved to your wishlist.');
+        toast.success('Saved to your saved items.');
       }
     } catch {
       toast.error('Unable to update saved items.');
@@ -365,17 +371,16 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           </button>
 
           <div className="grid md:grid-cols-[minmax(0,55%)_minmax(0,45%)] max-h-[90vh]">
-            <div className="relative h-[82vh] md:h-[90vh] min-w-0 overflow-hidden bg-transparent">
+            <div className="relative h-[82vh] md:h-[90vh] min-w-0 overflow-y-auto overflow-x-hidden no-scrollbar bg-white/5 dark:bg-black/20 backdrop-blur-xl">
               <MediaRenderer
                 kind={activeMedia?.type === 'POST_VIDEO' ? 'video' : 'image'}
                 src={activeMedia?.url || ''}
-                fit="cover"
-                className="h-full w-full"
-                mediaClassName="h-full w-full object-cover"
-                maxHeightClassName="max-h-full"
-                maxWidthClassName="max-w-full"
-                allowScroll={false}
-                controls={false}
+                fit="contain" // Override MediaRenderer's default cover constraints
+                className="h-auto min-h-full w-full"
+                mediaClassName="w-full h-auto min-h-full object-cover"
+                maxHeightClassName="" // remove max-h
+                allowScroll={true}
+                controls={true}
               />
 
               {loadingMedia ? (
@@ -415,16 +420,16 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               ) : null}
             </div>
 
-            <div className="h-[82vh] md:h-[90vh] min-w-0 p-4 md:p-5 bg-white/65 dark:bg-[#0f0b11]/70 text-slate-900 dark:text-white flex flex-col">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-3">
+            <div className="h-[82vh] md:h-[90vh] min-w-0 p-3.5 md:p-4 bg-white/65 dark:bg-[#0f0b11]/70 text-slate-900 dark:text-white flex flex-col">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-3 pr-8">
                   <button
                     type="button"
                     onClick={handleOpenBrandCatalog}
                     className="flex min-w-0 items-center gap-3 text-left"
                     title={`Open ${brandLabel} catalog`}
                   >
-                    <div className="size-12 shrink-0 rounded-full overflow-hidden ring-2 ring-white/70 dark:ring-white/15">
+                    <div className="size-10 shrink-0 rounded-full overflow-hidden ring-2 ring-white/70 dark:ring-white/15">
                       <ImageWithFallback
                         src={avatar.src}
                         fileId={avatar.fileId}
@@ -432,8 +437,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                         fit="cover"
                         rounded="full"
                         fallbackName={avatarFallback}
-                        containerClassName="size-12 rounded-full"
-                        className="size-12 object-cover"
+                        containerClassName="size-10 rounded-full"
+                        className="size-10 object-cover"
                       />
                     </div>
                     <div className="min-w-0">
@@ -495,7 +500,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     type="button"
                     onClick={handleToggleSave}
                     disabled={saveBusy}
-                    title={isOwnBrandContent ? 'Brands cannot save their own products' : 'Save to wishlist'}
+                    title={isOwnBrandContent ? 'Brands cannot save their own products' : 'Save item'}
                     className="rounded-md px-2.5 py-1.5 bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold hover:bg-rose-200 transition dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-700/40 disabled:opacity-60"
                   >
                     <span className="inline-flex items-center gap-1">

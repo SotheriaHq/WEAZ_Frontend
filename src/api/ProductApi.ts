@@ -42,6 +42,9 @@ function buildStoreProductPayload(data: Partial<ProductCreateDto>) {
     payload.salePrice = data.compareAtPrice;
 
   if (Array.isArray(data.tags)) payload.tags = data.tags;
+  if (Array.isArray(data.filterValueIds)) {
+    payload.filterValueIds = data.filterValueIds;
+  }
 
   // Extra metadata fields now supported by backend
   if (data.sku !== undefined) payload.sku = data.sku;
@@ -66,6 +69,19 @@ function buildStoreProductPayload(data: Partial<ProductCreateDto>) {
     payload.metaDescription = data.metaDescription;
   if ((data as any).publishAt !== undefined)
     payload.publishAt = (data as any).publishAt;
+
+  if (data.sizingMode !== undefined) payload.sizingMode = data.sizingMode;
+  if (data.rtwSizeSystem !== undefined)
+    payload.rtwSizeSystem = data.rtwSizeSystem;
+  if (data.rtwSizeType !== undefined) payload.rtwSizeType = data.rtwSizeType;
+  if (data.customGender !== undefined) payload.customGender = data.customGender;
+  if (Array.isArray(data.customMeasurementKeys)) {
+    payload.customMeasurementKeys = data.customMeasurementKeys;
+  }
+  if (data.fitPreference !== undefined)
+    payload.fitPreference = data.fitPreference;
+  if (data.targetAgeGroup !== undefined)
+    payload.targetAgeGroup = data.targetAgeGroup;
 
   // Variants mapping (store schema uses arrays + sizeStock map)
   if (Array.isArray(data.variants) && data.variants.length > 0) {
@@ -139,6 +155,7 @@ export interface ProductCreateDto {
   /** @deprecated Use subCategoryId */
   categoryTypeId?: string;
   tags?: string[];
+  filterValueIds?: string[];
   price: number;
   compareAtPrice?: number;
   costPerItem?: number;
@@ -163,6 +180,13 @@ export interface ProductCreateDto {
   metaDescription?: string;
   publishAt?: string;
   isActive?: boolean;
+  sizingMode?: "NONE" | "RTW" | "CUSTOM" | "RTW_PLUS_CUSTOM";
+  rtwSizeSystem?: string;
+  rtwSizeType?: "PREDEFINED" | "FREEFORM" | "MIXED";
+  customGender?: "MEN" | "WOMEN" | "UNISEX";
+  customMeasurementKeys?: string[];
+  fitPreference?: "SLIM" | "REGULAR" | "LOOSE" | "OVERSIZED";
+  targetAgeGroup?: "ADULT" | "CHILD";
 }
 
 export interface ProductDto {
@@ -176,6 +200,16 @@ export interface ProductDto {
   /** @deprecated Use subCategoryId */
   categoryTypeId?: string;
   tags?: string[];
+  filterValueIds?: string[];
+  filterSelection?: Record<string, string[]>;
+  filters?: Array<{
+    dimensionId: string;
+    dimensionSlug: string;
+    dimensionName: string;
+    valueId: string;
+    valueSlug: string;
+    valueName: string;
+  }>;
   price: number;
   compareAtPrice?: number;
   costPerItem?: number;
@@ -201,6 +235,14 @@ export interface ProductDto {
   mediaIds?: string[];
   media?: Array<{ id: string; url: string; type: string; isPrimary?: boolean }>;
   variants?: ProductVariant[];
+  sizes?: string[];
+  sizingMode?: "NONE" | "RTW" | "CUSTOM" | "RTW_PLUS_CUSTOM";
+  rtwSizeSystem?: string;
+  rtwSizeType?: "PREDEFINED" | "FREEFORM" | "MIXED";
+  customGender?: "MEN" | "WOMEN" | "UNISEX";
+  customMeasurementKeys?: string[];
+  fitPreference?: "SLIM" | "REGULAR" | "LOOSE" | "OVERSIZED";
+  targetAgeGroup?: "ADULT" | "CHILD";
   isPhysicalProduct?: boolean;
   customsRegion?: string;
   isFeatured?: boolean;
@@ -242,6 +284,33 @@ export interface ProductListResponse {
   limit: number;
   totalPages: number;
   hasNextPage: boolean;
+}
+
+export interface BulkDeleteProductsResponse {
+  requestedCount: number;
+  deletedCount: number;
+  failedCount: number;
+  successIds: string[];
+  failures: Array<{ productId: string; message: string }>;
+  message: string;
+}
+
+export interface BulkArchiveProductsResponse {
+  requestedCount: number;
+  archivedCount: number;
+  failedCount: number;
+  successIds: string[];
+  failures: Array<{ productId: string; message: string }>;
+  message: string;
+}
+
+export interface BulkUnpublishProductsResponse {
+  requestedCount: number;
+  unpublishedCount: number;
+  failedCount: number;
+  successIds: string[];
+  failures: Array<{ productId: string; message: string }>;
+  message: string;
 }
 
 // =====================
@@ -324,6 +393,59 @@ export const productApi = {
   },
 
   /**
+   * Bulk delete products (soft delete)
+   */
+  async bulkDeleteProducts(
+    productIds: string[],
+    options?: { cancelPendingOrders?: boolean },
+  ): Promise<BulkDeleteProductsResponse> {
+    try {
+      const response = await apiClient.post(`/products/bulk/delete`, {
+        productIds,
+        cancelPendingOrders: options?.cancelPendingOrders === true,
+      });
+      return unwrapApiResponse<BulkDeleteProductsResponse>(response.data);
+    } catch (error) {
+      console.error("Failed to bulk delete products", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Bulk archive products
+   */
+  async bulkArchiveProducts(
+    productIds: string[],
+  ): Promise<BulkArchiveProductsResponse> {
+    try {
+      const response = await apiClient.post(`/products/bulk/archive`, {
+        productIds,
+      });
+      return unwrapApiResponse<BulkArchiveProductsResponse>(response.data);
+    } catch (error) {
+      console.error("Failed to bulk archive products", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Bulk unpublish products
+   */
+  async bulkUnpublishProducts(
+    productIds: string[],
+  ): Promise<BulkUnpublishProductsResponse> {
+    try {
+      const response = await apiClient.post(`/products/bulk/unpublish`, {
+        productIds,
+      });
+      return unwrapApiResponse<BulkUnpublishProductsResponse>(response.data);
+    } catch (error) {
+      console.error("Failed to bulk unpublish products", error);
+      throw error;
+    }
+  },
+
+  /**
    * Permanently delete a product (hard delete)
    */
   async permanentlyDeleteProduct(productId: string): Promise<void> {
@@ -397,16 +519,45 @@ export const productApi = {
    * Unarchive/restore a product
    */
   async unarchiveProduct(productId: string): Promise<ProductDto> {
-    try {
-      const response = await apiClient.post<{
-        status: string;
-        data: ProductDto;
-      }>(`/products/${productId}/unarchive`);
-      return response.data?.data ?? (response.data as unknown as ProductDto);
-    } catch (error) {
-      console.error("Failed to unarchive product", error);
-      throw error;
+    const attempts: Array<{
+      method: "post" | "patch";
+      url: string;
+    }> = [
+      { method: "post", url: `/products/${productId}/unarchive` },
+      { method: "post", url: `/store/products/${productId}/unarchive` },
+      { method: "patch", url: `/products/${productId}/unarchive` },
+      { method: "patch", url: `/store/products/${productId}/unarchive` },
+    ];
+
+    let lastError: unknown = new Error("Failed to unarchive product");
+
+    for (const attempt of attempts) {
+      try {
+        const response =
+          attempt.method === "post"
+            ? await apiClient.post<{
+                status: string;
+                data: ProductDto;
+              }>(attempt.url)
+            : await apiClient.patch<{
+                status: string;
+                data: ProductDto;
+              }>(attempt.url, {});
+
+        return response.data?.data ?? (response.data as unknown as ProductDto);
+      } catch (error: any) {
+        lastError = error;
+        const status = error?.response?.status;
+        // Retry only for route/method mismatches across environments.
+        if (status !== 404 && status !== 405) {
+          console.error("Failed to unarchive product", error);
+          throw error;
+        }
+      }
     }
+
+    console.error("Failed to unarchive product", lastError);
+    throw lastError;
   },
 
   /**

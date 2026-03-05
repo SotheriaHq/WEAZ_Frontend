@@ -1,4 +1,4 @@
-import { ArrowLeft, ShoppingBag, Heart, Share2, Star } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, Heart, Share2, Star, Check } from 'lucide-react';
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'sonner';
@@ -6,13 +6,35 @@ import type { StoreProduct } from '@/components/designs/StoreProductCard';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import ImageLightbox from './ImageLightbox';
 import type { AppDispatch, RootState } from '@/store';
-import { addToCart, openCartDrawer } from '@/features/cartSlice';
+import { addToCart } from '@/features/cartSlice';
 
 interface InlineProductDetailProps {
   product: StoreProduct;
   onBack: () => void;
   brandName?: string;
 }
+
+// Color name to hex mapping
+const COLOR_HEX_MAP: Record<string, string> = {
+  'Black': '#000000',
+  'White': '#FFFFFF',
+  'Navy': '#1E3A5F',
+  'Indigo': '#4F46E5',
+  'Red': '#DC2626',
+  'Green': '#16A34A',
+  'Yellow': '#EAB308',
+  'Purple': '#9333EA',
+  'Orange': '#EA580C',
+  'Blue': '#2563EB',
+  'Pink': '#EC4899',
+  'Brown': '#92400E',
+  'Gray': '#6B7280',
+  'Burgundy': '#800020',
+  'Teal': '#14B8A6',
+  'Gold': '#D4AF37',
+  'Black/Gold': 'linear-gradient(135deg, #000000 50%, #D4AF37 50%)',
+  'Multi': 'linear-gradient(135deg, #EC4899, #8B5CF6, #3B82F6, #10B981)',
+};
 
 export default function InlineProductDetail({
   product,
@@ -111,7 +133,7 @@ export default function InlineProductDetail({
           selectedColor: selectedColor || undefined,
         }),
       ).unwrap();
-      dispatch(openCartDrawer());
+      // Drawer opens automatically via addToCart.fulfilled in cartSlice
       toast.success('Added to bag');
     } catch (error: any) {
       toast.error(error || 'Failed to add to bag');
@@ -135,7 +157,7 @@ export default function InlineProductDetail({
         <div className="space-y-4">
           {/* Main Image */}
           <div 
-            className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-white/10 dark:to-white/5 border border-gray-200/70 dark:border-white/10 cursor-zoom-in group"
+            className="relative w-full overflow-hidden rounded-2xl cursor-zoom-in group"
             onClick={() => productImages.length > 0 && setLightboxOpen(true)}
           >
             {currentImage ? (
@@ -144,8 +166,9 @@ export default function InlineProductDetail({
                 fileId={!currentImage.url.startsWith('http') ? currentImage.id : undefined}
                 alt={product.name}
                 fit="contain"
-                className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
-                containerClassName="w-full h-full"
+                maxHeightClassName="max-h-[85vh]"
+                className="block w-full h-auto max-h-[85vh] max-w-full"
+                containerClassName="w-full"
                 rounded="xl"
               />
             ) : (
@@ -254,22 +277,37 @@ export default function InlineProductDetail({
           {/* Color Selection */}
           {colors.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Color</h3>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                  Color {selectedColor && <span className="font-normal text-gray-500 dark:text-gray-400">— {selectedColor}</span>}
+                </span>
+              </div>
               <div className="flex flex-wrap gap-2">
-                {colors.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setSelectedColor(color === selectedColor ? null : color)}
-                    className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
-                      selectedColor === color
-                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300'
-                        : 'border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-300'
-                    }`}
-                  >
-                    {color}
-                  </button>
-                ))}
+                {colors.map((color) => {
+                  const colorStyle = COLOR_HEX_MAP[color] || '#9CA3AF';
+                  const isGradient = colorStyle.includes('gradient');
+                  
+                  return (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setSelectedColor(color === selectedColor ? null : color)}
+                      className={`w-10 h-10 rounded-full border-2 transition-all relative ${
+                        selectedColor === color
+                          ? 'border-purple-500 ring-2 ring-purple-500/30 scale-110'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-purple-400'
+                      }`}
+                      style={{
+                        background: isGradient ? colorStyle : colorStyle,
+                      }}
+                      title={color}
+                    >
+                      {selectedColor === color && (
+                        <Check size={16} className={`absolute inset-0 m-auto ${color === 'White' || color === 'Yellow' ? 'text-gray-900' : 'text-white'}`} />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

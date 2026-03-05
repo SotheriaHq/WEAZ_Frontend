@@ -41,6 +41,8 @@ export const NotificationTypes = {
   SIZE_FIT_SHARE_APPROVED: 'SIZE_FIT_SHARE_APPROVED',
   SIZE_FIT_SHARE_REJECTED: 'SIZE_FIT_SHARE_REJECTED',
   SIZE_FIT_RESHARED: 'SIZE_FIT_RESHARED',
+  WISHLIST_PRODUCT_UNAVAILABLE: 'WISHLIST_PRODUCT_UNAVAILABLE',
+  WISHLIST_PRODUCT_AVAILABLE: 'WISHLIST_PRODUCT_AVAILABLE',
 } as const;
 
 export type NotificationType =
@@ -62,6 +64,7 @@ export type NotificationIconKey =
   | 'comment'
   | 'patch'
   | 'tag'
+  | 'heart'
   | 'collab'
   | 'access'
   | 'approved'
@@ -103,7 +106,7 @@ export const NotificationRegistry: Record<
     actionKey: 'notification.action.thread',
     iconKey: 'thread',
     routePattern: (t) =>
-      t?.type === 'COLLECTION' ? `/collections/${t.id}` : null,
+        t?.type === 'COLLECTION' ? `/market?openDesign=${t.id}` : null,
     defaultAriaAction: 'View threaded content',
     trackingCategory: 'engagement',
   },
@@ -113,7 +116,7 @@ export const NotificationRegistry: Record<
     iconKey: 'comment',
     routePattern: (t, sub) =>
       t?.type === 'COLLECTION'
-        ? `/collections/${t.id}${sub ? `#comment-${sub}` : ''}`
+          ? `/market?openDesign=${t.id}${sub ? `&commentId=${sub}` : ''}`
         : null,
     defaultAriaAction: 'View comment',
     trackingCategory: 'engagement',
@@ -243,7 +246,7 @@ export const NotificationRegistry: Record<
     actionText: 'signed in from',
     actionKey: 'notification.action.login',
     iconKey: 'security',
-    routePattern: () => '/settings?tab=notifications',
+    routePattern: () => '/profile',
     defaultAriaAction: 'View security settings',
     trackingCategory: 'security',
   },
@@ -251,7 +254,7 @@ export const NotificationRegistry: Record<
     actionText: 'signed out from',
     actionKey: 'notification.action.logout',
     iconKey: 'logout',
-    routePattern: () => '/settings?tab=notifications',
+    routePattern: () => '/profile',
     defaultAriaAction: 'View security settings',
     trackingCategory: 'security',
   },
@@ -259,7 +262,7 @@ export const NotificationRegistry: Record<
     actionText: 'signed out from all devices',
     actionKey: 'notification.action.logout_all',
     iconKey: 'security',
-    routePattern: () => '/settings?tab=notifications',
+    routePattern: () => '/profile',
     defaultAriaAction: 'View security settings',
     trackingCategory: 'security',
   },
@@ -267,7 +270,7 @@ export const NotificationRegistry: Record<
     actionText: 'Welcome! Account created',
     actionKey: 'notification.action.signup',
     iconKey: 'celebrate',
-    routePattern: () => '/settings?tab=account',
+    routePattern: () => '/profile',
     defaultAriaAction: 'View profile settings',
     trackingCategory: 'security',
   },
@@ -292,7 +295,7 @@ export const NotificationRegistry: Record<
     actionKey: 'notification.action.collection_upload',
     iconKey: 'upload',
     routePattern: (t) =>
-      t?.type === 'COLLECTION' ? `/collections/${t.id}` : null,
+      t?.type === 'COLLECTION' ? `/market?openDesign=${t.id}` : null,
     defaultAriaAction: 'View collection',
     trackingCategory: 'content',
   },
@@ -360,6 +363,22 @@ export const NotificationRegistry: Record<
     routePattern: () => '/profile',
     defaultAriaAction: 'View reshare activity',
     trackingCategory: 'order',
+  },
+  [NotificationTypes.WISHLIST_PRODUCT_UNAVAILABLE]: {
+    actionText: 'A product on your wishlist is currently unavailable',
+    actionKey: 'notification.action.wishlist_product_unavailable',
+    iconKey: 'heart',
+    routePattern: () => '/profile?tab=Store',
+    defaultAriaAction: 'View wishlist',
+    trackingCategory: 'engagement',
+  },
+  [NotificationTypes.WISHLIST_PRODUCT_AVAILABLE]: {
+    actionText: 'A product on your wishlist is available again',
+    actionKey: 'notification.action.wishlist_product_available',
+    iconKey: 'heart',
+    routePattern: () => '/profile?tab=Store',
+    defaultAriaAction: 'View wishlist',
+    trackingCategory: 'engagement',
   },
 };
 

@@ -9,6 +9,7 @@ interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   isDestructive?: boolean;
+  isLoading?: boolean;
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }
@@ -20,6 +21,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   isDestructive = false,
+  isLoading = false,
   onConfirm,
   onCancel,
 }) => {
@@ -54,20 +56,22 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <div className="flex justify-end gap-2">
             <button
               onClick={onCancel}
-              className="px-3 py-1.5 rounded-md text-sm font-medium neu-modal-inset text-[color:var(--neu-text)]"
+              disabled={isLoading}
+              className="px-3 py-1.5 rounded-md text-sm font-medium neu-modal-inset text-[color:var(--neu-text)] disabled:opacity-60"
             >
               {cancelText}
             </button>
             <button
               onClick={onConfirm}
               autoFocus
-              className={`px-3 py-1.5 rounded-md text-sm font-semibold text-white ${
+              disabled={isLoading}
+              className={`px-3 py-1.5 rounded-md text-sm font-semibold text-white disabled:opacity-70 ${
                 isDestructive
-                  ? 'bg-red-600 hover:bg-red-700'
-                  : 'bg-black dark:bg-white dark:text-black hover:opacity-90'
+                  ? 'bg-[color:var(--status-danger,#dc2626)] hover:bg-[color:var(--status-danger-strong,#b91c1c)]'
+                  : 'bg-[color:var(--brand-primary)] hover:bg-[color:var(--brand-primary-strong)]'
               }`}
             >
-              {confirmText}
+              {isLoading ? 'Processing...' : confirmText}
             </button>
           </div>
         </div>

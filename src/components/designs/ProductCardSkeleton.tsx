@@ -25,16 +25,14 @@ const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({
   const SkeletonCard = ({ index }: { index: number }) => (
     <div 
       className="
-        flex flex-col
-        bg-white dark:bg-zinc-900/80
+        relative
         rounded-2xl
-        border border-gray-100 dark:border-white/[0.08]
-        shadow-sm
         overflow-hidden
+        aspect-[4/5]
       "
     >
-      {/* Image skeleton - 4:5 aspect ratio to match product card */}
-      <div className="relative aspect-[4/5] bg-gray-100 dark:bg-zinc-800/50 overflow-hidden">
+      {/* Full-bleed image skeleton */}
+      <div className="absolute inset-0 bg-gray-100 dark:bg-zinc-800/50 overflow-hidden">
         {/* Shimmer effect */}
         <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/10 to-transparent" />
         
@@ -47,32 +45,27 @@ const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({
         )}
       </div>
       
-      {/* Product info skeleton */}
-      <div className="flex flex-col gap-3 p-4">
-        {/* Title - 2 lines */}
-        <div className="space-y-2">
-          <div className="h-4 w-full bg-gray-200 dark:bg-zinc-700 rounded-md" />
-          <div className="h-4 w-2/3 bg-gray-200 dark:bg-zinc-700 rounded-md" />
-        </div>
-        
-        {/* Price */}
-        <div className="flex items-center gap-2">
-          <div className="h-5 w-24 bg-gray-200 dark:bg-zinc-700 rounded-md" />
-          <div className="h-4 w-16 bg-gray-100 dark:bg-zinc-800 rounded-md" />
-        </div>
-        
-        {/* Sizes text */}
-        <div className="h-3 w-28 bg-gray-100 dark:bg-zinc-800 rounded" />
-        
-        {/* Stats row with divider */}
-        <div className="flex items-center gap-4 pt-3 border-t border-gray-100 dark:border-white/5">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-gray-200 dark:bg-zinc-700" />
-            <div className="w-6 h-3 bg-gray-200 dark:bg-zinc-700 rounded" />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-gray-200 dark:bg-zinc-700" />
-            <div className="w-6 h-3 bg-gray-200 dark:bg-zinc-700 rounded" />
+      {/* Frosted glass info overlay skeleton */}
+      <div
+        className="
+          absolute inset-x-0 bottom-0 z-10
+          backdrop-blur-xl
+          bg-black/30
+          border-t border-white/10
+          p-3
+        "
+      >
+        <div className="flex flex-col gap-2">
+          {/* Title */}
+          <div className="h-4 w-3/4 bg-white/20 rounded-md" />
+          {/* Brand name */}
+          <div className="h-3 w-1/2 bg-white/15 rounded-md" />
+          {/* Price */}
+          <div className="h-4 w-20 bg-white/20 rounded-md" />
+          {/* Stock + action row */}
+          <div className="flex items-center justify-between mt-1">
+            <div className="h-3 w-16 bg-white/15 rounded" />
+            <div className="w-8 h-8 rounded-lg bg-white/15" />
           </div>
         </div>
       </div>

@@ -11,6 +11,8 @@ interface ImageWithFallbackProps {
   fit?: 'contain' | 'cover';
   className?: string;
   containerClassName?: string;
+  /** Override the max-height constraint. Default: 'max-h-[70vh]' */
+  maxHeightClassName?: string;
   rounded?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
   fallbackName?: string;
   draggable?: boolean;
@@ -90,6 +92,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   fit = 'contain',
   className,
   containerClassName,
+  maxHeightClassName,
   rounded = 'md',
   fallbackName,
   draggable: _draggable = false,
@@ -187,7 +190,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           onLoad={() => setLoaded(true)}
           className={containerClassName}
           mediaClassName={`transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${className ?? ''}`}
-          maxHeightClassName="max-h-[70vh]"
+          maxHeightClassName={maxHeightClassName ?? 'max-h-[70vh]'}
           maxWidthClassName="max-w-full"
         />
       )}

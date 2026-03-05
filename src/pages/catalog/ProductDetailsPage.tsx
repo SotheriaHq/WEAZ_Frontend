@@ -8,17 +8,41 @@ import {
   Truck, 
   ShieldCheck,
   ChevronRight,
+  Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
-// import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
+import { addToWishlist, checkWishlistStatus, removeFromWishlist } from '@/features/wishlistSlice';
 import { productApi } from '@/api/ProductApi';
 import type { ProductDto } from '@/api/ProductApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { formatPrice } from '@/utils/helpers';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
+import { SizeFitApi } from '@/api/SizeFitApi';
+
+// Color name to hex mapping
+const COLOR_HEX_MAP: Record<string, string> = {
+  'Black': '#000000',
+  'White': '#FFFFFF',
+  'Navy': '#1E3A5F',
+  'Indigo': '#4F46E5',
+  'Red': '#DC2626',
+  'Green': '#16A34A',
+  'Yellow': '#EAB308',
+  'Purple': '#9333EA',
+  'Orange': '#EA580C',
+  'Blue': '#2563EB',
+  'Pink': '#EC4899',
+  'Brown': '#92400E',
+  'Gray': '#6B7280',
+  'Burgundy': '#800020',
+  'Teal': '#14B8A6',
+  'Gold': '#D4AF37',
+  'Black/Gold': 'linear-gradient(135deg, #000000 50%, #D4AF37 50%)',
+  'Multi': 'linear-gradient(135deg, #EC4899, #8B5CF6, #3B82F6, #10B981)',
+};
 
 // Helper component to render signed media
 function SignedMediaItem({ 
@@ -86,8 +110,8 @@ function SignedMediaItem({
       alt={alt}
       fit="contain"
       className={className}
-      mediaClassName="block h-auto w-auto"
-      maxHeightClassName="max-h-[78vh]"
+      mediaClassName="block w-full h-auto"
+      maxHeightClassName="max-h-[85vh]"
       maxWidthClassName="max-w-full"
     />
   );
@@ -127,6 +151,8 @@ export default function ProductDetailsPage() {
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((s: RootState) => s.user.profile);
+  const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
   const [product, setProduct] = useState<ProductDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +160,8 @@ export default function ProductDetailsPage() {
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>('');
+  const [measurementValues, setMeasurementValues] = useState<Record<string, string>>({});
+  const [wishlistBusy, setWishlistBusy] = useState(false);
   
   // Fetch product
   useEffect(() => {
@@ -193,6 +221,87 @@ export default function ProductDetailsPage() {
     return Array.from(new Set(variants.map(v => v.size).filter(Boolean))) as string[];
   }, [variants]);
 
+  const availableSizes = useMemo(() => {
+    if (sizes.length > 0) return sizes;
+    if (Array.isArray(product?.sizes)) {
+      return product.sizes.filter(
+        (size): size is string => typeof size === 'string' && size.trim().length > 0,
+      );
+    }
+    return [] as string[];
+  }, [product?.sizes, sizes]);
+
+  const sizingMode = useMemo(() => {
+    const raw = product?.sizingMode;
+    if (raw === 'RTW' || raw === 'CUSTOM' || raw === 'RTW_PLUS_CUSTOM') return raw;
+    return 'NONE' as const;
+  }, [product?.sizingMode]);
+
+  const requiredMeasurementKeys = useMemo(() => {
+    if (!Array.isArray(product?.customMeasurementKeys)) return [];
+    return product.customMeasurementKeys.filter(
+      (key): key is string => typeof key === 'string' && key.trim().length > 0,
+    );
+  }, [product?.customMeasurementKeys]);
+
+  const requiresRtwSelection =
+    (sizingMode === 'RTW' || sizingMode === 'RTW_PLUS_CUSTOM') && availableSizes.length > 0;
+  const isCustomAvailable =
+    sizingMode === 'CUSTOM' ||
+    sizingMode === 'RTW_PLUS_CUSTOM' ||
+    requiredMeasurementKeys.length > 0;
+  const requiresMeasurements =
+    isCustomAvailable && requiredMeasurementKeys.length > 0;
+
+  useEffect(() => {
+    if (!product?.id || !isAuth) return;
+    dispatch(checkWishlistStatus(product.id));
+  }, [dispatch, isAuth, product?.id]);
+
+  useEffect(() => {
+    let active = true;
+    const hydrateMeasurements = async () => {
+      if (!isAuth || requiredMeasurementKeys.length === 0) return;
+      try {
+        const profile = await SizeFitApi.getMyProfile();
+        if (!active) return;
+        const profileMeasurements =
+          profile?.measurements && typeof profile.measurements === 'object'
+            ? (profile.measurements as Record<string, unknown>)
+            : {};
+
+        setMeasurementValues((prev) => {
+          const next = { ...prev };
+          requiredMeasurementKeys.forEach((key) => {
+            if (next[key] && next[key].trim().length > 0) return;
+            const raw = profileMeasurements[key];
+            if (typeof raw === 'number' && Number.isFinite(raw)) {
+              next[key] = String(raw);
+              return;
+            }
+            if (typeof raw === 'object' && raw && 'value' in (raw as Record<string, unknown>)) {
+              const nested = (raw as { value?: unknown }).value;
+              if (typeof nested === 'number' && Number.isFinite(nested)) {
+                next[key] = String(nested);
+              }
+            }
+          });
+          return next;
+        });
+      } catch {
+      }
+    };
+
+    void hydrateMeasurements();
+
+    return () => {
+      active = false;
+    };
+  }, [isAuth, requiredMeasurementKeys]);
+
+    (sizingMode === 'CUSTOM' || sizingMode === 'RTW_PLUS_CUSTOM') &&
+    requiredMeasurementKeys.length > 0;
+
   const currentPrice = useMemo(() => {
     if (!product) return 0;
     const variant = variants.find(v => 
@@ -218,7 +327,7 @@ export default function ProductDetailsPage() {
     );
   }
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return;
     if (isOwnProduct || isStudioStoreView) {
       toast.info('You cannot add your own product to bag.');
@@ -237,18 +346,82 @@ export default function ProductDetailsPage() {
        return;
     }
 
-    dispatch(addToCart({
-      productId: product.id,
-      quantity: 1,
-      selectedSize: variant?.size || selectedSize,
-      selectedColor: variant?.color || selectedColor
-    }));
-    dispatch(openCartDrawer());
-    toast.success('Added to bag');
+    if (requiresRtwSelection && !selectedSize && !variant?.size) {
+      toast.error('Please select your size');
+      return;
+    }
+
+    const normalizedMeasurements = requiredMeasurementKeys.reduce(
+      (acc, key) => {
+        const rawValue = measurementValues[key];
+        const parsedValue = Number(rawValue);
+        if (Number.isFinite(parsedValue) && parsedValue > 0) {
+          acc[key] = {
+            value: parsedValue,
+            unit: 'CM',
+          };
+        }
+        return acc;
+      },
+      {} as Record<string, { value: number; unit: 'CM' }>,
+    );
+
+    if (requiresMeasurements && Object.keys(normalizedMeasurements).length !== requiredMeasurementKeys.length) {
+      const missingCount =
+        requiredMeasurementKeys.length - Object.keys(normalizedMeasurements).length;
+      void dispatch(addToWishlist(product.id));
+      toast.error(
+        `Required measurements are incomplete (${missingCount} missing). Item saved to wishlist. Update your profile measurements before adding to bag.`,
+      );
+      navigate('/profile');
+      return;
+    }
+
+    const sizeFitData =
+      Object.keys(normalizedMeasurements).length > 0
+        ? { measurements: normalizedMeasurements }
+        : undefined;
+
+    try {
+      await dispatch(
+        addToCart({
+          productId: product.id,
+          quantity: 1,
+          selectedSize: variant?.size || selectedSize,
+          selectedColor: variant?.color || selectedColor,
+          sizingMode,
+          requiredMeasurementKeys,
+          sizeFitData,
+        }),
+      ).unwrap();
+      dispatch(openCartDrawer());
+      toast.success('Added to bag');
+    } catch (error: any) {
+      toast.error(error || 'Failed to add to bag');
+    }
   };
 
-  const handleWishlist = () => {
-    toast.success('Added to wishlist');
+  const handleWishlist = async () => {
+    if (!product?.id) return;
+    if (!isAuth) {
+      toast.info('Please sign in to use wishlist');
+      return;
+    }
+    setWishlistBusy(true);
+    try {
+      const isWishlisted = wishlistedIds.has(product.id);
+      if (isWishlisted) {
+        await dispatch(removeFromWishlist(product.id)).unwrap();
+        toast.success('Removed from wishlist');
+      } else {
+        await dispatch(addToWishlist(product.id)).unwrap();
+        toast.success('Added to wishlist');
+      }
+    } catch (error: any) {
+      toast.error(error || 'Failed to update wishlist');
+    } finally {
+      setWishlistBusy(false);
+    }
   };
 
   const handleShare = async () => {
@@ -369,12 +542,12 @@ export default function ProductDetailsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8 flex flex-col gap-6">
-            <div className="w-full flex items-start justify-center">
+            <div className="w-full overflow-hidden rounded-2xl">
               {currentMedia ? (
                 <SignedMediaItem
                   media={currentMedia}
                   alt={product.title}
-                  className="w-full max-w-full"
+                  className="w-full"
                 />
               ) : (
                 <div className="w-full min-h-[220px] flex items-center justify-center text-slate-500 dark:text-slate-400">
@@ -413,9 +586,15 @@ export default function ProductDetailsPage() {
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                       {product.brand?.name ? `${product.brand.name} drop` : 'Limited release'}
                     </p>
+                    {isCustomAvailable ? (
+                      <span className="mt-2 inline-flex items-center rounded-full border border-purple-500/30 bg-purple-500/10 px-2.5 py-1 text-[11px] font-semibold text-purple-700 dark:text-purple-200">
+                        ✂️ Custom Available
+                      </span>
+                    ) : null}
                   </div>
                   <button
                     onClick={handleWishlist}
+                    disabled={wishlistBusy}
                     className="text-slate-500 hover:text-rose-500 transition-colors"
                     type="button"
                   >
@@ -447,26 +626,38 @@ export default function ProductDetailsPage() {
                   </div>
                 </div>
 
-                {(colors.length > 0 || sizes.length > 0) ? (
+                {(colors.length > 0 || availableSizes.length > 0) ? (
                   <div className="space-y-4 border-y border-black/10 dark:border-white/10 py-4">
                     {colors.length > 0 ? (
-                      <div className="space-y-2">
-                        <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Color</div>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wide">
+                            Color {selectedColor && <span className="font-normal text-slate-500 dark:text-slate-400 normal-case">— {selectedColor}</span>}
+                          </span>
+                        </div>
                         <div className="flex flex-wrap gap-2">
                           {colors.map((color) => {
                             const isActive = selectedColor === color;
+                            const colorStyle = COLOR_HEX_MAP[color] || '#9CA3AF';
+                            const isGradient = colorStyle.includes('gradient');
                             return (
                               <button
                                 key={color}
                                 onClick={() => setSelectedColor(color)}
                                 type="button"
-                                className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+                                className={`w-10 h-10 rounded-full border-2 transition-all relative ${
                                   isActive
-                                    ? 'border-emerald-500 bg-emerald-500/20 text-emerald-700 dark:text-emerald-200'
-                                    : 'border-black/10 dark:border-white/15 text-slate-600 dark:text-slate-300 hover:border-emerald-500/60'
+                                    ? 'border-emerald-500 ring-2 ring-emerald-500/30 scale-110'
+                                    : 'border-black/10 dark:border-white/15 hover:border-emerald-500/60'
                                 }`}
+                                style={{
+                                  background: isGradient ? colorStyle : colorStyle,
+                                }}
+                                title={color}
                               >
-                                {color}
+                                {isActive && (
+                                  <Check size={16} className={`absolute inset-0 m-auto ${color === 'White' || color === 'Yellow' ? 'text-gray-900' : 'text-white'}`} />
+                                )}
                               </button>
                             );
                           })}
@@ -474,11 +665,11 @@ export default function ProductDetailsPage() {
                       </div>
                     ) : null}
 
-                    {sizes.length > 0 ? (
+                    {availableSizes.length > 0 ? (
                       <div className="space-y-2">
                         <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Size</div>
                         <div className="flex flex-wrap gap-2">
-                          {sizes.map((size) => {
+                          {availableSizes.map((size) => {
                             const isActive = selectedSize === size;
                             return (
                               <button
@@ -498,6 +689,38 @@ export default function ProductDetailsPage() {
                         </div>
                       </div>
                     ) : null}
+                  </div>
+                ) : null}
+
+                {requiresMeasurements ? (
+                  <div className="space-y-3 border-b border-black/10 dark:border-white/10 pb-4">
+                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Required Measurements (cm)
+                    </div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {requiredMeasurementKeys.map((key) => (
+                        <label key={key} className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                            {key.replace(/_/g, ' ')}
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.1"
+                            value={measurementValues[key] ?? ''}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setMeasurementValues((prev) => ({
+                                ...prev,
+                                [key]: value,
+                              }));
+                            }}
+                            className="h-10 rounded-xl border border-black/10 dark:border-white/15 bg-white/80 dark:bg-white/5 px-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                            placeholder="e.g. 38"
+                          />
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
 

@@ -16,11 +16,13 @@ import {
   DeleteProductModal,
   ArchiveProductModal,
   ComingSoonModal,
+  BulkDeleteProductsModal,
   ProductActionsMenu,
   getDefaultProductActions,
   RestoreDeletedProductModal,
   PermanentDeleteProductModal,
 } from './modals';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { Select } from '@/components/ui/Select';
 import StoreEmptyState, { type EmptyStateType } from '@/components/designs/StoreEmptyState';
@@ -225,6 +227,10 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const [archiveModalProduct, setArchiveModalProduct] = useState<BackendProduct | null>(null);
   const [archiveMode, setArchiveMode] = useState<'archive' | 'unarchive'>('archive');
   const [comingSoonModal, setComingSoonModal] = useState<{ open: boolean; feature?: string; description?: string }>({ open: false });
+  const [bulkConfirmAction, setBulkConfirmAction] = useState<
+    'delete' | 'archive' | 'unpublish' | null
+  >(null);
+  const [bulkActionBusy, setBulkActionBusy] = useState(false);
   const [restoreModalProduct, setRestoreModalProduct] = useState<BackendProduct | null>(null);
   const [permanentDeleteProduct, setPermanentDeleteProduct] = useState<BackendProduct | null>(null);
   const [draftReminderProduct, setDraftReminderProduct] = useState<BackendProduct | null>(null);
@@ -289,6 +295,18 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   };
 
   const showBulkActions = selectedProducts.length > 0;
+  const selectedBulkDeleteProducts = useMemo(() => {
+    const byId = new Map(products.map((product) => [product.id, product]));
+    return selectedProducts.map((id) => {
+      const product = byId.get(id);
+      return {
+        id,
+        name: product?.name || 'Product',
+        thumbnail: product?.thumbnail ?? null,
+        images: Array.isArray(product?.images) ? product.images : [],
+      };
+    });
+  }, [products, selectedProducts]);
 
   const filteredProducts = useMemo(() => {
     let items = products;
@@ -351,16 +369,20 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     [previewCollections],
   );
 
+  // Only duplicate collections for infinite scroll when there are enough to
+  // overflow the visible viewport (each card is ~264px with gap). With 4 or
+  // fewer the duplicates are fully visible and look like a bug.
+  const CAROUSEL_OVERFLOW_THRESHOLD = 4;
   const quickAccessCarouselItems = useMemo(
     () =>
-      quickAccessCollections.length > 1
+      quickAccessCollections.length > CAROUSEL_OVERFLOW_THRESHOLD
         ? [...quickAccessCollections, ...quickAccessCollections]
         : quickAccessCollections,
     [quickAccessCollections],
   );
 
   const previewSourcesByCollectionId = useMemo(() => {
-    const map = new Map<string, Array<{ src: string | null; fileId: string | null; alt: string }>>();
+    const map = new Map<string, Array<{ src: string | null; fileId: string | null; alt: string; productName?: string }>>();
     visibleCollections.forEach((collection) => {
       map.set(collection.id, getCollectionPreviewSources(collection));
     });
@@ -458,7 +480,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   useEffect(() => {
     if (outletView !== 'products') return;
     if (!quickCollectionsRef.current) return;
-    if (quickAccessCarouselItems.length <= 1) return;
+    // Only auto-scroll when there are enough items to overflow the viewport.
+    // Below the threshold collections are shown as a static row.
+    if (quickAccessCollections.length <= CAROUSEL_OVERFLOW_THRESHOLD) return;
 
     const scroller = quickCollectionsRef.current;
     let raf = 0;
@@ -479,7 +503,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
     raf = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(raf);
-  }, [outletView, quickAccessCarouselItems.length]);
+  }, [outletView, quickAccessCollections.length]);
 
   useEffect(() => {
     setActiveCollectionProductsPage(1);
@@ -932,11 +956,140 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
   // Show coming soon for bulk operations
   const handleBulkAction = (action: string) => {
+    const normalized = action.toLowerCase();
+    if (
+      normalized === 'delete' ||
+      normalized === 'archive' ||
+      normalized === 'unpublish'
+    ) {
+      setBulkConfirmAction(normalized as 'delete' | 'archive' | 'unpublish');
+      return;
+    }
     setComingSoonModal({
       open: true,
       feature: `Bulk ${action}`,
       description: `We're working on powerful bulk ${action.toLowerCase()} tools to help you manage multiple products at once.`,
     });
+  };
+
+  const handleConfirmBulkAction = async () => {
+    if (selectedProducts.length === 0) {
+      setBulkConfirmAction(null);
+      return;
+    }
+
+    if (!bulkConfirmAction) return;
+    if (bulkConfirmAction === 'delete') return;
+
+    setBulkActionBusy(true);
+    try {
+      const plural = (count: number) => (count === 1 ? '' : 's');
+      if (bulkConfirmAction === 'archive') {
+        const result = await productApi.bulkArchiveProducts(selectedProducts);
+        const { archivedCount, failedCount, failures, requestedCount } = result;
+
+        if (archivedCount > 0) {
+          toast.success(
+            `Archived ${archivedCount} product${plural(archivedCount)}.`,
+          );
+        }
+        if (failedCount > 0) {
+          const firstFailure = failures[0];
+          const suffix = failedCount > 1 ? ` (+${failedCount - 1} more)` : '';
+          toast.error(
+            firstFailure?.message
+              ? `${firstFailure.message}${suffix}`
+              : `${failedCount} product${plural(failedCount)} could not be archived`,
+          );
+        }
+        if (archivedCount === 0 && failedCount === 0) {
+          toast.error(
+            `No products were archived from ${requestedCount} selected item${plural(requestedCount)}.`,
+          );
+        }
+      } else {
+        const result = await productApi.bulkUnpublishProducts(selectedProducts);
+        const { unpublishedCount, failedCount, failures, requestedCount } =
+          result;
+
+        if (unpublishedCount > 0) {
+          toast.success(
+            `Unpublished ${unpublishedCount} product${plural(unpublishedCount)}.`,
+          );
+        }
+        if (failedCount > 0) {
+          const firstFailure = failures[0];
+          const suffix = failedCount > 1 ? ` (+${failedCount - 1} more)` : '';
+          toast.error(
+            firstFailure?.message
+              ? `${firstFailure.message}${suffix}`
+              : `${failedCount} product${plural(failedCount)} could not be unpublished`,
+          );
+        }
+        if (unpublishedCount === 0 && failedCount === 0) {
+          toast.error(
+            `No products were unpublished from ${requestedCount} selected item${plural(requestedCount)}.`,
+          );
+        }
+      }
+
+      setSelectedProducts([]);
+      await refresh();
+    } catch (error: any) {
+      const defaultMessage =
+        bulkConfirmAction === 'archive'
+          ? 'Failed to archive selected products.'
+          : 'Failed to unpublish selected products.';
+      const message = error?.response?.data?.message || defaultMessage;
+      toast.error(typeof message === 'string' ? message : defaultMessage);
+    } finally {
+      setBulkActionBusy(false);
+      setBulkConfirmAction(null);
+    }
+  };
+
+  const handleConfirmBulkDeleteWithTypedFlow = async (productIds: string[]) => {
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      toast.error('No deletable products selected.');
+      return;
+    }
+
+    setBulkActionBusy(true);
+    try {
+      const result = await productApi.bulkDeleteProducts(productIds);
+      const { deletedCount, failedCount, failures, requestedCount } = result;
+      const plural = (count: number) => (count === 1 ? '' : 's');
+
+      if (deletedCount > 0) {
+        toast.success(`Deleted ${deletedCount} product${plural(deletedCount)}.`);
+      }
+      if (failedCount > 0) {
+        const firstFailure = failures[0];
+        const suffix = failedCount > 1 ? ` (+${failedCount - 1} more)` : '';
+        toast.error(
+          firstFailure?.message
+            ? `${firstFailure.message}${suffix}`
+            : `${failedCount} product${plural(failedCount)} could not be deleted`,
+        );
+      }
+      if (deletedCount === 0 && failedCount === 0) {
+        toast.error(
+          `No products were deleted from ${requestedCount} selected item${plural(requestedCount)}.`,
+        );
+      }
+
+      const failedIds = failures.map((failure) => failure.productId);
+      setSelectedProducts(failedIds);
+      await refresh();
+      setBulkConfirmAction(null);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message || 'Failed to delete selected products.';
+      toast.error(typeof message === 'string' ? message : 'Failed to delete selected products.');
+      throw error;
+    } finally {
+      setBulkActionBusy(false);
+    }
   };
 
   const openCollectionEditor = (collection: CollectionOption) => {
@@ -1343,6 +1496,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                               src: collection.coverImage ?? null,
                               fileId: collection.coverFileId ?? null,
                               alt: collection.name,
+                              productName: undefined as string | undefined,
                             };
 
                       return (
@@ -1355,25 +1509,71 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         setHoveredCollectionId((prev) => (prev === collection.id ? null : prev));
                         setHoverPreviewFrame((prev) => ({ ...prev, [collection.id]: 0 }));
                       }}
-                      className="group w-64 shrink-0 snap-start overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 text-left transition-all hover:shadow-md bg-white dark:bg-zinc-900/80"
+                      className="group relative w-64 h-44 shrink-0 snap-start overflow-hidden rounded-xl border border-gray-200 shadow-sm dark:border-white/10 text-left transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/20 bg-gray-100 dark:bg-zinc-900/80"
                     >
-                      <div className="relative h-28 w-full bg-gray-100 dark:bg-white/5">
+                      {/* Opacity-based crossfade stack — fills entire card */}
+                      {previewSources.length > 0 ? (
+                        <>
+                          {previewSources.map((preview, pIdx) => (
+                            <div
+                              key={`${preview.src ?? preview.fileId ?? pIdx}`}
+                              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+                                pIdx === previewFrame ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                              }`}
+                            >
+                              <ImageWithFallback
+                                src={preview.src}
+                                fileId={preview.fileId}
+                                alt={preview.alt}
+                                fit="cover"
+                                rounded="none"
+                                containerClassName="h-full w-full"
+                                className="h-full w-full"
+                                fallbackName={collection.name}
+                              />
+                            </div>
+                          ))}
+                          {/* Product name badge - Top Left to avoid bottom text overlap */}
+                          {previewSources.length > 1 && activePreview.productName && (
+                            <div className="absolute top-2.5 left-2.5 z-30 max-w-[calc(100%-3rem)]">
+                              <span className="inline-block rounded-full bg-white/20 dark:bg-black/30 backdrop-blur-md border border-white/20 dark:border-white/10 px-2.5 py-0.5 text-[10px] font-medium text-white truncate shadow-sm transition-opacity duration-300">
+                                {activePreview.productName}
+                              </span>
+                            </div>
+                          )}
+                          {/* Dot indicators - Top Right */}
+                          {previewSources.length > 1 && (
+                            <div className="absolute top-3.5 right-2.5 z-30 flex items-center gap-1">
+                              {previewSources.map((_, dotIdx) => (
+                                <div
+                                  key={dotIdx}
+                                  className={`w-1 h-1 rounded-full transition-all duration-200 shadow-sm ${
+                                    dotIdx === previewFrame ? 'bg-white scale-125' : 'bg-white/40'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
                         <ImageWithFallback
                           src={activePreview.src}
                           fileId={activePreview.fileId}
                           alt={activePreview.alt}
                           fit="cover"
                           rounded="none"
-                          containerClassName="h-full w-full"
-                          className="h-full w-full transition-transform duration-300 group-hover:scale-105"
+                          containerClassName="h-full w-full relative z-10"
+                          className="h-full w-full"
                           fallbackName={collection.name}
                         />
-                      </div>
-                      <div className="p-3">
-                        <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
+                      )}
+
+                      {/* Frosted Glass Text Component - Bottom Overlay */}
+                      <div className="absolute bottom-0 left-0 right-0 z-30 p-3 bg-white/60 dark:bg-black/60 backdrop-blur-md border-t border-white/20 dark:border-white/10 transition-transform duration-300">
+                        <p className="line-clamp-1 text-sm font-bold text-gray-900 dark:text-white drop-shadow-sm">
                           {collection.name}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5">
                           {collection.itemCount ?? 0} items
                         </p>
                       </div>
@@ -1790,6 +1990,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                             src: collection.coverImage ?? null,
                             fileId: collection.coverFileId ?? null,
                             alt: collection.name,
+                            productName: undefined as string | undefined,
                           };
 
                     const collectionMenuId = `collection-menu-${collection.id}`;
@@ -1814,30 +2015,78 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                             handleOpenCollectionView(collection.id);
                           }
                         }}
-                        className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-zinc-900/70"
+                        className="group overflow-hidden rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-zinc-900/70"
                       >
-                        <div className="relative h-36 w-full bg-gray-100 dark:bg-white/5">
-                          <ImageWithFallback
-                            src={activePreview.src}
-                            fileId={activePreview.fileId}
-                            alt={activePreview.alt}
-                            fit="cover"
-                            rounded="none"
-                            containerClassName="h-full w-full"
-                            className="h-full w-full transition-transform duration-300 hover:scale-[1.02]"
-                            fallbackName={collection.name}
-                          />
-                          <div className="collection-menu-host absolute right-3 top-3 z-20">
+                        <div className="relative h-64 w-full bg-gray-100 dark:bg-white/5">
+                          {/* Opacity-based crossfade stack — fills entire card */}
+                          {previewSources.length > 0 ? (
+                            <>
+                              {previewSources.map((preview, pIdx) => (
+                                <div
+                                  key={`${preview.src ?? preview.fileId ?? pIdx}`}
+                                  className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+                                    pIdx === previewFrame ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                                  }`}
+                                >
+                                  <ImageWithFallback
+                                    src={preview.src}
+                                    fileId={preview.fileId}
+                                    alt={preview.alt}
+                                    fit="cover"
+                                    rounded="none"
+                                    containerClassName="h-full w-full"
+                                    className="h-full w-full"
+                                    fallbackName={collection.name}
+                                  />
+                                </div>
+                              ))}
+                              {/* Product name badge - Top Left to avoid bottom text overlap */}
+                              {previewSources.length > 1 && activePreview.productName && (
+                                <div className="absolute top-3 left-3 z-30 max-w-[calc(100%-4rem)]">
+                                  <span className="inline-block rounded-full bg-white/20 dark:bg-black/30 backdrop-blur-md border border-white/20 dark:border-white/10 px-3 py-1 text-xs font-medium text-white truncate shadow-sm transition-opacity duration-300">
+                                    {activePreview.productName}
+                                  </span>
+                                </div>
+                              )}
+                              {/* Dot indicators - Top Right, beside menu */}
+                              {previewSources.length > 1 && (
+                                <div className="absolute top-4 right-14 z-30 flex items-center gap-1.5">
+                                  {previewSources.map((_, dotIdx) => (
+                                    <div
+                                      key={dotIdx}
+                                      className={`w-1.5 h-1.5 rounded-full transition-all duration-200 shadow-sm ${
+                                        dotIdx === previewFrame ? 'bg-white scale-125' : 'bg-white/40'
+                                      }`}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <ImageWithFallback
+                              src={activePreview.src}
+                              fileId={activePreview.fileId}
+                              alt={activePreview.alt}
+                              fit="cover"
+                              rounded="none"
+                              containerClassName="h-full w-full relative z-10"
+                              className="h-full w-full"
+                              fallbackName={collection.name}
+                            />
+                          )}
+
+                          {/* Menu host — Top Right */}
+                          <div className="collection-menu-host absolute right-3 top-3 z-40 transition-opacity opacity-0 group-hover:opacity-100 focus-within:opacity-100">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 dropdownManager.setOpenId(isMenuOpen ? null : collectionMenuId);
                               }}
-                              className="flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition hover:bg-black/65"
+                              className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 dark:bg-black/30 backdrop-blur-md border border-white/20 dark:border-white/10 text-white transition hover:bg-white/30 dark:hover:bg-black/50"
                               aria-label="Collection actions"
                             >
-                              <span className="text-base font-bold">...</span>
+                              <span className="text-base font-bold pb-1">...</span>
                             </button>
                             {isMenuOpen && (
                               <div
@@ -1900,36 +2149,35 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                               </div>
                             )}
                           </div>
-                        </div>
-                        <div className="space-y-3 p-4">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
-                                {collection.name}
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {collection.itemCount ?? 0} items
-                              </p>
-                            </div>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                status === 'ARCHIVED'
-                                  ? 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300'
-                                  : status === 'DRAFT'
-                                    ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
-                                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
-                              }`}
-                            >
-                              {status}
-                            </span>
-                          </div>
 
-                          <p className="line-clamp-2 text-xs text-gray-600 dark:text-gray-300">
-                            {collection.description?.trim() || 'No description yet.'}
-                          </p>
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                            Click card to view collection products.
-                          </p>
+                          {/* Frosted Glass Text Component - Bottom Overlay */}
+                          <div className="absolute bottom-0 left-0 right-0 z-30 space-y-2 p-4 bg-white/60 dark:bg-black/60 backdrop-blur-md border-t border-white/20 dark:border-white/10 transition-transform duration-300">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="line-clamp-1 text-sm font-bold text-gray-900 dark:text-white drop-shadow-sm">
+                                  {collection.name}
+                                </p>
+                                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5">
+                                  {collection.itemCount ?? 0} items
+                                </p>
+                              </div>
+                              <span
+                                className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold shadow-sm backdrop-blur-md ${
+                                  status === 'ARCHIVED'
+                                    ? 'bg-gray-500/20 text-gray-800 border-gray-400/30 dark:bg-white/20 dark:text-gray-200 dark:border-white/20'
+                                    : status === 'DRAFT'
+                                      ? 'bg-amber-400/20 text-amber-900 border-amber-400/30 dark:bg-amber-500/30 dark:text-amber-200 dark:border-amber-400/20'
+                                      : 'bg-emerald-400/20 text-emerald-900 border-emerald-400/30 dark:bg-emerald-500/30 dark:text-emerald-200 dark:border-emerald-400/20'
+                                }`}
+                              >
+                                {status}
+                              </span>
+                            </div>
+
+                            <p className="line-clamp-2 text-xs font-medium text-gray-800 dark:text-gray-200 leading-relaxed">
+                              {collection.description?.trim() || 'No description yet.'}
+                            </p>
+                          </div>
                         </div>
                       </article>
                     );
@@ -2095,10 +2343,10 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 <div
                   key={product.id}
                   className={[
-                    'group relative flex flex-col rounded-2xl border bg-white dark:bg-zinc-900/80 shadow-sm transition-all duration-300 ease-out',
+                    'group relative rounded-2xl overflow-hidden aspect-[4/5] shadow-sm transition-all duration-300 ease-out',
                     selectedProducts.includes(product.id)
                       ? 'ring-2 ring-purple-500 border-purple-300 dark:border-purple-500/30'
-                      : 'border-gray-100 dark:border-white/[0.08] hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30 hover:border-gray-200 dark:hover:border-white/[0.12]',
+                      : 'hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30',
                     layoutMode ? 'cursor-move' : 'cursor-pointer',
                     dropdownManager.openId === ('product-menu-' + product.id) ? 'z-50' : 'z-10'
                   ].join(' ')}
@@ -2199,8 +2447,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     </div>
                   )}
 
-                  {/* Image Container - 4:5 aspect ratio */}
-                  <div className="relative aspect-[4/5] overflow-hidden rounded-t-2xl bg-gray-50 dark:bg-zinc-800/50">
+                  {/* Full-bleed Image Container */}
+                  <div className="absolute inset-0 bg-gray-50 dark:bg-zinc-800/50">
                     {(() => {
                       const primaryMedia = product.media?.find((m) => m.isPrimary) ?? product.media?.[0];
                       const fallbackValue = product.thumbnail || product.images?.[0] || null;
@@ -2239,99 +2487,99 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         <span className="text-xs text-gray-400 dark:text-zinc-500">No image</span>
                       </div>
                     )}
-                    
-                    {/* Gradient overlay for readability */}
-                    <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/20 to-transparent pointer-events-none" />
-                    
-                    {/* Status badge inside image area */}
-                    <div className="absolute bottom-3 left-3 z-10">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold shadow-lg ${
-                        productStatus === 'DELETED'
-                          ? 'bg-rose-500/90 text-white'
-                          : productStatus === 'ARCHIVED'
-                            ? 'bg-gray-500/90 text-white'
-                            : productStatus === 'DRAFT' 
-                              ? 'bg-amber-500/90 text-white' 
-                              : 'bg-emerald-500/90 text-white'
-                      }`}>
-                        {productStatus === 'DELETED'
-                          ? '🗑️ Deleted'
-                          : productStatus === 'ARCHIVED'
-                            ? '📦 Archived'
-                            : productStatus === 'DRAFT'
-                              ? '📝 Draft'
-                              : '✅ Published'}
-                      </span>
-                    </div>
                   </div>
 
-                  {/* Product Info */}
-                  <div className="flex flex-col gap-2.5 p-4">
-                    {/* Name and Collection */}
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1">{product.name}</h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{collectionLabel}</p>
-                    </div>
-                    
-                    {/* Price Section */}
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-lg font-bold text-gray-900 dark:text-white">
-                        ₦{product.price.toLocaleString()}
-                      </span>
-                      {typeof product.salePrice === 'number' && product.salePrice > 0 && (
-                        <span className="text-xs text-rose-500 font-medium">
-                          🏷️ ₦{product.salePrice.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                    
-                    {/* Stock info with tooltip */}
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-white/5">
-                      <span 
-                        className={`text-xs font-medium cursor-help ${
-                          (product.totalStock ?? 0) === 0 
-                            ? 'text-rose-500' 
-                            : (product.totalStock ?? 0) <= 5 
-                              ? 'text-amber-500' 
-                              : 'text-emerald-500'
-                        }`}
-                        title={
-                          (product.totalStock ?? 0) === 0 
-                            ? 'This product is out of stock and cannot be purchased' 
-                            : (product.totalStock ?? 0) <= 5 
-                              ? 'Low stock warning: Consider restocking soon' 
-                              : 'Stock is healthy'
-                        }
-                      >
-                        {(product.totalStock ?? 0) === 0 
-                          ? '🔴 Out of stock' 
-                          : (product.totalStock ?? 0) <= 5 
-                            ? `🟡 ${product.totalStock} in stock` 
-                            : `🟢 ${product.totalStock} in stock`}
-                      </span>
+                  {/* Gradient overlay for readability */}
+                  <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/20 to-transparent pointer-events-none z-[1]" />
+
+                  {/* Status badge inside image area */}
+                  <div className="absolute bottom-[calc(theme(spacing.3)+8rem)] left-3 z-10">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold shadow-lg ${
+                      productStatus === 'DELETED'
+                        ? 'bg-rose-500/90 text-white'
+                        : productStatus === 'ARCHIVED'
+                          ? 'bg-gray-500/90 text-white'
+                          : productStatus === 'DRAFT' 
+                            ? 'bg-amber-500/90 text-white' 
+                            : 'bg-emerald-500/90 text-white'
+                    }`}>
+                      {productStatus === 'DELETED'
+                        ? '🗑️ Deleted'
+                        : productStatus === 'ARCHIVED'
+                          ? '📦 Archived'
+                          : productStatus === 'DRAFT'
+                            ? '📝 Draft'
+                            : '✅ Published'}
+                    </span>
+                  </div>
+
+                  {/* Frosted Glass Info Overlay */}
+                  <div className="absolute inset-x-0 bottom-0 z-10 backdrop-blur-xl bg-black/30 border-t border-white/10 p-3">
+                    <div className="flex flex-col gap-1.5">
+                      {/* Name and Collection */}
+                      <h3 className="text-sm font-semibold text-white line-clamp-1 drop-shadow-sm">{product.name}</h3>
+                      <p className="text-[11px] text-white/60 line-clamp-1">{collectionLabel}</p>
                       
-                      {/* Creation time - especially useful for drafts */}
-                      {product.createdAt && (
-                        <span 
-                          className="text-[10px] text-gray-400 dark:text-zinc-500"
-                          title={new Date(product.createdAt).toLocaleString()}
-                        >
-                          {(() => {
-                            const created = new Date(product.createdAt);
-                            const now = new Date();
-                            const diffMs = now.getTime() - created.getTime();
-                            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                            const diffMins = Math.floor(diffMs / (1000 * 60));
-                            
-                            if (diffMins < 60) return `${diffMins}m ago`;
-                            if (diffHours < 24) return `${diffHours}h ago`;
-                            if (diffDays < 7) return `${diffDays}d ago`;
-                            if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-                            return created.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                          })()}
+                      {/* Price Section */}
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-sm font-bold text-white drop-shadow-sm">
+                          ₦{product.price.toLocaleString()}
                         </span>
-                      )}
+                        {typeof product.salePrice === 'number' && product.salePrice > 0 && (
+                          <span className="text-xs text-rose-300 font-medium">
+                            🏷️ ₦{product.salePrice.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Stock info row */}
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span 
+                          className={`text-[10px] font-medium cursor-help ${
+                            (product.totalStock ?? 0) === 0 
+                              ? 'text-rose-300' 
+                              : (product.totalStock ?? 0) <= 5 
+                                ? 'text-amber-300' 
+                                : 'text-emerald-300'
+                          }`}
+                          title={
+                            (product.totalStock ?? 0) === 0 
+                              ? 'This product is out of stock and cannot be purchased' 
+                              : (product.totalStock ?? 0) <= 5 
+                                ? 'Low stock warning: Consider restocking soon' 
+                                : 'Stock is healthy'
+                          }
+                        >
+                          {(product.totalStock ?? 0) === 0 
+                            ? '🔴 Out of stock' 
+                            : (product.totalStock ?? 0) <= 5 
+                              ? `🟡 ${product.totalStock} in stock` 
+                              : `🟢 ${product.totalStock} in stock`}
+                        </span>
+                        
+                        {/* Creation time */}
+                        {product.createdAt && (
+                          <span 
+                            className="text-[10px] text-white/50"
+                            title={new Date(product.createdAt).toLocaleString()}
+                          >
+                            {(() => {
+                              const created = new Date(product.createdAt);
+                              const now = new Date();
+                              const diffMs = now.getTime() - created.getTime();
+                              const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                              const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                              const diffMins = Math.floor(diffMs / (1000 * 60));
+                              
+                              if (diffMins < 60) return `${diffMins}m ago`;
+                              if (diffHours < 24) return `${diffHours}h ago`;
+                              if (diffDays < 7) return `${diffDays}d ago`;
+                              if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+                              return created.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            })()}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2476,161 +2724,127 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           <button
             type="button"
             onClick={() => handleBulkAction('Edit')}
-            className="hover:text-purple-200"
+            disabled={bulkActionBusy}
+            className="hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            ✏️ Edit
+            {'\u270F\uFE0F'} Edit
           </button>
-          <button type="button" onClick={() => handleBulkAction('Delete')} className="hover:text-purple-200">
-            🗑️ Delete
+          <button
+            type="button"
+            onClick={() => handleBulkAction('Delete')}
+            disabled={bulkActionBusy}
+            className="hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {'\uD83D\uDDD1\uFE0F'} Delete
           </button>
-          <button type="button" onClick={() => handleBulkAction('Archive')} className="hover:text-purple-200">
-            📦 Archive
+          <button
+            type="button"
+            onClick={() => handleBulkAction('Archive')}
+            disabled={bulkActionBusy}
+            className="hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {'\uD83D\uDCE6'} Archive
           </button>
-          <button type="button" onClick={() => handleBulkAction('Unpublish')} className="hover:text-purple-200">
-            📥 Unpublish
+          <button
+            type="button"
+            onClick={() => handleBulkAction('Unpublish')}
+            disabled={bulkActionBusy}
+            className="hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {'\uD83D\uDCE5'} Unpublish
           </button>
           <button
             type="button"
             onClick={() => setSelectedProducts([])}
-            className="ml-2 hover:text-purple-200"
+            disabled={bulkActionBusy}
+            className="ml-2 hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            ✕ Clear
+            {'\u2716'} Clear
           </button>
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════════════ */}
+      {/* --------------------------------------------------------------------------- */}
       {/* MODALS */}
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       
-      {collectionConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setCollectionConfirm(null)}
-            aria-label="Close collection action confirmation"
-          />
-          <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/85 p-8 text-center shadow-2xl backdrop-blur-xl">
-            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full shadow-inner ring-1
-              ring-white/10
-              bg-zinc-800/70
-              ">
-              <span aria-hidden className="text-4xl">
-                {collectionConfirm.mode === 'archive'
-                  ? '📦'
-                  : collectionConfirm.mode === 'unarchive'
-                    ? '📤'
-                    : '🗑️'}
-              </span>
-            </div>
+      <BulkDeleteProductsModal
+        isOpen={bulkConfirmAction === 'delete'}
+        products={selectedBulkDeleteProducts}
+        isProcessing={bulkActionBusy}
+        onConfirmDelete={handleConfirmBulkDeleteWithTypedFlow}
+        onClose={() => setBulkConfirmAction(null)}
+      />
 
-            <h3 className="text-xl font-bold tracking-tight text-white">
-              {collectionConfirm.mode === 'archive'
-                ? 'Archive this collection?'
-                : collectionConfirm.mode === 'unarchive'
-                  ? 'Restore this collection?'
-                  : 'Delete this collection?'}
-            </h3>
+      <ConfirmDialog
+        open={bulkConfirmAction === 'archive' || bulkConfirmAction === 'unpublish'}
+        title={
+          bulkConfirmAction === 'archive'
+            ? 'Archive selected products?'
+            : 'Unpublish selected products?'
+        }
+        message={
+          `You selected ${selectedProducts.length} product${selectedProducts.length === 1 ? '' : 's'}. ${
+            bulkConfirmAction === 'archive'
+              ? 'This will archive them and hide them from your store.'
+              : 'This will move them to draft and remove them from public store listings.'
+          }`
+        }
+        confirmText={
+          bulkActionBusy
+            ? bulkConfirmAction === 'archive'
+              ? 'Archiving...'
+              : 'Unpublishing...'
+            : bulkConfirmAction === 'archive'
+              ? 'Archive Selected'
+              : 'Unpublish Selected'
+        }
+        isLoading={bulkActionBusy}
+        onConfirm={() => void handleConfirmBulkAction()}
+        onCancel={() => setBulkConfirmAction(null)}
+      />
 
-            <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-zinc-400">
-              {collectionConfirm.mode === 'archive'
-                ? 'This collection will be hidden from your main view but can be restored later at any time.'
-                : collectionConfirm.mode === 'unarchive'
-                  ? 'This collection will be moved back to your Drafts folder and become fully editable again.'
-                  : 'This action is permanent and cannot be undone. All associated data will be lost.'}
-            </p>
+      <ConfirmDialog
+        open={Boolean(collectionConfirm)}
+        title={
+          collectionConfirm?.mode === 'archive'
+            ? 'Archive this collection?'
+            : collectionConfirm?.mode === 'unarchive'
+              ? 'Restore this collection?'
+              : 'Delete this collection?'
+        }
+        message={
+          collectionConfirm?.mode === 'archive'
+            ? 'This collection will be hidden from your main view but can be restored later at any time.'
+            : collectionConfirm?.mode === 'unarchive'
+              ? 'This collection will be moved back to Drafts and become fully editable again.'
+              : 'This action is permanent and cannot be undone. All associated data will be lost.'
+        }
+        confirmText={
+          collectionConfirmBusy
+            ? 'Processing...'
+            : collectionConfirm?.mode === 'unarchive'
+              ? 'Restore'
+              : collectionConfirm?.mode === 'archive'
+                ? 'Archive'
+                : 'Delete'
+        }
+        isDestructive={collectionConfirm?.mode === 'delete'}
+        isLoading={collectionConfirmBusy}
+        onConfirm={() => void handleConfirmCollectionAction()}
+        onCancel={() => setCollectionConfirm(null)}
+      />
+      <ConfirmDialog
+        open={deleteAllCollectionsConfirmOpen}
+        title="Delete all collections?"
+        message="This will permanently delete all your store collections and remove their product links. Products themselves will remain in your store."
+        confirmText={deletingAllCollections ? 'Deleting...' : 'Delete All Collections'}
+        isDestructive
+        isLoading={deletingAllCollections}
+        onConfirm={() => void handleDeleteAllCollections()}
+        onCancel={() => setDeleteAllCollectionsConfirmOpen(false)}
+      />
 
-            <div className="mt-8 flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => void handleConfirmCollectionAction()}
-                disabled={collectionConfirmBusy}
-                className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-lg transition-colors duration-200 disabled:opacity-60 ${
-                  collectionConfirm.mode === 'archive'
-                    ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-900/20'
-                    : collectionConfirm.mode === 'unarchive'
-                      ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20'
-                      : 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/20'
-                }`}
-              >
-                {collectionConfirmBusy ? (
-                  <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                ) : (
-                  <span aria-hidden>
-                    {collectionConfirm.mode === 'archive'
-                      ? '📦'
-                      : collectionConfirm.mode === 'unarchive'
-                        ? '📤'
-                        : '🗑️'}
-                  </span>
-                )}
-                {collectionConfirmBusy
-                  ? 'Processing'
-                  : collectionConfirm.mode === 'unarchive'
-                    ? 'Restore'
-                    : collectionConfirm.mode === 'archive'
-                      ? 'Archive'
-                      : 'Delete'}
-                {collectionConfirmBusy && (
-                  <span className="inline-flex items-center gap-1" aria-hidden>
-                    <span className="h-1 w-1 rounded-full bg-white/90 animate-bounce [animation-delay:-0.3s]" />
-                    <span className="h-1 w-1 rounded-full bg-white/90 animate-bounce [animation-delay:-0.15s]" />
-                    <span className="h-1 w-1 rounded-full bg-white/90 animate-bounce" />
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setCollectionConfirm(null)}
-                disabled={collectionConfirmBusy}
-                className="w-full rounded-xl border border-zinc-700 bg-transparent px-4 py-3 text-sm font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/5 disabled:opacity-60"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {deleteAllCollectionsConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => {
-              if (!deletingAllCollections) setDeleteAllCollectionsConfirmOpen(false);
-            }}
-            aria-label="Close delete all collections confirmation"
-          />
-          <div className="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-zinc-900">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-              Delete all collections?
-            </h3>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              This will attempt to delete all {visibleCollections.length} collection(s) in your store.
-            </p>
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDeleteAllCollectionsConfirmOpen(false)}
-                disabled={deletingAllCollections}
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 disabled:opacity-60 dark:border-white/10 dark:text-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDeleteAllCollections()}
-                disabled={deletingAllCollections}
-                className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {deletingAllCollections ? 'Deleting...' : 'Delete all'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {collectionGalleryOpen && (() => {
         const onTouchStart = (e: React.TouchEvent) => {
@@ -2928,3 +3142,5 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 };
 
 export default StoreProductsPanel;
+
+

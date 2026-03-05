@@ -1,13 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { AlertTriangle, CalendarClock, Lock, MapPin, Tag } from 'lucide-react';
+import { AlertTriangle, CalendarClock, ChevronRight, Lock, MapPin, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/api/httpClient';
 import type { RootState } from '@/store';
 import EmptyState from '@/components/EmptyState';
-import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 
@@ -36,7 +34,6 @@ interface PatchesTabProps {
 }
 
 export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibility }) => {
-  const patchDetailsEmoji = String.fromCodePoint(0x1f9f7);
   const [patchedBrands, setPatchedBrands] = useState<PatchedBrand[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +85,7 @@ export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibili
   }, [patchedBrands]);
 
   const navigateToBrandCatalog = (brandId: string) => {
-    navigate(`/profile/${brandId}?tab=Store`);
+    navigate(`/profile/${brandId}?tab=Content`);
   };
 
   const handleUnpatchBrand = async (brandId: string) => {
@@ -104,11 +101,6 @@ export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibili
       setUnpatchingBrandId(null);
     }
   };
-
-  const itemLayoutClass =
-    viewMode === 'grid'
-      ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4'
-      : 'space-y-3';
 
   if (!isOwner && profileVisibility === 'LOCKED') {
     return (
@@ -126,11 +118,11 @@ export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibili
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[...Array(3)].map((_, idx) => (
-          <div key={idx} className="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 animate-pulse">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full mr-3" />
-              <div className="flex-1">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-3/4" />
+          <div key={idx} className="rounded-2xl border border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 backdrop-blur p-4 animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 bg-gray-200 dark:bg-gray-700 rounded-xl shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
                 <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
               </div>
             </div>
@@ -164,150 +156,246 @@ export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibili
     );
   }
 
+  /* --- Grid card (default) --- */
+  const renderGridCard = (brand: PatchedBrand, avatar: ReturnType<typeof resolveProfileImageSource>, fallback: string) => (
+    <div
+      key={brand.id}
+      className="group relative rounded-2xl border border-purple-200/40 dark:border-purple-500/15 bg-gradient-to-br from-white/80 via-white/60 to-purple-50/40 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-purple-900/10 backdrop-blur-md p-4 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10 hover:border-purple-400/50 dark:hover:border-purple-400/30 hover:-translate-y-0.5 cursor-pointer overflow-hidden"
+      onClick={() => navigateToBrandCatalog(brand.id)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigateToBrandCatalog(brand.id); } }}
+    >
+      {/* Subtle gradient shine on hover */}
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-purple-500/0 via-purple-500/0 to-purple-500/0 group-hover:from-purple-500/[0.03] group-hover:via-transparent group-hover:to-pink-500/[0.03] transition-all duration-500 pointer-events-none" />
+
+      <div className="relative flex items-start gap-3.5">
+        {/* Square profile image */}
+        <div className="h-14 w-14 shrink-0">
+          <ImageWithFallback
+            src={avatar.src}
+            fileId={avatar.fileId}
+            alt={brand.brandName}
+            fit="cover"
+            rounded="lg"
+            fallbackName={fallback}
+            containerClassName="h-14 w-14 rounded-xl overflow-hidden ring-2 ring-purple-200/50 dark:ring-purple-500/20 shadow-sm"
+            className="h-14 w-14 object-cover"
+          />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-gray-900 dark:text-white truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+            {brand.brandName}
+          </p>
+          <p className="text-sm text-purple-600/70 dark:text-purple-400/60 font-medium truncate">
+            @{brand.username}
+          </p>
+          {brand.brandTitle && (
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-1 italic">{brand.brandTitle}</p>
+          )}
+        </div>
+
+        <ChevronRight size={16} className="shrink-0 mt-1 text-purple-300 dark:text-purple-500/40 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+      </div>
+
+      {/* Meta row */}
+      <div className="relative mt-3 pt-3 border-t border-purple-100/50 dark:border-purple-500/10 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex flex-wrap items-center gap-3">
+          {brand.location && (
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="h-3 w-3 text-purple-400" />
+              <span className="line-clamp-1">{brand.location}</span>
+            </span>
+          )}
+          {brand.patchedAt && (
+            <span className="inline-flex items-center gap-1">
+              <CalendarClock className="h-3 w-3 text-purple-400" />
+              <span>Patched {new Date(brand.patchedAt).toLocaleDateString()}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm shadow-purple-500/20 hover:shadow-md hover:shadow-purple-500/30 hover:brightness-110 transition-all"
+            onClick={() => navigateToBrandCatalog(brand.id)}
+          >
+            Catalog
+          </button>
+          {isOwner && (
+            <button
+              type="button"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200/60 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-500/10 dark:hover:text-red-400 dark:hover:border-red-500/20 transition-all"
+              onClick={() => handleUnpatchBrand(brand.id)}
+              disabled={unpatchingBrandId === brand.id}
+            >
+              {unpatchingBrandId === brand.id ? 'Removing…' : 'Unpatch'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  /* --- List row --- */
+  const renderListRow = (brand: PatchedBrand, avatar: ReturnType<typeof resolveProfileImageSource>, fallback: string) => (
+    <div
+      key={brand.id}
+      className="group relative flex items-center gap-4 rounded-2xl border border-purple-200/40 dark:border-purple-500/15 bg-gradient-to-r from-white/80 to-purple-50/30 dark:from-white/[0.06] dark:to-purple-900/10 backdrop-blur-md px-4 py-3 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10 hover:border-purple-400/50 dark:hover:border-purple-400/30 hover:-translate-y-0.5 cursor-pointer overflow-hidden"
+      onClick={() => navigateToBrandCatalog(brand.id)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigateToBrandCatalog(brand.id); } }}
+    >
+      <div className="h-12 w-12 shrink-0">
+        <ImageWithFallback
+          src={avatar.src}
+          fileId={avatar.fileId}
+          alt={brand.brandName}
+          fit="cover"
+          rounded="lg"
+          fallbackName={fallback}
+          containerClassName="h-12 w-12 rounded-xl overflow-hidden ring-2 ring-purple-200/50 dark:ring-purple-500/20 shadow-sm"
+          className="h-12 w-12 object-cover"
+        />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <p className="font-bold text-gray-900 dark:text-white truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+            {brand.brandName}
+          </p>
+          <span className="text-xs text-purple-600/70 dark:text-purple-400/60 font-medium truncate shrink-0">@{brand.username}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+          {brand.location && (
+            <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 text-purple-400" />{brand.location}</span>
+          )}
+          {brand.patchedAt && (
+            <span className="inline-flex items-center gap-1">
+              <CalendarClock className="h-3 w-3 text-purple-400" />
+              Patched {new Date(brand.patchedAt).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm shadow-purple-500/20 hover:shadow-md hover:shadow-purple-500/30 hover:brightness-110 transition-all"
+          onClick={() => navigateToBrandCatalog(brand.id)}
+        >
+          Catalog
+        </button>
+        {isOwner && (
+          <button
+            type="button"
+            className="px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200/60 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-500/10 dark:hover:text-red-400 dark:hover:border-red-500/20 transition-all"
+            onClick={() => handleUnpatchBrand(brand.id)}
+            disabled={unpatchingBrandId === brand.id}
+          >
+            {unpatchingBrandId === brand.id ? 'Removing…' : 'Unpatch'}
+          </button>
+        )}
+      </div>
+
+      <ChevronRight size={16} className="shrink-0 text-purple-300 dark:text-purple-500/40 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+    </div>
+  );
+
+  /* --- Compact pill --- */
+  const renderCompactPill = (brand: PatchedBrand, avatar: ReturnType<typeof resolveProfileImageSource>, fallback: string) => (
+    <div
+      key={brand.id}
+      className="group inline-flex items-center gap-2.5 rounded-xl border border-purple-200/40 dark:border-purple-500/15 bg-gradient-to-r from-white/70 to-purple-50/30 dark:from-white/[0.06] dark:to-purple-900/10 backdrop-blur-md px-3 py-2 transition-all duration-300 hover:shadow-md hover:shadow-purple-500/10 hover:border-purple-400/50 dark:hover:border-purple-400/30 cursor-pointer"
+      onClick={() => navigateToBrandCatalog(brand.id)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigateToBrandCatalog(brand.id); } }}
+    >
+      <div className="h-8 w-8 shrink-0">
+        <ImageWithFallback
+          src={avatar.src}
+          fileId={avatar.fileId}
+          alt={brand.brandName}
+          fit="cover"
+          rounded="lg"
+          fallbackName={fallback}
+          containerClassName="h-8 w-8 rounded-lg overflow-hidden ring-1 ring-purple-200/50 dark:ring-purple-500/20"
+          className="h-8 w-8 object-cover"
+        />
+      </div>
+      <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+        {brand.brandName}
+      </span>
+      {isOwner && (
+        <button
+          type="button"
+          className="ml-auto flex items-center justify-center h-5 w-5 rounded-full text-[11px] text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 transition-all"
+          onClick={(e) => { e.stopPropagation(); handleUnpatchBrand(brand.id); }}
+          disabled={unpatchingBrandId === brand.id}
+        >
+          {unpatchingBrandId === brand.id ? '…' : '×'}
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-sm text-gray-600 dark:text-gray-300">
+        <div className="text-sm text-[color:var(--text-secondary)]">
           {sortedPatchedBrands.length} active patch{sortedPatchedBrands.length === 1 ? '' : 'es'}
         </div>
-        <div className="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/70 p-1">
-          <button
-            type="button"
-            onClick={() => setViewMode('grid')}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              viewMode === 'grid'
-                ? 'bg-indigo-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-            }`}
-          >
-            Cards
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              viewMode === 'list'
-                ? 'bg-indigo-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-            }`}
-          >
-            List
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('compact')}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              viewMode === 'compact'
-                ? 'bg-indigo-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-            }`}
-          >
-            Compact
-          </button>
+        <div className="inline-flex items-center rounded-full border border-purple-200/40 dark:border-purple-500/15 bg-white/60 dark:bg-white/5 backdrop-blur-md p-1 shadow-sm">
+          {(['grid', 'list', 'compact'] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setViewMode(mode)}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+                viewMode === mode
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm shadow-purple-500/20'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50/50 dark:hover:bg-purple-500/10'
+              }`}
+            >
+              {mode === 'grid' ? 'Cards' : mode === 'list' ? 'List' : 'Compact'}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className={itemLayoutClass}>
-        {sortedPatchedBrands.map((brand) => {
-          const avatar = resolveProfileImageSource({
-            profileImage: brand.profileImage,
-            profileImageId: brand.profileImageId,
-            profileImageFile: brand.profileImageFile,
-            brandLogo: brand.brandLogo,
-          });
-          const fallback = getAvatarFallback(brand.brandName, brand.username);
+      {/* Grid / List / Compact renders */}
+      {viewMode === 'grid' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {sortedPatchedBrands.map((brand) => {
+            const avatar = resolveProfileImageSource({ profileImage: brand.profileImage, profileImageId: brand.profileImageId, profileImageFile: brand.profileImageFile, brandLogo: brand.brandLogo });
+            return renderGridCard(brand, avatar, getAvatarFallback(brand.brandName, brand.username));
+          })}
+        </div>
+      )}
 
-          return (
-            <Card
-              key={brand.id}
-              className={`p-4 ${viewMode === 'compact' ? 'py-3' : ''}`}
-            >
-              <div className={`flex ${viewMode === 'list' ? 'items-start' : 'items-center'} gap-3`}>
-                <div className="h-12 w-12 shrink-0">
-                  <ImageWithFallback
-                    src={avatar.src}
-                    fileId={avatar.fileId}
-                    alt={brand.brandName}
-                    fit="cover"
-                    rounded="full"
-                    fallbackName={fallback}
-                    containerClassName="h-12 w-12 rounded-full overflow-hidden ring-2 ring-white dark:ring-gray-800"
-                    className="h-12 w-12 object-cover"
-                  />
-                </div>
+      {viewMode === 'list' && (
+        <div className="space-y-2">
+          {sortedPatchedBrands.map((brand) => {
+            const avatar = resolveProfileImageSource({ profileImage: brand.profileImage, profileImageId: brand.profileImageId, profileImageFile: brand.profileImageFile, brandLogo: brand.brandLogo });
+            return renderListRow(brand, avatar, getAvatarFallback(brand.brandName, brand.username));
+          })}
+        </div>
+      )}
 
-                <div className="min-w-0 flex-1 space-y-1">
-                  <button
-                    type="button"
-                    onClick={() => navigateToBrandCatalog(brand.id)}
-                    className="max-w-full truncate text-left font-semibold text-gray-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-300"
-                    title={`Open ${brand.brandName} catalog`}
-                  >
-                    {brand.brandName}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigateToBrandCatalog(brand.id)}
-                    className="max-w-full truncate text-left text-sm text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-300"
-                    title={`Open @${brand.username} catalog`}
-                  >
-                    @{brand.username}
-                  </button>
-                  {brand.brandTitle ? (
-                    <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-1">{brand.brandTitle}</p>
-                  ) : null}
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                    {brand.location ? (
-                      <span className="inline-flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5" />
-                        <span className="line-clamp-1">{brand.location}</span>
-                      </span>
-                    ) : null}
-                    {brand.patchedAt ? (
-                      <span className="inline-flex items-center gap-1">
-                        <CalendarClock className="h-3.5 w-3.5" />
-                        <span>Patched {new Date(brand.patchedAt).toLocaleDateString()}</span>
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 self-start sm:self-center">
-                  <div className="relative group">
-                    <span
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-base dark:border-indigo-800 dark:bg-indigo-900/30"
-                      role="img"
-                      aria-label="Patch details"
-                    >
-                      {patchDetailsEmoji}
-                    </span>
-                    <span className="pointer-events-none absolute right-0 top-10 z-20 min-w-[180px] rounded-xl bg-gray-900 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                      {brand.description?.trim() || 'Patched brand connection active.'}
-                    </span>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => navigateToBrandCatalog(brand.id)}
-                  >
-                    Catalog
-                  </Button>
-                  {isOwner ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleUnpatchBrand(brand.id)}
-                      disabled={unpatchingBrandId === brand.id}
-                    >
-                      {unpatchingBrandId === brand.id ? 'Unpatching...' : 'Unpatch'}
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+      {viewMode === 'compact' && (
+        <div className="flex flex-wrap gap-2">
+          {sortedPatchedBrands.map((brand) => {
+            const avatar = resolveProfileImageSource({ profileImage: brand.profileImage, profileImageId: brand.profileImageId, profileImageFile: brand.profileImageFile, brandLogo: brand.brandLogo });
+            return renderCompactPill(brand, avatar, getAvatarFallback(brand.brandName, brand.username));
+          })}
+        </div>
+      )}
     </div>
   );
 };

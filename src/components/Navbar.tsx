@@ -9,6 +9,7 @@ import {
   selectCartTotalQuantity,
   selectCartIsDrawerOpen,
   fetchCart,
+  resetCartState,
 } from '../features/cartSlice';
 import {
   openWishlistDrawer,
@@ -16,6 +17,7 @@ import {
   fetchWishlist,
   selectWishlistTotal,
   selectWishlistIsDrawerOpen,
+  resetWishlistState,
 } from '../features/wishlistSlice';
 import type { RootState, AppDispatch } from '../store';
 // Notifications bootstrap logic moved to useNotificationsBootstrap hook mounted at app root.
@@ -65,7 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   React.useEffect(() => {
     if (isAuthenticated) {
       dispatch(fetchCart());
-      dispatch(fetchWishlist({}));
+      dispatch(fetchWishlist({ page: 1, limit: 200 }));
     }
   }, [isAuthenticated, dispatch]);
 
@@ -304,12 +306,11 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                   } catch (e) { void e; }
                   // Announce logout before clearing user
                   dispatch(addLocalNotification({ message: 'Signed out successfully.' }));
-                  localStorage.removeItem(env.tokenStorageKey);
-                  localStorage.removeItem('access_token');
-                  localStorage.removeItem('accessToken');
                   dropStoredAccessToken();
                   localStorage.removeItem(env.userStorageKey);
                   dispatch(clearUser());
+                  dispatch(resetCartState());
+                  dispatch(resetWishlistState());
                   dispatch(resetUnreadCount());
                   setShowProfileMenu(false);
                   navigate('/', { replace: true });

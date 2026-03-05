@@ -5,5 +5,6 @@ export { default as RestoreDeletedProductModal } from './RestoreDeletedProductMo
 export { default as PermanentDeleteProductModal } from './PermanentDeleteProductModal';
 export { default as ComingSoonModal } from './ComingSoonModal';
 export { default as DiscardChangesModal } from './DiscardChangesModal';
+export { default as BulkDeleteProductsModal } from './BulkDeleteProductsModal';
 export { default as ProductActionsMenu, getDefaultProductActions } from './ProductActionsMenu';
 export type { ProductAction } from './ProductActionsMenu';

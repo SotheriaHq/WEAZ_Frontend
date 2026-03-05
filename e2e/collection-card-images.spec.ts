@@ -35,10 +35,6 @@ test.describe('Collection Card Images', () => {
         const imgTag = imageArea.locator('img');
         const imgCount = await imgTag.count();
 
-        // Also check for the fallback avatar (div with initials text)
-        const fallback = imageArea.locator('[class*="DefaultAvatar"], [class*="default-avatar"]');
-        const fallbackCount = await fallback.count();
-
         // At least one of: img tag should exist or fallback should not exist
         // For a published collection with a cover image, we expect an <img>
         if (imgCount > 0) {

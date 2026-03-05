@@ -21,7 +21,7 @@ import { FrostedButton } from '@/components/ui/FrostedButton';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
-import MediaRenderer from '@/components/media/MediaRenderer';
+import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 
 // Promo code type
@@ -37,6 +37,22 @@ const VALID_PROMO_CODES: Record<string, PromoCode> = {
   'SAVE20': { code: 'SAVE20', discountPercent: 20, minOrderAmount: 50000 },
   'FIRST10': { code: 'FIRST10', discountPercent: 10 },
   'FLAT5000': { code: 'FLAT5000', discountAmount: 5000, minOrderAmount: 30000 },
+};
+
+// Small component to handle signed URL resolution for cart thumbnails
+const CartItemThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+  const { url, loading } = useSignedFileUrl(undefined, src);
+  if (loading) {
+    return <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg" />;
+  }
+  return (
+    <img
+      src={url || src}
+      alt={alt}
+      className="w-full h-full object-cover rounded-lg"
+      loading="lazy"
+    />
+  );
 };
 
 /**
@@ -218,22 +234,22 @@ const CartDrawer: React.FC = () => {
               {/* Glass panel */}
               <div className="h-full bg-white/98 dark:bg-gray-950/98 backdrop-blur-2xl border-l border-white/30 dark:border-white/10 shadow-2xl flex flex-col">
               {/* Header */}
-              <div className="flex items-center justify-between p-5 border-b border-gray-200/60 dark:border-gray-800/60">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200/60 dark:border-gray-800/60">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-gray-900 dark:text-white">
                     Your Cart
                   </h2>
                   {totalQuantity > 0 && (
-                    <span className="px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-sm font-semibold">
+                    <span className="px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-[10px] font-semibold">
                       {totalQuantity} {totalQuantity === 1 ? 'item' : 'items'}
                     </span>
                   )}
                 </div>
                 <button
                   onClick={() => dispatch(closeCartDrawer())}
-                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors"
+                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors"
                 >
-                  <X size={22} className="text-gray-500 dark:text-gray-400" />
+                  <X size={16} className="text-gray-500 dark:text-gray-400" />
                 </button>
               </div>
 
@@ -304,101 +320,117 @@ const CartDrawer: React.FC = () => {
                     </FrostedButton>
                   </div>
                 ) : (
-                  <div className="p-4 space-y-3">
+                  <div className="p-3 space-y-2">
                     {items.map((item, index) => (
                       <motion.div
                         key={item.id}
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="group relative flex gap-4 p-3 rounded-2xl bg-gray-50/80 dark:bg-gray-900/60 border border-gray-100 dark:border-gray-800/60 hover:border-purple-200 dark:hover:border-purple-800/40 transition-all duration-200"
+                        transition={{ delay: index * 0.04 }}
+                        className="group relative flex gap-3 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/80 border border-gray-200/80 dark:border-gray-700/60 shadow-sm hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700/50 transition-all duration-200"
                       >
                         {/* Delete button - top right */}
                         <button
                           onClick={() => handleRemoveItem(item.id)}
                           disabled={isLoading}
-                          className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200"
+                          className="absolute -top-1.5 -right-1.5 p-1 text-gray-400 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-sm hover:text-red-500 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={12} />
                         </button>
 
-                        {/* Thumbnail */}
-                        <div className="max-w-20 max-h-24 flex-shrink-0 rounded-xl overflow-hidden">
+                        {/* Thumbnail - fixed size */}
+                        <div 
+                          className="w-16 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer"
+                          onClick={() => {
+                            dispatch(closeCartDrawer());
+                            navigate(`/products/${item.productId}`);
+                          }}
+                        >
                           {item.product.thumbnail ? (
-                            <MediaRenderer
-                              kind="image"
+                            <CartItemThumbnail
                               src={item.product.thumbnail}
                               alt={item.product.name}
-                              maxHeightClassName="max-h-24"
-                              maxWidthClassName="max-w-20"
-                              className="rounded-xl"
-                              mediaClassName="rounded-xl"
                             />
                           ) : (
-                            <div className="w-20 h-24 flex items-center justify-center text-gray-400 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
-                              <ShoppingBag size={24} />
+                            <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-gray-600">
+                              <ShoppingBag size={20} />
                             </div>
                           )}
                         </div>
 
-                        {/* Details */}
-                        <div className="flex-1 min-w-0 pr-6">
-                          <h4 className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2 leading-snug">
-                            {item.product.name}
-                          </h4>
-                          
-                          {/* Variant info */}
-                          {(item.selectedSize || item.selectedColor) && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              {[
-                                item.selectedSize && `Size: ${item.selectedSize}`,
-                                item.selectedColor && `Color: ${item.selectedColor}`,
-                              ]
-                                .filter(Boolean)
-                                .join(' • ')}
-                            </p>
-                          )}
+                        {/* Details & Controls */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                          {/* Top: Name + Brand */}
+                          <div 
+                            className="cursor-pointer group/link"
+                            onClick={() => {
+                              dispatch(closeCartDrawer());
+                              navigate(`/products/${item.productId}`);
+                            }}
+                          >
+                            <h4 className="text-xs font-semibold text-gray-900 dark:text-white line-clamp-1 leading-tight group-hover/link:text-purple-600 dark:group-hover/link:text-purple-400 transition-colors">
+                              {item.product.name}
+                            </h4>
+                            {item.brand?.name && (
+                              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                                {item.brand.name}
+                              </p>
+                            )}
+                            
+                            {/* Variant info */}
+                            {(item.selectedSize || item.selectedColor) && (
+                              <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                {[
+                                  item.selectedSize && `Size: ${item.selectedSize}`,
+                                  item.selectedColor && `Color: ${item.selectedColor}`,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')}
+                              </p>
+                            )}
+                          </div>
 
-                          {/* Quantity controls */}
-                          <div className="flex items-center gap-3 mt-3">
-                            <div className="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900">
+                          {/* Bottom: Quantity + Price */}
+                          <div className="flex items-center justify-between mt-1.5">
+                            {/* Compact quantity stepper */}
+                            <div className="flex items-center rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900/80">
                               <button
                                 onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
                                 disabled={item.quantity <= 1 || isLoading}
-                                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                className="w-6 h-6 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                               >
-                                <Minus size={14} />
+                                <Minus size={10} />
                               </button>
-                              <span className="w-8 text-center text-sm font-semibold text-gray-900 dark:text-white">
+                              <span className="w-6 text-center text-xs font-semibold text-gray-900 dark:text-white">
                                 {item.quantity}
                               </span>
                               <button
                                 onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
                                 disabled={isLoading}
-                                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors"
+                                className="w-6 h-6 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 transition-colors"
                               >
-                                <Plus size={14} />
+                                <Plus size={10} />
                               </button>
                             </div>
-                          </div>
-                        </div>
 
-                        {/* Price - right aligned */}
-                        <div className="flex flex-col items-end justify-between py-1">
-                          {item.product.isOnSale && item.product.salePrice ? (
-                            <>
-                              <span className="text-xs text-gray-400 line-through">
-                                {formatPrice(item.product.price * item.quantity)}
-                              </span>
-                              <span className="text-base font-bold text-gray-900 dark:text-white">
-                                {formatPrice(item.product.effectivePrice * item.quantity)}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-base font-bold text-gray-900 dark:text-white mt-auto">
-                              {formatPrice(item.product.effectivePrice * item.quantity)}
-                            </span>
-                          )}
+                            {/* Price */}
+                            <div className="flex flex-col items-end">
+                              {item.product.isOnSale && item.product.salePrice ? (
+                                <>
+                                  <span className="text-[10px] text-gray-400 line-through leading-none">
+                                    {formatPrice(item.product.price * item.quantity)}
+                                  </span>
+                                  <span className="text-sm font-bold text-gray-900 dark:text-white leading-tight">
+                                    {formatPrice(item.product.effectivePrice * item.quantity)}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                  {formatPrice(item.product.effectivePrice * item.quantity)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </motion.div>
                     ))}
@@ -408,36 +440,36 @@ const CartDrawer: React.FC = () => {
 
               {/* Footer - only show when cart has items */}
               {items.length > 0 && (
-                <div className="border-t border-gray-200/60 dark:border-gray-800/60 bg-gradient-to-t from-white via-white to-white/80 dark:from-gray-950 dark:via-gray-950 dark:to-gray-950/80 p-5">
+                <div className="border-t border-gray-200/60 dark:border-gray-800/60 bg-white/40 dark:bg-gray-950/40 backdrop-blur-2xl px-3 py-1.5">
                   {/* Promo Code Section */}
-                  <div className="mb-4">
+                  <div className="mb-1.5">
                     {appliedPromo ? (
-                      <div className="flex items-center justify-between p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
-                            <Check size={16} className="text-green-600 dark:text-green-400" />
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                            <Check size={12} className="text-green-600 dark:text-green-400" />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+                            <p className="text-xs font-semibold text-green-700 dark:text-green-300 leading-tight">
                               {appliedPromo.code} applied
                             </p>
-                            <p className="text-xs text-green-600 dark:text-green-400">
+                            <p className="text-[10px] text-green-600 dark:text-green-400 leading-tight">
                               -{formatPrice(discount)} off
                             </p>
                           </div>
                         </div>
                         <button
                           onClick={handleRemovePromo}
-                          className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-sm font-medium"
+                          className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-xs font-medium"
                         >
                           Remove
                         </button>
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
+                      <div className="space-y-1">
+                        <div className="flex gap-1.5">
                           <div className="relative flex-1">
-                            <Tag size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <Tag size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                             <input
                               type="text"
                               value={promoInput}
@@ -445,22 +477,22 @@ const CartDrawer: React.FC = () => {
                                 setPromoInput(e.target.value.toUpperCase());
                                 setPromoError(null);
                               }}
-                              placeholder="Enter promo code"
-                              className="w-full h-11 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                              placeholder="Promo code"
+                              className="w-full h-7 pl-8 pr-3 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-[11px] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                               onKeyDown={(e) => e.key === 'Enter' && handleApplyPromo()}
                             />
                           </div>
                           <button
                             onClick={handleApplyPromo}
                             disabled={applyingPromo || !promoInput.trim()}
-                            className="px-5 h-11 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-semibold text-sm hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="px-2.5 h-7 rounded-md bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-semibold text-[11px] hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
                             {applyingPromo ? '...' : 'Apply'}
                           </button>
                         </div>
                         {promoError && (
-                          <div className="flex items-center gap-1.5 text-red-500 text-xs">
-                            <AlertCircle size={12} />
+                          <div className="flex items-center gap-1 text-red-500 text-[10px]">
+                            <AlertCircle size={10} />
                             {promoError}
                           </div>
                         )}
@@ -469,66 +501,64 @@ const CartDrawer: React.FC = () => {
                   </div>
 
                   {/* Order Summary */}
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
+                  <div className="space-y-0.5 mb-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
                       <span className="font-medium text-gray-900 dark:text-white">{formatPrice(subtotal)}</span>
                     </div>
                     
                     {appliedPromo && discount > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Discount</span>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 dark:text-gray-400">Discount</span>
                         <span className="font-medium text-green-600 dark:text-green-400">-{formatPrice(discount)}</span>
                       </div>
                     )}
                     
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Shipping</span>
-                      <span className="text-gray-500 dark:text-gray-400 text-xs italic">Calculated at checkout</span>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500 dark:text-gray-400">Shipping</span>
+                      <span className="text-gray-400 dark:text-gray-500 text-[10px] italic">At checkout</span>
                     </div>
                     
-                    <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-800">
-                      <span className="text-base font-semibold text-gray-900 dark:text-white">Total</span>
-                      <span className="text-2xl font-bold text-gray-900 dark:text-white">{formatPrice(total)}</span>
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-200 dark:border-gray-800">
+                      <span className="text-xs font-semibold text-gray-900 dark:text-white">Total</span>
+                      <span className="text-sm font-bold text-gray-900 dark:text-white">{formatPrice(total)}</span>
                     </div>
                   </div>
 
-                  {/* Checkout Button */}
-                  <button
-                    onClick={handleCheckout}
-                    disabled={isLoading}
-                    className="w-full h-14 rounded-xl bg-gradient-to-r from-purple-600 via-purple-600 to-indigo-600 hover:from-purple-700 hover:via-purple-700 hover:to-indigo-700 text-white font-semibold text-base flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Lock size={18} />
-                    Proceed to Checkout
-                  </button>
-
-                  {/* Continue Shopping */}
-                  <button
-                    onClick={handleContinueShopping}
-                    className="w-full mt-3 flex items-center justify-center gap-2 text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 text-sm font-medium transition-colors"
-                  >
-                    <ArrowLeft size={16} />
-                    Continue Shopping
-                  </button>
+                  {/* Checkout + Continue */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleContinueShopping}
+                      className="flex-shrink-0 px-3 h-8 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 text-[11px] font-medium transition-colors flex items-center gap-1"
+                    >
+                      <ArrowLeft size={11} />
+                      Back
+                    </button>
+                    <button
+                      onClick={handleCheckout}
+                      disabled={isLoading}
+                      className="flex-1 h-8 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold text-[11px] flex items-center justify-center gap-1 shadow-md shadow-purple-500/25 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Lock size={12} />
+                      Checkout
+                    </button>
+                  </div>
 
                   {/* Payment Methods */}
-                  <div className="flex items-center justify-center gap-4 mt-5 pt-4 border-t border-gray-200/50 dark:border-gray-800/50">
-                    <span className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800/80 text-xs font-bold text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-gray-700/60">
-                      PAYSTACK
-                    </span>
-                    <span className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800/80 text-xs font-bold text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-gray-700/60">
-                      FLUTTERWAVE
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-8 h-5 rounded bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center shadow-sm">
-                        <span className="text-[8px] font-bold text-white tracking-wide">VISA</span>
+                  <div className="flex items-center justify-center gap-2 mt-1.5 pt-1 border-t border-gray-100 dark:border-gray-800/50">
+                    <span className="text-[9px] text-gray-400">Pay with</span>
+                    <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800/80 text-[9px] font-bold text-gray-500 dark:text-gray-400">PAYSTACK</span>
+                    <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800/80 text-[9px] font-bold text-gray-500 dark:text-gray-400">FLUTTERWAVE</span>
+                    <div className="flex items-center gap-0.5">
+                      <div className="w-6 h-3.5 rounded bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center">
+                        <span className="text-[6px] font-bold text-white">VISA</span>
                       </div>
-                      <div className="w-8 h-5 rounded bg-gradient-to-r from-red-500 to-orange-500 flex items-center justify-center shadow-sm">
-                        <span className="text-[8px] font-bold text-white tracking-wide">MC</span>
+                      <div className="w-6 h-3.5 rounded bg-gradient-to-r from-red-500 to-orange-500 flex items-center justify-center">
+                        <span className="text-[6px] font-bold text-white">MC</span>
                       </div>
                     </div>
                   </div>
+
                 </div>
               )}
             </div>

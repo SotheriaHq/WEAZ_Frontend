@@ -24,6 +24,9 @@ export interface StoreProduct {
   media?: Array<{ id: string; url: string; type: string; isPrimary?: boolean }>;
   mediaIds?: string[];
   sizes: string[];
+  sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+  customMeasurementKeys?: string[];
+  customAvailable?: boolean;
   sizeAvailability: { size: string; inStock: boolean; quantity: number }[];
   colors: string[];
   totalStock: number;
@@ -53,7 +56,6 @@ interface StoreProductCardProps {
 export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   product,
   onViewProduct,
-  isWishlisted: initialWishlisted = false,
   className = '',
   isOwnerView = false,
   onEdit,
@@ -66,15 +68,20 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(initialWishlisted);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
   const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
   const redHeartEmoji = String.fromCodePoint(0x2764, 0xfe0f);
   const whiteHeartEmoji = String.fromCodePoint(0x1f90d);
+  const isCustomAvailable =
+    product.customAvailable === true ||
+    product.sizingMode === 'CUSTOM' ||
+    product.sizingMode === 'RTW_PLUS_CUSTOM' ||
+    (Array.isArray(product.customMeasurementKeys) &&
+      product.customMeasurementKeys.length > 0);
 
-  // Check if product is wishlisted from Redux state
-  const isProductWishlisted = wishlistedIds.has(product.id) || isWishlisted;
+  // Derive wishlist state entirely from Redux for real-time sync
+  const isProductWishlisted = wishlistedIds.has(product.id);
 
   const formatPrice = useCallback((price: number, currency: string = 'NGN') => {
     return new Intl.NumberFormat('en-NG', {
@@ -101,11 +108,9 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     try {
       if (isProductWishlisted) {
         await dispatch(removeFromWishlist(product.id)).unwrap();
-        setIsWishlisted(false);
         toast.success('Removed from wishlist');
       } else {
         await dispatch(addToWishlist(product.id)).unwrap();
-        setIsWishlisted(true);
         toast.success('Added to wishlist');
       }
     } catch (error: any) {
@@ -186,21 +191,20 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   return (
     <article
       className={`
-        group relative flex flex-col
-        bg-white dark:bg-zinc-900/80
+        group relative
         rounded-2xl
-        rounded-lg
         transition-all duration-300 ease-out
         cursor-pointer
         overflow-hidden
+        aspect-[4/5]
         ${className}
       `}
       onClick={handleCardClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Image Container - Match studio card framing */}
-      <div className="relative aspect-[4/5] overflow-hidden bg-gray-50 dark:bg-zinc-800/50">
+      {/* Full-bleed Image Container */}
+      <div className="absolute inset-0 bg-gray-50 dark:bg-zinc-800/50">
         {/* Skeleton loader */}
         {!imgLoaded && !imgError && (
           <div className="absolute inset-0 animate-pulse">
@@ -237,184 +241,196 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             <span className="text-xs text-gray-400 dark:text-zinc-500">No image</span>
           </div>
         )}
+      </div>
 
-        {/* Image overlay gradient for better badge visibility */}
-        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/20 to-transparent pointer-events-none" />
+      {/* Image overlay gradient for better badge visibility */}
+      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/20 to-transparent pointer-events-none z-[1]" />
 
-        {/* Status Badges - Top Left */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
-          {product.isFeatured && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-semibold uppercase tracking-wider shadow-lg shadow-orange-500/25">
-              <Sparkles size={10} />
-              New
-            </span>
-          )}
-          {product.isOnSale && product.discountPercent && (
-            <span className="px-2 py-1 rounded-full bg-rose-500 text-white text-[10px] font-bold shadow-lg shadow-rose-500/25">
-              -{product.discountPercent}%
-            </span>
-          )}
-          {product.isLowStock && !product.isOutOfStock && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/90 text-white text-[10px] font-semibold shadow-lg shadow-amber-500/25">
-              <AlertTriangle size={10} />
-              Low Stock
-            </span>
-          )}
-          {isOwnerView && !product.isOutOfStock && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/90 text-white text-[10px] font-semibold">
-              <Package size={10} />
-              {product.totalStock} in stock
-            </span>
-          )}
-        </div>
-
-        {/* Wishlist Button - Top Right */}
-        {!isOwnerView && (
-          <button
-            type="button"
-            onClick={handleWishlistToggle}
-            disabled={wishlistLoading || isOwnProduct}
-            aria-label={isProductWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-            title={
-              isOwnProduct
-                ? 'Brands cannot wishlist their own products'
-                : isProductWishlisted
-                  ? 'Remove from wishlist'
-                  : 'Add to wishlist'
-            }
-            className={`
-              absolute top-2 right-2 z-10
-              p-2 rounded-full
-              backdrop-blur-md
-              transition-all duration-200 ease-out
-              ${isProductWishlisted
-                ? 'bg-white/90 dark:bg-black/55 text-gray-900 dark:text-white shadow-md ring-1 ring-white/25'
-                : 'bg-black/40 text-white shadow-md ring-1 ring-white/30 hover:bg-black/55'
-              }
-              ${wishlistLoading || isOwnProduct ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110 active:scale-95'}
-            `}
-          >
-            <span role="img" aria-hidden="true" className="text-base leading-none">
-              {isProductWishlisted ? redHeartEmoji : whiteHeartEmoji}
-            </span>
-          </button>
+      {/* Status Badges - Top Left */}
+      <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
+        {product.isFeatured && (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-semibold uppercase tracking-wider shadow-lg shadow-orange-500/25">
+            <Sparkles size={10} />
+            New
+          </span>
         )}
-
-        {/* Owner View: Edit Overlay */}
-        {isOwnerView && onEdit && (
-          <div
-            className={`
-              absolute inset-0
-              flex items-center justify-center
-              bg-black/50 backdrop-blur-sm
-              transition-all duration-300
-              ${isHovered ? 'opacity-100' : 'opacity-0'}
-            `}
-          >
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onEdit?.(product);
-              }}
-              className="px-6 py-3 bg-white text-gray-900 rounded-xl font-semibold text-sm shadow-xl hover:bg-gray-100 transition-all active:scale-95"
-            >
-              Edit Product
-            </button>
-          </div>
+        {product.isOnSale && product.discountPercent && (
+          <span className="px-2 py-1 rounded-full bg-rose-500 text-white text-[10px] font-bold shadow-lg shadow-rose-500/25">
+            -{product.discountPercent}%
+          </span>
         )}
-
-        {/* Out of Stock Overlay */}
-        {product.isOutOfStock && (
-          <div className="absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
-            <span className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold rounded-full shadow-xl">
-              Sold Out
-            </span>
-          </div>
+        {product.isLowStock && !product.isOutOfStock && (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/90 text-white text-[10px] font-semibold shadow-lg shadow-amber-500/25">
+            <AlertTriangle size={10} />
+            Low Stock
+          </span>
+        )}
+        {isCustomAvailable && (
+          <span className="inline-flex items-center px-2 py-1 rounded-full bg-purple-500/90 text-white text-[10px] font-semibold shadow-lg shadow-purple-500/25">
+            ✂️ Custom Available
+          </span>
+        )}
+        {isOwnerView && !product.isOutOfStock && (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/90 text-white text-[10px] font-semibold">
+            <Package size={10} />
+            {product.totalStock} in stock
+          </span>
         )}
       </div>
 
-      {/* Product Info */}
-      <div className="flex flex-col gap-2 p-3 flex-1">
-        {/* Product Name */}
-        <h3 className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1 leading-snug">
-          {product.name}
-        </h3>
-
-        {/* Price Section */}
-        <div className="flex items-baseline gap-2 flex-wrap mb-1">
-          <span className={`text-sm font-semibold ${product.isOnSale ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white'}`}>
-            {formatPrice(product.effectivePrice, product.brand.currency)}
+      {/* Wishlist Button - Top Right */}
+      {!isOwnerView && (
+        <button
+          type="button"
+          onClick={handleWishlistToggle}
+          disabled={wishlistLoading || isOwnProduct}
+          aria-label={isProductWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+          title={
+            isOwnProduct
+              ? 'Brands cannot wishlist their own products'
+              : isProductWishlisted
+                ? 'Remove from wishlist'
+                : 'Add to wishlist'
+          }
+          className={`
+            absolute top-2 right-2 z-10
+            p-2 rounded-full
+            transition-all duration-200 ease-out
+            ${wishlistLoading || isOwnProduct ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110 active:scale-95'}
+          `}
+        >
+          <span role="img" aria-hidden="true" className="text-base leading-none">
+            {isProductWishlisted ? redHeartEmoji : whiteHeartEmoji}
           </span>
-          {product.isOnSale && product.salePrice && (
-            <span className="text-xs text-gray-400 dark:text-gray-500 line-through">
-              {formatPrice(product.price, product.brand.currency)}
-            </span>
-          )}
-        </div>
+        </button>
+      )}
 
-        {/* Add to Cart Button (Customer View) */}
-        {!isOwnerView && (
+      {/* Owner View: Edit Overlay */}
+      {isOwnerView && onEdit && (
+        <div
+          className={`
+            absolute inset-0 z-20
+            flex items-center justify-center
+            bg-black/50 backdrop-blur-sm
+            transition-all duration-300
+            ${isHovered ? 'opacity-100' : 'opacity-0'}
+          `}
+        >
           <button
             type="button"
-            onClick={handleQuickAddToCart}
-            disabled={cartLoading || product.isOutOfStock || isOwnProduct}
-            title={
-              isOwnProduct
-                ? 'Brands cannot add their own products to cart'
-                : product.isOutOfStock
-                  ? 'Item is out of stock'
-                  : 'Add to your shopping cart'
-            }
-            className={`
-              mt-auto w-full py-2 px-3 rounded-lg
-              font-medium text-xs
-              flex items-center justify-center gap-2
-              transition-all duration-200
-              border
-              ${product.isOutOfStock || isOwnProduct
-                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed dark:bg-white/5 dark:border-white/10 dark:text-zinc-500'
-                : 'bg-transparent border-gray-200 text-gray-900 hover:bg-black hover:text-white hover:border-black dark:border-white/20 dark:text-white dark:hover:bg-white dark:hover:text-black active:scale-[0.98]'
-              }
-              ${cartLoading ? 'opacity-70 cursor-wait' : ''}
-            `}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onEdit?.(product);
+            }}
+            className="px-6 py-3 bg-white text-gray-900 rounded-xl font-semibold text-sm shadow-xl hover:bg-gray-100 transition-all active:scale-95"
           >
-            <ShoppingBag size={14} />
-            {isOwnProduct
-              ? 'Unavailable'
-              : product.isOutOfStock
-              ? 'Sold Out'
-              : product.sizes.length > 0 || product.colors.length > 0
-                ? 'Select Options'
-                : 'Buy'
-            }
+            Edit Product
           </button>
-        )}
+        </div>
+      )}
 
-        {/* Engagement Stats (Visible mostly to Owner, or small on bottom) */}
-        {isOwnerView && (
-          <div className="flex items-center gap-4 mt-auto pt-2 border-t border-gray-100 dark:border-white/5">
-            <span className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
-              <Link2 size={12} className={product.threadsCount > 0 ? 'text-indigo-400' : ''} />
-              <span>{product.threadsCount}</span>
+      {/* Out of Stock Overlay */}
+      {product.isOutOfStock && (
+        <div className="absolute inset-0 z-20 bg-white/60 dark:bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
+          <span className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold rounded-full shadow-xl">
+            Sold Out
+          </span>
+        </div>
+      )}
+
+      {/* Frosted Glass Info Overlay */}
+      <div
+        className="
+          absolute inset-x-0 bottom-0 z-10
+          backdrop-blur-xl
+          bg-black/30
+          border-t border-white/10
+          p-3
+        "
+      >
+        <div className="flex flex-col gap-1.5">
+          {/* Product Name */}
+          <h3 className="text-sm font-semibold text-white line-clamp-1 leading-snug drop-shadow-sm">
+            {product.name}
+          </h3>
+
+          {/* Brand Name */}
+          <p className="text-[11px] text-white/60 line-clamp-1">
+            {product.brand.name}
+          </p>
+
+          {/* Price Section */}
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className={`text-sm font-bold drop-shadow-sm ${product.isOnSale ? 'text-rose-300' : 'text-white'}`}>
+              {formatPrice(product.effectivePrice, product.brand.currency)}
             </span>
-            <span className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
-              <Eye size={12} />
-              <span>{product.viewsCount}</span>
-            </span>
-            {/* Stock indicator for owner view */}
-            <span className={`ml-auto text-xs font-medium ${
-              product.isOutOfStock
-                ? 'text-rose-500'
-                : product.isLowStock
-                  ? 'text-amber-500'
-                  : 'text-emerald-500'
-            }`}>
-              {product.isOutOfStock ? 'Out' : `${product.totalStock}`}
-            </span>
+            {product.isOnSale && product.salePrice && (
+              <span className="text-xs text-white/50 line-through">
+                {formatPrice(product.price, product.brand.currency)}
+              </span>
+            )}
           </div>
-        )}
+
+          {/* Stock + Action Row */}
+          <div className="flex items-center justify-between mt-1">
+            {/* Stock indicator */}
+            {!product.isOutOfStock && (
+              <span className={`text-[10px] font-medium flex items-center gap-1 ${
+                product.isLowStock ? 'text-amber-300' : 'text-emerald-300'
+              }`}>
+                <span className={`inline-block w-1.5 h-1.5 rounded-full ${
+                  product.isLowStock ? 'bg-amber-400' : 'bg-emerald-400'
+                }`} />
+                {product.totalStock} in stock
+              </span>
+            )}
+
+            {/* Action buttons row */}
+            <div className="flex items-center gap-1.5 ml-auto">
+              {/* Add to Cart Button (Customer View) */}
+              {!isOwnerView && (
+                <button
+                  type="button"
+                  onClick={handleQuickAddToCart}
+                  disabled={cartLoading || product.isOutOfStock || isOwnProduct}
+                  title={
+                    isOwnProduct
+                      ? 'Brands cannot add their own products to cart'
+                      : product.isOutOfStock
+                        ? 'Item is out of stock'
+                        : 'Add to your shopping cart'
+                  }
+                  className={`
+                    p-2 rounded-lg
+                    transition-all duration-200
+                    ${product.isOutOfStock || isOwnProduct
+                      ? 'text-white/30 cursor-not-allowed'
+                      : 'text-white/90 hover:bg-white/20 hover:text-white active:scale-95'
+                    }
+                    ${cartLoading ? 'opacity-70 cursor-wait' : ''}
+                  `}
+                >
+                  <ShoppingBag size={16} />
+                </button>
+              )}
+
+              {/* Owner View: Engagement Stats */}
+              {isOwnerView && (
+                <>
+                  <span className="flex items-center gap-1 text-[10px] text-white/60">
+                    <Link2 size={11} className={product.threadsCount > 0 ? 'text-indigo-300' : ''} />
+                    {product.threadsCount}
+                  </span>
+                  <span className="flex items-center gap-1 text-[10px] text-white/60">
+                    <Eye size={11} />
+                    {product.viewsCount}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </article>
   );

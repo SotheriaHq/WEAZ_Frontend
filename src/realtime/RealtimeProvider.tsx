@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { env } from '@/config/env';
-import { getStoredAccessToken } from '@/api/httpClient';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { wsApplied, incrementCommentCount, decrementCommentCount } from '@/features/engagementSlice';
@@ -108,8 +107,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
 
   // Establish socket
   useEffect(() => {
-    const token = getStoredAccessToken();
-    if (!token || !userId) {
+    if (!userId) {
       const current = socketRef.current;
       if (current) {
         current.removeAllListeners();
@@ -128,7 +126,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
 
     const url = buildUrl();
     const s = io(url, {
-      auth: token ? { token } : undefined,
+      withCredentials: true,
       transports: ['polling', 'websocket'],
       autoConnect: true,
       timeout: 3000,
@@ -229,7 +227,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     }, 10000);
     pendingJoinTimeouts.current.set(room, timeoutId);
 
-    s.emit('join', { room, userId });
+    s.emit('join', { room });
   }, [clearPendingJoin, userId]);
 
   const joinCollection = useCallback((collectionId: string) => safeJoin(`COLLECTION:${collectionId}`), [safeJoin]);

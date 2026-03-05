@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
-import { getStoredAccessToken } from '../api/httpClient';
+import { useAuth } from '@/context/AuthContext';
 
 interface RequireBrandProps {
   children?: React.ReactNode;
@@ -10,20 +10,20 @@ interface RequireBrandProps {
 
 const RequireBrand: React.FC<RequireBrandProps> = ({ children }) => {
   const { profile: user } = useSelector((state: RootState) => state.user);
+  const { loading } = useAuth();
 
   if (!user) {
     // If not logged in, redirect to login
     return <Navigate to="/login" replace />;
   }
 
-  // If we have a token but the persisted user is stale/partial, wait for AuthProvider
-  // to hydrate the real profile rather than redirecting incorrectly.
+  // If persisted user is stale/partial, wait for AuthProvider hydration
+  // to avoid incorrect redirects.
   if (user.type !== 'BRAND') {
-    const token = getStoredAccessToken();
-    if (token && (user.type as any) == null) {
+    if (loading && (user.type as any) == null) {
       return (
         <div className="flex items-center justify-center min-h-[240px]">
-          <div className="text-sm text-gray-500">Loading your brand dashboard…</div>
+          <div className="text-sm text-gray-500">Loading your brand dashboard...</div>
         </div>
       );
     }

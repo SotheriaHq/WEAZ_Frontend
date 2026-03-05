@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import type { RootState } from "@/store";
 import { brandApi } from "@/api/BrandApi";
 import { apiClient } from "@/api/httpClient";
+import { productApi } from "@/api/ProductApi";
 import {
   getBrandProductsForOwner,
   type Product as StoreProduct,
@@ -43,6 +44,28 @@ type CategoryOption = {
 };
 
 const FILTER_SELECTION_STORAGE_PREFIX = "storeCollectionFilterSelection:";
+
+const areFilterSelectionsEqual = (
+  a: FilterSelection,
+  b: FilterSelection,
+): boolean => {
+  const aKeys = Object.keys(a).sort();
+  const bKeys = Object.keys(b).sort();
+  if (aKeys.length !== bKeys.length) return false;
+
+  for (let index = 0; index < aKeys.length; index += 1) {
+    const key = aKeys[index];
+    if (key !== bKeys[index]) return false;
+    const aValues = Array.isArray(a[key]) ? [...a[key]].sort() : [];
+    const bValues = Array.isArray(b[key]) ? [...b[key]].sort() : [];
+    if (aValues.length !== bValues.length) return false;
+    for (let valueIndex = 0; valueIndex < aValues.length; valueIndex += 1) {
+      if (aValues[valueIndex] !== bValues[valueIndex]) return false;
+    }
+  }
+
+  return true;
+};
 
 const normalizeFilterSelectionFromDetail = (detail: any): FilterSelection => {
   if (!detail || typeof detail !== "object") return {};
@@ -120,12 +143,16 @@ const normalizeFilterSelectionFromProduct = (raw: any): FilterSelection => {
   };
 
   const directSelection = mapSelection((raw as any).filterSelection);
-  if (Object.keys(directSelection).length > 0) return directSelection;
+  if (Object.keys(directSelection).length > 0) {
+    return directSelection;
+  }
 
   const rows = Array.isArray((raw as any).filters)
     ? ((raw as any).filters as any[])
     : [];
-  if (rows.length === 0) return {};
+  if (rows.length === 0) {
+    return {};
+  }
 
   const next: FilterSelection = {};
   rows.forEach((row) => {
@@ -154,6 +181,28 @@ const normalizeLinkedProduct = (raw: any): StoreProduct | null => {
   if (!raw || typeof raw !== "object") return null;
   const id = typeof raw.id === "string" ? raw.id : "";
   if (!id) return null;
+  const normalizedFilterSelection = normalizeFilterSelectionFromProduct(raw);
+  const normalizedFilters = Array.isArray(raw.filters)
+    ? raw.filters.filter((row: unknown) => {
+        if (!row || typeof row !== "object") return false;
+        const item = row as {
+          dimensionId?: unknown;
+          valueId?: unknown;
+        };
+        return (
+          typeof item.dimensionId === "string" &&
+          item.dimensionId.length > 0 &&
+          typeof item.valueId === "string" &&
+          item.valueId.length > 0
+        );
+      })
+    : [];
+  const normalizedFilterValueIds = Array.isArray(raw.filterValueIds)
+    ? raw.filterValueIds.filter(
+        (value: unknown): value is string =>
+          typeof value === "string" && value.length > 0,
+      )
+    : [];
   return {
     id,
     collectionId: typeof raw.collectionId === "string" ? raw.collectionId : "",
@@ -192,12 +241,52 @@ const normalizeLinkedProduct = (raw: any): StoreProduct | null => {
     tags: Array.isArray(raw.tags)
       ? raw.tags.filter((v: unknown) => typeof v === "string")
       : [],
+    filterSelection: normalizedFilterSelection,
+    filters: normalizedFilters as StoreProduct["filters"],
+    filterValueIds: normalizedFilterValueIds,
     gender:
       raw.gender === "MALE" ||
       raw.gender === "FEMALE" ||
       raw.gender === "EVERYBODY"
         ? raw.gender
         : "EVERYBODY",
+    categoryId:
+      typeof raw.categoryId === "string" && raw.categoryId
+        ? raw.categoryId
+        : undefined,
+    categoryTypeId:
+      typeof raw.categoryTypeId === "string" && raw.categoryTypeId
+        ? raw.categoryTypeId
+        : typeof raw.subCategoryId === "string" && raw.subCategoryId
+          ? raw.subCategoryId
+          : undefined,
+    subCategoryId:
+      typeof raw.subCategoryId === "string" && raw.subCategoryId
+        ? raw.subCategoryId
+        : typeof raw.categoryTypeId === "string" && raw.categoryTypeId
+          ? raw.categoryTypeId
+          : undefined,
+    categoryType:
+      raw.categoryType && typeof raw.categoryType === "object"
+        ? {
+            id:
+              typeof raw.categoryType.id === "string"
+                ? raw.categoryType.id
+                : "",
+            categoryId:
+              typeof raw.categoryType.categoryId === "string"
+                ? raw.categoryType.categoryId
+                : "",
+            slug:
+              typeof raw.categoryType.slug === "string"
+                ? raw.categoryType.slug
+                : "",
+            name:
+              typeof raw.categoryType.name === "string"
+                ? raw.categoryType.name
+                : "",
+          }
+        : undefined,
     isActive: raw.isActive !== false,
     isFeatured: Boolean(raw.isFeatured),
     viewsCount: typeof raw.viewsCount === "number" ? raw.viewsCount : 0,
@@ -232,6 +321,10 @@ const StoreCollectionCreate: React.FC = () => {
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
+  const [hasManualFilterEdits, setHasManualFilterEdits] = useState(false);
+  const [hasManualTagEdits, setHasManualTagEdits] = useState(false);
+  const [hasManualCategoryEdit, setHasManualCategoryEdit] = useState(false);
+  const [hasManualSubCategoryEdit, setHasManualSubCategoryEdit] = useState(false);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
   const [products, setProducts] = useState<StoreProduct[]>([]);
@@ -274,11 +367,11 @@ const StoreCollectionCreate: React.FC = () => {
   >([]);
   const hydratedSessionRef = useRef<string | null>(null);
   const submitLockRef = useRef(false);
+  const hydratedSelectionMetaRef = useRef<Set<string>>(new Set());
   const autoCleanupSessionRef = useRef(
     autoCleanupParam === "1" || returnMode === "new" || returnMode === "existing",
   );
   const abandoningSessionRef = useRef(false);
-  const skipAbandonOnUnmountRef = useRef(false);
 
   const clearSessionFilterCache = useCallback((sessionId?: string | null) => {
     if (!sessionId) return;
@@ -298,6 +391,16 @@ const StoreCollectionCreate: React.FC = () => {
 
       abandoningSessionRef.current = true;
       try {
+        // Clean up any products that were created during this session
+        // so they don't persist as orphaned DRAFT products.
+        if (sessionDraftProductIds.length > 0) {
+          await Promise.allSettled(
+            sessionDraftProductIds.map((productId) =>
+              productApi.deleteProduct(productId),
+            ),
+          );
+        }
+
         await abandonStoreCollection(collectionSessionId, {
           permanent: true,
           keepalive: options?.keepalive,
@@ -310,13 +413,12 @@ const StoreCollectionCreate: React.FC = () => {
         abandoningSessionRef.current = false;
       }
     },
-    [clearSessionFilterCache, collectionSessionId],
+    [clearSessionFilterCache, collectionSessionId, sessionDraftProductIds],
   );
 
   const navigateAway = useCallback(
     async (target: string | number) => {
       await abandonSessionIfNeeded();
-      skipAbandonOnUnmountRef.current = false;
       if (typeof target === "number") {
         navigate(target);
         return;
@@ -415,7 +517,17 @@ const StoreCollectionCreate: React.FC = () => {
       );
 
       const links = Array.isArray(detail.products) ? detail.products : [];
-      const orderedLinks = [...links].sort((a: any, b: any) => {
+      const includeInactiveLinkedProducts = detail.status === "DRAFT";
+      const eligibleLinks = links.filter((link: any) => {
+        const product = link?.product;
+        if (!product || typeof product !== "object") return false;
+        if (product.deletedAt || product.archivedAt) return false;
+        if (!includeInactiveLinkedProducts && product.isActive === false) {
+          return false;
+        }
+        return true;
+      });
+      const orderedLinks = [...eligibleLinks].sort((a: any, b: any) => {
         const aOrder =
           typeof a?.orderIndex === "number" ? a.orderIndex : Number.MAX_SAFE_INTEGER;
         const bOrder =
@@ -428,7 +540,7 @@ const StoreCollectionCreate: React.FC = () => {
           String(link?.product?.id || link?.productId || link?.id || ""),
         )
         .filter(Boolean);
-      const linkedProducts = links
+      const linkedProducts = eligibleLinks
         .map((link: any) => normalizeLinkedProduct(link?.product))
         .filter(Boolean) as StoreProduct[];
       setExistingLinkedProductIds(linkedIds);
@@ -443,8 +555,38 @@ const StoreCollectionCreate: React.FC = () => {
         setProducts((prev) => {
           const merged = new Map(prev.map((product) => [product.id, product]));
           linkedProducts.forEach((product) => {
-            if (!merged.has(product.id)) {
+            const existing = merged.get(product.id);
+            if (!existing) {
               merged.set(product.id, product);
+              return;
+            }
+            const metadataScore = (candidate: StoreProduct) => {
+              const filterCount = Object.values(candidate.filterSelection ?? {}).reduce(
+                (sum, values) =>
+                  sum +
+                  (Array.isArray(values)
+                    ? values.filter((value) => typeof value === "string").length
+                    : 0),
+                0,
+              );
+              const hasCategory =
+                typeof candidate.categoryId === "string" && candidate.categoryId.length > 0
+                  ? 1
+                  : 0;
+              const hasSubCategory =
+                (typeof candidate.subCategoryId === "string" && candidate.subCategoryId.length > 0) ||
+                (typeof candidate.categoryTypeId === "string" && candidate.categoryTypeId.length > 0)
+                  ? 1
+                  : 0;
+              const hasTags = Array.isArray(candidate.tags) && candidate.tags.length > 0 ? 1 : 0;
+              return filterCount + hasCategory + hasSubCategory + hasTags;
+            };
+
+            if (metadataScore(product) > metadataScore(existing)) {
+              merged.set(product.id, {
+                ...existing,
+                ...product,
+              });
             }
           });
           return Array.from(merged.values());
@@ -589,9 +731,6 @@ const StoreCollectionCreate: React.FC = () => {
   useEffect(() => {
     if (!preselectProductId) return;
     void loadProducts();
-    setSessionDraftProductIds((prev) =>
-      prev.includes(preselectProductId) ? prev : [...prev, preselectProductId],
-    );
     setSessionFlowProductIds((prev) =>
       prev.includes(preselectProductId) ? prev : [...prev, preselectProductId],
     );
@@ -601,7 +740,21 @@ const StoreCollectionCreate: React.FC = () => {
       return [...prev, preselectProductId];
     });
     setCreationMode("new");
-  }, [preselectProductId, loadProducts]);
+
+    // Eagerly link the product to the collection in the backend so it persists
+    // across navigation (e.g. when user goes to create a second product).
+    if (collectionSessionId) {
+      addProductsToCollection(collectionSessionId, [preselectProductId]).catch(
+        (err) => {
+          console.warn(
+            "[StoreCollectionCreate] Failed to eagerly link product to collection",
+            preselectProductId,
+            err,
+          );
+        },
+      );
+    }
+  }, [preselectProductId, loadProducts, collectionSessionId]);
 
   useEffect(() => {
     if (returnMode === "new") {
@@ -622,8 +775,9 @@ const StoreCollectionCreate: React.FC = () => {
     return () => {
       window.removeEventListener("beforeunload", handlePageExit);
       window.removeEventListener("pagehide", handlePageExit);
-      if (skipAbandonOnUnmountRef.current) return;
-      void abandonSessionIfNeeded();
+      // Do not auto-abandon on generic component unmount.
+      // In React StrictMode (development), effect cleanups run extra times and can
+      // otherwise delete in-progress session drafts unexpectedly.
     };
   }, [abandonSessionIfNeeded, collectionSessionId]);
 
@@ -665,6 +819,22 @@ const StoreCollectionCreate: React.FC = () => {
     return cleaned.slice(0, MAX_TAGS);
   }, [tags]);
 
+  const selectedFilterValueIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          Object.values(filterSelection)
+            .flatMap((values) =>
+              Array.isArray(values)
+                ? values.filter((value): value is string => typeof value === "string")
+                : [],
+            )
+            .filter((value) => value.trim().length > 0),
+        ),
+      ),
+    [filterSelection],
+  );
+
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === categoryId),
     [categories, categoryId],
@@ -676,6 +846,7 @@ const StoreCollectionCreate: React.FC = () => {
     if (!raw) return;
     const cleaned = raw.replace(/#/g, "").trim().slice(0, TAG_CHAR_LIMIT);
     if (!cleaned) return;
+    setHasManualTagEdits(true);
     setTags((prev) => {
       if (prev.length >= MAX_TAGS) {
         toast.error(`You can add up to ${MAX_TAGS} tags.`);
@@ -699,7 +870,13 @@ const StoreCollectionCreate: React.FC = () => {
   );
 
   const handleRemoveTag = useCallback((tagToRemove: string) => {
+    setHasManualTagEdits(true);
     setTags((prev) => prev.filter((tag) => tag !== tagToRemove));
+  }, []);
+
+  const handleFilterSelectionChange = useCallback((next: FilterSelection) => {
+    setHasManualFilterEdits(true);
+    setFilterSelection(next);
   }, []);
 
   const filteredProducts = useMemo(() => {
@@ -742,10 +919,71 @@ const StoreCollectionCreate: React.FC = () => {
   );
 
   useEffect(() => {
-    if (selectedProducts.length === 0) return;
+    const selectedProductMap = new Map(products.map((product) => [product.id, product]));
+    const missingMetadataIds = selectedProductIds.filter((productId) => {
+      if (hydratedSelectionMetaRef.current.has(productId)) return false;
+      const product = selectedProductMap.get(productId);
+      if (!product) return false;
+      const filterSelection = normalizeFilterSelectionFromProduct(product);
+      const hasFilterSelection = Object.keys(filterSelection).length > 0;
+      const hasFilterRows = Array.isArray(product.filters) && product.filters.length > 0;
+      const hasFilterValueIds =
+        Array.isArray(product.filterValueIds) && product.filterValueIds.length > 0;
+      return !(hasFilterSelection || hasFilterRows || hasFilterValueIds);
+    });
 
-    if (tags.length === 0) {
-      const inferredTags = Array.from(
+    if (missingMetadataIds.length === 0) return;
+
+    let mounted = true;
+    const hydrateMissingMetadata = async () => {
+      const hydrated: StoreProduct[] = [];
+
+      for (const productId of missingMetadataIds) {
+        hydratedSelectionMetaRef.current.add(productId);
+        try {
+          const detail = await productApi.getProduct(productId);
+          const normalized = normalizeLinkedProduct(detail);
+          if (normalized) hydrated.push(normalized);
+        } catch (err) {
+          // hydration fetch failed – ignore this product
+        }
+      }
+
+      if (!mounted || hydrated.length === 0) return;
+
+      setProducts((prev) => {
+        const byId = new Map(prev.map((product) => [product.id, product]));
+        hydrated.forEach((product) => {
+          const existing = byId.get(product.id);
+          byId.set(product.id, existing ? { ...existing, ...product } : product);
+        });
+        return Array.from(byId.values());
+      });
+    };
+
+    void hydrateMissingMetadata();
+    return () => {
+      mounted = false;
+    };
+  }, [products, selectedProductIds]);
+
+  useEffect(() => {
+    // When all products are deselected, clear auto-derived fields
+    if (selectedProducts.length === 0) {
+      if (!hasManualFilterEdits) {
+        setFilterSelection((prev) =>
+          Object.keys(prev).length === 0 ? prev : {},
+        );
+      }
+      if (!hasManualTagEdits) {
+        setTags((prev) => (prev.length === 0 ? prev : []));
+      }
+      return;
+    }
+
+    // TAGS: re-derive from selected products (replace, not merge)
+    if (!hasManualTagEdits) {
+      const productTags = Array.from(
         new Set(
           selectedProducts.flatMap((product) =>
             Array.isArray(product.tags)
@@ -757,15 +995,29 @@ const StoreCollectionCreate: React.FC = () => {
           ),
         ),
       ).slice(0, MAX_TAGS);
-      if (inferredTags.length > 0) {
-        setTags(inferredTags);
-      }
+      setTags((prev) => {
+        if (
+          productTags.length === prev.length &&
+          productTags.every((t, i) => t === prev[i])
+        ) {
+          return prev;
+        }
+        return productTags;
+      });
     }
 
-    if (Object.keys(filterSelection).length === 0) {
+    // FILTERS: always re-derive from products if user hasn't manually edited
+    if (!hasManualFilterEdits) {
       const inferredSelection: FilterSelection = {};
       selectedProducts.forEach((product) => {
         const fromProduct = normalizeFilterSelectionFromProduct(product as any);
+        console.debug(
+          "[FilterDerivation] product", product.id,
+          "| filterSelection:", (product as any).filterSelection,
+          "| filters:", (product as any).filters,
+          "| filterValueIds:", (product as any).filterValueIds,
+          "| normalized:", fromProduct,
+        );
         Object.entries(fromProduct).forEach(([dimensionId, valueIds]) => {
           const current = inferredSelection[dimensionId] ?? [];
           inferredSelection[dimensionId] = Array.from(
@@ -773,27 +1025,94 @@ const StoreCollectionCreate: React.FC = () => {
           );
         });
       });
-      if (Object.keys(inferredSelection).length > 0) {
-        setFilterSelection(inferredSelection);
+      console.debug(
+        "[FilterDerivation] inferred:", inferredSelection,
+        "| selectedProducts.length:", selectedProducts.length,
+        "| hasManualFilterEdits:", hasManualFilterEdits,
+      );
+      setFilterSelection((prev) => {
+        const equal = areFilterSelectionsEqual(prev, inferredSelection);
+        console.debug(
+          "[FilterDerivation] prev:", prev,
+          "| equal:", equal,
+          "| will update:", !equal,
+        );
+        if (equal) return prev;
+        return inferredSelection;
+      });
+    }
+
+    // CATEGORY: use majority-vote from selected products
+    // Backend returns categoryType.categoryId (nested), not top-level categoryId
+    if (!hasManualCategoryEdit) {
+      const categoryCounts = new Map<string, number>();
+      selectedProducts.forEach((product) => {
+        const catId =
+          (typeof product.categoryId === "string" && product.categoryId) ||
+          (typeof product.categoryType?.categoryId === "string" &&
+            product.categoryType.categoryId) ||
+          "";
+        if (catId) {
+          categoryCounts.set(catId, (categoryCounts.get(catId) ?? 0) + 1);
+        }
+      });
+      if (categoryCounts.size > 0) {
+        const bestCategory = [...categoryCounts.entries()].sort(
+          (a, b) => b[1] - a[1],
+        )[0][0];
+        setCategoryId((prev) => (prev === bestCategory ? prev : bestCategory));
       }
     }
 
-    const firstProduct = selectedProducts[0] as any;
-    if (!categoryId && typeof firstProduct?.categoryId === "string") {
-      setCategoryId(firstProduct.categoryId);
-    }
-    if (!categoryTypeId) {
-      const inferredCategoryTypeId =
-        (typeof firstProduct?.subCategoryId === "string" &&
-          firstProduct.subCategoryId) ||
-        (typeof firstProduct?.categoryTypeId === "string" &&
-          firstProduct.categoryTypeId) ||
-        "";
-      if (inferredCategoryTypeId) {
-        setCategoryTypeId(inferredCategoryTypeId);
+    // SUB-CATEGORY: use majority-vote from selected products
+    if (!hasManualSubCategoryEdit) {
+      const subCategoryCounts = new Map<string, number>();
+      selectedProducts.forEach((product) => {
+        const subCatId =
+          (typeof product.subCategoryId === "string" && product.subCategoryId) ||
+          (typeof product.categoryTypeId === "string" && product.categoryTypeId) ||
+          "";
+        if (subCatId) {
+          subCategoryCounts.set(
+            subCatId,
+            (subCategoryCounts.get(subCatId) ?? 0) + 1,
+          );
+        }
+      });
+      if (subCategoryCounts.size > 0) {
+        const bestSubCategory = [...subCategoryCounts.entries()].sort(
+          (a, b) => b[1] - a[1],
+        )[0][0];
+        setCategoryTypeId((prev) =>
+          prev === bestSubCategory ? prev : bestSubCategory,
+        );
       }
     }
-  }, [categoryId, categoryTypeId, filterSelection, selectedProducts, tags.length]);
+
+    // TYPE (gender): infer from products if not manually set
+    const genderCounts = new Map<string, number>();
+    selectedProducts.forEach((product) => {
+      const g = product.gender;
+      if (g) genderCounts.set(g, (genderCounts.get(g) ?? 0) + 1);
+    });
+    if (genderCounts.size > 0) {
+      const uniqueGenders = [...genderCounts.keys()];
+      const inferredType =
+        uniqueGenders.length === 1
+          ? (uniqueGenders[0] === "MALE"
+              ? "MALE"
+              : uniqueGenders[0] === "FEMALE"
+                ? "FEMALE"
+                : "EVERYBODY")
+          : "EVERYBODY";
+      if (inferredType !== "EVERYBODY") {
+        setType((prev) =>
+          prev === "EVERYBODY" ? (inferredType as CollectionType) : prev,
+        );
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProducts, hasManualTagEdits, hasManualFilterEdits, hasManualCategoryEdit, hasManualSubCategoryEdit]);
 
   const orderedSelectedProductIds = useMemo(() => {
     if (!primaryProductId || !selectedProductIds.includes(primaryProductId)) {
@@ -922,12 +1241,10 @@ const StoreCollectionCreate: React.FC = () => {
       const basePath = productId
         ? `/studio/store/products/${productId}/edit`
         : "/studio/store/products/new";
-      skipAbandonOnUnmountRef.current = true;
       navigate(
         `${basePath}?returnTo=${encodeURIComponent(returnPath)}&returnContext=collection&collectionId=${sessionId}`,
       );
     } catch (error: any) {
-      skipAbandonOnUnmountRef.current = false;
       toast.error(
         error?.response?.data?.message ??
           "Failed to start product flow for this collection.",
@@ -999,6 +1316,7 @@ const StoreCollectionCreate: React.FC = () => {
         categoryId: categoryId || undefined,
         categoryTypeId: categoryTypeId || undefined,
         tags: normalizedTags,
+        filterValueIds: selectedFilterValueIds,
         isAvailableInStore: true,
         subCategoryId: categoryTypeId || undefined,
       };
@@ -1079,6 +1397,19 @@ const StoreCollectionCreate: React.FC = () => {
         action,
         collectionMetadata: metadataPayload,
       });
+
+      // Clean up session-drafted products that were NOT selected for this
+      // collection. These products were created during the flow but the user
+      // decided not to include them.
+      const selectedSet = new Set(orderedSelectedProductIds);
+      const orphanedDraftIds = sessionDraftProductIds.filter(
+        (id) => !selectedSet.has(id),
+      );
+      if (orphanedDraftIds.length > 0) {
+        await Promise.allSettled(
+          orphanedDraftIds.map((id) => productApi.deleteProduct(id)),
+        );
+      }
 
       autoCleanupSessionRef.current = false;
       clearSessionFilterCache(sessionId);
@@ -1262,24 +1593,30 @@ const StoreCollectionCreate: React.FC = () => {
       pushEntry(null, mediaId, `media-${index}`);
     });
 
-    imageValues.forEach((value, index) => {
-      const isRemote =
-        value.startsWith("http") ||
-        value.startsWith("/") ||
-        value.startsWith("data:") ||
-        value.includes("://") ||
-        value.includes("?");
-      pushEntry(
-        isRemote ? value : null,
-        !isRemote && isLikelyFileId(value) ? value : null,
-        `fallback-${index}`,
-      );
-    });
+    // Only use imageValues / mediaIds as fallbacks when the authoritative
+    // media[] array produced no entries. These secondary sources often
+    // contain duplicate representations of the same uploads, inflating the
+    // displayed image count.
+    if (entries.length === 0) {
+      imageValues.forEach((value, index) => {
+        const isRemote =
+          value.startsWith("http") ||
+          value.startsWith("/") ||
+          value.startsWith("data:") ||
+          value.includes("://") ||
+          value.includes("?");
+        pushEntry(
+          isRemote ? value : null,
+          !isRemote && isLikelyFileId(value) ? value : null,
+          `fallback-${index}`,
+        );
+      });
 
-    mediaIds.forEach((id, index) => {
-      if (!isLikelyFileId(id)) return;
-      pushEntry(null, id, `media-id-${index}`);
-    });
+      mediaIds.forEach((id, index) => {
+        if (!isLikelyFileId(id)) return;
+        pushEntry(null, id, `media-id-${index}`);
+      });
+    }
 
     return entries;
   }, []);
@@ -1727,7 +2064,10 @@ const StoreCollectionCreate: React.FC = () => {
                       </label>
                       <Select
                         value={categoryId}
-                        onChange={(e) => setCategoryId(e.target.value)}
+                        onChange={(e) => {
+                          setHasManualCategoryEdit(true);
+                          setCategoryId(e.target.value);
+                        }}
                         disabled={loadingCategories || categories.length === 0}
                         variant="default"
                       >
@@ -1752,7 +2092,10 @@ const StoreCollectionCreate: React.FC = () => {
                       </label>
                       <Select
                         value={categoryTypeId}
-                        onChange={(e) => setCategoryTypeId(e.target.value)}
+                        onChange={(e) => {
+                          setHasManualSubCategoryEdit(true);
+                          setCategoryTypeId(e.target.value);
+                        }}
                         disabled={
                           loadingCategories || categoryTypeOptions.length === 0
                         }
@@ -1782,7 +2125,7 @@ const StoreCollectionCreate: React.FC = () => {
                     </label>
                     <FilterSelector
                       value={filterSelection}
-                      onChange={setFilterSelection}
+                      onChange={handleFilterSelectionChange}
                       entityType="COLLECTION"
                       onTagSuggestions={setTagSuggestions}
                     />
@@ -2040,7 +2383,7 @@ const StoreCollectionCreate: React.FC = () => {
 
       {previewProduct && (
         <OverlayPortal>
-          <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-layer-modal flex items-center justify-center px-4 animate-in fade-in duration-200">
             <button
               type="button"
               className="absolute inset-0 bg-gradient-to-br from-purple-900/60 via-black/70 to-pink-900/60 backdrop-blur-md transition-opacity duration-200"
@@ -2195,4 +2538,3 @@ const StoreCollectionCreate: React.FC = () => {
 };
 
 export default StoreCollectionCreate;
-

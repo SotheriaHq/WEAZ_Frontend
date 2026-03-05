@@ -32,6 +32,9 @@ export interface MarketItem {
   // When requested with counts=combined, backend may supply combined total
   combinedCommentsCount?: number | null;
   collectionCollabCount?: number | null;
+  sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+  customMeasurementKeys?: string[];
+  customAvailable?: boolean;
   tags: string[];
   media: MarketMedia;
   isThreaded?: boolean; // Backend includes this for authenticated users

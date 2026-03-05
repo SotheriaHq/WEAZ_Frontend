@@ -9,7 +9,6 @@ import { setUser, clearUser } from '../features/userSlice';
 import {
   apiClient,
   dropStoredAccessToken,
-  getStoredAccessToken,
   persistAccessToken,
 } from '../api/httpClient';
 import { isAxiosError } from 'axios';
@@ -116,11 +115,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const initialize = async () => {
       try {
-        const storedToken = getStoredAccessToken();
-        if (!storedToken) {
-          dispatch(clearUser());
-          return;
-        }
         await fetchUserProfile();
       } catch (error) {
         handleProfileError(error, { allowPersistedUser: true });
@@ -168,11 +162,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (user && user.id) {
         dispatch(setUser(user));
-        try {
-          await fetchUserProfile();
-        } catch (profileError) {
+        void fetchUserProfile().catch((profileError) => {
           handleProfileError(profileError, { allowPersistedUser: true });
-        }
+        });
       } else {
         await fetchUserProfile();
       }

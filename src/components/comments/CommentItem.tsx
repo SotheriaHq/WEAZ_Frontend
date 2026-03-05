@@ -92,7 +92,7 @@ const CommentItem: React.FC<Props> = ({ comment, onThread, onReply, onDelete, cu
 
   return (
     <div className="flex gap-2 py-0.5">
-      <div className="max-h-8 max-w-8 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+      <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold">
         {comment.user?.profileImage ? (
           <MediaRenderer
             kind="image"

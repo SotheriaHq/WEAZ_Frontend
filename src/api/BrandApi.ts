@@ -38,7 +38,7 @@ export interface UploadAssetDto {
 export type CollectionScope = 'design' | 'store' | 'all';
 
 const getCollectionBasePath = (scope?: CollectionScope) =>
-  scope === 'store' ? '/store-collections' : '/designs';
+  scope === 'store' ? '/store-collections' : scope === 'all' ? '/collections' : '/designs';
 
 const SIGNED_URL_TTL_MS = 4 * 60 * 1000;
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();

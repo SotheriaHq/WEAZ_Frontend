@@ -163,6 +163,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
 
   const exploreLinks = [
     { emoji: '📈', label: 'Trending', path: '/trending', active: location.pathname === '/trending' },
+    {
+      emoji: '📏',
+      label: 'Size Charts',
+      path: '/size-charts',
+      active: location.pathname === '/size-charts',
+    },
   ];
 
   const mobileDockLinks = [

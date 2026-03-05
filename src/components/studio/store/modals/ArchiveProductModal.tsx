@@ -88,7 +88,16 @@ const ArchiveProductModal: React.FC<ArchiveProductModalProps> = ({
       onArchived();
       onClose();
     } catch (e: any) {
-      const message = e?.response?.data?.message || `Failed to ${mode} product`;
+      const responseData = e?.response?.data;
+      const message =
+        (typeof responseData?.message === 'string' && responseData.message.trim()) ||
+        (Array.isArray(responseData?.message) &&
+          responseData.message
+            .filter((entry: unknown) => typeof entry === 'string')
+            .join(', ')) ||
+        (typeof responseData === 'string' && responseData.trim()) ||
+        (typeof e?.message === 'string' && e.message.trim()) ||
+        `Failed to ${mode} product`;
       setError(message);
       toast.error(message);
     } finally {

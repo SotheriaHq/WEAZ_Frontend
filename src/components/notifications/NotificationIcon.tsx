@@ -1,31 +1,10 @@
 /**
- * NotificationIcon - Type-based notification icons
+ * NotificationIcon - Type-based notification emoji
  * 
- * Displays an appropriate icon/emoji based on notification type.
+ * Displays an appropriate emoji based on notification type.
  */
 
 import React from 'react';
-import {
-  Bell,
-  MessageCircle,
-  Link2,
-  UserPlus,
-  Share2,
-  Lock,
-  CheckCircle,
-  XCircle,
-  Mail,
-  Sparkles,
-  Handshake,
-  ShieldCheck,
-  LogOut,
-  ShoppingCart,
-  Package,
-  Upload,
-  Trash2,
-  Ruler,
-  Tag,
-} from 'lucide-react';
 import { getNotificationIcon } from '@/types/notificationTypes';
 
 interface NotificationIconProps {
@@ -34,42 +13,45 @@ interface NotificationIconProps {
   className?: string;
 }
 
-const sizePx = {
-  sm: 14,
-  md: 16,
-  lg: 18,
+const sizeClass = {
+  sm: 'text-sm',
+  md: 'text-base',
+  lg: 'text-lg',
 } as const;
 
-const iconMap: Record<string, React.ElementType> = {
-  thread: Link2,
-  comment: MessageCircle,
-  patch: UserPlus,
-  tag: Tag,
-  collab: Share2,
-  access: Lock,
-  approved: CheckCircle,
-  rejected: XCircle,
-  revoked: Lock,
-  mail: Mail,
-  celebrate: Sparkles,
-  contribution: Handshake,
-  security: ShieldCheck,
-  logout: LogOut,
-  order: ShoppingCart,
-  order_status: Package,
-  upload: Upload,
-  delete: Trash2,
-  fit: Ruler,
-  bell: Bell,
+const emojiMap: Record<string, string> = {
+  thread: '🔗',
+  comment: '💬',
+  patch: '🫶',
+  tag: '🏷️',
+  heart: '❤️',
+  collab: '🤝',
+  access: '🔒',
+  approved: '✅',
+  rejected: '❌',
+  revoked: '🚫',
+  mail: '📩',
+  celebrate: '🎉',
+  contribution: '🤲',
+  security: '🛡️',
+  logout: '🚪',
+  order: '🛍️',
+  order_status: '📦',
+  upload: '📤',
+  delete: '🗑️',
+  fit: '📏',
+  bell: '🔔',
 };
 
 export const NotificationIcon = React.memo<NotificationIconProps>(
   ({ type, size = 'md', className = '' }) => {
     const iconKey = getNotificationIcon(type);
-    const Icon = iconMap[iconKey] || Bell;
+    const emoji = emojiMap[iconKey] || '🔔';
 
     return (
-      <Icon className={className} size={sizePx[size]} aria-hidden="true" />
+      <span className={`${sizeClass[size]} leading-none ${className}`} aria-hidden="true">
+        {emoji}
+      </span>
     );
   }
 );

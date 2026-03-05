@@ -18,7 +18,7 @@ export function disconnectSocket(): void {
   }
 }
 
-export function joinContentRoom(contentType: string, contentId: string, userId?: string) {
+export function joinContentRoom(contentType: string, contentId: string) {
   const s = getSocket();
-  s.emit('join', { room: `${contentType}:${contentId}`, userId });
+  s.emit('join', { room: `${contentType}:${contentId}` });
 }

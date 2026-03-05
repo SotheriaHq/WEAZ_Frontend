@@ -116,6 +116,26 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
         : typeof raw.collectionCollabCount === 'number'
           ? (raw.collectionCollabCount as number)
           : null,
+    sizingMode:
+      typeof (collection as any).sizingMode === 'string'
+        ? ((collection as any).sizingMode as MarketItem['sizingMode'])
+        : typeof (raw as any).sizingMode === 'string'
+          ? ((raw as any).sizingMode as MarketItem['sizingMode'])
+          : undefined,
+    customMeasurementKeys: Array.isArray((collection as any).customMeasurementKeys)
+      ? ((collection as any).customMeasurementKeys as string[])
+      : Array.isArray((raw as any).customMeasurementKeys)
+        ? ((raw as any).customMeasurementKeys as string[])
+        : [],
+    customAvailable:
+      typeof (raw as any).customAvailable === 'boolean'
+        ? Boolean((raw as any).customAvailable)
+        : typeof (collection as any).customAvailable === 'boolean'
+          ? Boolean((collection as any).customAvailable)
+          : ((collection as any).sizingMode === 'CUSTOM' ||
+              (collection as any).sizingMode === 'RTW_PLUS_CUSTOM' ||
+              (raw as any).sizingMode === 'CUSTOM' ||
+              (raw as any).sizingMode === 'RTW_PLUS_CUSTOM'),
     tags,
     isThreaded: typeof raw.isThreaded === 'boolean' ? (raw.isThreaded as boolean) : false,
     media: {

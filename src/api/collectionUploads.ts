@@ -29,6 +29,10 @@ export interface CartPreviewProduct {
   isAvailable: boolean;
   unavailableReason?: string;
   variants?: { size?: string; color?: string; stock: number; price?: number }[];
+  sizes?: string[];
+  colors?: string[];
+  defaultSize?: string;
+  defaultColor?: string;
 }
 
 export interface CollectionCartPreviewResponse {
@@ -41,6 +45,174 @@ export interface CollectionCartPreviewResponse {
   currency: string;
   products: CartPreviewProduct[];
 }
+
+type RawCartPreviewItem = {
+  productId?: string;
+  id?: string;
+  name?: string;
+  price?: number;
+  salePrice?: number | null;
+  effectivePrice?: number;
+  currency?: string;
+  thumbnail?: string | null;
+  images?: string[];
+  variants?: { size?: string; color?: string; stock: number; price?: number }[];
+  sizes?: string[];
+  colors?: string[];
+  defaultSize?: string;
+  defaultColor?: string;
+  reason?: string;
+};
+
+type RawCartPreviewEnvelope = {
+  collectionId?: string;
+  collectionTitle?: string;
+  available?: RawCartPreviewItem[];
+  unavailable?: RawCartPreviewItem[];
+  summary?: {
+    availableCount?: number;
+    unavailableCount?: number;
+    totalCount?: number;
+    availableSubtotal?: number;
+    currency?: string;
+  };
+  // Legacy/client-ready shape fallback
+  totalProducts?: number;
+  availableCount?: number;
+  unavailableCount?: number;
+  totalPrice?: number;
+  currency?: string;
+  products?: CartPreviewProduct[];
+};
+
+const mapUnavailableReason = (reason?: string): string => {
+  switch (String(reason || '').toLowerCase()) {
+    case 'out_of_stock':
+      return 'Out of stock';
+    case 'archived':
+      return 'Archived';
+    case 'deleted':
+      return 'Deleted';
+    case 'inactive':
+      return 'Not active';
+    case 'scheduled':
+      return 'Scheduled for later';
+    default:
+      return 'Unavailable';
+  }
+};
+
+const normalizeCollectionCartPreview = (
+  raw: RawCartPreviewEnvelope,
+): CollectionCartPreviewResponse => {
+  const legacyProducts = Array.isArray(raw?.products) ? raw.products : null;
+  if (legacyProducts) {
+    return {
+      collectionId: String(raw?.collectionId || ''),
+      collectionTitle: String(raw?.collectionTitle || 'Collection'),
+      totalProducts:
+        typeof raw?.totalProducts === 'number'
+          ? raw.totalProducts
+          : legacyProducts.length,
+      availableCount:
+        typeof raw?.availableCount === 'number'
+          ? raw.availableCount
+          : legacyProducts.filter((p) => p.isAvailable).length,
+      unavailableCount:
+        typeof raw?.unavailableCount === 'number'
+          ? raw.unavailableCount
+          : legacyProducts.filter((p) => !p.isAvailable).length,
+      totalPrice:
+        typeof raw?.totalPrice === 'number'
+          ? raw.totalPrice
+          : legacyProducts
+              .filter((p) => p.isAvailable)
+              .reduce((sum, p) => sum + Number(p.salePrice ?? p.price ?? 0), 0),
+      currency: String(raw?.currency || 'NGN'),
+      products: legacyProducts,
+    };
+  }
+
+  const available = Array.isArray(raw?.available) ? raw.available : [];
+  const unavailable = Array.isArray(raw?.unavailable) ? raw.unavailable : [];
+  const currency =
+    raw?.summary?.currency ||
+    available[0]?.currency ||
+    unavailable[0]?.currency ||
+    raw?.currency ||
+    'NGN';
+
+  const availableProducts: CartPreviewProduct[] = available
+    .filter((item): item is RawCartPreviewItem => Boolean(item?.productId || item?.id))
+    .map((item) => ({
+      id: String(item.productId || item.id),
+      name: String(item.name || 'Product'),
+      price: Number(item.price ?? 0),
+      salePrice:
+        typeof item.salePrice === 'number' ? Number(item.salePrice) : null,
+      currency: String(item.currency || currency),
+      thumbnail: item.thumbnail ?? null,
+      images: Array.isArray(item.images) ? item.images : [],
+      isAvailable: true,
+      variants: Array.isArray(item.variants) ? item.variants : [],
+      sizes: Array.isArray(item.sizes) ? item.sizes : [],
+      colors: Array.isArray(item.colors) ? item.colors : [],
+      defaultSize:
+        typeof item.defaultSize === 'string' ? item.defaultSize : undefined,
+      defaultColor:
+        typeof item.defaultColor === 'string' ? item.defaultColor : undefined,
+    }));
+
+  const unavailableProducts: CartPreviewProduct[] = unavailable
+    .filter((item): item is RawCartPreviewItem => Boolean(item?.productId || item?.id))
+    .map((item) => ({
+      id: String(item.productId || item.id),
+      name: String(item.name || 'Product'),
+      price: Number(item.price ?? 0),
+      salePrice:
+        typeof item.salePrice === 'number' ? Number(item.salePrice) : null,
+      currency: String(item.currency || currency),
+      thumbnail: item.thumbnail ?? null,
+      images: Array.isArray(item.images) ? item.images : [],
+      isAvailable: false,
+      unavailableReason: mapUnavailableReason(item.reason),
+      variants: Array.isArray(item.variants) ? item.variants : [],
+      sizes: Array.isArray(item.sizes) ? item.sizes : [],
+      colors: Array.isArray(item.colors) ? item.colors : [],
+      defaultSize:
+        typeof item.defaultSize === 'string' ? item.defaultSize : undefined,
+      defaultColor:
+        typeof item.defaultColor === 'string' ? item.defaultColor : undefined,
+    }));
+
+  const products = [...availableProducts, ...unavailableProducts];
+
+  return {
+    collectionId: String(raw?.collectionId || ''),
+    collectionTitle: String(raw?.collectionTitle || 'Collection'),
+    totalProducts:
+      typeof raw?.summary?.totalCount === 'number'
+        ? raw.summary.totalCount
+        : products.length,
+    availableCount:
+      typeof raw?.summary?.availableCount === 'number'
+        ? raw.summary.availableCount
+        : availableProducts.length,
+    unavailableCount:
+      typeof raw?.summary?.unavailableCount === 'number'
+        ? raw.summary.unavailableCount
+        : unavailableProducts.length,
+    totalPrice:
+      typeof raw?.summary?.availableSubtotal === 'number'
+        ? raw.summary.availableSubtotal
+        : availableProducts.reduce(
+            (sum, p) => sum + Number(p.salePrice ?? p.price ?? 0),
+            0,
+          ),
+    currency: String(currency),
+    products,
+  };
+};
 
 // ===================== Draft Session Types =====================
 export interface DraftSessionResponse {
@@ -91,6 +263,13 @@ export async function initializeCollectionUploads(
     type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
     visibility?: 'PUBLIC' | 'PRIVATE';
     filterValueIds?: string[];
+    sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+    rtwSizeSystem?: string;
+    rtwSizeType?: 'PREDEFINED' | 'FREEFORM' | 'MIXED';
+    customGender?: 'MEN' | 'WOMEN' | 'UNISEX';
+    customMeasurementKeys?: string[];
+    fitPreference?: 'SLIM' | 'REGULAR' | 'LOOSE' | 'OVERSIZED';
+    targetAgeGroup?: 'ADULT' | 'CHILD';
   },
 ): Promise<InitializeCollectionResponse> {
   const resp = await apiClient.post('/collections/initialize', dto);
@@ -123,6 +302,13 @@ export async function finalizeCollectionUploads(
       categoryTypeId?: string;
       tags?: string[];
       filterValueIds?: string[];
+      sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+      rtwSizeSystem?: string;
+      rtwSizeType?: 'PREDEFINED' | 'FREEFORM' | 'MIXED';
+      customGender?: 'MEN' | 'WOMEN' | 'UNISEX';
+      customMeasurementKeys?: string[];
+      fitPreference?: 'SLIM' | 'REGULAR' | 'LOOSE' | 'OVERSIZED';
+      targetAgeGroup?: 'ADULT' | 'CHILD';
     };
     coverMediaId?: string;
     coverIndex?: number;
@@ -152,11 +338,14 @@ export async function finalizeCollectionUploads(
  */
 export async function getCollectionCartPreview(collectionId: string): Promise<CollectionCartPreviewResponse> {
   const resp = await apiClient.get(`/collections/${collectionId}/cart-preview`);
-  let data = resp.data;
+  let data: unknown = resp.data;
   if (data && typeof data === 'object' && 'data' in data) {
     data = (data as Record<string, unknown>).data;
   }
-  return data as CollectionCartPreviewResponse;
+  if (data && typeof data === 'object' && 'data' in data) {
+    data = (data as Record<string, unknown>).data;
+  }
+  return normalizeCollectionCartPreview((data ?? {}) as RawCartPreviewEnvelope);
 }
 
 // ===================== Draft Session API =====================
