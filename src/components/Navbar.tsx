@@ -31,7 +31,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import React from 'react';
 import { User, Settings, TagIcon, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, SearchIcon, LayoutDashboard, Heart } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
@@ -49,10 +49,9 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   // search focus handled inside SearchField
   // search focus handled inside SearchField
-  const [, setScrolled] = useState(false); // removed scroll usage
   const profileMenuRef = useRef(null);
   const notificationsAnchorRef = useRef<HTMLElement | null>(null);
-  const { theme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
   const { setLanguage, translate } = useLanguage();
   const { profile: userProfile, isAuthenticated } = useSelector((state: RootState) => state.user);
   const { unreadCount } = useSelector((state: RootState) => state.notifications);
@@ -87,7 +86,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   }, [user, dispatch]);
 
   const navigate = useNavigate();
-  const location = useLocation();
 
 
 
@@ -125,9 +123,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-
-  // Remove scroll transparency behavior; always solid background
-  useEffect(() => { setScrolled(false); }, [location.pathname, theme]);
 
   // Track scroll position for liquid glass effect
   const [isScrolled, setIsScrolled] = useState(false);
@@ -436,15 +431,15 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
 
   return (
     <nav
-      className={`fixed top-0 left-0 w-full px-4 sm:px-5 h-16 z-layer-nav transition-all duration-300 ease-out
+      className={`fixed top-0 left-0 w-full px-4 sm:px-5 h-16 z-layer-nav transition-all duration-500 ease-out
       ${minimal
         ? 'bg-transparent border-b border-transparent'
         : isScrolled
-          ? 'bg-gradient-to-r from-[#faf8ff]/95 to-[#f5f0ff]/90 dark:from-[#0f0f0f]/95 dark:to-[#0a0a0a]/95 backdrop-blur-xl border-b border-purple-200/40 dark:border-white/10 shadow-sm'
-          : 'bg-gradient-to-r from-[#faf8ff]/90 to-[#f5f0ff]/85 dark:from-[#0f0f0f]/95 dark:to-[#0a0a0a]/90 backdrop-blur-xl border-b border-purple-200/30 dark:border-white/10'}`}
+          ? 'bg-gradient-to-r from-[#faf8ff]/60 to-[#f5f0ff]/52 dark:from-[#0f0f0f]/58 dark:to-[#0a0a0a]/54 backdrop-blur-md border-b border-purple-200/25 dark:border-white/10'
+          : 'bg-gradient-to-r from-[#faf8ff]/84 to-[#f5f0ff]/78 dark:from-[#0f0f0f]/82 dark:to-[#0a0a0a]/78 backdrop-blur-xl border-b border-purple-200/30 dark:border-white/10'}`}
       style={isScrolled && !minimal ? {
-        backdropFilter: 'blur(20px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        backdropFilter: 'blur(10px) saturate(130%)',
+        WebkitBackdropFilter: 'blur(10px) saturate(130%)',
       } : undefined}
     >
      

@@ -67,6 +67,7 @@ export interface AuthJwtClaims {
   email: string;
   firstName: string;
   lastName: string;
+  permissions?: string[];
 }
 export type ApiSuccessPayload<T> =
   | (T & { statusCode: number; message: string })

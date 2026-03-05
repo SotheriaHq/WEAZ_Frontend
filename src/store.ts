@@ -7,6 +7,7 @@ import patchesReducer from './features/patchesSlice';
 import uiReducer from './features/uiSlice';
 import cartReducer from './features/cartSlice';
 import wishlistReducer from './features/wishlistSlice';
+import adminReducer from './features/adminSlice';
 
 // Required for reducers that mutate Set/Map values (wishlist.wishlistedIds).
 enableMapSet();
@@ -20,6 +21,7 @@ export const store = configureStore({
     ui: uiReducer,
     cart: cartReducer,
     wishlist: wishlistReducer,
+    admin: adminReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

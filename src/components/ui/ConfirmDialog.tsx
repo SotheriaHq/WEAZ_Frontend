@@ -34,10 +34,16 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   if (!open) return null;
 
+  const iconEmoji = isDestructive ? '⚠️' : 'ℹ️';
+  const accentBg = isDestructive
+    ? 'bg-red-50 dark:bg-red-500/10 ring-1 ring-red-200/60 dark:ring-red-500/20'
+    : 'bg-purple-50 dark:bg-purple-500/10 ring-1 ring-purple-200/60 dark:ring-purple-500/20';
+
   return (
     <OverlayPortal>
-      <div className="fixed inset-0 z-layer-modal flex items-center justify-center">
-        <div className="absolute inset-0 bg-black/50" onClick={onCancel} aria-hidden />
+      <div className="fixed inset-0 z-layer-modal flex items-center justify-center px-4">
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onCancel} aria-hidden />
         <div
           ref={panelRef}
           role="dialog"
@@ -45,19 +51,33 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           aria-labelledby="confirm-title"
           aria-describedby="confirm-message"
           tabIndex={-1}
-          className="relative w-[90%] max-w-sm rounded-2xl neu-modal-surface shadow-xl p-4 outline-none"
+          className={`
+            relative w-[90%] max-w-md overflow-hidden rounded-3xl
+            bg-white dark:bg-zinc-900
+            shadow-2xl ring-1 ring-black/5 dark:ring-white/10
+            outline-none
+            ${isDestructive ? 'shadow-red-500/10 dark:shadow-red-500/20' : ''}
+          `}
         >
-          <h2 id="confirm-title" className="text-base font-semibold text-[color:var(--neu-text)] mb-2">
-            {title}
-          </h2>
-          <p id="confirm-message" className="text-sm neu-text-muted mb-4">
-            {message}
-          </p>
-          <div className="flex justify-end gap-2">
+          {/* Header with icon */}
+          <div className="flex flex-col items-center pt-8 pb-2 px-6">
+            <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${accentBg} mb-4`}>
+              <span className="text-2xl">{iconEmoji}</span>
+            </div>
+            <h2 id="confirm-title" className="text-lg font-bold text-gray-900 dark:text-white text-center">
+              {title}
+            </h2>
+            <p id="confirm-message" className="mt-2 text-sm text-gray-500 dark:text-zinc-400 text-center max-w-xs leading-relaxed">
+              {message}
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 border-t border-gray-100 dark:border-white/[0.08] bg-gray-50/50 dark:bg-white/[0.02] px-6 py-4 mt-4">
             <button
               onClick={onCancel}
               disabled={isLoading}
-              className="px-3 py-1.5 rounded-md text-sm font-medium neu-modal-inset text-[color:var(--neu-text)] disabled:opacity-60"
+              className="flex-1 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 text-sm font-semibold text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-white/10 transition-all disabled:opacity-50 active:scale-[0.98]"
             >
               {cancelText}
             </button>
@@ -65,13 +85,22 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               onClick={onConfirm}
               autoFocus
               disabled={isLoading}
-              className={`px-3 py-1.5 rounded-md text-sm font-semibold text-white disabled:opacity-70 ${
-                isDestructive
-                  ? 'bg-[color:var(--status-danger,#dc2626)] hover:bg-[color:var(--status-danger-strong,#b91c1c)]'
-                  : 'bg-[color:var(--brand-primary)] hover:bg-[color:var(--brand-primary-strong)]'
-              }`}
+              className={`
+                flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-white
+                transition-all active:scale-[0.98]
+                disabled:opacity-50 disabled:shadow-none
+                ${isDestructive
+                  ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/25'
+                  : 'bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-500/25'
+                }
+              `}
             >
-              {isLoading ? 'Processing...' : confirmText}
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="inline-block h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  Processing...
+                </span>
+              ) : confirmText}
             </button>
           </div>
         </div>

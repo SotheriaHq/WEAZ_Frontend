@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { Suspense, useEffect, lazy } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet, Navigate, useParams, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import Market from './pages/Market';
@@ -8,6 +8,7 @@ import CollectionsSettings from './pages/settings/CollectionsSettings';
 import SignupPage from './pages/SignUp';
 import Success from './pages/Success';
 import LoginPage from './pages/Login';
+import MarketPlace from './pages/MarketPlace';
 // Removed separate BrandPublic visitor page; unified profile view handles both owner & visitor modes
 import ProtectedRoute from './components/ProtectedRoute';
 import GuestRoute from './components/GuestRoute';
@@ -33,7 +34,6 @@ import ProductDetailsPage from './pages/catalog/ProductDetailsPage';
 // Placeholder pages for features under development
 import {
   NotFound,
-  MarketplacePlaceholder,
   SubscriptionsPlaceholder,
   HistoryPlaceholder,
   WatchLaterPlaceholder,
@@ -50,6 +50,23 @@ import SizeChartsPage from './pages/size-charts/SizeChartsPage';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { setViewportWidth } from '@/features/uiSlice';
+import RequireAdmin from './components/admin/RequireAdmin';
+
+// Admin pages — lazy loaded for code splitting
+const AdminScaffold = lazy(() => import('./components/admin/AdminScaffold'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
+const AdminBrandsPage = lazy(() => import('./pages/admin/AdminBrandsPage'));
+const AdminProductsPage = lazy(() => import('./pages/admin/AdminProductsPage'));
+const AdminCollectionsPage = lazy(() => import('./pages/admin/AdminCollectionsPage'));
+const AdminTaxonomyPage = lazy(() => import('./pages/admin/AdminTaxonomyPage'));
+const AdminTagsPage = lazy(() => import('./pages/admin/AdminTagsPage'));
+const AdminMeasurementsPage = lazy(() => import('./pages/admin/AdminMeasurementsPage'));
+const AdminPayoutsPage = lazy(() => import('./pages/admin/AdminPayoutsPage'));
+const AdminDisputesPage = lazy(() => import('./pages/admin/AdminDisputesPage'));
+const AdminModerationPage = lazy(() => import('./pages/admin/AdminModerationPage'));
+const AdminAuditPage = lazy(() => import('./pages/admin/AdminAuditPage'));
+const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'));
 
 /**
  * Root layout component that wraps all routes
@@ -136,8 +153,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Market /> },
           { path: 'market', element: <Market /> },
-          // Placeholder routes - these render inside Layout via Outlet
-          { path: 'market-place', element: <MarketplacePlaceholder /> },
+          { path: 'market-place', element: <MarketPlace /> },
           { path: 'subscriptions', element: <SubscriptionsPlaceholder /> },
           { path: 'history', element: <HistoryPlaceholder /> },
           { path: 'watch-later', element: <WatchLaterPlaceholder /> },
@@ -317,6 +333,32 @@ const router = createBrowserRouter([
       {
         path: '/products/:id',
         element: <Layout><ProductDetailsPage /></Layout>,
+      },
+      // ── Admin Console (lazy-loaded, guarded) ──
+      {
+        path: '/admin',
+        element: (
+          <RequireAdmin>
+            <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-gray-500 text-sm">Loading admin console...</div>}>
+              <AdminScaffold />
+            </Suspense>
+          </RequireAdmin>
+        ),
+        children: [
+          { index: true, element: <AdminDashboard /> },
+          { path: 'users', element: <AdminUsersPage /> },
+          { path: 'brands', element: <AdminBrandsPage /> },
+          { path: 'products', element: <AdminProductsPage /> },
+          { path: 'collections', element: <AdminCollectionsPage /> },
+          { path: 'taxonomy', element: <AdminTaxonomyPage /> },
+          { path: 'tags', element: <AdminTagsPage /> },
+          { path: 'measurements', element: <AdminMeasurementsPage /> },
+          { path: 'payouts', element: <AdminPayoutsPage /> },
+          { path: 'disputes', element: <AdminDisputesPage /> },
+          { path: 'moderation', element: <AdminModerationPage /> },
+          { path: 'audit', element: <AdminAuditPage /> },
+          { path: 'settings', element: <AdminSettingsPage /> },
+        ],
       },
       // Catch-all 404 route - must be last
       {

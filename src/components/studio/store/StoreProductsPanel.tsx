@@ -228,7 +228,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const [archiveMode, setArchiveMode] = useState<'archive' | 'unarchive'>('archive');
   const [comingSoonModal, setComingSoonModal] = useState<{ open: boolean; feature?: string; description?: string }>({ open: false });
   const [bulkConfirmAction, setBulkConfirmAction] = useState<
-    'delete' | 'archive' | 'unpublish' | null
+    'delete' | 'permanent-delete' | 'archive' | 'unpublish' | null
   >(null);
   const [bulkActionBusy, setBulkActionBusy] = useState(false);
   const [restoreModalProduct, setRestoreModalProduct] = useState<BackendProduct | null>(null);
@@ -295,6 +295,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   };
 
   const showBulkActions = selectedProducts.length > 0;
+  const isDeletedTab = filterStatus === 'deleted';
   const selectedBulkDeleteProducts = useMemo(() => {
     const byId = new Map(products.map((product) => [product.id, product]));
     return selectedProducts.map((id) => {
@@ -959,10 +960,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     const normalized = action.toLowerCase();
     if (
       normalized === 'delete' ||
+      normalized === 'permanent-delete' ||
       normalized === 'archive' ||
       normalized === 'unpublish'
     ) {
-      setBulkConfirmAction(normalized as 'delete' | 'archive' | 'unpublish');
+      setBulkConfirmAction(normalized as 'delete' | 'permanent-delete' | 'archive' | 'unpublish');
       return;
     }
     setComingSoonModal({
@@ -979,7 +981,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     }
 
     if (!bulkConfirmAction) return;
-    if (bulkConfirmAction === 'delete') return;
+    if (bulkConfirmAction === 'delete' || bulkConfirmAction === 'permanent-delete') return;
 
     setBulkActionBusy(true);
     try {
@@ -1050,15 +1052,58 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
   const handleConfirmBulkDeleteWithTypedFlow = async (productIds: string[]) => {
     if (!Array.isArray(productIds) || productIds.length === 0) {
-      toast.error('No deletable products selected.');
+      toast.error(
+        bulkConfirmAction === 'permanent-delete'
+          ? 'No products selected for permanent delete.'
+          : 'No deletable products selected.',
+      );
       return;
     }
 
     setBulkActionBusy(true);
     try {
+      const plural = (count: number) => (count === 1 ? '' : 's');
+
+      if (bulkConfirmAction === 'permanent-delete') {
+        const results = await Promise.allSettled(
+          productIds.map((productId) => productApi.permanentlyDeleteProduct(productId)),
+        );
+
+        const deletedCount = results.filter((result) => result.status === 'fulfilled').length;
+        const failedEntries = results
+          .map((result, index) => ({ result, productId: productIds[index] }))
+          .filter((entry) => entry.result.status === 'rejected');
+        const failedCount = failedEntries.length;
+
+        if (deletedCount > 0) {
+          toast.success(
+            `Permanently deleted ${deletedCount} product${plural(deletedCount)}.`,
+          );
+        }
+        if (failedCount > 0) {
+          const firstError = (failedEntries[0].result as PromiseRejectedResult).reason;
+          const apiMessage =
+            firstError?.response?.data?.message ||
+            firstError?.message ||
+            `${failedCount} product${plural(failedCount)} could not be permanently deleted`;
+          const suffix = failedCount > 1 ? ` (+${failedCount - 1} more)` : '';
+          toast.error(`${apiMessage}${suffix}`);
+        }
+        if (deletedCount === 0 && failedCount === 0) {
+          toast.error(
+            `No products were permanently deleted from ${productIds.length} selected item${plural(productIds.length)}.`,
+          );
+        }
+
+        const failedIds = failedEntries.map((entry) => entry.productId);
+        setSelectedProducts(failedIds);
+        await refresh();
+        setBulkConfirmAction(null);
+        return;
+      }
+
       const result = await productApi.bulkDeleteProducts(productIds);
       const { deletedCount, failedCount, failures, requestedCount } = result;
-      const plural = (count: number) => (count === 1 ? '' : 's');
 
       if (deletedCount > 0) {
         toast.success(`Deleted ${deletedCount} product${plural(deletedCount)}.`);
@@ -1084,8 +1129,17 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       setBulkConfirmAction(null);
     } catch (error: any) {
       const message =
-        error?.response?.data?.message || 'Failed to delete selected products.';
-      toast.error(typeof message === 'string' ? message : 'Failed to delete selected products.');
+        error?.response?.data?.message ||
+        (bulkConfirmAction === 'permanent-delete'
+          ? 'Failed to permanently delete selected products.'
+          : 'Failed to delete selected products.');
+      toast.error(
+        typeof message === 'string'
+          ? message
+          : bulkConfirmAction === 'permanent-delete'
+            ? 'Failed to permanently delete selected products.'
+            : 'Failed to delete selected products.',
+      );
       throw error;
     } finally {
       setBulkActionBusy(false);
@@ -2721,38 +2775,44 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         <div className="fixed bottom-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-full bg-purple-600 px-6 py-3 text-sm font-semibold text-white shadow-2xl">
           <span>{selectedProducts.length} selected</span>
           <div className="h-5 w-px bg-white/30" />
+          {!isDeletedTab && (
+            <button
+              type="button"
+              onClick={() => handleBulkAction('Edit')}
+              disabled={bulkActionBusy}
+              className="hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {'\u270F\uFE0F'} Edit
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => handleBulkAction('Edit')}
+            onClick={() => handleBulkAction(isDeletedTab ? 'Permanent-Delete' : 'Delete')}
             disabled={bulkActionBusy}
             className="hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {'\u270F\uFE0F'} Edit
+            {'\uD83D\uDDD1\uFE0F'} {isDeletedTab ? 'Permanent Delete' : 'Delete'}
           </button>
-          <button
-            type="button"
-            onClick={() => handleBulkAction('Delete')}
-            disabled={bulkActionBusy}
-            className="hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {'\uD83D\uDDD1\uFE0F'} Delete
-          </button>
-          <button
-            type="button"
-            onClick={() => handleBulkAction('Archive')}
-            disabled={bulkActionBusy}
-            className="hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {'\uD83D\uDCE6'} Archive
-          </button>
-          <button
-            type="button"
-            onClick={() => handleBulkAction('Unpublish')}
-            disabled={bulkActionBusy}
-            className="hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {'\uD83D\uDCE5'} Unpublish
-          </button>
+          {!isDeletedTab && (
+            <>
+              <button
+                type="button"
+                onClick={() => handleBulkAction('Archive')}
+                disabled={bulkActionBusy}
+                className="hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {'\uD83D\uDCE6'} Archive
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkAction('Unpublish')}
+                disabled={bulkActionBusy}
+                className="hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {'\uD83D\uDCE5'} Unpublish
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={() => setSelectedProducts([])}
@@ -2769,7 +2829,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
       
       <BulkDeleteProductsModal
-        isOpen={bulkConfirmAction === 'delete'}
+        isOpen={bulkConfirmAction === 'delete' || bulkConfirmAction === 'permanent-delete'}
+        mode={bulkConfirmAction === 'permanent-delete' ? 'permanent-delete' : 'delete'}
         products={selectedBulkDeleteProducts}
         isProcessing={bulkActionBusy}
         onConfirmDelete={handleConfirmBulkDeleteWithTypedFlow}

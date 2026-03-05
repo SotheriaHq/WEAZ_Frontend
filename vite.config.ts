@@ -12,4 +12,15 @@ export default defineConfig({
             "@": "/src",
         },
     },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (id.includes('/pages/admin/') || id.includes('/components/admin/')) {
+                        return 'admin';
+                    }
+                },
+            },
+        },
+    },
 });
