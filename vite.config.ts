@@ -16,6 +16,17 @@ export default defineConfig({
         rollupOptions: {
             output: {
                 manualChunks(id) {
+                    if (id.includes('/node_modules/')) {
+                        if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) {
+                            return 'react-vendor';
+                        }
+                        if (id.includes('/react-router')) {
+                            return 'router-vendor';
+                        }
+                        if (id.includes('/@reduxjs/') || id.includes('/react-redux/')) {
+                            return 'redux-vendor';
+                        }
+                    }
                     if (id.includes('/pages/admin/') || id.includes('/components/admin/')) {
                         return 'admin';
                     }

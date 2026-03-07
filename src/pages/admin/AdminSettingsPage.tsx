@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { adminSlaApi, adminFeatureFlagsApi } from '@/api/AdminApi';
 import type { AdminSlaConfig, FeatureFlag } from '@/types/admin';
+import { toast } from 'sonner';
+import { unwrapApiResponse } from '@/types/auth';
 
 const AdminSettingsPage: React.FC = () => {
   const [slaConfigs, setSlaConfigs] = useState<AdminSlaConfig[]>([]);
@@ -17,8 +19,10 @@ const AdminSettingsPage: React.FC = () => {
         adminSlaApi.list(),
         adminFeatureFlagsApi.list(),
       ]);
-      setSlaConfigs(Array.isArray(slaRes.data) ? slaRes.data : []);
-      setFeatureFlags(Array.isArray(flagsRes.data) ? flagsRes.data : []);
+      const slaPayload = unwrapApiResponse<AdminSlaConfig[] | { items?: AdminSlaConfig[] }>(slaRes.data as any);
+      const flagsPayload = unwrapApiResponse<FeatureFlag[] | { items?: FeatureFlag[] }>(flagsRes.data as any);
+      setSlaConfigs(Array.isArray(slaPayload) ? slaPayload : slaPayload?.items ?? []);
+      setFeatureFlags(Array.isArray(flagsPayload) ? flagsPayload : flagsPayload?.items ?? []);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load settings');
     } finally {
@@ -30,12 +34,13 @@ const AdminSettingsPage: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleToggleFlag = async (id: string) => {
+  const handleToggleFlag = async (flag: FeatureFlag) => {
     try {
-      await adminFeatureFlagsApi.toggle(id);
+      await adminFeatureFlagsApi.toggle(flag.id);
+      toast.success(`Flag "${flag.key}" ${flag.enabled ? 'disabled' : 'enabled'}`);
       fetchData();
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to toggle feature flag');
+      toast.error(err?.response?.data?.message || 'Failed to toggle feature flag');
     }
   };
 
@@ -115,7 +120,7 @@ const AdminSettingsPage: React.FC = () => {
                     )}
                   </div>
                   <button
-                    onClick={() => handleToggleFlag(flag.id)}
+                    onClick={() => handleToggleFlag(flag)}
                     className={`px-3 py-1 text-xs rounded-full font-medium transition ${
                       flag.enabled
                         ? 'bg-green-100 text-green-700 hover:bg-green-200'

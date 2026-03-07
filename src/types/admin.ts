@@ -9,6 +9,7 @@ export type AdminPermissionCode =
   | 'MEASUREMENTS_READ' | 'MEASUREMENTS_REVIEW'
   | 'PAYOUTS_READ' | 'PAYOUTS_PROCESS'
   | 'DISPUTES_READ' | 'DISPUTES_RESOLVE'
+  | 'FEATURED_MANAGE'
   | 'AUDIT_READ'
   | 'SYSTEM_FEATURE_FLAGS' | 'SYSTEM_BREAK_GLASS' | 'SYSTEM_ROLE_ASSIGN'
   | 'SYSTEM_PERMISSION_ASSIGN' | 'SYSTEM_SLA_READ' | 'SYSTEM_SLA_WRITE'
@@ -20,11 +21,42 @@ export interface AdminUser {
   firstName: string;
   lastName: string;
   username: string;
-  role: 'SuperAdmin' | 'Admin';
+  role: 'SuperAdmin' | 'Admin' | 'User';
+  type?: 'BRAND' | 'REGULAR';
   status: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
+  profileImage?: string | null;
+  profileImageId?: string | null;
+  profileImageFile?: { id: string; s3Url: string } | null;
   createdAt: string;
   updatedAt: string;
   permissions?: { permissionCode: string }[];
+}
+
+export interface AdminReactivationRequest {
+  id: string;
+  userId: string;
+  emailSnapshot: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  adminNote: string | null;
+  reviewedById: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: 'SuperAdmin' | 'Admin' | 'User';
+    status: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
+  };
+  reviewedBy?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  } | null;
 }
 
 export interface AdminBrand {
@@ -32,12 +64,17 @@ export interface AdminBrand {
   name: string | null;
   ownerId?: string;
   isStoreOpen?: boolean;
+  description?: string | null;
+  logo?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
   owner?: {
     id: string;
     email: string;
     firstName: string;
     lastName: string;
     status?: string;
+    profileImage?: string | null;
   };
 }
 
@@ -58,13 +95,56 @@ export interface AdminProduct {
   description: string | null;
   brandId: string;
   isActive: boolean;
-  isFeatured: boolean;
   price: string;
   salePrice: string | null;
   currency: string;
+  thumbnail?: string | null;
+  images?: string[];
   createdAt: string;
   updatedAt: string;
   brand?: { id: string; name: string | null };
+}
+
+export interface FeaturedItem {
+  id: string;
+  entityType: 'PRODUCT' | 'DESIGN';
+  entityId: string;
+  brandId: string;
+  startsAt: string;
+  expiresAt: string;
+  isActive: boolean;
+  removedAt: string | null;
+  removeReason: string | null;
+  displayImages: string[] | null;
+  useCoverOnly: boolean;
+  viewsDelta: number;
+  threadsDelta: number;
+  clicksDelta: number;
+  createdAt: string;
+  entityName?: string;
+  entityThumbnail?: string | null;
+  brandName?: string;
+  featuredBy?: { id: string; email: string };
+  removedBy?: { id: string; email: string } | null;
+  status?: 'active' | 'scheduled' | 'expired' | 'removed';
+}
+
+export interface FeaturedSlotsSummary {
+  active: number;
+  scheduled: number;
+  total: number;
+  remaining: number;
+}
+
+export interface EligibleEntity {
+  entityType: 'PRODUCT' | 'DESIGN';
+  entityId: string;
+  name: string;
+  brandId: string;
+  brandName: string;
+  thumbnail: string | null;
+  eligible: boolean;
+  reason: string | null;
 }
 
 export interface AdminCollection {
@@ -83,6 +163,8 @@ export interface AdminCategory {
   id: string;
   name: string;
   slug?: string;
+  description?: string | null;
+  order?: number;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;

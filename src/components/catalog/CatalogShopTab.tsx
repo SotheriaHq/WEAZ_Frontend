@@ -378,13 +378,27 @@ export default function CatalogShopTab({
     return [...staticCats, ...dynamicCats];
   }, [categories]);
 
+  const isSystemStoreCollection = useCallback((collection: CollectionDto) => {
+    if (collection.isSystemGenerated) return true;
+    const title = String(collection.title || collection.name || '').trim().toLowerCase();
+    const description = String(collection.description || '').trim().toLowerCase();
+    return (
+      title === 'store products' &&
+      (description === '' || description === 'system bucket for standalone products.')
+    );
+  }, []);
+
   const visibleCollections = useMemo(() => {
     return collections.filter((c) => {
-      const title = String(c.title || c.name || '').trim();
-      const isStoreProducts = title.toLowerCase() === 'store products';
-      return c.isAvailableInStore !== false && !isStoreProducts;
+      if (isSystemStoreCollection(c)) return false;
+      if (c.deletedAt) return false;
+      if (c.isAvailableInStore !== true) return false;
+      const status = String(c.status || '').toUpperCase();
+      if (status.length > 0 && status !== 'PUBLISHED') return false;
+      const itemCount = Number(c.itemCount ?? c.postsCount ?? 0);
+      return Number.isFinite(itemCount) && itemCount > 0;
     });
-  }, [collections]);
+  }, [collections, isSystemStoreCollection]);
 
   const featuredCollections = useMemo(() => {
     return visibleCollections.slice(0, 3);
@@ -476,6 +490,8 @@ export default function CatalogShopTab({
     },
     [isAuth],
   );
+
+  const showProductsEmpty = !error && !loading && products.length === 0;
 
   if (storeClosedPlaceholder) {
     return <div className="w-full">{storeClosedPlaceholder}</div>;
@@ -850,24 +866,26 @@ export default function CatalogShopTab({
                 </div>
               ) : null}
 
-              {!error && !loading && products.length === 0 ? (
-                <StoreEmptyState type="no-products" isOwner={isOwner} />
-              ) : null}
-
               <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 sm:gap-5">
-                {loading
-                  ? Array.from({ length: 8 }).map((_, idx) => <ProductCardSkeleton key={idx} />)
-                  : products.map((p) => (
-                    <StoreProductCard 
-                      key={p.id} 
-                      product={p} 
+                {showProductsEmpty ? (
+                  <div className="col-span-full">
+                    <StoreEmptyState type="no-products" isOwner={isOwner} />
+                  </div>
+                ) : loading ? (
+                  Array.from({ length: 8 }).map((_, idx) => <ProductCardSkeleton key={idx} />)
+                ) : (
+                  products.map((p) => (
+                    <StoreProductCard
+                      key={p.id}
+                      product={p}
                       isOwnerView={isOwner}
                       onViewProduct={(product) => {
                         setViewContext('store');
                         setSelectedProduct(product);
                       }}
                     />
-                  ))}
+                  ))
+                )}
               </div>
 
               {!loading && hasMore ? (

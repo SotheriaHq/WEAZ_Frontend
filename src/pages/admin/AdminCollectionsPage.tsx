@@ -2,42 +2,68 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { adminCollectionsApi } from '@/api/AdminApi';
 import type { AdminCollection } from '@/types/admin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { toast } from 'sonner';
+import { unwrapApiResponse } from '@/types/auth';
 
 const AdminCollectionsPage: React.FC = () => {
-  const [collections, setCollections] = useState<AdminCollection[]>([]);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const { hasPermission } = useAdminPermissions();
-
-  const fetchCollections = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params: Record<string, string> = {};
-      if (search) params.search = search;
-      const res = await adminCollectionsApi.list(params);
-      const data = res.data as { items?: AdminCollection[] } | AdminCollection[];
-      setCollections(Array.isArray(data) ? data : data.items ?? []);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to load collections');
-    } finally {
-      setLoading(false);
-    }
-  }, [search]);
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string; message: string; isDestructive: boolean; action: () => Promise<void>;
+  } | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   useEffect(() => {
-    fetchCollections();
-  }, [fetchCollections]);
+    const handle = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => window.clearTimeout(handle);
+  }, [search]);
 
-  const handleVisibilityToggle = async (collection: AdminCollection) => {
+  const fetchPage = useCallback(
+    async (cursor?: string, limit?: number) => {
+      const params: Record<string, string> = {};
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (cursor) params.cursor = cursor;
+      if (limit) params.limit = String(limit);
+      const res = await adminCollectionsApi.list(params);
+      const data = unwrapApiResponse<
+        { items?: AdminCollection[]; nextCursor?: string } | AdminCollection[]
+      >(res.data as any);
+      if (Array.isArray(data)) return { items: data };
+      return { items: data.items ?? [], nextCursor: data.nextCursor };
+    },
+    [debouncedSearch],
+  );
+
+  const { items: collections, isLoading: loading, isLoadingMore, hasMore, error, sentinelRef, reset } =
+    useInfiniteScroll<AdminCollection>(fetchPage, { limit: 30 });
+
+  const handleVisibilityToggle = (collection: AdminCollection) => {
+    const newVis = collection.visibility === 'PUBLIC' ? 'PRIVATE' : 'PUBLIC';
+    setConfirmAction({
+      title: `Set collection to ${newVis}?`,
+      message: `"${collection.title ?? 'Untitled'}" will be ${newVis === 'PUBLIC' ? 'visible to everyone' : 'hidden from the public'}.`,
+      isDestructive: newVis === 'PRIVATE',
+      action: async () => {
+        await adminCollectionsApi.moderate(collection.id, { visibility: newVis });
+        toast.success(`Collection set to ${newVis.toLowerCase()}`);
+        reset();
+      },
+    });
+  };
+
+  const executeConfirm = async () => {
+    if (!confirmAction) return;
+    setConfirmLoading(true);
     try {
-      await adminCollectionsApi.moderate(collection.id, {
-        visibility: collection.visibility === 'PUBLIC' ? 'PRIVATE' : 'PUBLIC',
-      });
-      fetchCollections();
+      await confirmAction.action();
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to update collection visibility');
+      toast.error(err?.response?.data?.message || 'Action failed');
+    } finally {
+      setConfirmLoading(false);
+      setConfirmAction(null);
     }
   };
 
@@ -92,8 +118,20 @@ const AdminCollectionsPage: React.FC = () => {
               )}
             </tbody>
           </table>
+          {isLoadingMore && <div className="text-center text-gray-500 text-sm py-4">Loading more...</div>}
+          {hasMore && <div ref={sentinelRef} />}
+          {!hasMore && collections.length > 0 && <div className="text-center text-gray-400 text-xs py-4">End of list</div>}
         </div>
       )}
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title}
+        message={confirmAction?.message}
+        isDestructive={confirmAction?.isDestructive}
+        isLoading={confirmLoading}
+        onConfirm={executeConfirm}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   );
 };

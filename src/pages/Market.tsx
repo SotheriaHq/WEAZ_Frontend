@@ -15,6 +15,8 @@ import { setEngagementState } from '@/features/engagementSlice';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
+import FeaturedSection from '@/components/FeaturedSection';
+import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 
 // Error type detection
 type ErrorType = 'network' | 'timeout' | 'server' | 'empty' | 'category_empty' | 'unknown';
@@ -238,6 +240,7 @@ const Market: React.FC = () => {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [viewItem, setViewItem] = useState<MarketItem | null>(null);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -589,6 +592,15 @@ const Market: React.FC = () => {
 
   return (
     <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4">
+      <FeaturedSection
+        filterType="DESIGN"
+        onViewDesign={(collectionId) => {
+          const item = filteredItems.find((i) => i.id === collectionId);
+          if (item) setViewItem(item);
+        }}
+        onSeeAll={() => setGalleryOpen(true)}
+      />
+
            <div className="flex w-full gap-3 overflow-x-auto no-scrollbar mt-2 mb-3">
         {[
           { slug: 'ALL', label: 'All', border: 'border-slate-300/80 dark:border-slate-400/60', bgActive: 'bg-slate-500/20 backdrop-blur-md', hoverBg: 'hover:bg-slate-500/10' },
@@ -710,6 +722,8 @@ const Market: React.FC = () => {
           }
         }}
       />
+
+      <FeaturedGalleryModal open={galleryOpen} onClose={() => setGalleryOpen(false)} />
     </div>
   );
 };

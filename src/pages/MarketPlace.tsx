@@ -11,6 +11,8 @@ import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreP
 import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import { fetchWishlist } from '@/features/wishlistSlice';
+import FeaturedSection from '@/components/FeaturedSection';
+import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 
 interface RawProductsPayload {
   items?: any[];
@@ -176,17 +178,12 @@ const MarketPlace: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<string>('FOR_YOU');
   const [visibleCount, setVisibleCount] = useState(16);
   const [heroIndex, setHeroIndex] = useState(0);
-  const [curatedItems, setCuratedItems] = useState<Array<{
-    id: string;
-    title: string;
-    subtitle: string;
-    imageUrl?: string | null;
-    itemCount: number;
-  }>>([]);
+
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -198,14 +195,7 @@ const MarketPlace: React.FC = () => {
         new Set((feed.items ?? []).map((item) => item.brandId).filter(Boolean)),
       ).slice(0, 12);
 
-      const curated = (feed.items ?? []).slice(0, 4).map((item) => ({
-        id: item.id,
-        title: item.collectionTitle || 'Curated Drop',
-        subtitle: item.brandName || item.username || 'Threadly Brand',
-        imageUrl: item.media?.previewUrl || item.media?.url || null,
-        itemCount: Number(item.threadsCount ?? item.commentsCount ?? 0),
-      }));
-      setCuratedItems(curated);
+
 
       const productResults = await Promise.allSettled(
         uniqueBrandIds.map(async (brandId) => {
@@ -420,6 +410,15 @@ const MarketPlace: React.FC = () => {
           </div>
         </section>
 
+        <FeaturedSection
+          filterType="PRODUCT"
+          onViewProduct={(productId) => {
+            const p = products.find((pr) => pr.id === productId);
+            if (p) setSelectedProduct(p);
+          }}
+          onSeeAll={() => setGalleryOpen(true)}
+        />
+
         {loading ? (
           <section>
             <div className="mb-4 h-8 w-52 animate-pulse rounded-lg bg-gray-200/80 dark:bg-white/10" />
@@ -438,43 +437,7 @@ const MarketPlace: React.FC = () => {
           />
         )}
 
-        {curatedItems.length > 0 && (
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Curated Collections</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">From active market showcases</p>
-            </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {curatedItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-gray-100 dark:border-white/10 dark:bg-white/5"
-                >
-                  {item.imageUrl ? (
-                    <ImageWithFallback
-                      src={item.imageUrl}
-                      alt={item.title}
-                      fit="cover"
-                      rounded="none"
-                      containerClassName="h-52 w-full"
-                      className="h-52 w-full transition-transform duration-500 group-hover:scale-105"
-                      maxHeightClassName="max-h-full"
-                      fallbackName={item.title}
-                    />
-                  ) : (
-                    <div className="h-52 w-full bg-gray-200 dark:bg-white/10" />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 p-4 text-white">
-                    <h3 className="line-clamp-1 text-lg font-bold">{item.title}</h3>
-                    <p className="line-clamp-1 text-sm text-white/80">{item.subtitle}</p>
-                    <p className="mt-2 text-xs font-semibold text-white/70">💬 {item.itemCount} interactions</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+
 
         <section className="space-y-5">
           <div className="sticky top-16 z-20 rounded-2xl border border-gray-200/70 bg-white/55 p-4 backdrop-blur-[4px] dark:border-white/10 dark:bg-[#0f0b13]/55">
@@ -609,6 +572,8 @@ const MarketPlace: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <FeaturedGalleryModal open={galleryOpen} onClose={() => setGalleryOpen(false)} />
     </div>
   );
 };

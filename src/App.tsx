@@ -8,12 +8,12 @@ import CollectionsSettings from './pages/settings/CollectionsSettings';
 import SignupPage from './pages/SignUp';
 import Success from './pages/Success';
 import LoginPage from './pages/Login';
+import AccountReactivationRequestPage from './pages/AccountReactivationRequestPage';
 import MarketPlace from './pages/MarketPlace';
 // Removed separate BrandPublic visitor page; unified profile view handles both owner & visitor modes
 import ProtectedRoute from './components/ProtectedRoute';
 import GuestRoute from './components/GuestRoute';
 import { AuthProvider } from './context/AuthContext';
-import { ThemeProvider } from './context/ThemeContext';
 import { DropdownManagerProvider } from './context/DropdownManagerContext';
 import Profile from './pages/catalog/Catalog';
 import { ProfileLayout } from './components/catalog/ProfileLayout';
@@ -294,6 +294,7 @@ const router = createBrowserRouter([
         children: [
           { path: '/signup', element: <SignupPage /> },
           { path: '/login', element: <LoginPage /> },
+          { path: '/account-reactivation', element: <AccountReactivationRequestPage /> },
         ],
       },
       {
@@ -392,12 +393,10 @@ const router = createBrowserRouter([
 
 const App: React.FC = () => (
   <AuthProvider>
-    <ThemeProvider defaultTheme="light">
-      <DropdownManagerProvider>
-        <Toaster position="top-center" richColors closeButton />
-        <RouterProvider router={router} />
-      </DropdownManagerProvider>
-    </ThemeProvider>
+    <DropdownManagerProvider>
+      <Toaster position="top-center" richColors closeButton />
+      <RouterProvider router={router} />
+    </DropdownManagerProvider>
   </AuthProvider>
 );
 

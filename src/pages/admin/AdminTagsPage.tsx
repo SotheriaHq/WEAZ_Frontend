@@ -1,34 +1,40 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { adminTagsApi } from '@/api/AdminApi';
 import type { AdminTagItem } from '@/types/admin';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { unwrapApiResponse } from '@/types/auth';
 
 const AdminTagsPage: React.FC = () => {
-  const [tags, setTags] = useState<AdminTagItem[]>([]);
   const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchTags = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (query.trim().length > 0) {
-        const res = await adminTagsApi.search(query, 50);
-        setTags(res.data?.items ?? []);
-      } else {
-        const res = await adminTagsApi.list(100);
-        setTags(Array.isArray(res.data) ? res.data : []);
-      }
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to load tags');
-    } finally {
-      setLoading(false);
-    }
-  }, [query]);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   useEffect(() => {
-    fetchTags();
-  }, [fetchTags]);
+    const handle = window.setTimeout(() => setDebouncedQuery(query.trim()), 350);
+    return () => window.clearTimeout(handle);
+  }, [query]);
+
+  const fetchPage = useCallback(
+    async (cursor?: string, limit?: number) => {
+      if (debouncedQuery.length > 0) {
+        const res = await adminTagsApi.search(debouncedQuery, limit ?? 50);
+        const data = unwrapApiResponse<{ items?: AdminTagItem[] }>(res.data as any);
+        return { items: data?.items ?? [] };
+      }
+      const params: Record<string, string | number> = {};
+      if (cursor) params.cursor = cursor;
+      if (limit) params.limit = limit;
+      const res = await adminTagsApi.list(params);
+      const data = unwrapApiResponse<
+        { items?: AdminTagItem[]; nextCursor?: string } | AdminTagItem[]
+      >(res.data as any);
+      if (Array.isArray(data)) return { items: data };
+      return { items: data.items ?? [], nextCursor: data.nextCursor };
+    },
+    [debouncedQuery],
+  );
+
+  const { items: tags, isLoading: loading, isLoadingMore, hasMore, error, sentinelRef } =
+    useInfiniteScroll<AdminTagItem>(fetchPage, { limit: 50 });
 
   return (
     <div className="space-y-6">
@@ -69,6 +75,9 @@ const AdminTagsPage: React.FC = () => {
               )}
             </tbody>
           </table>
+          {isLoadingMore && <div className="text-center text-gray-500 text-sm py-4">Loading more...</div>}
+          {hasMore && <div ref={sentinelRef} />}
+          {!hasMore && tags.length > 0 && <div className="text-center text-gray-400 text-xs py-4">End of list</div>}
         </div>
       )}
     </div>

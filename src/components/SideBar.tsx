@@ -74,10 +74,10 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left transition-all duration-200 ${
+      className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-all duration-200 ${
         active
-          ? 'neu-modal-inset font-semibold text-[color:var(--neu-text)]'
-          : 'text-[color:var(--neu-text)] hover:bg-white/55 dark:hover:bg-white/10'
+          ? 'bg-gray-100 dark:bg-white/10 font-semibold text-gray-900 dark:text-white'
+          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100/70 dark:hover:bg-white/5'
       }`}
       title={isRail ? label : undefined}
     >
@@ -217,19 +217,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
       )}
 
       <div
-        className={`${positionClass} ${widthClass} ${showOverlay ? 'neu-modal-surface' : 'bg-[color:var(--surface-primary)]/95 dark:bg-[color:var(--surface-primary)]/95 border-r border-gray-200/70 dark:border-white/10'} backdrop-blur-xl flex flex-col transition-all duration-300 ease-out overflow-hidden ${slideClasses}`}
+        className={`${positionClass} ${widthClass} ${showOverlay ? 'bg-white/95 dark:bg-gray-950 border border-white/30 dark:border-white/10 shadow-xl rounded-r-lg' : 'bg-white/95 dark:bg-gray-950/95 border-r border-gray-200/70 dark:border-white/10'} backdrop-blur-xl flex flex-col transition-all duration-300 ease-out overflow-hidden ${slideClasses}`}
       >
         {showOverlay && (
-          <div className="h-16 px-4 sm:px-5 flex items-center justify-start shrink-0 border-b border-[color:var(--neu-border)]/80">
+          <div className="h-16 px-4 sm:px-5 flex items-center justify-start shrink-0 border-b border-gray-200/50 dark:border-white/10">
             <button
               onClick={() => dispatch(toggleSidebar())}
-              className="inline-flex h-9 w-9 items-center justify-center mr-2 sm:mr-3 rounded-xl neu-modal-inset transition-all hover:brightness-105"
+              className="inline-flex h-9 w-9 items-center justify-center mr-2 sm:mr-3 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"
             >
               <span className="text-xl">🍔</span>
             </button>
             <div className="flex items-center cursor-pointer" onClick={() => handleLinkClick('/')}>
               <ThreadlyLogo />
-              <span className="ml-2 text-lg font-bold text-[color:var(--neu-text)] tracking-tight">
+              <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight">
                 Threadly
               </span>
             </div>
@@ -252,10 +252,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
 
           {!isRail && (
             <>
-              <div className="border-t border-[color:var(--neu-border)] my-3 mx-2" />
+              <div className="border-t border-gray-200/50 dark:border-white/10 my-3 mx-2" />
 
               <div className="px-3 mb-2">
-                <h3 className="text-base font-semibold text-[color:var(--neu-text)] flex items-center">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center">
                   You <span className="ml-1 text-xs">{'>'}</span>
                 </h3>
               </div>
@@ -272,10 +272,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
                 ))}
               </div>
 
-              <div className="border-t border-[color:var(--neu-border)] my-3 mx-2" />
+              <div className="border-t border-gray-200/50 dark:border-white/10 my-3 mx-2" />
 
               <div className="px-3 mb-2">
-                <h3 className="text-base font-semibold text-[color:var(--neu-text)]">Explore</h3>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Explore</h3>
               </div>
               <div className="space-y-1 mb-3">
                 {exploreLinks.map((link) => (
@@ -290,7 +290,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
                 ))}
               </div>
 
-              <div className="border-t border-[color:var(--neu-border)] my-3 mx-2" />
+              <div className="border-t border-gray-200/50 dark:border-white/10 my-3 mx-2" />
 
               {user && (
                 <div className="space-y-1 mb-3">

@@ -224,16 +224,6 @@ export const getProductById = async (productId: string): Promise<Product> => {
   return extractData<Product>(res);
 };
 
-export const getFeaturedProducts = async (brandId: string, limit = 6): Promise<Product[]> => {
-  const res = await apiClient.get(`/store/brands/${brandId}/products?isFeatured=true&limit=${limit}`);
-  const data = extractData<PaginatedResponse<Product>>(res);
-  return Array.isArray((data as any)?.items)
-    ? ((data as any).items as Product[])
-    : Array.isArray(data as any)
-      ? ((data as any) as Product[])
-      : [];
-};
-
 // ============= Cart API =============
 
 export const getCart = async (): Promise<{ items: CartItem[]; subtotal: number; itemCount: number }> => {
@@ -610,7 +600,6 @@ export const getProductPriceChangePreview = async (
 export default {
   getProducts,
   getProductById,
-  getFeaturedProducts,
   getCart,
   addToCart,
   updateCartItem,

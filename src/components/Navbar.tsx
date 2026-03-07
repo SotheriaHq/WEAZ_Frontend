@@ -167,7 +167,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                   fit="cover"
                   className="w-10 h-10"
                   containerClassName="w-10 h-10"
-                  rounded="full"
+                  rounded="xl"
                 />
                 <div>
                   <p className="font-medium text-gray-900 dark:text-white">{user.firstName} {user.lastName}</p>
@@ -574,7 +574,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                 setShowLanguageDropdown(false);
                 setShowProfileMenu((prev) => !prev);
               }}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:ring-2 hover:ring-primary/20 transition-all duration-200 overflow-hidden"
+              className="w-8 h-8 rounded-xl flex items-center justify-center hover:ring-2 hover:ring-primary/20 transition-all duration-200 overflow-hidden"
               aria-label="Profile menu"
             >
               {user ? (
@@ -586,10 +586,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                   fit="cover"
                   className="w-full h-full object-cover"
                   containerClassName="w-full h-full"
-                  rounded="full"
+                  rounded="xl"
                 />
               ) : (
-                <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-xl flex items-center justify-center">
                   <User className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                 </div>
               )}

@@ -1,7 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { adminDisputesApi } from '@/api/AdminApi';
 import type { AdminDispute } from '@/types/admin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { unwrapApiResponse } from '@/types/auth';
+import { CreateDisputeModal, DisputeDetailModal } from './modals/DisputeModals';
 
 const STATUS_EMOJI: Record<string, string> = {
   OPEN: '🟡',
@@ -11,35 +14,34 @@ const STATUS_EMOJI: Record<string, string> = {
 };
 
 const AdminDisputesPage: React.FC = () => {
-  const [disputes, setDisputes] = useState<AdminDispute[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { hasPermission } = useAdminPermissions();
+  const [selectedDispute, setSelectedDispute] = useState<AdminDispute | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
 
-  const fetchDisputes = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await adminDisputesApi.list();
-      const data = res.data as { items?: AdminDispute[] } | AdminDispute[];
-      setDisputes(Array.isArray(data) ? data : data.items ?? []);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to load disputes');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchPage = useCallback(
+    async (cursor?: string, limit?: number) => {
+      const params: Record<string, string> = {};
+      if (cursor) params.cursor = cursor;
+      if (limit) params.limit = String(limit);
+      const res = await adminDisputesApi.list(params);
+      const data = unwrapApiResponse<{ items?: AdminDispute[]; nextCursor?: string } | AdminDispute[]>(
+        res.data as any,
+      );
+      if (Array.isArray(data)) return { items: data };
+      return { items: data.items ?? [], nextCursor: data.nextCursor };
+    },
+    [],
+  );
 
-  useEffect(() => {
-    fetchDisputes();
-  }, [fetchDisputes]);
+  const { items: disputes, isLoading: loading, isLoadingMore, hasMore, error, sentinelRef } =
+    useInfiniteScroll<AdminDispute>(fetchPage, { limit: 30 });
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">⚖️ Disputes</h1>
         {hasPermission('DISPUTES_RESOLVE') && (
-          <button className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition">
+          <button onClick={() => setShowCreate(true)} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition">
             + Create Dispute
           </button>
         )}
@@ -70,7 +72,7 @@ const AdminDisputesPage: React.FC = () => {
                   <td className="py-2.5 px-3 text-gray-500">{new Date(dispute.createdAt).toLocaleDateString()}</td>
                   {hasPermission('DISPUTES_RESOLVE') && (
                     <td className="py-2.5 px-3">
-                      <button className="text-primary hover:underline text-xs">Manage</button>
+                      <button onClick={() => setSelectedDispute(dispute)} className="text-primary hover:underline text-xs">Manage</button>
                     </td>
                   )}
                 </tr>
@@ -82,8 +84,23 @@ const AdminDisputesPage: React.FC = () => {
               )}
             </tbody>
           </table>
+          {isLoadingMore && <div className="text-center text-gray-500 text-sm py-4">Loading more...</div>}
+          {hasMore && <div ref={sentinelRef} />}
+          {!hasMore && disputes.length > 0 && <div className="text-center text-gray-400 text-xs py-4">End of list</div>}
         </div>
       )}
+
+      <CreateDisputeModal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={() => {}}
+      />
+      <DisputeDetailModal
+        dispute={selectedDispute}
+        open={!!selectedDispute}
+        onClose={() => setSelectedDispute(null)}
+        onUpdated={() => {}}
+      />
     </div>
   );
 };

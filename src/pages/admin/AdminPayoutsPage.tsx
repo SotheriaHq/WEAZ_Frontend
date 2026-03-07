@@ -1,7 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { adminPayoutsApi } from '@/api/AdminApi';
 import type { AdminPayout } from '@/types/admin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { unwrapApiResponse } from '@/types/auth';
+import PayoutProcessModal from './modals/PayoutProcessModal';
 
 const STATUS_EMOJI: Record<string, string> = {
   PENDING: '🟡',
@@ -11,31 +14,28 @@ const STATUS_EMOJI: Record<string, string> = {
 };
 
 const AdminPayoutsPage: React.FC = () => {
-  const [payouts, setPayouts] = useState<AdminPayout[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
+  const [selectedPayout, setSelectedPayout] = useState<AdminPayout | null>(null);
   const { hasPermission } = useAdminPermissions();
 
-  const fetchPayouts = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const fetchPage = useCallback(
+    async (cursor?: string, limit?: number) => {
       const params: Record<string, string> = {};
       if (statusFilter) params.status = statusFilter;
+      if (cursor) params.cursor = cursor;
+      if (limit) params.limit = String(limit);
       const res = await adminPayoutsApi.list(params);
-      const data = res.data as { items?: AdminPayout[] } | AdminPayout[];
-      setPayouts(Array.isArray(data) ? data : data.items ?? []);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to load payouts');
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter]);
+      const data = unwrapApiResponse<{ items?: AdminPayout[]; nextCursor?: string } | AdminPayout[]>(
+        res.data as any,
+      );
+      if (Array.isArray(data)) return { items: data };
+      return { items: data.items ?? [], nextCursor: data.nextCursor };
+    },
+    [statusFilter],
+  );
 
-  useEffect(() => {
-    fetchPayouts();
-  }, [fetchPayouts]);
+  const { items: payouts, isLoading: loading, isLoadingMore, hasMore, error, sentinelRef } =
+    useInfiniteScroll<AdminPayout>(fetchPage, { limit: 30 });
 
   return (
     <div className="space-y-6">
@@ -80,7 +80,7 @@ const AdminPayoutsPage: React.FC = () => {
                   <td className="py-2.5 px-3 text-gray-500">{new Date(payout.createdAt).toLocaleDateString()}</td>
                   {hasPermission('PAYOUTS_PROCESS') && (
                     <td className="py-2.5 px-3">
-                      <button className="text-primary hover:underline text-xs">Process</button>
+                      <button onClick={() => setSelectedPayout(payout)} className="text-primary hover:underline text-xs">Process</button>
                     </td>
                   )}
                 </tr>
@@ -92,8 +92,18 @@ const AdminPayoutsPage: React.FC = () => {
               )}
             </tbody>
           </table>
+          {isLoadingMore && <div className="text-center text-gray-500 text-sm py-4">Loading more...</div>}
+          {hasMore && <div ref={sentinelRef} />}
+          {!hasMore && payouts.length > 0 && <div className="text-center text-gray-400 text-xs py-4">End of list</div>}
         </div>
       )}
+
+      <PayoutProcessModal
+        payout={selectedPayout}
+        open={!!selectedPayout}
+        onClose={() => setSelectedPayout(null)}
+        onUpdated={() => {}}
+      />
     </div>
   );
 };

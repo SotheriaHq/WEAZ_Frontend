@@ -561,22 +561,6 @@ export const productApi = {
   },
 
   /**
-   * Toggle product featured status
-   */
-  async toggleFeatured(productId: string): Promise<ProductDto> {
-    try {
-      const response = await apiClient.post<{
-        status: string;
-        data: ProductDto;
-      }>(`/products/${productId}/toggle-featured`);
-      return response.data?.data ?? (response.data as unknown as ProductDto);
-    } catch (error) {
-      console.error("Failed to toggle featured", error);
-      throw error;
-    }
-  },
-
-  /**
    * Duplicate a product
    */
   async duplicateProduct(productId: string): Promise<ProductDto> {

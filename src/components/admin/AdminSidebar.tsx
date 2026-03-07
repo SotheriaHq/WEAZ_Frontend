@@ -46,27 +46,30 @@ const AdminSidebar: React.FC = () => {
   };
 
   return (
-    <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[200px] z-20 overflow-y-auto scrollbar-hide border-r border-purple-200/30 dark:border-white/10 bg-gradient-to-b from-[#faf8ff]/90 to-[#f5f0ff]/80 dark:from-[#0f0f0f]/95 dark:to-[#0a0a0a]/90 backdrop-blur-xl">
-      <div className="py-4 px-2">
+    <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[200px] z-20 overflow-y-auto scrollbar-hide border-r border-white/30 dark:border-white/10 bg-white/95 dark:bg-gray-950 backdrop-blur-xl shadow-lg">
+      {/* Gradient overlay matching profile dropdown */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-purple-400/5 to-transparent opacity-40 pointer-events-none" />
+
+      <div className="relative z-10 py-4 px-2">
         <div className="px-3 mb-4">
-          <h2 className="text-sm font-bold text-black dark:text-white uppercase tracking-wider">Admin</h2>
+          <h2 className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Admin</h2>
         </div>
 
-        <nav className="space-y-1">
+        <nav className="space-y-0.5">
           {visibleItems.map((item) => {
             const isActive = getIsActive(item);
             return (
               <button
                 key={item.key}
                 onClick={() => navigate(item.path)}
-                className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-all duration-150 flex items-center gap-2 group ${
+                className={`w-full text-left px-3 py-2 text-sm rounded-xl transition-all duration-150 flex items-center gap-2.5 group ${
                   isActive
-                    ? 'font-medium text-primary border-l-4 border-primary bg-primary/10'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    ? 'font-semibold text-purple-700 dark:text-purple-300 bg-purple-500/10 dark:bg-purple-500/15 border-l-3 border-purple-500'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-purple-500/5 dark:hover:bg-white/5'
                 }`}
               >
                 <span className="text-base">{item.emoji}</span>
-                <span className="text-sm">{item.label}</span>
+                <span className="text-[13px]">{item.label}</span>
               </button>
             );
           })}

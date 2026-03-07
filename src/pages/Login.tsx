@@ -97,6 +97,7 @@ const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showReactivationLink, setShowReactivationLink] = useState(false);
   const [rememberMe, setRememberMe] = useState<boolean>(rememberedState.remember);
   const [emailSuggestions, setEmailSuggestions] = useState<string[]>(rememberedState.emails);
   const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
@@ -230,10 +231,14 @@ const LoginPage = () => {
       dispatch(setUser(user));
       dispatch(addLocalNotification({ message: 'Signed in successfully.' }));
       toast.success('Login successful!');
+      setShowReactivationLink(false);
 
-      // Redirect based on user type
-      // BRAND users go to profile, REGULAR users also go to profile now
-      const redirectPath = user.type === 'BRAND' || user.type === 'REGULAR' ? '/profile' : '/';
+      // Redirect based on role first: admin users always land in admin console.
+      // Non-admin users continue to use profile as their post-login landing page.
+      const redirectPath =
+        user.role === 'SuperAdmin' || user.role === 'Admin'
+          ? '/admin'
+          : '/profile';
       navigate(redirectPath, { replace: true });
       setIsRedirecting(true);
       reset({ email: rememberMe ? normalizedEmail : '', password: '' });
@@ -243,6 +248,11 @@ const LoginPage = () => {
         const data = error.response?.data as Record<string, unknown> | undefined;
         const responseMessage =
           (data && typeof data.message === 'string' && data.message) || 'Login failed. Please try again.';
+        const normalizedMessage = responseMessage.toLowerCase();
+        const accountBlocked =
+          normalizedMessage.includes('suspended') ||
+          normalizedMessage.includes('deactivated');
+        setShowReactivationLink(accountBlocked);
 
         if (data && Array.isArray((data as { errors?: unknown }).errors)) {
           const serverErrors = (data as { errors: Array<Record<string, unknown>> }).errors;
@@ -464,6 +474,22 @@ const LoginPage = () => {
                 </button>
               </form>
 
+              {showReactivationLink && (
+                <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+                  <p className="text-xs text-amber-300">
+                    Account access is currently restricted. You can submit a leniency/reactivation request.
+                  </p>
+                  <Link
+                    to={`/account-reactivation?email=${encodeURIComponent(
+                      (watchEmail ?? '').trim(),
+                    )}`}
+                    className="mt-2 inline-block text-xs font-medium text-amber-200 hover:text-white underline"
+                  >
+                    Submit reactivation request
+                  </Link>
+                </div>
+              )}
+
               {/* Divider */}
               <div className="relative my-8">
                 <div className="absolute inset-0 flex items-center">
@@ -524,6 +550,4 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
-
-
 

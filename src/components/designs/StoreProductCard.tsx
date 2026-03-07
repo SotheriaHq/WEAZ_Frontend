@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { ShoppingBag, Eye, ImageOff, Sparkles, AlertTriangle, Package, Link2 } from 'lucide-react';
+import { ShoppingBag, Eye, ImageOff, AlertTriangle, Package, Link2 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
@@ -33,6 +33,10 @@ export interface StoreProduct {
   isLowStock: boolean;
   isOutOfStock: boolean;
   isFeatured: boolean;
+  isActive?: boolean;
+  archivedAt?: string | null;
+  deletedAt?: string | null;
+  publishAt?: string | null;
   threadsCount: number;
   viewsCount: number;
   brand: {
@@ -68,6 +72,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [showCustomLabel, setShowCustomLabel] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
   const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
@@ -79,6 +84,24 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     product.sizingMode === 'RTW_PLUS_CUSTOM' ||
     (Array.isArray(product.customMeasurementKeys) &&
       product.customMeasurementKeys.length > 0);
+  const ownerStatus = (() => {
+    if (!isOwnerView) return null;
+    if (product.deletedAt) {
+      return { emoji: '🗑️', label: 'Deleted', className: 'bg-rose-500/90 text-white' };
+    }
+    if (product.archivedAt) {
+      return { emoji: '📦', label: 'Archived', className: 'bg-gray-500/90 text-white' };
+    }
+    const publishAtTs = product.publishAt ? new Date(product.publishAt).getTime() : null;
+    const isScheduled = typeof publishAtTs === 'number' && Number.isFinite(publishAtTs) && publishAtTs > Date.now();
+    if (isScheduled) {
+      return { emoji: '⏰', label: 'Scheduled', className: 'bg-sky-500/90 text-white' };
+    }
+    if (product.isActive === false) {
+      return { emoji: '📝', label: 'Draft', className: 'bg-amber-500/90 text-white' };
+    }
+    return { emoji: '✅', label: 'Published', className: 'bg-emerald-500/90 text-white' };
+  })();
 
   // Derive wishlist state entirely from Redux for real-time sync
   const isProductWishlisted = wishlistedIds.has(product.id);
@@ -250,8 +273,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
         {product.isFeatured && (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-semibold uppercase tracking-wider shadow-lg shadow-orange-500/25">
-            <Sparkles size={10} />
-            New
+            ⭐ Featured
           </span>
         )}
         {product.isOnSale && product.discountPercent && (
@@ -265,10 +287,38 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             Low Stock
           </span>
         )}
-        {isCustomAvailable && (
-          <span className="inline-flex items-center px-2 py-1 rounded-full bg-purple-500/90 text-white text-[10px] font-semibold shadow-lg shadow-purple-500/25">
-            ✂️ Custom Available
+        {ownerStatus && (
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold shadow-lg ${ownerStatus.className}`}
+          >
+            <span>{ownerStatus.emoji}</span>
+            {ownerStatus.label}
           </span>
+        )}
+        {isCustomAvailable && (
+          <div className="relative inline-flex">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setShowCustomLabel((prev) => !prev);
+              }}
+              onMouseEnter={() => setShowCustomLabel(true)}
+              onMouseLeave={() => setShowCustomLabel(false)}
+              onFocus={() => setShowCustomLabel(true)}
+              onBlur={() => setShowCustomLabel(false)}
+              className="inline-flex items-center justify-center rounded-full bg-purple-500/90 px-2 py-1 text-sm leading-none text-white shadow-lg shadow-purple-500/25"
+              aria-label="Custom available"
+              title="Custom available"
+            >
+              <span role="img" aria-hidden="true">{String.fromCodePoint(0x2702, 0xfe0f)}</span>
+            </button>
+            {showCustomLabel && (
+              <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded-full bg-black/80 px-2 py-1 text-[10px] font-semibold text-white shadow-lg backdrop-blur">
+                Custom Available
+              </span>
+            )}
+          </div>
         )}
         {isOwnerView && !product.isOutOfStock && (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/90 text-white text-[10px] font-semibold">
@@ -437,3 +487,4 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 };
 
 export default StoreProductCard;
+

@@ -28,10 +28,9 @@ const RequireAdmin: React.FC<{ children?: React.ReactNode }> = ({ children }) =>
 
   if (
     user.mustResetPassword === true &&
-    location.pathname !== '/admin/force-reset-password' &&
     location.pathname !== '/admin/reset-password'
   ) {
-    return <Navigate to="/admin/force-reset-password" replace />;
+    return <Navigate to="/admin/reset-password" replace />;
   }
 
   return children ? <>{children}</> : <Outlet />;

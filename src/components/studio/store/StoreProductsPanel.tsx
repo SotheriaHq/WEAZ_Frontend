@@ -916,16 +916,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   // Handle product action from menu
   const handleProductAction = async (actionId: string, product: BackendProduct) => {
     switch (actionId) {
-      case 'feature':
-        try {
-          await productApi.toggleFeatured(product.id);
-          toast.success(product.isFeatured ? 'Removed from featured' : 'Added to featured');
-          await refresh();
-        } catch (e) {
-          toast.error('Failed to update featured status');
-        }
-        break;
-        
       case 'duplicate':
         await handleDuplicate(product.id);
         break;
@@ -2130,7 +2120,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           )}
 
                           {/* Menu host — Top Right */}
-                          <div className="collection-menu-host absolute right-3 top-3 z-40 transition-opacity opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                          <div
+                            className={`collection-menu-host absolute right-3 top-3 z-40 transition-opacity ${
+                              isMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+                            }`}
+                          >
                             <button
                               type="button"
                               onClick={(e) => {
@@ -2445,19 +2439,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       <span className="text-lg font-bold">⋯</span>
                     </button>
                     
-                    {/* Actions dropdown menu */}
-                    {dropdownManager.openId === `product-menu-${product.id}` && (
-                      <ProductActionsMenu
-                        isOpen={true}
-                        onClose={() => dropdownManager.setOpenId(null)}
-                        onAction={(actionId) => handleProductAction(actionId, product)}
-                        actions={getDefaultProductActions(product)}
-                        triggerElement={
-                          productMenuTriggerRefs.current[product.id] ?? null
-                        }
-                      />
-                    )}
-                    
                     {/* Featured indicator (small badge) */}
                     {product.isFeatured && (
                       <div className="absolute -top-1 -right-1 w-5 h-5 bg-amber-400 rounded-full flex items-center justify-center shadow-md" title="Featured product">
@@ -2465,6 +2446,20 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       </div>
                     )}
                   </div>
+
+                  {/* Actions dropdown menu — rendered as card overlay */}
+                  {dropdownManager.openId === `product-menu-${product.id}` && (
+                    <ProductActionsMenu
+                      isOpen={true}
+                      onClose={() => dropdownManager.setOpenId(null)}
+                      onAction={(actionId) => handleProductAction(actionId, product)}
+                      actions={getDefaultProductActions(product)}
+                      triggerElement={
+                        productMenuTriggerRefs.current[product.id] ?? null
+                      }
+                      renderInline
+                    />
+                  )}
 
                   {/* Quick action icons - always visible */}
                   {!product.deletedAt && (

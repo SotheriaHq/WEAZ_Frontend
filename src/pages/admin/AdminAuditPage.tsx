@@ -1,33 +1,37 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { adminAuditApi } from '@/api/AdminApi';
 import type { AdminAuditLog } from '@/types/admin';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { unwrapApiResponse } from '@/types/auth';
 
 const AdminAuditPage: React.FC = () => {
-  const [logs, setLogs] = useState<AdminAuditLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [actionFilter, setActionFilter] = useState('');
+  const [debouncedFilter, setDebouncedFilter] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params: Record<string, string> = {};
-      if (actionFilter) params.action = actionFilter;
-      const res = await adminAuditApi.list(params);
-      const data = res.data as { items?: AdminAuditLog[] } | AdminAuditLog[];
-      setLogs(Array.isArray(data) ? data : data.items ?? []);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to load audit logs');
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedFilter(actionFilter.trim()), 350);
+    return () => window.clearTimeout(handle);
   }, [actionFilter]);
 
-  useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+  const fetchPage = useCallback(
+    async (cursor?: string, limit?: number) => {
+      const params: Record<string, string> = {};
+      if (debouncedFilter) params.action = debouncedFilter;
+      if (cursor) params.cursor = cursor;
+      if (limit) params.limit = String(limit);
+      const res = await adminAuditApi.list(params);
+      const data = unwrapApiResponse<{ items?: AdminAuditLog[]; nextCursor?: string } | AdminAuditLog[]>(
+        res.data as any,
+      );
+      if (Array.isArray(data)) return { items: data };
+      return { items: data.items ?? [], nextCursor: data.nextCursor };
+    },
+    [debouncedFilter],
+  );
+
+  const { items: logs, isLoading: loading, isLoadingMore, hasMore, error, sentinelRef } =
+    useInfiniteScroll<AdminAuditLog>(fetchPage, { limit: 30 });
 
   return (
     <div className="space-y-6">
@@ -109,6 +113,9 @@ const AdminAuditPage: React.FC = () => {
               )}
             </tbody>
           </table>
+          {isLoadingMore && <div className="text-center text-gray-500 text-sm py-4">Loading more...</div>}
+          {hasMore && <div ref={sentinelRef} />}
+          {!hasMore && logs.length > 0 && <div className="text-center text-gray-400 text-xs py-4">End of list</div>}
         </div>
       )}
     </div>

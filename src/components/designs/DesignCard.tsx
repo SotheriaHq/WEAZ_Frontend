@@ -51,6 +51,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   const [isHidden, setIsHidden] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showTags, setShowTags] = useState(false);
+  const [showCustomLabel, setShowCustomLabel] = useState(false);
   const [isSavedLocal, setIsSavedLocal] = useState(false);
   const [saveBusyLocal, setSaveBusyLocal] = useState(false);
   const [isPatchedLocal, setIsPatchedLocal] = useState(false);
@@ -229,6 +230,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
       onMouseLeave={() => {
         setShowMenu(false);
         setShowTags(false);
+        setShowCustomLabel(false);
       }}
     >
       {/* Full Image Background */}
@@ -292,9 +294,29 @@ export const DesignCard: React.FC<DesignCardProps> = ({
             </div>
           )}
           {isCustomAvailable && (
-            <span className="mt-2 inline-flex items-center rounded-full border border-purple-300/50 bg-purple-500/25 px-2 py-1 text-[10px] font-semibold text-white shadow-md">
-              ✂️ Custom Available
-            </span>
+            <div className="relative mt-2 inline-flex">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowCustomLabel((prev) => !prev);
+                }}
+                onMouseEnter={() => setShowCustomLabel(true)}
+                onMouseLeave={() => setShowCustomLabel(false)}
+                onFocus={() => setShowCustomLabel(true)}
+                onBlur={() => setShowCustomLabel(false)}
+                className="inline-flex items-center justify-center rounded-full border border-purple-300/50 bg-purple-500/25 px-2 py-1 text-sm leading-none text-white shadow-md"
+                aria-label="Custom available"
+                title="Custom available"
+              >
+                <span role="img" aria-hidden="true">{String.fromCodePoint(0x2702, 0xfe0f)}</span>
+              </button>
+              {showCustomLabel && (
+                <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded-full bg-black/80 px-2 py-1 text-[10px] font-semibold text-white shadow-lg backdrop-blur whitespace-nowrap">
+                  Custom Available
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -316,6 +338,15 @@ export const DesignCard: React.FC<DesignCardProps> = ({
           
           {showMenu && (
             <div className="absolute right-0 mt-1 w-40 rounded-lg bg-white/90 dark:bg-black/80 backdrop-blur-md border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right z-40">
+              {isCustomAvailable && (
+                <>
+                  <div className="w-full px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                    <span role="img" aria-hidden="true">{String.fromCodePoint(0x2702, 0xfe0f)}</span>
+                    <span>Custom Available</span>
+                  </div>
+                  <div className="h-px bg-gray-200 dark:bg-white/10 my-0.5" />
+                </>
+              )}
               <button
                 onClick={handleToggleSave}
                 disabled={resolvedSaveBusy}
@@ -473,3 +504,4 @@ export const DesignCard: React.FC<DesignCardProps> = ({
 };
 
 export default DesignCard;
+

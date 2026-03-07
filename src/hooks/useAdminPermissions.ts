@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { getStoredAccessToken } from '../api/httpClient';
@@ -25,6 +25,7 @@ const PERMISSION_ALIASES: Record<string, string> = {
   PAYOUTS_PROCESS: 'payouts.process',
   DISPUTES_READ: 'disputes.read',
   DISPUTES_RESOLVE: 'disputes.resolve',
+  FEATURED_MANAGE: 'featured.manage',
   MODERATION_READ: 'moderation.read',
   MODERATION_REVIEW: 'moderation.write',
   AUDIT_READ: 'audit.read',
@@ -61,12 +62,18 @@ export function useAdminPermissions() {
   const isAdmin = profile?.role === 'SuperAdmin' || profile?.role === 'Admin';
   const isSuperAdmin = profile?.role === 'SuperAdmin';
 
-  const hasPermission = (code: string): boolean => {
-    if (!isAdmin) return false;
-    if (isSuperAdmin) return true;
-    const normalized = PERMISSION_ALIASES[code] ?? code;
-    return permissions.includes(normalized);
-  };
+  const hasPermission = useCallback(
+    (code: string): boolean => {
+      if (!isAdmin) return false;
+      if (isSuperAdmin) return true;
+      const normalized = PERMISSION_ALIASES[code] ?? code;
+      return permissions.includes(normalized);
+    },
+    [isAdmin, isSuperAdmin, permissions],
+  );
 
-  return { permissions, isAdmin, isSuperAdmin, hasPermission };
+  return useMemo(
+    () => ({ permissions, isAdmin, isSuperAdmin, hasPermission }),
+    [permissions, isAdmin, isSuperAdmin, hasPermission],
+  );
 }

@@ -1,37 +1,57 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { adminModerationApi } from '@/api/AdminApi';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { toast } from 'sonner';
+import { unwrapApiResponse } from '@/types/auth';
 
 const AdminModerationPage: React.FC = () => {
-  const [queue, setQueue] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { hasPermission } = useAdminPermissions();
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string; message: string; isDestructive: boolean; action: () => Promise<void>;
+  } | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
-  const fetchQueue = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const fetchPage = useCallback(
+    async (cursor?: string, limit?: number) => {
+      const params: Record<string, string> = {};
+      if (cursor) params.cursor = cursor;
+      if (limit) params.limit = String(limit);
+      const res = await adminModerationApi.getQueue(params);
+      const data = unwrapApiResponse<any>(res.data as any);
+      if (Array.isArray(data)) return { items: data };
+      return { items: (data as any)?.items ?? [], nextCursor: (data as any)?.nextCursor };
+    },
+    [],
+  );
+
+  const { items: queue, isLoading: loading, isLoadingMore, hasMore, error, sentinelRef, reset } =
+    useInfiniteScroll<any>(fetchPage, { limit: 30 });
+
+  const handleReview = (id: string, action: string) => {
+    setConfirmAction({
+      title: `${action === 'APPROVE' ? 'Approve' : 'Reject'} this item?`,
+      message: `This moderation item will be marked as ${action.toLowerCase()}.`,
+      isDestructive: action === 'REJECT',
+      action: async () => {
+        await adminModerationApi.reviewItem(id, { action });
+        toast.success(`Item ${action.toLowerCase()}d`);
+        reset();
+      },
+    });
+  };
+
+  const executeConfirm = async () => {
+    if (!confirmAction) return;
+    setConfirmLoading(true);
     try {
-      const res = await adminModerationApi.getQueue();
-      const data = res.data;
-      setQueue(Array.isArray(data) ? data : (data as any)?.items ?? []);
+      await confirmAction.action();
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to load moderation queue');
+      toast.error(err?.response?.data?.message || 'Action failed');
     } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchQueue();
-  }, [fetchQueue]);
-
-  const handleReview = async (id: string, action: string) => {
-    try {
-      await adminModerationApi.reviewItem(id, { action });
-      fetchQueue();
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Review action failed');
+      setConfirmLoading(false);
+      setConfirmAction(null);
     }
   };
 
@@ -82,6 +102,19 @@ const AdminModerationPage: React.FC = () => {
           ))}
         </div>
       )}
+      {isLoadingMore && <div className="text-center text-gray-500 text-sm py-4">Loading more...</div>}
+      {hasMore && <div ref={sentinelRef} />}
+      {!hasMore && queue.length > 0 && <div className="text-center text-gray-400 text-xs py-4">End of list</div>}
+
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title}
+        message={confirmAction?.message}
+        isDestructive={confirmAction?.isDestructive}
+        isLoading={confirmLoading}
+        onConfirm={executeConfirm}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   );
 };

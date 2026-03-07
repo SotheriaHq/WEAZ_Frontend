@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { apiClient } from '@/api/httpClient';
+import { unwrapApiResponse } from '@/types/auth';
 
 const AdminResetPasswordPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -15,7 +16,7 @@ const AdminResetPasswordPage: React.FC = () => {
     setMessage(null);
     try {
       const res = await apiClient.post('/auth/admin/reset-password/request', { email });
-      const body = res.data as any;
+      const body = unwrapApiResponse<any>(res.data as any);
       setMessage('Reset token generated. Use the token below to confirm reset.');
       if (body?.resetToken) {
         setToken(body.resetToken);

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { adminModerationApi } from '@/api/AdminApi';
+import { unwrapApiResponse } from '@/types/auth';
 
 const AdminMeasurementsPage: React.FC = () => {
   const [freeformPoints, setFreeformPoints] = useState<any[]>([]);
@@ -12,7 +13,7 @@ const AdminMeasurementsPage: React.FC = () => {
     setError(null);
     try {
       const res = await adminModerationApi.getQueue();
-      const data = res.data as { freeformPoints?: any[]; sizeCharts?: any[] };
+      const data = unwrapApiResponse<{ freeformPoints?: any[]; sizeCharts?: any[] }>(res.data as any);
       setFreeformPoints(data.freeformPoints ?? []);
       setSizeCharts(data.sizeCharts ?? []);
     } catch (err: any) {
