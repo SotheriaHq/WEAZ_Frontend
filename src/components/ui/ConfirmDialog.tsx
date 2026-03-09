@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { OverlayPortal } from './OverlayPortal';
+import VLoader from '@/components/loaders/VLoader';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface ConfirmDialogProps {
@@ -97,7 +98,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <span className="inline-block h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  <VLoader size={16} progress={64} phase="loading" showLabel={false} />
                   Processing...
                 </span>
               ) : confirmText}

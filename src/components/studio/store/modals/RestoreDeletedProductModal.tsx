@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { productApi } from '@/api/ProductApi';
+import VLoader from '@/components/loaders/VLoader';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RESTORE DELETED PRODUCT MODAL
@@ -64,7 +65,7 @@ const RestoreDeletedProductModal: React.FC<RestoreDeletedProductModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-layer-modal flex items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -156,7 +157,7 @@ const RestoreDeletedProductModal: React.FC<RestoreDeletedProductModalProps> = ({
           >
             {loading ? (
               <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <VLoader size={16} progress={66} phase="loading" showLabel={false} />
                 Restoring...
               </>
             ) : (

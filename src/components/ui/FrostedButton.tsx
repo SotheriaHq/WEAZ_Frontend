@@ -1,5 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
+import VLoader from '@/components/loaders/VLoader';
 
 type Variant = 'primary' | 'ghost' | 'outline';
 type Size = 'xs' | 'sm' | 'md' | 'lg';
@@ -39,10 +40,7 @@ export const FrostedButton: React.FC<FrostedButtonProps> = ({
     {...props}
   >
     {loading ? (
-      <span
-        className="inline-block h-4 w-4 rounded-full border-2 border-current/35 border-t-current animate-spin"
-        aria-hidden
-      />
+      <VLoader size={16} progress={54} phase="loading" showLabel={false} className="text-current" />
     ) : (
       leftIcon
     )}

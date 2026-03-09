@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { productApi } from '@/api/ProductApi';
+import VLoader from '@/components/loaders/VLoader';
 
 const getProductInitials = (name: string): string => {
   if (!name) return 'P';
@@ -106,7 +107,7 @@ const ArchiveProductModal: React.FC<ArchiveProductModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-24 sm:pt-20">
+    <div className="fixed inset-0 z-layer-modal flex items-start justify-center px-4 pt-24 sm:pt-20">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-zinc-900 max-h-[calc(100vh-8rem)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
@@ -251,7 +252,7 @@ const ArchiveProductModal: React.FC<ArchiveProductModalProps> = ({
           >
             {loading ? (
               <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <VLoader size={16} progress={64} phase="loading" showLabel={false} />
                 {isArchiving ? 'Archiving...' : 'Restoring...'}
               </>
             ) : (

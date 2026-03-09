@@ -9,6 +9,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import VLoader from '@/components/loaders/VLoader';
 import { Select } from '@/components/ui/Select';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import ImageWithFallback from '@/components/ImageWithFallback';
@@ -844,7 +845,7 @@ export const CollectionCartPreviewModal: React.FC<CollectionCartPreviewModalProp
             >
               {isAdding ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <VLoader size={16} progress={68} phase="loading" showLabel={false} />
                   Adding to Cart...
                 </>
               ) : (

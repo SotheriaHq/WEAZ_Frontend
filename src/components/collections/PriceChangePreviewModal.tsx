@@ -10,6 +10,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import VLoader from '@/components/loaders/VLoader';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 /**
@@ -376,7 +377,7 @@ export const PriceChangePreviewModal: React.FC<PriceChangePreviewModalProps> = (
               >
                 {isConfirming ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <VLoader size={16} progress={72} phase="loading" showLabel={false} />
                     Updating...
                   </>
                 ) : (

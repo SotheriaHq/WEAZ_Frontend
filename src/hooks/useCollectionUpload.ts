@@ -7,11 +7,14 @@ import {
   type InitializeCollectionResponse,
 } from '../api/collectionUploads';
 import type { MediaItem } from '../types/media';
+import { preprocessImageFile } from '../utils/imagePreprocess';
 
 const MAX_PARALLEL_UPLOADS = 3;
 const MAX_RETRY_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 750;
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const IMAGE_CLIENT_PREPROCESS_ENABLED =
+  String(import.meta.env.VITE_IMAGE_CLIENT_PREPROCESS_ENABLED ?? 'false').toLowerCase() === 'true';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -135,15 +138,15 @@ export function useCollectionUpload() {
         : [];
 
       const normalizedCategoryId = meta?.categoryId?.trim();
-      if (!normalizedCategoryId) {
+      if (meta?.categoryId !== undefined && !normalizedCategoryId) {
         throw new Error('Please select a category before publishing.');
       }
-      if (!UUID_V4_REGEX.test(normalizedCategoryId)) {
+      if (normalizedCategoryId && !UUID_V4_REGEX.test(normalizedCategoryId)) {
         throw new Error('Selected category is invalid. Please reselect a category and try again.');
       }
       const normalizedSubCategoryId =
         meta?.subCategoryId?.trim() || meta?.categoryTypeId?.trim();
-      if (shouldPublish && !normalizedSubCategoryId) {
+      if (shouldPublish && normalizedCategoryId && !normalizedSubCategoryId) {
         throw new Error('Please select a sub-category before publishing.');
       }
       if (normalizedSubCategoryId && !UUID_V4_REGEX.test(normalizedSubCategoryId)) {
@@ -161,8 +164,36 @@ export function useCollectionUpload() {
       cancelFlag.current = false;
 
       try {
+        const uploadSources = await Promise.all(
+          items.map(async (item) => {
+            const file = item.file!;
+            if (!IMAGE_CLIENT_PREPROCESS_ENABLED || item.kind !== 'image') {
+              return { mediaId: item.id, file, originalFile: file };
+            }
+            try {
+              const pre = await preprocessImageFile(file, 'detail');
+              return {
+                mediaId: item.id,
+                file: pre.file,
+                originalFile: pre.originalFile,
+              };
+            } catch {
+              return { mediaId: item.id, file, originalFile: file };
+            }
+          }),
+        );
+
+        const uploadSourceMap = uploadSources.reduce<Record<string, { file: File; originalFile: File }>>(
+          (acc, entry) => {
+            acc[entry.mediaId] = { file: entry.file, originalFile: entry.originalFile };
+            return acc;
+          },
+          {},
+        );
+
         const filesPayload = items.map((item) => {
-          const file = item.file!;
+          const source = uploadSourceMap[item.id];
+          const file = source?.file ?? item.file!;
           return {
             name: file.name,
             type: file.type,
@@ -262,7 +293,9 @@ export function useCollectionUpload() {
               return;
             }
             const { entry, mediaItem } = next;
-            const file = mediaItem.file!;
+            const selected = uploadSourceMap[mediaItem.id];
+            const file = selected?.file ?? mediaItem.file!;
+            const originalFile = selected?.originalFile ?? mediaItem.file!;
             let attempt = 0;
             while (attempt <= MAX_RETRY_ATTEMPTS) {
               try {
@@ -278,8 +311,8 @@ export function useCollectionUpload() {
                 completions.push({
                   fileId: completionId,
                   s3Key: entry.expectedKey,
-                  actualSize: file.size,
-                  actualMimeType: file.type,
+                  actualSize: originalFile.size,
+                  actualMimeType: originalFile.type,
                 });
                 break;
               } catch (uploadError) {
@@ -296,8 +329,8 @@ export function useCollectionUpload() {
         const workers = Array.from({ length: Math.min(MAX_PARALLEL_UPLOADS, queue.length) }, () => worker());
         await Promise.all(workers);
 
-        const finalizeResp = (await finalizeCollectionUploads(collectionId, completions, shouldPublish, {
-          action: shouldPublish ? 'publish' : 'draft',
+        const finalizeOptions = {
+          action: (shouldPublish ? 'publish' : 'draft') as 'publish' | 'draft',
           coverIndex:
             typeof meta?.coverIndex === 'number' ? meta.coverIndex : undefined,
           collectionMetadata: {
@@ -313,7 +346,24 @@ export function useCollectionUpload() {
               ? meta?.filterValueIds
               : undefined,
           },
-        })) as
+        };
+
+        const hasFinalizeOptions =
+          Boolean(meta?.coverIndex !== undefined) ||
+          Boolean(meta?.visibility) ||
+          Boolean(meta?.type) ||
+          Boolean(normalizedCategoryId) ||
+          Boolean(normalizedSubCategoryId) ||
+          Boolean(Array.isArray(meta?.filterValueIds));
+
+        const finalizeResp = (await (hasFinalizeOptions
+          ? finalizeCollectionUploads(
+              collectionId,
+              completions,
+              shouldPublish,
+              finalizeOptions,
+            )
+          : finalizeCollectionUploads(collectionId, completions, shouldPublish))) as
           | { data?: unknown }
           | unknown;
         const finalizeResponse = finalizeResp && typeof finalizeResp === 'object' && 'data' in finalizeResp

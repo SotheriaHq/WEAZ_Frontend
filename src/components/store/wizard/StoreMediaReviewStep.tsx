@@ -12,11 +12,11 @@ import {
   Lightbulb,
   ChevronRight,
   ImageOff,
-  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { StoreWizardData, MediaItem } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import VLoader from '@/components/loaders/VLoader';
 
 interface StoreMediaReviewStepProps {
   data: StoreWizardData;
@@ -210,7 +210,7 @@ const StoreMediaReviewStep: React.FC<StoreMediaReviewStepProps> = ({
             >
               {isAutoFixing ? (
                 <>
-                  <Loader2 className="w-4 h-4 text-purple-600 dark:text-indigo-400 animate-spin" />
+                  <VLoader size={16} progress={60} phase="loading" showLabel={false} />
                   Processing...
                 </>
               ) : (

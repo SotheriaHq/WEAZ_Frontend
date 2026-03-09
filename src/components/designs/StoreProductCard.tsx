@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { ShoppingBag, Eye, ImageOff, AlertTriangle, Package, Link2 } from 'lucide-react';
+import { ShoppingBag, Eye, ImageOff, AlertTriangle, Package } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
@@ -29,6 +29,15 @@ export interface StoreProduct {
   customAvailable?: boolean;
   sizeAvailability: { size: string; inStock: boolean; quantity: number }[];
   colors: string[];
+  variants?: Array<{
+    id: string;
+    size: string | null;
+    color: string | null;
+    stock: number;
+    price?: number | null;
+    sku?: string | null;
+    colorHex?: string | null;
+  }>;
   totalStock: number;
   isLowStock: boolean;
   isOutOfStock: boolean;
@@ -425,16 +434,22 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           {/* Stock + Action Row */}
           <div className="flex items-center justify-between mt-1">
             {/* Stock indicator */}
-            {!product.isOutOfStock && (
-              <span className={`text-[10px] font-medium flex items-center gap-1 ${
-                product.isLowStock ? 'text-amber-300' : 'text-emerald-300'
-              }`}>
-                <span className={`inline-block w-1.5 h-1.5 rounded-full ${
-                  product.isLowStock ? 'bg-amber-400' : 'bg-emerald-400'
-                }`} />
-                {product.totalStock} in stock
+            <div className="flex items-center gap-2">
+              {!product.isOutOfStock && (
+                <span className={`text-[10px] font-medium flex items-center gap-1 ${
+                  product.isLowStock ? 'text-amber-300' : 'text-emerald-300'
+                }`}>
+                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${
+                    product.isLowStock ? 'bg-amber-400' : 'bg-emerald-400'
+                  }`} />
+                  {product.totalStock} in stock
+                </span>
+              )}
+              <span className="text-[10px] font-medium text-indigo-200/95 inline-flex items-center gap-1">
+                <span aria-hidden="true">🧵</span>
+                {product.threadsCount ?? 0}
               </span>
-            )}
+            </div>
 
             {/* Action buttons row */}
             <div className="flex items-center gap-1.5 ml-auto">
@@ -469,7 +484,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               {isOwnerView && (
                 <>
                   <span className="flex items-center gap-1 text-[10px] text-white/60">
-                    <Link2 size={11} className={product.threadsCount > 0 ? 'text-indigo-300' : ''} />
+                    <span aria-hidden="true" className={product.threadsCount > 0 ? 'animate-pulse' : ''}>🧵</span>
                     {product.threadsCount}
                   </span>
                   <span className="flex items-center gap-1 text-[10px] text-white/60">

@@ -1,5 +1,6 @@
 import React from 'react';
-import { MessageCircle, Send, Loader2 } from 'lucide-react';
+import { MessageCircle, Send } from 'lucide-react';
+import VLoader from '@/components/loaders/VLoader';
 
 interface CommentInputProps {
   value: string;
@@ -69,7 +70,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
         onClick={handleSubmit}
         className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white shadow-md hover:brightness-110 disabled:opacity-60"
       >
-        {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={14} />}
+        {busy ? <VLoader size={16} progress={52} phase="loading" showLabel={false} /> : <Send size={14} />}
       </button>
     </div>
   );

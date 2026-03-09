@@ -38,7 +38,7 @@ const roundClass = (rounded: ImageWithFallbackProps['rounded']) => {
 
 // Session-storage backed cache for signed URLs to prevent flickering on navigation
 const CACHE_KEY = 'threadly_signed_url_cache';
-const CACHE_EXPIRY_MS = 3 * 60 * 1000; // 3 minutes (less than signed URL TTL)
+const CACHE_EXPIRY_MS = 14 * 60 * 1000; // 14 minutes (signed URLs typically expire at 15min)
 
 interface CacheEntry {
   url: string;
@@ -85,6 +85,28 @@ const setCachedUrl = (fileId: string, url: string) => {
   setCache(cache);
 };
 
+// In-flight dedup: prevents concurrent requests for the same fileId/src
+const inflight = new Map<string, Promise<string | null>>();
+
+const resolveSignedUrl = async (key: string, fetcher: () => Promise<string>): Promise<string | null> => {
+  const cached = getCachedUrl(key);
+  if (cached) return cached;
+
+  const existing = inflight.get(key);
+  if (existing) return existing;
+
+  const promise = fetcher()
+    .then((url) => {
+      if (url) setCachedUrl(key, url);
+      return url || null;
+    })
+    .catch(() => null)
+    .finally(() => { inflight.delete(key); });
+
+  inflight.set(key, promise);
+  return promise;
+};
+
 export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   src,
   fileId,
@@ -111,9 +133,12 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     // If we have a value initially, assume it might be loaded (browser cache) 
     return !!(src || (fileId && getCachedUrl(fileId)));
   });
+  const retryCountRef = React.useRef(0);
 
   useEffect(() => {
     let mounted = true;
+    retryCountRef.current = 0;
+
     const run = async () => {
       // If src/fileId changed, reset error
       setHadError(false);
@@ -127,15 +152,9 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       // Handle raw unsigned S3 URLs (contain '.s3.' but no '?' query params)
       if (src && src.includes('.s3.') && !src.includes('?')) {
         setLoaded(false);
-        try {
-          const signedUrl = await brandApi.getSignedS3Url(src);
-          if (mounted && signedUrl) {
-            setCachedUrl(src, signedUrl);
-            setResolved(signedUrl);
-          }
-        } catch {
-          // Fall back to raw URL as last resort
-          if (mounted) setResolved(src);
+        const url = await resolveSignedUrl(src, () => brandApi.getSignedS3Url(src));
+        if (mounted) {
+          setResolved(url || src); // fallback to raw URL
         }
         return;
       }
@@ -152,14 +171,19 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         // No cached URL, need to fetch
         setLoaded(false);
 
-        try {
-          const url = await brandApi.getSignedFileUrl(fileId);
-          if (mounted && url) {
-            setCachedUrl(fileId, url);
+        const url = await resolveSignedUrl(fileId, () => brandApi.getSignedFileUrl(fileId));
+        if (mounted) {
+          if (url) {
             setResolved(url);
+          } else {
+            if (src) {
+              // If file-id signing fails, keep the raw source as a best-effort fallback.
+              setResolved(src);
+              setHadError(false);
+            } else {
+              setHadError(true);
+            }
           }
-        } catch {
-          if (mounted) setHadError(true);
         }
       } else {
         setResolved(src ?? null);
@@ -173,6 +197,25 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       mounted = false;
     };
   }, [fileId, src]);
+
+  // Auto-retry once on error after a short delay
+  useEffect(() => {
+    if (!hadError || retryCountRef.current >= 1) return;
+    retryCountRef.current += 1;
+    const timer = setTimeout(() => {
+      setHadError(false);
+      const key = fileId || src;
+      if (!key) return;
+      const fetcher = fileId
+        ? () => brandApi.getSignedFileUrl(fileId)
+        : () => brandApi.getSignedS3Url(src!);
+      resolveSignedUrl(key, fetcher).then((url) => {
+        if (url) setResolved(url);
+        else setHadError(true);
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [hadError, fileId, src]);
 
   const showFallback = hadError || !resolved;
 

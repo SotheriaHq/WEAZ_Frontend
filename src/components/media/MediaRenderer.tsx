@@ -45,6 +45,10 @@ export interface MediaRendererProps {
   onLoadedData?: () => void;
   onError?: () => void;
 
+  /** Optional responsive image descriptors for optimized variants. */
+  srcSet?: string;
+  sizes?: string;
+
   /** Optional direct access to the underlying element (for playback control, etc.) */
   imgRef?: React.Ref<HTMLImageElement>;
   videoRef?: React.Ref<HTMLVideoElement>;
@@ -77,6 +81,8 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
   onLoad,
   onLoadedData,
   onError,
+  srcSet,
+  sizes,
   imgRef,
   videoRef,
 }) => {
@@ -127,6 +133,8 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
       <img
         ref={imgRef}
         src={src}
+        srcSet={srcSet}
+        sizes={sizes}
         alt={alt ?? ''}
         className={elementClassName}
         loading="lazy"

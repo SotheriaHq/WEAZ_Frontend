@@ -67,18 +67,21 @@ const OrderManagement: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'COMPLETED': return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400';
+      case 'DELIVERED': return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400';
       case 'PENDING': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400';
+      case 'PROCESSING': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400';
       case 'CANCELLED': return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400';
       case 'SHIPPED': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400';
+      case 'RETURNED': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400';
       default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'COMPLETED': return <CheckCircle className="w-4 h-4" />;
+      case 'DELIVERED': return <CheckCircle className="w-4 h-4" />;
       case 'PENDING': return <Clock className="w-4 h-4" />;
+      case 'PROCESSING': return <Package className="w-4 h-4" />;
       case 'CANCELLED': return <XCircle className="w-4 h-4" />;
       case 'SHIPPED': return <Truck className="w-4 h-4" />;
       default: return <Package className="w-4 h-4" />;
@@ -120,10 +123,11 @@ const OrderManagement: React.FC = () => {
           >
             <option value="">All Statuses</option>
             <option value="PENDING">Pending</option>
-            <option value="PAID">Paid</option>
+            <option value="PROCESSING">Processing</option>
             <option value="SHIPPED">Shipped</option>
-            <option value="COMPLETED">Completed</option>
+            <option value="DELIVERED">Delivered</option>
             <option value="CANCELLED">Cancelled</option>
+            <option value="RETURNED">Returned</option>
           </Select>
         </div>
       </div>

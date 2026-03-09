@@ -68,9 +68,13 @@ export function useInfiniteScroll<T>(
         setError(err?.response?.data?.message || err?.message || 'Failed to load');
         setHasMore(false);
       } finally {
-        if (append) setIsLoadingMore(false);
-        else setIsLoading(false);
-        fetchingRef.current = false;
+        // Only reset guards for the current version — prevents stale fetches
+        // from reopening the fetch window under React StrictMode double-mount
+        if (ver === versionRef.current) {
+          if (append) setIsLoadingMore(false);
+          else setIsLoading(false);
+          fetchingRef.current = false;
+        }
       }
     },
     [fetchFn, limit],

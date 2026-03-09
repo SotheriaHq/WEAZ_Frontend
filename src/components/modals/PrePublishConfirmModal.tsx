@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import VLoader from '@/components/loaders/VLoader';
 
 interface CollectionSummary {
   title: string;
@@ -40,7 +41,7 @@ type ModalState = 'confirm' | 'loading' | 'success';
  * 
  * States:
  * - confirm: Shows collection summary with Edit/Publish buttons
- * - loading: Shows spinner while publishing
+ * - loading: Shows thread loader while publishing
  * - success: Shows success animation with View/Create Another buttons
  */
 const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
@@ -429,7 +430,7 @@ const SummaryRow: React.FC<{ label: string; value: string }> = ({ label, value }
 );
 
 /**
- * Loading Content - Shows spinner while publishing
+ * Loading Content - Shows thread loader while publishing
  */
 const LoadingContent: React.FC = () => (
   <motion.div
@@ -438,8 +439,9 @@ const LoadingContent: React.FC = () => (
     exit={{ opacity: 0 }}
     className="py-12 flex flex-col items-center justify-center"
   >
-    {/* Spinner */}
-    <div className="w-12 h-12 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin mb-6" />
+    <div className="mb-6">
+      <VLoader size={64} progress={66} phase="loading" />
+    </div>
     
     <h3 className="text-lg text-gray-900 dark:text-white font-medium mb-1">Publishing your design...</h3>
     <p className="text-sm text-gray-400 mb-4">This may take a moment</p>

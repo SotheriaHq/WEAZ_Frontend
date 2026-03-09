@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MessageCircle, Share2, MoreVertical, Store, AlertTriangle, Loader2, Bookmark } from 'lucide-react';
+import { MessageCircle, Share2, MoreVertical, Store, AlertTriangle, Bookmark } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import ThreadButton from '@/components/ui/ThreadButton';
 import type { CollectionDto } from '../../types/profile';
@@ -12,6 +12,7 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
+import VLoader from '@/components/loaders/VLoader';
 
 interface CollectionCardProps {
   collection: CollectionDto;
@@ -287,7 +288,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
           <div className="absolute inset-0 z-40 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-white px-4 text-center">
             {isPublishing ? (
               <>
-                <Loader2 className="w-6 h-6 animate-spin" />
+                <VLoader size={24} progress={62} phase="loading" showLabel={false} />
                 <div className="text-sm font-medium">{statusMessage}</div>
                 <div className="text-xs text-white/70">You can keep browsing; we will finish this in the background.</div>
               </>

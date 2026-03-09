@@ -611,7 +611,7 @@ const AdminUsersPage: React.FC = () => {
 
       {photoPreview && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-layer-modal flex items-center justify-center bg-black/60 backdrop-blur-sm"
           onClick={() => setPhotoPreview(null)}
         >
           <div className="relative max-h-[80vh] max-w-md overflow-hidden rounded-2xl shadow-2xl">

@@ -435,8 +435,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
       ${minimal
         ? 'bg-transparent border-b border-transparent'
         : isScrolled
-          ? 'bg-gradient-to-r from-[#faf8ff]/60 to-[#f5f0ff]/52 dark:from-[#0f0f0f]/58 dark:to-[#0a0a0a]/54 backdrop-blur-md border-b border-purple-200/25 dark:border-white/10'
-          : 'bg-gradient-to-r from-[#faf8ff]/84 to-[#f5f0ff]/78 dark:from-[#0f0f0f]/82 dark:to-[#0a0a0a]/78 backdrop-blur-xl border-b border-purple-200/30 dark:border-white/10'}`}
+          ? 'bg-gradient-to-r from-[#faf8ff]/60 to-[#f5f0ff]/52 dark:from-[#0b0b0b]/99 dark:to-[#080808]/97 backdrop-blur-md border-b border-purple-200/25 dark:border-white/12'
+          : 'bg-gradient-to-r from-[#faf8ff]/84 to-[#f5f0ff]/78 dark:from-[#0b0b0b]/100 dark:to-[#080808]/99 backdrop-blur-xl border-b border-purple-200/30 dark:border-white/12'}`}
       style={isScrolled && !minimal ? {
         backdropFilter: 'blur(10px) saturate(130%)',
         WebkitBackdropFilter: 'blur(10px) saturate(130%)',

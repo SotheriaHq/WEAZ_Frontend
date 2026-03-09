@@ -9,8 +9,11 @@ import {
   ShieldCheck,
   ChevronRight,
   Check,
+  X,
+  Ruler,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
@@ -21,6 +24,7 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import { formatPrice } from '@/utils/helpers';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { SizeFitApi } from '@/api/SizeFitApi';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
 
 // Color name to hex mapping
 const COLOR_HEX_MAP: Record<string, string> = {
@@ -162,6 +166,9 @@ export default function ProductDetailsPage() {
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [measurementValues, setMeasurementValues] = useState<Record<string, string>>({});
   const [wishlistBusy, setWishlistBusy] = useState(false);
+  const [showMeasurementModal, setShowMeasurementModal] = useState(false);
+  const [modalMeasurementValues, setModalMeasurementValues] = useState<Record<string, string>>({});
+  const [savingMeasurements, setSavingMeasurements] = useState(false);
   
   // Fetch product
   useEffect(() => {
@@ -367,13 +374,12 @@ export default function ProductDetailsPage() {
     );
 
     if (requiresMeasurements && Object.keys(normalizedMeasurements).length !== requiredMeasurementKeys.length) {
-      const missingCount =
-        requiredMeasurementKeys.length - Object.keys(normalizedMeasurements).length;
-      void dispatch(addToWishlist(product.id));
-      toast.error(
-        `Required measurements are incomplete (${missingCount} missing). Item saved to wishlist. Update your profile measurements before adding to bag.`,
+      // Open the measurement modal instead of navigating away
+      const missingKeys = requiredMeasurementKeys.filter(
+        (key) => !normalizedMeasurements[key],
       );
-      navigate('/profile');
+      setModalMeasurementValues({ ...measurementValues });
+      setShowMeasurementModal(true);
       return;
     }
 
@@ -474,8 +480,174 @@ export default function ProductDetailsPage() {
     navigate(`/collections/${sourceCollectionId}`);
   };
 
+  // Handle saving modal measurements and retrying add-to-bag
+  const handleModalSaveAndAdd = async () => {
+    // Build normalised values from modal inputs
+    const normalised: Record<string, { value: number; unit: 'CM' }> = {};
+    requiredMeasurementKeys.forEach((key) => {
+      const parsed = Number(modalMeasurementValues[key]);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        normalised[key] = { value: parsed, unit: 'CM' };
+      }
+    });
+
+    const missingKeys = requiredMeasurementKeys.filter((k) => !normalised[k]);
+    if (missingKeys.length > 0) {
+      toast.error(`Please fill in all ${missingKeys.length} missing measurement(s)`);
+      return;
+    }
+
+    setSavingMeasurements(true);
+    try {
+      // Persist to user profile so they don't have to enter again
+      await SizeFitApi.updateProfile({ measurements: normalised });
+      // Update local state so the inline form also reflects the values
+      setMeasurementValues(modalMeasurementValues);
+      setShowMeasurementModal(false);
+
+      // Now add to cart with the updated measurements
+      const variant = variants.find(v =>
+        (!selectedColor || v.color === selectedColor) &&
+        (!selectedSize || v.size === selectedSize),
+      );
+      await dispatch(
+        addToCart({
+          productId: product.id,
+          quantity: 1,
+          selectedSize: variant?.size || selectedSize,
+          selectedColor: variant?.color || selectedColor,
+          sizingMode,
+          requiredMeasurementKeys,
+          sizeFitData: { measurements: normalised },
+        }),
+      ).unwrap();
+      dispatch(openCartDrawer());
+      toast.success('Measurements saved & added to bag');
+    } catch (err: any) {
+      toast.error(err || 'Failed to add to bag');
+    } finally {
+      setSavingMeasurements(false);
+    }
+  };
+
+  // Count missing measurements for modal display
+  const missingMeasurementKeys = requiredMeasurementKeys.filter((key) => {
+    const raw = modalMeasurementValues[key];
+    const parsed = Number(raw);
+    return !(Number.isFinite(parsed) && parsed > 0);
+  });
+
   return (
     <div className={`bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 ${isStudioStoreView ? 'min-h-0 pb-0' : 'min-h-screen pb-10'}`}>
+      {/* Measurement Modal */}
+      <AnimatePresence>
+        {showMeasurementModal && (
+          <OverlayPortal>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-layer-overlay bg-black/50 backdrop-blur-sm"
+              onClick={() => setShowMeasurementModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="fixed inset-0 z-layer-modal flex items-center justify-center p-4"
+            >
+              <div className="w-full max-w-md bg-white dark:bg-gray-950 rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 dark:border-white/10 bg-gradient-to-r from-purple-500/10 to-fuchsia-500/10 dark:from-purple-500/5 dark:to-fuchsia-500/5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center">
+                      <Ruler size={18} className="text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">Measurements Required</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {missingMeasurementKeys.length} of {requiredMeasurementKeys.length} missing
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowMeasurementModal(false)}
+                    className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                  >
+                    <X size={18} className="text-slate-500" />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto space-y-3">
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    This product requires custom measurements. Fill in the values below to add it to your bag.
+                  </p>
+                  {requiredMeasurementKeys.map((key) => {
+                    const isMissing = missingMeasurementKeys.includes(key);
+                    return (
+                      <label key={key} className="flex flex-col gap-1">
+                        <span className={`text-xs font-medium flex items-center gap-1.5 ${isMissing ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                          {key.replace(/_/g, ' ')}
+                          {isMissing && <span className="text-[10px]">(required)</span>}
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.1"
+                          value={modalMeasurementValues[key] ?? ''}
+                          onChange={(e) =>
+                            setModalMeasurementValues((prev) => ({ ...prev, [key]: e.target.value }))
+                          }
+                          className={`h-10 rounded-xl border px-3 text-sm bg-white/80 dark:bg-white/5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/40 ${
+                            isMissing ? 'border-red-300 dark:border-red-500/30' : 'border-black/10 dark:border-white/15'
+                          }`}
+                          placeholder="cm"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {/* Footer */}
+                <div className="px-5 py-4 border-t border-black/10 dark:border-white/10 space-y-2.5">
+                  <button
+                    type="button"
+                    onClick={handleModalSaveAndAdd}
+                    disabled={savingMeasurements}
+                    className="w-full py-3 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {savingMeasurements ? (
+                      <>
+                        <span className="animate-spin text-sm">⏳</span> Saving...
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingBag size={16} />
+                        Save Measurements & Add to Bag
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMeasurementModal(false);
+                      navigate('/settings?tab=fittings');
+                    }}
+                    className="w-full py-2.5 rounded-full border border-black/10 dark:border-white/15 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Ruler size={14} />
+                    Go to My Fittings
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </OverlayPortal>
+        )}
+      </AnimatePresence>
+
       <main className={`flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-8 lg:px-12 py-8 lg:py-10 ${isStudioStoreView ? 'rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg' : ''}`}>
         <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           {isStudioStoreView ? (
@@ -595,10 +767,11 @@ export default function ProductDetailsPage() {
                   <button
                     onClick={handleWishlist}
                     disabled={wishlistBusy}
-                    className="text-slate-500 hover:text-rose-500 transition-colors"
+                    className={`transition-colors ${wishlistedIds.has(product.id) ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}
                     type="button"
+                    aria-label={wishlistedIds.has(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
                   >
-                    <Heart size={20} />
+                    <Heart size={22} fill={wishlistedIds.has(product.id) ? 'currentColor' : 'none'} />
                   </button>
                 </div>
 
@@ -725,18 +898,32 @@ export default function ProductDetailsPage() {
                 ) : null}
 
                 {showAddToBag ? (
-                  <button
-                    onClick={handleAddToCart}
-                    disabled={isOutOfStock}
-                    className={`w-full font-bold py-3.5 rounded-full transition-all flex items-center justify-center gap-2 ${
-                      isOutOfStock
-                        ? 'bg-slate-300 dark:bg-white/15 text-slate-500 dark:text-slate-400 cursor-not-allowed'
-                        : 'bg-emerald-500 hover:bg-emerald-400 text-black'
-                    }`}
-                  >
-                    <ShoppingBag size={18} />
-                    {isOutOfStock ? 'Sold Out' : 'Add to Cart'}
-                  </button>
+                  <div className="space-y-2.5">
+                    <button
+                      onClick={handleAddToCart}
+                      disabled={isOutOfStock}
+                      className={`w-full font-bold py-3.5 rounded-full transition-all flex items-center justify-center gap-2 ${
+                        isOutOfStock
+                          ? 'bg-slate-300 dark:bg-white/15 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                          : 'bg-emerald-500 hover:bg-emerald-400 text-black'
+                      }`}
+                    >
+                      <ShoppingBag size={18} />
+                      {isOutOfStock ? 'Sold Out' : 'Add to Cart'}
+                    </button>
+                    <button
+                      onClick={handleWishlist}
+                      disabled={wishlistBusy}
+                      className={`w-full py-3 rounded-full border text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                        wishlistedIds.has(product.id)
+                          ? 'border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400'
+                          : 'border-black/10 dark:border-white/15 text-slate-600 dark:text-slate-300 hover:border-rose-400 hover:text-rose-500'
+                      }`}
+                    >
+                      <Heart size={16} fill={wishlistedIds.has(product.id) ? 'currentColor' : 'none'} />
+                      {wishlistedIds.has(product.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                    </button>
+                  </div>
                 ) : (
                   <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
                     This is your product. Customer checkout actions are hidden.

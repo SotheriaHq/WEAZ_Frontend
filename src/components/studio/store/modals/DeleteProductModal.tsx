@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { productApi } from '@/api/ProductApi';
+import VLoader from '@/components/loaders/VLoader';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DELETE PRODUCT MODAL
@@ -113,7 +114,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
   const productImage = product.thumbnail || product.images?.[0];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 py-6">
+    <div className="fixed inset-0 z-layer-modal flex items-center justify-center px-4 py-6">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -159,7 +160,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
             <div className="p-6">
               {loading ? (
                 <div className="py-8 text-center">
-                  <div className="inline-block w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  <VLoader size={34} progress={46} phase="loading" showLabel={false} className="mx-auto" />
                   <p className="text-gray-500 dark:text-gray-400 mt-3">Checking impact...</p>
                 </div>
               ) : impact ? (
@@ -319,7 +320,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
               >
                 {deleting ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <VLoader size={16} progress={74} phase="loading" showLabel={false} />
                     Deleting...
                   </>
                 ) : (

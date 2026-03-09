@@ -8,6 +8,7 @@ import { FaXTwitter } from 'react-icons/fa6';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
@@ -95,6 +96,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onViewProduct,
 }) => {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const currentUser = useSelector((s: RootState) => s.user.profile);
@@ -266,7 +268,13 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       dispatch(openCartDrawer());
       onClose();
     } catch (error: any) {
-      toast.error(error || 'Failed to add to cart');
+      if (typeof error === 'string' && error.includes('__MEASUREMENTS_REQUIRED__')) {
+        toast.info('This product requires custom measurements. Redirecting to product page...');
+        onClose();
+        navigate(`/products/${product.id}`);
+      } else {
+        toast.error(error || 'Failed to add to cart');
+      }
     } finally {
       setIsAddingToCart(false);
     }
@@ -609,32 +617,48 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Add to Cart & Buy Now */}
-                    <div className="flex gap-3 mb-6">
+                    {/* Add to Cart & Wishlist */}
+                    <div className="flex flex-col gap-2.5 mb-6">
                       {!isOwnProduct ? (
                         <button
                           onClick={handleAddToCart}
                           disabled={isAddingToCart || isOutOfStock || (product.sizes.length > 0 && !selectedSize)}
                           title="Add selected item to cart"
-                          className="flex-1 h-14 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                          className="w-full h-14 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                         >
                           <ShoppingCart size={20} />
                           {isAddingToCart ? 'Adding...' : 'Add to Cart'}
                         </button>
                       ) : (
-                        <div className="flex-1 h-14 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 font-medium flex items-center justify-center">
+                        <div className="w-full h-14 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 font-medium flex items-center justify-center">
                           Your product
                         </div>
                       )}
-                      
-                      {/* Share button with dropdown */}
-                      <div className="relative" ref={shareMenuRef}>
+
+                      <div className="flex gap-2.5">
                         <button
-                          onClick={() => setIsShareMenuOpen(!isShareMenuOpen)}
-                          className="w-14 h-14 rounded-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                          onClick={handleToggleWishlist}
+                          disabled={isOwnProduct}
+                          className={`flex-1 h-12 rounded-xl border font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
+                            isWishlisted
+                              ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+                              : 'border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400'
+                          } ${isOwnProduct ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                          <Share2 size={20} className="text-gray-600 dark:text-gray-400" />
+                          <span role="img" aria-hidden="true" className="text-base">
+                            {isWishlisted ? filledHeartEmoji : outlineHeartEmoji}
+                          </span>
+                          {isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
                         </button>
+
+                        {/* Share button */}
+                        <div className="relative" ref={shareMenuRef}>
+                          <button
+                            onClick={() => setIsShareMenuOpen(!isShareMenuOpen)}
+                            className="w-12 h-12 rounded-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                          >
+                            <Share2 size={18} className="text-gray-600 dark:text-gray-400" />
+                          </button>
                         
                         {/* Share dropdown menu */}
                         <AnimatePresence>
@@ -678,6 +702,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           )}
                         </AnimatePresence>
                       </div>
+                    </div>
                     </div>
 
                     {/* Delivery Estimate */}

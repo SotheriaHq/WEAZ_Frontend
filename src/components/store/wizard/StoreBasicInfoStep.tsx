@@ -1,7 +1,8 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { StoreWizardData } from '@/types/storeWizard';
+import VLoader from '@/components/loaders/VLoader';
 
 
 interface StoreBasicInfoStepProps {
@@ -77,7 +78,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
             <div className="inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300 bg-white/60 dark:bg-white/5 border border-gray-200/50 dark:border-white/10 backdrop-blur-sm rounded-full px-3 py-1.5">
               {saveState === 'saving' ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <VLoader size={14} progress={52} phase="loading" showLabel={false} />
                   <span>Saving…</span>
                 </>
               ) : saveState === 'saved' ? (

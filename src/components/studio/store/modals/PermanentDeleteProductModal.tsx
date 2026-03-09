@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { productApi } from '@/api/ProductApi';
+import VLoader from '@/components/loaders/VLoader';
 
 interface PermanentDeleteProductModalProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ const PermanentDeleteProductModal: React.FC<PermanentDeleteProductModalProps> = 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-layer-modal flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-md mx-4 neu-modal-surface bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
         <div className="p-6 border-b border-gray-100 dark:border-white/10">
@@ -98,7 +99,7 @@ const PermanentDeleteProductModal: React.FC<PermanentDeleteProductModalProps> = 
           >
             {loading ? (
               <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <VLoader size={16} progress={78} phase="loading" showLabel={false} />
                 Deleting...
               </>
             ) : (

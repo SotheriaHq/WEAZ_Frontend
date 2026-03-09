@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { productApi } from '@/api/ProductApi';
+import VLoader from '@/components/loaders/VLoader';
 
 interface BulkDeleteCandidate {
   id: string;
@@ -174,7 +175,7 @@ const BulkDeleteProductsModal: React.FC<BulkDeleteProductsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 py-6">
+    <div className="fixed inset-0 z-layer-modal flex items-center justify-center px-4 py-6">
       {/* Backdrop */}
       <button
         type="button"
@@ -211,7 +212,7 @@ const BulkDeleteProductsModal: React.FC<BulkDeleteProductsModalProps> = ({
             <div className="px-6 pb-5">
               {loadingImpact ? (
                 <div className="flex flex-col items-center gap-3 py-10">
-                  <div className="h-8 w-8 rounded-full border-2 border-red-200 border-t-red-500 animate-spin" />
+                  <VLoader size={36} progress={48} phase="loading" showLabel={false} />
                   <span className="text-sm text-gray-500 dark:text-zinc-400">Checking impact...</span>
                 </div>
               ) : (
@@ -409,7 +410,7 @@ const BulkDeleteProductsModal: React.FC<BulkDeleteProductsModalProps> = ({
               >
                 {isProcessing ? (
                   <span className="flex items-center justify-center gap-2">
-                    <span className="inline-block h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    <VLoader size={16} progress={72} phase="loading" showLabel={false} />
                     Deleting...
                   </span>
                 ) : (

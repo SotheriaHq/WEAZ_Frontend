@@ -1,12 +1,17 @@
-import { ArrowLeft, ShoppingBag, Heart, Share2, Star, Check } from 'lucide-react';
-import { useState } from 'react';
+import { Check } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import ImageLightbox from './ImageLightbox';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart } from '@/features/cartSlice';
+import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
+import { SizeFitApi } from '@/api/SizeFitApi';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
 
 interface InlineProductDetailProps {
   product: StoreProduct;
@@ -42,26 +47,103 @@ export default function InlineProductDetail({
   brandName,
 }: InlineProductDetailProps) {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const currentUser = useSelector((s: RootState) => s.user.profile);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
+  const [measurementValues, setMeasurementValues] = useState<Record<string, string>>({});
+  const [modalMeasurementValues, setModalMeasurementValues] = useState<Record<string, string>>({});
+  const [showMeasurementModal, setShowMeasurementModal] = useState(false);
+  const [savingMeasurements, setSavingMeasurements] = useState(false);
+
+  const requiredMeasurementKeys = useMemo(() => {
+    const raw = product.customMeasurementKeys;
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((key): key is string => typeof key === 'string' && key.trim().length > 0);
+  }, [product.customMeasurementKeys]);
+
+  const requiresMeasurements = useMemo(() => {
+    if (requiredMeasurementKeys.length === 0) return false;
+    return (
+      product.customAvailable === true ||
+      product.sizingMode === 'CUSTOM' ||
+      product.sizingMode === 'RTW_PLUS_CUSTOM'
+    );
+  }, [product.customAvailable, product.sizingMode, requiredMeasurementKeys]);
+  const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
+  const isWishlisted = wishlistedIds.has(product.id);
+
+  useEffect(() => {
+    setMeasurementValues({});
+    setModalMeasurementValues({});
+    setShowMeasurementModal(false);
+  }, [product.id]);
+
+  useEffect(() => {
+    let active = true;
+
+    const hydrateMeasurements = async () => {
+      if (!isAuth || requiredMeasurementKeys.length === 0) return;
+      try {
+        const profile = await SizeFitApi.getMyProfile();
+        if (!active) return;
+        const profileMeasurements =
+          profile?.measurements && typeof profile.measurements === 'object'
+            ? (profile.measurements as Record<string, unknown>)
+            : {};
+
+        const hydrated: Record<string, string> = {};
+        requiredMeasurementKeys.forEach((key) => {
+          const raw = profileMeasurements[key];
+          if (typeof raw === 'number' && Number.isFinite(raw)) {
+            hydrated[key] = String(raw);
+            return;
+          }
+          if (typeof raw === 'object' && raw && 'value' in (raw as Record<string, unknown>)) {
+            const nested = (raw as { value?: unknown }).value;
+            if (typeof nested === 'number' && Number.isFinite(nested)) {
+              hydrated[key] = String(nested);
+            }
+          }
+        });
+
+        setMeasurementValues((prev) => ({ ...hydrated, ...prev }));
+      } catch {
+      }
+    };
+
+    void hydrateMeasurements();
+
+    return () => {
+      active = false;
+    };
+  }, [isAuth, requiredMeasurementKeys]);
 
   // Get product images
   const getProductImages = () => {
-    const images: Array<{ id: string; url: string; type?: string }> = [];
+    const images: Array<{ id: string; url: string; type?: string; fileId?: string }> = [];
     
     // Add media items
     if (Array.isArray((product as any)?.media)) {
       const media = (product as any).media as Array<{ id?: string; url?: string; type?: string }>;
       media.forEach((m, idx) => {
         if (m.url) {
+          const candidateId = typeof m.id === 'string' ? m.id.trim() : '';
+          const looksLikeFileId =
+            candidateId.length > 0 &&
+            !candidateId.startsWith('img-') &&
+            !candidateId.startsWith('thumb-') &&
+            !candidateId.startsWith('media-') &&
+            !candidateId.includes('/');
           images.push({
             id: m.id || `media-${idx}`,
             url: m.url,
             type: m.type,
+            fileId: looksLikeFileId ? candidateId : undefined,
           });
         }
       });
@@ -98,9 +180,81 @@ export default function InlineProductDetail({
 
   const sizes = product.sizes || [];
   const colors = product.colors || [];
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const hasVariants = variants.length > 0;
+  const inStockVariants = variants.filter((variant) => Number(variant.stock || 0) > 0);
   const compareAtPrice = (product as any).compareAtPrice as number | undefined;
   const isOutOfStock = !product.totalStock || product.totalStock <= 0;
   const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
+  const isCustomOrderProduct =
+    product.customAvailable === true ||
+    product.sizingMode === 'CUSTOM' ||
+    product.sizingMode === 'RTW_PLUS_CUSTOM';
+
+  const availableSizes = useMemo(() => {
+    if (!hasVariants) return sizes;
+    const matches = selectedColor
+      ? inStockVariants.filter((variant) => (variant.color || null) === selectedColor)
+      : inStockVariants;
+    return Array.from(
+      new Set(
+        matches
+          .map((variant) => variant.size)
+          .filter((size): size is string => typeof size === 'string' && size.length > 0),
+      ),
+    );
+  }, [hasVariants, inStockVariants, selectedColor, sizes]);
+
+  const availableColors = useMemo(() => {
+    if (!hasVariants) return colors;
+    const matches = selectedSize
+      ? inStockVariants.filter((variant) => (variant.size || null) === selectedSize)
+      : inStockVariants;
+    return Array.from(
+      new Set(
+        matches
+          .map((variant) => variant.color)
+          .filter((color): color is string => typeof color === 'string' && color.length > 0),
+      ),
+    );
+  }, [colors, hasVariants, inStockVariants, selectedSize]);
+
+  useEffect(() => {
+    if (!selectedSize) return;
+    if (!availableSizes.includes(selectedSize)) {
+      setSelectedSize(null);
+    }
+  }, [availableSizes, selectedSize]);
+
+  useEffect(() => {
+    if (!selectedColor) return;
+    if (!availableColors.includes(selectedColor)) {
+      setSelectedColor(null);
+    }
+  }, [availableColors, selectedColor]);
+
+  const selectedVariant = useMemo(() => {
+    if (!hasVariants) return null;
+    if (!selectedSize || !selectedColor) return null;
+    return inStockVariants.find(
+      (variant) => (variant.size || null) === selectedSize && (variant.color || null) === selectedColor,
+    ) ?? null;
+  }, [hasVariants, inStockVariants, selectedColor, selectedSize]);
+
+  const normalizeMeasurements = (values: Record<string, string>) => {
+    return requiredMeasurementKeys.reduce((acc, key) => {
+      const parsed = Number(values[key]);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        acc[key] = { value: parsed, unit: 'CM' as const };
+      }
+      return acc;
+    }, {} as Record<string, { value: number; unit: 'CM' }>);
+  };
+
+  const missingMeasurementKeys = requiredMeasurementKeys.filter((key) => {
+    const parsed = Number(modalMeasurementValues[key]);
+    return !(Number.isFinite(parsed) && parsed > 0);
+  });
 
   const handleAddToBag = async () => {
     if (isOwnProduct) {
@@ -123,6 +277,20 @@ export default function InlineProductDetail({
       toast.warning('Please select a color.');
       return;
     }
+    if (hasVariants && !selectedVariant) {
+      toast.warning('Please choose an available size and color combination.');
+      return;
+    }
+
+    const normalizedMeasurements = normalizeMeasurements(measurementValues);
+    if (
+      requiresMeasurements &&
+      Object.keys(normalizedMeasurements).length !== requiredMeasurementKeys.length
+    ) {
+      setModalMeasurementValues({ ...measurementValues });
+      setShowMeasurementModal(true);
+      return;
+    }
 
     try {
       await dispatch(
@@ -131,12 +299,109 @@ export default function InlineProductDetail({
           quantity: 1,
           selectedSize: selectedSize || undefined,
           selectedColor: selectedColor || undefined,
+          sizingMode: product.sizingMode || 'NONE',
+          requiredMeasurementKeys,
+          sizeFitData:
+            Object.keys(normalizedMeasurements).length > 0
+              ? { measurements: normalizedMeasurements }
+              : undefined,
         }),
       ).unwrap();
       // Drawer opens automatically via addToCart.fulfilled in cartSlice
       toast.success('Added to bag');
     } catch (error: any) {
+      if (typeof error === 'string' && error.includes('__MEASUREMENTS_REQUIRED__')) {
+        setModalMeasurementValues({ ...measurementValues });
+        setShowMeasurementModal(true);
+        return;
+      }
       toast.error(error || 'Failed to add to bag');
+    }
+  };
+
+  const handleToggleWishlist = async () => {
+    if (isOwnProduct) {
+      toast.info('You cannot wishlist your own product.');
+      return;
+    }
+    if (!isAuth) {
+      toast.info('Please sign in to use wishlist.');
+      return;
+    }
+
+    setWishlistBusy(true);
+    try {
+      if (isWishlisted) {
+        await dispatch(removeFromWishlist(product.id)).unwrap();
+        toast.success('Removed from wishlist');
+      } else {
+        await dispatch(addToWishlist(product.id)).unwrap();
+        toast.success('Added to wishlist');
+      }
+    } catch (error: any) {
+      toast.error(error || 'Failed to update wishlist');
+    } finally {
+      setWishlistBusy(false);
+    }
+  };
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/products/${product.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: product.name,
+          text: product.description || product.name,
+          url,
+        });
+        return;
+      } catch {
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Product link copied');
+    } catch {
+      toast.error('Unable to copy link');
+    }
+  };
+
+  const handleModalSaveAndAdd = async () => {
+    const normalized = normalizeMeasurements(modalMeasurementValues);
+    const missing = requiredMeasurementKeys.filter((key) => !normalized[key]);
+    if (missing.length > 0) {
+      toast.error(`Please fill in all ${missing.length} missing measurement(s)`);
+      return;
+    }
+    if (hasVariants && !selectedVariant) {
+      toast.warning('Please choose an available size and color combination.');
+      return;
+    }
+
+    setSavingMeasurements(true);
+    try {
+      await SizeFitApi.updateProfile({ measurements: normalized });
+      setMeasurementValues(modalMeasurementValues);
+
+      await dispatch(
+        addToCart({
+          productId: product.id,
+          quantity: 1,
+          selectedSize: selectedSize || undefined,
+          selectedColor: selectedColor || undefined,
+          sizingMode: product.sizingMode || 'NONE',
+          requiredMeasurementKeys,
+          sizeFitData: { measurements: normalized },
+        }),
+      ).unwrap();
+
+      setShowMeasurementModal(false);
+      toast.success('Measurements saved and item added to bag');
+    } catch (error: any) {
+      toast.error(error || 'Failed to save measurements');
+    } finally {
+      setSavingMeasurements(false);
     }
   };
 
@@ -148,7 +413,7 @@ export default function InlineProductDetail({
         onClick={onBack}
         className="mb-6 flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors group"
       >
-        <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+        <span className="group-hover:-translate-x-1 transition-transform">⬅️</span>
         <span>Back to products</span>
       </button>
 
@@ -162,8 +427,8 @@ export default function InlineProductDetail({
           >
             {currentImage ? (
               <ImageWithFallback
-                src={currentImage.url.startsWith('http') ? currentImage.url : undefined}
-                fileId={!currentImage.url.startsWith('http') ? currentImage.id : undefined}
+                src={currentImage.url || undefined}
+                fileId={currentImage.fileId}
                 alt={product.name}
                 fit="contain"
                 maxHeightClassName="max-h-[85vh]"
@@ -198,8 +463,8 @@ export default function InlineProductDetail({
                   }`}
                 >
                   <ImageWithFallback
-                    src={img.url.startsWith('http') ? img.url : undefined}
-                    fileId={!img.url.startsWith('http') ? img.id : undefined}
+                    src={img.url || undefined}
+                    fileId={img.fileId}
                     alt={`${product.name} - ${idx + 1}`}
                     fit="cover"
                     className="w-full h-full object-cover"
@@ -220,18 +485,19 @@ export default function InlineProductDetail({
               <p className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-1">{brandName}</p>
             )}
             <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">{product.name}</h1>
+            {isCustomOrderProduct && (
+              <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-purple-400/40 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300">
+                <span>✂️</span>
+                <span>Custom Order</span>
+                {requiredMeasurementKeys.length > 0 ? (
+                  <span className="text-[11px] opacity-80">({requiredMeasurementKeys.length} points)</span>
+                ) : null}
+              </div>
+            )}
             
             {/* Rating placeholder */}
             <div className="flex items-center gap-2 mt-2">
-              <div className="flex items-center gap-0.5">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star
-                    key={star}
-                    size={14}
-                    className={star <= 4 ? 'text-amber-400 fill-amber-400' : 'text-gray-300 dark:text-gray-600'}
-                  />
-                ))}
-              </div>
+              <div className="flex items-center gap-0.5 text-sm" aria-label="4 out of 5 stars">⭐⭐⭐⭐☆</div>
               <span className="text-sm text-gray-500">(12 reviews)</span>
             </div>
           </div>
@@ -260,11 +526,14 @@ export default function InlineProductDetail({
                   <button
                     key={size}
                     type="button"
+                    disabled={hasVariants && !availableSizes.includes(size)}
                     onClick={() => setSelectedSize(size === selectedSize ? null : size)}
                     className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
                       selectedSize === size
                         ? 'border-purple-500 bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300'
-                        : 'border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-300'
+                        : hasVariants && !availableSizes.includes(size)
+                          ? 'border-gray-200/60 dark:border-white/5 text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-60'
+                          : 'border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-300'
                     }`}
                   >
                     {size}
@@ -284,6 +553,7 @@ export default function InlineProductDetail({
               </div>
               <div className="flex flex-wrap gap-2">
                 {colors.map((color) => {
+                  const isAvailable = !hasVariants || availableColors.includes(color);
                   const colorStyle = COLOR_HEX_MAP[color] || '#9CA3AF';
                   const isGradient = colorStyle.includes('gradient');
                   
@@ -291,11 +561,14 @@ export default function InlineProductDetail({
                     <button
                       key={color}
                       type="button"
+                      disabled={!isAvailable}
                       onClick={() => setSelectedColor(color === selectedColor ? null : color)}
                       className={`w-10 h-10 rounded-full border-2 transition-all relative ${
                         selectedColor === color
                           ? 'border-purple-500 ring-2 ring-purple-500/30 scale-110'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-purple-400'
+                          : !isAvailable
+                            ? 'border-gray-200/60 dark:border-gray-700/60 opacity-50 cursor-not-allowed'
+                            : 'border-gray-200 dark:border-gray-700 hover:border-purple-400'
                       }`}
                       style={{
                         background: isGradient ? colorStyle : colorStyle,
@@ -333,7 +606,7 @@ export default function InlineProductDetail({
                 disabled={isOutOfStock}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:scale-100"
               >
-                <ShoppingBag size={18} />
+                <span aria-hidden="true">🛍️</span>
                 Add to bag
               </button>
             ) : (
@@ -343,15 +616,20 @@ export default function InlineProductDetail({
             )}
             <button
               type="button"
-              className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-pink-500 hover:border-pink-300 transition-all flex items-center justify-center"
+              onClick={handleToggleWishlist}
+              disabled={wishlistBusy || isOwnProduct}
+              className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-pink-500 hover:border-pink-300 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
             >
-              <Heart size={20} />
+              <span aria-hidden="true">{isWishlisted ? '❤️' : '🤍'}</span>
             </button>
             <button
               type="button"
+              onClick={handleShare}
               className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-purple-500 hover:border-purple-300 transition-all flex items-center justify-center"
+              aria-label="Share product"
             >
-              <Share2 size={20} />
+              <span aria-hidden="true">🔗</span>
             </button>
           </div>
         </div>
@@ -369,6 +647,96 @@ export default function InlineProductDetail({
           onSelectIndex={setSelectedImageIndex}
         />
       )}
+
+      <AnimatePresence>
+        {showMeasurementModal && (
+          <OverlayPortal>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 12, scale: 0.98 }}
+                className="w-full max-w-md bg-white dark:bg-gray-950 rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden"
+              >
+                <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 dark:border-white/10 bg-gradient-to-r from-purple-500/10 to-fuchsia-500/10 dark:from-purple-500/5 dark:to-fuchsia-500/5">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Measurements Required</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {missingMeasurementKeys.length} of {requiredMeasurementKeys.length} missing
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowMeasurementModal(false)}
+                    className="px-2 py-1 text-xs rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-slate-500"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto scrollbar-threadly-strong space-y-3">
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    This product needs custom measurements. Add only the required points below to buy now.
+                  </p>
+                  {requiredMeasurementKeys.map((key) => {
+                    const isMissing = missingMeasurementKeys.includes(key);
+                    return (
+                      <label key={key} className="flex flex-col gap-1">
+                        <span className={`text-xs font-medium ${isMissing ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                          {key.replace(/_/g, ' ')}
+                          {isMissing ? ' (required)' : ''}
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.1"
+                          value={modalMeasurementValues[key] ?? ''}
+                          onChange={(event) =>
+                            setModalMeasurementValues((prev) => ({
+                              ...prev,
+                              [key]: event.target.value,
+                            }))
+                          }
+                          className={`h-10 rounded-xl border px-3 text-sm bg-white/80 dark:bg-white/5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/40 ${
+                            isMissing ? 'border-red-300 dark:border-red-500/30' : 'border-black/10 dark:border-white/15'
+                          }`}
+                          placeholder="cm"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div className="px-5 py-4 border-t border-black/10 dark:border-white/10 space-y-2.5">
+                  <button
+                    type="button"
+                    onClick={handleModalSaveAndAdd}
+                    disabled={savingMeasurements}
+                    className="w-full py-3 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50"
+                  >
+                    {savingMeasurements ? '⏳ Saving...' : '🛍️ Save Measurements & Add to Bag'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMeasurementModal(false);
+                      navigate('/settings?tab=fittings');
+                    }}
+                    className="w-full py-2.5 rounded-full border border-black/10 dark:border-white/15 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  >
+                    📏 Go to My Fittings
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          </OverlayPortal>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

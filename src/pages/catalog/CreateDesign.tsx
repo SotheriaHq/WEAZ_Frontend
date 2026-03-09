@@ -896,7 +896,7 @@ const CreateDesignInner: React.FC = () => {
       {/* CreateStoreModal removed as per request */}
       {/* Save Draft Confirmation */}
       {showSaveDraftConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-layer-modal flex items-center justify-center">
           <div
             className="absolute inset-0 bg-black/60"
             onClick={() => setShowSaveDraftConfirm(false)}
@@ -928,7 +928,7 @@ const CreateDesignInner: React.FC = () => {
       )}
 
       {showDraftSavedChoices && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-layer-modal flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60" />
           <div className="relative z-10 w-[460px] bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-6">
             <h3 className="text-lg font-semibold mb-2">Draft saved</h3>
@@ -1613,7 +1613,7 @@ const CreateDesignInner: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-layer-modal flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           >
             <div className="w-full max-w-md rounded-2xl glass-panel-dark border border-white/10 p-6 space-y-4">
               <div className="flex items-start gap-3">
@@ -1657,7 +1657,7 @@ const CreateDesignInner: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-layer-modal bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
             onClick={closeFullscreen}
           >
             <div
@@ -1764,7 +1764,7 @@ const CreateDesignInner: React.FC = () => {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+                      className="fixed inset-0 z-layer-modal flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
                       onClick={() => setShowDraftPreview(false)}
                     >
                       <motion.div

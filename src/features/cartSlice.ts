@@ -140,19 +140,11 @@ export const addToCart = createAsyncThunk(
 
       if (
         typeof serverMessage === 'string' &&
-        serverMessage.toLowerCase().includes('missing required measurements') &&
-        payload?.productId
+        serverMessage.toLowerCase().includes('missing required measurements')
       ) {
-        try {
-          await apiClient.post('/store/wishlist', { productId: payload.productId });
-          return rejectWithValue(
-            'Required measurements are incomplete. We saved this item to your wishlist. Update your measurements in your profile, then add to bag again.',
-          );
-        } catch {
-          return rejectWithValue(
-            'Required measurements are incomplete. Update your measurements in your profile before adding to bag.',
-          );
-        }
+        return rejectWithValue(
+          '__MEASUREMENTS_REQUIRED__',
+        );
       }
 
       return rejectWithValue(serverMessage);

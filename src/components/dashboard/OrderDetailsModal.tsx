@@ -4,6 +4,7 @@ import { X, Package, Truck, CheckCircle, XCircle, MapPin, Phone, Mail } from 'lu
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import VLoader from '@/components/loaders/VLoader';
 
 interface OrderDetailsModalProps {
   isOpen: boolean;
@@ -107,7 +108,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         <div className="flex-1 overflow-y-auto p-6 space-y-6 overscroll-contain">
           {loading ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black dark:border-white"></div>
+              <VLoader size={56} progress={62} phase="loading" />
             </div>
           ) : order ? (
             <>
@@ -115,9 +116,11 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               <div className="flex flex-wrap items-center gap-2 justify-between bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
-                    order.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                    order.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
                     order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                    order.status === 'PROCESSING' ? 'bg-purple-100 text-purple-700' :
                     order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-700' :
+                    order.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
                     'bg-gray-100 text-gray-700'
                   }`}>
                     {order.status}
@@ -132,6 +135,15 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 <div className="flex items-center gap-2">
                   {order.status === 'PENDING' && (
                     <button 
+                      onClick={() => handleStatusUpdate('PROCESSING')}
+                      disabled={updating}
+                      className="px-3 py-1.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center gap-1"
+                    >
+                      <Package className="w-4 h-4" /> Process
+                    </button>
+                  )}
+                  {order.status === 'PROCESSING' && (
+                    <button 
                       onClick={() => handleStatusUpdate('SHIPPED')}
                       disabled={updating}
                       className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-1"
@@ -141,14 +153,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   )}
                   {order.status === 'SHIPPED' && (
                     <button 
-                      onClick={() => handleStatusUpdate('COMPLETED')}
+                      onClick={() => handleStatusUpdate('DELIVERED')}
                       disabled={updating}
                       className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-1"
                     >
-                      <CheckCircle className="w-4 h-4" /> Complete
+                      <CheckCircle className="w-4 h-4" /> Delivered
                     </button>
                   )}
-                  {order.status !== 'CANCELLED' && order.status !== 'COMPLETED' && (
+                  {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && (
                     <button 
                       onClick={() => handleStatusUpdate('CANCELLED')}
                       disabled={updating}
@@ -167,10 +179,10 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   <div className="space-y-2">
                     <p className="font-medium text-lg">{order.customerName}</p>
                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Mail className="w-4 h-4" /> {order.customerEmail || 'No email'}
+                      <Mail className="w-4 h-4" /> {order.customerEmail || (order.contactInfo as any)?.email || 'No email'}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Phone className="w-4 h-4" /> {order.customerPhone || 'No phone'}
+                      <Phone className="w-4 h-4" /> {order.customerPhone || (order.contactInfo as any)?.phone || 'No phone'}
                     </div>
                   </div>
                 </div>
@@ -178,7 +190,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3">Shipping Address</h3>
                   <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-                    <p>{order.shippingAddress || 'No shipping address provided'}</p>
+                    <p>{order.formattedShippingAddress || (typeof order.shippingAddress === 'object' ? [order.shippingAddress?.street, order.shippingAddress?.apartment, order.shippingAddress?.city, order.shippingAddress?.state, order.shippingAddress?.country].filter(Boolean).join(', ') : order.shippingAddress) || 'No shipping address provided'}</p>
                   </div>
                 </div>
               </div>
@@ -197,16 +209,23 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {order.items?.map((item: any) => (
-                        <tr key={item.id}>
+                      {/* Prefer relational orderItems; fall back to JSON items blob */}
+                      {(order.orderItems?.length ? order.orderItems : order.items)?.map((item: any, idx: number) => {
+                        const name = item.nameAtPurchase || item.name || 'Product';
+                        const thumb = item.thumbnailAtPurchase || item.thumbnail || item.image;
+                        const unitPrice = Number(item.unitPrice || item.price || 0);
+                        const qty = item.quantity || 1;
+                        const variant = [item.selectedSize, item.selectedColor].filter(Boolean).join(' / ') || item.variant;
+                        return (
+                        <tr key={item.id || idx}>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-                                {item.image ? (
+                                {thumb ? (
                                   <MediaRenderer
                                     kind="image"
-                                    src={item.image}
-                                    alt={item.productName}
+                                    src={thumb}
+                                    alt={name}
                                     maxHeightClassName="max-h-10"
                                     maxWidthClassName="max-w-10"
                                     className="rounded-lg"
@@ -217,17 +236,18 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                                 )}
                               </div>
                               <div>
-                                <p className="font-medium">{item.name}</p>
-                                {item.variant && <p className="text-xs text-gray-500">{item.variant}</p>}
+                                <p className="font-medium">{name}</p>
+                                {variant && <p className="text-xs text-gray-500">{variant}</p>}
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right">{item.quantity}</td>
-                          <td className="px-4 py-3 text-right">{formatCurrency(Number(item.price), order.currency)}</td>
-                          <td className="px-4 py-3 text-right font-medium">{formatCurrency(Number(item.price) * item.quantity, order.currency)}</td>
+                          <td className="px-4 py-3 text-right">{qty}</td>
+                          <td className="px-4 py-3 text-right">{formatCurrency(unitPrice, order.currency)}</td>
+                          <td className="px-4 py-3 text-right font-medium">{formatCurrency(unitPrice * qty, order.currency)}</td>
                         </tr>
-                      ))}
-                      {!order.items?.length && (
+                        );
+                      })}
+                      {!order.orderItems?.length && !order.items?.length && (
                         <tr>
                           <td colSpan={4} className="px-4 py-6 text-center text-gray-500">No items found</td>
                         </tr>

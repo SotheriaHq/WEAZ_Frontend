@@ -286,7 +286,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     <OverlayPortal>
       <div
         ref={containerRef}
-        className="fixed glass-menu overflow-hidden z-layer-dropdown animate-slideDown flex flex-col outline-none"
+        className="fixed glass-menu border border-white/25 dark:border-white/12 overflow-hidden z-layer-dropdown animate-slideDown flex flex-col outline-none"
         style={{
           top: panelPos.top,
           left: panelPos.left,

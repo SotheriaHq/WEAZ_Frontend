@@ -8,6 +8,7 @@ import FilterDropdown from '@/components/ui/FilterDropdown';
 import { toast } from 'sonner';
 import { unwrapApiResponse } from '@/types/auth';
 import FeatureItemModal from './modals/FeatureItemModal';
+import ImageWithFallback from '@/components/ImageWithFallback';
 
 type StatusFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
 type SortBy = 'newest' | 'oldest' | 'name' | 'price_high' | 'price_low';
@@ -413,7 +414,7 @@ const AdminProductsPage: React.FC = () => {
                         <div className="flex items-center gap-3">
                           <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-gray-200/70 bg-gray-100 dark:border-white/10 dark:bg-white/10">
                             {getCoverImage(product) ? (
-                              <img src={getCoverImage(product) as string} alt={product.name} className="h-full w-full object-cover" loading="lazy" />
+                              <ImageWithFallback src={getCoverImage(product)} alt={product.name} fit="cover" className="h-12 w-12" rounded="lg" />
                             ) : (
                               <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">📦</div>
                             )}
@@ -468,7 +469,7 @@ const AdminProductsPage: React.FC = () => {
                 >
                   <div className="h-40 w-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-white/5 dark:to-white/10">
                     {getCoverImage(product) ? (
-                      <img src={getCoverImage(product) as string} alt={product.name} className="h-full w-full object-cover" loading="lazy" />
+                      <ImageWithFallback src={getCoverImage(product)} alt={product.name} fit="cover" className="h-40 w-full" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-3xl text-gray-400">📦</div>
                     )}

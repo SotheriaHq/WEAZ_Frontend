@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { AlertTriangle, Monitor, Smartphone, Laptop, RefreshCw, X, Clock, User } from 'lucide-react';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import VLoader from '@/components/loaders/VLoader';
 
 /**
  * Draft Conflict Warning Modal (Item #17)
@@ -209,7 +210,7 @@ export const DraftConflictWarningModal: React.FC<DraftConflictWarningModalProps>
             >
               {isTakingOver ? (
                 <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <VLoader size={16} progress={61} phase="loading" showLabel={false} />
                   Taking over...
                 </>
               ) : (

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import Select from '@/components/ui/Select';
 import { MeasurementPointsApi } from '@/api/MeasurementPointsApi';
@@ -63,6 +63,9 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
     useState<MeasurementPointCategory>('GENERAL');
   const [isSubmittingFreeform, setIsSubmittingFreeform] = useState(false);
   const [addedPoints, setAddedPoints] = useState<MeasurementPoint[]>([]);
+  const [showAllPoints, setShowAllPoints] = useState(false);
+
+  const INITIAL_DISPLAY_COUNT = 12;
 
   const modeLabel = contentType === 'design' ? 'Design Sizing Mode' : 'Product Sizing Mode';
   const customBehaviorHint =
@@ -79,14 +82,21 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
   };
 
   const mergedPoints = useMemo(() => {
-    const map = new Map<string, MeasurementPoint>();
+    const byKey = new Map<string, MeasurementPoint>();
+    const seenLabels = new Set<string>();
     for (const point of points) {
-      map.set(point.key, point);
+      const normalizedLabel = point.label.trim().toLowerCase();
+      if (seenLabels.has(normalizedLabel)) continue;
+      seenLabels.add(normalizedLabel);
+      byKey.set(point.key, point);
     }
     for (const point of addedPoints) {
-      map.set(point.key, point);
+      const normalizedLabel = point.label.trim().toLowerCase();
+      if (seenLabels.has(normalizedLabel)) continue;
+      seenLabels.add(normalizedLabel);
+      byKey.set(point.key, point);
     }
-    return Array.from(map.values());
+    return Array.from(byKey.values());
   }, [addedPoints, points]);
 
   /** Points the user has already selected */
@@ -243,9 +253,9 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
                     type="button"
                     onClick={() => toggleMeasurementKey(point.key)}
                     disabled={disabled}
-                    className="inline-flex items-center gap-1 rounded-full border border-purple-500/60 bg-purple-500/10 px-2.5 py-1 text-[11px] text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 transition"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-purple-400/60 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300 shadow-sm hover:bg-purple-500/20 transition-all"
                   >
-                    <span className="truncate max-w-[120px]">{point.label}</span>
+                    <span className="truncate max-w-[140px]">{point.label}</span>
                     <span className="text-purple-400 text-[9px]">✕</span>
                   </button>
                 ))}
@@ -256,7 +266,7 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
           {/* Available measurement points — selectable chips */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
-              Available Points
+              Available Points{unselectedPoints.length > 0 && ` (${unselectedPoints.length})`}
             </label>
             <div className="rounded-lg border border-gray-200/70 dark:border-white/10 p-2">
               {isLoading ? (
@@ -264,22 +274,34 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
               ) : unselectedPoints.length === 0 ? (
                 <p className="text-[11px] text-gray-400">All available points are selected</p>
               ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {unselectedPoints.map((point) => (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(showAllPoints ? unselectedPoints : unselectedPoints.slice(0, INITIAL_DISPLAY_COUNT)).map((point) => (
+                      <button
+                        key={point.id}
+                        type="button"
+                        onClick={() => toggleMeasurementKey(point.key)}
+                        disabled={disabled}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 shadow-sm hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 dark:hover:bg-purple-500/10 dark:hover:text-purple-300 transition-all"
+                        title={`Click to select — ${point.label}`}
+                      >
+                        <span className="truncate max-w-[140px]">{point.label}</span>
+                        <span className="text-[9px] text-gray-400">+</span>
+                      </button>
+                    ))}
+                  </div>
+                  {unselectedPoints.length > INITIAL_DISPLAY_COUNT && (
                     <button
-                      key={point.id}
                       type="button"
-                      onClick={() => toggleMeasurementKey(point.key)}
-                      disabled={disabled}
-                      className="inline-flex items-center gap-1 rounded-full border border-gray-300/70 dark:border-white/15 bg-white dark:bg-white/5 px-2.5 py-1 text-[11px] text-gray-700 dark:text-gray-300 hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition"
+                      onClick={() => setShowAllPoints((v) => !v)}
+                      className="mt-2 text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline"
                     >
-                      <span className="truncate max-w-[120px]">{point.label}</span>
-                      <span className="text-[9px] text-gray-400">
-                        {point.gender === 'MEN' ? '♂' : point.gender === 'WOMEN' ? '♀' : '⚥'}
-                      </span>
+                      {showAllPoints
+                        ? 'Show less'
+                        : `Show all ${unselectedPoints.length} points (+${unselectedPoints.length - INITIAL_DISPLAY_COUNT} more)`}
                     </button>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
             </div>
           </div>

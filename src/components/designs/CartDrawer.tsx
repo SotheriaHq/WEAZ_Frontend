@@ -171,7 +171,7 @@ const CartDrawer: React.FC = () => {
   const handleRemoveItem = async (itemId: string) => {
     try {
       await dispatch(removeFromCart(itemId)).unwrap();
-      toast.success('Item removed from cart');
+      toast.success('Item removed from bag');
     } catch (error: any) {
       toast.error(error || 'Failed to remove item');
     }
@@ -229,7 +229,7 @@ const CartDrawer: React.FC = () => {
               className="fixed right-0 top-0 bottom-0 z-layer-drawer w-full max-w-md flex flex-col"
               role="dialog"
               aria-modal="true"
-              aria-label="Cart"
+              aria-label="Shopping Bag"
             >
               {/* Glass panel */}
               <div className="h-full bg-white/98 dark:bg-gray-950/98 backdrop-blur-2xl border-l border-white/30 dark:border-white/10 shadow-2xl flex flex-col">
@@ -237,7 +237,7 @@ const CartDrawer: React.FC = () => {
               <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200/60 dark:border-gray-800/60">
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-bold text-gray-900 dark:text-white">
-                    Your Cart
+                    Your Bag
                   </h2>
                   {totalQuantity > 0 && (
                     <span className="px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-[10px] font-semibold">
@@ -265,7 +265,7 @@ const CartDrawer: React.FC = () => {
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center justify-between">
                             <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-                              We updated your cart
+                              We updated your bag
                             </p>
                             <button
                               onClick={() => dispatch(clearCartNotices())}
@@ -310,10 +310,10 @@ const CartDrawer: React.FC = () => {
                       <span className="absolute -top-1 -right-1 text-3xl">🛒</span>
                     </div>
                     <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                      Your cart is empty
+                      Your bag is empty
                     </h3>
                     <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-xs leading-relaxed">
-                      Discover amazing fashion from African designers and add items to your cart
+                      Discover amazing fashion from African designers and add items to your bag
                     </p>
                     <FrostedButton variant="primary" onClick={handleContinueShopping}>
                       Start Shopping

@@ -16,6 +16,7 @@ import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { formatPrice } from '@/utils/helpers';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
+import VLoader from '@/components/loaders/VLoader';
 
 type Props = {
   open: boolean;
@@ -385,7 +386,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
               {loadingMedia ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/25">
-                  <div className="h-7 w-7 rounded-full border-2 border-white/80 border-t-transparent animate-spin" />
+                  <VLoader size={30} progress={58} phase="loading" showLabel={false} />
                 </div>
               ) : null}
 

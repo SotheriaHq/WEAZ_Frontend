@@ -128,6 +128,24 @@ const normalizeProduct = (raw: any): StoreProduct | null => {
     }))
     : [];
 
+  const variants = Array.isArray(raw?.variants)
+    ? raw.variants
+      .map((v: any) => {
+        const id = String(v?.id ?? '').trim();
+        if (!id) return null;
+        return {
+          id,
+          size: v?.size != null ? String(v.size) : null,
+          color: v?.color != null ? String(v.color) : null,
+          stock: Number(v?.stock ?? 0),
+          price: v?.price != null ? Number(v.price) : null,
+          sku: v?.sku != null ? String(v.sku) : null,
+          colorHex: v?.colorHex != null ? String(v.colorHex) : null,
+        };
+      })
+      .filter((v): v is NonNullable<typeof v> => Boolean(v))
+    : [];
+
   return {
     id,
     collectionId: String(raw?.collectionId ?? raw?.collection?.id ?? ''),
@@ -155,6 +173,7 @@ const normalizeProduct = (raw: any): StoreProduct | null => {
     customAvailable: Boolean(raw?.customAvailable),
     sizeAvailability,
     colors: Array.isArray(raw?.colors) ? raw.colors.map((c: any) => String(c)) : [],
+    variants,
     totalStock,
     isLowStock: totalStock > 0 && totalStock <= 5,
     isOutOfStock: totalStock <= 0,

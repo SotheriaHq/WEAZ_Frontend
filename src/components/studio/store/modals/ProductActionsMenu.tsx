@@ -204,7 +204,7 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[3000] pointer-events-none">
+    <div className="fixed inset-0 z-layer-dropdown pointer-events-none">
       <div
         ref={menuRef}
         style={menuStyle}

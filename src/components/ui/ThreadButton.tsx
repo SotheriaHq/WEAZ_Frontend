@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import { Link2 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { optimisticToggle, reconcile, setThreadState, wsApplied, adjustAggregatedCollectionThreads } from '@/features/engagementSlice';
@@ -37,6 +36,7 @@ const ThreadButton: React.FC<Props> = ({
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [initializing, setInitializing] = React.useState(true);
+  const [showThreadBurst, setShowThreadBurst] = React.useState(false);
   const k = `${contentType}:${contentId}`;
   const stateItem = useSelector((s: RootState) => s.engagement.items?.[k]);
   const item = useMemo(() => {
@@ -183,6 +183,10 @@ const ThreadButton: React.FC<Props> = ({
           threadCount: res.threads,
           threadedByMe: next
         }));
+        if (next) {
+          setShowThreadBurst(true);
+          window.setTimeout(() => setShowThreadBurst(false), 650);
+        }
         // Reconcile aggregated collection threads using actual delta if media thread
         if (contentType === 'COLLECTION_MEDIA' && parentCollectionId) {
           const delta = res.threads - previousThreadCount;
@@ -233,7 +237,7 @@ const ThreadButton: React.FC<Props> = ({
   };
 
   return (
-    <div className={`flex flex-col items-center ${className ?? ''}`}>
+    <div className={`relative flex flex-col items-center ${className ?? ''}`}>
       <button
         type="button"
         onClick={(e) => {
@@ -248,17 +252,14 @@ const ThreadButton: React.FC<Props> = ({
       >
         <div
           style={{ width: size, height: size }}
-          className="flex items-center justify-center"
+          className="flex items-center justify-center text-base"
         >
-          <Link2
-            className={`transition-colors duration-200 ${
-              item.threadedByMe
-                ? 'text-indigo-500'
-                : 'text-white'
-            }`}
-            width={size}
-            height={size}
-          />
+          <span
+            aria-hidden="true"
+            className={`${busy ? 'animate-[spin_1.2s_linear_infinite]' : ''} ${item.threadedByMe ? 'drop-shadow-[0_0_8px_rgba(147,51,234,0.65)]' : ''}`}
+          >
+            🧵
+          </span>
         </div>
       </button>
       <button
@@ -272,6 +273,14 @@ const ThreadButton: React.FC<Props> = ({
       >
         {item.threadCount ?? 0}
       </button>
+      {showThreadBurst && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-3 text-xs animate-bounce"
+        >
+          ✨🧵
+        </span>
+      )}
       <ThreadListModal
         open={open}
         onClose={() => setOpen(false)}

@@ -1,9 +1,10 @@
-import React, { useId, useMemo } from 'react';
+import React, { useMemo } from 'react';
 
 export interface VLoaderProps {
   size?: number;
   progress?: number | null;
-  showCheckOnComplete?: boolean;
+  phase?: 'idle' | 'starting' | 'loading' | 'finishing' | 'complete';
+  showLabel?: boolean;
   className?: string;
 }
 
@@ -14,113 +15,49 @@ const clampProgress = (value?: number | null): number | null => {
 };
 
 const VLoader: React.FC<VLoaderProps> = ({
-  size = 56,
+  size = 64,
   progress = null,
-  showCheckOnComplete = true,
+  phase = 'loading',
+  showLabel = true,
   className = '',
 }) => {
-  const clipId = useId().replace(/:/g, '');
   const normalized = useMemo(() => clampProgress(progress), [progress]);
-  const isComplete = normalized !== null && normalized >= 100;
-  const fillHeight = normalized !== null ? (normalized / 100) * 96 : 96;
-  const fillY = 108 - fillHeight;
+  const derivedProgress = normalized ?? (phase === 'complete' ? 100 : phase === 'finishing' ? 90 : phase === 'starting' ? 12 : 56);
+  const completion = Math.round(derivedProgress);
+  const phaseLabel =
+    phase === 'complete'
+      ? 'Thread complete'
+      : phase === 'finishing'
+        ? 'Sealing thread'
+        : phase === 'starting'
+          ? 'Starting thread'
+          : 'Winding thread';
+  const ringStyle = {
+    background: `conic-gradient(rgba(147,51,234,0.95) ${completion * 3.6}deg, rgba(255,255,255,0.1) 0deg)`,
+  };
 
   return (
-    <div
-      className={`inline-flex items-center justify-center ${className}`}
-      style={{ width: size, height: size }}
-    >
-      <svg
-        viewBox="0 0 120 120"
-        width={size}
-        height={size}
-        role="status"
-        aria-live="polite"
-        className="overflow-visible"
+    <div className={`inline-flex flex-col items-center justify-center ${className}`} role="status" aria-live="polite">
+      <div
+        className="relative rounded-full p-[3px]"
+        style={{ width: size, height: size, ...ringStyle }}
+        aria-label={`${phaseLabel} ${completion}%`}
       >
-        <defs>
-          <clipPath id={`${clipId}-clip`}>
-            <path d="M12 12 L60 108 L108 12 L88 12 L60 72 L32 12 Z" />
-          </clipPath>
-          <linearGradient id={`${clipId}-gradient`} x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0%" stopColor="#0ea5e9" />
-            <stop offset="45%" stopColor="#6366f1" />
-            <stop offset="100%" stopColor="#a855f7" />
-          </linearGradient>
-          <linearGradient
-            id={`${clipId}-shine`}
-            x1="0"
-            y1="0"
-            x2="1"
-            y2="1"
+        <div className="relative flex h-full w-full items-center justify-center rounded-full bg-[#0f0f0f] text-white">
+          <span
+            className={`text-[1.45rem] leading-none ${phase === 'complete' ? '' : 'animate-[spin_1.8s_linear_infinite]'}`}
+            aria-hidden="true"
           >
-            <stop offset="0%" stopColor="rgba(255,255,255,0.25)" />
-            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-          </linearGradient>
-        </defs>
-
-        {normalized === null ? (
-          <g clipPath={`url(#${clipId}-clip)`}>
-            <rect
-              className="v-loader__fillLoop"
-              width="96"
-              height="96"
-              x="12"
-              y="12"
-              fill={`url(#${clipId}-gradient)`}
-            />
-          </g>
-        ) : (
-          <rect
-            width="96"
-            height={fillHeight}
-            x="12"
-            y={fillY}
-            clipPath={`url(#${clipId}-clip)`}
-            fill={`url(#${clipId}-gradient)`}
-            style={{
-              transition: 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1), y 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
-          />
-        )}
-
-        <path
-          d="M12 12 L60 108 L108 12"
-          stroke="rgba(15, 23, 42, 0.65)"
-          strokeWidth="10"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <path
-          d="M18 12 L60 100 L102 12"
-          stroke="rgba(148, 163, 184, 0.35)"
-          strokeWidth="6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-
-        <path
-          d="M24 18 L60 88 L96 18"
-          stroke={`url(#${clipId}-shine)`}
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-
-        {isComplete && showCheckOnComplete ? (
-          <path
-            d="M40 66 L55 82 L82 50"
-            stroke="#34d399"
-            strokeWidth="9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-        ) : null}
-      </svg>
+            {phase === 'complete' ? '✅' : '🧵'}
+          </span>
+        </div>
+      </div>
+      {showLabel ? (
+        <div className="mt-2 text-center">
+          <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">{phaseLabel}</p>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400">{completion}% complete</p>
+        </div>
+      ) : null}
     </div>
   );
 };

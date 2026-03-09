@@ -15,6 +15,7 @@ import AccessApi, { type AccessState } from '@/api/AccessApi';
 import ThreadButton from '@/components/ui/ThreadButton';
 import UnifiedCollectionComments from '@/components/collections/UnifiedCollectionComments';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { selectImageVariant } from '@/utils/selectImageVariant';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { apiClient } from '@/api/httpClient';
 
@@ -28,6 +29,15 @@ interface MediaItem {
   fileId?: string | null;
   caption?: string | null;
   order?: number;
+  processingStatus?: 'PENDING' | 'READY' | 'FAILED' | string;
+  variants?: {
+    thumb?: { url: string; width: number; height: number; format?: string };
+    card?: { url: string; width: number; height: number; format?: string };
+    detail?: { url: string; width: number; height: number; format?: string };
+    zoom?: { url: string; width: number; height: number; format?: string };
+    avatar?: { url: string; width: number; height: number; format?: string };
+    banner?: { url: string; width: number; height: number; format?: string };
+  };
 }
 
 interface CollectionDetail {
@@ -141,6 +151,17 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const currentItem = items[currentIndex];
+  const currentVariant =
+    currentItem?.type === 'image'
+      ? selectImageVariant(
+          {
+            processingStatus: currentItem.processingStatus,
+            variants: currentItem.variants,
+            fallbackUrl: currentItem.url,
+          },
+          'detail',
+        )
+      : null;
 
   const handlePrev = useCallback(() => {
     onIndexChange((currentIndex - 1 + items.length) % items.length);
@@ -204,7 +225,9 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                   ) : (
                     <MediaRenderer
                       kind="image"
-                      src={currentItem.url}
+                      src={currentVariant?.src || currentItem.url}
+                      srcSet={currentVariant?.srcSet}
+                      sizes={currentVariant?.sizes}
                       alt={currentItem.caption || 'Collection Item'}
                       maxHeightClassName="max-h-[80vh]"
                       className="w-full rounded-2xl shadow-2xl"
@@ -293,15 +316,29 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                     </div>
                   </>
                 ) : (
+                  (() => {
+                    const thumb = selectImageVariant(
+                      {
+                        processingStatus: item.processingStatus,
+                        variants: item.variants,
+                        fallbackUrl: item.url,
+                      },
+                      'card',
+                    );
+                    return (
                   <MediaRenderer
                     kind="image"
-                    src={item.url}
+                    src={thumb.src}
+                    srcSet={thumb.srcSet}
+                    sizes={thumb.sizes}
                     alt={`Thumbnail ${idx + 1}`}
                     maxHeightClassName="max-h-20"
                     maxWidthClassName="max-w-20"
                     className="rounded-xl"
                     mediaClassName="rounded-xl"
                   />
+                    );
+                  })()
                 )}
                 
                 {/* Cover badge */}
@@ -949,6 +986,8 @@ const DesignView: React.FC = () => {
               fileId: file?.id,
               caption: m.caption ?? null,
               order: m.orderIndex ?? idx,
+              processingStatus: file?.processingStatus,
+              variants: file?.variants,
             };
           });
           

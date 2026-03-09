@@ -116,7 +116,7 @@ export default function ImageLightbox({
 
   const lightboxContent = (
     <div 
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-black/95 backdrop-blur-md p-4 md:p-8"
+      className="fixed inset-0 z-layer-modal flex flex-col items-center justify-between bg-black/95 backdrop-blur-md p-4 md:p-8"
       role="dialog"
       aria-modal="true"
       aria-label="Image lightbox"

@@ -30,11 +30,14 @@ const FinancePage: React.FC = () => {
       const payoutsData = await brandApi.getPayouts(user.id);
       
       const totalSales = overview?.kpis?.totalSales || 0;
-      const totalPaidOut = payoutsData?.reduce((sum: number, p: any) => 
-        p.status === 'COMPLETED' ? sum + Number(p.amount) : sum, 0) || 0;
+      const payoutsList = payoutsData?.items || payoutsData || [];
+      const totalPaidOut = Array.isArray(payoutsList)
+        ? payoutsList.reduce((sum: number, p: any) =>
+            p.status === 'COMPLETED' ? sum + Number(p.amount) : sum, 0)
+        : 0;
       
       setAvailableBalance(Math.max(0, totalSales - totalPaidOut));
-      setPayouts(payoutsData || []);
+      setPayouts(Array.isArray(payoutsList) ? payoutsList : []);
     } catch (error) {
       console.error('Failed to fetch finance data', error);
     } finally {

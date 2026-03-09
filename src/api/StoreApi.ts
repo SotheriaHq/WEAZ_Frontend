@@ -131,9 +131,15 @@ export interface Order {
   sizeFitSnapshot?: Record<string, any> | null;
   items: OrderItem[];
   totalAmount: number;
+  shippingCost?: number;
+  discountAmount?: number;
+  promoCode?: string | null;
   currency: string;
   status: string;
   paymentStatus: string;
+  paymentMethod?: string;
+  paymentReference?: string | null;
+  paidAt?: string | null;
   createdAt: string;
   updatedAt: string;
   brand?: {
@@ -144,10 +150,31 @@ export interface Order {
   };
 }
 
+export type PaymentMethodType =
+  | 'PAYSTACK'
+  | 'FLUTTERWAVE'
+  | 'BANK_TRANSFER'
+  | 'PAY_ON_DELIVERY'
+  | 'PENDING_SELECTION';
+
+export interface ShippingAddress {
+  firstName: string;
+  lastName: string;
+  street: string;
+  apartment?: string;
+  city: string;
+  state: string;
+  postalCode?: string;
+  country: string;
+  phone: string;
+}
+
 export interface CheckoutPayload {
   customerName?: string;
-  shippingAddress?: Record<string, any>;
+  shippingAddress?: ShippingAddress;
   contactInfo?: Record<string, any>;
+  paymentMethod?: PaymentMethodType;
+  promoCode?: string;
 }
 
 export interface CreateProductPayload {
