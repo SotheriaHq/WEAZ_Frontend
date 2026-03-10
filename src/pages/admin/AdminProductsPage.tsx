@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { unwrapApiResponse } from '@/types/auth';
 import FeatureItemModal from './modals/FeatureItemModal';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import useDebounce from '@/hooks/useDebounce';
 
 type StatusFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
 type SortBy = 'newest' | 'oldest' | 'name' | 'price_high' | 'price_low';
@@ -40,7 +41,7 @@ const AdminProductsPage: React.FC = () => {
 
   // ── Products tab state ──
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDebounce(search.trim(), 350);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [sortBy, setSortBy] = useState<SortBy>('newest');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
@@ -58,11 +59,6 @@ const AdminProductsPage: React.FC = () => {
   const [showFeatureModal, setShowFeatureModal] = useState(false);
   const [featuredView, setFeaturedView] = useState<'active' | 'history'>('active');
 
-  useEffect(() => {
-    const handle = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
-    return () => window.clearTimeout(handle);
-  }, [search]);
-
   // Fetch slots when Featured tab is active
   useEffect(() => {
     if (activeTab !== 'featured') return;
@@ -76,7 +72,7 @@ const AdminProductsPage: React.FC = () => {
   const fetchProductsPage = useCallback(
     async (cursor?: string, limit?: number) => {
       const params: Record<string, string> = {};
-      if (debouncedSearch) params.search = debouncedSearch;
+      if (debouncedSearch) params.q = debouncedSearch;
       if (statusFilter === 'ACTIVE') params.isActive = 'true';
       if (statusFilter === 'INACTIVE') params.isActive = 'false';
       if (cursor) params.cursor = cursor;

@@ -9,6 +9,7 @@ import { ImageWithFallback } from '@/components/ImageWithFallback';
 import Modal from '@/components/ui/Modal';
 import UserManageModal from './modals/UserManageModal';
 import CreateAdminModal from './modals/CreateAdminModal';
+import useDebounce from '@/hooks/useDebounce';
 
 type UserRoleFilter = 'ALL' | 'User' | 'Admin' | 'SuperAdmin';
 type UserStatusFilter = 'ALL' | 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
@@ -98,7 +99,7 @@ const AdminUsersPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDebounce(search.trim(), 300);
   const [roleFilter, setRoleFilter] = useState<UserRoleFilter>('ALL');
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('ALL');
   const [sortBy, setSortBy] = useState<UserSortBy>('created_desc');
@@ -117,17 +118,10 @@ const AdminUsersPage: React.FC = () => {
   const canReadUsers = hasPermission('USERS_READ');
   const reactivationFetchInFlightRef = useRef(false);
 
-  useEffect(() => {
-    const handle = window.setTimeout(() => {
-      setDebouncedSearch(search.trim());
-    }, 300);
-    return () => window.clearTimeout(handle);
-  }, [search]);
-
   const fetchUsersPage = useCallback(
     async (cursor?: string, limit?: number) => {
       const params: Record<string, string> = {};
-      if (debouncedSearch) params.search = debouncedSearch;
+      if (debouncedSearch) params.q = debouncedSearch;
       if (roleFilter !== 'ALL') params.role = roleFilter;
       if (statusFilter !== 'ALL') params.status = statusFilter;
       if (cursor) params.cursor = cursor;

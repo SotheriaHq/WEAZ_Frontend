@@ -16,6 +16,7 @@ import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type { SizeFitProfile, SizeFitSharesPayload } from '@/types/sizeFit';
 import ProfileActionsBar, { type ProfileAction } from '@/components/profile/ProfileActionsBar';
+import { buildProfileUrl, shareOrCopyLink } from '@/utils/publicLinks';
 
 interface UserProfile {
   id: string;
@@ -160,21 +161,13 @@ export const EndUserProfile: React.FC = () => {
 
   const handleShareProfile = useCallback(async () => {
     if (!profile) return;
-    const url = `${window.location.origin}/profile/${profile.id}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: `${profile.firstName} ${profile.lastName}`, url });
-        return;
-      } catch {
-        // fallback below
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success('Profile link copied.');
-    } catch {
-      toast.error('Unable to copy profile link.');
-    }
+    const url = buildProfileUrl({ id: profile.id, username: profile.username });
+    await shareOrCopyLink({
+      url,
+      title: `${profile.firstName} ${profile.lastName}`.trim() || profile.username,
+      successMessage: 'Profile link copied.',
+      errorMessage: 'Unable to copy profile link.',
+    });
   }, [profile]);
 
   const handleQuickProfileSave = useCallback(
@@ -335,7 +328,7 @@ export const EndUserProfile: React.FC = () => {
     );
   }
 
-  const profileUrl = `${window.location.origin}/profile/${profile.id}`;
+  const profileUrl = buildProfileUrl({ id: profile.id, username: profile.username });
   const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || profile.username;
   const joinLabel = formatJoinLabel(profile.createdAt ?? (isOwner ? currentUser?.createdAt : undefined));
   const tabs = availableTabs.map((tab) => ({
@@ -391,15 +384,15 @@ export const EndUserProfile: React.FC = () => {
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex min-w-0 items-center gap-4 sm:gap-5">
-                <div className="relative h-20 w-20 shrink-0 rounded-full border border-white/60 bg-white/60 p-1 shadow-md dark:border-white/15 dark:bg-white/5 sm:h-24 sm:w-24">
+                <div className="relative h-20 w-20 shrink-0 rounded-[1.5rem] border border-white/60 bg-white/60 p-1 shadow-md dark:border-white/15 dark:bg-white/5 sm:h-24 sm:w-24">
                   {profile.profileImage ? (
                     <img
                       src={profile.profileImage}
                       alt={fullName}
-                      className="h-full w-full rounded-full object-cover"
+                      className="h-full w-full rounded-[1.2rem] object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 text-2xl font-bold text-gray-800 dark:text-white">
+                    <div className="flex h-full w-full items-center justify-center rounded-[1.2rem] bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 text-2xl font-bold text-gray-800 dark:text-white">
                       {(profile.firstName?.charAt(0) || profile.username?.charAt(0) || '?').toUpperCase()}
                     </div>
                   )}
@@ -502,7 +495,12 @@ export const EndUserProfile: React.FC = () => {
         onRespond={handleRespondShareRequest}
       />
 
-      <EndUserProfileQrModal open={isQrOpen} onClose={() => setIsQrOpen(false)} profileUrl={profileUrl} />
+      <EndUserProfileQrModal
+        open={isQrOpen}
+        onClose={() => setIsQrOpen(false)}
+        profileUrl={profileUrl}
+        logoUrl={profile.profileImage}
+      />
 
       {isReminderDialogOpen ? (
         <OverlayPortal>

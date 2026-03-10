@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { adminBrandsApi } from '@/api/AdminApi';
 import type { AdminBrand } from '@/types/admin';
+import type { VerificationQueueItem } from '@/types/verification';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { unwrapApiResponse } from '@/types/auth';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import FilterDropdown from '@/components/ui/FilterDropdown';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import BrandDetailModal from './modals/BrandDetailModal';
+import useDebounce from '@/hooks/useDebounce';
 
 type StoreFilter = 'ALL' | 'OPEN' | 'CLOSED';
 type StatusFilter = 'ALL' | 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
@@ -48,7 +51,7 @@ const AdminBrandsPage: React.FC = () => {
   const canStoreOverride = hasPermission('BRANDS_STORE_OVERRIDE');
 
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDebounce(search.trim(), 350);
   const [storeFilter, setStoreFilter] = useState<StoreFilter>('ALL');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [sortBy, setSortBy] = useState<SortBy>('newest');
@@ -56,16 +59,35 @@ const AdminBrandsPage: React.FC = () => {
   const [actionLoadingBrandId, setActionLoadingBrandId] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<AdminBrand | null>(null);
   const [confirmStore, setConfirmStore] = useState<{ brand: AdminBrand; nextOpen: boolean } | null>(null);
+  const [verificationQueue, setVerificationQueue] = useState<VerificationQueueItem[]>([]);
+  const [pendingVerificationCount, setPendingVerificationCount] = useState(0);
 
   useEffect(() => {
-    const handle = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
-    return () => window.clearTimeout(handle);
-  }, [search]);
+    let active = true;
+    const loadQueue = async () => {
+      try {
+        const response = await adminBrandsApi.getVerificationQueue({ limit: '5' });
+        const data = unwrapApiResponse<{ items?: VerificationQueueItem[]; totalPending?: number }>(response.data as any);
+        if (!active) return;
+        setVerificationQueue(data.items ?? []);
+        setPendingVerificationCount(data.totalPending ?? 0);
+      } catch {
+        if (!active) return;
+        setVerificationQueue([]);
+        setPendingVerificationCount(0);
+      }
+    };
+
+    void loadQueue();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const fetchPage = useCallback(
     async (cursor?: string, limit?: number) => {
       const params: Record<string, string> = {};
-      if (debouncedSearch) params.search = debouncedSearch;
+      if (debouncedSearch) params.q = debouncedSearch;
       if (storeFilter === 'OPEN') params.isStoreOpen = 'true';
       if (storeFilter === 'CLOSED') params.isStoreOpen = 'false';
       if (cursor) params.cursor = cursor;
@@ -219,6 +241,42 @@ const AdminBrandsPage: React.FC = () => {
         <div className="rounded-2xl border border-amber-200/70 bg-amber-50/80 p-4 shadow-sm transition-transform hover:-translate-y-0.5 dark:border-amber-500/30 dark:bg-amber-500/10">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Suspended</p>
           <p className="mt-2 text-2xl font-black text-amber-800 dark:text-amber-200">{metrics.suspended}</p>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-sky-200/80 bg-sky-50/70 p-5 shadow-sm dark:border-sky-500/20 dark:bg-sky-500/10">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Verification queue</p>
+            <h2 className="mt-2 text-xl font-black text-gray-900 dark:text-white">{pendingVerificationCount} active review item{pendingVerificationCount === 1 ? '' : 's'}</h2>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">Jump directly into the verification reviews that still need action.</p>
+          </div>
+          <Link
+            to="/admin/verification"
+            className="inline-flex items-center rounded-full border border-sky-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-sky-700 shadow-sm transition hover:border-sky-300 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-white/5 dark:text-sky-200"
+          >
+            Open full queue
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {verificationQueue.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-sky-200 bg-white/70 px-4 py-5 text-sm text-gray-500 dark:border-sky-500/20 dark:bg-white/5 dark:text-gray-300">
+              No verification items are waiting right now.
+            </div>
+          ) : (
+            verificationQueue.map((item) => (
+              <Link
+                key={item.id}
+                to={`/admin/brands/${item.id}/verification-review`}
+                className="rounded-2xl border border-white/80 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 dark:border-white/10 dark:bg-white/[0.04]"
+              >
+                <p className="text-sm font-bold text-gray-900 dark:text-white">{item.name || 'Unnamed brand'}</p>
+                <p className="mt-1 text-xs uppercase tracking-wide text-sky-700 dark:text-sky-300">{String(item.verificationStatus).replace(/_/g, ' ')}</p>
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{item.owner?.firstName} {item.owner?.lastName}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{item.owner?.email}</p>
+              </Link>
+            ))
+          )}
         </div>
       </section>
 

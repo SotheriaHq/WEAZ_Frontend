@@ -6,6 +6,14 @@ import type {
   ReviewDto,
   BrandProfileDto,
 } from '../types/profile';
+import type {
+  VerificationDraftData,
+  VerificationDraftResponse,
+  VerificationLetterResponse,
+  VerificationStatusResponse,
+  VerificationUploadInstruction,
+  VerificationUploadResult,
+} from '../types/verification';
 
 export interface UpdateBrandProfilePayload {
   brandFullName?: string;
@@ -282,6 +290,72 @@ export const brandApi = {
         categoryId ? type.categoryId === categoryId : true,
       );
     }
+  },
+  async getVerificationStatus(brandId: string): Promise<VerificationStatusResponse> {
+    const response = await apiClient.get(`/brands/${brandId}/verification`);
+    return unwrapApiResponse<VerificationStatusResponse>(response.data);
+  },
+  async getVerificationDraft(brandId: string): Promise<VerificationDraftResponse> {
+    const response = await apiClient.get(`/brands/${brandId}/verification/draft`);
+    return unwrapApiResponse<VerificationDraftResponse>(response.data);
+  },
+  async saveVerificationDraft(
+    brandId: string,
+    draftData: VerificationDraftData,
+    currentStep?: number,
+  ): Promise<{ ok: true; lastSavedAt: string }> {
+    const response = await apiClient.patch(`/brands/${brandId}/verification/draft`, {
+      draftData,
+      currentStep,
+    });
+    return unwrapApiResponse<{ ok: true; lastSavedAt: string }>(response.data);
+  },
+  async getVerificationLetter(brandId: string): Promise<VerificationLetterResponse> {
+    const response = await apiClient.get(`/brands/${brandId}/verification/letter`);
+    return unwrapApiResponse<VerificationLetterResponse>(response.data);
+  },
+  async signVerificationLetter(
+    brandId: string,
+    data: { signatureImage: string; signatureMethod: 'TYPED' | 'DRAWN'; letterVersion: number; typedSignatureText?: string },
+  ): Promise<{ letterKey: string; letterHash: string; letterVersion: number; signedAt: string }> {
+    const response = await apiClient.post(`/brands/${brandId}/verification/letter/sign`, data);
+    return unwrapApiResponse(response.data);
+  },
+  async presignVerificationUpload(
+    brandId: string,
+    data: { fileName: string; contentType: string; documentType: string },
+  ): Promise<VerificationUploadInstruction> {
+    const response = await apiClient.post(`/brands/${brandId}/verification/uploads/presign`, data);
+    return unwrapApiResponse<VerificationUploadInstruction>(response.data);
+  },
+  async finalizeVerificationUpload(
+    brandId: string,
+    data: { fileId: string; key: string; actualMimeType: string; actualSize: number },
+  ): Promise<VerificationUploadResult> {
+    const response = await apiClient.post(`/brands/${brandId}/verification/uploads/finalize`, data);
+    return unwrapApiResponse<VerificationUploadResult>(response.data);
+  },
+  async submitVerification(brandId: string, data: Record<string, unknown>) {
+    const response = await apiClient.post(`/brands/${brandId}/verification`, data);
+    return unwrapApiResponse(response.data);
+  },
+  async cancelVerification(brandId: string, expectedUpdatedAt?: string) {
+    const response = await apiClient.post(`/brands/${brandId}/verification/cancel`, {
+      expectedUpdatedAt,
+    });
+    return unwrapApiResponse(response.data);
+  },
+  async resubmitVerificationInfo(brandId: string, data: Record<string, unknown>) {
+    const response = await apiClient.post(`/brands/${brandId}/verification/resubmit-info`, data);
+    return unwrapApiResponse(response.data);
+  },
+  async setVerificationNudgeOptOut(brandId: string, nudgeOptOut: boolean) {
+    const response = await apiClient.patch(`/brands/${brandId}/verification/nudge-optout`, {
+      nudgeOptOut,
+    });
+    return unwrapApiResponse<{ nudgeOptOut: boolean; updatedAt: string }>(
+      response.data,
+    );
   },
 
   /**

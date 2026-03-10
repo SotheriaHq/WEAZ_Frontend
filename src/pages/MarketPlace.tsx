@@ -13,6 +13,7 @@ import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import { fetchWishlist } from '@/features/wishlistSlice';
 import FeaturedSection from '@/components/FeaturedSection';
 import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
+import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 
 interface RawProductsPayload {
   items?: any[];
@@ -143,7 +144,7 @@ const normalizeProduct = (raw: any): StoreProduct | null => {
           colorHex: v?.colorHex != null ? String(v.colorHex) : null,
         };
       })
-      .filter((v): v is NonNullable<typeof v> => Boolean(v))
+      .filter((v: NonNullable<typeof variants>[number] | null): v is NonNullable<typeof v> => Boolean(v))
     : [];
 
   return {
@@ -198,7 +199,6 @@ const MarketPlace: React.FC = () => {
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
-  const [search, setSearch] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<string>('FOR_YOU');
   const [visibleCount, setVisibleCount] = useState(16);
   const [heroIndex, setHeroIndex] = useState(0);
@@ -293,7 +293,6 @@ const MarketPlace: React.FC = () => {
   const heroProducts = useMemo(() => products.slice(0, 3), [products]);
 
   const filteredProducts = useMemo(() => {
-    const query = search.trim().toLowerCase();
     return products.filter((product) => {
       if (selectedFilter === 'MENSWEAR' && product.sizingMode === 'CUSTOM') return false;
       if (selectedFilter === 'WOMENSWEAR' && product.sizingMode === 'CUSTOM') return false;
@@ -305,21 +304,9 @@ const MarketPlace: React.FC = () => {
         return false;
       }
 
-      if (!query) return true;
-
-      const haystack = [
-        product.name,
-        product.description || '',
-        product.brand?.name || '',
-        ...(product.colors || []),
-        ...(product.sizes || []),
-      ]
-        .join(' ')
-        .toLowerCase();
-
-      return haystack.includes(query);
+      return true;
     });
-  }, [products, search, selectedFilter]);
+  }, [products, selectedFilter]);
 
   const visibleProducts = useMemo(
     () => filteredProducts.slice(0, visibleCount),
@@ -328,7 +315,7 @@ const MarketPlace: React.FC = () => {
 
   useEffect(() => {
     setVisibleCount(16);
-  }, [selectedFilter, search]);
+  }, [selectedFilter]);
 
   const activeHero = heroProducts[heroIndex] ?? null;
 
@@ -463,14 +450,12 @@ const MarketPlace: React.FC = () => {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h2 className="text-2xl font-black text-gray-900 dark:text-white">Explore the Market</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Tap any product to preview, wishlist, or add to bag.</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Tap any product to preview, wishlist, or add to bag. Use global search for product, brand, design, and tag discovery.</p>
               </div>
               <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[520px] lg:flex-row">
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search products, brands, colors..."
-                  className="w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 outline-none transition focus:border-purple-500 dark:border-white/15 dark:bg-white/10 dark:text-white"
+                <SearchBarWithSuggestions
+                  placeholder="Search products, brands, styles, or tags..."
+                  className="w-full"
                 />
               </div>
             </div>
@@ -516,11 +501,10 @@ const MarketPlace: React.FC = () => {
             <div className="rounded-2xl border border-gray-200 bg-white/70 p-10 text-center dark:border-white/10 dark:bg-white/5">
               <p className="text-3xl">🧭</p>
               <h3 className="mt-3 text-xl font-bold text-gray-900 dark:text-white">No products matched this view</h3>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Try another filter or clear your search to keep exploring.</p>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Try another market filter or use the global search bar above for broader discovery.</p>
               <button
                 type="button"
                 onClick={() => {
-                  setSearch('');
                   setSelectedFilter('FOR_YOU');
                 }}
                 className="mt-5 rounded-full border border-gray-300 px-5 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100 dark:border-white/15 dark:text-gray-200 dark:hover:bg-white/10"

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import Button from '@/components/ui/Button';
 import { formatPrice } from '@/utils/helpers';
 import type { PaymentMethodType } from '@/api/StoreApi';
+import LazyOrderQrCard from '@/components/qr/LazyOrderQrCard';
 
 interface OrderSummaryItem {
   name: string;
@@ -47,8 +48,7 @@ const OrderConfirmation: React.FC = () => {
   const isBankTransfer = paymentMethod === 'BANK_TRANSFER';
 
   return (
-    <div className="max-w-lg mx-auto py-16 px-4 text-center">
-      {/* Success icon */}
+    <div className="max-w-2xl mx-auto py-16 px-4 text-center">
       <div className="text-6xl mb-6">
         {isPod ? '📦' : isBankTransfer ? '🏦' : '✅'}
       </div>
@@ -67,17 +67,22 @@ const OrderConfirmation: React.FC = () => {
         {!isPod && !isBankTransfer && 'Your payment was processed and your order is being prepared.'}
       </p>
 
-      {/* Order IDs */}
-      <div className="bg-gray-50 dark:bg-zinc-800/50 border border-gray-200/70 dark:border-zinc-700/60 rounded-xl p-4 mb-6 text-left">
-        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400 mb-2">
+      <div className="bg-gray-50 dark:bg-zinc-800/50 border border-gray-200/70 dark:border-zinc-700/60 rounded-xl p-4 mb-6 text-left space-y-4">
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400">
           Order {orderIds.length > 1 ? 'IDs' : 'ID'}
         </p>
         {orderIds.map((id) => (
-          <p key={id} className="font-mono text-sm text-gray-900 dark:text-white">{id}</p>
+          <div key={id} className="space-y-3 border-t border-gray-200/70 pt-4 first:border-t-0 first:pt-0 dark:border-zinc-700/60">
+            <p className="font-mono text-sm text-gray-900 dark:text-white">{id}</p>
+            <LazyOrderQrCard
+              orderId={id}
+              title="Order QR Code"
+              subtitle="Scan to reopen this order while signed in."
+            />
+          </div>
         ))}
       </div>
 
-      {/* Order summary */}
       {summary && (
         <div className="bg-gray-50 dark:bg-zinc-800/50 border border-gray-200/70 dark:border-zinc-700/60 rounded-xl p-5 mb-6 text-left space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400">
@@ -105,7 +110,7 @@ const OrderConfirmation: React.FC = () => {
             {summary.discount > 0 && (
               <div className="flex justify-between text-green-600 dark:text-green-400">
                 <span>Discount</span>
-                <span>−{formatPrice(summary.discount)}</span>
+                <span>-{formatPrice(summary.discount)}</span>
               </div>
             )}
             <div className="flex justify-between font-bold text-base pt-2 border-t border-gray-200 dark:border-zinc-700">
@@ -121,10 +126,11 @@ const OrderConfirmation: React.FC = () => {
         </div>
       )}
 
-      {/* Bank transfer details */}
       {isBankTransfer && bankAccount && (
         <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200/70 dark:border-purple-700/40 rounded-xl p-5 mb-6 text-left space-y-2">
-          <p className="text-sm font-semibold text-purple-900 dark:text-purple-200">Transfer Details</p>
+          <p className="text-sm font-semibold text-purple-900 dark:text-purple-200">
+            Transfer Details
+          </p>
           <div className="text-sm space-y-1 text-gray-700 dark:text-zinc-300">
             <p><span className="text-gray-500">Bank:</span> {bankAccount.bankName}</p>
             <p><span className="text-gray-500">Account:</span> <span className="font-mono font-bold">{bankAccount.accountNumber}</span></p>
@@ -136,7 +142,6 @@ const OrderConfirmation: React.FC = () => {
         </div>
       )}
 
-      {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <Button onClick={() => navigate('/orders')} size="lg">
           View My Orders

@@ -15,6 +15,7 @@ const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', path: '/admin', emoji: '📊' },
   { key: 'users', label: 'Users', path: '/admin/users', emoji: '👤', permission: 'USERS_READ' },
   { key: 'brands', label: 'Brands', path: '/admin/brands', emoji: '🏷️', permission: 'BRANDS_READ' },
+  { key: 'verification', label: 'Verification', path: '/admin/verification', emoji: '🪪', permission: 'BRANDS_VERIFY' },
   { key: 'products', label: 'Products', path: '/admin/products', emoji: '📦', permission: 'PRODUCTS_READ' },
   { key: 'collections', label: 'Collections', path: '/admin/collections', emoji: '🗂️', permission: 'COLLECTIONS_READ' },
   { key: 'taxonomy', label: 'Taxonomy', path: '/admin/taxonomy', emoji: '🧬', permission: 'TAXONOMY_READ' },
@@ -46,13 +47,14 @@ const AdminSidebar: React.FC = () => {
   };
 
   return (
-    <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[200px] z-20 overflow-y-auto scrollbar-hide border-r border-white/30 dark:border-white/10 bg-white/95 dark:bg-gray-950 backdrop-blur-xl shadow-lg">
-      {/* Gradient overlay matching profile dropdown */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-purple-400/5 to-transparent opacity-40 pointer-events-none" />
+    <aside className="fixed left-0 top-16 z-20 hidden h-[calc(100vh-64px)] w-[200px] overflow-y-auto border-r border-white/30 bg-white/95 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-gray-950 md:block">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/20 via-purple-400/5 to-transparent opacity-40" />
 
-      <div className="relative z-10 py-4 px-2">
-        <div className="px-3 mb-4">
-          <h2 className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Admin</h2>
+      <div className="relative z-10 px-2 py-4">
+        <div className="mb-4 px-3">
+          <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+            Admin
+          </h2>
         </div>
 
         <nav className="space-y-0.5">
@@ -62,10 +64,10 @@ const AdminSidebar: React.FC = () => {
               <button
                 key={item.key}
                 onClick={() => navigate(item.path)}
-                className={`w-full text-left px-3 py-2 text-sm rounded-xl transition-all duration-150 flex items-center gap-2.5 group ${
+                className={`group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition-all duration-150 ${
                   isActive
-                    ? 'font-semibold text-purple-700 dark:text-purple-300 bg-purple-500/10 dark:bg-purple-500/15 border-l-3 border-purple-500'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-purple-500/5 dark:hover:bg-white/5'
+                    ? 'border-l-3 border-purple-500 bg-purple-500/10 font-semibold text-purple-700 dark:bg-purple-500/15 dark:text-purple-300'
+                    : 'text-gray-700 hover:bg-purple-500/5 dark:text-gray-300 dark:hover:bg-white/5'
                 }`}
               >
                 <span className="text-base">{item.emoji}</span>

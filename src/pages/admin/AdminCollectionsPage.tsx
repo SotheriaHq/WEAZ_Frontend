@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { adminCollectionsApi } from '@/api/AdminApi';
 import type { AdminCollection } from '@/types/admin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -6,25 +6,21 @@ import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { toast } from 'sonner';
 import { unwrapApiResponse } from '@/types/auth';
+import useDebounce from '@/hooks/useDebounce';
 
 const AdminCollectionsPage: React.FC = () => {
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDebounce(search.trim(), 350);
   const { hasPermission } = useAdminPermissions();
   const [confirmAction, setConfirmAction] = useState<{
     title: string; message: string; isDestructive: boolean; action: () => Promise<void>;
   } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
-  useEffect(() => {
-    const handle = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
-    return () => window.clearTimeout(handle);
-  }, [search]);
-
   const fetchPage = useCallback(
     async (cursor?: string, limit?: number) => {
       const params: Record<string, string> = {};
-      if (debouncedSearch) params.search = debouncedSearch;
+      if (debouncedSearch) params.q = debouncedSearch;
       if (cursor) params.cursor = cursor;
       if (limit) params.limit = String(limit);
       const res = await adminCollectionsApi.list(params);

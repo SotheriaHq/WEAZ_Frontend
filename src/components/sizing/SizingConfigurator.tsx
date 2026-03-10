@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import Select from '@/components/ui/Select';
 import { MeasurementPointsApi } from '@/api/MeasurementPointsApi';

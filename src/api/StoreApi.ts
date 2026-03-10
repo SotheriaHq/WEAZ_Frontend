@@ -150,6 +150,12 @@ export interface Order {
   };
 }
 
+export interface OrderAccessResolution {
+  orderId: string;
+  viewerRole: 'BUYER' | 'BRAND';
+  destination: string;
+}
+
 export type PaymentMethodType =
   | 'PAYSTACK'
   | 'FLUTTERWAVE'
@@ -304,6 +310,13 @@ export const getMyOrders = async (page = 1, limit = 20): Promise<{ items: Order[
 export const getMyOrder = async (orderId: string): Promise<Order> => {
   const res = await apiClient.get(`/store/orders/${orderId}`);
   return extractData<Order>(res);
+};
+
+export const resolveOrderAccess = async (
+  orderId: string,
+): Promise<OrderAccessResolution> => {
+  const res = await apiClient.get(`/store/orders/${orderId}/resolve`);
+  return extractData<OrderAccessResolution>(res);
 };
 
 // ============= Seller Products =============
@@ -647,4 +660,5 @@ export default {
   getStorePolicies,
   updateStorePolicies,
   getProductPriceChangePreview,
+  resolveOrderAccess,
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link2, Share2, ShoppingCart, Trash2, MessageCircle, Eye, Heart } from 'lucide-react';
+import { Link2, ShoppingCart, Trash2, MessageCircle, Eye, Heart } from 'lucide-react';
 import TagChip from '@/components/ui/Tag';
 
 interface CollectionMetadataProps {
@@ -14,6 +14,7 @@ interface CollectionMetadataProps {
   isThreaded?: boolean;
   onThread?: () => void;
   onShare?: () => void;
+  onOpenQr?: () => void;
   onAddToCart?: () => void;
   onAddToWishlist?: () => void;
   onDelete?: () => void;
@@ -45,6 +46,7 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
   isThreaded = false,
   onThread,
   onShare,
+  onOpenQr,
   onAddToCart,
   onAddToWishlist,
   onDelete,
@@ -311,14 +313,23 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
       )}
 
       {/* Action Buttons */}
-      <div className="flex gap-2">
+      <div className={`grid gap-2 ${onOpenQr ? 'grid-cols-2' : 'grid-cols-1'}`}>
         <button
           onClick={onShare}
           className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border bg-white/80 border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-white/5 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-white/10 transition text-xs font-medium"
         >
-          <Share2 className="w-3.5 h-3.5" />
+          <span aria-hidden="true">🔗</span>
           Share
         </button>
+        {onOpenQr ? (
+          <button
+            onClick={onOpenQr}
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border bg-white/80 border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-white/5 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-white/10 transition text-xs font-medium"
+          >
+            <span aria-hidden="true">🪪</span>
+            QR Code
+          </button>
+        ) : null}
       </div>
 
       {!isOwner && (

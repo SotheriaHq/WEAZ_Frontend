@@ -31,6 +31,7 @@ import CheckoutPage from './pages/checkout/CheckoutPage';
 import OrderConfirmation from './pages/checkout/OrderConfirmation';
 import MyOrders from './pages/orders/MyOrders';
 import OrderDetail from './pages/orders/OrderDetail';
+import OrderAccessResolverPage from './pages/orders/OrderAccessResolverPage';
 import ProductDetailsPage from './pages/catalog/ProductDetailsPage';
 // Placeholder pages for features under development
 import {
@@ -45,9 +46,19 @@ import ShopSetupWizardPage from './pages/studio/shop/ShopSetupWizardPage';
 import ShopSetupEssentialsPage from './pages/studio/shop/ShopSetupEssentialsPage';
 import StudioScaffold from './components/studio/StudioScaffold';
 import StoreManagement from './pages/studio/store/StoreManagement';
+import StoreVerificationPage from './pages/studio/store/StoreVerificationPage';
+import VerificationWizardPage from './pages/studio/store/VerificationWizardPage';
+import VerificationSubmittedPage from './pages/studio/store/VerificationSubmittedPage';
 import StoreCollectionCreate from './pages/studio/store/StoreCollectionCreate';
 import RequireStoreSetup from './components/store/RequireStoreSetup';
+import {
+  ProductAliasRedirect,
+  ProfileAliasRedirect,
+  StorefrontAliasRedirect,
+} from './pages/redirects/PublicAliasRedirects';
 import SizeChartsPage from './pages/size-charts/SizeChartsPage';
+import VerifiedBadgeMeaningPage from './pages/ui/VerifiedBadgeMeaningPage';
+import SearchResultsPage from './pages/SearchResultsPage';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { setViewportWidth } from '@/features/uiSlice';
@@ -58,6 +69,8 @@ const AdminScaffold = lazy(() => import('./components/admin/AdminScaffold'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
 const AdminBrandsPage = lazy(() => import('./pages/admin/AdminBrandsPage'));
+const AdminVerificationQueuePage = lazy(() => import('./pages/admin/AdminVerificationQueuePage'));
+const AdminBrandVerificationReviewPage = lazy(() => import('./pages/admin/AdminBrandVerificationReviewPage'));
 const AdminProductsPage = lazy(() => import('./pages/admin/AdminProductsPage'));
 const AdminCollectionsPage = lazy(() => import('./pages/admin/AdminCollectionsPage'));
 const AdminTaxonomyPage = lazy(() => import('./pages/admin/AdminTaxonomyPage'));
@@ -157,11 +170,13 @@ const router = createBrowserRouter([
           { index: true, element: <Market /> },
           { path: 'market', element: <Market /> },
           { path: 'market-place', element: <MarketPlace /> },
+          { path: 'search', element: <SearchResultsPage /> },
           { path: 'subscriptions', element: <SubscriptionsPlaceholder /> },
           { path: 'history', element: <HistoryPlaceholder /> },
           { path: 'watch-later', element: <WatchLaterPlaceholder /> },
           { path: 'trending', element: <TrendingPlaceholder /> },
           { path: 'size-charts', element: <SizeChartsPage /> },
+          { path: 'help/verified-badge', element: <VerifiedBadgeMeaningPage /> },
           { path: 'settings', element: <SettingsHome /> },
           { path: 'settings/collections', element: <CollectionsSettings /> },
         ],
@@ -183,6 +198,42 @@ const router = createBrowserRouter([
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={() => {}}>
                 <StoreManagement />
+              </StudioScaffold>
+            </RequireStoreSetup>
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/verification',
+        element: (
+          <RequireBrand>
+            <RequireStoreSetup>
+              <StudioScaffold active="store" onSelect={() => {}}>
+                <StoreVerificationPage />
+              </StudioScaffold>
+            </RequireStoreSetup>
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/verification/apply',
+        element: (
+          <RequireBrand>
+            <RequireStoreSetup>
+              <StudioScaffold active="store" onSelect={() => {}}>
+                <VerificationWizardPage />
+              </StudioScaffold>
+            </RequireStoreSetup>
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/verification/submitted',
+        element: (
+          <RequireBrand>
+            <RequireStoreSetup>
+              <StudioScaffold active="store" onSelect={() => {}}>
+                <VerificationSubmittedPage />
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -291,6 +342,14 @@ const router = createBrowserRouter([
         children: profileChildren,
       },
       {
+        path: '/u/:username',
+        element: <Layout><ProfileAliasRedirect /></Layout>,
+      },
+      {
+        path: '/brand/:slug',
+        element: <Layout><StorefrontAliasRedirect /></Layout>,
+      },
+      {
         element: <GuestRoute />,
         children: [
           { path: '/signup', element: <SignupPage /> },
@@ -304,6 +363,7 @@ const router = createBrowserRouter([
           { path: '/checkout', element: <Layout><CheckoutPage /></Layout> },
           { path: '/checkout/confirmation', element: <Layout><OrderConfirmation /></Layout> },
           { path: '/orders', element: <Layout><MyOrders /></Layout> },
+          { path: '/orders/access/:orderId', element: <Layout><OrderAccessResolverPage /></Layout> },
           { path: '/orders/:orderId', element: <Layout><OrderDetail /></Layout> },
         ],
       },
@@ -340,6 +400,10 @@ const router = createBrowserRouter([
         element: <Layout><ProductDetailsPage /></Layout>,
       },
       {
+        path: '/p/:slug',
+        element: <Layout><ProductAliasRedirect /></Layout>,
+      },
+      {
         path: '/admin/reset-password',
         element: (
           <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-gray-500 text-sm">Loading reset page...</div>}>
@@ -371,6 +435,8 @@ const router = createBrowserRouter([
           { index: true, element: <AdminDashboard /> },
           { path: 'users', element: <AdminUsersPage /> },
           { path: 'brands', element: <AdminBrandsPage /> },
+          { path: 'verification', element: <AdminVerificationQueuePage /> },
+          { path: 'brands/:id/verification-review', element: <AdminBrandVerificationReviewPage /> },
           { path: 'products', element: <AdminProductsPage /> },
           { path: 'collections', element: <AdminCollectionsPage /> },
           { path: 'taxonomy', element: <AdminTaxonomyPage /> },

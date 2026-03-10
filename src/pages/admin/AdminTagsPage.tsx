@@ -1,17 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { adminTagsApi } from '@/api/AdminApi';
 import type { AdminTagItem } from '@/types/admin';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { unwrapApiResponse } from '@/types/auth';
+import useDebounce from '@/hooks/useDebounce';
 
 const AdminTagsPage: React.FC = () => {
   const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-
-  useEffect(() => {
-    const handle = window.setTimeout(() => setDebouncedQuery(query.trim()), 350);
-    return () => window.clearTimeout(handle);
-  }, [query]);
+  const debouncedQuery = useDebounce(query.trim(), 350);
 
   const fetchPage = useCallback(
     async (cursor?: string, limit?: number) => {

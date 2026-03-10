@@ -23,14 +23,14 @@ import type { RootState, AppDispatch } from '../store';
 // Notifications bootstrap logic moved to useNotificationsBootstrap hook mounted at app root.
 import type { AuthUserDto } from '../types/auth';
 import '../styles/scrollbar-hide.css';
-import SearchField from '@/components/SearchField';
+import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 import { apiClient, dropStoredAccessToken } from '../api/httpClient';
 import { env } from '../config/env';
 import getProfileOrHomeUrl from '../lib/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import React from 'react';
-import { User, Settings, TagIcon, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, SearchIcon, LayoutDashboard, Heart } from 'lucide-react';
+import { User, Settings, TagIcon, Sun, ChevronDown, Moon, Monitor, Globe, MapPin, LogOut, LayoutDashboard, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
@@ -479,10 +479,9 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
         {!minimal && (
           <div className="hidden sm:flex flex-1 justify-center px-6">
             <div className="flex items-center w-full gap-2">
-              <SearchField 
-                placeholder={translate('searchPlaceholder') || 'Search designs, brands...'} 
-                showFilter={true} 
-                className="!flex-1" 
+              <SearchBarWithSuggestions
+                placeholder={translate('searchPlaceholder') || 'Search products, brands, styles...'}
+                className="!flex-1"
               />
             </div>
           </div>
@@ -492,8 +491,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
         <div className="flex items-center justify-end shrink-0 min-w-[100px] space-x-2 sm:space-x-3">
           {/* Mobile Search Icon (visible only on mobile when search is hidden) */}
           {!minimal && (
-            <button className="sm:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
-               <SearchIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+            <button
+              type="button"
+              className="sm:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+              aria-label="Open search"
+              onClick={() => navigate('/search')}
+            >
+               <span aria-hidden="true" className="text-lg text-gray-700 dark:text-gray-200">🔎</span>
             </button>
           )}
 

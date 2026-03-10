@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getMyOrder, type Order } from '@/api/StoreApi';
 import { toast } from 'sonner';
+import LazyOrderQrCard from '@/components/qr/LazyOrderQrCard';
 
 const OrderDetail: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -24,7 +25,7 @@ const OrderDetail: React.FC = () => {
       }
     };
 
-    fetchOrder();
+    void fetchOrder();
   }, [orderId, navigate]);
 
   if (loading) {
@@ -37,7 +38,9 @@ const OrderDetail: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-4 space-y-6">
-      <button className="text-sm text-gray-500 hover:text-black" onClick={() => navigate(-1)}>Back</button>
+      <button className="text-sm text-gray-500 hover:text-black" onClick={() => navigate(-1)}>
+        Back
+      </button>
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -47,11 +50,16 @@ const OrderDetail: React.FC = () => {
           <div className="text-right">
             <p className="text-sm text-gray-500">Total</p>
             <p className="text-xl font-semibold">
-              {new Intl.NumberFormat('en-NG', { style: 'currency', currency: order.currency || 'NGN' }).format(Number(order.totalAmount))}
+              {new Intl.NumberFormat('en-NG', {
+                style: 'currency',
+                currency: order.currency || 'NGN',
+              }).format(Number(order.totalAmount))}
             </p>
           </div>
         </div>
-        <div className="text-sm text-gray-500">Placed on {new Date(order.createdAt).toLocaleString()}</div>
+        <div className="text-sm text-gray-500">
+          Placed on {new Date(order.createdAt).toLocaleString()}
+        </div>
         <div className="space-y-3">
           {order.items.map((item) => (
             <div key={item.productId} className="flex items-center justify-between text-sm">
@@ -65,13 +73,23 @@ const OrderDetail: React.FC = () => {
               <div className="text-right">
                 <p className="text-gray-500">Qty {item.quantity}</p>
                 <p className="font-medium">
-                  {new Intl.NumberFormat('en-NG', { style: 'currency', currency: order.currency || 'NGN' }).format(Number(item.price) * item.quantity)}
+                  {new Intl.NumberFormat('en-NG', {
+                    style: 'currency',
+                    currency: order.currency || 'NGN',
+                  }).format(Number(item.price) * item.quantity)}
                 </p>
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      <LazyOrderQrCard
+        orderId={order.id}
+        title="Order QR Code"
+        subtitle="Scan to reopen this order while signed in."
+        logoUrl={order.brand?.logo || null}
+      />
     </div>
   );
 };

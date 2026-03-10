@@ -8,11 +8,18 @@ import StoreProductsPanel from '@/components/studio/store/StoreProductsPanel';
 import { brandApi } from '@/api/BrandApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
-import { clearStoreOpenPending, isStoreOpenPending, resolveStoreSetupDestination, sleep } from '@/utils/storeSetup';
-import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import {
-  Eye,
-} from 'lucide-react';
+  clearStoreOpenPending,
+  isStoreOpenPending,
+  resolveStoreSetupDestination,
+  sleep,
+} from '@/utils/storeSetup';
+import {
+  getAvatarFallback,
+  resolveProfileImageSource,
+} from '@/utils/profileImage';
+import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
+import { buildStorefrontUrl } from '@/utils/publicLinks';
 
 export default function StoreManagement() {
   const navigate = useNavigate();
@@ -28,6 +35,7 @@ export default function StoreManagement() {
   const [layoutMode, setLayoutMode] = useState(false);
   const [draftCollections, setDraftCollections] = useState<any[]>([]);
   const [draftCollectionsLoading, setDraftCollectionsLoading] = useState(false);
+  const [showStoreQr, setShowStoreQr] = useState(false);
 
   const resolvedAvatar = useMemo(
     () =>
@@ -36,16 +44,19 @@ export default function StoreManagement() {
         profileImageId: user?.profileImageId,
         profileImageFile: user?.profileImageFile,
       }),
-    [user?.profileImage, user?.profileImageFile, user?.profileImageId]
+    [user?.profileImage, user?.profileImageFile, user?.profileImageId],
   );
-  const { url: avatarUrl } = useSignedFileUrl(resolvedAvatar.fileId, resolvedAvatar.src);
+  const { url: avatarUrl } = useSignedFileUrl(
+    resolvedAvatar.fileId,
+    resolvedAvatar.src,
+  );
   const avatarFallback = useMemo(
     () =>
       getAvatarFallback(
         `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim(),
-        user?.username
+        user?.username,
       ),
-    [user?.firstName, user?.lastName, user?.username]
+    [user?.firstName, user?.lastName, user?.username],
   );
 
   const brandName = useMemo(() => {
@@ -53,7 +64,13 @@ export default function StoreManagement() {
     if (user?.brandFullName) return user.brandFullName;
     const fullName = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim();
     return fullName || user?.username || 'Your Store';
-  }, [status?.profile?.name, user?.brandFullName, user?.firstName, user?.lastName, user?.username]);
+  }, [
+    status?.profile?.name,
+    user?.brandFullName,
+    user?.firstName,
+    user?.lastName,
+    user?.username,
+  ]);
 
   const brandDescription = useMemo(() => {
     return (
@@ -62,19 +79,51 @@ export default function StoreManagement() {
       user?.brandDescription ||
       'Showcase your collection, manage products, and track performance.'
     );
-  }, [status?.profile?.description, status?.profile?.tagline, user?.brandDescription]);
+  }, [
+    status?.profile?.description,
+    status?.profile?.tagline,
+    user?.brandDescription,
+  ]);
 
   const brandLocation = useMemo(() => {
     if (user?.companyLocation) return user.companyLocation;
-    const bits = [user?.brandCity, user?.brandState, user?.brandCountry].filter(Boolean);
+    const bits = [user?.brandCity, user?.brandState, user?.brandCountry].filter(
+      Boolean,
+    );
     return bits.length ? bits.join(', ') : null;
-  }, [user?.companyLocation, user?.brandCity, user?.brandState, user?.brandCountry]);
+  }, [
+    user?.companyLocation,
+    user?.brandCity,
+    user?.brandState,
+    user?.brandCountry,
+  ]);
 
   const kpis = overview?.kpis || {};
   const recentOrders = overview?.recentOrders || [];
+  const verificationMarker = user?.verificationBadgeVisible
+    ? '✅'
+    : user?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED'
+      ? '🛠️'
+      : user?.verificationStatus === 'PENDING' ||
+          user?.verificationStatus === 'IN_REVIEW'
+        ? '⏳'
+        : user?.verificationStatus === 'REJECTED'
+          ? '⚠️'
+          : '🪪';
+  const verificationLabel = user?.verificationBadgeVisible
+    ? 'Seller verified'
+    : user?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED'
+      ? 'Reviewer requested updates'
+      : user?.verificationStatus === 'PENDING' ||
+          user?.verificationStatus === 'IN_REVIEW'
+        ? 'Verification in progress'
+        : 'Open verification workspace';
 
   const formatCurrency = (val: number) =>
-    new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(val || 0);
+    new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+    }).format(val || 0);
   const formatNumber = (val: number) => {
     if (!val) return '0';
     if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
@@ -162,7 +211,7 @@ export default function StoreManagement() {
         if (!mounted) return;
         setOverview(overviewData);
         setAnalytics(analyticsData);
-      } catch (error) {
+      } catch {
         if (!mounted) return;
         setOverview({
           kpis: {
@@ -201,7 +250,7 @@ export default function StoreManagement() {
         const drafts = await brandApi.getMyDraftCollections();
         if (!mounted) return;
         setDraftCollections(drafts || []);
-      } catch (error) {
+      } catch {
         if (!mounted) return;
         setDraftCollections([]);
       } finally {
@@ -218,29 +267,32 @@ export default function StoreManagement() {
   if (loading) {
     return (
       <div className="animate-in fade-in duration-300">
-        <div className="h-8 w-48 bg-gray-200/80 dark:bg-white/10 rounded mb-3 animate-pulse" />
-        <div className="h-4 w-96 bg-gray-200/80 dark:bg-white/10 rounded animate-pulse" />
-        <div className="mt-6 h-72 rounded-2xl bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 animate-pulse" />
+        <div className="mb-3 h-8 w-48 animate-pulse rounded bg-gray-200/80 dark:bg-white/10" />
+        <div className="h-4 w-96 animate-pulse rounded bg-gray-200/80 dark:bg-white/10" />
+        <div className="mt-6 h-72 animate-pulse rounded-2xl border border-gray-200 bg-white/70 dark:border-white/10 dark:bg-white/5" />
       </div>
     );
   }
 
   if (!status) {
     return (
-      <div className="rounded-2xl bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 p-6">
-        <div className="text-gray-900 dark:text-white font-semibold">Store</div>
-        <div className="text-gray-600 dark:text-gray-400 text-sm mt-1">Unable to load store status.</div>
+      <div className="rounded-2xl border border-gray-200 bg-white/70 p-6 dark:border-white/10 dark:bg-white/5">
+        <div className="font-semibold text-gray-900 dark:text-white">Store</div>
+        <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          Unable to load store status.
+        </div>
       </div>
     );
   }
 
-  // If store isn't open, we already redirected to the setup flow.
   if (!status.isStoreOpen) {
     if (isStoreOpenPending()) {
       return (
-        <div className="rounded-2xl bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 p-6">
-          <div className="text-gray-900 dark:text-white font-semibold">Finalizing Store</div>
-          <div className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+        <div className="rounded-2xl border border-gray-200 bg-white/70 p-6 dark:border-white/10 dark:bg-white/5">
+          <div className="font-semibold text-gray-900 dark:text-white">
+            Finalizing Store
+          </div>
+          <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             Your store is being activated. This usually takes a few seconds.
           </div>
         </div>
@@ -250,13 +302,11 @@ export default function StoreManagement() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* ═══ Compact Brand Bar ═══ */}
+    <div className="animate-in fade-in space-y-8 duration-500">
       <div className="sticky top-0 z-30">
-        <div className="backdrop-blur-xl bg-white/90 dark:bg-[#111118]/90 border border-gray-200/60 dark:border-white/10 rounded-2xl px-4 py-3 shadow-lg">
+        <div className="rounded-2xl border border-gray-200/60 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/90">
           <div className="flex items-center gap-4">
-            {/* Avatar */}
-            <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl border-2 border-white dark:border-white/10 shadow-md">
+            <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl border-2 border-white shadow-md dark:border-white/10">
               {avatarUrl ? (
                 <MediaRenderer
                   kind="image"
@@ -273,85 +323,101 @@ export default function StoreManagement() {
               )}
             </div>
 
-            {/* Brand name + tagline */}
             <div className="min-w-0 flex-1">
-              <h1 className="text-base font-bold text-gray-900 dark:text-white truncate leading-tight">{brandName}</h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate leading-tight mt-0.5">{brandDescription}</p>
+              <h1 className="truncate text-base font-bold leading-tight text-gray-900 dark:text-white">
+                {brandName}
+              </h1>
+              <p className="mt-0.5 truncate text-xs leading-tight text-gray-500 dark:text-gray-400">
+                {brandDescription}
+              </p>
             </div>
 
-            {/* Emoji feature badges with hover tooltips */}
-            <div className="hidden sm:flex items-center gap-1">
-              {/* Reviews */}
-              <div className="relative group">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-default text-sm">
+            <div className="hidden items-center gap-1 sm:flex">
+              <div className="group relative">
+                <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
                   {kpis.reviewScore ? '⭐' : '☆'}
                 </span>
-                <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
                   {kpis.reviewScore
                     ? `${kpis.reviewScore.toFixed(1)} (${kpis.reviewCount || 0} reviews)`
                     : 'No reviews yet'}
                 </span>
               </div>
 
-              {/* Location */}
-              {brandLocation && (
-                <div className="relative group">
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-default text-sm">📍</span>
-                  <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+              {brandLocation ? (
+                <div className="group relative">
+                  <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
+                    📍
+                  </span>
+                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
                     {brandLocation}
                   </span>
                 </div>
-              )}
+              ) : null}
 
-              {/* Shipping */}
-              <div className="relative group">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-default text-sm">🚚</span>
-                <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+              <div className="group relative">
+                <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
+                  🚚
+                </span>
+                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
                   Ships Nationwide
                 </span>
               </div>
 
-              {/* Verification */}
-              <div className="relative group">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-default text-sm">
-                  {user?.isEmailVerified ? '✅' : '⏳'}
+              <button
+                type="button"
+                onClick={() => navigate('/studio/verification')}
+                className="group relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10"
+              >
+                <span>{verificationMarker}</span>
+                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
+                  {verificationLabel}
                 </span>
-                <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
-                  {user?.isEmailVerified ? 'Verified Seller' : 'Verification Pending'}
-                </span>
-              </div>
+              </button>
 
-              {/* Buyer Protection */}
-              <div className="relative group">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-default text-sm">🛡️</span>
-                <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+              <div className="group relative">
+                <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
+                  🛡️
+                </span>
+                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
                   Buyer Protection
                 </span>
               </div>
             </div>
 
-            {/* Divider */}
-            <div className="h-6 w-px bg-gray-200 dark:bg-white/10 hidden sm:block" />
+            <div className="hidden h-6 w-px bg-gray-200 dark:bg-white/10 sm:block" />
 
-            {/* Live badge */}
-            <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
-              status?.isStoreOpen
-                ? 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-500/30'
-                : 'bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-500/30'
-            }`}>
-              <span className="text-xs">{status?.isStoreOpen ? '🟢' : '🟡'}</span>
-              {status?.isStoreOpen ? 'Live' : 'Draft'}
+            <div
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                status.isStoreOpen
+                  ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300'
+                  : 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300'
+              }`}
+            >
+              <span className="text-xs">{status.isStoreOpen ? '🟢' : '🟡'}</span>
+              {status.isStoreOpen ? 'Live' : 'Draft'}
             </div>
 
-            {/* Preview as visitor */}
+            <button
+              type="button"
+              onClick={() => setShowStoreQr(true)}
+              className="group relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white/80 text-gray-600 shadow-sm transition-all hover:scale-105 hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-emerald-300"
+              aria-label="Open storefront QR code"
+            >
+              <span className="text-sm">🪪</span>
+              <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
+                Storefront QR code
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={() => navigate('/profile')}
-              className="relative group flex-shrink-0 h-9 w-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-white/10 hover:text-purple-600 dark:hover:text-purple-400 hover:scale-105 active:scale-95 transition-all flex items-center justify-center shadow-sm"
+              className="group relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white/80 text-gray-600 shadow-sm transition-all hover:scale-105 hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-purple-400"
               aria-label="Preview as visitor"
             >
-              <Eye className="w-4 h-4" />
-              <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+              <span className="text-sm">👁️</span>
+              <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
                 Preview as visitor
               </span>
             </button>
@@ -366,23 +432,40 @@ export default function StoreManagement() {
         draftCollectionsLoading={draftCollectionsLoading}
       />
 
-      {analyticsOpen && analyticsCollapsed && (
+      <LazyEntityQrModal
+        open={showStoreQr}
+        onClose={() => setShowStoreQr(false)}
+        title="Storefront QR Code"
+        subtitle="Scan to open this storefront."
+        url={buildStorefrontUrl({
+          ownerId: user?.id,
+          slug: overview?.store?.slug || user?.username,
+          username: user?.username,
+        })}
+        downloadFileName="storefront-qr.png"
+        logoUrl={avatarUrl || resolvedAvatar.src}
+        logoFileId={resolvedAvatar.fileId}
+      />
+
+      {analyticsOpen && analyticsCollapsed ? (
         <button
           type="button"
           onClick={() => setAnalyticsCollapsed(false)}
-          className="fixed right-6 bottom-20 z-40 flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 text-sm font-semibold text-white shadow-2xl"
+          className="fixed bottom-20 right-6 z-40 flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 text-sm font-semibold text-white shadow-2xl"
           aria-label="Open analytics panel"
         >
           📊 Analytics
           <span className="text-xs font-semibold text-green-200">● Live</span>
         </button>
-      )}
+      ) : null}
 
-      {analyticsOpen && !analyticsCollapsed && (
-        <aside className="fixed right-6 top-24 bottom-6 z-40 w-[320px] max-w-[90vw] rounded-2xl border border-gray-200 dark:border-white/10 bg-white/95 dark:bg-white/5 shadow-2xl overflow-y-auto">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      {analyticsOpen && !analyticsCollapsed ? (
+        <aside className="fixed bottom-6 right-6 top-24 z-40 w-[320px] max-w-[90vw] overflow-y-auto rounded-2xl border border-gray-200 bg-white/95 shadow-2xl dark:border-white/10 dark:bg-white/5">
+          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <div>
-              <h3 className="text-base font-bold text-gray-900 dark:text-white">Analytics</h3>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                Analytics
+              </h3>
               <p className="text-xs text-gray-500">Live store performance</p>
             </div>
             <div className="flex items-center gap-3">
@@ -397,30 +480,47 @@ export default function StoreManagement() {
             </div>
           </div>
 
-          <div className="px-5 pb-5 space-y-6">
+          <div className="space-y-6 px-5 pb-5">
             <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
-              <div className="text-xs font-semibold text-gray-500">Store Views (7d)</div>
+              <div className="text-xs font-semibold text-gray-500">
+                Store Views (7d)
+              </div>
               <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
                 {formatNumber(kpis.storeViews)}
               </div>
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Top Performing</h4>
-              {Array.isArray(overview?.topProducts) && overview.topProducts.length > 0 ? (
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Top Performing
+              </h4>
+              {Array.isArray(overview?.topProducts) &&
+              overview.topProducts.length > 0 ? (
                 <div className="mt-3 space-y-3">
                   {overview.topProducts.slice(0, 3).map((item: any) => (
                     <div key={item.id} className="flex items-center gap-3">
                       <div className="h-12 w-12 overflow-hidden rounded-lg border border-gray-200">
                         {item.thumbnail ? (
-                          <MediaRenderer kind="image" src={item.thumbnail} alt={item.name} className="h-full w-full" mediaClassName="h-full w-full object-cover" />
+                          <MediaRenderer
+                            kind="image"
+                            src={item.thumbnail}
+                            alt={item.name}
+                            className="h-full w-full"
+                            mediaClassName="h-full w-full object-cover"
+                          />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-gray-100 text-xs text-gray-500">No Image</div>
+                          <div className="flex h-full w-full items-center justify-center bg-gray-100 text-xs text-gray-500">
+                            No Image
+                          </div>
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.name}</p>
-                        <p className="text-xs text-gray-500">{formatNumber(item.views || 0)} views</p>
+                        <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                          {item.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatNumber(item.views || 0)} views
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -431,16 +531,24 @@ export default function StoreManagement() {
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Recent Orders</h4>
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Recent Orders
+              </h4>
               {recentOrders.length > 0 ? (
                 <div className="mt-3 space-y-3">
                   {recentOrders.slice(0, 3).map((order: any) => (
                     <div key={order.id} className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs font-semibold text-gray-900 dark:text-white">#{order.id}</p>
-                        <p className="text-xs text-gray-500">{order.items?.length || 0} items</p>
+                        <p className="text-xs font-semibold text-gray-900 dark:text-white">
+                          #{order.id}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {order.items?.length || 0} items
+                        </p>
                       </div>
-                      <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-semibold text-green-600">{order.status || 'Paid'}</span>
+                      <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-semibold text-green-600">
+                        {order.status || 'Paid'}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -450,19 +558,24 @@ export default function StoreManagement() {
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Revenue (7 days)</h4>
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Revenue (7 days)
+              </h4>
               <div className="mt-3 space-y-2">
                 {(analytics?.salesChart || []).slice(-7).map((entry: any) => (
-                  <div key={entry.date} className="flex items-center justify-between text-xs text-gray-500">
+                  <div
+                    key={entry.date}
+                    className="flex items-center justify-between text-xs text-gray-500"
+                  >
                     <span>{entry.date}</span>
                     <span className="font-semibold text-gray-900 dark:text-white">
                       {formatCurrency(entry.amount || 0)}
                     </span>
                   </div>
                 ))}
-                {(!analytics?.salesChart || analytics.salesChart.length === 0) && (
+                {!analytics?.salesChart || analytics.salesChart.length === 0 ? (
                   <p className="text-xs text-gray-500">No revenue data yet.</p>
-                )}
+                ) : null}
               </div>
             </div>
 
@@ -475,13 +588,13 @@ export default function StoreManagement() {
             </button>
           </div>
         </aside>
-      )}
+      ) : null}
 
-      {overviewLoading && (
-        <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-white/5 p-4 text-sm text-gray-500">
-          Loading store stats…
+      {overviewLoading ? (
+        <div className="rounded-2xl border border-gray-200 bg-white/70 p-4 text-sm text-gray-500 dark:border-white/10 dark:bg-white/5">
+          Loading store stats...
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

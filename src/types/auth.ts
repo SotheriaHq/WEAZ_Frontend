@@ -44,6 +44,10 @@ export interface AuthUserDto {
   bannerImageFile: AuthProfileImageFileDto | null;
   isEmailVerified: boolean;
   storeId: string | null;
+  verificationStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'IN_REVIEW' | 'ADDITIONAL_INFO_REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | null;
+  isVerifiedBrand?: boolean;
+  verificationBadgeVisible?: boolean;
+  verifiedExplanationUrl?: string | null;
   isActive: string;
   status?: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED' | null;
   mustResetPassword?: boolean;

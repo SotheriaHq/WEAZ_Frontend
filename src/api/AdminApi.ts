@@ -17,6 +17,12 @@ import type {
   FeaturedSlotsSummary,
   EligibleEntity,
 } from '../types/admin';
+import type {
+  AdminVerificationDetails,
+  VerificationNote,
+  VerificationQueueResponse,
+  VerificationReason,
+} from '../types/verification';
 
 type Paginated<T> = { items: T[]; nextCursor?: string };
 
@@ -75,11 +81,30 @@ export const adminBrandsApi = {
   suspend: (id: string, reason: string) =>
     apiClient.patch(`/admin/brands/${id}/suspend`, { reason }),
   getVerificationQueue: (params?: Record<string, string>) =>
-    apiClient.get<Paginated<AdminBrand>>('/admin/brands/verification-queue', { params }),
+    apiClient.get<VerificationQueueResponse>('/admin/brands/verification-queue', { params }),
+  getVerificationRejectionReasons: () =>
+    apiClient.get<{ reasons: VerificationReason[] }>('/admin/brands/verification-rejection-reasons'),
   getVerificationDetails: (id: string) =>
-    apiClient.get(`/admin/brands/${id}/verification`),
-  reviewVerification: (id: string, data: { decision: 'APPROVED' | 'REJECTED'; rejectionReason?: string }) =>
+    apiClient.get<AdminVerificationDetails>(`/admin/brands/${id}/verification`),
+  claimVerification: (id: string, expectedUpdatedAt?: string) =>
+    apiClient.patch(`/admin/brands/${id}/verification/claim`, { expectedUpdatedAt }),
+  releaseVerification: (id: string, expectedUpdatedAt?: string) =>
+    apiClient.patch(`/admin/brands/${id}/verification/release`, { expectedUpdatedAt }),
+  reassignVerificationToSelf: (id: string, expectedUpdatedAt?: string) =>
+    apiClient.patch(`/admin/brands/${id}/verification/reassign-to-self`, { expectedUpdatedAt }),
+  requestVerificationInfo: (
+    id: string,
+    data: { items: Array<{ field: string; label: string; message?: string }>; generalMessage?: string; expectedUpdatedAt?: string },
+  ) => apiClient.patch(`/admin/brands/${id}/verification/request-info`, data),
+  reviewVerification: (
+    id: string,
+    data: { decision: 'APPROVED' | 'REJECTED'; rejectionReasons?: Array<{ code: string; label: string; customReason?: string }>; expectedUpdatedAt?: string },
+  ) =>
     apiClient.patch(`/admin/brands/${id}/verification`, data),
+  getVerificationNotes: (id: string) =>
+    apiClient.get<{ notes: VerificationNote[] }>(`/admin/brands/${id}/verification/notes`),
+  addVerificationNote: (id: string, text: string) =>
+    apiClient.post<VerificationNote>(`/admin/brands/${id}/verification/notes`, { text }),
 };
 
 // ── Products ──

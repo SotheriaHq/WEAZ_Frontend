@@ -99,6 +99,9 @@ export interface BrandProfileDto {
   cacNumber?: string | null;
   tin?: string | null;
   verified?: boolean;
+  verificationStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'IN_REVIEW' | 'ADDITIONAL_INFO_REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  verificationBadgeVisible?: boolean;
+  verifiedExplanationUrl?: string | null;
   averageRating?: number;
   totalReviews?: number;
   collectionsCount?: number;

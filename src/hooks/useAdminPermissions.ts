@@ -9,6 +9,7 @@ const PERMISSION_ALIASES: Record<string, string> = {
   USERS_DEACTIVATE: 'users.deactivate',
   USERS_NOTIFY: 'notifications.send',
   BRANDS_READ: 'brands.read',
+  BRANDS_VERIFY: 'brands.verify',
   BRANDS_SUSPEND: 'brands.suspend',
   BRANDS_STORE_OVERRIDE: 'brands.store_override',
   PRODUCTS_READ: 'products.read',

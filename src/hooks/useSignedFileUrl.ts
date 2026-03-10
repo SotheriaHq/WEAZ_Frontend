@@ -25,7 +25,10 @@ const setCachedUrl = (key: string, url: string) => {
 // In-flight dedup map (shared module-level singleton)
 const inflight = new Map<string, Promise<string | null>>();
 
-const dedup = async (key: string, fetcher: () => Promise<string>): Promise<string | null> => {
+const dedup = async (
+  key: string,
+  fetcher: () => Promise<string | null>,
+): Promise<string | null> => {
   const cached = getCachedUrl(key);
   if (cached) return cached;
   const existing = inflight.get(key);

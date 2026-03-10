@@ -4,6 +4,7 @@ import { adminFeaturedApi } from '@/api/AdminApi';
 import type { EligibleEntity } from '@/types/admin';
 import { unwrapApiResponse } from '@/types/auth';
 import { toast } from 'sonner';
+import useDebounce from '@/hooks/useDebounce';
 
 interface Props {
   onClose: () => void;
@@ -13,22 +14,17 @@ interface Props {
 const FeatureItemModal: React.FC<Props> = ({ onClose, onSuccess }) => {
   const [entityType, setEntityType] = useState<'PRODUCT' | 'DESIGN'>('PRODUCT');
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDebounce(search.trim(), 350);
   const [results, setResults] = useState<EligibleEntity[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<EligibleEntity | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    const handle = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
-    return () => window.clearTimeout(handle);
-  }, [search]);
-
   const doSearch = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, string> = { entityType };
-      if (debouncedSearch) params.search = debouncedSearch;
+      if (debouncedSearch) params.q = debouncedSearch;
       params.limit = '20';
       const res = await adminFeaturedApi.search(params);
       const data = unwrapApiResponse<EligibleEntity[]>(res.data as any);

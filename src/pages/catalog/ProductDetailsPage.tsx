@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Heart, 
-  Share2, 
   ShoppingBag, 
   ChevronDown, 
   Truck, 
@@ -25,6 +24,8 @@ import { formatPrice } from '@/utils/helpers';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
+import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 
 // Color name to hex mapping
 const COLOR_HEX_MAP: Record<string, string> = {
@@ -169,6 +170,7 @@ export default function ProductDetailsPage() {
   const [showMeasurementModal, setShowMeasurementModal] = useState(false);
   const [modalMeasurementValues, setModalMeasurementValues] = useState<Record<string, string>>({});
   const [savingMeasurements, setSavingMeasurements] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   
   // Fetch product
   useEffect(() => {
@@ -216,6 +218,11 @@ export default function ProductDetailsPage() {
   }, [product]);
 
   const currentMedia = mediaList[selectedMediaIndex];
+  const canOpenQr =
+    Boolean(product) &&
+    product?.status === 'ACTIVE' &&
+    !product?.archivedAt &&
+    !product?.deletedAt;
 
   // Variants Logic
   const variants = useMemo(() => product?.variants || [], [product]);
@@ -375,9 +382,6 @@ export default function ProductDetailsPage() {
 
     if (requiresMeasurements && Object.keys(normalizedMeasurements).length !== requiredMeasurementKeys.length) {
       // Open the measurement modal instead of navigating away
-      const missingKeys = requiredMeasurementKeys.filter(
-        (key) => !normalizedMeasurements[key],
-      );
       setModalMeasurementValues({ ...measurementValues });
       setShowMeasurementModal(true);
       return;
@@ -431,24 +435,15 @@ export default function ProductDetailsPage() {
   };
 
   const handleShare = async () => {
-    const url = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: product.title,
-          text: product.description || product.title,
-          url,
-        });
-        return;
-      } catch {
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success('Product link copied');
-    } catch {
-      toast.error('Unable to copy link');
-    }
+    if (!product) return;
+    const url = buildProductUrl({ id: product.id, slug: (product as ProductDto & { slug?: string }).slug });
+    await shareOrCopyLink({
+      url,
+      title: product.title,
+      text: product.description || product.title,
+      successMessage: 'Product link copied.',
+      errorMessage: 'Unable to copy link.',
+    });
   };
 
   const currentVariant = variants.find(v => 
@@ -932,14 +927,25 @@ export default function ProductDetailsPage() {
 
                 <div className="text-center text-xs text-slate-500 dark:text-slate-400">Free shipping on eligible orders</div>
 
-                <div className="flex items-center gap-2">
+                <div className={`grid gap-2 ${sourceCollectionId ? 'grid-cols-3' : 'grid-cols-2'}`}>
                   <button
                     type="button"
                     onClick={handleShare}
                     className="flex-1 h-10 rounded-full border border-black/10 dark:border-white/15 text-sm text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center gap-2"
                   >
-                    <Share2 size={16} />
+                    <span aria-hidden="true">🔗</span>
                     Share
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (canOpenQr) setShowQr(true);
+                    }}
+                    style={canOpenQr ? undefined : { display: 'none' }}
+                    className="flex-1 h-10 rounded-full border border-black/10 dark:border-white/15 text-sm text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center gap-2"
+                  >
+                    <span aria-hidden="true">🪪</span>
+                    QR Code
                   </button>
                   {sourceCollectionId ? (
                     <button
@@ -999,6 +1005,17 @@ export default function ProductDetailsPage() {
           </div>
         </div>
       </main>
+      {canOpenQr ? (
+        <LazyEntityQrModal
+          open={showQr}
+          onClose={() => setShowQr(false)}
+          title="Product QR Code"
+          subtitle="Scan to open this product."
+          url={buildProductUrl({ id: product.id, slug: (product as ProductDto & { slug?: string }).slug })}
+          downloadFileName="product-qr.png"
+          logoUrl={(product.brand as { logo?: string } | undefined)?.logo || null}
+        />
+      ) : null}
     </div>
   );
 }

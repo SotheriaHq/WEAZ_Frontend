@@ -12,6 +12,8 @@ import { addToCart } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
+import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 
 interface InlineProductDetailProps {
   product: StoreProduct;
@@ -59,6 +61,12 @@ export default function InlineProductDetail({
   const [modalMeasurementValues, setModalMeasurementValues] = useState<Record<string, string>>({});
   const [showMeasurementModal, setShowMeasurementModal] = useState(false);
   const [savingMeasurements, setSavingMeasurements] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const canOpenQr =
+    Boolean(product) &&
+    product?.isActive !== false &&
+    !product?.archivedAt &&
+    !product?.deletedAt;
 
   const requiredMeasurementKeys = useMemo(() => {
     const raw = product.customMeasurementKeys;
@@ -346,25 +354,14 @@ export default function InlineProductDetail({
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/products/${product.id}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: product.name,
-          text: product.description || product.name,
-          url,
-        });
-        return;
-      } catch {
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success('Product link copied');
-    } catch {
-      toast.error('Unable to copy link');
-    }
+    const url = buildProductUrl({ id: product.id, slug: (product as StoreProduct & { slug?: string }).slug });
+    await shareOrCopyLink({
+      url,
+      title: product.name,
+      text: product.description || product.name,
+      successMessage: 'Product link copied.',
+      errorMessage: 'Unable to copy link.',
+    });
   };
 
   const handleModalSaveAndAdd = async () => {
@@ -631,6 +628,17 @@ export default function InlineProductDetail({
             >
               <span aria-hidden="true">🔗</span>
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (canOpenQr) setShowQr(true);
+              }}
+              style={canOpenQr ? undefined : { display: 'none' }}
+              className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-emerald-600 hover:border-emerald-300 transition-all flex items-center justify-center"
+              aria-label="Open product QR code"
+            >
+              <span aria-hidden="true">🪪</span>
+            </button>
           </div>
         </div>
       </div>
@@ -737,6 +745,18 @@ export default function InlineProductDetail({
           </OverlayPortal>
         )}
       </AnimatePresence>
+
+      {canOpenQr ? (
+        <LazyEntityQrModal
+          open={showQr}
+          onClose={() => setShowQr(false)}
+          title="Product QR Code"
+          subtitle="Scan to open this product."
+          url={buildProductUrl({ id: product.id, slug: (product as StoreProduct & { slug?: string }).slug })}
+          downloadFileName="product-qr.png"
+          logoUrl={product.brand?.logo || null}
+        />
+      ) : null}
     </div>
   );
 }

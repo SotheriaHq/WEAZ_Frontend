@@ -27,6 +27,12 @@ const normalizeUser = (user: AuthUserDto): AuthUserDto => ({
   bannerImage: user.bannerImage ?? null,
   bannerImageId: user.bannerImageId ?? null,
   bannerImageFile: user.bannerImageFile ?? null,
+  verificationStatus: user.verificationStatus ?? null,
+  isVerifiedBrand: Boolean(user.isVerifiedBrand),
+  verificationBadgeVisible: Boolean(
+    user.verificationBadgeVisible ?? user.isVerifiedBrand,
+  ),
+  verifiedExplanationUrl: user.verifiedExplanationUrl ?? null,
 });
 
 const parsePersistedProfile = (raw: string | null): AuthUserDto | null => {

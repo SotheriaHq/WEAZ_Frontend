@@ -10,7 +10,7 @@ import { unwrapApiResponse } from '../types/auth';
 import { useDispatch } from 'react-redux';
 import { setUser } from '../features/userSlice';
 import { addLocalNotification } from '../features/notificationsSlice';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { apiClient, persistAccessToken, dropStoredAccessToken } from '../api/httpClient';
 import '../styles/auth.css';
 
@@ -104,6 +104,17 @@ const LoginPage = () => {
   const suggestionHideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectState = location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null;
+  const fromLocation = redirectState?.from;
+  const redirectFromState = fromLocation?.pathname
+    ? `${fromLocation.pathname}${fromLocation.search ?? ''}${fromLocation.hash ?? ''}`
+    : null;
+  const redirectFromQuery = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const value = params.get('returnTo');
+    return value && value.startsWith('/') ? value : null;
+  }, [location.search]);
 
   useEffect(() => {
     return () => {
@@ -238,7 +249,7 @@ const LoginPage = () => {
       const redirectPath =
         user.role === 'SuperAdmin' || user.role === 'Admin'
           ? '/admin'
-          : '/profile';
+          : redirectFromQuery || redirectFromState || '/profile';
       navigate(redirectPath, { replace: true });
       setIsRedirecting(true);
       reset({ email: rememberMe ? normalizedEmail : '', password: '' });
@@ -550,4 +561,3 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
-

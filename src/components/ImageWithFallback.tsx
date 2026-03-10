@@ -88,7 +88,10 @@ const setCachedUrl = (fileId: string, url: string) => {
 // In-flight dedup: prevents concurrent requests for the same fileId/src
 const inflight = new Map<string, Promise<string | null>>();
 
-const resolveSignedUrl = async (key: string, fetcher: () => Promise<string>): Promise<string | null> => {
+const resolveSignedUrl = async (
+  key: string,
+  fetcher: () => Promise<string | null>,
+): Promise<string | null> => {
   const cached = getCachedUrl(key);
   if (cached) return cached;
 

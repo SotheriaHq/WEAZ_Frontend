@@ -24,6 +24,7 @@ import InlineProductDetail from './InlineProductDetail';
 import InlineStoreCollectionView from './InlineStoreCollectionView';
 import type { RootState } from '@/store';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import useDebounce from '@/hooks/useDebounce';
 
 interface ProductsResponse {
   items: StoreProduct[];
@@ -134,6 +135,7 @@ export default function CatalogShopTab({
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search.trim(), 250);
   const [sortBy, setSortBy] = useState('newest');
   const [onSale, setOnSale] = useState(false);
   const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
@@ -309,7 +311,7 @@ export default function CatalogShopTab({
           status: 'PUBLISHED', // Only show live products in Store tab
         };
         if (cursor) params.cursor = cursor;
-        if (search) params.search = search;
+        if (debouncedSearch) params.q = debouncedSearch;
         if (normalizedMinPrice !== undefined) params.minPrice = normalizedMinPrice;
         if (normalizedMaxPrice !== undefined) params.maxPrice = normalizedMaxPrice;
         if (onSale) params.onSale = 'true';
@@ -340,7 +342,17 @@ export default function CatalogShopTab({
         setLoading(false);
       }
     },
-    [brandId, isStoreOpen, nextCursor, normalizedMaxPrice, normalizedMinPrice, onSale, page, search, sortBy]
+    [
+      brandId,
+      debouncedSearch,
+      isStoreOpen,
+      nextCursor,
+      normalizedMaxPrice,
+      normalizedMinPrice,
+      onSale,
+      page,
+      sortBy,
+    ]
   );
 
   useEffect(() => {
