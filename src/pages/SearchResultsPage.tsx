@@ -1,8 +1,9 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import SearchField from '@/components/SearchField';
+import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 import useSearch from '@/hooks/useSearch';
 import type { SearchEntityType, SearchHighlightOffset, SearchItem } from '@/types/search';
+import { resolveSearchIntent } from '@/lib/searchRouting';
 
 const TABS: Array<{ key: SearchEntityType | 'all'; label: string }> = [
   { key: 'all', label: 'All' },
@@ -111,12 +112,18 @@ const SearchResultsPage: React.FC = () => {
   };
 
   const submitQuery = (nextQuery: string) => {
-    const trimmed = nextQuery.trim();
+    const intent = resolveSearchIntent(nextQuery);
+    const trimmed = intent.query;
     const next = new URLSearchParams(searchParams);
     if (!trimmed) {
       next.delete('q');
     } else {
       next.set('q', trimmed);
+    }
+    if (!trimmed || !intent.type || intent.type === 'all') {
+      next.delete('type');
+    } else {
+      next.set('type', intent.type);
     }
     setSearchParams(next);
   };
@@ -136,12 +143,12 @@ const SearchResultsPage: React.FC = () => {
               <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Find products, brands, designs, and collections</h1>
             </div>
 
-            <SearchField
-              value={draftQuery}
-              onChange={setDraftQuery}
-              onSubmit={submitQuery}
-              onClear={() => setDraftQuery('')}
-              ariaLabel="Search results query"
+            <SearchBarWithSuggestions
+              initialValue={draftQuery}
+              onValueChange={setDraftQuery}
+              onSubmitQuery={submitQuery}
+              enableGlobalShortcut={false}
+              placeholder="Search products, brands, designs, collections, or use @brand and /tag"
               className="!max-w-none"
             />
 

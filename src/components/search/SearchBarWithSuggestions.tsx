@@ -1,13 +1,48 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SearchField from '@/components/SearchField';
 import useDebounce from '@/hooks/useDebounce';
 import useSearchSuggestions from '@/hooks/useSearchSuggestions';
 import { getRecentSearches, storeRecentSearch } from '@/lib/searchHistory';
+import { buildSearchHref } from '@/lib/searchRouting';
 import SearchSuggestionDropdown, {
   flattenSuggestionEntries,
   type SearchSuggestionEntry,
 } from './SearchSuggestionDropdown';
+
+const globalShortcutSubscribers: Array<() => void> = [];
+let removeGlobalShortcutListener: (() => void) | null = null;
+
+function subscribeGlobalSearchShortcut(callback: () => void) {
+  globalShortcutSubscribers.push(callback);
+
+  if (!removeGlobalShortcutListener) {
+    const listener = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        const latest = globalShortcutSubscribers[globalShortcutSubscribers.length - 1];
+        latest?.();
+      }
+    };
+
+    document.addEventListener('keydown', listener);
+    removeGlobalShortcutListener = () => {
+      document.removeEventListener('keydown', listener);
+      removeGlobalShortcutListener = null;
+    };
+  }
+
+  return () => {
+    const index = globalShortcutSubscribers.lastIndexOf(callback);
+    if (index >= 0) {
+      globalShortcutSubscribers.splice(index, 1);
+    }
+
+    if (globalShortcutSubscribers.length === 0) {
+      removeGlobalShortcutListener?.();
+    }
+  };
+}
 
 interface SearchBarWithSuggestionsProps {
   placeholder?: string;
@@ -15,6 +50,10 @@ interface SearchBarWithSuggestionsProps {
   brandId?: string;
   initialValue?: string;
   showShortcutHint?: boolean;
+  enableGlobalShortcut?: boolean;
+  onValueChange?: (value: string) => void;
+  onSubmitQuery?: (query: string) => void;
+  onNavigate?: (href: string) => void;
 }
 
 const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
@@ -22,6 +61,10 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
   className,
   brandId,
   initialValue = '',
+  enableGlobalShortcut = true,
+  onValueChange,
+  onSubmitQuery,
+  onNavigate,
 }) => {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -30,10 +73,10 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [localRecent, setLocalRecent] = useState<string[]>(() => getRecentSearches());
-  const dropdownId = 'global-search-suggestions';
+  const dropdownId = useId().replace(/:/g, '-');
   const debouncedValue = useDebounce(value, 180);
   const { suggestions, isLoading } = useSearchSuggestions(debouncedValue, {
-    enabled: open && (debouncedValue.trim().length === 0 || debouncedValue.trim().length >= 2),
+    enabled: open && (debouncedValue.trim().length === 0 || debouncedValue.trim().length >= 1),
     brandId,
   });
 
@@ -54,17 +97,15 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
   }, []);
 
   useEffect(() => {
-    const handleShortcut = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        inputRef.current?.focus();
-        setOpen(true);
-      }
-    };
+    if (!enableGlobalShortcut) {
+      return;
+    }
 
-    document.addEventListener('keydown', handleShortcut);
-    return () => document.removeEventListener('keydown', handleShortcut);
-  }, []);
+    return subscribeGlobalSearchShortcut(() => {
+      inputRef.current?.focus();
+      setOpen(true);
+    });
+  }, [enableGlobalShortcut]);
 
   const entries = useMemo(
     () => flattenSuggestionEntries(suggestions, localRecent),
@@ -89,7 +130,11 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
     setLocalRecent(getRecentSearches());
     setOpen(false);
     setActiveIndex(-1);
-    navigate(`/search?q=${encodeURIComponent(next)}`);
+    if (onSubmitQuery) {
+      onSubmitQuery(next);
+      return;
+    }
+    navigate(buildSearchHref(next));
   };
 
   const handleSelect = (entry: SearchSuggestionEntry) => {
@@ -105,6 +150,10 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
     }
     setOpen(false);
     setActiveIndex(-1);
+    if (onNavigate) {
+      onNavigate(entry.href);
+      return;
+    }
     navigate(entry.href);
   };
 
@@ -115,6 +164,7 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
         value={value}
         onChange={(next) => {
           setValue(next);
+          onValueChange?.(next);
           setOpen(true);
           setActiveIndex(-1);
         }}

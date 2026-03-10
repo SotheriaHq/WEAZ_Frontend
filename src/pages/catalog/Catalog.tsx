@@ -9,7 +9,6 @@ import Tabs from '../../components/Tabs';
 import AddCollectionModal from '../../components/profile/AddCollectionModal';
 import CollectionsGrid from '../../components/profile/CollectionsGrid';
 import CollectionsSkeleton from '../../components/profile/CollectionsSkeleton';
-import SearchField from '../../components/SearchField';
 import EmptyState from '../../components/EmptyState';
 import AddCollectionDropdown from '../../components/profile/AddCollectionDropdown';
 import ProfileHeaderSkeleton from '../../components/profile/ProfileHeaderSkeleton';
@@ -30,6 +29,7 @@ import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedF
 import { getStoreStatus, type StoreStatusResponse } from '../../api/StoreApi';
 import FrostedButton from '@/components/ui/FrostedButton';
 import CatalogShopTab from '@/components/catalog/CatalogShopTab';
+import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 
 import ComingSoon from '../placeholders/ComingSoon';
 
@@ -1230,7 +1230,11 @@ const ProfilePage: React.FC = () => {
                   <>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                       <div className="flex-1 w-full sm:w-auto">
-                        <SearchField placeholder="Search content..." onSearch={setSearchQuery} />
+                        <SearchBarWithSuggestions
+                          placeholder="Search Threadly or filter this content with @brand and /tag"
+                          onValueChange={setSearchQuery}
+                          enableGlobalShortcut={false}
+                        />
                       </div>
                       {/* Show create controls only for owner */}
                       {isOwner && (

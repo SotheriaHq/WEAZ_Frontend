@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import SearchApi from '@/api/SearchApi';
 import type { SearchSuggestionResponse } from '@/types/search';
 
@@ -14,6 +14,7 @@ export default function useSearchSuggestions(
   const [suggestions, setSuggestions] = useState<SearchSuggestionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     if (options.enabled === false) {
@@ -23,22 +24,27 @@ export default function useSearchSuggestions(
     }
 
     const controller = new AbortController();
-    setSuggestions(null);
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     setIsLoading(true);
     setError(null);
 
     SearchApi.suggest({ q: query || undefined, brandId: options.brandId }, controller.signal)
       .then((result) => {
-        setSuggestions(result);
+        if (requestIdRef.current === requestId) {
+          setSuggestions(result);
+        }
       })
       .catch((err: any) => {
         if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
           return;
         }
-        setError(err?.message || 'Failed to load search suggestions');
+        if (requestIdRef.current === requestId) {
+          setError(err?.message || 'Failed to load search suggestions');
+        }
       })
       .finally(() => {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && requestIdRef.current === requestId) {
           setIsLoading(false);
         }
       });

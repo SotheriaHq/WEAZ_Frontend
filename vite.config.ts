@@ -26,6 +26,26 @@ export default defineConfig({
                         if (id.includes('/@reduxjs/') || id.includes('/react-redux/')) {
                             return 'redux-vendor';
                         }
+                        if (id.includes('/framer-motion/')) {
+                            return 'motion-vendor';
+                        }
+                        if (id.includes('/lucide-react/')) {
+                            return 'icons-vendor';
+                        }
+                        if (id.includes('/primereact/') || id.includes('/primeicons/')) {
+                            return 'prime-vendor';
+                        }
+                        if (id.includes('/recharts/')) {
+                            return 'charts-vendor';
+                        }
+                        if (
+                            id.includes('/qrcode.react/') ||
+                            id.includes('/react-qrcode-logo/') ||
+                            id.includes('/emoji-picker-react/') ||
+                            id.includes('/react-easy-crop/')
+                        ) {
+                            return 'feature-vendor';
+                        }
                     }
                     if (id.includes('/pages/admin/') || id.includes('/components/admin/')) {
                         return 'admin';
