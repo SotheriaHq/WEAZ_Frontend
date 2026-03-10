@@ -112,13 +112,19 @@ export interface WishlistItem {
 }
 
 export interface OrderItem {
+  id?: string;
+  orderItemId?: string;
   productId: string;
   name: string;
+  productName?: string | null;
   thumbnail?: string | null;
   price: number;
+  unitPrice?: number;
   quantity: number;
   selectedSize?: string | null;
   selectedColor?: string | null;
+  reviewState?: 'CAN_CREATE' | 'ALREADY_REVIEWED' | 'BLOCKED_BY_DISPUTE' | 'NOT_DELIVERED';
+  existingReviewId?: string | null;
 }
 
 export interface Order {
@@ -140,8 +146,10 @@ export interface Order {
   paymentMethod?: string;
   paymentReference?: string | null;
   paidAt?: string | null;
+  deliveredAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  orderItems?: OrderItem[];
   brand?: {
     id: string;
     name?: string;

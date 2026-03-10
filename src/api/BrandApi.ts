@@ -1,10 +1,11 @@
 import { apiClient } from './httpClient';
 import { isAxiosError } from 'axios';
+import { reviewsApi, type ProductReviewResponse } from './ReviewsApi';
 import { unwrapApiResponse, type AuthUserDto } from '../types/auth';
 import type {
   CollectionDto,
-  ReviewDto,
   BrandProfileDto,
+  ReviewRatingDistributionItem,
 } from '../types/profile';
 import type {
   VerificationDraftData,
@@ -163,6 +164,20 @@ const mapCategoriesWithSubCategories = (payload: unknown): CategoryOption[] => {
         : [],
     }))
     .filter((c: CategoryOption) => c.id.length > 0 && c.name.length > 0);
+};
+
+const mapRatingDistribution = (
+  ratingBreakdown: { 1: number; 2: number; 3: number; 4: number; 5: number },
+  totalReviews: number,
+): ReviewRatingDistributionItem[] => {
+  return [5, 4, 3, 2, 1].map((stars) => {
+    const count = ratingBreakdown[stars as 1 | 2 | 3 | 4 | 5] ?? 0;
+    return {
+      stars,
+      count,
+      percentage: totalReviews > 0 ? (count / totalReviews) * 100 : 0,
+    };
+  });
 };
 
 export const brandApi = {
@@ -1193,20 +1208,24 @@ export const brandApi = {
   },
 
   // Fetch reviews
-  async getReviews(brandId: string): Promise<{ reviews: ReviewDto[]; averageRating: number; totalReviews: number }> {
+  async getReviews(brandId: string): Promise<{ reviews: ProductReviewResponse[]; averageRating: number; totalReviews: number; ratingDistribution: ReviewRatingDistributionItem[] }> {
     try {
-      const response = await apiClient.get(`/reviews`, {
-        params: { brandId },
+      const data = await reviewsApi.getBrandReviews(brandId, {
+        sort: 'newest',
+        limit: 20,
       });
-      const data = unwrapApiResponse<{ reviews: ReviewDto[]; averageRating: number; totalReviews: number }>(response.data);
+
+      const totalReviews = data.summary.totalReviews || 0;
+
       return {
-        reviews: Array.isArray(data.reviews) ? data.reviews : [],
-        averageRating: data.averageRating || 0,
-        totalReviews: data.totalReviews || 0,
+        reviews: Array.isArray(data.items) ? data.items : [],
+        averageRating: data.summary.averageRating || 0,
+        totalReviews,
+        ratingDistribution: mapRatingDistribution(data.summary.ratingBreakdown, totalReviews),
       };
     } catch (error) {
       console.error('Error fetching reviews:', error);
-      return { reviews: [], averageRating: 0, totalReviews: 0 };
+      return { reviews: [], averageRating: 0, totalReviews: 0, ratingDistribution: [] };
     }
   },
 

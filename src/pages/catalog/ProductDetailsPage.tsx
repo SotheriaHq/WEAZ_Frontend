@@ -26,6 +26,7 @@ import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
+import ProductReviewSection from '@/components/reviews/ProductReviewSection';
 
 // Color name to hex mapping
 const COLOR_HEX_MAP: Record<string, string> = {
@@ -1005,6 +1006,10 @@ export default function ProductDetailsPage() {
           </div>
         </div>
       </main>
+
+      <div className="mx-auto w-full max-w-[1440px] px-4 pb-10 md:px-8 lg:px-12">
+        <ProductReviewSection productId={product.id} />
+      </div>
       {canOpenQr ? (
         <LazyEntityQrModal
           open={showQr}

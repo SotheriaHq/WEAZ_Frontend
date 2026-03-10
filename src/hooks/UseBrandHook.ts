@@ -1,20 +1,23 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
+import type { ProductReviewResponse } from '../api/ReviewsApi';
 import type { RootState } from '../store';
 import { brandApi } from '../api/BrandApi';
 import type {
   CollectionDto,
-  ReviewDto,
+  ReviewRatingDistributionItem,
   BrandProfileDto,
   BrandMediaAssetDto,
 } from '../types/profile';
 import type { AuthProfileImageFileDto } from '../types/auth';
 import { env } from '../config/env';
 import { useSignedFileUrl } from './useSignedFileUrl';
+import { useReviewRuntimeFlags } from './useReviewRuntimeFlags';
 
 export const useBrandProfile = () => {
   const { profile: user } = useSelector((state: RootState) => state.user);
   const brandDetailEndpointsEnabled = env.featureFlags.brandDetailEndpoints;
+  const { flags: reviewFlags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
 
   // Brand profile state
   const [brandProfile, setBrandProfile] = useState<BrandProfileDto | null>(null);
@@ -27,11 +30,13 @@ export const useBrandProfile = () => {
   const [collectionsError, setCollectionsError] = useState<string | null>(null);
 
   // Reviews state
-  const [reviews, setReviews] = useState<ReviewDto[]>([]);
+  const [reviews, setReviews] = useState<ProductReviewResponse[]>([]);
   const [averageRating, setAverageRating] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
+  const [ratingDistribution, setRatingDistribution] = useState<ReviewRatingDistributionItem[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
+  const [loadedReviewsBrandId, setLoadedReviewsBrandId] = useState<string | null>(null);
 
   // Fetch brand profile
   const fetchBrandProfile = useCallback(async (brandId: string) => {
@@ -79,6 +84,21 @@ export const useBrandProfile = () => {
 
   // Fetch reviews
   const fetchReviews = useCallback(async (brandId: string) => {
+    if (reviewFlagsLoading) {
+      return;
+    }
+
+    if (!reviewFlags.readEnabled) {
+      setReviews([]);
+      setAverageRating(0);
+      setTotalReviews(0);
+      setRatingDistribution([]);
+      setReviewsError(null);
+      setReviewsLoading(false);
+      setLoadedReviewsBrandId(null);
+      return;
+    }
+
     setReviewsLoading(true);
     setReviewsError(null);
     try {
@@ -86,13 +106,16 @@ export const useBrandProfile = () => {
       setReviews(data.reviews);
       setAverageRating(data.averageRating);
       setTotalReviews(data.totalReviews);
+      setRatingDistribution(data.ratingDistribution);
+      setLoadedReviewsBrandId(brandId);
     } catch (error) {
       setReviewsError('Failed to load reviews');
+      setLoadedReviewsBrandId(null);
       console.error('Error fetching reviews:', error);
     } finally {
       setReviewsLoading(false);
     }
-  }, []);
+  }, [reviewFlags.readEnabled, reviewFlagsLoading]);
 
   // Create collection
   const createCollection = useCallback(async (data: { name: string; description?: string; isPublic?: boolean }) => {
@@ -134,9 +157,11 @@ export const useBrandProfile = () => {
     // Fetch brand-specific data only for BRAND users
     if (user.type === 'BRAND' && brandDetailEndpointsEnabled) {
       void fetchBrandProfile(user.id);
-      void fetchReviews(user.id);
+      if (!reviewFlagsLoading && reviewFlags.readEnabled) {
+        void fetchReviews(user.id);
+      }
     }
-  }, [user, fetchCollections, fetchBrandProfile, fetchReviews, brandDetailEndpointsEnabled]);
+  }, [user, fetchCollections, fetchBrandProfile, fetchReviews, brandDetailEndpointsEnabled, reviewFlags.readEnabled, reviewFlagsLoading]);
 
   // Get display values with fallbacks
   const defaultFallbackTags =
@@ -260,8 +285,12 @@ export const useBrandProfile = () => {
     reviews,
     averageRating,
     totalReviews,
+    ratingDistribution,
     reviewsLoading,
     reviewsError,
+    loadedReviewsBrandId,
+    reviewFlags,
+    reviewFlagsLoading,
     displayData,
     fetchBrandProfile,
     fetchCollections,

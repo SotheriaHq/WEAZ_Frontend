@@ -44,20 +44,10 @@ export interface CollectionDto {
   clientStatusMeta?: { startedAt?: number; attempts?: number; offline?: boolean };
 }
 
-// Review Types
-export interface ReviewDto {
-  id: string;
-  userId: string;
-  userName: string;
-  userImage?: string;
-  brandId: string;
-  rating: number;
-  comment: string;
-  helpful: number;
-  images?: string[];
-  verified?: boolean;
-  createdAt: string;
-  updatedAt: string;
+export interface ReviewRatingDistributionItem {
+  stars: number;
+  count: number;
+  percentage: number;
 }
 
 // Brand Profile Types
@@ -117,15 +107,4 @@ export type ProfileTabType = 'Collections' | 'About' | 'Reviews';
 export interface CollectionsResponse {
   collections: CollectionDto[];
   total: number;
-}
-
-export interface ReviewsResponse {
-  reviews: ReviewDto[];
-  averageRating: number;
-  totalReviews: number;
-  ratingDistribution: {
-    stars: number;
-    count: number;
-    percentage: number;
-  }[];
 }

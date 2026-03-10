@@ -47,7 +47,7 @@ const AdminSidebar: React.FC = () => {
   };
 
   return (
-    <aside className="fixed left-0 top-16 z-20 hidden h-[calc(100vh-64px)] w-[200px] overflow-y-auto border-r border-white/30 bg-white/95 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-gray-950 md:block">
+    <aside className="fixed left-0 top-16 z-20 hidden h-[calc(100vh-64px)] w-[200px] overflow-y-auto border-r border-white/30 bg-white/95 shadow-lg backdrop-blur-xl scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10 dark:bg-gray-950 md:block">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/20 via-purple-400/5 to-transparent opacity-40" />
 
       <div className="relative z-10 px-2 py-4">

@@ -52,6 +52,24 @@ const STEP_LABELS: Record<Step, string> = {
   review: 'Review',
 };
 
+const STEP_KICKERS: Record<Step, string> = {
+  shipping: 'Delivery details',
+  payment: 'Payment setup',
+  review: 'Final confirmation',
+};
+
+const STEP_TITLES: Record<Step, string> = {
+  shipping: 'Where should we send this order?',
+  payment: 'How would you like to pay?',
+  review: 'Review everything before you place the order',
+};
+
+const STEP_DESCRIPTIONS: Record<Step, string> = {
+  shipping: 'Keep your delivery information accurate so shipping and tracking stay smooth.',
+  payment: 'Choose the payment route that fits your checkout flow today.',
+  review: 'Double-check your address, payment method, and items before we lock the order in.',
+};
+
 /* ─── Helpers ─── */
 
 function getShippingCost(state: string): number {
@@ -69,6 +87,47 @@ function groupByBrand(items: CartItem[]) {
   }
   return Array.from(groups.values());
 }
+
+const CheckoutBackLink: React.FC<{
+  label: string;
+  onClick: () => void;
+}> = ({ label, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+  >
+    <span aria-hidden>←</span>
+    <span>{label}</span>
+  </button>
+);
+
+const CheckoutPanel: React.FC<{
+  kicker: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}> = ({ kicker, title, description, children }) => (
+  <section className="relative overflow-hidden rounded-[32px] border border-white/60 bg-white/78 p-6 shadow-[0_28px_80px_rgba(148,163,184,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-[#060816]/82 sm:p-8">
+    <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top_left,_rgba(244,114,182,0.16),_transparent_50%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.12),_transparent_45%)]" />
+    <div className="relative z-10 space-y-6">
+      <div className="space-y-3">
+        <div className="text-[11px] font-black uppercase tracking-[0.28em] text-fuchsia-500 dark:text-fuchsia-300">
+          {kicker}
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white sm:text-[2rem]">
+            {title}
+          </h2>
+          <p className="max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-base">
+            {description}
+          </p>
+        </div>
+      </div>
+      {children}
+    </div>
+  </section>
+);
 
 /* ─── Component ─── */
 
@@ -275,9 +334,23 @@ const CheckoutPage: React.FC = () => {
   const stepIdx = STEPS.indexOf(step);
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4">
+    <div className="relative overflow-hidden bg-[linear-gradient(180deg,_#f7f2ff_0%,_#f8f5ff_26%,_#fbf8ff_52%,_#ffffff_100%)] dark:bg-[radial-gradient(circle_at_top,_rgba(30,41,59,0.95),_rgba(2,6,23,1)_55%)]">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-20 top-20 h-72 w-72 rounded-full bg-fuchsia-300/18 blur-3xl dark:bg-fuchsia-500/12" />
+        <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-sky-300/14 blur-3xl dark:bg-sky-500/10" />
+        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-violet-300/12 blur-3xl dark:bg-violet-500/10" />
+      </div>
+
+      <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <CheckoutBackLink label="Back to bag" onClick={() => navigate(-1)} />
+        <div className="hidden rounded-full border border-white/60 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-slate-400 sm:inline-flex">
+          Secure checkout
+        </div>
+      </div>
+
       {/* Step indicator */}
-      <nav className="flex items-center justify-center gap-2 mb-8" aria-label="Checkout steps">
+      <nav className="mb-8 flex items-center justify-center gap-2 rounded-full border border-white/60 bg-white/72 px-3 py-3 shadow-[0_14px_40px_rgba(148,163,184,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-white/5" aria-label="Checkout steps">
         {STEPS.map((s, i) => {
           const isActive = s === step;
           const isCompleted = i < stepIdx;
@@ -290,21 +363,21 @@ const CheckoutPage: React.FC = () => {
                 type="button"
                 onClick={() => goToStep(s)}
                 disabled={i >= stepIdx}
-                className={`flex items-center gap-2 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2 rounded-full px-2.5 py-1.5 text-sm font-semibold transition-colors ${
                   isActive
-                    ? 'text-purple-600 dark:text-purple-400'
+                    ? 'text-fuchsia-600 dark:text-fuchsia-300'
                     : isCompleted
-                      ? 'text-purple-600 dark:text-purple-400 cursor-pointer'
-                      : 'text-gray-400 dark:text-zinc-500 cursor-default'
+                      ? 'text-fuchsia-600 dark:text-fuchsia-300 cursor-pointer'
+                      : 'text-slate-400 dark:text-zinc-500 cursor-default'
                 }`}
               >
                 <span
-                  className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold border-2 transition-colors ${
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black border-2 transition-colors ${
                     isActive
-                      ? 'border-purple-500 bg-purple-500 text-white'
+                      ? 'border-fuchsia-500 bg-fuchsia-500 text-white shadow-[0_0_0_8px_rgba(217,70,239,0.12)]'
                       : isCompleted
-                        ? 'border-purple-500 bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300'
-                        : 'border-gray-300 dark:border-zinc-600 text-gray-400 dark:text-zinc-500'
+                        ? 'border-fuchsia-400 bg-fuchsia-50 text-fuchsia-600 dark:bg-fuchsia-500/18 dark:text-fuchsia-200'
+                        : 'border-slate-300 dark:border-zinc-600 text-slate-400 dark:text-zinc-500'
                   }`}
                 >
                   {isCompleted ? '✓' : i + 1}
@@ -330,21 +403,24 @@ const CheckoutPage: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,0.95fr)] lg:items-start">
         {/* ─── Main panel ─── */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6">
           {/* STEP 1: Shipping */}
           {step === 'shipping' && (
-            <div className="border border-gray-200/70 dark:border-white/10 rounded-xl p-6 space-y-5">
-              <h2 className="text-xl font-semibold">Shipping Address</h2>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <CheckoutPanel
+              kicker={STEP_KICKERS.shipping}
+              title={STEP_TITLES.shipping}
+              description={STEP_DESCRIPTIONS.shipping}
+            >
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <Input
                   label="First name"
                   value={address.firstName}
                   onChange={(e) => updateField('firstName', e.target.value)}
                   error={shippingErrors.firstName}
                   required
+                  className="[&_input]:rounded-2xl [&_input]:border-white/60 [&_input]:bg-white/80 [&_input]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_input]:border-white/10 dark:[&_input]:bg-white/[0.03]"
                 />
                 <Input
                   label="Last name"
@@ -352,6 +428,7 @@ const CheckoutPage: React.FC = () => {
                   onChange={(e) => updateField('lastName', e.target.value)}
                   error={shippingErrors.lastName}
                   required
+                  className="[&_input]:rounded-2xl [&_input]:border-white/60 [&_input]:bg-white/80 [&_input]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_input]:border-white/10 dark:[&_input]:bg-white/[0.03]"
                 />
               </div>
 
@@ -362,6 +439,7 @@ const CheckoutPage: React.FC = () => {
                 placeholder="e.g. 12 Admiralty Way"
                 error={shippingErrors.street}
                 required
+                className="[&_input]:rounded-2xl [&_input]:border-white/60 [&_input]:bg-white/80 [&_input]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_input]:border-white/10 dark:[&_input]:bg-white/[0.03]"
               />
 
               <Input
@@ -369,9 +447,10 @@ const CheckoutPage: React.FC = () => {
                 value={address.apartment ?? ''}
                 onChange={(e) => updateField('apartment', e.target.value)}
                 placeholder="Apt 4B"
+                className="[&_input]:rounded-2xl [&_input]:border-white/60 [&_input]:bg-white/80 [&_input]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_input]:border-white/10 dark:[&_input]:bg-white/[0.03]"
               />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <Input
                   label="City"
                   value={address.city}
@@ -379,18 +458,19 @@ const CheckoutPage: React.FC = () => {
                   placeholder="e.g. Lekki"
                   error={shippingErrors.city}
                   required
+                  className="[&_input]:rounded-2xl [&_input]:border-white/60 [&_input]:bg-white/80 [&_input]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_input]:border-white/10 dark:[&_input]:bg-white/[0.03]"
                 />
                 <div className="w-full">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-300 mb-2">
+                  <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
                     State <span className="text-purple-500 ml-1">*</span>
                   </label>
                   <select
                     value={address.state}
                     onChange={(e) => updateField('state', e.target.value)}
-                    className={`w-full px-4 py-3 text-sm font-medium bg-white dark:bg-zinc-900/60 border rounded-xl text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-all duration-200 ${
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm font-medium text-gray-900 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all duration-200 focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20 dark:text-white ${
                       shippingErrors.state
-                        ? 'border-red-500 dark:border-red-500'
-                        : 'border-gray-300/80 dark:border-zinc-700/60'
+                        ? 'border-red-500 bg-white dark:border-red-500 dark:bg-white/[0.03]'
+                        : 'border-white/60 bg-white/80 dark:border-white/10 dark:bg-white/[0.03]'
                     }`}
                   >
                     <option value="">Select state</option>
@@ -404,12 +484,13 @@ const CheckoutPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <Input
                   label="Postal code (optional)"
                   value={address.postalCode ?? ''}
                   onChange={(e) => updateField('postalCode', e.target.value)}
                   placeholder="100001"
+                  className="[&_input]:rounded-2xl [&_input]:border-white/60 [&_input]:bg-white/80 [&_input]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_input]:border-white/10 dark:[&_input]:bg-white/[0.03]"
                 />
                 <Input
                   label="Phone number"
@@ -419,30 +500,35 @@ const CheckoutPage: React.FC = () => {
                   placeholder="080XXXXXXXX"
                   error={shippingErrors.phone}
                   required
+                  className="[&_input]:rounded-2xl [&_input]:border-white/60 [&_input]:bg-white/80 [&_input]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_input]:border-white/10 dark:[&_input]:bg-white/[0.03]"
                 />
               </div>
 
-              <div className="flex justify-end pt-2">
-                <Button onClick={goNext} size="lg">
+              <div className="flex flex-col gap-4 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+                <CheckoutBackLink label="Back to bag" onClick={() => navigate(-1)} />
+                <Button onClick={goNext} size="lg" className="rounded-2xl px-8 shadow-[0_16px_36px_rgba(217,70,239,0.28)]">
                   Continue to Payment
                 </Button>
               </div>
-            </div>
+            </CheckoutPanel>
           )}
 
           {/* STEP 2: Payment Method */}
           {step === 'payment' && (
-            <div className="border border-gray-200/70 dark:border-white/10 rounded-xl p-6 space-y-5">
-              <h2 className="text-xl font-semibold">Payment Method</h2>
+            <CheckoutPanel
+              kicker={STEP_KICKERS.payment}
+              title={STEP_TITLES.payment}
+              description={STEP_DESCRIPTIONS.payment}
+            >
 
               <div className="space-y-3">
                 {PAYMENT_OPTIONS.map((opt) => (
                   <label
                     key={opt.value}
-                    className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+                    className={`flex cursor-pointer items-center gap-4 rounded-[26px] border p-5 transition-all duration-200 ${
                       paymentMethod === opt.value
-                        ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-900/20'
-                        : 'border-gray-200/70 dark:border-zinc-700/60 hover:border-gray-300 dark:hover:border-zinc-600'
+                        ? 'border-fuchsia-400 bg-[linear-gradient(135deg,rgba(245,208,254,0.6),rgba(224,231,255,0.7))] shadow-[0_18px_50px_rgba(217,70,239,0.18)] dark:bg-[linear-gradient(135deg,rgba(168,85,247,0.14),rgba(59,130,246,0.10))]'
+                        : 'border-white/60 bg-white/75 shadow-[0_14px_32px_rgba(15,23,42,0.06)] hover:border-fuchsia-200 dark:border-white/10 dark:bg-white/[0.03]'
                     }`}
                   >
                     <input
@@ -461,8 +547,8 @@ const CheckoutPage: React.FC = () => {
                     <span
                       className={`flex-shrink-0 w-5 h-5 rounded-full border-2 transition-colors ${
                         paymentMethod === opt.value
-                          ? 'border-purple-500 bg-purple-500'
-                          : 'border-gray-300 dark:border-zinc-600'
+                          ? 'border-fuchsia-500 bg-fuchsia-500'
+                          : 'border-slate-300 dark:border-zinc-600'
                       }`}
                     >
                       {paymentMethod === opt.value && (
@@ -475,10 +561,10 @@ const CheckoutPage: React.FC = () => {
 
               {/* Promo code */}
               <div className="pt-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-300 mb-2">
+                <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
                   Promo Code
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <Input
                     value={promoCode}
                     onChange={(e) => {
@@ -487,12 +573,13 @@ const CheckoutPage: React.FC = () => {
                     }}
                     placeholder="Enter code"
                     disabled={promoApplied}
+                    className="[&_input]:rounded-2xl [&_input]:border-white/60 [&_input]:bg-white/80 [&_input]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_input]:border-white/10 dark:[&_input]:bg-white/[0.03]"
                   />
                   <Button
                     type="button"
                     variant={promoApplied ? 'secondary' : 'primary'}
                     onClick={promoApplied ? () => { setPromoApplied(false); setPromoCode(''); } : handleApplyPromo}
-                    className="flex-shrink-0"
+                    className="flex-shrink-0 rounded-2xl"
                   >
                     {promoApplied ? 'Remove' : 'Apply'}
                   </Button>
@@ -504,25 +591,28 @@ const CheckoutPage: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex justify-between pt-2">
-                <Button variant="ghost" onClick={goBack}>
-                  ← Back
-                </Button>
-                <Button onClick={goNext} size="lg">
+              <div className="flex flex-col gap-4 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+                <CheckoutBackLink label="Back to shipping" onClick={goBack} />
+                <Button onClick={goNext} size="lg" className="rounded-2xl px-8 shadow-[0_16px_36px_rgba(217,70,239,0.28)]">
                   Review Order
                 </Button>
               </div>
-            </div>
+            </CheckoutPanel>
           )}
 
           {/* STEP 3: Review */}
           {step === 'review' && (
+            <CheckoutPanel
+              kicker={STEP_KICKERS.review}
+              title={STEP_TITLES.review}
+              description={STEP_DESCRIPTIONS.review}
+            >
             <div className="space-y-6">
               {/* Shipping summary */}
-              <div className="border border-gray-200/70 dark:border-white/10 rounded-xl p-5">
+              <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">📍 Shipping Address</h3>
-                  <button type="button" onClick={() => setStep('shipping')} className="text-sm text-purple-600 dark:text-purple-400 hover:underline">
+                  <button type="button" onClick={() => setStep('shipping')} className="text-sm font-semibold text-fuchsia-600 dark:text-fuchsia-300 hover:underline">
                     Edit
                   </button>
                 </div>
@@ -536,10 +626,10 @@ const CheckoutPage: React.FC = () => {
               </div>
 
               {/* Payment summary */}
-              <div className="border border-gray-200/70 dark:border-white/10 rounded-xl p-5">
+              <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">💳 Payment Method</h3>
-                  <button type="button" onClick={() => setStep('payment')} className="text-sm text-purple-600 dark:text-purple-400 hover:underline">
+                  <button type="button" onClick={() => setStep('payment')} className="text-sm font-semibold text-fuchsia-600 dark:text-fuchsia-300 hover:underline">
                     Edit
                   </button>
                 </div>
@@ -555,7 +645,7 @@ const CheckoutPage: React.FC = () => {
               </div>
 
               {/* Items grouped by brand */}
-              <div className="border border-gray-200/70 dark:border-white/10 rounded-xl p-5 space-y-4">
+              <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03] space-y-4">
                 <h3 className="font-semibold">🛍️ Items</h3>
                 {brandGroups.map((group) => (
                   <div key={group.brandName} className="space-y-2">
@@ -602,60 +692,100 @@ const CheckoutPage: React.FC = () => {
                 ))}
               </div>
 
-              <div className="flex justify-between pt-2">
-                <Button variant="ghost" onClick={goBack}>
-                  ← Back
-                </Button>
-                <Button onClick={handlePlaceOrder} size="lg" loading={submitting} disabled={submitting}>
+              <div className="flex flex-col gap-4 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+                <CheckoutBackLink label="Back to payment" onClick={goBack} />
+                <Button onClick={handlePlaceOrder} size="lg" loading={submitting} disabled={submitting} className="rounded-2xl px-8 shadow-[0_16px_36px_rgba(217,70,239,0.28)]">
                   {submitting ? 'Processing...' : `Pay ${formatPrice(grandTotal)}`}
                 </Button>
               </div>
             </div>
+            </CheckoutPanel>
           )}
         </div>
 
         {/* ─── Order Summary Sidebar ─── */}
         <div className="lg:sticky lg:top-24 self-start">
-          <div className="border border-gray-200/70 dark:border-white/10 rounded-xl p-6 space-y-4">
-            <h3 className="text-lg font-semibold">Order Summary</h3>
+          <div className="overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#17181f_0%,#10111a_100%)] p-6 text-white shadow-[0_28px_80px_rgba(15,23,42,0.35)]">
+            <div className="space-y-6">
+              <div className="space-y-1">
+                <p className="text-[11px] font-black uppercase tracking-[0.28em] text-fuchsia-300/80">Checkout</p>
+                <h3 className="text-2xl font-black tracking-tight">Order Summary</h3>
+              </div>
 
-            <div className="divide-y divide-gray-100 dark:divide-gray-800 text-sm">
-              {cart.items.map((item) => (
-                <div key={item.id} className="py-2.5 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{item.product.name}</p>
-                    <p className="text-gray-500 text-xs">
-                      {item.quantity} × {formatPrice(item.product.effectivePrice)}
-                    </p>
+              <div className="space-y-4">
+                {cart.items.map((item) => (
+                  <div key={item.id} className="flex items-start gap-3 rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
+                    <div className="h-16 w-16 overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/10">
+                      {item.product.thumbnail ? (
+                        <ImageWithFallback
+                          src={item.product.thumbnail}
+                          alt={item.product.name}
+                          className="h-full w-full"
+                          fit="cover"
+                          rounded="none"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-xl">🛍️</div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="truncate text-sm font-semibold text-white">{item.product.name}</p>
+                          <p className="text-xs text-slate-400">{item.brand.name}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-white">{formatPrice(item.itemTotal)}</span>
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        {item.selectedSize ? `Size: ${item.selectedSize}` : 'Size selected'}
+                        {' · '}
+                        Qty: {item.quantity}
+                        {item.selectedColor ? ` · ${item.selectedColor}` : ''}
+                      </p>
+                    </div>
                   </div>
-                  <span className="font-medium flex-shrink-0">{formatPrice(item.itemTotal)}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Subtotal</span>
-                <span>{formatPrice(cart.subtotal)}</span>
+                ))}
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Shipping</span>
-                <span>{address.state ? formatPrice(shippingCost) : '—'}</span>
-              </div>
-              {discountAmount > 0 && (
-                <div className="flex justify-between text-green-600 dark:text-green-400">
-                  <span>Discount</span>
-                  <span>−{formatPrice(discountAmount)}</span>
-                </div>
-              )}
-            </div>
 
-            <div className="flex justify-between font-bold text-lg pt-3 border-t border-gray-200 dark:border-gray-700">
-              <span>Total</span>
-              <span>{formatPrice(grandTotal)}</span>
+              <div className="space-y-3 border-t border-white/8 pt-4 text-sm">
+                <div className="flex justify-between text-slate-400">
+                  <span>Subtotal</span>
+                  <span className="text-white">{formatPrice(cart.subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>Shipping</span>
+                  <span className="text-white">{address.state ? formatPrice(shippingCost) : '—'}</span>
+                </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-emerald-300">
+                    <span>Discount</span>
+                    <span>−{formatPrice(discountAmount)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-end justify-between border-t border-white/8 pt-5">
+                <div>
+                  <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Total</p>
+                  <p className="mt-1 text-3xl font-black tracking-tight">{formatPrice(grandTotal)}</p>
+                </div>
+                <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">
+                  Secure checkout
+                </div>
+              </div>
+
+              <div className="rounded-[22px] border border-fuchsia-500/16 bg-[linear-gradient(135deg,rgba(168,85,247,0.18),rgba(59,130,246,0.08))] px-4 py-4 text-sm text-slate-300">
+                <div className="flex gap-3">
+                  <span className="mt-0.5 text-base text-fuchsia-300">◉</span>
+                  <p>
+                    Items in your order may ship separately when they come from different brands. Tracking updates will follow each package.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

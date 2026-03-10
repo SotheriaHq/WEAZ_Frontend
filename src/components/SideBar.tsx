@@ -236,7 +236,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
           </div>
         )}
 
-        <div className={`flex-1 overflow-y-auto scrollbar-hide hover:scrollbar-default ${isRail ? 'px-1' : 'px-3'} py-2`}>
+        <div className={`flex-1 overflow-y-auto scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${isRail ? 'px-1' : 'px-3'} py-2`}>
           <div className="space-y-1 mb-3">
             {mainLinks.map((link) => (
               <SidebarLink

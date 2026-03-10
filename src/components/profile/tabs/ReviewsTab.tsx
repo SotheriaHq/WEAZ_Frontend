@@ -1,131 +1,34 @@
-import React, { useState } from 'react';
-import { ThumbsUp, CheckCircle2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
 import Card from '../../ui/Card';
-import Avatar from '../../ui/Avatar';
+import MediaRenderer from '../../media/MediaRenderer';
+import Modal from '../../ui/Modal';
+import { toast } from 'sonner';
+import type { ReviewRatingDistributionItem } from '../../../types/profile';
+import { getAvatarFallback, resolveProfileImageSource } from '../../../utils/profileImage';
+import {
+  reviewsApi,
+  type ProductReviewResponse,
+  type ReviewReportReason,
+} from '../../../api/ReviewsApi';
 
-interface Review {
-  id: string;
-  userName: string;
-  userAvatar?: string;
-  rating: number;
-  date: string;
-  comment: string;
-  helpful: number;
-  verifiedPurchase: boolean;
+interface ReviewsTabProps {
+  reviews: ProductReviewResponse[];
+  averageRating: number;
+  totalReviews: number;
+  ratingDistribution: ReviewRatingDistributionItem[];
+  isLoading?: boolean;
+  isOwner?: boolean;
+  brandRepliesEnabled?: boolean;
 }
-
-const dummyReviews: Review[] = [
-  {
-    id: '1',
-    userName: 'Sarah Johnson',
-    userAvatar: undefined,
-    rating: 5,
-    date: '2025-01-10',
-    comment: "Absolutely love the quality and attention to detail! The fabric feels premium and the fit is perfect. This brand has become my go-to for special occasions. Can't wait to order more pieces!",
-    helpful: 24,
-    verifiedPurchase: true,
-  },
-  {
-    id: '2',
-    userName: 'Michael Chen',
-    userAvatar: undefined,
-    rating: 4,
-    date: '2025-01-08',
-    comment: 'Great customer service and unique designs. The delivery was faster than expected. Only minor issue was sizing ran a bit small, but overall very satisfied with my purchase.',
-    helpful: 18,
-    verifiedPurchase: true,
-  },
-  {
-    id: '3',
-    userName: 'Aisha Bakare',
-    userAvatar: undefined,
-    rating: 5,
-    date: '2025-01-05',
-    comment: 'Finally found a brand that celebrates African heritage with modern style! The craftsmanship is exceptional and I always get compliments when wearing their pieces. Highly recommend!',
-    helpful: 31,
-    verifiedPurchase: true,
-  },
-  {
-    id: '4',
-    userName: 'David Williams',
-    userAvatar: undefined,
-    rating: 4,
-    date: '2025-01-02',
-    comment: 'Beautiful designs and sustainable practices. The packaging was eco-friendly which I really appreciated. Prices are reasonable for the quality you get.',
-    helpful: 12,
-    verifiedPurchase: false,
-  },
-  {
-    id: '5',
-    userName: 'Fatima Okafor',
-    userAvatar: undefined,
-    rating: 5,
-    date: '2024-12-28',
-    comment: 'This brand understands fashion! Every piece tells a story and the attention to cultural details is remarkable. I own 5 pieces now and planning to buy more.',
-    helpful: 29,
-    verifiedPurchase: true,
-  },
-  {
-    id: '6',
-    userName: 'James Rodriguez',
-    userAvatar: undefined,
-    rating: 3,
-    date: '2024-12-20',
-    comment: 'Good quality overall but had some issues with color matching online photos. Customer service was helpful in resolving it. Would order again but check in-store first.',
-    helpful: 8,
-    verifiedPurchase: true,
-  },
-  {
-    id: '7',
-    userName: 'Chioma Nwosu',
-    userAvatar: undefined,
-    rating: 5,
-    date: '2024-12-15',
-    comment: 'Exceptional quality and beautiful designs! The fabrics are authentic and the modern cuts make them perfect for any occasion. This brand represents Nigerian fashion at its finest.',
-    helpful: 41,
-    verifiedPurchase: true,
-  },
-  {
-    id: '8',
-    userName: 'Emily Thompson',
-    userAvatar: undefined,
-    rating: 4,
-    date: '2024-12-10',
-    comment: 'Love supporting brands with such rich cultural heritage. The pieces are conversation starters and the quality justifies the price. Shipping took a bit long but worth the wait.',
-    helpful: 15,
-    verifiedPurchase: false,
-  },
-];
 
 interface RatingStarsProps {
   rating: number;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md';
 }
 
 const RatingStars: React.FC<RatingStarsProps> = ({ rating, size = 'md' }) => {
-  const sizeClasses = {
-    sm: 'w-4 h-4',
-    md: 'w-5 h-5',
-    lg: 'w-6 h-6',
-  };
-
-  return (
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <svg
-          key={star}
-          className={`${sizeClasses[size]} ${
-            star <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 dark:text-gray-600'
-          }`}
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-        >
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-        </svg>
-      ))}
-    </div>
-  );
+  const sizeClass = size === 'sm' ? 'text-sm' : 'text-lg';
+  return <div className={sizeClass}>{'⭐'.repeat(Math.max(1, rating))}</div>;
 };
 
 const formatDate = (dateString: string): string => {
@@ -139,79 +42,188 @@ const formatDate = (dateString: string): string => {
   if (diffDays < 7) return `${diffDays} days ago`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
   if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-  
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 };
 
 type SortOption = 'recent' | 'highest';
 
-const ReviewsTab: React.FC = () => {
-  const [sortBy, setSortBy] = useState<SortOption>('recent');
-  const [helpfulClicks, setHelpfulClicks] = useState<Record<string, number>>({});
+const getDisplayName = (review: ProductReviewResponse) => {
+  const fullName = `${review.reviewer.firstName ?? ''} ${review.reviewer.lastName ?? ''}`.trim();
+  return fullName || review.reviewer.username || 'Threadly user';
+};
 
-  const sortedReviews = [...dummyReviews].sort((a, b) => {
-    if (sortBy === 'recent') {
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    } else {
-      // Sort by rating, then by helpful count
+const getApiErrorMessage = (error: unknown, fallback: string) => {
+  const response = (error as { response?: { data?: { message?: string | string[] } } })?.response;
+  const message = response?.data?.message;
+  if (Array.isArray(message)) {
+    return message[0] || fallback;
+  }
+  if (typeof message === 'string' && message.trim()) {
+    return message;
+  }
+  return fallback;
+};
+
+const ReviewsTab: React.FC<ReviewsTabProps> = ({
+  reviews,
+  averageRating,
+  totalReviews,
+  ratingDistribution,
+  isLoading = false,
+  isOwner = false,
+  brandRepliesEnabled = false,
+}) => {
+  const [sortBy, setSortBy] = useState<SortOption>('recent');
+  const [localReviews, setLocalReviews] = useState(reviews);
+  const [replyingReviewId, setReplyingReviewId] = useState<string | null>(null);
+  const [replyDraft, setReplyDraft] = useState('');
+  const [reportingReviewId, setReportingReviewId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState<ReviewReportReason>('OFF_TOPIC');
+  const [reportDetails, setReportDetails] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    setLocalReviews(reviews);
+  }, [reviews]);
+
+  const normalizedDistribution = useMemo(() => {
+    if (ratingDistribution.length > 0) {
+      return ratingDistribution;
+    }
+
+    return [5, 4, 3, 2, 1].map((stars) => {
+      const count = localReviews.filter((review) => review.rating === stars).length;
+      return {
+        stars,
+        count,
+        percentage: totalReviews > 0 ? (count / totalReviews) * 100 : 0,
+      };
+    });
+  }, [localReviews, ratingDistribution, totalReviews]);
+
+  const sortedReviews = useMemo(() => {
+    return [...localReviews].sort((a, b) => {
+      if (sortBy === 'recent') {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+
       if (b.rating !== a.rating) {
         return b.rating - a.rating;
       }
-      return b.helpful - a.helpful;
-    }
-  });
 
-  const handleHelpfulClick = (reviewId: string) => {
-    setHelpfulClicks(prev => ({
-      ...prev,
-      [reviewId]: (prev[reviewId] || 0) + 1,
-    }));
+      return b.helpfulCount - a.helpfulCount;
+    });
+  }, [localReviews, sortBy]);
+
+  const replyingReview = replyingReviewId
+    ? localReviews.find((review) => review.id === replyingReviewId) ?? null
+    : null;
+
+  const openReplyModal = (review: ProductReviewResponse) => {
+    setReplyingReviewId(review.id);
+    setReplyDraft(review.brandReply?.content ?? '');
   };
 
-  const averageRating = (
-    dummyReviews.reduce((sum, review) => sum + review.rating, 0) / dummyReviews.length
-  ).toFixed(1);
+  const submitReply = async () => {
+    if (!brandRepliesEnabled) {
+      toast.info('Brand replies are currently unavailable.');
+      return;
+    }
 
-  const ratingDistribution = [5, 4, 3, 2, 1].map(rating => ({
-    stars: rating,
-    count: dummyReviews.filter(r => r.rating === rating).length,
-    percentage: (dummyReviews.filter(r => r.rating === rating).length / dummyReviews.length) * 100,
-  }));
+    if (!replyingReviewId || !replyDraft.trim()) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const updated = await reviewsApi.replyToBrandReview(replyingReviewId, {
+        brandReply: replyDraft.trim(),
+      });
+
+      setLocalReviews((current) =>
+        current.map((review) =>
+          review.id === replyingReviewId
+            ? {
+                ...review,
+                brandReply: updated.brandReply,
+              }
+            : review,
+        ),
+      );
+      toast.success('Reply saved');
+      setReplyingReviewId(null);
+      setReplyDraft('');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Unable to save reply'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitReport = async () => {
+    if (!brandRepliesEnabled) {
+      toast.info('Review reporting is currently unavailable.');
+      return;
+    }
+
+    if (!reportingReviewId) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await reviewsApi.reportBrandReview(reportingReviewId, {
+        reason: reportReason,
+        details: reportDetails.trim() || undefined,
+      });
+      toast.success('Review reported for moderation');
+      setReportingReviewId(null);
+      setReportReason('OFF_TOPIC');
+      setReportDetails('');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Unable to report review'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
-      {/* Reviews Summary */}
-      <section className="bg-gradient-to-r from-purple-50 via-pink-50 to-indigo-50 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 rounded-2xl p-8 border border-purple-100 dark:border-purple-800/30">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Average Rating */}
+    <div className="mx-auto max-w-6xl space-y-8">
+      <section className="rounded-[28px] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-emerald-50 p-8 dark:border-amber-300/20 dark:from-amber-500/10 dark:via-white/5 dark:to-emerald-500/10">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           <div className="text-center md:text-left">
-            <div className="flex flex-col md:flex-row items-center gap-4">
-              <div>
-                <div className="text-6xl font-bold text-gray-900 dark:text-white">
-                  {averageRating}
-                </div>
-                <RatingStars rating={Math.round(parseFloat(averageRating))} size="lg" />
-                <p className="text-gray-600 dark:text-gray-400 mt-2">
-                  Based on {dummyReviews.length} reviews
-                </p>
-              </div>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700 dark:text-amber-200">
+              Customer sentiment
             </div>
+            <div className="mt-2 text-6xl font-bold text-gray-900 dark:text-white">
+              {averageRating.toFixed(1)}
+            </div>
+            <div className="mt-2 text-lg text-gray-700 dark:text-gray-200">
+              <RatingStars rating={Math.max(1, Math.round(averageRating || 0))} />
+            </div>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">
+              Based on {totalReviews} published reviews
+            </p>
           </div>
 
-          {/* Rating Distribution */}
           <div className="space-y-2">
-            {ratingDistribution.map(({ stars, count, percentage }) => (
+            {normalizedDistribution.map(({ stars, count, percentage }) => (
               <div key={stars} className="flex items-center gap-3">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-12">
+                <span className="w-12 text-sm font-medium text-gray-700 dark:text-gray-300">
                   {stars} star
                 </span>
-                <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                   <div
-                    className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full transition-all"
+                    className="h-full rounded-full bg-gradient-to-r from-amber-400 to-emerald-500 transition-all"
                     style={{ width: `${percentage}%` }}
                   />
                 </div>
-                <span className="text-sm text-gray-600 dark:text-gray-400 w-8 text-right">
+                <span className="w-8 text-right text-sm text-gray-600 dark:text-gray-400">
                   {count}
                 </span>
               </div>
@@ -220,28 +232,25 @@ const ReviewsTab: React.FC = () => {
         </div>
       </section>
 
-      {/* Sort Options */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Customer Reviews
-        </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Customer Reviews</h2>
         <div className="flex gap-2">
           <button
             onClick={() => setSortBy('recent')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`rounded-lg px-4 py-2 font-medium transition-all ${
               sortBy === 'recent'
-                ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
             }`}
           >
             Most Recent
           </button>
           <button
             onClick={() => setSortBy('highest')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`rounded-lg px-4 py-2 font-medium transition-all ${
               sortBy === 'highest'
-                ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
             }`}
           >
             Highest Rated
@@ -249,58 +258,247 @@ const ReviewsTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Reviews Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {sortedReviews.map((review) => (
-          <Card key={review.id} variant="bordered" padding="lg" className="hover:shadow-lg transition-shadow">
-            <div className="space-y-4">
-              {/* Reviewer Info */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar
-                    src={review.userAvatar}
-                    alt={review.userName}
-                    size="md"
-                  />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold text-gray-900 dark:text-white">
-                        {review.userName}
-                      </h4>
-                      {review.verifiedPurchase && (
-                        <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span className="text-xs font-medium">Verified</span>
+      {isLoading ? (
+        <div className="rounded-[28px] border border-gray-200 bg-gray-50 p-8 text-sm text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
+          Loading reviews...
+        </div>
+      ) : sortedReviews.length === 0 ? (
+        <div className="rounded-[28px] border border-dashed border-gray-200 p-8 text-center dark:border-white/10">
+          <div className="text-lg font-semibold text-gray-900 dark:text-white">No reviews yet</div>
+          <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            Verified buyer feedback will appear here once customers start sharing their experience.
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {sortedReviews.map((review) => {
+            const displayName = getDisplayName(review);
+            const avatar = resolveProfileImageSource(review.reviewer);
+            const avatarFallback = getAvatarFallback(displayName, review.reviewer.username);
+            const imageMedia = review.media.filter((media) => media.type === 'image');
+
+            return (
+              <Card key={review.id} variant="bordered" padding="lg" className="transition-shadow hover:shadow-lg">
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      {avatar.src ? (
+                        <div className="h-12 w-12 overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+                          <MediaRenderer
+                            kind="image"
+                            src={avatar.src}
+                            alt={displayName}
+                            className="h-full w-full"
+                            mediaClassName="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-sm font-semibold text-black">
+                          {avatarFallback}
                         </div>
                       )}
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-semibold text-gray-900 dark:text-white">{displayName}</h4>
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+                            ✅ Verified buyer
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {formatDate(review.createdAt)}
+                        </p>
+                        {review.variantSummary ? (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{review.variantSummary}</p>
+                        ) : null}
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {formatDate(review.date)}
-                    </p>
+                    <div className="shrink-0 text-amber-600 dark:text-amber-200">
+                      <RatingStars rating={review.rating} size="sm" />
+                    </div>
+                  </div>
+
+                  <p className="leading-relaxed text-gray-700 dark:text-gray-300">{review.content}</p>
+
+                  {imageMedia.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      {imageMedia.slice(0, 4).map((image, index) => (
+                        <div
+                          key={image.id || `${review.id}-${index}`}
+                          className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/5"
+                        >
+                          <MediaRenderer
+                            kind="image"
+                            src={image.url}
+                            alt={`Review media ${index + 1}`}
+                            className="h-28 w-full"
+                            mediaClassName="h-full w-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {review.brandReply ? (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-400/20 dark:bg-emerald-400/10">
+                      <div className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-200">
+                        {review.brandReply.brandName} replied
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-gray-700 dark:text-gray-200">
+                        {review.brandReply.content}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-3 text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+                    <div>👍 Helpful to {review.helpfulCount} shoppers</div>
+                    {isOwner && brandRepliesEnabled ? (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openReplyModal(review)}
+                          className="rounded-full border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-400/20 dark:text-emerald-200 dark:hover:bg-emerald-400/10"
+                        >
+                          {review.brandReply ? 'Edit reply' : 'Reply'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReportingReviewId(review.id)}
+                          className="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 dark:border-rose-400/20 dark:text-rose-200 dark:hover:bg-rose-400/10"
+                        >
+                          Report review
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
-                <RatingStars rating={review.rating} size="sm" />
-              </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
-              {/* Review Comment */}
-              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                {review.comment}
-              </p>
-
-              {/* Helpful Button */}
-              <div className="flex items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <button
-                  onClick={() => handleHelpfulClick(review.id)}
-                  className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
-                >
-                  <ThumbsUp className="w-4 h-4" />
-                  <span>Helpful ({review.helpful + (helpfulClicks[review.id] || 0)})</span>
-                </button>
-              </div>
+      <Modal
+        open={Boolean(replyingReview)}
+        onClose={() => {
+          if (!submitting) {
+            setReplyingReviewId(null);
+            setReplyDraft('');
+          }
+        }}
+        title="Reply to review"
+        size="md"
+      >
+        <div className="space-y-4">
+          {replyingReview ? (
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
+              {replyingReview.content}
             </div>
-          </Card>
-        ))}
-      </div>
+          ) : null}
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-900 dark:text-white">
+              Brand reply
+            </label>
+            <textarea
+              value={replyDraft}
+              onChange={(event) => setReplyDraft(event.target.value)}
+              rows={6}
+              maxLength={2000}
+              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-emerald-400 dark:border-white/10 dark:bg-[#0f1116] dark:text-white"
+              placeholder="Share a clear, professional response for the buyer."
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setReplyingReviewId(null);
+                setReplyDraft('');
+              }}
+              className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void submitReply()}
+              className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={submitting || !replyDraft.trim()}
+            >
+              {submitting ? 'Saving...' : 'Save reply'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(reportingReviewId)}
+        onClose={() => {
+          if (!submitting) {
+            setReportingReviewId(null);
+            setReportReason('OFF_TOPIC');
+            setReportDetails('');
+          }
+        }}
+        title="Report review"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-900 dark:text-white">
+              Reason
+            </label>
+            <select
+              value={reportReason}
+              onChange={(event) => setReportReason(event.target.value as ReviewReportReason)}
+              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-rose-400 dark:border-white/10 dark:bg-[#0f1116] dark:text-white"
+            >
+              <option value="SPAM">Spam</option>
+              <option value="HARASSMENT">Harassment</option>
+              <option value="HATE">Hate</option>
+              <option value="OFF_TOPIC">Off topic</option>
+              <option value="COUNTERFEIT">Counterfeit claim</option>
+              <option value="MEDIA_POLICY">Media policy</option>
+              <option value="OTHER">Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-900 dark:text-white">
+              Details
+            </label>
+            <textarea
+              value={reportDetails}
+              onChange={(event) => setReportDetails(event.target.value)}
+              rows={4}
+              maxLength={1000}
+              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-rose-400 dark:border-white/10 dark:bg-[#0f1116] dark:text-white"
+              placeholder="Add any context moderators should review."
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setReportingReviewId(null);
+                setReportReason('OFF_TOPIC');
+                setReportDetails('');
+              }}
+              className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void submitReport()}
+              className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={submitting}
+            >
+              {submitting ? 'Reporting...' : 'Send report'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

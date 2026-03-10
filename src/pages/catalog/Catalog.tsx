@@ -36,6 +36,25 @@ import ComingSoon from '../placeholders/ComingSoon';
 type TabType = 'Content' | 'Store' | 'Reviews' | 'About' | 'Drafts';
 // CollectionType removed — dropdown opens modal directly
 
+type CatalogTabNoticeProps = {
+  title: string;
+  description: string;
+};
+
+const CatalogTabNotice: React.FC<CatalogTabNoticeProps> = ({ title, description }) => (
+  <div className="flex min-h-[400px] w-full items-center justify-center rounded-3xl border border-dashed border-gray-200 px-8 py-16 text-center dark:border-gray-800">
+    <div className="max-w-2xl space-y-4">
+      <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[24px] border border-gray-200 text-4xl shadow-sm dark:border-gray-800">
+        💬
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-4xl font-black tracking-tight text-gray-900 dark:text-white">{title}</h2>
+        <p className="text-base text-gray-500 dark:text-gray-400">{description}</p>
+      </div>
+    </div>
+  </div>
+);
+
 const ProfilePage: React.FC = () => {
   const { id: routeBrandId } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -47,8 +66,14 @@ const ProfilePage: React.FC = () => {
     collectionsLoading,
     collectionsError,
     reviews,
+    averageRating,
+    totalReviews,
+    ratingDistribution,
     reviewsLoading,
     reviewsError,
+    loadedReviewsBrandId,
+    reviewFlags,
+    reviewFlagsLoading,
     displayData,
     fetchCollections,
     fetchReviews,
@@ -253,17 +278,29 @@ const ProfilePage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'Reviews') {
-      if (isOwner && user && reviews.length === 0 && !reviewsLoading) {
-        void fetchReviews(user.id);
-      }
-      if (isVisitorView && routeBrandId) {
-        void (async () => {
-          try { await brandApi.getReviews(routeBrandId); } catch {/* noop */}
-        })();
-      }
+    if (activeTab !== 'Reviews' || reviewFlagsLoading || !reviewFlags.readEnabled) {
+      return;
     }
-  }, [activeTab, isOwner, isVisitorView, user, reviews.length, reviewsLoading, fetchReviews, routeBrandId]);
+
+    if (isOwner && user?.id && loadedReviewsBrandId !== user.id && !reviewsLoading) {
+      void fetchReviews(user.id);
+    }
+
+    if (isVisitorView && routeBrandId && loadedReviewsBrandId !== routeBrandId && !reviewsLoading) {
+      void fetchReviews(routeBrandId);
+    }
+  }, [
+    activeTab,
+    fetchReviews,
+    isOwner,
+    isVisitorView,
+    loadedReviewsBrandId,
+    reviewFlags.readEnabled,
+    reviewFlagsLoading,
+    reviewsLoading,
+    routeBrandId,
+    user?.id,
+  ]);
 
   useEffect(() => {
     if (visibilityFilter === 'Drafts' && isOwner) {
@@ -1494,21 +1531,30 @@ const ProfilePage: React.FC = () => {
             )}
 
             {activeTab === 'Reviews' && (
-              reviewsError ? (
-                <div className="relative h-[60vh] min-h-[400px] w-full rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800">
-                  <ComingSoon
-                    title="Reviews Unavailable"
-                    description="We couldn't connect to the server to load reviews."
-                    emoji="💬"
-                    showNotify={false}
-                    backPath="#"
-                    variant="default"
-                    minHeight="min-h-full"
-                    className="bg-gray-50 dark:bg-[#0a0a0a]"
-                  />
-                </div>
+              !reviewFlagsLoading && !reviewFlags.readEnabled ? (
+                <CatalogTabNotice
+                  title="No reviews yet"
+                  description={
+                    isOwner
+                      ? 'Your customer feedback will appear here once buyers start sharing their experience.'
+                      : 'Verified buyer feedback will appear here once customers start sharing their experience.'
+                  }
+                />
+              ) : reviewsError ? (
+                <CatalogTabNotice
+                  title="Reviews unavailable"
+                  description="We couldn't load reviews right now. Please try again shortly."
+                />
               ) : (
-                <ReviewsTab />
+                <ReviewsTab
+                  reviews={reviews}
+                  averageRating={averageRating}
+                  totalReviews={totalReviews}
+                  ratingDistribution={ratingDistribution}
+                  isLoading={reviewsLoading}
+                  isOwner={isOwner}
+                  brandRepliesEnabled={reviewFlags.brandRepliesEnabled}
+                />
               )
             )}
 

@@ -204,6 +204,17 @@ export const adminModerationApi = {
     apiClient.patch(`/admin/moderation/items/${id}`, data),
 };
 
+export const adminReviewsApi = {
+  getReviews: (params?: Record<string, string>) =>
+    apiClient.get('/admin/reviews', { params }),
+  getReports: (params?: Record<string, string>) =>
+    apiClient.get('/admin/reviews/reports', { params }),
+  moderateReview: (
+    reviewId: string,
+    data: { action: 'KEEP' | 'HIDE' | 'RESTORE' | 'DELETE'; reason?: string; moderatorNote?: string },
+  ) => apiClient.patch(`/admin/reviews/${reviewId}/moderation`, data),
+};
+
 // ── Audit Logs ──
 export const adminAuditApi = {
   list: (params?: Record<string, string>) =>

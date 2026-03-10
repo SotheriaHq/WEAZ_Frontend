@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { getMyOrders, type Order } from '@/api/StoreApi';
 import { toast } from 'sonner';
 import { BadgeCheck, Clock, Package, Truck } from 'lucide-react';
+import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
+import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
 
 const statusIcon = (status: string) => {
   switch (status) {
@@ -30,10 +32,12 @@ const statusTone = (status: string) => {
 
 const MyOrders: React.FC = () => {
   const navigate = useNavigate();
+  const { flags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [activeReviewItem, setActiveReviewItem] = useState<any | null>(null);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -89,6 +93,64 @@ const MyOrders: React.FC = () => {
                     ))}
                     {order.items.length > 3 && <span className="text-gray-400">+{order.items.length - 3} more</span>}
                   </div>
+                  {order.orderItems?.length ? (
+                    <div className="space-y-2 pt-2">
+                      {!reviewFlagsLoading && !flags.writeEnabled ? (
+                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                          Reviews are temporarily unavailable.
+                        </div>
+                      ) : null}
+                      {order.orderItems.map((item) => (
+                        <div key={item.orderItemId || item.id || `${order.id}-${item.productId}`} className="rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm dark:border-gray-800 dark:bg-gray-950/50">
+                          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                            <div className="space-y-1">
+                              <div className="font-medium text-gray-900 dark:text-gray-100">
+                                {item.productName || item.name}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {[
+                                  item.selectedSize ? `Size ${item.selectedSize}` : null,
+                                  item.selectedColor ? `Color ${item.selectedColor}` : null,
+                                ].filter(Boolean).join(' / ') || 'Purchase details available in order.'}
+                              </div>
+                            </div>
+
+                            {flags.writeEnabled && item.reviewState === 'CAN_CREATE' ? (
+                              <button
+                                type="button"
+                                onClick={() => setActiveReviewItem(item)}
+                                className="rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-black transition-colors hover:bg-emerald-400"
+                              >
+                                ⭐ Write review
+                              </button>
+                            ) : null}
+
+                            {flags.writeEnabled && item.reviewState === 'ALREADY_REVIEWED' ? (
+                              <button
+                                type="button"
+                                onClick={() => setActiveReviewItem(item)}
+                                className="rounded-full border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-700 transition-colors hover:border-emerald-300 hover:text-emerald-700 dark:border-gray-700 dark:text-gray-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-200"
+                              >
+                                ✅ Edit review
+                              </button>
+                            ) : null}
+
+                            {item.reviewState === 'BLOCKED_BY_DISPUTE' ? (
+                              <div className="text-xs font-semibold text-rose-600 dark:text-rose-300">
+                                🛑 Review paused while a sizing dispute is open.
+                              </div>
+                            ) : null}
+
+                            {item.reviewState === 'NOT_DELIVERED' ? (
+                              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                                📦 Review unlocks after delivery.
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -133,6 +195,18 @@ const MyOrders: React.FC = () => {
           </div>
         </div>
       </div>
+        <ReviewComposerModal
+          open={Boolean(activeReviewItem)}
+          onClose={() => setActiveReviewItem(null)}
+          orderItem={activeReviewItem}
+          reviewId={activeReviewItem?.existingReviewId || null}
+          onSaved={async () => {
+            await loadOrders();
+          }}
+          onDeleted={async () => {
+            await loadOrders();
+          }}
+        />
     </div>
   );
 };
