@@ -64,6 +64,23 @@ const OrderDetail: React.FC = () => {
         <div className="text-sm text-gray-500">
           Placed on {new Date(order.createdAt).toLocaleString()}
         </div>
+        {order.paymentStatus !== 'PAID' && order.paymentReference ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900 dark:border-amber-800/40 dark:bg-amber-900/10 dark:text-amber-100">
+            <p className="font-semibold">Payment still pending</p>
+            <p className="mt-1">
+              This order has a pending payment reference. You can reopen the payment flow and continue from where you stopped.
+            </p>
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => navigate(`/checkout/confirmation?reference=${encodeURIComponent(order.paymentReference!)}`)}
+                className="rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-black transition-colors hover:bg-amber-400"
+              >
+                Resume payment
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div className="space-y-3">
           {order.items.map((item) => (
             <div key={item.productId} className="flex items-center justify-between text-sm">

@@ -28,7 +28,7 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
   }, [dispatch]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#faf8ff] via-[#f5f0ff] to-[#ede9f7] dark:from-[#0f0f0f] dark:via-[#0a0a0a] dark:to-[#000000]">
+    <div className="min-h-screen threadly-shell-bg">
       <Navbar minimal={false} />
       <Sidebar overlayOnly />
       <StudioSidebar active={active} onSelect={onSelect} />

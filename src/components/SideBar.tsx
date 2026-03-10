@@ -54,8 +54,10 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
     return (
       <button
         onClick={onClick}
-        className={`w-full py-3 flex flex-col items-center justify-center gap-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors ${
-          active ? 'bg-gray-100 dark:bg-gray-800' : ''
+        className={`w-full py-3 flex flex-col items-center justify-center gap-1 rounded-lg transition-colors ${
+          active
+            ? 'bg-[linear-gradient(180deg,rgba(217,70,239,0.12),rgba(255,255,255,0.1))] dark:bg-[linear-gradient(180deg,rgba(168,85,247,0.18),rgba(255,255,255,0.05))]'
+            : 'hover:bg-white/28 dark:hover:bg-white/6'
         }`}
         title={label}
       >
@@ -76,8 +78,8 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
       onClick={onClick}
       className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-all duration-200 ${
         active
-          ? 'bg-gray-100 dark:bg-white/10 font-semibold text-gray-900 dark:text-white'
-          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100/70 dark:hover:bg-white/5'
+          ? 'bg-[linear-gradient(90deg,rgba(217,70,239,0.12),rgba(255,255,255,0.12))] font-semibold text-gray-900 dark:bg-[linear-gradient(90deg,rgba(168,85,247,0.18),rgba(255,255,255,0.04))] dark:text-white'
+          : 'text-gray-700 dark:text-gray-300 hover:bg-white/28 dark:hover:bg-white/5'
       }`}
       title={isRail ? label : undefined}
     >
@@ -217,10 +219,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
       )}
 
       <div
-        className={`${positionClass} ${widthClass} ${showOverlay ? 'bg-white/95 dark:bg-gray-950 border border-white/30 dark:border-white/10 shadow-xl rounded-r-lg' : 'bg-white/95 dark:bg-gray-950/95 border-r border-gray-200/70 dark:border-white/10'} backdrop-blur-xl flex flex-col transition-all duration-300 ease-out overflow-hidden ${slideClasses}`}
+        className={`${positionClass} ${widthClass} ${showOverlay ? 'threadly-chrome-surface rounded-r-lg shadow-xl' : 'bg-transparent shadow-none'} flex flex-col overflow-hidden transition-all duration-300 ease-out ${slideClasses}`}
       >
         {showOverlay && (
-          <div className="h-16 px-4 sm:px-5 flex items-center justify-start shrink-0 border-b border-gray-200/50 dark:border-white/10">
+          <div className="h-16 shrink-0 border-b border-gray-200/50 px-4 sm:px-5 dark:border-white/10 flex items-center justify-start">
             <button
               onClick={() => dispatch(toggleSidebar())}
               className="inline-flex h-9 w-9 items-center justify-center mr-2 sm:mr-3 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"

@@ -147,11 +147,11 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
     return (
       <div
         ref={profileMenuRef}
-        className="absolute right-0 mt-2 w-64 max-h-[calc(100vh-80px)] overflow-y-auto scrollbar-hide glass-panel bg-white/95 dark:bg-gray-950 backdrop-blur-xl rounded-lg shadow-xl border border-white/30 dark:border-white/10 py-2 z-50"
+        className="threadly-chrome-surface absolute right-0 mt-2 z-50 max-h-[calc(100vh-80px)] w-64 overflow-y-auto rounded-lg py-2 scrollbar-hide"
         style={{ WebkitOverflowScrolling: 'touch', height: 'auto', minHeight: '400px' }}
       >
         {/* Gradient Background Overlay - Same as Market Header */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-purple-400/10 to-transparent opacity-50 blur-2xl pointer-events-none" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(244,114,182,0.14),_transparent_42%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.12),_transparent_38%)] opacity-90" />
         
         <div className="relative z-10">
           {isAuthenticated && user ? (
@@ -435,11 +435,11 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
       ${minimal
         ? 'bg-transparent border-b border-transparent'
         : isScrolled
-          ? 'bg-gradient-to-r from-[#faf8ff]/60 to-[#f5f0ff]/52 dark:from-[#0b0b0b]/99 dark:to-[#080808]/97 backdrop-blur-md border-b border-purple-200/25 dark:border-white/12'
-          : 'bg-gradient-to-r from-[#faf8ff]/84 to-[#f5f0ff]/78 dark:from-[#0b0b0b]/100 dark:to-[#080808]/99 backdrop-blur-xl border-b border-purple-200/30 dark:border-white/12'}`}
+          ? 'threadly-nav-surface-muted'
+          : 'threadly-nav-surface'}`}
       style={isScrolled && !minimal ? {
-        backdropFilter: 'blur(10px) saturate(130%)',
-        WebkitBackdropFilter: 'blur(10px) saturate(130%)',
+        backdropFilter: 'blur(18px) saturate(140%)',
+        WebkitBackdropFilter: 'blur(18px) saturate(140%)',
       } : undefined}
     >
      

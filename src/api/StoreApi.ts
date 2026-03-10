@@ -171,6 +171,74 @@ export type PaymentMethodType =
   | 'PAY_ON_DELIVERY'
   | 'PENDING_SELECTION';
 
+export type CheckoutPaymentMethod = 'PAYSTACK' | 'FLUTTERWAVE' | 'BANK_TRANSFER';
+
+export type FlutterwavePaymentChannel =
+  | 'CARD'
+  | 'BANK_TRANSFER'
+  | 'BANK_ACCOUNT'
+  | 'USSD'
+  | 'MOBILE_MONEY';
+
+export interface BillingAddress {
+  firstName: string;
+  lastName: string;
+  street: string;
+  apartment?: string;
+  city: string;
+  state: string;
+  postalCode?: string;
+  country: string;
+}
+
+export interface PaymentContactDetails {
+  email: string;
+  phone: string;
+  billingSameAsShipping: boolean;
+  billingAddress?: BillingAddress;
+  consentAccepted: boolean;
+}
+
+export interface PaystackPaymentData extends PaymentContactDetails {
+  method: 'PAYSTACK';
+  channel: 'CARD';
+}
+
+export interface FlutterwavePaymentData extends PaymentContactDetails {
+  method: 'FLUTTERWAVE';
+  channel: FlutterwavePaymentChannel;
+  bankAccount?: {
+    bankCode: string;
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+  };
+  ussd?: {
+    bankCode: string;
+    bankName: string;
+  };
+  mobileMoney?: {
+    countryCode: 'GH' | 'KE';
+    networkId: string;
+    networkName: string;
+    phone: string;
+  };
+}
+
+export interface DirectBankTransferPaymentData extends PaymentContactDetails {
+  method: 'BANK_TRANSFER';
+  channel: 'BANK_TRANSFER';
+  senderName: string;
+  senderPhone: string;
+  senderBankName: string;
+  transferPurpose: string;
+}
+
+export type PaymentData =
+  | PaystackPaymentData
+  | FlutterwavePaymentData
+  | DirectBankTransferPaymentData;
+
 export interface ShippingAddress {
   firstName: string;
   lastName: string;
@@ -188,6 +256,7 @@ export interface CheckoutPayload {
   shippingAddress?: ShippingAddress;
   contactInfo?: Record<string, any>;
   paymentMethod?: PaymentMethodType;
+  paymentData?: PaymentData;
   promoCode?: string;
 }
 

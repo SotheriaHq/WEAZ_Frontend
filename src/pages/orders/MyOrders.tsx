@@ -85,6 +85,11 @@ const MyOrders: React.FC = () => {
                     <span>{new Date(order.createdAt).toLocaleDateString()}</span>
                   </div>
                   <div className="font-medium text-lg">{order.customerName}</div>
+                  {order.paymentStatus !== 'PAID' && order.paymentReference ? (
+                    <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                      ⏳ Payment pending
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap gap-2 text-sm text-gray-600">
                     {order.items.slice(0, 3).map((item) => (
                       <span key={item.productId} className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
@@ -162,6 +167,14 @@ const MyOrders: React.FC = () => {
                     <div className="text-lg font-semibold">
                       {new Intl.NumberFormat('en-NG', { style: 'currency', currency: order.currency || 'NGN' }).format(Number(order.totalAmount))}
                     </div>
+                    {order.paymentStatus !== 'PAID' && order.paymentReference ? (
+                      <button
+                        className="block w-full text-sm text-amber-700 hover:underline dark:text-amber-300"
+                        onClick={() => navigate(`/checkout/confirmation?reference=${encodeURIComponent(order.paymentReference!)}`)}
+                      >
+                        Resume payment
+                      </button>
+                    ) : null}
                     <button
                       className="text-sm text-black dark:text-white hover:underline"
                       onClick={() => navigate(`/orders/${order.id}`)}

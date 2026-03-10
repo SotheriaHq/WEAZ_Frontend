@@ -29,6 +29,7 @@ import WishlistDrawer from './components/designs/WishlistDrawer';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
 import CheckoutPage from './pages/checkout/CheckoutPage';
 import OrderConfirmation from './pages/checkout/OrderConfirmation';
+import PaymentReturnPage from './pages/checkout/PaymentReturnPage';
 import MyOrders from './pages/orders/MyOrders';
 import OrderDetail from './pages/orders/OrderDetail';
 import OrderAccessResolverPage from './pages/orders/OrderAccessResolverPage';
@@ -361,6 +362,7 @@ const router = createBrowserRouter([
         element: <ProtectedRoute />,
         children: [
           { path: '/checkout', element: <Layout><CheckoutPage /></Layout> },
+          { path: '/checkout/payment-return', element: <Layout><PaymentReturnPage /></Layout> },
           { path: '/checkout/confirmation', element: <Layout><OrderConfirmation /></Layout> },
           { path: '/orders', element: <Layout><MyOrders /></Layout> },
           { path: '/orders/access/:orderId', element: <Layout><OrderAccessResolverPage /></Layout> },

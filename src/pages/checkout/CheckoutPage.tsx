@@ -2,9 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { checkout } from '@/api/StoreApi';
-import type { PaymentMethodType, ShippingAddress } from '@/api/StoreApi';
+import type { CheckoutPaymentMethod, PaymentData, ShippingAddress } from '@/api/StoreApi';
 import { paymentApi } from '@/api/PaymentApi';
-import type { PaymentInitResult } from '@/api/PaymentApi';
 import {
   fetchCart,
   clearCart,
@@ -18,6 +17,17 @@ import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { formatPrice } from '@/utils/helpers';
+import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
+import {
+  CHECKOUT_PAYMENT_OPTIONS,
+  buildContactInfo,
+  buildPaymentSubmissionData,
+  createInitialPaymentState,
+  getPaymentSummaryLines,
+  getReviewCtaLabel,
+  type PaymentFormErrors,
+  validatePaymentData,
+} from '@/pages/checkout/paymentFlow';
 
 /* ─── Constants ─── */
 
@@ -36,13 +46,6 @@ const SHIPPING_RATES: Record<string, number> = {
   Rivers: 3500,
 };
 const DEFAULT_SHIPPING = 4000;
-
-const PAYMENT_OPTIONS: { value: PaymentMethodType; label: string; emoji: string; description: string }[] = [
-  { value: 'PAYSTACK', label: 'Pay with Card (Paystack)', emoji: '💳', description: 'Debit/credit card via Paystack' },
-  { value: 'FLUTTERWAVE', label: 'Pay with Flutterwave', emoji: '🦋', description: 'Card, bank, USSD via Flutterwave' },
-  { value: 'BANK_TRANSFER', label: 'Bank Transfer', emoji: '🏦', description: 'Transfer to a virtual account' },
-  { value: 'PAY_ON_DELIVERY', label: 'Pay on Delivery', emoji: '📦', description: 'Pay when your order arrives' },
-];
 
 type Step = 'shipping' | 'payment' | 'review';
 const STEPS: Step[] = ['shipping', 'payment', 'review'];
@@ -158,7 +161,11 @@ const CheckoutPage: React.FC = () => {
   const [shippingErrors, setShippingErrors] = useState<Partial<Record<keyof ShippingAddress, string>>>({});
 
   /* ── Payment state ── */
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('PENDING_SELECTION');
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod | 'PENDING_SELECTION'>('PENDING_SELECTION');
+  const [paymentState, setPaymentState] = useState(() =>
+    createInitialPaymentState(user?.email ?? '', user?.phoneNumber ?? ''),
+  );
+  const [paymentErrors, setPaymentErrors] = useState<PaymentFormErrors>({});
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
 
@@ -191,6 +198,32 @@ const CheckoutPage: React.FC = () => {
   const discountAmount = promoApplied ? Math.round(cart.subtotal * 0.1) : 0; // scaffold: 10% off
   const grandTotal = cart.subtotal + shippingCost - discountAmount;
   const brandGroups = useMemo(() => groupByBrand(cart.items), [cart.items]);
+  const activePaymentData = paymentMethod === 'PENDING_SELECTION' ? null : paymentState[paymentMethod];
+  const paymentSummaryLines = useMemo(
+    () => (activePaymentData && paymentMethod !== 'PENDING_SELECTION' ? getPaymentSummaryLines(paymentMethod, activePaymentData) : []),
+    [activePaymentData, paymentMethod],
+  );
+
+  useEffect(() => {
+    setPaymentState((prev) => ({
+      PAYSTACK: {
+        ...prev.PAYSTACK,
+        email: prev.PAYSTACK.email || user?.email || '',
+        phone: prev.PAYSTACK.phone || address.phone,
+      },
+      FLUTTERWAVE: {
+        ...prev.FLUTTERWAVE,
+        email: prev.FLUTTERWAVE.email || user?.email || '',
+        phone: prev.FLUTTERWAVE.phone || address.phone,
+      },
+      BANK_TRANSFER: {
+        ...prev.BANK_TRANSFER,
+        email: prev.BANK_TRANSFER.email || user?.email || '',
+        phone: prev.BANK_TRANSFER.phone || address.phone,
+        senderPhone: prev.BANK_TRANSFER.senderPhone || address.phone,
+      },
+    }));
+  }, [user?.email, address.phone]);
 
   /* ── Validation ── */
   const validateShipping = useCallback((): boolean => {
@@ -215,9 +248,15 @@ const CheckoutPage: React.FC = () => {
         toast.error('Please select a payment method');
         return;
       }
+      const validationErrors = validatePaymentData(paymentMethod, paymentState[paymentMethod], address);
+      setPaymentErrors(validationErrors);
+      if (Object.keys(validationErrors).length > 0) {
+        toast.error('Complete the payment details for the selected method');
+        return;
+      }
       setStep('review');
     }
-  }, [step, validateShipping, paymentMethod]);
+  }, [step, validateShipping, paymentMethod, paymentState, address]);
 
   const goBack = useCallback(() => {
     const idx = STEPS.indexOf(step);
@@ -250,6 +289,20 @@ const CheckoutPage: React.FC = () => {
     toast.success('Promo code applied — 10% discount');
   }, [promoCode]);
 
+  const updateSelectedPaymentData = useCallback((updater: (current: PaymentData) => PaymentData) => {
+    if (paymentMethod === 'PENDING_SELECTION') return;
+    setPaymentState((prev) => ({
+      ...prev,
+      [paymentMethod]: updater(prev[paymentMethod]),
+    }));
+    setPaymentErrors({});
+  }, [paymentMethod]);
+
+  const handleSelectPaymentMethod = useCallback((method: CheckoutPaymentMethod) => {
+    setPaymentMethod(method);
+    setPaymentErrors({});
+  }, []);
+
   /* ── Place order flow ── */
   const handlePlaceOrder = useCallback(async () => {
     if (submittingRef.current) return;
@@ -262,27 +315,42 @@ const CheckoutPage: React.FC = () => {
         return;
       }
 
+      if (paymentMethod === 'PENDING_SELECTION' || !activePaymentData) {
+        toast.error('Select and complete a payment method first');
+        return;
+      }
+
+      const validationErrors = validatePaymentData(paymentMethod, activePaymentData, address);
+      setPaymentErrors(validationErrors);
+      if (Object.keys(validationErrors).length > 0) {
+        toast.error('Complete the payment details for the selected method');
+        return;
+      }
+
+      const paymentSubmissionData = buildPaymentSubmissionData(activePaymentData, address);
+      const contactInfo = buildContactInfo(paymentSubmissionData, address);
+
       // 1. Place order via checkout endpoint
       const customerName = `${address.firstName} ${address.lastName}`.trim();
       const result = await checkout({
         customerName,
         shippingAddress: address,
-        contactInfo: { phone: address.phone },
+        contactInfo,
         paymentMethod,
+        paymentData: paymentSubmissionData,
         promoCode: promoApplied ? promoCode : undefined,
       });
 
       const orderIds = result.orders.map((o) => o.id);
 
-      // 2. Initialize payment (unless Pay on Delivery)
-      let paymentResult: PaymentInitResult | null = null;
-      if (paymentMethod !== 'PAY_ON_DELIVERY') {
-        paymentResult = await paymentApi.initialize({
-          orderIds,
-          paymentMethod,
-          email: user?.email ?? '',
-        });
-      }
+      // 2. Initialize payment
+      const paymentResult = await paymentApi.initialize({
+        orderIds,
+        paymentMethod,
+        email: paymentSubmissionData.email,
+        callbackUrl: `${window.location.origin}/checkout/payment-return`,
+        paymentData: paymentSubmissionData,
+      });
 
       // 3. Clear cart
       await dispatch(clearCart());
@@ -304,37 +372,40 @@ const CheckoutPage: React.FC = () => {
       };
 
       // 4. Handle gateway-specific flows
-      if (paymentMethod === 'PAY_ON_DELIVERY' || paymentResult?.directApproval) {
-        toast.success('Order placed successfully!');
-        navigate('/checkout/confirmation', { state: { orderIds, paymentMethod, summary } });
-      } else if (paymentResult?.authorizationUrl) {
-        // Scaffold: simulate redirect — in production, window.location.href = paymentResult.authorizationUrl
-        toast.success('Redirecting to payment gateway...');
-        navigate('/checkout/confirmation', {
-          state: { orderIds, paymentMethod, reference: paymentResult.reference, gateway: paymentResult.gateway, summary },
-        });
-      } else if (paymentResult?.bankAccount) {
-        toast.success('Order placed — complete your bank transfer');
-        navigate('/checkout/confirmation', {
-          state: { orderIds, paymentMethod, bankAccount: paymentResult.bankAccount, reference: paymentResult.reference, summary },
-        });
-      } else {
-        toast.success('Order placed!');
-        navigate('/checkout/confirmation', { state: { orderIds, paymentMethod, summary } });
+      if (paymentResult.authorizationUrl && paymentResult.nextAction?.type === 'REDIRECT') {
+        toast.success('Redirecting to payment flow...');
+        window.location.assign(paymentResult.authorizationUrl);
+        return;
       }
+
+      toast.success(paymentResult?.bankAccount ? 'Payment instructions are ready' : 'Payment flow started');
+
+      navigate(`/checkout/confirmation?reference=${encodeURIComponent(paymentResult.reference)}`, {
+        state: {
+          orderIds,
+          paymentMethod,
+          paymentData: paymentSubmissionData,
+          bankAccount: paymentResult.bankAccount,
+          authorizationUrl: paymentResult.authorizationUrl,
+          gateway: paymentResult.gateway,
+          reference: paymentResult.reference,
+          nextAction: paymentResult.nextAction,
+          summary,
+        },
+      });
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Checkout failed. Please try again.');
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
     }
-  }, [cart.items.length, address, paymentMethod, promoApplied, promoCode, user?.email, dispatch, navigate]);
+  }, [cart.items.length, address, paymentMethod, activePaymentData, promoApplied, promoCode, dispatch, navigate]);
 
   /* ─── Step Indicator ─── */
   const stepIdx = STEPS.indexOf(step);
 
   return (
-    <div className="relative overflow-hidden bg-[linear-gradient(180deg,_#f7f2ff_0%,_#f8f5ff_26%,_#fbf8ff_52%,_#ffffff_100%)] dark:bg-[radial-gradient(circle_at_top,_rgba(30,41,59,0.95),_rgba(2,6,23,1)_55%)]">
+    <div className="relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-20 top-20 h-72 w-72 rounded-full bg-fuchsia-300/18 blur-3xl dark:bg-fuchsia-500/12" />
         <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-sky-300/14 blur-3xl dark:bg-sky-500/10" />
@@ -522,41 +593,61 @@ const CheckoutPage: React.FC = () => {
             >
 
               <div className="space-y-3">
-                {PAYMENT_OPTIONS.map((opt) => (
-                  <label
-                    key={opt.value}
-                    className={`flex cursor-pointer items-center gap-4 rounded-[26px] border p-5 transition-all duration-200 ${
-                      paymentMethod === opt.value
-                        ? 'border-fuchsia-400 bg-[linear-gradient(135deg,rgba(245,208,254,0.6),rgba(224,231,255,0.7))] shadow-[0_18px_50px_rgba(217,70,239,0.18)] dark:bg-[linear-gradient(135deg,rgba(168,85,247,0.14),rgba(59,130,246,0.10))]'
-                        : 'border-white/60 bg-white/75 shadow-[0_14px_32px_rgba(15,23,42,0.06)] hover:border-fuchsia-200 dark:border-white/10 dark:bg-white/[0.03]'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value={opt.value}
-                      checked={paymentMethod === opt.value}
-                      onChange={() => setPaymentMethod(opt.value)}
-                      className="sr-only"
-                    />
-                    <span className="text-2xl">{opt.emoji}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 dark:text-white">{opt.label}</p>
-                      <p className="text-sm text-gray-500 dark:text-zinc-400">{opt.description}</p>
-                    </div>
-                    <span
-                      className={`flex-shrink-0 w-5 h-5 rounded-full border-2 transition-colors ${
-                        paymentMethod === opt.value
-                          ? 'border-fuchsia-500 bg-fuchsia-500'
-                          : 'border-slate-300 dark:border-zinc-600'
+                {CHECKOUT_PAYMENT_OPTIONS.map((opt) => {
+                  const isSelected = paymentMethod === opt.value;
+                  const optionPaymentData = paymentState[opt.value];
+
+                  return (
+                    <div
+                      key={opt.value}
+                      className={`rounded-[28px] border transition-all duration-200 ${
+                        isSelected
+                          ? 'border-fuchsia-300/90 bg-[linear-gradient(135deg,rgba(245,208,254,0.26),rgba(224,231,255,0.54))] shadow-[0_14px_34px_rgba(217,70,239,0.12)] dark:bg-[linear-gradient(135deg,rgba(168,85,247,0.12),rgba(59,130,246,0.08))]'
+                          : 'border-white/60 bg-white/75 shadow-[0_14px_32px_rgba(15,23,42,0.06)] hover:border-fuchsia-200 dark:border-white/10 dark:bg-white/[0.03]'
                       }`}
                     >
-                      {paymentMethod === opt.value && (
-                        <span className="block w-full h-full rounded-full ring-2 ring-white dark:ring-zinc-900 bg-purple-500" />
+                      <label className="flex cursor-pointer items-center gap-4 p-5">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value={opt.value}
+                          checked={isSelected}
+                          onChange={() => handleSelectPaymentMethod(opt.value)}
+                          className="sr-only"
+                        />
+                        <span className="text-2xl">{opt.emoji}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-gray-900 dark:text-white">{opt.label}</p>
+                          <p className="text-sm text-gray-500 dark:text-zinc-400">{opt.description}</p>
+                        </div>
+                        <span
+                          className={`flex h-5 w-5 flex-shrink-0 rounded-full border-2 transition-colors ${
+                            isSelected
+                              ? 'border-fuchsia-500 bg-fuchsia-500'
+                              : 'border-slate-300 dark:border-zinc-600'
+                          }`}
+                        >
+                          {isSelected && (
+                            <span className="block h-full w-full rounded-full bg-purple-500 ring-2 ring-white dark:ring-zinc-900" />
+                          )}
+                        </span>
+                      </label>
+
+                      {isSelected && (
+                        <div className="border-t border-fuchsia-200/70 px-4 pb-4 pt-1 dark:border-white/10 sm:px-5 sm:pb-5">
+                          <PaymentDetailsSection
+                            paymentMethod={opt.value}
+                            paymentData={optionPaymentData}
+                            shippingAddress={address}
+                            errors={paymentErrors}
+                            onChange={updateSelectedPaymentData}
+                            compact
+                          />
+                        </div>
                       )}
-                    </span>
-                  </label>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Promo code */}
@@ -634,9 +725,16 @@ const CheckoutPage: React.FC = () => {
                   </button>
                 </div>
                 <p className="text-sm text-gray-700 dark:text-zinc-300">
-                  {PAYMENT_OPTIONS.find((o) => o.value === paymentMethod)?.emoji}{' '}
-                  {PAYMENT_OPTIONS.find((o) => o.value === paymentMethod)?.label}
+                  {CHECKOUT_PAYMENT_OPTIONS.find((o) => o.value === paymentMethod)?.emoji}{' '}
+                  {CHECKOUT_PAYMENT_OPTIONS.find((o) => o.value === paymentMethod)?.label}
                 </p>
+                {paymentSummaryLines.length > 0 && (
+                  <div className="mt-3 space-y-1 text-sm text-gray-500 dark:text-zinc-400">
+                    {paymentSummaryLines.map((line) => (
+                      <p key={line}>{line}</p>
+                    ))}
+                  </div>
+                )}
                 {promoApplied && (
                   <p className="text-sm text-green-600 dark:text-green-400 mt-1">
                     🎟️ Promo: {promoCode} (−{formatPrice(discountAmount)})
@@ -695,7 +793,7 @@ const CheckoutPage: React.FC = () => {
               <div className="flex flex-col gap-4 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
                 <CheckoutBackLink label="Back to payment" onClick={goBack} />
                 <Button onClick={handlePlaceOrder} size="lg" loading={submitting} disabled={submitting} className="rounded-2xl px-8 shadow-[0_16px_36px_rgba(217,70,239,0.28)]">
-                  {submitting ? 'Processing...' : `Pay ${formatPrice(grandTotal)}`}
+                  {submitting ? 'Processing...' : `${getReviewCtaLabel(paymentMethod === 'PENDING_SELECTION' ? 'PAYSTACK' : paymentMethod, activePaymentData ?? paymentState.PAYSTACK)} · ${formatPrice(grandTotal)}`}
                 </Button>
               </div>
             </div>
@@ -705,17 +803,17 @@ const CheckoutPage: React.FC = () => {
 
         {/* ─── Order Summary Sidebar ─── */}
         <div className="lg:sticky lg:top-24 self-start">
-          <div className="overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#17181f_0%,#10111a_100%)] p-6 text-white shadow-[0_28px_80px_rgba(15,23,42,0.35)]">
+          <div className="threadly-summary-surface overflow-hidden rounded-[32px] p-6">
             <div className="space-y-6">
               <div className="space-y-1">
-                <p className="text-[11px] font-black uppercase tracking-[0.28em] text-fuchsia-300/80">Checkout</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.28em] text-fuchsia-500 dark:text-fuchsia-300/80">Checkout</p>
                 <h3 className="text-2xl font-black tracking-tight">Order Summary</h3>
               </div>
 
               <div className="space-y-4">
                 {cart.items.map((item) => (
-                  <div key={item.id} className="flex items-start gap-3 rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
-                    <div className="h-16 w-16 overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/10">
+                  <div key={item.id} className="flex items-start gap-3 rounded-[22px] border border-slate-200/80 bg-white/70 p-3 dark:border-white/8 dark:bg-white/[0.03]">
+                    <div className="h-16 w-16 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 dark:bg-white/10 dark:ring-white/10">
                       {item.product.thumbnail ? (
                         <ImageWithFallback
                           src={item.product.thumbnail}
@@ -731,12 +829,12 @@ const CheckoutPage: React.FC = () => {
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="truncate text-sm font-semibold text-white">{item.product.name}</p>
-                          <p className="text-xs text-slate-400">{item.brand.name}</p>
+                          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{item.product.name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{item.brand.name}</p>
                         </div>
-                        <span className="text-sm font-semibold text-white">{formatPrice(item.itemTotal)}</span>
+                        <span className="text-sm font-semibold text-slate-950 dark:text-white">{formatPrice(item.itemTotal)}</span>
                       </div>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         {item.selectedSize ? `Size: ${item.selectedSize}` : 'Size selected'}
                         {' · '}
                         Qty: {item.quantity}
@@ -747,36 +845,36 @@ const CheckoutPage: React.FC = () => {
                 ))}
               </div>
 
-              <div className="space-y-3 border-t border-white/8 pt-4 text-sm">
-                <div className="flex justify-between text-slate-400">
+              <div className="space-y-3 border-t border-slate-200/80 pt-4 text-sm dark:border-white/8">
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>Subtotal</span>
-                  <span className="text-white">{formatPrice(cart.subtotal)}</span>
+                  <span className="text-slate-950 dark:text-white">{formatPrice(cart.subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-slate-400">
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>Shipping</span>
-                  <span className="text-white">{address.state ? formatPrice(shippingCost) : '—'}</span>
+                  <span className="text-slate-950 dark:text-white">{address.state ? formatPrice(shippingCost) : '—'}</span>
                 </div>
                 {discountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-300">
+                  <div className="flex justify-between text-emerald-600 dark:text-emerald-300">
                     <span>Discount</span>
                     <span>−{formatPrice(discountAmount)}</span>
                   </div>
                 )}
               </div>
 
-              <div className="flex items-end justify-between border-t border-white/8 pt-5">
+              <div className="flex items-end justify-between border-t border-slate-200/80 pt-5 dark:border-white/8">
                 <div>
-                  <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Total</p>
+                  <p className="text-sm uppercase tracking-[0.2em] text-slate-500 dark:text-slate-500">Total</p>
                   <p className="mt-1 text-3xl font-black tracking-tight">{formatPrice(grandTotal)}</p>
                 </div>
-                <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">
+                <div className="rounded-full border border-slate-200/80 bg-white/65 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
                   Secure checkout
                 </div>
               </div>
 
-              <div className="rounded-[22px] border border-fuchsia-500/16 bg-[linear-gradient(135deg,rgba(168,85,247,0.18),rgba(59,130,246,0.08))] px-4 py-4 text-sm text-slate-300">
+              <div className="rounded-[22px] border border-fuchsia-300/35 bg-[linear-gradient(135deg,rgba(245,208,254,0.55),rgba(224,231,255,0.6))] px-4 py-4 text-sm text-slate-600 dark:border-fuchsia-500/16 dark:bg-[linear-gradient(135deg,rgba(168,85,247,0.18),rgba(59,130,246,0.08))] dark:text-slate-300">
                 <div className="flex gap-3">
-                  <span className="mt-0.5 text-base text-fuchsia-300">◉</span>
+                  <span className="mt-0.5 text-base text-fuchsia-500 dark:text-fuchsia-300">◉</span>
                   <p>
                     Items in your order may ship separately when they come from different brands. Tracking updates will follow each package.
                   </p>

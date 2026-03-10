@@ -61,7 +61,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const mainMarginLeft = computedSidebarMode === 'RAIL' ? '72px' : '0px';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#faf8ff] via-[#f5f0ff] to-[#ede9f7] dark:from-[#0f0f0f] dark:via-[#0a0a0a] dark:to-[#000000] text-gray-900 dark:text-white">
+    <div className="min-h-screen threadly-shell-bg text-gray-900 dark:text-white">
         
       {/* Navbar */}
       <Navbar />
