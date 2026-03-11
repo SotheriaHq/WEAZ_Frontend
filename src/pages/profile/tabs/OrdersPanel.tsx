@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { getMyOrders, type Order } from '@/api/StoreApi';
+import ImageWithFallback from '@/components/ImageWithFallback';
 
 const STATUS_OPTIONS = ['ALL', 'PENDING', 'PROCESSING', 'SHIPPED'] as const;
 type StatusFilter = (typeof STATUS_OPTIONS)[number];
@@ -221,10 +222,13 @@ export const OrdersPanel: React.FC = () => {
                   <div className="mb-3 flex items-start gap-3">
                     <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-white/10">
                       {firstItem?.thumbnail ? (
-                        <img
+                        <ImageWithFallback
                           src={firstItem.thumbnail}
                           alt={firstItem.name || 'Order item'}
-                          className="h-full w-full object-cover"
+                          className="h-full w-full"
+                          containerClassName="h-full w-full"
+                          fit="cover"
+                          rounded="none"
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-base">📦</div>

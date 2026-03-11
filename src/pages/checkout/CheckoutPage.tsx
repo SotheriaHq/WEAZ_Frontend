@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
-import { checkout } from '@/api/StoreApi';
+import { checkout, getMyOrders } from '@/api/StoreApi';
 import type { CheckoutPaymentMethod, PaymentData, ShippingAddress } from '@/api/StoreApi';
 import { paymentApi } from '@/api/PaymentApi';
 import {
@@ -91,6 +91,48 @@ function groupByBrand(items: CartItem[]) {
   return Array.from(groups.values());
 }
 
+function normalizeSavedAddress(address: unknown): ShippingAddress | null {
+  if (!address || typeof address !== 'object') return null;
+  const candidate = address as Record<string, unknown>;
+  const firstName = String(candidate.firstName ?? '').trim();
+  const lastName = String(candidate.lastName ?? '').trim();
+  const street = String(candidate.street ?? '').trim();
+  const city = String(candidate.city ?? '').trim();
+  const state = String(candidate.state ?? '').trim();
+  const country = String(candidate.country ?? 'Nigeria').trim();
+  const phone = String(candidate.phone ?? '').trim();
+
+  if (!firstName || !lastName || !street || !city || !state || !phone) {
+    return null;
+  }
+
+  return {
+    firstName,
+    lastName,
+    street,
+    apartment: String(candidate.apartment ?? '').trim(),
+    city,
+    state,
+    postalCode: String(candidate.postalCode ?? '').trim(),
+    country,
+    phone,
+  };
+}
+
+function buildSavedAddressKey(address: ShippingAddress) {
+  return [
+    address.firstName,
+    address.lastName,
+    address.street,
+    address.apartment ?? '',
+    address.city,
+    address.state,
+    address.postalCode ?? '',
+    address.country,
+    address.phone,
+  ].join('|').toLowerCase();
+}
+
 const CheckoutBackLink: React.FC<{
   label: string;
   onClick: () => void;
@@ -159,6 +201,9 @@ const CheckoutPage: React.FC = () => {
     phone: user?.phoneNumber ?? '',
   });
   const [shippingErrors, setShippingErrors] = useState<Partial<Record<keyof ShippingAddress, string>>>({});
+  const [savedAddresses, setSavedAddresses] = useState<ShippingAddress[]>([]);
+  const [savedAddressesLoading, setSavedAddressesLoading] = useState(false);
+  const [selectedSavedAddressKey, setSelectedSavedAddressKey] = useState<string | null>(null);
 
   /* ── Payment state ── */
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod | 'PENDING_SELECTION'>('PENDING_SELECTION');
@@ -187,6 +232,42 @@ const CheckoutPage: React.FC = () => {
       navigate('/', { replace: true });
     }
   }, [cartLoading, cart.items.length, navigate]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSavedAddresses = async () => {
+      setSavedAddressesLoading(true);
+      try {
+        const response = await getMyOrders(1, 50);
+        if (!active) return;
+        const items = Array.isArray((response as any)?.items) ? (response as any).items : [];
+        const unique = new Map<string, ShippingAddress>();
+
+        items.forEach((order: any) => {
+          const normalized = normalizeSavedAddress(order?.shippingAddress);
+          if (!normalized) return;
+          const key = buildSavedAddressKey(normalized);
+          if (!unique.has(key)) {
+            unique.set(key, normalized);
+          }
+        });
+
+        setSavedAddresses(Array.from(unique.values()));
+      } catch {
+        if (!active) return;
+        setSavedAddresses([]);
+      } finally {
+        if (active) setSavedAddressesLoading(false);
+      }
+    };
+
+    void loadSavedAddresses();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   /* ── Derived ── */
   const priceNoticeByItemId = useMemo(
@@ -273,12 +354,19 @@ const CheckoutPage: React.FC = () => {
   /* ── Address field updater ── */
   const updateField = useCallback(<K extends keyof ShippingAddress>(field: K, value: ShippingAddress[K]) => {
     setAddress((prev) => ({ ...prev, [field]: value }));
+    setSelectedSavedAddressKey(null);
     setShippingErrors((prev) => {
       if (!prev[field]) return prev;
       const next = { ...prev };
       delete next[field];
       return next;
     });
+  }, []);
+
+  const applySavedAddress = useCallback((savedAddress: ShippingAddress) => {
+    setAddress(savedAddress);
+    setSelectedSavedAddressKey(buildSavedAddressKey(savedAddress));
+    setShippingErrors({});
   }, []);
 
   /* ── Promo code (scaffold) ── */
@@ -337,7 +425,6 @@ const CheckoutPage: React.FC = () => {
         shippingAddress: address,
         contactInfo,
         paymentMethod,
-        paymentData: paymentSubmissionData,
         promoCode: promoApplied ? promoCode : undefined,
       });
 
@@ -484,6 +571,56 @@ const CheckoutPage: React.FC = () => {
               title={STEP_TITLES.shipping}
               description={STEP_DESCRIPTIONS.shipping}
             >
+              <div className="space-y-4 rounded-[28px] border border-dashed border-slate-200/80 bg-white/55 p-4 dark:border-white/10 dark:bg-white/[0.02]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Saved shipping addresses</p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Reuse an address from a previous order or keep filling a new one below.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSavedAddressKey(null)}
+                    className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:border-white/20 dark:hover:text-white"
+                  >
+                    Use a new address
+                  </button>
+                </div>
+
+                {savedAddressesLoading ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Loading saved addresses...</p>
+                ) : savedAddresses.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    {savedAddresses.map((savedAddress) => {
+                      const addressKey = buildSavedAddressKey(savedAddress);
+                      const isSelected = selectedSavedAddressKey === addressKey;
+                      return (
+                        <button
+                          key={addressKey}
+                          type="button"
+                          onClick={() => applySavedAddress(savedAddress)}
+                          className={`rounded-[24px] border p-4 text-left transition-all ${
+                            isSelected
+                              ? 'border-fuchsia-300 bg-[linear-gradient(135deg,rgba(245,208,254,0.28),rgba(224,231,255,0.54))] shadow-[0_12px_28px_rgba(217,70,239,0.12)] dark:border-fuchsia-400/30 dark:bg-[linear-gradient(135deg,rgba(168,85,247,0.14),rgba(59,130,246,0.08))]'
+                              : 'border-white/60 bg-white/75 hover:border-fuchsia-200 dark:border-white/10 dark:bg-white/[0.03]'
+                          }`}
+                        >
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {savedAddress.firstName} {savedAddress.lastName}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                            {savedAddress.street}{savedAddress.apartment ? `, ${savedAddress.apartment}` : ''}<br />
+                            {savedAddress.city}, {savedAddress.state}{savedAddress.postalCode ? ` ${savedAddress.postalCode}` : ''}<br />
+                            {savedAddress.country} • {savedAddress.phone}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">No reusable shipping addresses found yet. Your completed order addresses will appear here.</p>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <Input
                   label="First name"

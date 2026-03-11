@@ -28,6 +28,29 @@ import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import ProductReviewSection from '@/components/reviews/ProductReviewSection';
 
+const prettifyMeasurementKey = (value: string) =>
+  value
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(' ');
+
+const findMappedColorValue = (
+  map: Record<string, string> | undefined,
+  color: string,
+) => {
+  if (!map) return null;
+  if (map[color]) return map[color];
+  const normalizedColor = color.toLowerCase();
+  const match = Object.entries(map).find(([key]) => key.toLowerCase() === normalizedColor);
+  if (match) return match[1];
+  const partialMatch = Object.entries(map).find(([key]) =>
+    normalizedColor.includes(key.toLowerCase()) || key.toLowerCase().includes(normalizedColor),
+  );
+  if (partialMatch) return partialMatch[1];
+  return null;
+};
+
 // Color name to hex mapping
 const COLOR_HEX_MAP: Record<string, string> = {
   'Black': '#000000',
@@ -218,7 +241,24 @@ export default function ProductDetailsPage() {
     return [];
   }, [product]);
 
-  const currentMedia = mediaList[selectedMediaIndex];
+  const colorImageUrl = useMemo(
+    () => findMappedColorValue(product?.colorImages, selectedColor),
+    [product?.colorImages, selectedColor],
+  );
+
+  const colorHexCodes = useMemo(() => product?.colorHexCodes ?? {}, [product?.colorHexCodes]);
+
+  const activeMedia = useMemo(() => {
+    if (colorImageUrl) {
+      return {
+        id: `color-${selectedColor}`,
+        url: colorImageUrl,
+        type: 'IMAGE',
+      };
+    }
+    return mediaList[selectedMediaIndex] ?? null;
+  }, [colorImageUrl, mediaList, selectedColor, selectedMediaIndex]);
+
   const canOpenQr =
     Boolean(product) &&
     product?.status === 'ACTIVE' &&
@@ -313,6 +353,14 @@ export default function ProductDetailsPage() {
       active = false;
     };
   }, [isAuth, requiredMeasurementKeys]);
+
+  useEffect(() => {
+    if (!selectedColor || !colorImageUrl || mediaList.length === 0) return;
+    const imageIndex = mediaList.findIndex((item) => item.url === colorImageUrl);
+    if (imageIndex >= 0 && imageIndex !== selectedMediaIndex) {
+      setSelectedMediaIndex(imageIndex);
+    }
+  }, [colorImageUrl, mediaList, selectedColor, selectedMediaIndex]);
 
     (sizingMode === 'CUSTOM' || sizingMode === 'RTW_PLUS_CUSTOM') &&
     requiredMeasurementKeys.length > 0;
@@ -498,7 +546,10 @@ export default function ProductDetailsPage() {
       // Persist to user profile so they don't have to enter again
       await SizeFitApi.updateProfile({ measurements: normalised });
       // Update local state so the inline form also reflects the values
-      setMeasurementValues(modalMeasurementValues);
+      setMeasurementValues((prev) => ({
+        ...prev,
+        ...modalMeasurementValues,
+      }));
       setShowMeasurementModal(false);
 
       // Now add to cart with the updated measurements
@@ -586,7 +637,7 @@ export default function ProductDetailsPage() {
                     return (
                       <label key={key} className="flex flex-col gap-1">
                         <span className={`text-xs font-medium flex items-center gap-1.5 ${isMissing ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                          {key.replace(/_/g, ' ')}
+                          {prettifyMeasurementKey(key)}
                           {isMissing && <span className="text-[10px]">(required)</span>}
                         </span>
                         <input
@@ -711,9 +762,9 @@ export default function ProductDetailsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8 flex flex-col gap-6">
             <div className="w-full overflow-hidden rounded-2xl">
-              {currentMedia ? (
+              {activeMedia ? (
                 <SignedMediaItem
-                  media={currentMedia}
+                  media={activeMedia}
                   alt={product.title}
                   className="w-full"
                 />
@@ -807,7 +858,7 @@ export default function ProductDetailsPage() {
                         <div className="flex flex-wrap gap-2">
                           {colors.map((color) => {
                             const isActive = selectedColor === color;
-                            const colorStyle = COLOR_HEX_MAP[color] || '#9CA3AF';
+                            const colorStyle = findMappedColorValue(colorHexCodes, color) || COLOR_HEX_MAP[color] || '#9CA3AF';
                             const isGradient = colorStyle.includes('gradient');
                             return (
                               <button

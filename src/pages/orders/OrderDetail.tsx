@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getMyOrder, type Order } from '@/api/StoreApi';
+import { getMyOrder, resolveOrderAccess, type Order } from '@/api/StoreApi';
 import { toast } from 'sonner';
 import LazyOrderQrCard from '@/components/qr/LazyOrderQrCard';
 import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
 import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
+import ImageWithFallback from '@/components/ImageWithFallback';
+import VLoader from '@/components/loaders/VLoader';
 
 const OrderDetail: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -15,25 +17,42 @@ const OrderDetail: React.FC = () => {
   const [activeReviewItem, setActiveReviewItem] = useState<any | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     const fetchOrder = async () => {
       if (!orderId) return;
       setLoading(true);
       try {
+        const access = await resolveOrderAccess(orderId);
+        if (!active) return;
+        if (access.destination !== `/orders/${orderId}`) {
+          navigate(access.destination, { replace: true });
+          return;
+        }
         const data = await getMyOrder(orderId);
+        if (!active) return;
         setOrder(data as any);
       } catch (error: any) {
         toast.error(error?.response?.data?.message || 'Order not found');
         navigate('/orders');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     void fetchOrder();
+
+    return () => {
+      active = false;
+    };
   }, [orderId, navigate]);
 
   if (loading) {
-    return <div className="max-w-4xl mx-auto py-10 px-4">Loading...</div>;
+    return (
+      <div className="max-w-4xl mx-auto py-10 px-4 flex justify-center">
+        <VLoader size={56} phase="loading" />
+      </div>
+    );
   }
 
   if (!order) {
@@ -42,10 +61,18 @@ const OrderDetail: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-4 space-y-6">
-      <button className="text-sm text-gray-500 hover:text-black" onClick={() => navigate(-1)}>
-        Back
-      </button>
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-6 space-y-4">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+        <button type="button" onClick={() => navigate(-1)} className="font-semibold transition-colors hover:text-black dark:hover:text-white">
+          Back
+        </button>
+        <span>/</span>
+        <button type="button" onClick={() => navigate('/orders')} className="transition-colors hover:text-black dark:hover:text-white">
+          Orders
+        </button>
+        <span>/</span>
+        <span className="font-medium text-gray-900 dark:text-white">#{order.id.slice(0, 8)}</span>
+      </div>
+      <div className="rounded-2xl border border-gray-200/80 bg-white/65 p-6 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03] space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-500">Order ID</p>
@@ -65,7 +92,7 @@ const OrderDetail: React.FC = () => {
           Placed on {new Date(order.createdAt).toLocaleString()}
         </div>
         {order.paymentStatus !== 'PAID' && order.paymentReference ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900 dark:border-amber-800/40 dark:bg-amber-900/10 dark:text-amber-100">
+          <div className="rounded-2xl border border-amber-300/70 px-4 py-4 text-sm text-amber-900 backdrop-blur-sm dark:border-amber-800/40 dark:text-amber-100">
             <p className="font-semibold">Payment still pending</p>
             <p className="mt-1">
               This order has a pending payment reference. You can reopen the payment flow and continue from where you stopped.
@@ -83,12 +110,28 @@ const OrderDetail: React.FC = () => {
         ) : null}
         <div className="space-y-3">
           {order.items.map((item) => (
-            <div key={item.productId} className="flex items-center justify-between text-sm">
-              <div className="space-y-1">
-                <p className="font-medium">{item.name}</p>
-                <div className="text-gray-500 flex gap-2">
+            <div key={item.productId} className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200/70 px-4 py-3 text-sm dark:border-gray-800/80">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-white/10">
+                  {item.thumbnail ? (
+                    <ImageWithFallback
+                      src={item.thumbnail}
+                      alt={item.name}
+                      className="h-full w-full"
+                      containerClassName="h-full w-full"
+                      fit="cover"
+                      rounded="none"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-base">📦</div>
+                  )}
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <p className="font-medium">{item.name}</p>
+                  <div className="text-gray-500 flex gap-2 flex-wrap">
                   {item.selectedSize && <span>Size: {item.selectedSize}</span>}
                   {item.selectedColor && <span>Color: {item.selectedColor}</span>}
+                  </div>
                 </div>
               </div>
               <div className="text-right">

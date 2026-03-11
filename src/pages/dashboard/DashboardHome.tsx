@@ -523,24 +523,42 @@ const ActivityItem: React.FC<{
 
 // Alert Item
 const AlertItem: React.FC<{
-  type: 'error' | 'warning' | 'info';
-  title: string;
-  description: string;
-}> = ({ type, title, description }) => {
+  type?: string;
+  title?: string;
+  description?: string;
+  message?: string;
+  count?: number;
+  link?: string;
+}> = ({ type, title, description, message, count, link }) => {
   const styles = {
     error: { bg: 'bg-red-500/10', border: 'border-red-500/20', icon: <AlertCircle className="w-4 h-4" />, color: 'text-red-500' },
     warning: { bg: 'bg-orange-500/10', border: 'border-orange-500/20', icon: <Camera className="w-4 h-4" />, color: 'text-orange-500' },
     info: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: <CreditCard className="w-4 h-4" />, color: 'text-blue-500' },
   };
 
-  const { bg, border, icon, color } = styles[type];
+  const normalizedType = (() => {
+    const rawType = (type ?? '').toUpperCase();
+    if (rawType.includes('ERROR') || rawType.includes('FAILED')) return 'error';
+    if (rawType.includes('INFO') || rawType.includes('PAYMENT')) return 'info';
+    return 'warning';
+  })();
+  const { bg, border, icon, color } = styles[normalizedType];
+  const derivedTitle = title?.trim() || message?.trim() || 'Action required';
+  const derivedDescription = description?.trim() || (count
+    ? `${count} ${count === 1 ? 'item needs' : 'items need'} attention.`
+    : 'Review this item from your studio dashboard.');
 
   return (
     <div className={`${bg} border ${border} rounded-lg p-3 flex gap-3 items-start`}>
       <span className={`${color} mt-0.5`}>{icon}</span>
       <div>
-        <p className="text-sm text-gray-900 dark:text-white font-medium">{title}</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{description}</p>
+        <p className="text-sm text-gray-900 dark:text-white font-medium">{derivedTitle}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{derivedDescription}</p>
+        {link ? (
+          <Link to={link} className="mt-2 inline-flex text-xs font-medium text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300">
+            Open
+          </Link>
+        ) : null}
       </div>
     </div>
   );

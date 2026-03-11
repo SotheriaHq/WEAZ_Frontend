@@ -134,6 +134,12 @@ export function createInitialPaymentState(email: string, phone: string): Payment
       billingSameAsShipping: true,
       billingAddress: { ...EMPTY_BILLING_ADDRESS },
       consentAccepted: false,
+      mockCard: {
+        cardNumber: '',
+        cardholderName: '',
+        expiry: '',
+        cvv: '',
+      },
     },
     FLUTTERWAVE: {
       method: 'FLUTTERWAVE',
@@ -229,6 +235,30 @@ export function validatePaymentData(
     validateBillingAddress(paymentData.billingAddress, errors);
   }
 
+  if (paymentMethod === 'PAYSTACK') {
+    const paystackData = paymentData as PaystackPaymentData;
+    const cardNumber = paystackData.mockCard?.cardNumber.replace(/\s+/g, '') ?? '';
+    const cardholderName = paystackData.mockCard?.cardholderName.trim() ?? '';
+    const expiry = paystackData.mockCard?.expiry.trim() ?? '';
+    const cvv = paystackData.mockCard?.cvv.trim() ?? '';
+
+    if (cardNumber.length < 16) {
+      errors['mockCard.cardNumber'] = 'Enter a 16-digit card number to simulate the Paystack step';
+    }
+
+    if (!cardholderName) {
+      errors['mockCard.cardholderName'] = 'Cardholder name is required';
+    }
+
+    if (!/^\d{2}\/\d{2}$/.test(expiry)) {
+      errors['mockCard.expiry'] = 'Use MM/YY format';
+    }
+
+    if (!/^\d{3,4}$/.test(cvv)) {
+      errors['mockCard.cvv'] = 'Enter a valid CVV';
+    }
+  }
+
   if (paymentMethod === 'FLUTTERWAVE') {
     const flutterwaveData = paymentData as FlutterwavePaymentData;
 
@@ -293,6 +323,18 @@ export function buildContactInfo(paymentData: PaymentData, shippingAddress: Ship
 }
 
 export function buildPaymentSubmissionData(paymentData: PaymentData, shippingAddress: ShippingAddress): PaymentData {
+  if (paymentData.method === 'PAYSTACK') {
+    return {
+      method: paymentData.method,
+      channel: paymentData.channel,
+      email: paymentData.email,
+      phone: paymentData.phone,
+      billingSameAsShipping: paymentData.billingSameAsShipping,
+      billingAddress: resolveBillingAddress(paymentData, shippingAddress),
+      consentAccepted: paymentData.consentAccepted,
+    } as PaymentData;
+  }
+
   return {
     ...paymentData,
     billingAddress: resolveBillingAddress(paymentData, shippingAddress),
@@ -307,6 +349,11 @@ export function getPaymentSummaryLines(
 
   if (paymentMethod === 'PAYSTACK') {
     lines.push('Hosted card checkout via Paystack');
+    const paystackData = paymentData as PaystackPaymentData;
+    const lastFour = paystackData.mockCard?.cardNumber.replace(/\s+/g, '').slice(-4);
+    if (lastFour) {
+      lines.push(`Demo card ending in ${lastFour}`);
+    }
   }
 
   if (paymentMethod === 'FLUTTERWAVE') {
@@ -334,6 +381,10 @@ export function getPaymentSummaryLines(
 }
 
 export function getReviewCtaLabel(paymentMethod: CheckoutPaymentMethod, paymentData: PaymentData): string {
+  if (paymentMethod === 'PAYSTACK') {
+    return 'Continue to Paystack';
+  }
+
   if (paymentMethod === 'BANK_TRANSFER') {
     return 'Generate Transfer Instructions';
   }

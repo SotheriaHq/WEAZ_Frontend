@@ -44,6 +44,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     (s: RootState) => s.notifications
   );
   const isAuthenticated = useSelector((s: RootState) => s.user.isAuthenticated);
+  const currentUser = useSelector((s: RootState) => s.user.profile);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
@@ -151,10 +152,17 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   }, [open, onClose]);
 
   const handleBodyClick = useCallback((notification: NormalizedNotification) => {
-    const route = determineNotificationRoute(notification);
+    const payload = (notification.payload as Record<string, unknown> | undefined) ?? {};
+    const payloadOrderId = typeof payload.orderId === 'string' ? payload.orderId : null;
+    const route =
+      currentUser?.type === 'BRAND' &&
+      (notification.type === NotificationTypes.ORDER_PLACED || notification.type === NotificationTypes.ORDER_STATUS_UPDATED) &&
+      payloadOrderId
+        ? `/studio?tab=orders&orderId=${encodeURIComponent(payloadOrderId)}`
+        : determineNotificationRoute(notification);
     navigate(route);
     onClose();
-  }, [navigate, onClose]);
+  }, [currentUser?.type, navigate, onClose]);
 
   const handleMarkRead = useCallback((id: string) => {
     // Idempotency guard

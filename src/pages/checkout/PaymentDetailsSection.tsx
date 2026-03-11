@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type {
   CheckoutPaymentMethod,
   DirectBankTransferPaymentData,
   FlutterwavePaymentData,
+  PaystackPaymentData,
   PaymentData,
   ShippingAddress,
 } from '@/api/StoreApi';
 import Input from '@/components/ui/Input';
+import VLoader from '@/components/loaders/VLoader';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import {
@@ -34,6 +36,14 @@ const selectClassName = '[&_.DropdownTrigger]:rounded-2xl [&_.DropdownTrigger]:b
 
 const infoCardClassName = 'rounded-[24px] border border-slate-200/80 bg-white/70 p-4 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300';
 
+const formatDemoCardNumber = (value: string) => value.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
+const formatDemoExpiry = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+};
+const formatDemoCvv = (value: string) => value.replace(/\D/g, '').slice(0, 4);
+
 const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   paymentMethod,
   paymentData,
@@ -42,6 +52,8 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   onChange,
   compact = false,
 }) => {
+  const [cardValidationPhase, setCardValidationPhase] = useState<'idle' | 'starting' | 'loading' | 'complete'>('idle');
+
   const updateField = (field: string, value: string | boolean) => {
     onChange((current) => ({ ...current, [field]: value } as PaymentData));
   };
@@ -55,6 +67,38 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
       },
     } as PaymentData));
   };
+
+  useEffect(() => {
+    if (paymentMethod !== 'PAYSTACK') {
+      setCardValidationPhase('idle');
+      return;
+    }
+
+    const paystackData = paymentData as PaystackPaymentData;
+    const cardNumber = paystackData.mockCard?.cardNumber.replace(/\s+/g, '') ?? '';
+    const cardholderName = paystackData.mockCard?.cardholderName.trim() ?? '';
+    const expiry = paystackData.mockCard?.expiry.trim() ?? '';
+    const cvv = paystackData.mockCard?.cvv.trim() ?? '';
+    const isComplete =
+      cardNumber.length >= 16 &&
+      cardholderName.length > 0 &&
+      /^\d{2}\/\d{2}$/.test(expiry) &&
+      /^\d{3,4}$/.test(cvv);
+
+    if (!isComplete) {
+      setCardValidationPhase('idle');
+      return;
+    }
+
+    setCardValidationPhase('starting');
+    const startTimer = window.setTimeout(() => setCardValidationPhase('loading'), 180);
+    const finishTimer = window.setTimeout(() => setCardValidationPhase('complete'), 1300);
+
+    return () => {
+      window.clearTimeout(startTimer);
+      window.clearTimeout(finishTimer);
+    };
+  }, [paymentData, paymentMethod]);
 
   const renderBillingAddress = () => {
     if (paymentData.billingSameAsShipping) {
@@ -215,6 +259,46 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
     );
   };
 
+  const renderPaystackFields = () => {
+    const paystackData = paymentData as PaystackPaymentData;
+
+    return (
+      <div className="space-y-4">
+        <div className={infoCardClassName}>
+          <p className="font-semibold text-slate-900 dark:text-white">Inline demo card step</p>
+          <p className="mt-1">This is a Threadly-only simulation so you can rehearse the card step before redirect. Real card capture, OTP, and verification still happen on Paystack.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Input label="Card number" value={paystackData.mockCard?.cardNumber ?? ''} placeholder="4242 4242 4242 4242" onChange={(e) => updateNestedField('mockCard', 'cardNumber', formatDemoCardNumber(e.target.value))} error={errors['mockCard.cardNumber']} className={inputClassName} helperText="Demo validation only. This value is not sent to the backend." />
+          <Input label="Cardholder name" value={paystackData.mockCard?.cardholderName ?? ''} placeholder="ABEL FIRSTMAN" onChange={(e) => updateNestedField('mockCard', 'cardholderName', e.target.value.toUpperCase())} error={errors['mockCard.cardholderName']} className={inputClassName} />
+          <Input label="Expiry date" value={paystackData.mockCard?.expiry ?? ''} placeholder="MM/YY" onChange={(e) => updateNestedField('mockCard', 'expiry', formatDemoExpiry(e.target.value))} error={errors['mockCard.expiry']} className={inputClassName} />
+          <Input label="CVV" value={paystackData.mockCard?.cvv ?? ''} placeholder="123" onChange={(e) => updateNestedField('mockCard', 'cvv', formatDemoCvv(e.target.value))} error={errors['mockCard.cvv']} className={inputClassName} />
+        </div>
+        {cardValidationPhase !== 'idle' ? (
+          <div className="rounded-[24px] border border-slate-200/80 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="flex items-center gap-3">
+              {cardValidationPhase === 'complete' ? (
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/12 text-lg">✅</div>
+              ) : (
+                <VLoader size={44} phase={cardValidationPhase} showLabel={false} className="shrink-0" />
+              )}
+              <div>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                  {cardValidationPhase === 'complete' ? 'Card fields look ready' : 'Checking card fields'}
+                </p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {cardValidationPhase === 'complete'
+                    ? 'Threadly has finished the dummy card check. Paystack will still run the real secure verification.'
+                    : 'Running a dummy safety check on the card number, expiry, and CVV before redirect.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
   return (
     <div className={`space-y-6 rounded-[28px] border ${compact ? 'border-fuchsia-200/80 bg-white/72 p-4 shadow-[0_16px_36px_rgba(217,70,239,0.08)] dark:border-fuchsia-400/20 dark:bg-white/[0.04]' : 'border-white/60 bg-white/62 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-white/[0.025]'}`}>
       <div className="space-y-1">
@@ -233,10 +317,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
       </div>
 
       {paymentMethod === 'PAYSTACK' && (
-        <div className={infoCardClassName}>
-          <p className="font-semibold text-slate-900 dark:text-white">Paystack hosted card checkout</p>
-          <p className="mt-1">Threadly will not ask for card number, CVV, or expiry in your checkout. Those fields remain on the secure Paystack page to keep card handling out of app scope.</p>
-        </div>
+        renderPaystackFields()
       )}
 
       {paymentMethod === 'FLUTTERWAVE' && renderFlutterwaveFields()}

@@ -202,6 +202,12 @@ export interface PaymentContactDetails {
 export interface PaystackPaymentData extends PaymentContactDetails {
   method: 'PAYSTACK';
   channel: 'CARD';
+  mockCard?: {
+    cardNumber: string;
+    cardholderName: string;
+    expiry: string;
+    cvv: string;
+  };
 }
 
 export interface FlutterwavePaymentData extends PaymentContactDetails {
@@ -256,7 +262,6 @@ export interface CheckoutPayload {
   shippingAddress?: ShippingAddress;
   contactInfo?: Record<string, any>;
   paymentMethod?: PaymentMethodType;
-  paymentData?: PaymentData;
   promoCode?: string;
 }
 

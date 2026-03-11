@@ -112,7 +112,7 @@ export function determineNotificationRoute(notification: NormalizedNotification)
         case NotificationTypes.ORDER_STATUS_UPDATED:
         {
             const orderId = (payload as Record<string, unknown>)?.orderId;
-            return orderId ? `/orders/${orderId}` : '/orders';
+            return orderId ? `/orders/access/${orderId}` : fallbackUrl;
         }
 
         case NotificationTypes.PRODUCT_UPLOAD:

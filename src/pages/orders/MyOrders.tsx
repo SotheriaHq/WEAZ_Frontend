@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { BadgeCheck, Clock, Package, Truck } from 'lucide-react';
 import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
 import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
+import VLoader from '@/components/loaders/VLoader';
 
 const statusIcon = (status: string) => {
   switch (status) {
@@ -59,6 +60,18 @@ const MyOrders: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto py-10 px-4 space-y-6">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+        <button type="button" onClick={() => navigate(-1)} className="font-semibold transition-colors hover:text-black dark:hover:text-white">
+          Back
+        </button>
+        <span>/</span>
+        <button type="button" onClick={() => navigate('/')} className="transition-colors hover:text-black dark:hover:text-white">
+          Home
+        </button>
+        <span>/</span>
+        <span className="font-medium text-gray-900 dark:text-white">Orders</span>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Your Orders</h1>
@@ -70,8 +83,8 @@ const MyOrders: React.FC = () => {
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {loading ? (
             <div className="p-8 text-center text-gray-500">
-              <Clock className="w-5 h-5 mx-auto mb-2 animate-spin" />
-              Loading orders...
+              <VLoader size={48} phase="loading" className="mx-auto" />
+              <p className="mt-3">Loading orders...</p>
             </div>
           ) : orders.length === 0 ? (
             <div className="p-8 text-center text-gray-500">You have not placed any orders yet.</div>

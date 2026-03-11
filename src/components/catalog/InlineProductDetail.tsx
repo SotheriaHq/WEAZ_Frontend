@@ -43,6 +43,31 @@ const COLOR_HEX_MAP: Record<string, string> = {
   'Multi': 'linear-gradient(135deg, #EC4899, #8B5CF6, #3B82F6, #10B981)',
 };
 
+const resolveColorStyle = (color: string, colorHexCodes?: Record<string, string> | null) => {
+  if (colorHexCodes?.[color]) return colorHexCodes[color];
+
+  const normalizedColor = color.toLowerCase();
+  const exactCustom = colorHexCodes
+    ? Object.entries(colorHexCodes).find(([key]) => key.toLowerCase() === normalizedColor)?.[1]
+    : null;
+  if (exactCustom) return exactCustom;
+
+  const partialCustom = colorHexCodes
+    ? Object.entries(colorHexCodes).find(([key]) =>
+        normalizedColor.includes(key.toLowerCase()) || key.toLowerCase().includes(normalizedColor),
+      )?.[1]
+    : null;
+  if (partialCustom) return partialCustom;
+
+  const exactPalette = Object.entries(COLOR_HEX_MAP).find(([key]) => key.toLowerCase() === normalizedColor)?.[1];
+  if (exactPalette) return exactPalette;
+
+  const partialPalette = Object.entries(COLOR_HEX_MAP).find(([key]) =>
+    normalizedColor.includes(key.toLowerCase()) || key.toLowerCase().includes(normalizedColor),
+  )?.[1];
+  return partialPalette ?? '#9CA3AF';
+};
+
 export default function InlineProductDetail({
   product,
   onBack,
@@ -379,7 +404,10 @@ export default function InlineProductDetail({
     setSavingMeasurements(true);
     try {
       await SizeFitApi.updateProfile({ measurements: normalized });
-      setMeasurementValues(modalMeasurementValues);
+      setMeasurementValues((prev) => ({
+        ...prev,
+        ...modalMeasurementValues,
+      }));
 
       await dispatch(
         addToCart({
@@ -551,7 +579,7 @@ export default function InlineProductDetail({
               <div className="flex flex-wrap gap-2">
                 {colors.map((color) => {
                   const isAvailable = !hasVariants || availableColors.includes(color);
-                  const colorStyle = COLOR_HEX_MAP[color] || '#9CA3AF';
+                  const colorStyle = resolveColorStyle(color, product.colorHexCodes ?? null);
                   const isGradient = colorStyle.includes('gradient');
                   
                   return (

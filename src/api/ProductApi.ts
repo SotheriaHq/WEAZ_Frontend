@@ -232,6 +232,8 @@ export interface ProductDto {
   publishAt?: string;
   images?: string[];
   thumbnail?: string;
+  colorImages?: Record<string, string>;
+  colorHexCodes?: Record<string, string>;
   mediaIds?: string[];
   media?: Array<{ id: string; url: string; type: string; isPrimary?: boolean }>;
   variants?: ProductVariant[];
