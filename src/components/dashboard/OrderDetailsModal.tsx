@@ -5,6 +5,7 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 import VLoader from '@/components/loaders/VLoader';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getSizingModeLabel } from '@/types/sizing';
+import OrderMessagesPanel from '@/components/messaging/OrderMessagesPanel';
 
 interface OrderDetailsModalProps {
   isOpen: boolean;
@@ -302,6 +303,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>
                   </div>
                 </section>
+
+                <OrderMessagesPanel
+                  contextType="STANDARD_ORDER"
+                  orderId={orderId}
+                  title="Brand order conversation"
+                  actorSurface="BRAND"
+                  brandId={brandId}
+                />
 
                 <section className="space-y-4">
                   <div className="flex items-center justify-between">

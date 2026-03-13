@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { messagingApi, type ThreadMessage } from '@/api/MessagingApi';
 import { useRealtime } from '@/realtime/RealtimeProvider';
@@ -6,11 +6,21 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 
 type ContextType = 'CUSTOM_ORDER' | 'STANDARD_ORDER';
+type ActorSurface = 'BUYER' | 'BRAND' | 'ADMIN';
 
 interface OrderMessagesPanelProps {
   contextType: ContextType;
   orderId: string;
   title?: string;
+  actorSurface?: ActorSurface;
+  brandId?: string | null;
+  readOnly?: boolean;
+}
+
+interface PendingAttachment {
+  fileId: string;
+  fileName: string;
+  previewUrl: string | null;
 }
 
 const formatTimestamp = (value: string) => {
@@ -48,6 +58,9 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
   contextType,
   orderId,
   title = 'Order messages',
+  actorSurface = 'BUYER',
+  brandId,
+  readOnly = false,
 }) => {
   const profile = useSelector((state: RootState) => state.user.profile);
   const actorId = profile?.id;
@@ -57,14 +70,39 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
   const [sending, setSending] = useState(false);
   const [summaryUnread, setSummaryUnread] = useState<number>(0);
   const [input, setInput] = useState('');
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const attachmentsRef = useRef<PendingAttachment[]>([]);
+
+  useEffect(() => {
+    attachmentsRef.current = pendingAttachments;
+  }, [pendingAttachments]);
+
+  useEffect(() => {
+    return () => {
+      for (const attachment of attachmentsRef.current) {
+        if (attachment.previewUrl) {
+          URL.revokeObjectURL(attachment.previewUrl);
+        }
+      }
+    };
+  }, []);
 
   const listMessages = useCallback(async () => {
     if (!orderId) return;
 
     const response =
-      contextType === 'CUSTOM_ORDER'
-        ? await messagingApi.listCustomOrderMessages(orderId, { limit: 50 })
-        : await messagingApi.listOrderMessages(orderId, { limit: 50 });
+      actorSurface === 'ADMIN'
+        ? contextType === 'CUSTOM_ORDER'
+          ? await messagingApi.listAdminCustomOrderMessages(orderId, { limit: 50 })
+          : await messagingApi.listAdminOrderMessages(orderId, { limit: 50 })
+        : contextType === 'CUSTOM_ORDER'
+          ? actorSurface === 'BRAND' && brandId
+            ? await messagingApi.listCustomOrderMessagesForBrand(brandId, orderId, { limit: 50 })
+            : await messagingApi.listCustomOrderMessages(orderId, { limit: 50 })
+          : actorSurface === 'BRAND' && brandId
+            ? await messagingApi.listOrderMessagesForBrand(brandId, orderId, { limit: 50 })
+            : await messagingApi.listOrderMessages(orderId, { limit: 50 });
 
     const sorted = [...response.items].sort(
       (left, right) =>
@@ -73,26 +111,43 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
 
     setMessages(sorted);
 
-    const latestMessageId = sorted.at(-1)?.id;
-    if (latestMessageId) {
-      if (contextType === 'CUSTOM_ORDER') {
-        await messagingApi.markCustomOrderRead(orderId, latestMessageId);
-      } else {
-        await messagingApi.markOrderRead(orderId, latestMessageId);
+    if (actorSurface !== 'ADMIN') {
+      const latestMessageId = sorted.at(-1)?.id;
+      if (latestMessageId) {
+        if (contextType === 'CUSTOM_ORDER') {
+          if (actorSurface === 'BRAND' && brandId) {
+            await messagingApi.markCustomOrderReadForBrand(brandId, orderId, latestMessageId);
+          } else {
+            await messagingApi.markCustomOrderRead(orderId, latestMessageId);
+          }
+        } else if (actorSurface === 'BRAND' && brandId) {
+          await messagingApi.markOrderReadForBrand(brandId, orderId, latestMessageId);
+        } else {
+          await messagingApi.markOrderRead(orderId, latestMessageId);
+        }
       }
     }
-  }, [contextType, orderId]);
+  }, [actorSurface, brandId, contextType, orderId]);
 
   const loadSummary = useCallback(async () => {
     if (!orderId) return;
 
+    if (actorSurface === 'ADMIN') {
+      setSummaryUnread(0);
+      return;
+    }
+
     const summary =
       contextType === 'CUSTOM_ORDER'
-        ? await messagingApi.getCustomOrderSummary(orderId, true)
-        : await messagingApi.getOrderSummary(orderId, true);
+        ? actorSurface === 'BRAND' && brandId
+          ? await messagingApi.getCustomOrderSummaryForBrand(brandId, orderId, true)
+          : await messagingApi.getCustomOrderSummary(orderId, true)
+        : actorSurface === 'BRAND' && brandId
+          ? await messagingApi.getOrderSummaryForBrand(brandId, orderId, true)
+          : await messagingApi.getOrderSummary(orderId, true);
 
     setSummaryUnread(Number(summary?.unreadCount ?? 0));
-  }, [contextType, orderId]);
+  }, [actorSurface, brandId, contextType, orderId]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -108,6 +163,40 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!orderId) return;
+
+    let intervalId: number | null = null;
+    const setupPolling = () => {
+      if (intervalId) {
+        window.clearInterval(intervalId);
+        intervalId = null;
+      }
+
+      if (document.visibilityState === 'visible') {
+        intervalId = window.setInterval(() => {
+          void refresh();
+        }, 25000);
+      }
+    };
+
+    setupPolling();
+    const onVisibilityChange = () => {
+      setupPolling();
+      if (document.visibilityState === 'visible') {
+        void refresh();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (intervalId) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [orderId, refresh]);
 
   useEffect(() => {
     const unsubscribe = onNotification((payload) => {
@@ -134,25 +223,90 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
     return unsubscribe;
   }, [onNotification, orderId, refresh]);
 
-  const canSend = useMemo(
-    () => Boolean(input.trim()) && !sending,
-    [input, sending],
-  );
+  const canSend = useMemo(() => {
+    const hasBody = Boolean(input.trim());
+    const hasAttachments = pendingAttachments.length > 0;
+    return !readOnly && actorSurface !== 'ADMIN' && (hasBody || hasAttachments) && !sending && !uploading;
+  }, [actorSurface, input, pendingAttachments.length, readOnly, sending, uploading]);
+
+  const onPickAttachments: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
+    const fileList = event.target.files;
+    if (!fileList || fileList.length === 0) {
+      return;
+    }
+
+    const files = Array.from(fileList);
+    if (pendingAttachments.length + files.length > 5) {
+      toast.error('A maximum of 5 attachments is allowed');
+      event.target.value = '';
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const uploaded: PendingAttachment[] = [];
+      for (const file of files) {
+        const response = await messagingApi.uploadMessageAttachment(file);
+        const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+        uploaded.push({
+          fileId: response.id,
+          fileName: response.originalName || response.fileName || file.name,
+          previewUrl,
+        });
+      }
+
+      setPendingAttachments((prev) => [...prev, ...uploaded]);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to upload one or more attachments');
+    } finally {
+      setUploading(false);
+      event.target.value = '';
+    }
+  };
+
+  const removeAttachment = (fileId: string) => {
+    setPendingAttachments((prev) => {
+      const target = prev.find((item) => item.fileId === fileId);
+      if (target?.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter((item) => item.fileId !== fileId);
+    });
+  };
 
   const handleSend = async () => {
     const bodyText = input.trim();
-    if (!bodyText) return;
+    const attachmentFileIds = pendingAttachments.map((attachment) => attachment.fileId);
+    if (!bodyText && attachmentFileIds.length === 0) return;
 
     setSending(true);
     try {
-      const payload = { bodyText, clientMessageId: nextClientMessageId() };
+      const payload = {
+        bodyText: bodyText || undefined,
+        clientMessageId: nextClientMessageId(),
+        attachmentFileIds,
+      };
       if (contextType === 'CUSTOM_ORDER') {
-        await messagingApi.sendCustomOrderMessage(orderId, payload);
+        if (actorSurface === 'BRAND' && brandId) {
+          await messagingApi.sendCustomOrderMessageForBrand(brandId, orderId, payload);
+        } else {
+          await messagingApi.sendCustomOrderMessage(orderId, payload);
+        }
       } else {
-        await messagingApi.sendOrderMessage(orderId, payload);
+        if (actorSurface === 'BRAND' && brandId) {
+          await messagingApi.sendOrderMessageForBrand(brandId, orderId, payload);
+        } else {
+          await messagingApi.sendOrderMessage(orderId, payload);
+        }
       }
 
       setInput('');
+      for (const attachment of pendingAttachments) {
+        if (attachment.previewUrl) {
+          URL.revokeObjectURL(attachment.previewUrl);
+        }
+      }
+      setPendingAttachments([]);
       await refresh();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to send message');
@@ -229,6 +383,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
         )}
       </div>
 
+      {readOnly || actorSurface === 'ADMIN' ? null : (
       <div className="mt-4 space-y-3">
         <textarea
           value={input}
@@ -238,6 +393,34 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
           placeholder="Type a message for this order"
           className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
         />
+        <div className="rounded-2xl border border-black/10 bg-white/70 p-3 dark:border-white/10 dark:bg-slate-950/60">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label className="inline-flex cursor-pointer items-center rounded-full border border-black/15 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-white/20 dark:text-slate-100">
+              <input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={onPickAttachments} disabled={uploading || sending} />
+              {uploading ? 'Uploading...' : 'Attach files'}
+            </label>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">Up to 5 files, max 25MB total, PDF or image</span>
+          </div>
+          {pendingAttachments.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {pendingAttachments.map((attachment) => (
+                <div key={attachment.fileId} className="flex items-center justify-between gap-3 rounded-xl border border-black/10 px-3 py-2 text-xs dark:border-white/10">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span>📎</span>
+                    <span className="truncate">{attachment.fileName}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(attachment.fileId)}
+                    className="rounded-full border border-black/15 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:border-white/20 dark:text-slate-100"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <div className="flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
           <span>{input.length}/4000</span>
           <button
@@ -250,6 +433,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
           </button>
         </div>
       </div>
+      )}
     </section>
   );
 };

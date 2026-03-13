@@ -18,6 +18,7 @@ import {
   getRelativeDeadlineText,
 } from '@/components/custom-orders/CustomOrderUi';
 import CustomOrderActionConfirmModal from '@/components/custom-orders/CustomOrderActionConfirmModal';
+import OrderMessagesPanel from '@/components/messaging/OrderMessagesPanel';
 
 interface PendingBrandAction {
   title: string;
@@ -275,6 +276,14 @@ const CustomOrdersPage: React.FC = () => {
                 <div className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Internal price breakdown</div>
                 <CustomOrderJsonBreakdown data={selected.internalPriceBreakdown as Record<string, unknown> | null | undefined} />
               </div>
+
+              <OrderMessagesPanel
+                contextType="CUSTOM_ORDER"
+                orderId={selected.id}
+                title="Brand conversation"
+                actorSurface="BRAND"
+                brandId={brandId}
+              />
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">

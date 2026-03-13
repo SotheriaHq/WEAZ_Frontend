@@ -26,6 +26,7 @@ import {
   getRelativeDeadlineText,
 } from '@/components/custom-orders/CustomOrderUi';
 import CustomOrderActionConfirmModal from '@/components/custom-orders/CustomOrderActionConfirmModal';
+import OrderMessagesPanel from '@/components/messaging/OrderMessagesPanel';
 
 interface PendingAdminAction {
   title: string;
@@ -478,6 +479,14 @@ const AdminCustomOrdersPage: React.FC = () => {
                   Escalate refund review
                 </button>
               </div>
+
+              <OrderMessagesPanel
+                contextType="CUSTOM_ORDER"
+                orderId={selected.id}
+                title="Admin thread view"
+                actorSurface="ADMIN"
+                readOnly
+              />
             </div>
           )}
         </section>
