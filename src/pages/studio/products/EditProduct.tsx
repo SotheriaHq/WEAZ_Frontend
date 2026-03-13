@@ -37,6 +37,8 @@ import Tag from "@/components/ui/Tag";
 import InfoTooltip from "@/components/ui/InfoTooltip";
 import { useConfirm } from "@/components/ui/useConfirm";
 import { DiscardChangesModal } from "@/components/studio/store/modals";
+import { isCustomSizingMode, isRtwSizingMode, normalizeSizingMode, type SizingMode } from '@/types/sizing';
+import CustomOrderOfferEditor from '@/components/custom-orders/CustomOrderOfferEditor';
 import {
   normalizePrimary,
   reorderItems,
@@ -259,7 +261,7 @@ interface FormState {
   onSale: boolean;
   mediaIds: string[];
   variants: ProductVariant[];
-  sizingMode: "NONE" | "RTW" | "CUSTOM" | "RTW_PLUS_CUSTOM";
+  sizingMode: SizingMode;
   rtwSizeSystem: string;
   customMeasurementKeys: string[];
   fitPreference: "SLIM" | "REGULAR" | "LOOSE" | "OVERSIZED" | "";
@@ -814,7 +816,7 @@ const EditProduct: React.FC = () => {
                     stock: typeof stock === "number" ? stock : 0,
                   })) as ProductVariant[];
                 })(),
-          sizingMode: (product.sizingMode || "NONE") as FormState["sizingMode"],
+          sizingMode: normalizeSizingMode(product.sizingMode) as FormState["sizingMode"],
           rtwSizeSystem: product.rtwSizeSystem || "ALPHA",
           customMeasurementKeys: Array.isArray(product.customMeasurementKeys)
             ? product.customMeasurementKeys
@@ -1392,14 +1394,13 @@ const EditProduct: React.FC = () => {
           isPhysicalProduct: form.isPhysicalProduct,
           customsRegion: resolvedCustomsRegion,
           mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
-          sizingMode: form.sizingMode,
+          sizingMode: normalizeSizingMode(form.sizingMode),
           rtwSizeSystem:
-            form.sizingMode === "RTW" || form.sizingMode === "RTW_PLUS_CUSTOM"
+            isRtwSizingMode(form.sizingMode)
               ? form.rtwSizeSystem || "ALPHA"
               : undefined,
           customMeasurementKeys:
-            form.sizingMode === "CUSTOM" ||
-            form.sizingMode === "RTW_PLUS_CUSTOM"
+            isCustomSizingMode(form.sizingMode)
               ? form.customMeasurementKeys
               : [],
           fitPreference: form.fitPreference || undefined,
@@ -1584,13 +1585,13 @@ const EditProduct: React.FC = () => {
         isPhysicalProduct: form.isPhysicalProduct,
         customsRegion: resolvedCustomsRegion,
         mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
-        sizingMode: form.sizingMode,
+        sizingMode: normalizeSizingMode(form.sizingMode),
         rtwSizeSystem:
-          form.sizingMode === "RTW" || form.sizingMode === "RTW_PLUS_CUSTOM"
+          isRtwSizingMode(form.sizingMode)
             ? form.rtwSizeSystem || "ALPHA"
             : undefined,
         customMeasurementKeys:
-          form.sizingMode === "CUSTOM" || form.sizingMode === "RTW_PLUS_CUSTOM"
+          isCustomSizingMode(form.sizingMode)
             ? form.customMeasurementKeys
             : [],
         fitPreference: form.fitPreference || undefined,
@@ -2907,6 +2908,13 @@ const EditProduct: React.FC = () => {
                   onTargetAgeGroupChange={(value) =>
                     updateForm("targetAgeGroup", value)
                   }
+                />
+
+                <CustomOrderOfferEditor
+                  sourceType="PRODUCT"
+                  sourceId={isEditMode ? productId : undefined}
+                  measurementKeys={form.customMeasurementKeys}
+                  disabled={saving}
                 />
 
                 <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">

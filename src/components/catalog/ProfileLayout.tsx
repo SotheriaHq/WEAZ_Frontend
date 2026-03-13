@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { lazy } from 'react';
 import { Sidebar } from '../SideBar';
 import { Navbar } from '../Navbar';
 import ProfileHeaderSkeleton from '../profile/ProfileHeaderSkeleton';
 import CollectionsSkeleton from '../profile/CollectionsSkeleton';
-import Profile from '../../pages/catalog/Catalog';
 import { EndUserProfile } from '../../pages/profile/EndUserProfile';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '@/context/AuthContext';
@@ -12,6 +11,8 @@ import type { AppDispatch, RootState } from '@/store';
 import { useLocation, Navigate, Outlet, useParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/api/httpClient';
+
+const Profile = lazy(() => import('../../pages/catalog/Catalog'));
 
 const computeSidebarMode = (pathname: string, isMobile: boolean) => {
   const isProfileRoute = pathname === '/profile' || pathname.startsWith('/profile/');

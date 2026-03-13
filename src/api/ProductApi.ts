@@ -1,6 +1,7 @@
 import { apiClient } from "./httpClient";
 import { createIdempotencyKey } from "./idempotency";
 import { unwrapApiResponse } from "../types/auth";
+import type { SizingMode } from '@/types/sizing';
 
 // =====================
 // Types
@@ -180,11 +181,14 @@ export interface ProductCreateDto {
   metaDescription?: string;
   publishAt?: string;
   isActive?: boolean;
-  sizingMode?: "NONE" | "RTW" | "CUSTOM" | "RTW_PLUS_CUSTOM";
+  sizingMode?: SizingMode;
   rtwSizeSystem?: string;
   rtwSizeType?: "PREDEFINED" | "FREEFORM" | "MIXED";
   customGender?: "MEN" | "WOMEN" | "UNISEX";
   customMeasurementKeys?: string[];
+  customAvailable?: boolean;
+  customOrderEnabled?: boolean;
+  standardCheckoutEnabled?: boolean;
   fitPreference?: "SLIM" | "REGULAR" | "LOOSE" | "OVERSIZED";
   targetAgeGroup?: "ADULT" | "CHILD";
 }
@@ -238,11 +242,14 @@ export interface ProductDto {
   media?: Array<{ id: string; url: string; type: string; isPrimary?: boolean }>;
   variants?: ProductVariant[];
   sizes?: string[];
-  sizingMode?: "NONE" | "RTW" | "CUSTOM" | "RTW_PLUS_CUSTOM";
+  sizingMode?: SizingMode;
   rtwSizeSystem?: string;
   rtwSizeType?: "PREDEFINED" | "FREEFORM" | "MIXED";
   customGender?: "MEN" | "WOMEN" | "UNISEX";
   customMeasurementKeys?: string[];
+  customAvailable?: boolean;
+  customOrderEnabled?: boolean;
+  standardCheckoutEnabled?: boolean;
   fitPreference?: "SLIM" | "REGULAR" | "LOOSE" | "OVERSIZED";
   targetAgeGroup?: "ADULT" | "CHILD";
   isPhysicalProduct?: boolean;

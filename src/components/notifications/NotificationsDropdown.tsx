@@ -251,11 +251,19 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     const action = getActionText(n.type).trim() || 'updated your';
     const title = contentTitleFor(n);
     const payload = (n.payload as Record<string, unknown> | undefined) ?? {};
+    const trimmedMessage = (n.message || '').trim();
 
-    const lowerMessage = (n.message || '').toLowerCase();
+    if (
+      trimmedMessage &&
+      (n.type === NotificationTypes.ORDER_PLACED || n.type === NotificationTypes.ORDER_STATUS_UPDATED)
+    ) {
+      return trimmedMessage;
+    }
+
+    const lowerMessage = trimmedMessage.toLowerCase();
     const hasExplicitTitle = lowerMessage.includes(title.toLowerCase());
-    if (hasExplicitTitle && n.message.trim()) {
-      return n.message.trim();
+    if (hasExplicitTitle && trimmedMessage) {
+      return trimmedMessage;
     }
 
     if (

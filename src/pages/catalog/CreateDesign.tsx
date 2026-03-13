@@ -27,6 +27,8 @@ import {
   FiPlus,
 } from "react-icons/fi";
 import { HiOutlineSparkles } from "react-icons/hi";
+import { isCustomSizingMode, isRtwSizingMode, normalizeSizingMode, type SizingMode } from '@/types/sizing';
+import CustomOrderOfferEditor from '@/components/custom-orders/CustomOrderOfferEditor';
 
 // Context & Hooks
 import TextField from "../../components/forms/TextField";
@@ -86,7 +88,7 @@ const CreateDesignInner: React.FC = () => {
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
   const [metadataEditedAt, setMetadataEditedAt] = useState<Date | null>(null);
   const [sizingMode, setSizingMode] = useState<
-    "NONE" | "RTW" | "CUSTOM" | "RTW_PLUS_CUSTOM"
+    SizingMode
   >("NONE");
   const [rtwSizeSystem, setRtwSizeSystem] = useState<string>("ALPHA");
   const [customMeasurementKeys, setCustomMeasurementKeys] = useState<string[]>(
@@ -243,7 +245,7 @@ const CreateDesignInner: React.FC = () => {
         setCategoryTypeId((d as any).subCategoryId || d.categoryTypeId || "");
         setType(d.type || "EVERYBODY");
         setVisibility(d.visibility || "PUBLIC");
-        setSizingMode(d.sizingMode || "NONE");
+        setSizingMode(normalizeSizingMode(d.sizingMode));
         setRtwSizeSystem(d.rtwSizeSystem || "ALPHA");
         setCustomMeasurementKeys(
           Array.isArray(d.customMeasurementKeys) ? d.customMeasurementKeys : [],
@@ -594,13 +596,13 @@ const CreateDesignInner: React.FC = () => {
           type,
           visibility,
           filterValueIds: getSelectedFilterValueIds(),
-          sizingMode,
+          sizingMode: normalizeSizingMode(sizingMode),
           rtwSizeSystem:
-            sizingMode === "RTW" || sizingMode === "RTW_PLUS_CUSTOM"
+            isRtwSizingMode(sizingMode)
               ? rtwSizeSystem
               : null,
           customMeasurementKeys:
-            sizingMode === "CUSTOM" || sizingMode === "RTW_PLUS_CUSTOM"
+            isCustomSizingMode(sizingMode)
               ? customMeasurementKeys
               : [],
           fitPreference: fitPreference || null,
@@ -623,13 +625,13 @@ const CreateDesignInner: React.FC = () => {
             visibility,
             filterValueIds: getSelectedFilterValueIds(),
             coverIndex,
-            sizingMode,
+            sizingMode: normalizeSizingMode(sizingMode),
             rtwSizeSystem:
-              sizingMode === "RTW" || sizingMode === "RTW_PLUS_CUSTOM"
+              isRtwSizingMode(sizingMode)
                 ? rtwSizeSystem
                 : undefined,
             customMeasurementKeys:
-              sizingMode === "CUSTOM" || sizingMode === "RTW_PLUS_CUSTOM"
+              isCustomSizingMode(sizingMode)
                 ? customMeasurementKeys
                 : [],
             fitPreference: fitPreference || undefined,
@@ -709,13 +711,13 @@ const CreateDesignInner: React.FC = () => {
           visibility,
           coverMediaId: files[coverIndex]?.remoteId || undefined,
           filterValueIds: getSelectedFilterValueIds(),
-          sizingMode,
+          sizingMode: normalizeSizingMode(sizingMode),
           rtwSizeSystem:
-            sizingMode === "RTW" || sizingMode === "RTW_PLUS_CUSTOM"
+            isRtwSizingMode(sizingMode)
               ? rtwSizeSystem
               : null,
           customMeasurementKeys:
-            sizingMode === "CUSTOM" || sizingMode === "RTW_PLUS_CUSTOM"
+            isCustomSizingMode(sizingMode)
               ? customMeasurementKeys
               : [],
           fitPreference: fitPreference || null,
@@ -749,13 +751,13 @@ const CreateDesignInner: React.FC = () => {
               categoryTypeId,
               tags: finalTags,
               filterValueIds: getSelectedFilterValueIds(),
-              sizingMode,
+              sizingMode: normalizeSizingMode(sizingMode),
               rtwSizeSystem:
-                sizingMode === "RTW" || sizingMode === "RTW_PLUS_CUSTOM"
+                isRtwSizingMode(sizingMode)
                   ? rtwSizeSystem
                   : undefined,
               customMeasurementKeys:
-                sizingMode === "CUSTOM" || sizingMode === "RTW_PLUS_CUSTOM"
+                isCustomSizingMode(sizingMode)
                   ? customMeasurementKeys
                   : [],
               fitPreference: fitPreference || undefined,
@@ -785,13 +787,13 @@ const CreateDesignInner: React.FC = () => {
             visibility,
             filterValueIds: getSelectedFilterValueIds(),
             coverIndex,
-            sizingMode,
+            sizingMode: normalizeSizingMode(sizingMode),
             rtwSizeSystem:
-              sizingMode === "RTW" || sizingMode === "RTW_PLUS_CUSTOM"
+              isRtwSizingMode(sizingMode)
                 ? rtwSizeSystem
                 : undefined,
             customMeasurementKeys:
-              sizingMode === "CUSTOM" || sizingMode === "RTW_PLUS_CUSTOM"
+              isCustomSizingMode(sizingMode)
                 ? customMeasurementKeys
                 : [],
             fitPreference: fitPreference || undefined,
@@ -1441,6 +1443,14 @@ const CreateDesignInner: React.FC = () => {
                 measurementGender={
                   type === "MALE" ? "MEN" : type === "FEMALE" ? "WOMEN" : undefined
                 }
+                disabled={disabled}
+              />
+
+              <CustomOrderOfferEditor
+                sourceType="DESIGN"
+                sourceId={isEditMode ? id : undefined}
+                measurementKeys={customMeasurementKeys}
+                measurementGender={type === "MALE" ? "MEN" : type === "FEMALE" ? "WOMEN" : "UNISEX"}
                 disabled={disabled}
               />
             </div>

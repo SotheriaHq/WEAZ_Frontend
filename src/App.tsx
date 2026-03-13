@@ -2,38 +2,28 @@
 import React, { Suspense, useEffect, lazy } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet, Navigate, useParams, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import Market from './pages/Market';
 import SettingsHome from './pages/settings/SettingsHome';
 import CollectionsSettings from './pages/settings/CollectionsSettings';
 import SignupPage from './pages/SignUp';
 import Success from './pages/Success';
 import LoginPage from './pages/Login';
 import AccountReactivationRequestPage from './pages/AccountReactivationRequestPage';
-import MarketPlace from './pages/MarketPlace';
 // Removed separate BrandPublic visitor page; unified profile view handles both owner & visitor modes
 import ProtectedRoute from './components/ProtectedRoute';
 import GuestRoute from './components/GuestRoute';
 import { AuthProvider } from './context/AuthContext';
 import { DropdownManagerProvider } from './context/DropdownManagerContext';
-import Profile from './pages/catalog/Catalog';
 import { ProfileLayout } from './components/catalog/ProfileLayout';
-import CreateDesignPage from './pages/catalog/CreateDesign';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
-import CollectionRouter from './pages/catalog/CollectionRouter';
 import ErrorPage from './pages/ErrorPage';
-import StudioHome from './pages/studio/StudioHome';
-import EditProduct from './pages/studio/products/EditProduct';
 import CartDrawer from './components/designs/CartDrawer';
 import WishlistDrawer from './components/designs/WishlistDrawer';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
 import CheckoutPage from './pages/checkout/CheckoutPage';
 import OrderConfirmation from './pages/checkout/OrderConfirmation';
 import PaymentReturnPage from './pages/checkout/PaymentReturnPage';
-import MyOrders from './pages/orders/MyOrders';
-import OrderDetail from './pages/orders/OrderDetail';
 import OrderAccessResolverPage from './pages/orders/OrderAccessResolverPage';
-import ProductDetailsPage from './pages/catalog/ProductDetailsPage';
 // Placeholder pages for features under development
 import {
   NotFound,
@@ -46,24 +36,39 @@ import { GlobalModalRouter } from './components/modals/GlobalModalRouter';
 import ShopSetupWizardPage from './pages/studio/shop/ShopSetupWizardPage';
 import ShopSetupEssentialsPage from './pages/studio/shop/ShopSetupEssentialsPage';
 import StudioScaffold from './components/studio/StudioScaffold';
-import StoreManagement from './pages/studio/store/StoreManagement';
-import StoreVerificationPage from './pages/studio/store/StoreVerificationPage';
-import VerificationWizardPage from './pages/studio/store/VerificationWizardPage';
-import VerificationSubmittedPage from './pages/studio/store/VerificationSubmittedPage';
-import StoreCollectionCreate from './pages/studio/store/StoreCollectionCreate';
 import RequireStoreSetup from './components/store/RequireStoreSetup';
 import {
   ProductAliasRedirect,
   ProfileAliasRedirect,
   StorefrontAliasRedirect,
 } from './pages/redirects/PublicAliasRedirects';
-import SizeChartsPage from './pages/size-charts/SizeChartsPage';
 import VerifiedBadgeMeaningPage from './pages/ui/VerifiedBadgeMeaningPage';
-import SearchResultsPage from './pages/SearchResultsPage';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { setViewportWidth } from '@/features/uiSlice';
 import RequireAdmin from './components/admin/RequireAdmin';
+
+const Market = lazy(() => import('./pages/Market'));
+const MarketPlace = lazy(() => import('./pages/MarketPlace'));
+const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
+const Profile = lazy(() => import('./pages/catalog/Catalog'));
+const CreateDesignPage = lazy(() => import('./pages/catalog/CreateDesign'));
+const CollectionRouter = lazy(() => import('./pages/catalog/CollectionRouter'));
+const ProductDetailsPage = lazy(() => import('./pages/catalog/ProductDetailsPage'));
+const SizeChartsPage = lazy(() => import('./pages/size-charts/SizeChartsPage'));
+const StudioHome = lazy(() => import('./pages/studio/StudioHome'));
+const EditProduct = lazy(() => import('./pages/studio/products/EditProduct'));
+const StoreManagement = lazy(() => import('./pages/studio/store/StoreManagement'));
+const StoreVerificationPage = lazy(() => import('./pages/studio/store/StoreVerificationPage'));
+const VerificationWizardPage = lazy(() => import('./pages/studio/store/VerificationWizardPage'));
+const VerificationSubmittedPage = lazy(() => import('./pages/studio/store/VerificationSubmittedPage'));
+const StoreCollectionCreate = lazy(() => import('./pages/studio/store/StoreCollectionCreate'));
+const CustomOrdersPage = lazy(() => import('./pages/studio/CustomOrdersPage'));
+const MyOrders = lazy(() => import('./pages/orders/MyOrders'));
+const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
+const CustomOrdersIndexPage = lazy(() => import('./pages/custom-orders/CustomOrdersIndexPage'));
+const CustomOrderComposerPage = lazy(() => import('./pages/custom-orders/CustomOrderComposerPage'));
+const CustomOrderDetailPage = lazy(() => import('./pages/custom-orders/CustomOrderDetailPage'));
 
 // Admin pages — lazy loaded for code splitting
 const AdminScaffold = lazy(() => import('./components/admin/AdminScaffold'));
@@ -84,6 +89,11 @@ const AdminAuditPage = lazy(() => import('./pages/admin/AdminAuditPage'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'));
 const AdminForceResetPasswordPage = lazy(() => import('./pages/admin/AdminForceResetPasswordPage'));
 const AdminResetPasswordPage = lazy(() => import('./pages/admin/AdminResetPasswordPage'));
+const AdminCustomOrdersPage = lazy(() => import('./pages/admin/AdminCustomOrdersPage'));
+
+const AppRouteFallback: React.FC = () => (
+  <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">Loading page...</div>
+);
 
 /**
  * Root layout component that wraps all routes
@@ -133,7 +143,9 @@ const RootLayout: React.FC = () => {
       <CartDrawer />
       <WishlistDrawer />
       <GlobalModalRouter />
-      <Outlet />
+      <Suspense fallback={<AppRouteFallback />}>
+        <Outlet />
+      </Suspense>
     </>
   );
 };
@@ -245,6 +257,10 @@ const router = createBrowserRouter([
         element: <Navigate to="/studio/store?view=collections" replace />,
       },
       {
+        path: '/studio/store/custom-orders',
+        element: <Navigate to="/studio/custom-orders" replace />,
+      },
+      {
         path: '/studio/store/collections/new',
         element: (
           <RequireBrand>
@@ -287,6 +303,30 @@ const router = createBrowserRouter([
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={() => {}}>
                 <ProductDetailsPage />
+              </StudioScaffold>
+            </RequireStoreSetup>
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/custom-orders',
+        element: (
+          <RequireBrand>
+            <RequireStoreSetup>
+              <StudioScaffold active="custom-orders" onSelect={() => {}}>
+                <CustomOrdersPage />
+              </StudioScaffold>
+            </RequireStoreSetup>
+          </RequireBrand>
+        ),
+      },
+      {
+        path: '/studio/custom-orders/:orderId',
+        element: (
+          <RequireBrand>
+            <RequireStoreSetup>
+              <StudioScaffold active="custom-orders" onSelect={() => {}}>
+                <CustomOrdersPage />
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -365,6 +405,9 @@ const router = createBrowserRouter([
           { path: '/checkout/payment-return', element: <Layout><PaymentReturnPage /></Layout> },
           { path: '/checkout/confirmation', element: <Layout><OrderConfirmation /></Layout> },
           { path: '/orders', element: <Layout><MyOrders /></Layout> },
+          { path: '/custom-orders', element: <Layout><CustomOrdersIndexPage /></Layout> },
+          { path: '/custom-orders/new', element: <Layout><CustomOrderComposerPage /></Layout> },
+          { path: '/custom-orders/:orderId', element: <Layout><CustomOrderDetailPage /></Layout> },
           { path: '/orders/access/:orderId', element: <Layout><OrderAccessResolverPage /></Layout> },
           { path: '/orders/:orderId', element: <Layout><OrderDetail /></Layout> },
         ],
@@ -435,6 +478,8 @@ const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <AdminDashboard /> },
+          { path: 'custom-orders', element: <AdminCustomOrdersPage /> },
+          { path: 'custom-orders/:orderId', element: <AdminCustomOrdersPage /> },
           { path: 'users', element: <AdminUsersPage /> },
           { path: 'brands', element: <AdminBrandsPage /> },
           { path: 'verification', element: <AdminVerificationQueuePage /> },

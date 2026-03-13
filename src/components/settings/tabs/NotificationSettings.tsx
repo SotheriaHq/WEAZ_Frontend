@@ -29,12 +29,23 @@ interface NotificationSettingsData {
     contributions: boolean;
   };
   orders: {
-    updates: boolean;
+    placed: boolean;
+    statusChanges: boolean;
+  };
+  reviews: {
+    reminders: boolean;
+    replies: boolean;
+    moderation: boolean;
   };
   fit: {
     reminders: boolean;
     shares: boolean;
     approvals: boolean;
+  };
+  messaging: {
+    newMessages: boolean;
+    reminders: boolean;
+    moderation: boolean;
   };
 }
 
@@ -136,10 +147,19 @@ const NotificationSettings: React.FC = () => {
       ],
     },
     {
-      title: 'Orders',
+      title: 'Orders & Delivery',
       category: 'orders' as const,
       items: [
-        { id: 'updates', label: 'Order Updates', description: 'Order placement and order status updates' },
+        {
+          id: 'placed',
+          label: 'Order Placed Confirmations',
+          description: 'Get notified as soon as your checkout succeeds and your order is created',
+        },
+        {
+          id: 'statusChanges',
+          label: 'Order Status Changes',
+          description: 'Get notified when your order moves to processing, shipped, delivered, cancelled, returned, or refund-related states',
+        },
       ],
     },
     {
@@ -170,13 +190,34 @@ const NotificationSettings: React.FC = () => {
         },
       ],
     },
+    {
+      title: 'Order Messaging',
+      category: 'messaging' as const,
+      items: [
+        {
+          id: 'newMessages',
+          label: 'New Messages',
+          description: 'Get notified when someone sends a message in an order thread',
+        },
+        {
+          id: 'reminders',
+          label: 'Unread Reminders',
+          description: 'Receive reminders when you still have unread order messages',
+        },
+        {
+          id: 'moderation',
+          label: 'Moderation Notices',
+          description: 'Receive critical notices when support or moderation changes thread visibility',
+        },
+      ],
+    },
   ];
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Notification Preferences</h1>
-        <p className="text-gray-600 dark:text-gray-400">Choose what you want to be notified about.</p>
+        <p className="text-gray-600 dark:text-gray-400">Choose which account, order, and activity updates should reach you in real time.</p>
       </div>
 
       <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 divide-y divide-gray-200 dark:divide-white/10">

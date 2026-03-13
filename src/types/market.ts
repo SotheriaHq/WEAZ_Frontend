@@ -1,3 +1,5 @@
+import type { SizingMode } from './sizing';
+
 export type MarketMediaType = 'POST_IMAGE' | 'POST_VIDEO' | string;
 
 export interface MarketMedia {
@@ -32,7 +34,7 @@ export interface MarketItem {
   // When requested with counts=combined, backend may supply combined total
   combinedCommentsCount?: number | null;
   collectionCollabCount?: number | null;
-  sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+  sizingMode?: SizingMode;
   customMeasurementKeys?: string[];
   customAvailable?: boolean;
   tags: string[];

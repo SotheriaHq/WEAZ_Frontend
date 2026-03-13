@@ -7,6 +7,7 @@ import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { toast } from 'sonner';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import type { SizingMode } from '@/types/sizing';
 
 export interface StoreProduct {
   id: string;
@@ -24,7 +25,7 @@ export interface StoreProduct {
   media?: Array<{ id: string; url: string; type: string; isPrimary?: boolean }>;
   mediaIds?: string[];
   sizes: string[];
-  sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+  sizingMode?: SizingMode;
   customMeasurementKeys?: string[];
   customAvailable?: boolean;
   sizeAvailability: { size: string; inStock: boolean; quantity: number }[];
@@ -87,12 +88,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
   const redHeartEmoji = String.fromCodePoint(0x2764, 0xfe0f);
   const whiteHeartEmoji = String.fromCodePoint(0x1f90d);
-  const isCustomAvailable =
-    product.customAvailable === true ||
-    product.sizingMode === 'CUSTOM' ||
-    product.sizingMode === 'RTW_PLUS_CUSTOM' ||
-    (Array.isArray(product.customMeasurementKeys) &&
-      product.customMeasurementKeys.length > 0);
+  const isCustomAvailable = product.customAvailable === true;
   const ownerStatus = (() => {
     if (!isOwnerView) return null;
     if (product.deletedAt) {

@@ -14,6 +14,7 @@ import { fetchWishlist } from '@/features/wishlistSlice';
 import FeaturedSection from '@/components/FeaturedSection';
 import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
+import { normalizeSizingMode } from '@/types/sizing';
 
 interface RawProductsPayload {
   items?: any[];
@@ -162,12 +163,7 @@ const normalizeProduct = (raw: any): StoreProduct | null => {
     images: Array.isArray(raw?.images) ? raw.images.map((img: any) => String(img)) : [],
     media,
     sizes: Array.isArray(raw?.sizes) ? raw.sizes.map((size: any) => String(size)) : [],
-    sizingMode:
-      raw?.sizingMode === 'RTW' ||
-      raw?.sizingMode === 'CUSTOM' ||
-      raw?.sizingMode === 'RTW_PLUS_CUSTOM'
-        ? raw.sizingMode
-        : 'NONE',
+    sizingMode: normalizeSizingMode(raw?.sizingMode),
     customMeasurementKeys: Array.isArray(raw?.customMeasurementKeys)
       ? raw.customMeasurementKeys.map((k: any) => String(k))
       : [],
@@ -283,7 +279,7 @@ const MarketPlace: React.FC = () => {
 
   const availableFilters = useMemo(() => {
     const fromProducts = new Set<string>(BASE_FILTERS);
-    if (products.some((p) => p.sizingMode === 'CUSTOM' || p.sizingMode === 'RTW_PLUS_CUSTOM')) {
+    if (products.some((p) => p.customAvailable === true)) {
       fromProducts.add('CUSTOM_FIT');
     }
     return Array.from(fromProducts);
@@ -299,7 +295,7 @@ const MarketPlace: React.FC = () => {
       if (selectedFilter === 'ON_SALE' && !product.isOnSale) return false;
       if (
         selectedFilter === 'CUSTOM_FIT' &&
-        !(product.sizingMode === 'CUSTOM' || product.sizingMode === 'RTW_PLUS_CUSTOM')
+        product.customAvailable !== true
       ) {
         return false;
       }

@@ -18,6 +18,7 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import { selectImageVariant } from '@/utils/selectImageVariant';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { apiClient } from '@/api/httpClient';
+import { customOrderOffersApi } from '@/api/CustomOrderApi';
 
 // ============================================
 // TYPES
@@ -921,6 +922,7 @@ const DesignView: React.FC = () => {
   const [addingAll, setAddingAll] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
+  const [customOfferAvailable, setCustomOfferAvailable] = useState(false);
 
   const highlightCommentId = new URLSearchParams(window.location.search).get('commentId');
 
@@ -1039,6 +1041,36 @@ const DesignView: React.FC = () => {
     setMoreFromBrand([]);
     setYouMightLike([]);
   }, [detail?.owner?.id]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadCustomOffer = async () => {
+      if (!id || !detail || detail.isAvailableInStore) {
+        if (active) setCustomOfferAvailable(false);
+        return;
+      }
+      try {
+        const response = await customOrderOffersApi.listVisible({
+          sourceType: 'DESIGN',
+          sourceId: id,
+          limit: 1,
+        });
+        if (active) {
+          setCustomOfferAvailable(Boolean(response.items[0]));
+        }
+      } catch {
+        if (active) {
+          setCustomOfferAvailable(false);
+        }
+      }
+    };
+
+    void loadCustomOffer();
+    return () => {
+      active = false;
+    };
+  }, [detail, id]);
 
   const handleBack = () => navigate(-1);
   
@@ -1234,6 +1266,16 @@ const DesignView: React.FC = () => {
     navigate(`/collections/${collectionId}`);
   };
 
+  const handleStartCustomOrder = () => {
+    if (!id) return;
+    if (!isAuth) {
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    navigate(`/custom-orders/new?sourceType=DESIGN&sourceId=${encodeURIComponent(id)}`);
+  };
+
   const handleViewProduct = (productId: string) => {
     if (!detail) return;
     const params = new URLSearchParams({
@@ -1305,6 +1347,11 @@ const DesignView: React.FC = () => {
               </p>
             </div>
             <div className="flex gap-3">
+              {customOfferAvailable ? (
+                <button type="button" onClick={handleStartCustomOrder} className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20">
+                  ✂️ Request Custom Order
+                </button>
+              ) : null}
               <button type="button" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-white/80 hover:text-white transition-all text-sm font-medium">
                 Filter
               </button>
@@ -1313,6 +1360,27 @@ const DesignView: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {customOfferAvailable ? (
+            <section className="mb-10 rounded-[28px] border border-emerald-400/20 bg-[linear-gradient(145deg,rgba(16,185,129,0.12),rgba(15,23,42,0.72))] p-6 text-white shadow-[0_24px_80px_rgba(16,185,129,0.08)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-200">Custom Order Available</div>
+              <h2 className="mt-3 text-2xl font-bold">Request this design as a made-to-measure order</h2>
+              <div className="mt-3 grid gap-4 md:grid-cols-3 text-sm text-white/75">
+                <div>
+                  <div className="font-semibold text-white">📏 Measurement expectations</div>
+                  <p className="mt-1">You will review and confirm a measurement snapshot before pricing and payment.</p>
+                </div>
+                <div>
+                  <div className="font-semibold text-white">🧵 Production commitments</div>
+                  <p className="mt-1">The brand must accept the paid order before work starts and must keep stage updates current.</p>
+                </div>
+                <div>
+                  <div className="font-semibold text-white">💳 Pricing behavior</div>
+                  <p className="mt-1">You will see a locked buyer-facing total before checkout. The brand cannot raise the price later.</p>
+                </div>
+              </div>
+            </section>
+          ) : null}
 
           <ProductGrid
             products={productItems}

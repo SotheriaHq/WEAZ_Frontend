@@ -20,6 +20,7 @@ import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreP
 import ImageWithFallback from '@/components/ImageWithFallback';
 import ImageLightbox from './ImageLightbox';
 import { useNavigate } from 'react-router-dom';
+import { normalizeSizingMode, type SizingMode } from '@/types/sizing';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,7 +35,7 @@ interface CollectionProduct {
   images: string[];
   thumbnail?: string | null;
   sizes: string[];
-  sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+  sizingMode?: SizingMode;
   customMeasurementKeys?: string[];
   customAvailable?: boolean;
   colors: string[];
@@ -150,19 +151,14 @@ const InlineStoreCollectionView: React.FC<InlineStoreCollectionViewProps> = ({
           images: Array.isArray(p.images) ? p.images : [],
           thumbnail: p.thumbnail ?? null,
           sizes: Array.isArray(p.sizes) ? p.sizes : [],
-          sizingMode:
-            p.sizingMode === 'RTW' ||
-            p.sizingMode === 'CUSTOM' ||
-            p.sizingMode === 'RTW_PLUS_CUSTOM'
-              ? p.sizingMode
-              : 'NONE',
+          sizingMode: normalizeSizingMode(p.sizingMode),
           customMeasurementKeys: Array.isArray(p.customMeasurementKeys)
             ? p.customMeasurementKeys
             : [],
           customAvailable:
             typeof p.customAvailable === 'boolean'
               ? p.customAvailable
-              : p.sizingMode === 'CUSTOM' || p.sizingMode === 'RTW_PLUS_CUSTOM',
+              : false,
           colors: Array.isArray(p.colors) ? p.colors : [],
           hasVariants: Array.isArray(p.variants)
             ? p.variants.length > 0

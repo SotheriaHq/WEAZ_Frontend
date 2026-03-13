@@ -1,6 +1,7 @@
 import { apiClient } from './httpClient';
 import { createIdempotencyKey } from './idempotency';
 import { unwrapApiResponse } from '../types/auth'; // Keep this import for potential future use
+import type { SizingMode } from '@/types/sizing';
 
 // Type for presigned upload entries from collections/initialize
 export type PresignEntry = {
@@ -263,7 +264,7 @@ export async function initializeCollectionUploads(
     type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
     visibility?: 'PUBLIC' | 'PRIVATE';
     filterValueIds?: string[];
-    sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+    sizingMode?: SizingMode;
     rtwSizeSystem?: string;
     rtwSizeType?: 'PREDEFINED' | 'FREEFORM' | 'MIXED';
     customGender?: 'MEN' | 'WOMEN' | 'UNISEX';
@@ -302,7 +303,7 @@ export async function finalizeCollectionUploads(
       categoryTypeId?: string;
       tags?: string[];
       filterValueIds?: string[];
-      sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+      sizingMode?: SizingMode;
       rtwSizeSystem?: string;
       rtwSizeType?: 'PREDEFINED' | 'FREEFORM' | 'MIXED';
       customGender?: 'MEN' | 'WOMEN' | 'UNISEX';

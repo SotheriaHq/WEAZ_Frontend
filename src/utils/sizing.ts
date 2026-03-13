@@ -6,6 +6,7 @@ import type {
   OrderSizingSnapshot,
   SizingMode,
 } from '@/types/sizing';
+import { normalizeSizingMode } from '@/types/sizing';
 
 const conversions: Record<string, number> = {
   cm_in: 0.3937007874,
@@ -91,7 +92,7 @@ export function buildSizeFitSnapshot(
   }
 
   return {
-    mode: options.mode,
+    mode: normalizeSizingMode(options.mode),
     selectedSize: options.selectedSize,
     fitPreference: options.fitPreference,
     fitPreferenceSource: options.fitPreferenceSource,

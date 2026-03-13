@@ -13,6 +13,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', path: '/admin', emoji: '📊' },
+  { key: 'custom-orders', label: 'Custom Orders', path: '/admin/custom-orders', emoji: '✂️', permission: 'MODERATION_READ' },
   { key: 'users', label: 'Users', path: '/admin/users', emoji: '👤', permission: 'USERS_READ' },
   { key: 'brands', label: 'Brands', path: '/admin/brands', emoji: '🏷️', permission: 'BRANDS_READ' },
   { key: 'verification', label: 'Verification', path: '/admin/verification', emoji: '🪪', permission: 'BRANDS_VERIFY' },

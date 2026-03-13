@@ -478,7 +478,7 @@ const OrderManagement: React.FC = () => {
 
       <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(145deg,rgba(255,255,255,0.94),rgba(255,255,255,0.78))] shadow-[0_24px_60px_rgba(15,23,42,0.09)] dark:border-white/10 dark:bg-[linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] dark:shadow-none">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] border-collapse text-left">
+          <table className="w-full min-w-[1080px] border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200/80 bg-slate-100/80 dark:border-white/10 dark:bg-white/[0.03]">
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Order ID</th>
@@ -486,6 +486,7 @@ const OrderManagement: React.FC = () => {
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Items</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Details</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Status</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Payment</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Amount</th>
                 <th className="px-6 py-4" />
               </tr>
@@ -493,7 +494,7 @@ const OrderManagement: React.FC = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={8} className="px-6 py-16 text-center">
                     <div className="flex justify-center">
                       <VLoader size={56} progress={58} phase="loading" />
                     </div>
@@ -501,7 +502,7 @@ const OrderManagement: React.FC = () => {
                 </tr>
               ) : sortedOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <td colSpan={8} className="px-6 py-16 text-center text-sm text-slate-500 dark:text-slate-400">
                     No orders found matching your criteria.
                   </td>
                 </tr>
@@ -594,14 +595,15 @@ const OrderManagement: React.FC = () => {
                       </td>
 
                       <td className="px-6 py-4 align-top">
-                        <div className="flex flex-col gap-2">
-                          <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getStatusClasses(order.status)}`}>
-                            {order.status}
-                          </span>
-                          <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getPaymentClasses(order.paymentStatus)}`}>
-                            {order.paymentStatus || 'PENDING'}
-                          </span>
-                        </div>
+                        <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getStatusClasses(order.status)}`}>
+                          {order.status}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 align-top">
+                        <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getPaymentClasses(order.paymentStatus)}`}>
+                          {order.paymentStatus || 'PENDING'}
+                        </span>
                       </td>
 
                       <td className="px-6 py-4 align-top">

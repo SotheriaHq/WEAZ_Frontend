@@ -4,6 +4,7 @@ import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import VLoader from '@/components/loaders/VLoader';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import { getSizingModeLabel } from '@/types/sizing';
 
 interface OrderDetailsModalProps {
   isOpen: boolean;
@@ -373,7 +374,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                                     ) : null}
                                     {sizingMode && sizingMode !== 'NONE' ? (
                                       <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-                                        {sizingMode === 'RTW_PLUS_CUSTOM' ? 'RTW + Custom' : sizingMode.replace(/_/g, ' ')}
+                                        {getSizingModeLabel(sizingMode)}
                                       </span>
                                     ) : null}
                                     {requiredKeys.length > 0 ? (

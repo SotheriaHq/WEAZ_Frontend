@@ -101,12 +101,8 @@ export default function InlineProductDetail({
 
   const requiresMeasurements = useMemo(() => {
     if (requiredMeasurementKeys.length === 0) return false;
-    return (
-      product.customAvailable === true ||
-      product.sizingMode === 'CUSTOM' ||
-      product.sizingMode === 'RTW_PLUS_CUSTOM'
-    );
-  }, [product.customAvailable, product.sizingMode, requiredMeasurementKeys]);
+    return product.customAvailable === true;
+  }, [product.customAvailable, requiredMeasurementKeys]);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
   const isWishlisted = wishlistedIds.has(product.id);
 
@@ -219,10 +215,7 @@ export default function InlineProductDetail({
   const compareAtPrice = (product as any).compareAtPrice as number | undefined;
   const isOutOfStock = !product.totalStock || product.totalStock <= 0;
   const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
-  const isCustomOrderProduct =
-    product.customAvailable === true ||
-    product.sizingMode === 'CUSTOM' ||
-    product.sizingMode === 'RTW_PLUS_CUSTOM';
+  const isCustomOrderProduct = product.customAvailable === true;
 
   const availableSizes = useMemo(() => {
     if (!hasVariants) return sizes;
@@ -579,7 +572,10 @@ export default function InlineProductDetail({
               <div className="flex flex-wrap gap-2">
                 {colors.map((color) => {
                   const isAvailable = !hasVariants || availableColors.includes(color);
-                  const colorStyle = resolveColorStyle(color, product.colorHexCodes ?? null);
+                  const colorStyle = resolveColorStyle(
+                    color,
+                    ((product as StoreProduct & { colorHexCodes?: Record<string, string> }).colorHexCodes) ?? null,
+                  );
                   const isGradient = colorStyle.includes('gradient');
                   
                   return (

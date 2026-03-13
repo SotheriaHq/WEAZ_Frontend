@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { apiClient } from '../api/httpClient';
+import type { SizingMode } from '@/types/sizing';
 
 // Types
 export interface ProductBrand {
@@ -123,7 +124,7 @@ export const addToCart = createAsyncThunk(
       quantity?: number;
       selectedSize?: string;
       selectedColor?: string;
-      sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+      sizingMode?: SizingMode;
       sizeFitData?: Record<string, any>;
       requiredMeasurementKeys?: string[];
     },

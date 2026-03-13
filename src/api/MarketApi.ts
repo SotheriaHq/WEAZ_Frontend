@@ -1,6 +1,7 @@
 import { apiClient } from './httpClient';
 import { unwrapApiResponse } from '@/types/auth';
 import type { MarketFeedResponse, MarketItem, MarketMediaType } from '@/types/market';
+import { normalizeSizingMode } from '@/types/sizing';
 
 export interface GetMarketFeedParams {
   cursor?: string;
@@ -116,12 +117,13 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
         : typeof raw.collectionCollabCount === 'number'
           ? (raw.collectionCollabCount as number)
           : null,
-    sizingMode:
+    sizingMode: normalizeSizingMode(
       typeof (collection as any).sizingMode === 'string'
-        ? ((collection as any).sizingMode as MarketItem['sizingMode'])
+        ? String((collection as any).sizingMode)
         : typeof (raw as any).sizingMode === 'string'
-          ? ((raw as any).sizingMode as MarketItem['sizingMode'])
+          ? String((raw as any).sizingMode)
           : undefined,
+    ),
     customMeasurementKeys: Array.isArray((collection as any).customMeasurementKeys)
       ? ((collection as any).customMeasurementKeys as string[])
       : Array.isArray((raw as any).customMeasurementKeys)
@@ -132,10 +134,7 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
         ? Boolean((raw as any).customAvailable)
         : typeof (collection as any).customAvailable === 'boolean'
           ? Boolean((collection as any).customAvailable)
-          : ((collection as any).sizingMode === 'CUSTOM' ||
-              (collection as any).sizingMode === 'RTW_PLUS_CUSTOM' ||
-              (raw as any).sizingMode === 'CUSTOM' ||
-              (raw as any).sizingMode === 'RTW_PLUS_CUSTOM'),
+            : false,
     tags,
     isThreaded: typeof raw.isThreaded === 'boolean' ? (raw.isThreaded as boolean) : false,
     media: {

@@ -1,0 +1,169 @@
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import CustomOrderOfferEditor from '@/components/custom-orders/CustomOrderOfferEditor';
+
+const getStoreStatus = vi.fn();
+const listFabricRuleBases = vi.fn();
+const listBrandOffers = vi.fn();
+const createFabricRuleBasis = vi.fn();
+const createOffer = vi.fn();
+const updateOffer = vi.fn();
+const toastError = vi.fn();
+const toastSuccess = vi.fn();
+
+vi.mock('@/api/StoreApi', () => ({
+  getStoreStatus: (...args: unknown[]) => getStoreStatus(...args),
+}));
+
+vi.mock('@/api/CustomOrderApi', () => ({
+  customOrderOffersApi: {
+    listFabricRuleBases: (...args: unknown[]) => listFabricRuleBases(...args),
+    listBrandOffers: (...args: unknown[]) => listBrandOffers(...args),
+    createFabricRuleBasis: (...args: unknown[]) => createFabricRuleBasis(...args),
+    create: (...args: unknown[]) => createOffer(...args),
+    update: (...args: unknown[]) => updateOffer(...args),
+  },
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: (...args: unknown[]) => toastError(...args),
+    success: (...args: unknown[]) => toastSuccess(...args),
+  },
+}));
+
+describe('CustomOrderOfferEditor', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getStoreStatus.mockResolvedValue({
+      brandId: 'brand-1',
+      isStoreOpen: true,
+      isSetupComplete: true,
+      missingFields: [],
+      profile: {
+        name: 'Ada Atelier',
+        tags: [],
+      },
+    });
+    listFabricRuleBases.mockResolvedValue([]);
+    listBrandOffers.mockResolvedValue({ items: [], page: 1, limit: 10, total: 0 });
+    createFabricRuleBasis.mockResolvedValue({
+      id: 'basis-1',
+      label: 'Dress block',
+      measurementKeys: ['bust', 'waist'],
+      status: 'BRAND_ONLY',
+      gender: 'WOMEN',
+      createdAt: '2026-03-12T00:00:00.000Z',
+      updatedAt: '2026-03-12T00:00:00.000Z',
+    });
+    createOffer.mockResolvedValue({
+      id: 'offer-1',
+      brandId: 'brand-1',
+      sourceType: 'PRODUCT',
+      sourceId: 'product-1',
+      title: 'Bespoke blazer',
+      buyerInstructionText: 'Bring your final measurements.',
+      requiredMeasurementKeys: ['bust', 'waist'],
+      requiredFreeformPointIds: [],
+      baseProductionCharge: '120000',
+      fabricCostPerYard: '10000',
+      rushEnabled: false,
+      rushFee: null,
+      rushProductionLeadDays: null,
+      productionLeadDays: 7,
+      deliveryMinDays: 2,
+      deliveryMaxDays: 5,
+      deliveryScope: 'Nigeria',
+      revisionPolicy: 'One revision after delivery confirmation.',
+      returnPolicy: 'Custom orders are not returnable except where required by policy.',
+      defectPolicy: 'Defects and material faults are reviewed through support.',
+      fabricSourcingMode: 'BRAND_SOURCED',
+      notes: null,
+      isActive: true,
+      currentVersion: 1,
+      fabricRuleBasis: {
+        id: 'basis-1',
+        label: 'Dress block',
+        measurementKeys: ['bust', 'waist'],
+      },
+      rules: [
+        {
+          id: 'rule-1',
+          priority: 1,
+          conditionsJson: {},
+          outputYards: '4',
+          isFallback: true,
+        },
+      ],
+    });
+  });
+
+  it('shows the save-first state when the source has not been persisted yet', () => {
+    render(<CustomOrderOfferEditor sourceType="PRODUCT" measurementKeys={['bust', 'waist']} />);
+
+    expect(screen.getByText('Save this product first. The custom-order offer attaches to a persisted source id.')).toBeInTheDocument();
+    expect(getStoreStatus).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Create offer' })).toBeDisabled();
+  });
+
+  it('creates a basis and saves a new custom-order offer for a persisted source', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <CustomOrderOfferEditor
+        sourceType="PRODUCT"
+        sourceId="product-1"
+        measurementKeys={['bust', 'waist']}
+        measurementGender="WOMEN"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(getStoreStatus).toHaveBeenCalled();
+      expect(listFabricRuleBases).toHaveBeenCalledWith({ includeBrandOnly: true });
+      expect(listBrandOffers).toHaveBeenCalledWith('brand-1', {
+        sourceType: 'PRODUCT',
+        sourceId: 'product-1',
+        limit: 10,
+      });
+    });
+
+    await user.type(screen.getByPlaceholderText('New basis label'), 'Dress block');
+    await user.click(screen.getByRole('button', { name: 'Create basis' }));
+
+    await waitFor(() => {
+      expect(createFabricRuleBasis).toHaveBeenCalledWith({
+        label: 'Dress block',
+        measurementKeys: ['bust', 'waist'],
+        gender: 'WOMEN',
+      });
+    });
+
+    await user.type(screen.getByRole('textbox', { name: 'Offer title' }), 'Bespoke blazer');
+    await user.type(screen.getByRole('textbox', { name: 'Buyer instructions' }), 'Bring your final measurements.');
+    await user.type(screen.getByPlaceholderText('120000'), '120000');
+    await user.type(screen.getByPlaceholderText('10000'), '10000');
+    await user.click(screen.getByRole('button', { name: 'Create offer' }));
+
+    await waitFor(() => {
+      expect(createOffer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceType: 'PRODUCT',
+          sourceId: 'product-1',
+          title: 'Bespoke blazer',
+          buyerInstructionText: 'Bring your final measurements.',
+          requiredMeasurementKeys: ['bust', 'waist'],
+          fabricRuleBasisId: 'basis-1',
+          baseProductionCharge: '120000',
+          fabricCostPerYard: '10000',
+        }),
+      );
+    });
+
+    expect(toastSuccess).toHaveBeenCalledWith('Fabric-rule basis created.');
+    expect(toastSuccess).toHaveBeenCalledWith('Custom-order offer created.');
+    expect(screen.getByText('Offer v1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Update offer' })).toBeInTheDocument();
+  });
+});

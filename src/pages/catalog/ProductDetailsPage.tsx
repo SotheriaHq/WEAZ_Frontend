@@ -27,6 +27,7 @@ import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import ProductReviewSection from '@/components/reviews/ProductReviewSection';
+import { isRtwSizingMode, normalizeSizingMode } from '@/types/sizing';
 
 const prettifyMeasurementKey = (value: string) =>
   value
@@ -287,9 +288,7 @@ export default function ProductDetailsPage() {
   }, [product?.sizes, sizes]);
 
   const sizingMode = useMemo(() => {
-    const raw = product?.sizingMode;
-    if (raw === 'RTW' || raw === 'CUSTOM' || raw === 'RTW_PLUS_CUSTOM') return raw;
-    return 'NONE' as const;
+    return normalizeSizingMode(product?.sizingMode);
   }, [product?.sizingMode]);
 
   const requiredMeasurementKeys = useMemo(() => {
@@ -299,12 +298,8 @@ export default function ProductDetailsPage() {
     );
   }, [product?.customMeasurementKeys]);
 
-  const requiresRtwSelection =
-    (sizingMode === 'RTW' || sizingMode === 'RTW_PLUS_CUSTOM') && availableSizes.length > 0;
-  const isCustomAvailable =
-    sizingMode === 'CUSTOM' ||
-    sizingMode === 'RTW_PLUS_CUSTOM' ||
-    requiredMeasurementKeys.length > 0;
+  const requiresRtwSelection = isRtwSizingMode(sizingMode) && availableSizes.length > 0;
+  const isCustomAvailable = product?.customAvailable === true;
   const requiresMeasurements =
     isCustomAvailable && requiredMeasurementKeys.length > 0;
 
@@ -356,14 +351,11 @@ export default function ProductDetailsPage() {
 
   useEffect(() => {
     if (!selectedColor || !colorImageUrl || mediaList.length === 0) return;
-    const imageIndex = mediaList.findIndex((item) => item.url === colorImageUrl);
+    const imageIndex = mediaList.findIndex((item: { url?: string | null }) => item.url === colorImageUrl);
     if (imageIndex >= 0 && imageIndex !== selectedMediaIndex) {
       setSelectedMediaIndex(imageIndex);
     }
   }, [colorImageUrl, mediaList, selectedColor, selectedMediaIndex]);
-
-    (sizingMode === 'CUSTOM' || sizingMode === 'RTW_PLUS_CUSTOM') &&
-    requiredMeasurementKeys.length > 0;
 
   const currentPrice = useMemo(() => {
     if (!product) return 0;
@@ -499,6 +491,20 @@ export default function ProductDetailsPage() {
     (!selectedColor || v.color === selectedColor) && 
     (!selectedSize || v.size === selectedSize)
   );
+
+  const handleStartCustomOrder = () => {
+    if (!product?.id) return;
+    if (isOwnProduct || isStudioStoreView) {
+      toast.info('Custom-order checkout is hidden on your own product view.');
+      return;
+    }
+    if (!isAuth) {
+      toast.info('Please sign in to start a custom order.');
+      navigate('/login');
+      return;
+    }
+    navigate(`/custom-orders/new?sourceType=PRODUCT&sourceId=${encodeURIComponent(product.id)}`);
+  };
   
   const isOutOfStock = variants.length > 0 ? (currentVariant?.stock === 0) : false;
   const isStudioStoreView = location.pathname.startsWith('/studio/store');
@@ -946,6 +952,15 @@ export default function ProductDetailsPage() {
 
                 {showAddToBag ? (
                   <div className="space-y-2.5">
+                    {isCustomAvailable ? (
+                      <button
+                        onClick={handleStartCustomOrder}
+                        type="button"
+                        className="w-full rounded-full border border-emerald-400/50 bg-emerald-500/10 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-500/20 dark:text-emerald-200"
+                      >
+                        ✂️ Start Custom Order
+                      </button>
+                    ) : null}
                     <button
                       onClick={handleAddToCart}
                       disabled={isOutOfStock}

@@ -44,14 +44,14 @@ describe('sizing utils', () => {
       },
       ['NECK', 'WAIST'],
       {
-        mode: 'RTW_PLUS_CUSTOM',
+        mode: 'RTW_PLUS_FITTINGS',
         selectedSize: 'M',
         fitPreference: 'REGULAR',
         fitPreferenceSource: 'BUYER',
       },
     );
 
-    expect(snapshot.mode).toBe('RTW_PLUS_CUSTOM');
+    expect(snapshot.mode).toBe('RTW_PLUS_FITTINGS');
     expect(snapshot.selectedSize).toBe('M');
     expect(snapshot.measurements?.NECK?.value).toBe(40);
     expect(snapshot.measurements?.EXTRA).toBeUndefined();

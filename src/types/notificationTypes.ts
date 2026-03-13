@@ -43,6 +43,10 @@ export const NotificationTypes = {
   SIZE_FIT_RESHARED: 'SIZE_FIT_RESHARED',
   WISHLIST_PRODUCT_UNAVAILABLE: 'WISHLIST_PRODUCT_UNAVAILABLE',
   WISHLIST_PRODUCT_AVAILABLE: 'WISHLIST_PRODUCT_AVAILABLE',
+  MESSAGE_RECEIVED: 'MESSAGE_RECEIVED',
+  MESSAGE_UNREAD_REMINDER: 'MESSAGE_UNREAD_REMINDER',
+  MESSAGE_THREAD_REOPENED: 'MESSAGE_THREAD_REOPENED',
+  MESSAGE_MODERATED: 'MESSAGE_MODERATED',
 } as const;
 
 export type NotificationType =
@@ -379,6 +383,38 @@ export const NotificationRegistry: Record<
     routePattern: () => '/profile?tab=Store',
     defaultAriaAction: 'View wishlist',
     trackingCategory: 'engagement',
+  },
+  [NotificationTypes.MESSAGE_RECEIVED]: {
+    actionText: 'sent a new order message',
+    actionKey: 'notification.action.message_received',
+    iconKey: 'mail',
+    routePattern: () => null,
+    defaultAriaAction: 'Open order message thread',
+    trackingCategory: 'order',
+  },
+  [NotificationTypes.MESSAGE_UNREAD_REMINDER]: {
+    actionText: 'you have unread order messages',
+    actionKey: 'notification.action.message_unread_reminder',
+    iconKey: 'mail',
+    routePattern: () => null,
+    defaultAriaAction: 'Open unread order message thread',
+    trackingCategory: 'order',
+  },
+  [NotificationTypes.MESSAGE_THREAD_REOPENED]: {
+    actionText: 'an order thread was reopened',
+    actionKey: 'notification.action.message_thread_reopened',
+    iconKey: 'order_status',
+    routePattern: () => null,
+    defaultAriaAction: 'Open reopened order thread',
+    trackingCategory: 'order',
+  },
+  [NotificationTypes.MESSAGE_MODERATED]: {
+    actionText: 'a message was moderated',
+    actionKey: 'notification.action.message_moderated',
+    iconKey: 'security',
+    routePattern: () => null,
+    defaultAriaAction: 'Review moderated message notice',
+    trackingCategory: 'security',
   },
 };
 

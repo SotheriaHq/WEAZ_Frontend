@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyOrders, type Order } from '@/api/StoreApi';
 import { toast } from 'sonner';
-import { BadgeCheck, Clock, Package, Truck } from 'lucide-react';
+import { BadgeCheck, Package, Truck } from 'lucide-react';
 import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
 import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
 import VLoader from '@/components/loaders/VLoader';

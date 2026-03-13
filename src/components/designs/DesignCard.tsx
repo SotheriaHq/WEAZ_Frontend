@@ -205,11 +205,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
 
   if (isHidden) return null;
 
-  const isCustomAvailable =
-    item.customAvailable === true ||
-    item.sizingMode === 'CUSTOM' ||
-    item.sizingMode === 'RTW_PLUS_CUSTOM' ||
-    (Array.isArray(item.customMeasurementKeys) && item.customMeasurementKeys.length > 0);
+  const isCustomAvailable = item.customAvailable === true;
 
   const brandAvatar = resolveProfileImageSource({
     brandLogo: item.brandLogo,

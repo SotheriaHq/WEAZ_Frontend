@@ -10,6 +10,7 @@ import type {
   MeasurementPointCategory,
   SizingMode,
 } from '@/types/sizing';
+import { isCustomSizingMode, isRtwSizingMode } from '@/types/sizing';
 
 interface SizingConfiguratorProps {
   contentType: 'product' | 'design';
@@ -214,12 +215,11 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
         >
           <option value="NONE">No Sizing</option>
           <option value="RTW">RTW</option>
-          <option value="CUSTOM">Custom</option>
-          <option value="RTW_PLUS_CUSTOM">RTW + Custom</option>
+          <option value="RTW_PLUS_FITTINGS">RTW + Fittings</option>
         </Select>
       </div>
 
-      {(sizingMode === 'RTW' || sizingMode === 'RTW_PLUS_CUSTOM') && (
+      {isRtwSizingMode(sizingMode) && (
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
             RTW Size System
@@ -238,7 +238,7 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
         </div>
       )}
 
-      {(sizingMode === 'CUSTOM' || sizingMode === 'RTW_PLUS_CUSTOM') && (
+      {isCustomSizingMode(sizingMode) && (
         <div className="space-y-3">
           {/* Selected measurement points — compact chips */}
           {selectedPoints.length > 0 && (

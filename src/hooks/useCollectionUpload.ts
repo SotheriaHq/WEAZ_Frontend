@@ -7,6 +7,7 @@ import {
   type InitializeCollectionResponse,
 } from '../api/collectionUploads';
 import type { MediaItem } from '../types/media';
+import type { SizingMode } from '@/types/sizing';
 import { preprocessImageFile } from '../utils/imagePreprocess';
 
 const MAX_PARALLEL_UPLOADS = 3;
@@ -109,7 +110,7 @@ export function useCollectionUpload() {
         visibility?: 'PUBLIC' | 'PRIVATE';
         filterValueIds?: string[];
         coverIndex?: number;
-        sizingMode?: 'NONE' | 'RTW' | 'CUSTOM' | 'RTW_PLUS_CUSTOM';
+        sizingMode?: SizingMode;
         rtwSizeSystem?: string;
         rtwSizeType?: 'PREDEFINED' | 'FREEFORM' | 'MIXED';
         customGender?: 'MEN' | 'WOMEN' | 'UNISEX';

@@ -43,12 +43,7 @@ const sections: Record<string, React.ReactNode> = {
       <p className="text-gray-500 dark:text-gray-400">Manage who has access to your store settings.</p>
     </>
   ),
-  'store-notifications': (
-    <>
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Store Notifications</h1>
-      <p className="text-gray-500 dark:text-gray-400">Configure notification preferences for your store.</p>
-    </>
-  ),
+  'store-notifications': <NotificationSettings />,
   'store-danger': (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-red-600 dark:text-red-400 mb-2">Danger Zone</h1>
