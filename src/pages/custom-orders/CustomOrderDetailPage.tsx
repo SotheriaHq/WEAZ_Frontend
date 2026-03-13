@@ -18,6 +18,7 @@ import {
   formatDateTime,
   getRelativeDeadlineText,
 } from '@/components/custom-orders/CustomOrderUi';
+import OrderMessagesPanel from '@/components/messaging/OrderMessagesPanel';
 import { useConfirm } from '@/components/ui/useConfirm';
 
 const formatCurrency = (value: number | undefined, currency = 'NGN') =>
@@ -488,6 +489,12 @@ const CustomOrderDetailPage: React.FC = () => {
                     Confirm delivery
                   </button>
                 </div>
+
+                <OrderMessagesPanel
+                  contextType="CUSTOM_ORDER"
+                  orderId={order.id}
+                  title="Custom-order conversation"
+                />
 
                 <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
                   <div className="text-sm font-semibold text-slate-900 dark:text-white">Report issue</div>

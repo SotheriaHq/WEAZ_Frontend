@@ -7,6 +7,7 @@ import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
 import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import VLoader from '@/components/loaders/VLoader';
+import OrderMessagesPanel from '@/components/messaging/OrderMessagesPanel';
 
 const OrderDetail: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -209,6 +210,12 @@ const OrderDetail: React.FC = () => {
         title="Order QR Code"
         subtitle="Scan to reopen this order while signed in."
         logoUrl={order.brand?.logo || null}
+      />
+
+      <OrderMessagesPanel
+        contextType="STANDARD_ORDER"
+        orderId={order.id}
+        title="Order conversation"
       />
 
       <ReviewComposerModal
