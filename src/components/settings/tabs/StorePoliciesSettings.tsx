@@ -27,6 +27,9 @@ const initialPolicyData: StoreWizardData = {
   freeShippingThreshold: null,
   shippingMethod: 'standard',
   shippingRates: [],
+  orderProcessingMode: 'manual-review',
+  orderCancellationWindow: '24h',
+  allowOrderNotes: true,
   returnsAccepted: true,
   returnWindow: '14',
   returnConditions: [],
@@ -37,6 +40,10 @@ const initialPolicyData: StoreWizardData = {
   sizeChartSystem: null,
   responseTimeSla: '24h',
   contactEmail: '',
+  customOrdersEnabled: false,
+  customOrderConsultationMode: 'required',
+  customOrderLeadTime: '14-21',
+  customOrderRushSupported: false,
   products: [],
   collections: [],
   looks: [],
@@ -88,6 +95,27 @@ const StorePoliciesSettings: React.FC = () => {
             ? policies.shippingRules?.shippingRates
             : prev.shippingRates,
           shippingMethod: policies.shippingRules?.shippingMethod || prev.shippingMethod,
+          orderProcessingMode:
+            policies.shippingRules?.orderSettings?.orderProcessingMode || prev.orderProcessingMode,
+          orderCancellationWindow:
+            policies.shippingRules?.orderSettings?.orderCancellationWindow || prev.orderCancellationWindow,
+          allowOrderNotes:
+            typeof policies.shippingRules?.orderSettings?.allowOrderNotes === 'boolean'
+              ? policies.shippingRules.orderSettings.allowOrderNotes
+              : prev.allowOrderNotes,
+          customOrdersEnabled:
+            typeof policies.shippingRules?.customOrderSettings?.customOrdersEnabled === 'boolean'
+              ? policies.shippingRules.customOrderSettings.customOrdersEnabled
+              : prev.customOrdersEnabled,
+          customOrderConsultationMode:
+            policies.shippingRules?.customOrderSettings?.consultationMode ||
+            prev.customOrderConsultationMode,
+          customOrderLeadTime:
+            policies.shippingRules?.customOrderSettings?.leadTime || prev.customOrderLeadTime,
+          customOrderRushSupported:
+            typeof policies.shippingRules?.customOrderSettings?.rushSupported === 'boolean'
+              ? policies.shippingRules.customOrderSettings.rushSupported
+              : prev.customOrderRushSupported,
         }));
       } catch (error) {
         console.error('Failed to load store policies', error);
@@ -125,6 +153,17 @@ const StorePoliciesSettings: React.FC = () => {
       ? {
           shippingRates: data.shippingRates,
           shippingMethod: data.shippingMethod,
+          orderSettings: {
+            orderProcessingMode: data.orderProcessingMode,
+            orderCancellationWindow: data.orderCancellationWindow,
+            allowOrderNotes: data.allowOrderNotes,
+          },
+          customOrderSettings: {
+            customOrdersEnabled: data.customOrdersEnabled,
+            consultationMode: data.customOrderConsultationMode,
+            leadTime: data.customOrderLeadTime,
+            rushSupported: data.customOrderRushSupported,
+          },
         }
       : null;
 

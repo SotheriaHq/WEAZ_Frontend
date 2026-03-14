@@ -6,6 +6,7 @@ import {
   type CustomOrderListItem,
   type CustomOrderStatus,
 } from '@/api/CustomOrderApi';
+import { messagingApi, type ThreadSummaryResponse } from '@/api/MessagingApi';
 import {
   CustomOrderBadge,
   CustomOrderMetricCard,
@@ -20,6 +21,7 @@ const CustomOrdersIndexPage: React.FC = () => {
   const [orders, setOrders] = useState<CustomOrderListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
 
   useEffect(() => {
     let active = true;
@@ -33,6 +35,21 @@ const CustomOrdersIndexPage: React.FC = () => {
         });
         if (!active) return;
         setOrders(response.items);
+
+        const orderIds = response.items.map((order) => order.id);
+        if (orderIds.length === 0) {
+          setSummaryByOrderId({});
+          return;
+        }
+
+        const bulkSummaries = await messagingApi.getBulkCustomOrderSummaries(orderIds, true);
+        if (!active) return;
+        setSummaryByOrderId(
+          bulkSummaries.items.reduce<Record<string, ThreadSummaryResponse | null>>((acc, item) => {
+            acc[item.contextId] = item.summary;
+            return acc;
+          }, {}),
+        );
       } catch (error: any) {
         if (!active) return;
         toast.error(error?.response?.data?.message || 'Unable to load your custom orders');
@@ -104,6 +121,10 @@ const CustomOrdersIndexPage: React.FC = () => {
             </div>
           ) : null}
           {orders.map((order) => (
+            (() => {
+              const summary = summaryByOrderId[order.id];
+              const unreadCount = Number(summary?.unreadCount ?? 0);
+              return (
             <button
               key={order.id}
               type="button"
@@ -117,6 +138,11 @@ const CustomOrdersIndexPage: React.FC = () => {
                     <CustomOrderBadge value={order.status} />
                     <CustomOrderBadge value={order.paymentStatus} type="payment" />
                     <CustomOrderBadge value={order.currentProgressStage ?? 'ORDER_PLACED'} type="stage" />
+                    {summary?.hasUnread ? (
+                      <span className="inline-flex rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                        💬 {unreadCount > 0 ? `${unreadCount} unread` : 'New messages'}
+                      </span>
+                    ) : null}
                   </div>
                   <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                     Placed {formatDateTime(order.createdAt)} • {order.brand.name}
@@ -127,6 +153,8 @@ const CustomOrdersIndexPage: React.FC = () => {
                 </div>
               </div>
             </button>
+              );
+            })()
           ))}
         </div>
       </section>

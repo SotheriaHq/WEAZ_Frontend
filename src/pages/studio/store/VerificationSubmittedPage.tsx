@@ -58,6 +58,21 @@ export default function VerificationSubmittedPage() {
 
   return (
     <div className="space-y-6">
+      <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+        <Link to="/studio/store" className="transition hover:text-gray-700">
+          Store
+        </Link>
+        <span>/</span>
+        <Link
+          to="/studio/verification"
+          className="transition hover:text-gray-700"
+        >
+          Verification
+        </Link>
+        <span>/</span>
+        <span className="text-gray-800">Submitted</span>
+      </nav>
+
       <VerificationHero
         eyebrow="Submission complete"
         title="Verification sent for review"

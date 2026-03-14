@@ -44,9 +44,11 @@ import {
 } from './pages/redirects/PublicAliasRedirects';
 import VerifiedBadgeMeaningPage from './pages/ui/VerifiedBadgeMeaningPage';
 import { useDispatch } from 'react-redux';
-import type { AppDispatch } from '@/store';
+import { useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '@/store';
 import { setViewportWidth } from '@/features/uiSlice';
 import RequireAdmin from './components/admin/RequireAdmin';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 
 const Market = lazy(() => import('./pages/Market'));
 const MarketPlace = lazy(() => import('./pages/MarketPlace'));
@@ -94,6 +96,27 @@ const AdminCustomOrdersPage = lazy(() => import('./pages/admin/AdminCustomOrders
 const AppRouteFallback: React.FC = () => (
   <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">Loading page...</div>
 );
+
+const AdminProfileRouteGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const role = useSelector((state: RootState) => state.user.profile?.role);
+  if (role === 'SuperAdmin' || role === 'Admin') {
+    return <Navigate to="/admin" replace />;
+  }
+  return <>{children}</>;
+};
+
+const RequireAdminPermission: React.FC<{
+  permission?: string;
+  children: React.ReactNode;
+}> = ({ permission, children }) => {
+  const { isSuperAdmin, hasPermission } = useAdminPermissions();
+
+  if (!permission || isSuperAdmin || hasPermission(permission)) {
+    return <>{children}</>;
+  }
+
+  return <Navigate to="/admin" replace />;
+};
 
 /**
  * Root layout component that wraps all routes
@@ -374,12 +397,20 @@ const router = createBrowserRouter([
       },
       {
         path: '/profile',
-        element: <ProfileLayout />,
+        element: (
+          <AdminProfileRouteGuard>
+            <ProfileLayout />
+          </AdminProfileRouteGuard>
+        ),
         children: profileChildren,
       },
       {
         path: '/profile/:id',
-        element: <ProfileLayout />,
+        element: (
+          <AdminProfileRouteGuard>
+            <ProfileLayout />
+          </AdminProfileRouteGuard>
+        ),
         children: profileChildren,
       },
       {
@@ -478,23 +509,23 @@ const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <AdminDashboard /> },
-          { path: 'custom-orders', element: <AdminCustomOrdersPage /> },
-          { path: 'custom-orders/:orderId', element: <AdminCustomOrdersPage /> },
-          { path: 'users', element: <AdminUsersPage /> },
-          { path: 'brands', element: <AdminBrandsPage /> },
-          { path: 'verification', element: <AdminVerificationQueuePage /> },
-          { path: 'brands/:id/verification-review', element: <AdminBrandVerificationReviewPage /> },
-          { path: 'products', element: <AdminProductsPage /> },
-          { path: 'collections', element: <AdminCollectionsPage /> },
-          { path: 'taxonomy', element: <AdminTaxonomyPage /> },
-          { path: 'tags', element: <AdminTagsPage /> },
-          { path: 'measurements', element: <AdminMeasurementsPage /> },
-          { path: 'payouts', element: <AdminPayoutsPage /> },
-          { path: 'disputes', element: <AdminDisputesPage /> },
-          { path: 'moderation', element: <AdminModerationPage /> },
-          { path: 'audit', element: <AdminAuditPage /> },
-          { path: 'settings', element: <AdminSettingsPage /> },
-          { path: 'settings/sla', element: <AdminSettingsPage /> },
+          { path: 'custom-orders', element: <RequireAdminPermission permission="MODERATION_READ"><AdminCustomOrdersPage /></RequireAdminPermission> },
+          { path: 'custom-orders/:orderId', element: <RequireAdminPermission permission="MODERATION_READ"><AdminCustomOrdersPage /></RequireAdminPermission> },
+          { path: 'users', element: <RequireAdminPermission permission="USERS_READ"><AdminUsersPage /></RequireAdminPermission> },
+          { path: 'brands', element: <RequireAdminPermission permission="BRANDS_READ"><AdminBrandsPage /></RequireAdminPermission> },
+          { path: 'verification', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminVerificationQueuePage /></RequireAdminPermission> },
+          { path: 'brands/:id/verification-review', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminBrandVerificationReviewPage /></RequireAdminPermission> },
+          { path: 'products', element: <RequireAdminPermission permission="PRODUCTS_READ"><AdminProductsPage /></RequireAdminPermission> },
+          { path: 'collections', element: <RequireAdminPermission permission="COLLECTIONS_READ"><AdminCollectionsPage /></RequireAdminPermission> },
+          { path: 'taxonomy', element: <RequireAdminPermission permission="TAXONOMY_READ"><AdminTaxonomyPage /></RequireAdminPermission> },
+          { path: 'tags', element: <RequireAdminPermission permission="TAGS_READ"><AdminTagsPage /></RequireAdminPermission> },
+          { path: 'measurements', element: <RequireAdminPermission permission="MEASUREMENTS_READ"><AdminMeasurementsPage /></RequireAdminPermission> },
+          { path: 'payouts', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminPayoutsPage /></RequireAdminPermission> },
+          { path: 'disputes', element: <RequireAdminPermission permission="DISPUTES_READ"><AdminDisputesPage /></RequireAdminPermission> },
+          { path: 'moderation', element: <RequireAdminPermission permission="MODERATION_READ"><AdminModerationPage /></RequireAdminPermission> },
+          { path: 'audit', element: <RequireAdminPermission permission="AUDIT_READ"><AdminAuditPage /></RequireAdminPermission> },
+          { path: 'settings', element: <RequireAdminPermission permission="SYSTEM_SLA_READ"><AdminSettingsPage /></RequireAdminPermission> },
+          { path: 'settings/sla', element: <RequireAdminPermission permission="SYSTEM_SLA_READ"><AdminSettingsPage /></RequireAdminPermission> },
         ],
       },
       // Catch-all 404 route - must be last

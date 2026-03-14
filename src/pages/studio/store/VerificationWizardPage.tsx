@@ -5,7 +5,7 @@ import {
   useState,
 } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import VerificationHero from '@/components/studio/verification/VerificationHero';
 import {
@@ -148,7 +148,7 @@ export default function VerificationWizardPage() {
     return () => {
       active = false;
     };
-  }, [brandId, dispatch, user]);
+  }, [brandId, dispatch]);
 
   const setField = <K extends keyof VerificationDraftData>(
     key: K,
@@ -335,7 +335,9 @@ export default function VerificationWizardPage() {
         await brandApi.submitVerification(brandId, payload);
         toast.success('Verification submitted');
       }
-      const refreshed = await brandApi.getVerificationStatus(brandId);
+      const refreshed = await brandApi.getVerificationStatus(brandId, {
+        force: true,
+      });
       setStatus(refreshed);
       if (user) {
         dispatch(
@@ -374,6 +376,21 @@ export default function VerificationWizardPage() {
 
   return (
     <div className="space-y-6">
+      <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+        <Link to="/studio/store" className="transition hover:text-gray-700">
+          Store
+        </Link>
+        <span>/</span>
+        <Link
+          to="/studio/verification"
+          className="transition hover:text-gray-700"
+        >
+          Verification
+        </Link>
+        <span>/</span>
+        <span className="text-gray-800">Apply</span>
+      </nav>
+
       <VerificationHero
         eyebrow="Verification application"
         title="Guided seller verification"

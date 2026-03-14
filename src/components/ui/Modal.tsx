@@ -12,6 +12,8 @@ export interface ModalProps {
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   className?: string;
+  scope?: 'viewport' | 'parent';
+  backdropStyle?: 'default' | 'light';
   /** Use the unified glass backdrop style */
   glassBackdrop?: boolean;
 }
@@ -23,6 +25,8 @@ const Modal: React.FC<ModalProps> = ({
   children,
   size = 'md',
   className,
+  scope = 'viewport',
+  backdropStyle = 'default',
   glassBackdrop = true,
 }) => {
   const panelRef = React.useRef<HTMLDivElement | null>(null);
@@ -43,7 +47,7 @@ const Modal: React.FC<ModalProps> = ({
 
   // Scroll Locking
   React.useEffect(() => {
-    if (open) {
+    if (open && scope === 'viewport') {
       const originalBodyOverflow = document.body.style.overflow;
       const originalHtmlOverflow = document.documentElement.style.overflow;
       
@@ -57,11 +61,14 @@ const Modal: React.FC<ModalProps> = ({
     }
   }, [open]);
 
-  return (
-    <AnimatePresence>
-      {open && (
-        <OverlayPortal>
-          <div className="fixed inset-0 z-layer-modal" aria-hidden={false}>
+  const modalContent = (
+    <div
+      className={clsx(
+        scope === 'viewport' ? 'fixed' : 'absolute',
+        'inset-0 z-layer-modal'
+      )}
+      aria-hidden={false}
+    >
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -73,12 +80,36 @@ const Modal: React.FC<ModalProps> = ({
             >
               {glassBackdrop ? (
                 <>
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
-                  <div className="absolute inset-0 backdrop-blur-xl" />
-                  <div className="absolute inset-0 bg-black/40" />
+                  <div
+                    className={clsx(
+                      'absolute inset-0',
+                      backdropStyle === 'light'
+                        ? 'bg-gradient-to-br from-slate-700/12 via-indigo-700/10 to-sky-700/12'
+                        : 'bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40'
+                    )}
+                  />
+                  <div
+                    className={clsx(
+                      'absolute inset-0',
+                      backdropStyle === 'light' ? 'backdrop-blur-md' : 'backdrop-blur-xl'
+                    )}
+                  />
+                  <div
+                    className={clsx(
+                      'absolute inset-0',
+                      backdropStyle === 'light' ? 'bg-black/12' : 'bg-black/40'
+                    )}
+                  />
                 </>
               ) : (
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+                <div
+                  className={clsx(
+                    'absolute inset-0',
+                    scope === 'parent'
+                      ? 'bg-gradient-to-br from-slate-900/20 via-slate-800/16 to-indigo-900/20 backdrop-blur-[2px]'
+                      : 'bg-black/50 backdrop-blur-sm'
+                  )}
+                />
               )}
             </motion.div>
 
@@ -125,9 +156,17 @@ const Modal: React.FC<ModalProps> = ({
                 </div>
               </div>
             </motion.div>
-          </div>
-        </OverlayPortal>
-      )}
+    </div>
+  );
+
+  return (
+    <AnimatePresence>
+      {open &&
+        (scope === 'viewport' ? (
+          <OverlayPortal>{modalContent}</OverlayPortal>
+        ) : (
+          modalContent
+        ))}
     </AnimatePresence>
   );
 };

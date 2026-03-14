@@ -1020,6 +1020,10 @@ const ProfilePage: React.FC = () => {
         country: visitorProfile.country,
         state: visitorProfile.state,
         city: visitorProfile.city,
+        verificationBadgeVisible: Boolean(visitorProfile.verificationBadgeVisible),
+        isVerifiedBrand: Boolean(visitorProfile.verified),
+        verifiedExplanationUrl:
+          visitorProfile.verifiedExplanationUrl ?? '/help/verified-badge',
       }
     : displayData;
 
@@ -1181,6 +1185,11 @@ const ProfilePage: React.FC = () => {
           bannerImage: (bannerPreviewUrl ?? viewDisplayData.bannerImage) ?? undefined,
           address: viewDisplayData.location ?? undefined,
           location: viewDisplayData.location ?? undefined,
+          tags: viewDisplayData.hashtags ?? [],
+          verificationBadgeVisible: Boolean(viewDisplayData.verificationBadgeVisible),
+          isVerifiedBrand: Boolean(viewDisplayData.isVerifiedBrand),
+          verifiedExplanationUrl:
+            viewDisplayData.verifiedExplanationUrl ?? '/help/verified-badge',
           isOwner,
           profileVisibility: 'UNLOCKED',
         }}

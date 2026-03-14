@@ -9,9 +9,10 @@ import { ImageWithFallback } from '@/components/ImageWithFallback';
 import Modal from '@/components/ui/Modal';
 import UserManageModal from './modals/UserManageModal';
 import CreateAdminModal from './modals/CreateAdminModal';
+import AdminCredentialsModal from './modals/AdminCredentialsModal';
 import useDebounce from '@/hooks/useDebounce';
 
-type UserRoleFilter = 'ALL' | 'User' | 'Admin' | 'SuperAdmin';
+type UserRoleFilter = 'ALL' | 'User' | 'Admin';
 type UserStatusFilter = 'ALL' | 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
 type UserSortBy =
   | 'created_desc'
@@ -31,7 +32,6 @@ const ROLE_OPTIONS: Array<{ label: string; value: UserRoleFilter }> = [
   { label: 'All roles', value: 'ALL' },
   { label: 'Users', value: 'User' },
   { label: 'Admins', value: 'Admin' },
-  { label: 'SuperAdmins', value: 'SuperAdmin' },
 ];
 
 const STATUS_OPTIONS: Array<{ label: string; value: UserStatusFilter }> = [
@@ -108,6 +108,10 @@ const AdminUsersPage: React.FC = () => {
   const [reviewingRequestId, setReviewingRequestId] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newAdminCredentials, setNewAdminCredentials] = useState<null | {
+    email: string;
+    temporaryPassword: string;
+  }>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [reviewPrompt, setReviewPrompt] = useState<{
     request: AdminReactivationRequest;
@@ -147,17 +151,28 @@ const AdminUsersPage: React.FC = () => {
     reset: resetUsers,
   } = useInfiniteScroll<AdminUser>(fetchUsersPage, { limit: 30 });
 
-  const sortedUsers = useMemo(() => sortUsers(users, sortBy), [users, sortBy]);
+  const uniqueUsers = useMemo(() => {
+    const seen = new Set<string>();
+    const deduped: AdminUser[] = [];
+    for (const user of users) {
+      if (seen.has(user.id)) continue;
+      seen.add(user.id);
+      deduped.push(user);
+    }
+    return deduped;
+  }, [users]);
+
+  const sortedUsers = useMemo(() => sortUsers(uniqueUsers, sortBy), [uniqueUsers, sortBy]);
 
   const statusCounts = useMemo(() => {
     const counts = { ACTIVE: 0, SUSPENDED: 0, DEACTIVATED: 0 };
-    for (const user of users) {
+    for (const user of uniqueUsers) {
       if (user.status === 'ACTIVE') counts.ACTIVE += 1;
       if (user.status === 'SUSPENDED') counts.SUSPENDED += 1;
       if (user.status === 'DEACTIVATED') counts.DEACTIVATED += 1;
     }
     return counts;
-  }, [users]);
+  }, [uniqueUsers]);
 
   const fetchReactivationRequests = useCallback(async () => {
     if (!canReadUsers) {
@@ -226,7 +241,7 @@ const AdminUsersPage: React.FC = () => {
   const mergedError = error || scrollError;
 
   return (
-    <div className="space-y-6">
+    <div className="relative space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">👤 Users</h1>
@@ -258,8 +273,8 @@ const AdminUsersPage: React.FC = () => {
       </div>
 
       <section className="rounded-2xl border border-gray-200/80 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-6">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+          <div className="col-span-2">
             <label className="mb-1 block text-xs font-semibold text-gray-500 dark:text-gray-400">
               Search
             </label>
@@ -343,7 +358,7 @@ const AdminUsersPage: React.FC = () => {
             🔴 {statusCounts.DEACTIVATED} inactive
           </span>
           <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700 dark:bg-white/10 dark:text-gray-300">
-            👥 {users.length} loaded
+            👥 {uniqueUsers.length} loaded
           </span>
         </div>
       </section>
@@ -637,11 +652,25 @@ const AdminUsersPage: React.FC = () => {
       <CreateAdminModal
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onCreated={() => {
+        onCreated={(result) => {
           void fetchReactivationRequests();
           resetUsers();
+          if (result.temporaryPassword) {
+            setNewAdminCredentials({
+              email: result.email,
+              temporaryPassword: result.temporaryPassword,
+            });
+          }
         }}
       />
+      {newAdminCredentials && (
+        <AdminCredentialsModal
+          open={true}
+          onClose={() => setNewAdminCredentials(null)}
+          email={newAdminCredentials.email}
+          temporaryPassword={newAdminCredentials.temporaryPassword}
+        />
+      )}
 
       {/* Review reactivation request modal */}
       <Modal

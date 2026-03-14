@@ -59,6 +59,7 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     setError(null);
 
     // Optimization: If initial is already a signed URL (has query params) or non-S3, use it.
@@ -73,11 +74,27 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
       setLoading(true);
       dedup(initial, () => brandApi.getSignedS3Url(initial)).then((signed) => {
         if (!cancelled) {
-          setUrl(signed ?? initial);
-          setLoading(false);
+          if (signed) {
+            setUrl(signed);
+            setLoading(false);
+            return;
+          }
+
+          // Retry once after short delay for transient auth/network delays.
+          retryTimer = setTimeout(() => {
+            void dedup(initial, () => brandApi.getSignedS3Url(initial)).then((retrySigned) => {
+              if (!cancelled) {
+                setUrl(retrySigned ?? initial);
+                setLoading(false);
+              }
+            });
+          }, 900);
         }
       });
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+        if (retryTimer) clearTimeout(retryTimer);
+      };
     }
 
     if (!fileId) {
@@ -100,16 +117,34 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
       if (!cancelled) {
         if (signed) {
           setUrl(signed);
-        } else {
-          setError(new Error('Failed to resolve signed URL'));
-          setUrl(initial ?? null);
+          setLoading(false);
+          return;
         }
-        setLoading(false);
+
+        // Retry once after short delay for transient auth/network delays.
+        retryTimer = setTimeout(() => {
+          void dedup(fileId, () => brandApi.getSignedFileUrl(fileId)).then((retrySigned) => {
+            if (!cancelled) {
+              if (retrySigned) {
+                setUrl(retrySigned);
+                setError(null);
+              } else {
+                setError(new Error('Failed to resolve signed URL'));
+                setUrl(initial ?? null);
+              }
+              setLoading(false);
+            }
+          });
+        }, 900);
+        return;
       }
     });
 
     return () => {
       cancelled = true;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
     };
   }, [fileId, initial]);
 

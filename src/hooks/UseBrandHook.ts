@@ -272,6 +272,16 @@ export const useBrandProfile = () => {
     country: brandProfile?.country ?? user?.brandCountry ?? null,
     state: brandProfile?.state ?? user?.brandState ?? null,
     city: brandProfile?.city ?? user?.brandCity ?? null,
+    verificationBadgeVisible:
+      Boolean(brandProfile?.verificationBadgeVisible) ||
+      Boolean(user?.verificationBadgeVisible),
+    isVerifiedBrand:
+      Boolean(brandProfile?.verified) ||
+      Boolean(user?.isVerifiedBrand),
+    verifiedExplanationUrl:
+      brandProfile?.verifiedExplanationUrl ??
+      user?.verifiedExplanationUrl ??
+      '/help/verified-badge',
   };
 
   return {

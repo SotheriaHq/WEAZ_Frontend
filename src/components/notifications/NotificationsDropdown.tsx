@@ -48,6 +48,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
+  const isAdminConsoleUser = currentUser?.role === 'SuperAdmin' || currentUser?.role === 'Admin';
   const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number }>({
     top: 72,
     left: 12,
@@ -160,9 +161,10 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
       payloadOrderId
         ? `/studio?tab=orders&orderId=${encodeURIComponent(payloadOrderId)}`
         : determineNotificationRoute(notification);
-    navigate(route);
+    const resolvedRoute = isAdminConsoleUser && route.startsWith('/profile') ? '/admin' : route;
+    navigate(resolvedRoute);
     onClose();
-  }, [currentUser?.type, navigate, onClose]);
+  }, [currentUser?.type, isAdminConsoleUser, navigate, onClose]);
 
   const handleMarkRead = useCallback((id: string) => {
     // Idempotency guard
@@ -209,10 +211,12 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     (notification: NormalizedNotification) => {
       if (!notification.actor?.id) return;
       handleMarkRead(notification.id);
-      navigate(determineActorRoute(notification.actor.id));
+      const actorRoute = determineActorRoute(notification.actor.id);
+      const resolvedRoute = isAdminConsoleUser && actorRoute.startsWith('/profile') ? '/admin' : actorRoute;
+      navigate(resolvedRoute);
       onClose();
     },
-    [handleMarkRead, navigate, onClose],
+    [handleMarkRead, isAdminConsoleUser, navigate, onClose],
   );
 
   const timeAgo = (dateString: string): string => {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -11,6 +11,11 @@ export function useFocusTrap(opts: {
   restoreFocusTo?: React.RefObject<HTMLElement | null>;
 }) {
   const { active, containerRef, onEscape, initialFocusSelector, restoreFocusTo } = opts;
+  const onEscapeRef = useRef<typeof onEscape>(onEscape);
+
+  useEffect(() => {
+    onEscapeRef.current = onEscape;
+  }, [onEscape]);
 
   useEffect(() => {
     if (!active) return;
@@ -38,7 +43,7 @@ export function useFocusTrap(opts: {
       if (!containerRef.current) return;
 
       if (e.key === 'Escape') {
-        onEscape?.();
+        onEscapeRef.current?.();
         return;
       }
 
@@ -78,5 +83,5 @@ export function useFocusTrap(opts: {
       const restoreTarget = restoreTargetSnapshot ?? previouslyFocused;
       restoreTarget?.focus?.();
     };
-  }, [active, containerRef, onEscape, initialFocusSelector, restoreFocusTo]);
+  }, [active, containerRef, initialFocusSelector, restoreFocusTo]);
 }

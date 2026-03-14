@@ -140,8 +140,7 @@ describe('CustomOrderOfferEditor', () => {
       });
     });
 
-    await user.type(screen.getByRole('textbox', { name: 'Offer title' }), 'Bespoke blazer');
-    await user.type(screen.getByRole('textbox', { name: 'Buyer instructions' }), 'Bring your final measurements.');
+    await user.type(screen.getByRole('textbox', { name: /buyer instructions/i }), 'Bring your final measurements.');
     await user.type(screen.getByPlaceholderText('120000'), '120000');
     await user.type(screen.getByPlaceholderText('10000'), '10000');
     await user.click(screen.getByRole('button', { name: 'Create offer' }));
@@ -151,7 +150,6 @@ describe('CustomOrderOfferEditor', () => {
         expect.objectContaining({
           sourceType: 'PRODUCT',
           sourceId: 'product-1',
-          title: 'Bespoke blazer',
           buyerInstructionText: 'Bring your final measurements.',
           requiredMeasurementKeys: ['bust', 'waist'],
           fabricRuleBasisId: 'basis-1',

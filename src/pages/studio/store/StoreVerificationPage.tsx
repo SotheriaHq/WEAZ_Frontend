@@ -61,7 +61,7 @@ export default function StoreVerificationPage() {
     return () => {
       active = false;
     };
-  }, [brandId, dispatch, user]);
+  }, [brandId, dispatch]);
 
   const callToAction = useMemo(
     () => getVerificationCallToAction(status),
@@ -73,7 +73,9 @@ export default function StoreVerificationPage() {
     try {
       setSaving(true);
       await brandApi.cancelVerification(brandId, status.updatedAt);
-      const refreshed = await brandApi.getVerificationStatus(brandId);
+      const refreshed = await brandApi.getVerificationStatus(brandId, {
+        force: true,
+      });
       setStatus(refreshed);
       toast.success('Verification request cancelled');
     } catch (error: any) {
@@ -130,6 +132,14 @@ export default function StoreVerificationPage() {
 
   return (
     <div className="space-y-6">
+      <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+        <Link to="/studio/store" className="transition hover:text-gray-700">
+          Store
+        </Link>
+        <span>/</span>
+        <span className="text-gray-800">Verification</span>
+      </nav>
+
       <VerificationHero
         eyebrow="Seller trust"
         title="Verification workspace"
@@ -143,6 +153,13 @@ export default function StoreVerificationPage() {
               onClick={() => navigate(callToAction.primaryTo)}
             >
               {callToAction.primaryLabel}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => navigate('/studio/verification/apply')}
+            >
+              Initiate verification
             </Button>
             {status &&
             (status.verificationStatus === 'PENDING' ||

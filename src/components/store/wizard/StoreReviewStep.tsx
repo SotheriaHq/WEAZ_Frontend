@@ -39,6 +39,25 @@ const CATEGORY_LABELS: Record<string, string> = {
   'western-fashion': 'Western Fashion',
 };
 
+const ORDER_PROCESSING_LABELS: Record<StoreWizardData['orderProcessingMode'], string> = {
+  'manual-review': 'Manual review',
+  'auto-confirm': 'Auto-confirm',
+};
+
+const CANCELLATION_WINDOW_LABELS: Record<StoreWizardData['orderCancellationWindow'], string> = {
+  none: 'No self-cancel',
+  '1h': 'Within 1 hour',
+  '6h': 'Within 6 hours',
+  '24h': 'Within 24 hours',
+};
+
+const CUSTOM_ORDER_LEAD_TIME_LABELS: Record<StoreWizardData['customOrderLeadTime'], string> = {
+  '7-14': '7-14 days',
+  '14-21': '14-21 days',
+  '21-30': '21-30 days',
+  '30-plus': '30+ days',
+};
+
 /**
  * Store Review Step (Screen 1.10)
  * Step 4 of 4: Final review before publishing
@@ -260,7 +279,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
               {/* Store Policies */}
               <SectionCard
                 title="Store Policies"
-                subtitle="Shipping, returns, size guide & response time"
+                subtitle="Shipping, orders, custom orders, size guide & response time"
                 isComplete={policiesComplete}
                 isExpanded={expandedSection === 'policies'}
                 onToggle={() => toggleSection('policies')}
@@ -282,6 +301,38 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                   <InfoItem
                     label="Size Guide"
                     value={data.sizeChartPresetKey || data.sizeChartUrl ? 'Available' : 'Not set'}
+                  />
+                  <InfoItem
+                    label="Order Processing"
+                    value={ORDER_PROCESSING_LABELS[data.orderProcessingMode] || data.orderProcessingMode}
+                  />
+                  <InfoItem
+                    label="Cancellation Window"
+                    value={CANCELLATION_WINDOW_LABELS[data.orderCancellationWindow] || data.orderCancellationWindow}
+                  />
+                  <InfoItem
+                    label="Buyer Order Notes"
+                    value={data.allowOrderNotes ? 'Enabled' : 'Disabled'}
+                  />
+                  <InfoItem
+                    label="Custom Orders"
+                    value={data.customOrdersEnabled ? 'Enabled' : 'Disabled'}
+                  />
+                  <InfoItem
+                    label="Custom Consultation"
+                    value={data.customOrdersEnabled ? data.customOrderConsultationMode : 'Not applicable'}
+                  />
+                  <InfoItem
+                    label="Custom Lead Time"
+                    value={
+                      data.customOrdersEnabled
+                        ? CUSTOM_ORDER_LEAD_TIME_LABELS[data.customOrderLeadTime] || data.customOrderLeadTime
+                        : 'Not applicable'
+                    }
+                  />
+                  <InfoItem
+                    label="Rush Custom Orders"
+                    value={data.customOrdersEnabled && data.customOrderRushSupported ? 'Supported' : 'Not supported'}
                   />
                 </div>
               </SectionCard>

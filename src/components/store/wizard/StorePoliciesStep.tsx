@@ -53,6 +53,30 @@ const SHIPPING_METHODS = [
   { value: 'free-threshold', label: 'Free over threshold' },
 ];
 
+const ORDER_PROCESSING_MODES = [
+  { value: 'manual-review', label: 'Manual review before confirmation' },
+  { value: 'auto-confirm', label: 'Auto-confirm paid ready-to-wear orders' },
+];
+
+const ORDER_CANCELLATION_WINDOWS = [
+  { value: 'none', label: 'No self-cancellation' },
+  { value: '1h', label: 'Within 1 hour' },
+  { value: '6h', label: 'Within 6 hours' },
+  { value: '24h', label: 'Within 24 hours' },
+];
+
+const CUSTOM_ORDER_LEAD_TIMES = [
+  { value: '7-14', label: '7-14 days' },
+  { value: '14-21', label: '14-21 days' },
+  { value: '21-30', label: '21-30 days' },
+  { value: '30-plus', label: '30+ days' },
+];
+
+const CUSTOM_ORDER_CONSULTATION_MODES = [
+  { value: 'required', label: 'Consultation required before quote' },
+  { value: 'optional', label: 'Consultation optional' },
+];
+
 // Return windows
 const RETURN_WINDOWS = [
   { value: '7', label: '7 days' },
@@ -129,11 +153,18 @@ const RECOMMENDED_DEFAULTS: Partial<StoreWizardData> = {
   processingTime: '3-5',
   shippingMethods: ['standard', 'express'],
   freeShippingThreshold: 50000,
+  orderProcessingMode: 'manual-review',
+  orderCancellationWindow: '24h',
+  allowOrderNotes: true,
   returnsAccepted: true,
   returnWindow: '14',
   returnConditions: ['unworn', 'original-packaging'],
   refundMethod: 'original',
   responseTimeSla: '24h',
+  customOrdersEnabled: true,
+  customOrderConsultationMode: 'required',
+  customOrderLeadTime: '14-21',
+  customOrderRushSupported: false,
 };
 
 /**
@@ -531,6 +562,143 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       </p>
                     </div>
                   )}
+                </div>
+
+                {/* Orders & Custom Orders Card */}
+                <div className="rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 p-6 space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-lg">
+                      🧾
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Orders & Custom Orders
+                    </h3>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Standard Order Processing
+                    </label>
+                    <select
+                      value={data.orderProcessingMode}
+                      onChange={(e) => onChange({ orderProcessingMode: e.target.value as StoreWizardData['orderProcessingMode'] })}
+                      className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
+                    >
+                      {ORDER_PROCESSING_MODES.map((mode) => (
+                        <option key={mode.value} value={mode.value}>
+                          {mode.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Buyer Cancellation Window
+                    </label>
+                    <select
+                      value={data.orderCancellationWindow}
+                      onChange={(e) => onChange({ orderCancellationWindow: e.target.value as StoreWizardData['orderCancellationWindow'] })}
+                      className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
+                    >
+                      {ORDER_CANCELLATION_WINDOWS.map((window) => (
+                        <option key={window.value} value={window.value}>
+                          {window.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <label className="flex items-start gap-3 p-3 rounded-lg bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={data.allowOrderNotes}
+                      onChange={(e) => onChange({ allowOrderNotes: e.target.checked })}
+                      className="w-4 h-4 mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    />
+                    <div>
+                      <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">Allow buyer order notes</div>
+                      <div className="text-xs text-gray-500">Buyers can include fit/delivery notes at checkout.</div>
+                    </div>
+                  </label>
+
+                  <div className="pt-1 border-t border-gray-200/70 dark:border-white/10 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Accept custom orders
+                      </label>
+                      <button
+                        onClick={() => onChange({ customOrdersEnabled: !data.customOrdersEnabled })}
+                        className={`relative w-12 h-6 rounded-full transition-colors ${
+                          data.customOrdersEnabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-700'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                            data.customOrdersEnabled ? 'left-7' : 'left-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Enables custom-order entry points on eligible products and designs.
+                    </p>
+                  </div>
+
+                  {data.customOrdersEnabled ? (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Consultation Mode
+                        </label>
+                        <select
+                          value={data.customOrderConsultationMode}
+                          onChange={(e) =>
+                            onChange({
+                              customOrderConsultationMode: e.target.value as StoreWizardData['customOrderConsultationMode'],
+                            })
+                          }
+                          className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
+                        >
+                          {CUSTOM_ORDER_CONSULTATION_MODES.map((mode) => (
+                            <option key={mode.value} value={mode.value}>
+                              {mode.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Typical Custom-Order Lead Time
+                        </label>
+                        <select
+                          value={data.customOrderLeadTime}
+                          onChange={(e) => onChange({ customOrderLeadTime: e.target.value as StoreWizardData['customOrderLeadTime'] })}
+                          className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
+                        >
+                          {CUSTOM_ORDER_LEAD_TIMES.map((leadTime) => (
+                            <option key={leadTime.value} value={leadTime.value}>
+                              {leadTime.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <label className="flex items-start gap-3 p-3 rounded-lg bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={data.customOrderRushSupported}
+                          onChange={(e) => onChange({ customOrderRushSupported: e.target.checked })}
+                          className="w-4 h-4 mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <div>
+                          <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">Offer rush custom orders</div>
+                          <div className="text-xs text-gray-500">Use this only if your team can handle expedited timelines.</div>
+                        </div>
+                      </label>
+                    </>
+                  ) : null}
                 </div>
 
                 {/* Size Chart Card - Collapsible */}

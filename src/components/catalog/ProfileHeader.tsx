@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import Tag from '@/components/ui/Tag';
 import { getTagColor } from '@/utils/tagColors';
 import AvatarCard from '../profile/AvatarCard';
 import VLoader from '../loaders/VLoader';
 import MediaRenderer from '../media/MediaRenderer';
-import { Lock, MapPin } from 'lucide-react';
 
 interface ProfileHeaderProps {
   profile: {
@@ -16,6 +16,10 @@ interface ProfileHeaderProps {
     bannerImage?: string;
     address?: string;
     location?: string;
+    verificationBadgeVisible?: boolean;
+    isVerifiedBrand?: boolean;
+    verifiedExplanationUrl?: string;
+    tags?: string[];
     isOwner: boolean;
     profileVisibility: 'UNLOCKED' | 'LOCKED';
   };
@@ -52,6 +56,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   onEditProfile,
   onShareProfile,
 }) => {
+  const location = useLocation();
   const [bannerFailed, setBannerFailed] = useState(false);
   const hasBannerImage = showBanner && Boolean(profile.bannerImage) && !bannerFailed;
   const bannerLabel =
@@ -67,8 +72,11 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   const showBannerLoader =
     showBanner && (bannerLoading || (Boolean(profile.bannerImage) && !bannerFailed && isBannerImageLoading));
 
-  // For end users, we don't show tags
-  const tags: string[] = []; // End users don't have tags in this implementation
+  const tags: string[] = Array.isArray(profile.tags)
+    ? profile.tags
+        .map((tag) => String(tag || '').trim())
+        .filter(Boolean)
+    : [];
 
   // Split tags into rows of 3 so we always display max 3 tags per row
   const tagRows: string[][] = [];
@@ -121,7 +129,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           {profile.profileVisibility === 'LOCKED' && (
             <div className="absolute top-4 right-4 z-30">
               <div className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center">
-                <Lock className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
+                <span className="mr-1" aria-hidden="true">🔒</span>
                 <span>Private</span>
               </div>
             </div>
@@ -197,20 +205,34 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </div>
 
           <div className={`mt-4 flex flex-1 flex-col gap-2 sm:mt-2 ${showBanner ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
-            {/* FIX #5: Responsive font sizing without truncation */}
             <h1
-              className={`font-semibold italic tracking-[0.08em] leading-tight ${
-                showBanner ? 'text-blue-300 drop-shadow-lg' : 'text-gray-900 dark:text-white'
+              className={`flex flex-wrap items-center gap-2 font-semibold italic tracking-[0.08em] leading-tight ${
+                showBanner ? 'text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]' : 'text-gray-900 dark:text-white'
               }`}
               style={{ fontSize: 'clamp(1rem, 3vw, 1.5rem)' }}
             >
+              <Link
+                to={profile.verifiedExplanationUrl || '/help/verified-badge'}
+                state={{
+                  from:
+                    `${location.pathname}${location.search}${location.hash}` ||
+                    '/studio/store',
+                }}
+                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-black uppercase tracking-wide ${
+                  profile.verificationBadgeVisible
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-slate-300 text-slate-900'
+                }`}
+              >
+                {profile.verificationBadgeVisible ? 'Verified' : 'Unverified'}
+              </Link>
               {profile.firstName} {profile.lastName}
             </h1>
-            <p className={`flex items-center gap-2 text-sm font-medium ${showBanner ? 'text-white/90 drop-shadow-md' : 'text-gray-600 dark:text-gray-300'}`}>
-              <MapPin className={`h-4 w-4 ${showBanner ? 'text-white/90' : 'text-gray-500 dark:text-gray-300'}`} aria-hidden="true" />
+            <p className={`inline-flex w-fit items-center gap-2 rounded-md px-2 py-1 text-sm font-semibold ${showBanner ? 'bg-black/35 text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]' : 'text-gray-700 dark:text-gray-300'}`}>
+              <span aria-hidden="true">📍</span>
               <span>{profile.location || profile.address || 'Location not set'}</span>
             </p>
-            <span className={`text-sm font-semibold italic tracking-[0.01em] ${showBanner ? 'text-blue-200' : 'text-indigo-500 dark:text-indigo-300'}`}>
+            <span className={`inline-flex w-fit rounded-md px-2 py-1 text-sm font-semibold italic tracking-[0.01em] ${showBanner ? 'bg-black/35 text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]' : 'text-indigo-600 dark:text-indigo-300'}`}>
               @{profile.username}
             </span>
             {tags.length > 0 ? (
@@ -219,7 +241,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                   <div key={idx} className="flex gap-2">
                     {row.map((tag) => {
                       const color = getTagColor(tag);
-                      return <Tag key={tag} label={`#${tag}`} color={color} size="sm" />;
+                      return <Tag key={tag} label={`#${tag}`} color={color} size="sm" className="font-bold" />;
                     })}
                   </div>
                 ))}
@@ -231,7 +253,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           <div className={`flex gap-2 self-end sm:self-end ${showBanner ? 'mb-6' : 'mb-0'}`}>
             {!showBanner && profile.profileVisibility === 'LOCKED' ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-red-500 px-2 py-1 text-xs font-bold text-white">
-                <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                <span aria-hidden="true">🔒</span>
                 Private
               </span>
             ) : null}

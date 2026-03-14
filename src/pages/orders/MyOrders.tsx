@@ -6,6 +6,7 @@ import { BadgeCheck, Package, Truck } from 'lucide-react';
 import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
 import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
 import VLoader from '@/components/loaders/VLoader';
+import { messagingApi, type ThreadSummaryResponse } from '@/api/MessagingApi';
 
 const statusIcon = (status: string) => {
   switch (status) {
@@ -39,6 +40,7 @@ const MyOrders: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [activeReviewItem, setActiveReviewItem] = useState<any | null>(null);
+  const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -47,6 +49,19 @@ const MyOrders: React.FC = () => {
       const items = (res as any)?.items || (res as any)?.data || [];
       setOrders(items);
       setTotalPages((res as any)?.totalPages || 1);
+
+      const orderIds = items.map((item: Order) => item.id).filter(Boolean);
+      if (orderIds.length > 0) {
+        const summaries = await messagingApi.getBulkOrderSummaries(orderIds, true);
+        setSummaryByOrderId(
+          summaries.items.reduce<Record<string, ThreadSummaryResponse | null>>((acc, item) => {
+            acc[item.contextId] = item.summary;
+            return acc;
+          }, {}),
+        );
+      } else {
+        setSummaryByOrderId({});
+      }
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to load your orders');
     } finally {
@@ -90,6 +105,10 @@ const MyOrders: React.FC = () => {
             <div className="p-8 text-center text-gray-500">You have not placed any orders yet.</div>
           ) : (
             orders.map((order) => (
+              (() => {
+                const summary = summaryByOrderId[order.id];
+                const unreadCount = Number(summary?.unreadCount ?? 0);
+                return (
               <div key={order.id} className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -111,6 +130,11 @@ const MyOrders: React.FC = () => {
                     ))}
                     {order.items.length > 3 && <span className="text-gray-400">+{order.items.length - 3} more</span>}
                   </div>
+                  {summary?.hasUnread ? (
+                    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200">
+                      💬 {unreadCount > 0 ? `${unreadCount} unread message${unreadCount === 1 ? '' : 's'}` : 'New messages'}
+                    </div>
+                  ) : null}
                   {order.orderItems?.length ? (
                     <div className="space-y-2 pt-2">
                       {!reviewFlagsLoading && !flags.writeEnabled ? (
@@ -197,6 +221,8 @@ const MyOrders: React.FC = () => {
                   </div>
                 </div>
               </div>
+                );
+              })()
             ))
           )}
         </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { getMyOrders, type Order } from '@/api/StoreApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import { messagingApi, type ThreadSummaryResponse } from '@/api/MessagingApi';
 
 const STATUS_OPTIONS = ['ALL', 'PENDING', 'PROCESSING', 'SHIPPED'] as const;
 type StatusFilter = (typeof STATUS_OPTIONS)[number];
@@ -58,6 +59,7 @@ export const OrdersPanel: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<StatusFilter>('ALL');
+  const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
 
   useEffect(() => {
     let mounted = true;
@@ -68,7 +70,22 @@ export const OrdersPanel: React.FC = () => {
       try {
         const response = await getMyOrders(1, 50);
         if (!mounted) return;
-        setOrders(Array.isArray(response?.items) ? response.items : []);
+        const items = Array.isArray(response?.items) ? response.items : [];
+        setOrders(items);
+
+        const orderIds = items.map((item: Order) => item.id).filter(Boolean);
+        if (orderIds.length > 0) {
+          const summaries = await messagingApi.getBulkOrderSummaries(orderIds, true);
+          if (!mounted) return;
+          setSummaryByOrderId(
+            summaries.items.reduce<Record<string, ThreadSummaryResponse | null>>((acc, item) => {
+              acc[item.contextId] = item.summary;
+              return acc;
+            }, {}),
+          );
+        } else {
+          setSummaryByOrderId({});
+        }
       } catch (err) {
         if (!mounted) return;
         setOrders([]);
@@ -190,6 +207,8 @@ export const OrdersPanel: React.FC = () => {
               const normalizedStatus = normalizeStatus(order.status);
               const completedSegments = progressSegments(normalizedStatus);
               const firstItem = order.items?.[0];
+              const summary = summaryByOrderId[order.id];
+              const unreadCount = Number(summary?.unreadCount ?? 0);
 
               return (
                 <button
@@ -240,6 +259,11 @@ export const OrdersPanel: React.FC = () => {
                         {firstItem?.name || 'Order'}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(order.createdAt)}</p>
+                      {summary?.hasUnread ? (
+                        <p className="mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                          💬 {unreadCount > 0 ? `${unreadCount} unread` : 'New messages'}
+                        </p>
+                      ) : null}
                     </div>
 
                     <p className="shrink-0 text-sm font-bold text-gray-900 dark:text-white">

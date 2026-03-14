@@ -16,7 +16,7 @@ const AdminScaffold: React.FC = () => {
   }, [dispatch, location.pathname]);
 
   return (
-    <div className="min-h-screen threadly-shell-bg">
+    <div className="min-h-screen threadly-shell-bg pb-20 md:pb-0">
       <Navbar minimal={false} />
       <Sidebar overlayOnly />
       <AdminSidebar />

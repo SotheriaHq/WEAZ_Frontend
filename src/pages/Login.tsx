@@ -12,6 +12,7 @@ import { setUser } from '../features/userSlice';
 import { addLocalNotification } from '../features/notificationsSlice';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { apiClient, persistAccessToken, dropStoredAccessToken } from '../api/httpClient';
+import Modal from '@/components/ui/Modal';
 import '../styles/auth.css';
 
 const loginSchema = z.object({
@@ -101,6 +102,15 @@ const LoginPage = () => {
   const [rememberMe, setRememberMe] = useState<boolean>(rememberedState.remember);
   const [emailSuggestions, setEmailSuggestions] = useState<string[]>(rememberedState.emails);
   const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
+  const [showForceResetModal, setShowForceResetModal] = useState(false);
+  const [forceResetEmail, setForceResetEmail] = useState('');
+  const [forceResetCurrentPassword, setForceResetCurrentPassword] = useState('');
+  const [forceResetNewPassword, setForceResetNewPassword] = useState('');
+  const [forceResetConfirmPassword, setForceResetConfirmPassword] = useState('');
+  const [showResetCurrent, setShowResetCurrent] = useState(false);
+  const [showResetNew, setShowResetNew] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isSubmittingForceReset, setIsSubmittingForceReset] = useState(false);
   const suggestionHideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -208,6 +218,95 @@ const LoginPage = () => {
     setShowEmailSuggestions(false);
   };
 
+  const completeLogin = (
+    payload: AuthTokensResponse,
+    normalizedEmail: string,
+  ) => {
+    const { accessToken, user } = payload;
+    if (!user || !user.id) throw new Error('Invalid login response');
+
+    if (accessToken) {
+      persistAccessToken(accessToken);
+    }
+
+    if (rememberMe) {
+      const updatedEmails = [
+        normalizedEmail,
+        ...emailSuggestions.filter((email) => email.toLowerCase() !== normalizedEmail.toLowerCase()),
+      ].slice(0, 5);
+      setEmailSuggestions(updatedEmails);
+      setShowEmailSuggestions(false);
+      localStorage.setItem(REMEMBERED_EMAILS_KEY, JSON.stringify(updatedEmails));
+      localStorage.setItem(REMEMBERED_LOGIN_KEY, JSON.stringify({ remember: true, email: normalizedEmail }));
+    } else {
+      setShowEmailSuggestions(false);
+      localStorage.setItem(REMEMBERED_LOGIN_KEY, JSON.stringify({ remember: false, email: '' }));
+    }
+
+    dispatch(setUser(user));
+    dispatch(addLocalNotification({ message: 'Signed in successfully.' }));
+    toast.success('Login successful!');
+    setShowReactivationLink(false);
+
+    const redirectPath =
+      user.role === 'SuperAdmin' || user.role === 'Admin'
+        ? '/admin'
+        : redirectFromQuery || redirectFromState || '/profile';
+    navigate(redirectPath, { replace: true });
+    setIsRedirecting(true);
+    reset({ email: rememberMe ? normalizedEmail : '', password: '' });
+    setShowPassword(false);
+  };
+
+  const submitFirstLoginReset = async () => {
+    if (!forceResetEmail || !forceResetCurrentPassword || !forceResetNewPassword || !forceResetConfirmPassword) {
+      toast.error('All password reset fields are required.');
+      return;
+    }
+    if (forceResetNewPassword.length < 8) {
+      toast.error('New password must be at least 8 characters.');
+      return;
+    }
+    if (forceResetNewPassword !== forceResetConfirmPassword) {
+      toast.error('New password and confirm password do not match.');
+      return;
+    }
+
+    setIsSubmittingForceReset(true);
+    try {
+      await apiClient.post('/auth/admin/reset-password/first-login', {
+        email: forceResetEmail,
+        currentPassword: forceResetCurrentPassword,
+        newPassword: forceResetNewPassword,
+      });
+
+      const loginRes = await apiClient.post<ApiSuccessPayload<AuthTokensResponse>>('/auth/login', {
+        email: forceResetEmail,
+        password: forceResetNewPassword,
+      });
+      const payload = unwrapApiResponse(loginRes.data);
+      completeLogin(payload, forceResetEmail);
+
+      setShowForceResetModal(false);
+      setForceResetCurrentPassword('');
+      setForceResetNewPassword('');
+      setForceResetConfirmPassword('');
+      toast.success('Password set successfully. You are now signed in.');
+    } catch (error: unknown) {
+      if (isAxiosError(error)) {
+        const data = error.response?.data as Record<string, unknown> | undefined;
+        const responseMessage =
+          (data && typeof data.message === 'string' && data.message) ||
+          'Unable to complete password setup.';
+        toast.error(responseMessage);
+      } else {
+        toast.error('Unable to complete password setup.');
+      }
+    } finally {
+      setIsSubmittingForceReset(false);
+    }
+  };
+
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     const normalizedEmail = data.email.trim();
@@ -218,55 +317,30 @@ const LoginPage = () => {
         '/auth/login',
         { ...data, email: normalizedEmail },
       );
-      const { accessToken, user } = unwrapApiResponse(loginRes.data);
-      if (!user || !user.id) throw new Error('Invalid login response');
-
-      if (accessToken) {
-        persistAccessToken(accessToken);
-      }
-
-      if (rememberMe) {
-        const updatedEmails = [
-          normalizedEmail,
-          ...emailSuggestions.filter((email) => email.toLowerCase() !== normalizedEmail.toLowerCase()),
-        ].slice(0, 5);
-        setEmailSuggestions(updatedEmails);
-        setShowEmailSuggestions(false);
-        localStorage.setItem(REMEMBERED_EMAILS_KEY, JSON.stringify(updatedEmails));
-        localStorage.setItem(REMEMBERED_LOGIN_KEY, JSON.stringify({ remember: true, email: normalizedEmail }));
-      } else {
-        setShowEmailSuggestions(false);
-        localStorage.setItem(REMEMBERED_LOGIN_KEY, JSON.stringify({ remember: false, email: '' }));
-      }
-
-      dispatch(setUser(user));
-      dispatch(addLocalNotification({ message: 'Signed in successfully.' }));
-      toast.success('Login successful!');
-      setShowReactivationLink(false);
-
-      // Redirect based on role first: admin users always land in admin console.
-      // Non-admin users continue to use profile as their post-login landing page.
-      const redirectPath =
-        user.role === 'SuperAdmin' || user.role === 'Admin'
-          ? '/admin'
-          : redirectFromQuery || redirectFromState || '/profile';
-      navigate(redirectPath, { replace: true });
-      setIsRedirecting(true);
-      reset({ email: rememberMe ? normalizedEmail : '', password: '' });
-      setShowPassword(false);
+      const payload = unwrapApiResponse(loginRes.data);
+      completeLogin(payload, normalizedEmail);
     } catch (error: unknown) {
       if (isAxiosError(error)) {
-        const data = error.response?.data as Record<string, unknown> | undefined;
+        const responseData = error.response?.data as Record<string, unknown> | undefined;
         const responseMessage =
-          (data && typeof data.message === 'string' && data.message) || 'Login failed. Please try again.';
+          (responseData && typeof responseData.message === 'string' && responseData.message) ||
+          'Login failed. Please try again.';
         const normalizedMessage = responseMessage.toLowerCase();
+        const isForceResetRequired =
+          normalizedMessage.includes('password reset required for this admin account before login');
         const accountBlocked =
           normalizedMessage.includes('suspended') ||
           normalizedMessage.includes('deactivated');
         setShowReactivationLink(accountBlocked);
 
-        if (data && Array.isArray((data as { errors?: unknown }).errors)) {
-          const serverErrors = (data as { errors: Array<Record<string, unknown>> }).errors;
+        if (isForceResetRequired) {
+          setShowForceResetModal(true);
+          setForceResetEmail(normalizedEmail);
+          setForceResetCurrentPassword(data.password);
+        }
+
+        if (responseData && Array.isArray((responseData as { errors?: unknown }).errors)) {
+          const serverErrors = (responseData as { errors: Array<Record<string, unknown>> }).errors;
           let displayedMessage = '';
 
           serverErrors.forEach((serverErrorRaw) => {
@@ -556,6 +630,125 @@ const LoginPage = () => {
           </div>
         </div>
       </div>
+
+      <Modal
+        open={showForceResetModal}
+        onClose={() => {
+          if (isSubmittingForceReset) return;
+          setShowForceResetModal(false);
+        }}
+        title="🔐 Set A New Password"
+        size="sm"
+        scope="viewport"
+        glassBackdrop={true}
+        backdropStyle="light"
+        className="border border-white/45 bg-white/85 shadow-[0_30px_90px_-28px_rgba(79,70,229,0.45)] dark:border-white/15 dark:bg-slate-900/85"
+      >
+        <div className="space-y-4">
+          <div className="rounded-xl border border-indigo-200/70 bg-gradient-to-r from-indigo-50/90 to-cyan-50/90 p-3 dark:border-indigo-500/30 dark:from-indigo-500/10 dark:to-cyan-500/10">
+            <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">
+              This admin account requires a first-login password update.
+            </p>
+            <p className="mt-1 text-xs text-indigo-800/90 dark:text-indigo-200/90">
+              Enter your temporary password, then choose a secure new password to continue.
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+              Email
+            </label>
+            <input
+              value={forceResetEmail}
+              onChange={(e) => setForceResetEmail(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+              Temporary Password
+            </label>
+            <div className="relative">
+              <input
+                type={showResetCurrent ? 'text' : 'password'}
+                value={forceResetCurrentPassword}
+                onChange={(e) => setForceResetCurrentPassword(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-10 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              />
+              <button
+                type="button"
+                onClick={() => setShowResetCurrent((prev) => !prev)}
+                className="absolute inset-y-0 right-0 px-3 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+              >
+                {showResetCurrent ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                New Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showResetNew ? 'text' : 'password'}
+                  value={forceResetNewPassword}
+                  onChange={(e) => setForceResetNewPassword(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-10 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowResetNew((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 px-3 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                >
+                  {showResetNew ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                Confirm New Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showResetConfirm ? 'text' : 'password'}
+                  value={forceResetConfirmPassword}
+                  onChange={(e) => setForceResetConfirmPassword(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-10 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirm((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 px-3 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                >
+                  {showResetConfirm ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setShowForceResetModal(false)}
+              disabled={isSubmittingForceReset}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void submitFirstLoginReset()}
+              disabled={isSubmittingForceReset}
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {isSubmittingForceReset ? 'Setting Password...' : 'Set Password & Sign In'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

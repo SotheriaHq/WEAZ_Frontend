@@ -330,13 +330,13 @@ const AdminProductsPage: React.FC = () => {
           </section>
 
           <section className="rounded-2xl border border-gray-200/80 bg-white/85 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-2 lg:grid-cols-3">
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search products by name..."
-                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-purple-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
+                className="col-span-2 md:col-span-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-purple-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
               />
               <div className="inline-flex overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
                 {(['ALL', 'ACTIVE', 'INACTIVE'] as StatusFilter[]).map((option) => (

@@ -61,6 +61,15 @@ export interface ThreadSummaryResponse {
   lastMessageAt?: string | null;
 }
 
+export interface ThreadSummaryByContextItem {
+  contextId: string;
+  summary: ThreadSummaryResponse | null;
+}
+
+export interface ThreadSummaryByContextResponse {
+  items: ThreadSummaryByContextItem[];
+}
+
 const parseMessageList = (data: unknown): MessageListResponse => {
   const payload = unwrapApiResponse<any>(data);
   return {
@@ -152,6 +161,15 @@ export const messagingApi = {
     return unwrapApiResponse<ThreadSummaryResponse | null>(response.data);
   },
 
+  async getBulkCustomOrderSummaries(orderIds: string[], includeUnreadCount = true) {
+    const response = await apiClient.post('/custom-orders/messages/summaries', {
+      contextIds: orderIds,
+      includeUnreadCount: includeUnreadCount ? 'true' : 'false',
+    });
+
+    return unwrapApiResponse<ThreadSummaryByContextResponse>(response.data);
+  },
+
   async getCustomOrderSummaryForBrand(brandId: string, orderId: string, includeUnreadCount = true) {
     const response = await apiClient.get(`/brands/${brandId}/custom-orders/${orderId}/messages/summary`, {
       params: {
@@ -160,6 +178,15 @@ export const messagingApi = {
     });
 
     return unwrapApiResponse<ThreadSummaryResponse | null>(response.data);
+  },
+
+  async getBulkCustomOrderSummariesForBrand(brandId: string, orderIds: string[], includeUnreadCount = true) {
+    const response = await apiClient.post(`/brands/${brandId}/custom-orders/messages/summaries`, {
+      contextIds: orderIds,
+      includeUnreadCount: includeUnreadCount ? 'true' : 'false',
+    });
+
+    return unwrapApiResponse<ThreadSummaryByContextResponse>(response.data);
   },
 
   async listOrderMessages(orderId: string, params?: { cursorCreatedAt?: string; cursorId?: string; limit?: number }) {
@@ -218,6 +245,15 @@ export const messagingApi = {
     return unwrapApiResponse<ThreadSummaryResponse | null>(response.data);
   },
 
+  async getBulkOrderSummaries(orderIds: string[], includeUnreadCount = true) {
+    const response = await apiClient.post('/orders/messages/summaries', {
+      contextIds: orderIds,
+      includeUnreadCount: includeUnreadCount ? 'true' : 'false',
+    });
+
+    return unwrapApiResponse<ThreadSummaryByContextResponse>(response.data);
+  },
+
   async getOrderSummaryForBrand(brandId: string, orderId: string, includeUnreadCount = true) {
     const response = await apiClient.get(`/brands/${brandId}/orders/${orderId}/messages/summary`, {
       params: {
@@ -226,5 +262,14 @@ export const messagingApi = {
     });
 
     return unwrapApiResponse<ThreadSummaryResponse | null>(response.data);
+  },
+
+  async getBulkOrderSummariesForBrand(brandId: string, orderIds: string[], includeUnreadCount = true) {
+    const response = await apiClient.post(`/brands/${brandId}/orders/messages/summaries`, {
+      contextIds: orderIds,
+      includeUnreadCount: includeUnreadCount ? 'true' : 'false',
+    });
+
+    return unwrapApiResponse<ThreadSummaryByContextResponse>(response.data);
   },
 };

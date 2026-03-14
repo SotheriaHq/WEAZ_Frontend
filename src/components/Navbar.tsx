@@ -35,6 +35,7 @@ import { useNavigate } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
+import { generateUserUid } from '@/utils/userUid';
 
 
 
@@ -61,6 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const isWishlistOpen = useSelector(selectWishlistIsDrawerOpen);
   const user = isAuthenticated ? userProfile : null;
   const dispatch = useDispatch<AppDispatch>();
+  const userUid = user ? generateUserUid(user.id, user.firstName) : null;
 
   // Fetch cart and wishlist on mount if authenticated
   React.useEffect(() => {
@@ -170,8 +172,9 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                   rounded="xl"
                 />
                 <div>
-                  <p className="font-medium text-gray-900 dark:text-white">{user.firstName} {user.lastName}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{user.firstName} {user.lastName}</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{user.email}</p>
+                  <p className="mt-0.5 text-[11px] font-semibold tracking-wide text-gray-700 dark:text-gray-200">UID: {userUid}</p>
                 </div>
               </div>
             </div>

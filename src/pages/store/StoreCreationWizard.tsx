@@ -52,6 +52,9 @@ const initialData: StoreWizardData = {
   freeShippingThreshold: null,
   shippingMethod: 'standard',
   shippingRates: [],
+  orderProcessingMode: 'manual-review',
+  orderCancellationWindow: '24h',
+  allowOrderNotes: true,
   returnsAccepted: true,
   returnWindow: '14',
   returnConditions: [],
@@ -62,6 +65,10 @@ const initialData: StoreWizardData = {
   sizeChartSystem: null,
   responseTimeSla: '24h',
   contactEmail: '',
+  customOrdersEnabled: false,
+  customOrderConsultationMode: 'required',
+  customOrderLeadTime: '14-21',
+  customOrderRushSupported: false,
 
   // Step 4: Catalog
   products: [],
@@ -210,6 +217,17 @@ const StoreCreationWizard: React.FC = () => {
       ? {
           shippingRates: wizardData.shippingRates,
           shippingMethod: wizardData.shippingMethod,
+          orderSettings: {
+            orderProcessingMode: wizardData.orderProcessingMode,
+            orderCancellationWindow: wizardData.orderCancellationWindow,
+            allowOrderNotes: wizardData.allowOrderNotes,
+          },
+          customOrderSettings: {
+            customOrdersEnabled: wizardData.customOrdersEnabled,
+            consultationMode: wizardData.customOrderConsultationMode,
+            leadTime: wizardData.customOrderLeadTime,
+            rushSupported: wizardData.customOrderRushSupported,
+          },
         }
       : null;
 
@@ -360,6 +378,27 @@ const StoreCreationWizard: React.FC = () => {
               ? policy.shippingRules?.shippingRates
               : nextData.shippingRates,
             shippingMethod: policy.shippingRules?.shippingMethod || nextData.shippingMethod,
+            orderProcessingMode:
+              policy.shippingRules?.orderSettings?.orderProcessingMode || nextData.orderProcessingMode,
+            orderCancellationWindow:
+              policy.shippingRules?.orderSettings?.orderCancellationWindow || nextData.orderCancellationWindow,
+            allowOrderNotes:
+              typeof policy.shippingRules?.orderSettings?.allowOrderNotes === 'boolean'
+                ? policy.shippingRules.orderSettings.allowOrderNotes
+                : nextData.allowOrderNotes,
+            customOrdersEnabled:
+              typeof policy.shippingRules?.customOrderSettings?.customOrdersEnabled === 'boolean'
+                ? policy.shippingRules.customOrderSettings.customOrdersEnabled
+                : nextData.customOrdersEnabled,
+            customOrderConsultationMode:
+              policy.shippingRules?.customOrderSettings?.consultationMode ||
+              nextData.customOrderConsultationMode,
+            customOrderLeadTime:
+              policy.shippingRules?.customOrderSettings?.leadTime || nextData.customOrderLeadTime,
+            customOrderRushSupported:
+              typeof policy.shippingRules?.customOrderSettings?.rushSupported === 'boolean'
+                ? policy.shippingRules.customOrderSettings.rushSupported
+                : nextData.customOrderRushSupported,
           };
         }
       } catch (error) {

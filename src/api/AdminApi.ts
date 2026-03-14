@@ -46,7 +46,7 @@ export const adminUsersApi = {
     apiClient.get<Paginated<AdminUser>>('/admin/users', { params }),
   getById: (id: string) =>
     apiClient.get<AdminUser>(`/admin/users/${id}`),
-  create: (data: { email: string; firstName: string; lastName: string; tempPassword: string }) =>
+  create: (data: { email: string; firstName: string; lastName: string }) =>
     apiClient.post<AdminUser>('/admin/users', data),
   updateRole: (id: string, role: string) =>
     apiClient.patch(`/admin/users/${id}/role`, { role }),
@@ -56,6 +56,16 @@ export const adminUsersApi = {
     apiClient.patch(`/admin/users/${id}/status`, { status, reason }),
   forcePasswordReset: (id: string) =>
     apiClient.post(`/admin/users/${id}/force-password-reset`),
+  reissueTempPassword: (
+    id: string,
+    data: { actorEmail: string; actorUserIdConfirm: string; targetUserIdConfirm: string },
+  ) => apiClient.post(`/admin/users/${id}/reissue-temp-password`, data),
+  deleteAdminUser: (id: string) =>
+    apiClient.delete(`/admin/users/${id}/data-wipe`, {
+      headers: { 'x-confirm-wipe': 'true' },
+    }),
+  permanentlyDeleteAdminUser: (id: string) =>
+    apiClient.delete(`/admin/users/${id}/permanent-delete`),
   hardDeleteSeeded: (id: string) =>
     apiClient.delete(`/admin/users/${id}/hard-delete`),
   listReactivationRequests: (params?: Record<string, string>) =>
@@ -158,6 +168,18 @@ export const adminTaxonomyApi = {
       `/admin/categories/${categoryId}/sub-categories`,
       { params: includeInactive ? { includeInactive: 'true' } : undefined },
     ),
+  createSubCategory: (
+    categoryId: string,
+    data: { name: string; description?: string; order?: number },
+  ) => apiClient.post(`/admin/categories/${categoryId}/sub-categories`, data),
+  updateSubCategory: (
+    subCategoryId: string,
+    data: { name?: string; description?: string; order?: number },
+  ) => apiClient.patch(`/admin/categories/sub-categories/${subCategoryId}`, data),
+  activateSubCategory: (subCategoryId: string) =>
+    apiClient.patch(`/admin/categories/sub-categories/${subCategoryId}/activate`),
+  deactivateSubCategory: (subCategoryId: string) =>
+    apiClient.patch(`/admin/categories/sub-categories/${subCategoryId}/deactivate`),
   createCategory: (data: { name: string; slug?: string; description?: string; order?: number }) =>
     apiClient.post<AdminCategory>('/admin/categories', data),
   updateCategory: (id: string, data: { name?: string; slug?: string; description?: string; order?: number }) =>

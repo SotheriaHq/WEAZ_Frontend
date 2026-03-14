@@ -82,7 +82,7 @@ export interface CustomOrderOfferRuleInput {
 export interface CustomOrderOfferUpsertInput {
   sourceType: CustomOrderSourceType;
   sourceId: string;
-  title: string;
+  title?: string;
   buyerInstructionText?: string;
   requiredMeasurementKeys: string[];
   requiredFreeformPointIds?: string[];

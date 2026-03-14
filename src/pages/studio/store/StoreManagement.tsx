@@ -345,11 +345,9 @@ export default function StoreManagement() {
               </div>
 
               {brandLocation ? (
-                <div className="group relative">
-                  <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
-                    📍
-                  </span>
-                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
+                <div className="inline-flex max-w-[220px] items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
+                  <span aria-hidden="true">📍</span>
+                  <span className="truncate" title={brandLocation}>
                     {brandLocation}
                   </span>
                 </div>
@@ -367,12 +365,12 @@ export default function StoreManagement() {
               <button
                 type="button"
                 onClick={() => navigate('/studio/verification')}
-                className="group relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10"
+                className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300"
+                aria-label="Open verification workspace"
+                title={verificationLabel}
               >
                 <span>{verificationMarker}</span>
-                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                  {verificationLabel}
-                </span>
+                <span className="max-w-[140px] truncate">{verificationLabel}</span>
               </button>
 
               <div className="group relative">

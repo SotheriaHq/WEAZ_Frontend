@@ -5,7 +5,9 @@ import { getStoredAccessToken } from '../api/httpClient';
 
 const PERMISSION_ALIASES: Record<string, string> = {
   USERS_READ: 'users.read',
+  USERS_UPDATE: 'users.update',
   USERS_WRITE: 'users.update',
+  USERS_SUSPEND: 'users.deactivate',
   USERS_DEACTIVATE: 'users.deactivate',
   USERS_NOTIFY: 'notifications.send',
   BRANDS_READ: 'brands.read',

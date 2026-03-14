@@ -52,6 +52,15 @@ const getCollectionBasePath = (scope?: CollectionScope) =>
 const SIGNED_URL_TTL_MS = 4 * 60 * 1000;
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 const signedUrlPending = new Map<string, Promise<string | null>>();
+const VERIFICATION_STATUS_TTL_MS = 1500;
+const verificationStatusCache = new Map<
+  string,
+  { data: VerificationStatusResponse; expiresAt: number }
+>();
+const verificationStatusPending = new Map<
+  string,
+  Promise<VerificationStatusResponse>
+>();
 
 export type CategoryTypeOption = {
   id: string;
@@ -306,9 +315,41 @@ export const brandApi = {
       );
     }
   },
-  async getVerificationStatus(brandId: string): Promise<VerificationStatusResponse> {
-    const response = await apiClient.get(`/brands/${brandId}/verification`);
-    return unwrapApiResponse<VerificationStatusResponse>(response.data);
+  async getVerificationStatus(
+    brandId: string,
+    options?: { force?: boolean },
+  ): Promise<VerificationStatusResponse> {
+    const force = Boolean(options?.force);
+    const now = Date.now();
+
+    if (!force) {
+      const cached = verificationStatusCache.get(brandId);
+      if (cached && cached.expiresAt > now) {
+        return cached.data;
+      }
+
+      const pending = verificationStatusPending.get(brandId);
+      if (pending) {
+        return pending;
+      }
+    }
+
+    const request = apiClient
+      .get(`/brands/${brandId}/verification`)
+      .then((response) => {
+        const data = unwrapApiResponse<VerificationStatusResponse>(response.data);
+        verificationStatusCache.set(brandId, {
+          data,
+          expiresAt: Date.now() + VERIFICATION_STATUS_TTL_MS,
+        });
+        return data;
+      })
+      .finally(() => {
+        verificationStatusPending.delete(brandId);
+      });
+
+    verificationStatusPending.set(brandId, request);
+    return request;
   },
   async getVerificationDraft(brandId: string): Promise<VerificationDraftResponse> {
     const response = await apiClient.get(`/brands/${brandId}/verification/draft`);
@@ -951,10 +992,7 @@ export const brandApi = {
 
   // Fetch draft collections (PHASE 6)
   async getMyDraftCollections(): Promise<CollectionDto[]> {
-    try {
-      const response = await apiClient.get('/designs/my/drafts');
-      const payload = response.data;
-      // Robustly extract items array handling { data: [...] }, { items: [...] }, or [...]
+    const parseDraftItems = (payload: any): any[] => {
       const items = Array.isArray(payload)
         ? payload
         : Array.isArray(payload?.data)
@@ -964,13 +1002,11 @@ export const brandApi = {
             : Array.isArray(payload?.data?.items)
               ? payload.data.items
               : [];
+      return Array.isArray(items) ? items : [];
+    };
 
-      if (!Array.isArray(items)) {
-        console.warn('getMyDraftCollections: Expected array but got', typeof items);
-        return [];
-      }
-
-      return items.map((item: any) => ({
+    const mapDrafts = (items: any[]): CollectionDto[] =>
+      items.map((item: any) => ({
         id: item.id,
         name: item.title || '',
         title: item.title || '',
@@ -1007,9 +1043,24 @@ export const brandApi = {
         pendingCategoryName: item.pendingCategoryName,
         draftReason: item.draftReason,
       }));
+
+    const requestDrafts = async (): Promise<CollectionDto[]> => {
+      const response = await apiClient.get('/designs/my/drafts');
+      const payload = response.data;
+      return mapDrafts(parseDraftItems(payload));
+    };
+
+    try {
+      return await requestDrafts();
     } catch (error) {
-      console.error('Error fetching draft collections:', error);
-      return [];
+      console.warn('First draft fetch failed, retrying once...', error);
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      try {
+        return await requestDrafts();
+      } catch (retryError) {
+        console.error('Error fetching draft collections after retry:', retryError);
+        throw retryError;
+      }
     }
   },
 

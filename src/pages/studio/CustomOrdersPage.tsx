@@ -9,6 +9,7 @@ import {
   type CustomOrderProgressStage,
   type CustomOrderStatus,
 } from '@/api/CustomOrderApi';
+import { messagingApi, type ThreadSummaryResponse } from '@/api/MessagingApi';
 import {
   CustomOrderBadge,
   CustomOrderJsonBreakdown,
@@ -67,6 +68,7 @@ const CustomOrdersPage: React.FC = () => {
   const [counterResponse, setCounterResponse] = useState<'ACCEPTED' | 'REJECTED'>('ACCEPTED');
   const [counterNote, setCounterNote] = useState('');
   const [pendingAction, setPendingAction] = useState<PendingBrandAction | null>(null);
+  const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const refreshSequenceRef = useRef(0);
 
@@ -102,6 +104,27 @@ const CustomOrdersPage: React.FC = () => {
         return;
       }
       setOrders(list.items);
+
+      const orderIds = list.items.map((entry) => entry.id);
+      if (orderIds.length === 0) {
+        setSummaryByOrderId({});
+      } else {
+        const bulkSummaries = await messagingApi.getBulkCustomOrderSummariesForBrand(
+          status.brandId,
+          orderIds,
+          true,
+        );
+        if (refreshSequenceRef.current !== sequence) {
+          return;
+        }
+        setSummaryByOrderId(
+          bulkSummaries.items.reduce<Record<string, ThreadSummaryResponse | null>>((acc, item) => {
+            acc[item.contextId] = item.summary;
+            return acc;
+          }, {}),
+        );
+      }
+
       if (orderId) {
         void loadDetail(status.brandId, orderId, sequence).catch((error: any) => {
           if (refreshSequenceRef.current !== sequence) {
@@ -200,6 +223,10 @@ const CustomOrdersPage: React.FC = () => {
             {loading ? <div className="text-sm text-slate-500 dark:text-slate-400">Loading brand queue...</div> : null}
             {!loading && orders.length === 0 ? <div className="text-sm text-slate-500 dark:text-slate-400">No custom orders match this view.</div> : null}
             {orders.map((entry) => (
+              (() => {
+                const summary = summaryByOrderId[entry.id];
+                const unreadCount = Number(summary?.unreadCount ?? 0);
+                return (
               <button
                 key={entry.id}
                 type="button"
@@ -209,13 +236,22 @@ const CustomOrdersPage: React.FC = () => {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="font-semibold text-slate-900 dark:text-white">{entry.sourceTitle}</div>
-                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{entry.status} • {entry.currentProgressStage ?? 'Awaiting action'}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <span>{entry.status} • {entry.currentProgressStage ?? 'Awaiting action'}</span>
+                      {summary?.hasUnread ? (
+                        <span className="inline-flex rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-700 dark:text-emerald-300">
+                          💬 {unreadCount > 0 ? `${unreadCount} unread` : 'New messages'}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="text-right text-sm font-semibold text-slate-900 dark:text-white">
                     {formatCurrency(entry.buyerPriceSummary.grandTotal, entry.buyerPriceSummary.currency)}
                   </div>
                 </div>
               </button>
+                );
+              })()
             ))}
           </div>
         </section>

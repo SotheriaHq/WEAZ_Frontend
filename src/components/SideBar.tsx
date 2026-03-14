@@ -103,6 +103,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
       : viewportWidth;
   const isMobile = liveViewportWidth < MOBILE_BREAKPOINT;
   const isProfileRoute = location.pathname === '/profile' || location.pathname.startsWith('/profile/');
+  const isAdminConsoleUser = user?.role === 'SuperAdmin' || user?.role === 'Admin';
 
   const showOverlay = isSidebarOpen;
   const isRail = !showOverlay;
@@ -176,10 +177,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
   const mobileDockLinks = [
     ...mainLinks.slice(0, 4),
     {
-      emoji: '👤',
-      label: 'Profile',
-      path: '/profile',
-      active: isProfileRoute,
+      emoji: isAdminConsoleUser ? '🛡️' : '👤',
+      label: isAdminConsoleUser ? 'Admin' : 'Profile',
+      path: isAdminConsoleUser ? '/admin' : '/profile',
+      active: isAdminConsoleUser ? location.pathname.startsWith('/admin') : isProfileRoute,
     },
   ];
 
