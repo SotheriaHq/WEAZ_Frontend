@@ -38,12 +38,13 @@ const AdminCollectionsPage: React.FC = () => {
 
   const handleVisibilityToggle = (collection: AdminCollection) => {
     const newVis = collection.visibility === 'PUBLIC' ? 'PRIVATE' : 'PUBLIC';
+    const action = newVis === 'PUBLIC' ? 'REPUBLISH' : 'UNPUBLISH';
     setConfirmAction({
       title: `Set collection to ${newVis}?`,
       message: `"${collection.title ?? 'Untitled'}" will be ${newVis === 'PUBLIC' ? 'visible to everyone' : 'hidden from the public'}.`,
       isDestructive: newVis === 'PRIVATE',
       action: async () => {
-        await adminCollectionsApi.moderate(collection.id, { visibility: newVis });
+        await adminCollectionsApi.moderate(collection.id, { action });
         toast.success(`Collection set to ${newVis.toLowerCase()}`);
         reset();
       },

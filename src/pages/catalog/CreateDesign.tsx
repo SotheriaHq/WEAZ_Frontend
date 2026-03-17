@@ -49,6 +49,7 @@ import { MediaProvider, useMediaStore } from "../../hooks/useMediaStore";
 import useCollectionUpload from "../../hooks/useCollectionUpload";
 import { useBrandProfile } from "../../hooks/UseBrandHook";
 import { finalizeCollectionUploads } from "@/api/collectionUploads";
+import type { SizingMode } from '@/types/sizing';
 // ============================================================================
 
 type CategoryTypeOption = { id: string; name: string };
@@ -59,7 +60,11 @@ type CategoryOption = {
   types: CategoryTypeOption[];
 };
 
-const DESIGN_SIZING_MODE = 'RTW_PLUS_FITTINGS';
+const DESIGN_SIZING_MODE_OPTIONS = [
+  { value: 'RTW_PLUS_FITTINGS', label: 'Ready-to-Wear + Fittings' },
+  { value: 'CUSTOM', label: 'Custom Only' },
+] as const;
+type DesignSizingMode = Extract<SizingMode, (typeof DESIGN_SIZING_MODE_OPTIONS)[number]['value']>;
 
 const normalizeMeasurementLabel = (value: string) =>
   value.trim().toLowerCase().replace(/[\s_]+/g, ' ');
@@ -120,6 +125,7 @@ const CreateDesignInner: React.FC = () => {
     "EVERYBODY",
   );
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
+  const [sizingMode, setSizingMode] = useState<DesignSizingMode>('RTW_PLUS_FITTINGS');
   const [metadataEditedAt, setMetadataEditedAt] = useState<Date | null>(null);
   const [customMeasurementKeys, setCustomMeasurementKeys] = useState<string[]>(
     [],
@@ -186,7 +192,7 @@ const CreateDesignInner: React.FC = () => {
     accept: ["image/*", "video/*"],
     maxFiles: 20,
     onFiles: mediaStore.addFiles,
-    disabled: disabled || isEditMode,
+    disabled,
   });
 
   const getSelectedFilterValueIds = useCallback(() => {
@@ -269,6 +275,9 @@ const CreateDesignInner: React.FC = () => {
         setCategoryTypeId((d as any).subCategoryId || d.categoryTypeId || "");
         setType(d.type || "EVERYBODY");
         setVisibility(d.visibility || "PUBLIC");
+        setSizingMode(
+          d.sizingMode === 'CUSTOM' ? 'CUSTOM' : 'RTW_PLUS_FITTINGS',
+        );
         setCustomMeasurementKeys(
           Array.isArray(d.customMeasurementKeys) ? dedupeMeasurementKeysByLabel(d.customMeasurementKeys) : [],
         );
@@ -482,11 +491,12 @@ const CreateDesignInner: React.FC = () => {
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const categoryTypeOptions = selectedCategory?.types ?? [];
   const measurementGender = useMemo(
-    () => (type === 'MALE' ? 'MEN' : type === 'FEMALE' ? 'WOMEN' : 'UNISEX'),
+    (): 'MEN' | 'WOMEN' | 'UNISEX' => (type === 'MALE' ? 'MEN' : type === 'FEMALE' ? 'WOMEN' : 'UNISEX'),
     [type],
   );
   const designMeasurementFilter = useMemo(
-    () => (measurementGender === 'UNISEX' ? undefined : { gender: measurementGender }),
+    (): { gender?: 'MEN' | 'WOMEN' | 'UNISEX' } | undefined =>
+      measurementGender === 'UNISEX' ? undefined : { gender: measurementGender },
     [measurementGender],
   );
   const { points: designMeasurementPoints } = useMeasurementPoints(designMeasurementFilter);
@@ -661,7 +671,7 @@ const CreateDesignInner: React.FC = () => {
           type,
           visibility,
           filterValueIds: getSelectedFilterValueIds(),
-          sizingMode: DESIGN_SIZING_MODE,
+          sizingMode,
           rtwSizeSystem: null,
           customMeasurementKeys: normalizedCustomMeasurementKeys,
           fitPreference: null,
@@ -684,7 +694,7 @@ const CreateDesignInner: React.FC = () => {
             visibility,
             filterValueIds: getSelectedFilterValueIds(),
             coverIndex,
-            sizingMode: DESIGN_SIZING_MODE,
+            sizingMode,
             rtwSizeSystem: undefined,
             customMeasurementKeys: normalizedCustomMeasurementKeys,
             fitPreference: undefined,
@@ -764,7 +774,7 @@ const CreateDesignInner: React.FC = () => {
           visibility,
           coverMediaId: files[coverIndex]?.remoteId || undefined,
           filterValueIds: getSelectedFilterValueIds(),
-          sizingMode: DESIGN_SIZING_MODE,
+          sizingMode,
           rtwSizeSystem: null,
           customMeasurementKeys: normalizedCustomMeasurementKeys,
           fitPreference: null,
@@ -798,7 +808,7 @@ const CreateDesignInner: React.FC = () => {
               categoryTypeId,
               tags: finalTags,
               filterValueIds: getSelectedFilterValueIds(),
-              sizingMode: DESIGN_SIZING_MODE,
+              sizingMode,
               rtwSizeSystem: undefined,
               customMeasurementKeys: normalizedCustomMeasurementKeys,
               fitPreference: undefined,
@@ -828,7 +838,7 @@ const CreateDesignInner: React.FC = () => {
             visibility,
             filterValueIds: getSelectedFilterValueIds(),
             coverIndex,
-            sizingMode: DESIGN_SIZING_MODE,
+            sizingMode,
             rtwSizeSystem: undefined,
             customMeasurementKeys: normalizedCustomMeasurementKeys,
             fitPreference: undefined,
@@ -1136,7 +1146,7 @@ const CreateDesignInner: React.FC = () => {
                   onSelect={setSelectedIndex}
                   onDelete={handleDelete}
                   onSetCover={handleSetCover}
-                  onAddMore={!isEditMode ? picker.open : undefined}
+                  onAddMore={picker.open}
                   disabled={disabled}
                   progressById={perFileProgress}
                 />
@@ -1514,6 +1524,17 @@ const CreateDesignInner: React.FC = () => {
                   ))}
                 </div>
               </div>
+
+              <UniversalSelect
+                label="Sizing Mode"
+                value={sizingMode}
+                onChange={(value) => setSizingMode(value as DesignSizingMode)}
+                options={DESIGN_SIZING_MODE_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                disabled={disabled}
+              />
 
               {/* Visibility */}
               <div>
