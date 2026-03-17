@@ -28,6 +28,7 @@ import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import ProductReviewSection from '@/components/reviews/ProductReviewSection';
 import { isRtwSizingMode, normalizeSizingMode } from '@/types/sizing';
+import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 
 const prettifyMeasurementKey = (value: string) =>
   value
@@ -196,6 +197,7 @@ export default function ProductDetailsPage() {
   const [modalMeasurementValues, setModalMeasurementValues] = useState<Record<string, string>>({});
   const [savingMeasurements, setSavingMeasurements] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [startingCustomOrder, setStartingCustomOrder] = useState(false);
   
   // Fetch product
   useEffect(() => {
@@ -492,7 +494,7 @@ export default function ProductDetailsPage() {
     (!selectedSize || v.size === selectedSize)
   );
 
-  const handleStartCustomOrder = () => {
+  const handleStartCustomOrder = async () => {
     if (!product?.id) return;
     if (isOwnProduct || isStudioStoreView) {
       toast.info('Custom-order checkout is hidden on your own product view.');
@@ -503,7 +505,22 @@ export default function ProductDetailsPage() {
       navigate('/login');
       return;
     }
-    navigate(`/custom-orders/new?sourceType=PRODUCT&sourceId=${encodeURIComponent(product.id)}`);
+    if (startingCustomOrder) {
+      return;
+    }
+    try {
+      setStartingCustomOrder(true);
+      const activeConfiguration = await customOrderConfigurationsApi.getActiveForProduct(product.id);
+      if (!activeConfiguration?.id) {
+        toast.error('Custom order is not available for this product yet.');
+        return;
+      }
+      navigate(`/custom-orders/new?configurationId=${encodeURIComponent(activeConfiguration.id)}`);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to open custom-order checkout.');
+    } finally {
+      setStartingCustomOrder(false);
+    }
   };
   
   const isOutOfStock = variants.length > 0 ? (currentVariant?.stock === 0) : false;
@@ -956,9 +973,10 @@ export default function ProductDetailsPage() {
                       <button
                         onClick={handleStartCustomOrder}
                         type="button"
-                        className="w-full rounded-full border border-emerald-400/50 bg-emerald-500/10 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-500/20 dark:text-emerald-200"
+                        disabled={startingCustomOrder}
+                        className="w-full rounded-full border border-emerald-400/50 bg-emerald-500/10 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:text-emerald-200"
                       >
-                        ✂️ Start Custom Order
+                        {startingCustomOrder ? 'Opening custom order...' : '✂️ Start Custom Order'}
                       </button>
                     ) : null}
                     <button

@@ -197,10 +197,14 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           ? apiClient.get(`/brands/${brandId}/patches/check`)
           : Promise.resolve({ data: { isPatched: false } });
         const [savedRes, patchRes] = await Promise.all([savedPromise, patchPromise]);
+        const patchedValue =
+          (patchRes as any)?.data?.isPatched ??
+          (patchRes as any)?.data?.data?.isPatched ??
+          false;
 
         if (!mounted) return;
         setIsSaved(Boolean(savedRes.data?.isSaved));
-        setIsPatched(Boolean((patchRes as any).data?.isPatched));
+        setIsPatched(Boolean(patchedValue));
       } catch {
         if (!mounted) return;
         setIsSaved(false);

@@ -154,6 +154,14 @@ export default function CatalogShopTab({
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const collectionTargetIds = useMemo(
+    () => collections.map((collection) => collection.id).filter(Boolean),
+    [collections],
+  );
+  const collectionTargetIdsKey = useMemo(
+    () => collectionTargetIds.join('|'),
+    [collectionTargetIds],
+  );
   
   // Inline product detail state - when set, shows product detail instead of grid
   const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
@@ -242,14 +250,14 @@ export default function CatalogShopTab({
   useEffect(() => {
     let mounted = true;
     const loadSaved = async () => {
-      if (!isAuth || collections.length === 0) {
+      if (!isAuth || collectionTargetIds.length === 0) {
         if (mounted) setSavedMap({});
         return;
       }
       try {
         const res = await apiClient.post('/saved/check/batch', {
           targetType: 'COLLECTION',
-          targetIds: collections.map((c) => c.id).filter(Boolean),
+          targetIds: collectionTargetIds,
         });
         const items = res.data?.items ?? [];
         if (mounted) {
@@ -267,7 +275,7 @@ export default function CatalogShopTab({
     return () => {
       mounted = false;
     };
-  }, [collections, isAuth]);
+  }, [isAuth, collectionTargetIds, collectionTargetIdsKey]);
 
   // Click-outside handler for search field
   useEffect(() => {

@@ -20,6 +20,8 @@ export const SizeFitApi = {
     measurements?: Record<string, unknown>;
     notes?: string;
     requireUpdateEveryDays?: number;
+    measurementGender?: 'MEN' | 'WOMEN';
+    preferredLengthUnit?: 'CM' | 'IN';
   }): Promise<SizeFitProfile> {
     const res = await apiClient.put('/users/me/size-fit', payload);
     return unwrap<SizeFitProfile>(res.data);

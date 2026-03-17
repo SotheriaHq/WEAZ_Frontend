@@ -1418,6 +1418,47 @@ export const brandApi = {
     signedUrlPending.set(rawS3Url, request);
     return request;
   },
+
+  async getSignedS3KeyUrl(s3Key: string): Promise<string | null> {
+    const normalizedKey = String(s3Key ?? '').trim().replace(/^\/+/, '');
+    if (!normalizedKey) return null;
+
+    const existing = signedUrlCache.get(normalizedKey);
+    if (existing && existing.expiresAt > Date.now()) {
+      return existing.url;
+    }
+
+    const inflight = signedUrlPending.get(normalizedKey);
+    if (inflight) return inflight;
+
+    const request = (async (): Promise<string | null> => {
+      try {
+        const response = await apiClient.get('/uploads/public-url-by-key', {
+          params: { key: normalizedKey },
+        });
+        const payload = unwrapApiResponse<{ url?: string }>(response.data);
+        const signedUrl =
+          (payload as { url?: string })?.url ??
+          (response.data as { url?: string })?.url ??
+          null;
+        if (typeof signedUrl === 'string' && signedUrl.length > 0) {
+          signedUrlCache.set(normalizedKey, {
+            url: signedUrl,
+            expiresAt: Date.now() + SIGNED_URL_TTL_MS,
+          });
+          return signedUrl;
+        }
+        return null;
+      } catch {
+        return null;
+      } finally {
+        signedUrlPending.delete(normalizedKey);
+      }
+    })();
+
+    signedUrlPending.set(normalizedKey, request);
+    return request;
+  },
   // Get one collection with medias
   async getCollectionDetail(
     collectionId: string,

@@ -68,8 +68,8 @@ const AdminDashboard: React.FC = () => {
     { label: 'Pending Payouts', value: stats?.pendingPayouts?.toLocaleString() ?? '—', route: '/admin/payouts' },
     { label: 'Verifications', value: stats?.pendingVerifications?.toLocaleString() ?? '—', route: '/admin/brands' },
     { label: 'Audit Events', value: stats?.recentLogs?.length?.toString() ?? '—', route: '/admin/audit' },
-    { label: 'Products', value: '—', route: '/admin/products' },
-    { label: 'Collections', value: '—', route: '/admin/collections' },
+    { label: 'Content', value: '—', route: '/admin/content' },
+    { label: 'Designs', value: '—', route: '/admin/content?tab=designs' },
   ];
 
   const colorMap: Record<string, { bg: string; glow: string; text: string }> = {
@@ -280,8 +280,8 @@ const AdminDashboard: React.FC = () => {
             {[
               { emoji: '👤', label: 'Manage Users', route: '/admin/users' },
               { emoji: '🏷️', label: 'Manage Brands', route: '/admin/brands' },
-              { emoji: '📦', label: 'Manage Products', route: '/admin/products' },
-              { emoji: '🗂️', label: 'Manage Collections', route: '/admin/collections' },
+              { emoji: '🧰', label: 'Manage Content', route: '/admin/content' },
+              { emoji: '🧵', label: 'Review Designs', route: '/admin/content?tab=designs' },
             ].map((link) => (
               <button
                 key={link.route}

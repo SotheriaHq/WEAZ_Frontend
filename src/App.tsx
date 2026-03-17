@@ -79,8 +79,7 @@ const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
 const AdminBrandsPage = lazy(() => import('./pages/admin/AdminBrandsPage'));
 const AdminVerificationQueuePage = lazy(() => import('./pages/admin/AdminVerificationQueuePage'));
 const AdminBrandVerificationReviewPage = lazy(() => import('./pages/admin/AdminBrandVerificationReviewPage'));
-const AdminProductsPage = lazy(() => import('./pages/admin/AdminProductsPage'));
-const AdminCollectionsPage = lazy(() => import('./pages/admin/AdminCollectionsPage'));
+const AdminContentManagementPage = lazy(() => import('./pages/admin/AdminContentManagementPage'));
 const AdminTaxonomyPage = lazy(() => import('./pages/admin/AdminTaxonomyPage'));
 const AdminTagsPage = lazy(() => import('./pages/admin/AdminTagsPage'));
 const AdminMeasurementsPage = lazy(() => import('./pages/admin/AdminMeasurementsPage'));
@@ -515,8 +514,9 @@ const router = createBrowserRouter([
           { path: 'brands', element: <RequireAdminPermission permission="BRANDS_READ"><AdminBrandsPage /></RequireAdminPermission> },
           { path: 'verification', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminVerificationQueuePage /></RequireAdminPermission> },
           { path: 'brands/:id/verification-review', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminBrandVerificationReviewPage /></RequireAdminPermission> },
-          { path: 'products', element: <RequireAdminPermission permission="PRODUCTS_READ"><AdminProductsPage /></RequireAdminPermission> },
-          { path: 'collections', element: <RequireAdminPermission permission="COLLECTIONS_READ"><AdminCollectionsPage /></RequireAdminPermission> },
+          { path: 'content', element: <AdminContentManagementPage /> },
+          { path: 'products', element: <Navigate to="/admin/content?tab=products" replace /> },
+          { path: 'collections', element: <Navigate to="/admin/content?tab=collections" replace /> },
           { path: 'taxonomy', element: <RequireAdminPermission permission="TAXONOMY_READ"><AdminTaxonomyPage /></RequireAdminPermission> },
           { path: 'tags', element: <RequireAdminPermission permission="TAGS_READ"><AdminTagsPage /></RequireAdminPermission> },
           { path: 'measurements', element: <RequireAdminPermission permission="MEASUREMENTS_READ"><AdminMeasurementsPage /></RequireAdminPermission> },

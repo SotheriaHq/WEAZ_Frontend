@@ -49,7 +49,7 @@ export function useMeasurementPoints(filter?: {
     return () => {
       active = false;
     };
-  }, [cacheKey, filter]);
+  }, [cacheKey, filter?.gender, filter?.category]);
 
   return { points, isLoading, error };
 }

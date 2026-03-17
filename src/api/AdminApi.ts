@@ -5,6 +5,7 @@ import type {
   AdminBrand,
   AdminProduct,
   AdminCollection,
+  AdminDesign,
   AdminPayout,
   AdminDispute,
   AdminAuditLog,
@@ -121,7 +122,7 @@ export const adminBrandsApi = {
 export const adminProductsApi = {
   list: (params?: Record<string, string>) =>
     apiClient.get<Paginated<AdminProduct>>('/admin/products', { params }),
-  moderate: (id: string, data: { isActive?: boolean }) =>
+  moderate: (id: string, data: { isActive?: boolean; action?: 'UNPUBLISH' | 'REPUBLISH' | 'HARD_DELETE'; reason?: string }) =>
     apiClient.patch(`/admin/products/${id}/moderate`, data),
 };
 
@@ -155,8 +156,15 @@ export const adminFeaturedApi = {
 export const adminCollectionsApi = {
   list: (params?: Record<string, string>) =>
     apiClient.get<Paginated<AdminCollection>>('/admin/collections', { params }),
-  moderate: (id: string, data: { status?: string; visibility?: 'PUBLIC' | 'PRIVATE' }) =>
+  moderate: (id: string, data: { status?: string; action?: 'UNPUBLISH' | 'REPUBLISH' | 'HARD_DELETE'; reason?: string }) =>
     apiClient.patch(`/admin/collections/${id}/moderate`, data),
+};
+
+export const adminDesignsApi = {
+  list: (params?: Record<string, string>) =>
+    apiClient.get<Paginated<AdminDesign>>('/admin/designs', { params }),
+  moderate: (id: string, data: { status?: string; action?: 'UNPUBLISH' | 'REPUBLISH' | 'HARD_DELETE'; reason?: string }) =>
+    apiClient.patch(`/admin/designs/${id}/moderate`, data),
 };
 
 // ── Taxonomy ──

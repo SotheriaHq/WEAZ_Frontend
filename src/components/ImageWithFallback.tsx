@@ -162,6 +162,16 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         return;
       }
 
+      // Handle storage keys persisted without full host (e.g. "POST_IMAGE/.../file.jpg")
+      if (src && !src.includes('?') && !/^https?:\/\//i.test(src)) {
+        setLoaded(false);
+        const url = await resolveSignedUrl(`key:${src}`, () => brandApi.getSignedS3KeyUrl(src));
+        if (mounted) {
+          setResolved(url || src);
+        }
+        return;
+      }
+
       if (fileId) {
         // Check cache first
         const cachedUrl = getCachedUrl(fileId);

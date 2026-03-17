@@ -13,7 +13,6 @@ import type {
 import { isCustomSizingMode, isRtwSizingMode } from '@/types/sizing';
 
 interface SizingConfiguratorProps {
-  contentType: 'product' | 'design';
   sizingMode: SizingMode;
   onSizingModeChange: (value: SizingMode) => void;
   rtwSizeSystem?: string;
@@ -39,7 +38,6 @@ const CATEGORY_OPTIONS: MeasurementPointCategory[] = [
 ];
 
 export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
-  contentType,
   sizingMode,
   onSizingModeChange,
   rtwSizeSystem,
@@ -67,12 +65,6 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
   const [showAllPoints, setShowAllPoints] = useState(false);
 
   const INITIAL_DISPLAY_COUNT = 12;
-
-  const modeLabel = contentType === 'design' ? 'Design Sizing Mode' : 'Product Sizing Mode';
-  const customBehaviorHint =
-    contentType === 'design'
-      ? 'Custom/Hybrid on designs is used for custom-order intake and fit communication.'
-      : 'Custom/Hybrid on products requires buyer measurements at add-to-bag.';
 
   const toggleMeasurementKey = (key: string) => {
     if (customMeasurementKeys.includes(key)) {
@@ -201,12 +193,12 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
     <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4 space-y-4">
       <div>
         <h2 className="text-base font-medium text-gray-900 dark:text-white">Sizing</h2>
-        <p className="text-xs text-gray-500 mt-1">{customBehaviorHint}</p>
+        <p className="text-xs text-gray-500 mt-1">Custom/Hybrid on products requires buyer measurements at add-to-bag.</p>
       </div>
 
       <div>
         <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
-          {modeLabel}
+          Product Sizing Mode
         </label>
         <Select
           value={sizingMode}

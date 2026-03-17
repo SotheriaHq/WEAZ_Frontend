@@ -693,7 +693,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           className="w-4 h-4 mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                         />
                         <div>
-                          <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">Offer rush custom orders</div>
+                          <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">Enable rush custom orders</div>
                           <div className="text-xs text-gray-500">Use this only if your team can handle expedited timelines.</div>
                         </div>
                       </label>

@@ -38,7 +38,7 @@ import InfoTooltip from "@/components/ui/InfoTooltip";
 import { useConfirm } from "@/components/ui/useConfirm";
 import { DiscardChangesModal } from "@/components/studio/store/modals";
 import { isCustomSizingMode, isRtwSizingMode, normalizeSizingMode, type SizingMode } from '@/types/sizing';
-import CustomOrderOfferEditor from '@/components/custom-orders/CustomOrderOfferEditor';
+import CustomOrderConfigurationEditor from '@/components/custom-orders/CustomOrderConfigurationEditor';
 import {
   normalizePrimary,
   reorderItems,
@@ -2889,7 +2889,6 @@ const EditProduct: React.FC = () => {
 
                 {/* Inventory & Shipping Grid */}
                 <SizingConfigurator
-                  contentType="product"
                   sizingMode={form.sizingMode}
                   onSizingModeChange={(value) => updateForm("sizingMode", value)}
                   rtwSizeSystem={form.rtwSizeSystem}
@@ -2910,7 +2909,7 @@ const EditProduct: React.FC = () => {
                   }
                 />
 
-                <CustomOrderOfferEditor
+                <CustomOrderConfigurationEditor
                   sourceType="PRODUCT"
                   sourceId={isEditMode ? productId : undefined}
                   measurementKeys={form.customMeasurementKeys}

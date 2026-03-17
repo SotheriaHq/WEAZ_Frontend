@@ -1,11 +1,40 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
+import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
+import UniversalSelect from '@/components/forms/UniversalSelect';
 
 const AccountSettings: React.FC = () => {
   const { profile } = useSelector((state: RootState) => state.user);
+  const [displayChartFamily, setDisplayChartFamily] = useState<CustomOrderChartFamily>('UK');
 
   if (!profile) return null;
+
+  useEffect(() => {
+    let active = true;
+    void customOrdersBuyerApi
+      .getDisplayChartPreference()
+      .then((preference) => {
+        if (active) {
+          setDisplayChartFamily(preference.displayChartFamily);
+        }
+      })
+      .catch(() => {
+        // Keep default if preference endpoint is unavailable.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleDisplayChartChange = (value: string) => {
+    const next = value as CustomOrderChartFamily;
+    setDisplayChartFamily(next);
+    void customOrdersBuyerApi.updateDisplayChartPreference({
+      displayChartFamily: next,
+      updatedAtMs: Date.now(),
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -50,6 +79,25 @@ const AccountSettings: React.FC = () => {
               </span>
             </button>
           </div>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Custom Order Display Chart</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            This sets your preferred size chart labels used across custom-order composer and size-chart conversion views.
+          </p>
+          <UniversalSelect
+            label="Preferred chart"
+            value={displayChartFamily}
+            onChange={handleDisplayChartChange}
+            options={[
+              { value: 'UK', label: 'UK' },
+              { value: 'US', label: 'US' },
+              { value: 'NIGERIA', label: 'Nigeria' },
+              { value: 'ASIA', label: 'Asia' },
+            ]}
+            className="max-w-sm"
+          />
         </div>
 
         {/* Danger Zone */}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { RefreshCcw, WifiOff, ServerCrash, SearchX, Sparkles, TrendingUp, Clock } from 'lucide-react';
@@ -253,18 +253,27 @@ const Market: React.FC = () => {
   const isRegular = user?.type === 'REGULAR';
   const openDesignId = searchParams.get('openDesign');
   const openMediaId = searchParams.get('openMedia');
+  const openCommentId = searchParams.get('commentId');
+  const routeOpenKey = `${openDesignId ?? ''}::${openMediaId ?? ''}::${openCommentId ?? ''}`;
+  const dismissedRouteOpenKeyRef = useRef<string | null>(null);
+  const savedBatchInFlightRef = useRef<string | null>(null);
+  const savedBatchLastRunRef = useRef<Record<string, number>>({});
+  const patchBatchInFlightRef = useRef<string | null>(null);
+  const patchBatchLastRunRef = useRef<Record<string, number>>({});
 
   const closeViewModal = useCallback(() => {
-    setViewItem(null);
-    if (!searchParams.has('openDesign') && !searchParams.has('openMedia') && !searchParams.has('commentId')) {
-      return;
+    if (openDesignId || openMediaId || openCommentId) {
+      dismissedRouteOpenKeyRef.current = routeOpenKey;
     }
-    const next = new URLSearchParams(searchParams);
-    next.delete('openDesign');
-    next.delete('openMedia');
-    next.delete('commentId');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+    setViewItem(null);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('openDesign');
+      next.delete('openMedia');
+      next.delete('commentId');
+      return next;
+    }, { replace: true });
+  }, [openCommentId, openDesignId, openMediaId, routeOpenKey, setSearchParams]);
 
   const loadFeed = useCallback(async () => {
     // First load shows skeleton; subsequent loads use a soft overlay
@@ -312,6 +321,7 @@ const Market: React.FC = () => {
   useEffect(() => {
     const shouldResolveFromRoute = Boolean(openDesignId || openMediaId);
     if (!shouldResolveFromRoute || loading) return;
+    if (dismissedRouteOpenKeyRef.current === routeOpenKey) return;
 
     let cancelled = false;
 
@@ -398,19 +408,48 @@ const Market: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [items, loading, openDesignId, openMediaId]);
+  }, [items, loading, openDesignId, openMediaId, routeOpenKey]);
+
+  const mediaTargetIds = useMemo(
+    () => items.map((item) => item.id).filter(Boolean),
+    [items],
+  );
+
+  const mediaTargetIdsKey = useMemo(
+    () => mediaTargetIds.join('|'),
+    [mediaTargetIds],
+  );
+
+  const patchBrandTargetIds = useMemo(
+    () => Array.from(new Set(items.map((item) => item.brandId).filter(Boolean))) as string[],
+    [items],
+  );
+
+  const patchBrandTargetIdsKey = useMemo(
+    () => patchBrandTargetIds.join('|'),
+    [patchBrandTargetIds],
+  );
 
   useEffect(() => {
     let mounted = true;
     const loadSaved = async () => {
-      if (!isAuth || items.length === 0) {
+      if (!isAuth || mediaTargetIds.length === 0) {
         if (mounted) setSavedMap({});
         return;
       }
+
+      const requestKey = `COLLECTION_MEDIA:${mediaTargetIdsKey}`;
+      const now = Date.now();
+      const lastRunAt = savedBatchLastRunRef.current[requestKey] ?? 0;
+      if (savedBatchInFlightRef.current === requestKey || now - lastRunAt < 1500) {
+        return;
+      }
+      savedBatchInFlightRef.current = requestKey;
+
       try {
         const res = await apiClient.post('/saved/check/batch', {
           targetType: 'COLLECTION_MEDIA',
-          targetIds: items.map((item) => item.id).filter(Boolean),
+          targetIds: mediaTargetIds,
         });
         const list = res.data?.items ?? [];
         if (mounted) {
@@ -418,33 +457,47 @@ const Market: React.FC = () => {
           for (const entry of list) {
             if (entry?.targetId) next[entry.targetId] = Boolean(entry.isSaved);
           }
-          setSavedMap(next);
+          setSavedMap((prev) => {
+            const prevKeys = Object.keys(prev);
+            const nextKeys = Object.keys(next);
+            if (prevKeys.length === nextKeys.length && prevKeys.every((k) => prev[k] === next[k])) {
+              return prev;
+            }
+            return next;
+          });
         }
       } catch {
         if (mounted) setSavedMap({});
+      } finally {
+        if (savedBatchInFlightRef.current === requestKey) {
+          savedBatchInFlightRef.current = null;
+        }
+        savedBatchLastRunRef.current[requestKey] = Date.now();
       }
     };
     void loadSaved();
     return () => { mounted = false; };
-  }, [items, isAuth]);
+  }, [isAuth, mediaTargetIds, mediaTargetIdsKey]);
 
   useEffect(() => {
     let mounted = true;
     const loadPatches = async () => {
-      if (!isAuth || !isRegular || items.length === 0) {
+      if (!isAuth || !isRegular || patchBrandTargetIds.length === 0) {
         if (mounted) setPatchMap({});
         return;
       }
-      const brandIds = Array.from(
-        new Set(items.map((item) => item.brandId).filter(Boolean))
-      ) as string[];
-      if (brandIds.length === 0) {
-        if (mounted) setPatchMap({});
+
+      const requestKey = `BRAND_PATCH:${patchBrandTargetIdsKey}`;
+      const now = Date.now();
+      const lastRunAt = patchBatchLastRunRef.current[requestKey] ?? 0;
+      if (patchBatchInFlightRef.current === requestKey || now - lastRunAt < 1500) {
         return;
       }
+      patchBatchInFlightRef.current = requestKey;
+
       try {
         const res = await apiClient.post('/brands/patches/check/batch', {
-          targetIds: brandIds,
+          targetIds: patchBrandTargetIds,
         });
         const list = res.data?.items ?? [];
         if (mounted) {
@@ -452,15 +505,27 @@ const Market: React.FC = () => {
           for (const entry of list) {
             if (entry?.targetId) next[entry.targetId] = Boolean(entry.isPatched);
           }
-          setPatchMap(next);
+          setPatchMap((prev) => {
+            const prevKeys = Object.keys(prev);
+            const nextKeys = Object.keys(next);
+            if (prevKeys.length === nextKeys.length && prevKeys.every((k) => prev[k] === next[k])) {
+              return prev;
+            }
+            return next;
+          });
         }
       } catch {
         if (mounted) setPatchMap({});
+      } finally {
+        if (patchBatchInFlightRef.current === requestKey) {
+          patchBatchInFlightRef.current = null;
+        }
+        patchBatchLastRunRef.current[requestKey] = Date.now();
       }
     };
     void loadPatches();
     return () => { mounted = false; };
-  }, [items, isAuth, isRegular]);
+  }, [isAuth, isRegular, patchBrandTargetIds, patchBrandTargetIdsKey]);
   
   // Force reload when navigating back to this page (fixes image loading issue after route changes)
   useEffect(() => {
@@ -528,11 +593,24 @@ const Market: React.FC = () => {
   };
 
   const handleCommentCountChange = (itemId: string, newCount: number) => {
-    setItems((prevItems) =>
-      prevItems.map((item) =>
-        item.id === itemId ? { ...item, commentsCount: newCount } : item
-      )
-    );
+    setItems((prevItems) => {
+      let changed = false;
+      const nextItems = prevItems.map((item) => {
+        if (item.id !== itemId) return item;
+        const currentCount = item.commentsCount ?? 0;
+        if (currentCount === newCount) return item;
+        changed = true;
+        return { ...item, commentsCount: newCount };
+      });
+      return changed ? nextItems : prevItems;
+    });
+
+    setViewItem((prevItem) => {
+      if (!prevItem || prevItem.id !== itemId) return prevItem;
+      const currentCount = prevItem.commentsCount ?? 0;
+      if (currentCount === newCount) return prevItem;
+      return { ...prevItem, commentsCount: newCount };
+    });
   };
 
   const handleToggleSave = async (itemId: string) => {

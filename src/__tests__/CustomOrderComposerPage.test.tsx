@@ -3,7 +3,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
 
-const listVisible = vi.fn();
 const getById = vi.fn();
 const getMyProfile = vi.fn();
 
@@ -26,13 +25,14 @@ vi.mock('react-redux', () => ({
 }));
 
 vi.mock('@/api/CustomOrderApi', () => ({
-  customOrderOffersApi: {
-    listVisible: (...args: unknown[]) => listVisible(...args),
+  customOrderConfigurationsApi: {
     getById: (...args: unknown[]) => getById(...args),
   },
   customOrdersBuyerApi: {
     previewPrice: vi.fn(),
     create: vi.fn(),
+    getDisplayChartPreference: vi.fn().mockResolvedValue({ displayChartFamily: 'UK', updatedAtMs: Date.now() }),
+    updateDisplayChartPreference: vi.fn(),
   },
 }));
 
@@ -55,11 +55,11 @@ describe('CustomOrderComposerPage', () => {
     getMyProfile.mockResolvedValue({ measurements: {} });
   });
 
-  it('shows unavailable state when no active offer matches the source', async () => {
-    listVisible.mockResolvedValue({ items: [], page: 1, limit: 1, total: 0 });
+  it('shows unavailable state when the requested configuration is not found', async () => {
+    getById.mockRejectedValue({ response: { data: { message: 'Not found' } } });
 
     render(
-      <MemoryRouter initialEntries={['/custom-orders/new?sourceType=PRODUCT&sourceId=product-1']}>
+      <MemoryRouter initialEntries={['/custom-orders/new?configurationId=configuration-1']}>
         <Routes>
           <Route path="/custom-orders/new" element={<CustomOrderComposerPage />} />
         </Routes>
@@ -67,54 +67,43 @@ describe('CustomOrderComposerPage', () => {
     );
 
     await waitFor(() => {
-      expect(listVisible).toHaveBeenCalledWith({
-        sourceId: 'product-1',
-        sourceType: 'PRODUCT',
-        limit: 1,
-      });
+      expect(getById).toHaveBeenCalledWith('configuration-1');
     });
 
-    expect(screen.getByText('Custom order offer unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Custom order configuration unavailable')).toBeInTheDocument();
   });
 
-  it('renders required measurements when an active offer exists', async () => {
-    listVisible.mockResolvedValue({
-      items: [
-        {
-          id: 'offer-1',
-          brandId: 'brand-1',
-          sourceType: 'PRODUCT',
-          sourceId: 'product-1',
-          title: 'Bespoke blazer',
-          buyerInstructionText: 'Add precise body measurements.',
-          requiredMeasurementKeys: ['bust', 'waist'],
-          requiredFreeformPointIds: [],
-          baseProductionCharge: '120000',
-          fabricCostPerYard: '10000',
-          rushEnabled: true,
-          rushFee: '25000',
-          productionLeadDays: 7,
-          deliveryMinDays: 2,
-          deliveryMaxDays: 5,
-          deliveryScope: 'Nigeria',
-          revisionPolicy: 'One revision.',
-          returnPolicy: 'No returns.',
-          defectPolicy: 'Defects only.',
-          fabricSourcingMode: 'BRAND_SOURCED',
-          isActive: true,
-          currentVersion: 1,
-          brand: { id: 'brand-1', name: 'Ada Atelier' },
-          rules: [],
-          versions: [{ id: 'version-1', version: 1, createdAt: '2026-03-12T00:00:00.000Z' }],
-        },
-      ],
-      page: 1,
-      limit: 1,
-      total: 1,
+  it('renders required measurements when an active configuration exists', async () => {
+    getById.mockResolvedValue({
+      id: 'configuration-1',
+      brandId: 'brand-1',
+      sourceType: 'PRODUCT',
+      sourceId: 'product-1',
+      title: 'Bespoke blazer',
+      buyerInstructionText: 'Add precise body measurements.',
+      requiredMeasurementKeys: ['bust', 'waist'],
+      requiredFreeformPointIds: [],
+      baseProductionCharge: '120000',
+      fabricCostPerYard: '10000',
+      rushEnabled: true,
+      rushFee: '25000',
+      productionLeadDays: 7,
+      deliveryMinDays: 2,
+      deliveryMaxDays: 5,
+      deliveryScope: 'Nigeria',
+      revisionPolicy: 'One revision.',
+      returnPolicy: 'No returns.',
+      defectPolicy: 'Defects only.',
+      fabricSourcingMode: 'BRAND_SOURCED',
+      isActive: true,
+      currentVersion: 1,
+      brand: { id: 'brand-1', name: 'Ada Atelier' },
+      rules: [],
+      versions: [{ id: 'version-1', version: 1, createdAt: '2026-03-12T00:00:00.000Z' }],
     });
 
     render(
-      <MemoryRouter initialEntries={['/custom-orders/new?sourceType=PRODUCT&sourceId=product-1']}>
+      <MemoryRouter initialEntries={['/custom-orders/new?configurationId=configuration-1']}>
         <Routes>
           <Route path="/custom-orders/new" element={<CustomOrderComposerPage />} />
         </Routes>

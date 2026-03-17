@@ -34,6 +34,11 @@ vi.mock('@/api/CustomOrderApi', () => ({
   },
 }));
 
+vi.mock('@/components/messaging/OrderMessagesPanel', () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),

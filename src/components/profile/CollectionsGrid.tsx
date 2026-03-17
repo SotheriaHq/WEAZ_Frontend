@@ -39,6 +39,11 @@ const CollectionsGrid: React.FC<CollectionsGridProps> = ({
     [collections]
   );
 
+  const collectionIdsKey = useMemo(
+    () => collectionIds.join('|'),
+    [collectionIds],
+  );
+
   useEffect(() => {
     let mounted = true;
     const loadSaved = async () => {
@@ -65,7 +70,7 @@ const CollectionsGrid: React.FC<CollectionsGridProps> = ({
     };
     void loadSaved();
     return () => { mounted = false; };
-  }, [collectionIds, isAuth]);
+  }, [collectionIds, collectionIdsKey, isAuth]);
 
   const handleToggleSave = async (collectionId: string) => {
     if (!isAuth) {

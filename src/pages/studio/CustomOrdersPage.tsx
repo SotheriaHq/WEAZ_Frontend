@@ -10,6 +10,7 @@ import {
   type CustomOrderStatus,
 } from '@/api/CustomOrderApi';
 import { messagingApi, type ThreadSummaryResponse } from '@/api/MessagingApi';
+import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   CustomOrderBadge,
   CustomOrderJsonBreakdown,
@@ -47,6 +48,15 @@ const lifecycleOptions: CustomOrderStatus[] = [
   'CLOSED',
 ];
 
+const statusFilterOptions = [
+  { value: '', label: 'All statuses' },
+  { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pending brand acceptance' },
+  { value: 'ACCEPTED', label: 'Accepted' },
+  { value: 'IN_PRODUCTION', label: 'In production' },
+  { value: 'IN_TRANSIT', label: 'In transit' },
+  { value: 'DISPUTED', label: 'Disputed' },
+];
+
 const CustomOrdersPage: React.FC = () => {
   const navigate = useNavigate();
   const { orderId } = useParams<{ orderId: string }>();
@@ -67,6 +77,8 @@ const CustomOrdersPage: React.FC = () => {
   const [lifecycleNote, setLifecycleNote] = useState('');
   const [counterResponse, setCounterResponse] = useState<'ACCEPTED' | 'REJECTED'>('ACCEPTED');
   const [counterNote, setCounterNote] = useState('');
+  const [exceptionReason, setExceptionReason] = useState('');
+  const [requestedQuoteTotal, setRequestedQuoteTotal] = useState('');
   const [pendingAction, setPendingAction] = useState<PendingBrandAction | null>(null);
   const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -209,14 +221,12 @@ const CustomOrdersPage: React.FC = () => {
         <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
           <div className="flex flex-wrap gap-3">
             <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search title" className="min-w-[220px] flex-1 rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950">
-              <option value="">All statuses</option>
-              <option value="PENDING_BRAND_ACCEPTANCE">Pending brand acceptance</option>
-              <option value="ACCEPTED">Accepted</option>
-              <option value="IN_PRODUCTION">In production</option>
-              <option value="IN_TRANSIT">In transit</option>
-              <option value="DISPUTED">Disputed</option>
-            </select>
+            <UniversalSelect
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={statusFilterOptions}
+              className="min-w-[230px]"
+            />
           </div>
 
           <div className="mt-5 space-y-3">
@@ -273,7 +283,7 @@ const CustomOrdersPage: React.FC = () => {
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <CustomOrderMetricCard label="Measurement confirmed" value={formatDateTime(selected.measurementConfirmedAt)} helper="Buyer-approved snapshot" />
-                <CustomOrderMetricCard label="Offer version" value={selected.offerVersionId} helper="Immutable order pricing version" />
+                <CustomOrderMetricCard label="Configuration version" value={selected.configurationVersionId} helper="Immutable order pricing version" />
                 <CustomOrderMetricCard label="Production deadline" value={formatDateTime(selected.promisedProductionAt)} helper={getRelativeDeadlineText(selected.promisedProductionAt)} />
                 <CustomOrderMetricCard label="Delivery deadline" value={formatDateTime(selected.promisedDeliveryAt)} helper={getRelativeDeadlineText(selected.promisedDeliveryAt)} />
               </div>
@@ -363,9 +373,12 @@ const CustomOrdersPage: React.FC = () => {
 
                 <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
                   <div className="text-sm font-semibold text-slate-900 dark:text-white">Production stage</div>
-                  <select value={progressStage} onChange={(event) => setProgressStage(event.target.value as CustomOrderProgressStage)} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950">
-                    {stageOptions.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
-                  </select>
+                  <UniversalSelect
+                    value={progressStage}
+                    onChange={(value) => setProgressStage(value as CustomOrderProgressStage)}
+                    options={stageOptions.map((stage) => ({ value: stage, label: stage.replace(/_/g, ' ') }))}
+                    className="mt-3"
+                  />
                   <textarea value={progressNote} onChange={(event) => setProgressNote(event.target.value)} rows={3} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Progress note" />
                   <button
                     type="button"
@@ -409,9 +422,12 @@ const CustomOrdersPage: React.FC = () => {
 
                 <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
                   <div className="text-sm font-semibold text-slate-900 dark:text-white">Lifecycle override</div>
-                  <select value={lifecycleStatus} onChange={(event) => setLifecycleStatus(event.target.value as CustomOrderStatus)} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950">
-                    {lifecycleOptions.map((status) => <option key={status} value={status}>{status}</option>)}
-                  </select>
+                  <UniversalSelect
+                    value={lifecycleStatus}
+                    onChange={(value) => setLifecycleStatus(value as CustomOrderStatus)}
+                    options={lifecycleOptions.map((status) => ({ value: status, label: status.replace(/_/g, ' ') }))}
+                    className="mt-3"
+                  />
                   <textarea value={lifecycleNote} onChange={(event) => setLifecycleNote(event.target.value)} rows={3} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Lifecycle note" />
                   <button
                     type="button"
@@ -438,10 +454,14 @@ const CustomOrdersPage: React.FC = () => {
                     Buyer countered the extension request with {latestCounteredExtension.buyerCounterDays ?? 0} additional day(s).
                   </p>
                   <div className="mt-3 grid gap-3 md:grid-cols-[180px_1fr]">
-                    <select value={counterResponse} onChange={(event) => setCounterResponse(event.target.value as 'ACCEPTED' | 'REJECTED')} className="rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950">
-                      <option value="ACCEPTED">Accept buyer counter</option>
-                      <option value="REJECTED">Reject buyer counter</option>
-                    </select>
+                    <UniversalSelect
+                      value={counterResponse}
+                      onChange={(value) => setCounterResponse(value as 'ACCEPTED' | 'REJECTED')}
+                      options={[
+                        { value: 'ACCEPTED', label: 'Accept buyer counter' },
+                        { value: 'REJECTED', label: 'Reject buyer counter' },
+                      ]}
+                    />
                     <input value={counterNote} onChange={(event) => setCounterNote(event.target.value)} placeholder="Optional note" className="rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" />
                   </div>
                   <button
@@ -461,6 +481,54 @@ const CustomOrdersPage: React.FC = () => {
                   </button>
                 </div>
               ) : null}
+
+              <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
+                <div className="text-sm font-semibold text-slate-900 dark:text-white">Exception review request</div>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  Use this when auto pricing appears unsafe before acceptance. Monthly quota is capped by platform policy.
+                </p>
+                <textarea
+                  value={exceptionReason}
+                  onChange={(event) => setExceptionReason(event.target.value)}
+                  rows={3}
+                  className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                  placeholder="Why this order needs admin exception review"
+                />
+                <input
+                  value={requestedQuoteTotal}
+                  onChange={(event) => setRequestedQuoteTotal(event.target.value)}
+                  placeholder="Optional requested quote total (for example NGN 250000)"
+                  className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                />
+                <button
+                  type="button"
+                  disabled={busy || selected.status !== 'PENDING_BRAND_ACCEPTANCE' || exceptionReason.trim().length < 5}
+                  onClick={() =>
+                    setPendingAction({
+                      title: 'Submit exception review request?',
+                      description: 'This sends the order into the admin exception queue and pauses brand-side acceptance decisions until review is complete.',
+                      confirmLabel: 'Submit request',
+                      execute: () =>
+                        runAction(
+                          (currentBrandId) =>
+                            customOrdersBrandApi.requestExceptionReview(currentBrandId, selected.id, {
+                              reason: exceptionReason.trim(),
+                              requestedQuoteTotal: requestedQuoteTotal.trim() || undefined,
+                            }),
+                          'Exception review request submitted',
+                        ),
+                    })
+                  }
+                  className="mt-3 rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white"
+                >
+                  Submit exception review
+                </button>
+                {selected.status !== 'PENDING_BRAND_ACCEPTANCE' ? (
+                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    Exception review requests are available only while the order is pending brand acceptance.
+                  </div>
+                ) : null}
+              </div>
 
               <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
                 <div className="text-sm font-semibold text-slate-900 dark:text-white">Progress timeline</div>

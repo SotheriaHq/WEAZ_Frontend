@@ -237,6 +237,8 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     if (fromTarget) return fromTarget;
 
     const fromPayload =
+      (typeof payload.contentTitle === 'string' && payload.contentTitle) ||
+      (typeof payload.designTitle === 'string' && payload.designTitle) ||
       (typeof payload.collectionTitle === 'string' && payload.collectionTitle) ||
       (typeof payload.collectionName === 'string' && payload.collectionName) ||
       (typeof payload.productName === 'string' && payload.productName) ||
@@ -256,11 +258,53 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     const title = contentTitleFor(n);
     const payload = (n.payload as Record<string, unknown> | undefined) ?? {};
     const trimmedMessage = (n.message || '').trim();
+    const actorName = n.actor ? getActorDisplayName(n) : '';
+
+    const removeActorPrefix = (text: string): string => {
+      if (!actorName) return text;
+      const lowered = text.toLowerCase();
+      const rawActor = actorName.toLowerCase();
+      const atActor = `@${rawActor}`;
+      if (lowered.startsWith(`${atActor} `)) {
+        return text.slice(actorName.length + 2).trim();
+      }
+      if (lowered.startsWith(`${rawActor} `)) {
+        return text.slice(actorName.length + 1).trim();
+      }
+      return text;
+    };
+
+    const normalizeLegacyOwnershipText = (text: string): string => {
+      let normalized = text;
+      normalized = normalized.replace(/collection_media/gi, 'design');
+      normalized = normalized.replace(/received a new thread on\s+/i, 'threaded ');
+      normalized = normalized.replace(/received a new comment on\s+/i, 'commented on ');
+      normalized = normalized.replace(/commented on your design/gi, 'commented on design');
+      normalized = normalized.replace(/threaded on your design/gi, 'threaded design');
+      return normalized;
+    };
+
+    const appendMissingTitle = (text: string): string => {
+      const resolvedTitle = title.trim();
+      if (!resolvedTitle) return text;
+      if (/^(content|design|post|product|profile)$/i.test(resolvedTitle)) return text;
+      if (/"[^"]+"/.test(text)) return text;
+      if (text.toLowerCase().includes(resolvedTitle.toLowerCase())) return text;
+      return `${text} "${resolvedTitle}"`;
+    };
 
     if (
       trimmedMessage &&
-      (n.type === NotificationTypes.ORDER_PLACED || n.type === NotificationTypes.ORDER_STATUS_UPDATED)
+      (
+        n.type === NotificationTypes.ORDER_PLACED ||
+        n.type === NotificationTypes.ORDER_STATUS_UPDATED ||
+        n.type === NotificationTypes.COMMENT ||
+        n.type === NotificationTypes.THREAD
+      )
     ) {
+      if (n.type === NotificationTypes.COMMENT || n.type === NotificationTypes.THREAD) {
+        return appendMissingTitle(normalizeLegacyOwnershipText(removeActorPrefix(trimmedMessage)));
+      }
       return trimmedMessage;
     }
 
@@ -393,6 +437,19 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
               const isUnread = !n.isRead;
               const actorDisplayName = n.actor ? getActorDisplayName(n) : null;
               const actionText = actionTextFor(n);
+              const quotedTitleMatch = actionText.match(/"([^"]+)"/);
+              const explicitTitle = quotedTitleMatch ? quotedTitleMatch[1].trim() : '';
+              const fallbackTitle = contentTitleFor(n).trim();
+              const contentTitle = explicitTitle || (
+                fallbackTitle &&
+                !/^(content|design|post|product|profile)$/i.test(fallbackTitle) &&
+                !actionText.toLowerCase().includes(fallbackTitle.toLowerCase())
+                  ? fallbackTitle
+                  : ''
+              );
+              const actionTextWithoutTitle = quotedTitleMatch
+                ? actionText.replace(quotedTitleMatch[0], '').replace(/\s+/g, ' ').trim()
+                : actionText;
 
               return (
                 <li key={n.id} role="listitem">
@@ -442,7 +499,12 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                               ) : (
                                 <span className="font-semibold text-[color:var(--text-primary)]">System</span>
                               )}
-                              <span className="ml-1">{actionText}</span>
+                              <span className="ml-1">{actionTextWithoutTitle}</span>
+                              {contentTitle ? (
+                                <span className="ml-1 inline-flex max-w-[180px] items-center truncate rounded-md border border-purple-300/50 bg-purple-100/70 px-1.5 py-0.5 font-semibold text-purple-700 dark:border-purple-400/30 dark:bg-purple-500/15 dark:text-purple-300">
+                                  "{contentTitle}"
+                                </span>
+                              ) : null}
                             </p>
                             <p className="mt-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">{timeAgo(n.createdAt)}</p>
                           </div>

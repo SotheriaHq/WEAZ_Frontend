@@ -100,6 +100,7 @@ export interface AdminProduct {
   currency: string;
   thumbnail?: string | null;
   images?: string[];
+  orderCount?: number;
   createdAt: string;
   updatedAt: string;
   brand?: { id: string; name: string | null };
@@ -154,6 +155,23 @@ export interface AdminCollection {
   status: string;
   visibility: string;
   ownerId: string;
+  coverImage?: string | null;
+  orderCount?: number;
+  createdAt: string;
+  updatedAt: string;
+  owner?: { id: string; email: string; firstName: string; lastName: string };
+}
+
+export interface AdminDesign {
+  id: string;
+  title: string | null;
+  description: string | null;
+  status: string;
+  visibility: string;
+  ownerId: string;
+  coverImage?: string | null;
+  coverImageFileId?: string | null;
+  orderCount?: number;
   createdAt: string;
   updatedAt: string;
   owner?: { id: string; email: string; firstName: string; lastName: string };

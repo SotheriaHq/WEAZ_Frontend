@@ -106,7 +106,7 @@ export const NotificationRegistry: Record<
   NotificationTypeConfig
 > = {
   [NotificationTypes.THREAD]: {
-    actionText: 'threaded your',
+    actionText: 'threaded',
     actionKey: 'notification.action.thread',
     iconKey: 'thread',
     routePattern: (t) =>
@@ -115,7 +115,7 @@ export const NotificationRegistry: Record<
     trackingCategory: 'engagement',
   },
   [NotificationTypes.COMMENT]: {
-    actionText: 'commented on your',
+    actionText: 'commented on',
     actionKey: 'notification.action.comment',
     iconKey: 'comment',
     routePattern: (t, sub) =>
@@ -126,7 +126,7 @@ export const NotificationRegistry: Record<
     trackingCategory: 'engagement',
   },
   [NotificationTypes.FOLLOW]: {
-    actionText: 'patched your profile',
+    actionText: 'patched on your profile',
     actionKey: 'notification.action.patch_profile',
     iconKey: 'patch',
     routePattern: (_t, _sub, actorId) => (actorId ? `/profile/${actorId}` : null),

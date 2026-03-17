@@ -18,7 +18,7 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import { selectImageVariant } from '@/utils/selectImageVariant';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { apiClient } from '@/api/httpClient';
-import { customOrderOffersApi } from '@/api/CustomOrderApi';
+import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 
 // ============================================
 // TYPES
@@ -922,7 +922,9 @@ const DesignView: React.FC = () => {
   const [addingAll, setAddingAll] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
-  const [customOfferAvailable, setCustomOfferAvailable] = useState(false);
+  const [customConfigurationAvailable, setCustomConfigurationAvailable] = useState(false);
+  const [customConfigurationId, setCustomConfigurationId] = useState<string | null>(null);
+  const [openingCustomOrder, setOpeningCustomOrder] = useState(false);
 
   const highlightCommentId = new URLSearchParams(window.location.search).get('commentId');
 
@@ -1045,28 +1047,29 @@ const DesignView: React.FC = () => {
   useEffect(() => {
     let active = true;
 
-    const loadCustomOffer = async () => {
+    const loadCustomConfiguration = async () => {
       if (!id || !detail || detail.isAvailableInStore) {
-        if (active) setCustomOfferAvailable(false);
+        if (active) {
+          setCustomConfigurationAvailable(false);
+          setCustomConfigurationId(null);
+        }
         return;
       }
       try {
-        const response = await customOrderOffersApi.listVisible({
-          sourceType: 'DESIGN',
-          sourceId: id,
-          limit: 1,
-        });
+        const activeConfiguration = await customOrderConfigurationsApi.getActiveForDesign(id);
         if (active) {
-          setCustomOfferAvailable(Boolean(response.items[0]));
+          setCustomConfigurationAvailable(Boolean(activeConfiguration));
+          setCustomConfigurationId(activeConfiguration?.id ?? null);
         }
       } catch {
         if (active) {
-          setCustomOfferAvailable(false);
+          setCustomConfigurationAvailable(false);
+          setCustomConfigurationId(null);
         }
       }
     };
 
-    void loadCustomOffer();
+    void loadCustomConfiguration();
     return () => {
       active = false;
     };
@@ -1273,7 +1276,15 @@ const DesignView: React.FC = () => {
       navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
       return;
     }
-    navigate(`/custom-orders/new?sourceType=DESIGN&sourceId=${encodeURIComponent(id)}`);
+    if (!customConfigurationId) {
+      toast.error('Custom order is not available for this design yet.');
+      return;
+    }
+    if (openingCustomOrder) {
+      return;
+    }
+    setOpeningCustomOrder(true);
+    navigate(`/custom-orders/new?configurationId=${encodeURIComponent(customConfigurationId)}`);
   };
 
   const handleViewProduct = (productId: string) => {
@@ -1347,9 +1358,9 @@ const DesignView: React.FC = () => {
               </p>
             </div>
             <div className="flex gap-3">
-              {customOfferAvailable ? (
-                <button type="button" onClick={handleStartCustomOrder} className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20">
-                  ✂️ Request Custom Order
+              {customConfigurationAvailable ? (
+                <button type="button" onClick={handleStartCustomOrder} disabled={openingCustomOrder} className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60">
+                  {openingCustomOrder ? 'Opening custom order...' : '✂️ Request Custom Order'}
                 </button>
               ) : null}
               <button type="button" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-white/80 hover:text-white transition-all text-sm font-medium">
@@ -1361,7 +1372,7 @@ const DesignView: React.FC = () => {
             </div>
           </div>
 
-          {customOfferAvailable ? (
+          {customConfigurationAvailable ? (
             <section className="mb-10 rounded-[28px] border border-emerald-400/20 bg-[linear-gradient(145deg,rgba(16,185,129,0.12),rgba(15,23,42,0.72))] p-6 text-white shadow-[0_24px_80px_rgba(16,185,129,0.08)]">
               <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-200">Custom Order Available</div>
               <h2 className="mt-3 text-2xl font-bold">Request this design as a made-to-measure order</h2>

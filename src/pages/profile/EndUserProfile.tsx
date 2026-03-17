@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useDispatch, useSelector } from 'react-redux';
@@ -17,6 +17,7 @@ import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type { SizeFitProfile, SizeFitSharesPayload } from '@/types/sizeFit';
 import ProfileActionsBar, { type ProfileAction } from '@/components/profile/ProfileActionsBar';
 import { buildProfileUrl, shareOrCopyLink } from '@/utils/publicLinks';
+import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
 
 interface UserProfile {
   id: string;
@@ -74,6 +75,12 @@ export const EndUserProfile: React.FC = () => {
   const [sizeFitSaving, setSizeFitSaving] = useState(false);
   const [sizeFitProfile, setSizeFitProfile] = useState<SizeFitProfile | null>(null);
   const [sizeFitShares, setSizeFitShares] = useState<SizeFitSharesPayload | null>(null);
+  const [displayChartFamily, setDisplayChartFamily] = useState<CustomOrderChartFamily>('UK');
+  const [computedSize, setComputedSize] = useState<string | null>(null);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [chartSaving, setChartSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   const isOwner = !id || currentUser?.id === id;
   const profileId = id ?? currentUser?.id;
@@ -156,6 +163,45 @@ export const EndUserProfile: React.FC = () => {
   }, [isOwner, loadSizeFit]);
 
   useEffect(() => {
+    let active = true;
+    if (!isOwner) return;
+
+    const loadChartProfile = async () => {
+      setChartLoading(true);
+      try {
+        const preference = await customOrdersBuyerApi.getDisplayChartPreference();
+        if (!active) return;
+        setDisplayChartFamily(preference.displayChartFamily);
+
+        const orders = await customOrdersBuyerApi.list({ page: 1, limit: 1 });
+        const latestOrderId = orders.items?.[0]?.id;
+        if (!latestOrderId) {
+          if (active) setComputedSize(null);
+          return;
+        }
+
+        const latestOrder = await customOrdersBuyerApi.getById(latestOrderId);
+        if (!active) return;
+        setComputedSize(latestOrder.chartLock?.computedSize ?? null);
+      } catch (err) {
+        if (active) {
+          setComputedSize(null);
+        }
+        console.error('Failed to load display chart/computed size', err);
+      } finally {
+        if (active) {
+          setChartLoading(false);
+        }
+      }
+    };
+
+    void loadChartProfile();
+    return () => {
+      active = false;
+    };
+  }, [isOwner]);
+
+  useEffect(() => {
     setActiveTab((prev) => (availableTabs.includes(prev) ? prev : availableTabs[0]));
   }, [availableTabs]);
 
@@ -218,6 +264,7 @@ export const EndUserProfile: React.FC = () => {
       measurements: Record<string, unknown>;
       notes?: string;
       requireUpdateEveryDays?: number;
+      preferredLengthUnit?: 'CM' | 'IN';
     }) => {
       setSizeFitSaving(true);
       try {
@@ -295,6 +342,121 @@ export const EndUserProfile: React.FC = () => {
     },
     [loadSizeFit],
   );
+
+  const handleDisplayChartChange = useCallback(
+    async (value: string) => {
+      const next = value as CustomOrderChartFamily;
+      if (next === displayChartFamily) return;
+      setDisplayChartFamily(next);
+      setChartSaving(true);
+      try {
+        await customOrdersBuyerApi.updateDisplayChartPreference({
+          displayChartFamily: next,
+          updatedAtMs: Date.now(),
+        });
+        toast.success('Display chart updated.');
+      } catch (err) {
+        console.error('Failed to save display chart preference', err);
+        toast.error('Could not save display chart preference.');
+      } finally {
+        setChartSaving(false);
+      }
+    },
+    [displayChartFamily],
+  );
+
+  const handleTriggerAvatarUpload = useCallback(() => {
+    avatarInputRef.current?.click();
+  }, []);
+
+  const handleAvatarSelected: React.ChangeEventHandler<HTMLInputElement> = useCallback(
+    async (event) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file || !currentUser) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      setAvatarUploading(true);
+      try {
+        const response = await apiClient.post('/uploads/profile-image', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        const uploaded = response.data?.data ?? response.data;
+        const nextImage = uploaded?.url ?? null;
+        const nextImageId = uploaded?.id ?? null;
+
+        setProfile((prev) =>
+          prev
+            ? {
+                ...prev,
+                profileImage: nextImage ?? undefined,
+              }
+            : prev,
+        );
+
+        dispatch(
+          setUser({
+            ...currentUser,
+            profileImage: nextImage,
+            profileImageId: nextImageId,
+            profileImageFile: nextImage
+              ? {
+                  id: nextImageId,
+                  s3Url: nextImage,
+                  fileName: uploaded?.fileName ?? file.name,
+                  originalName: uploaded?.originalName ?? file.name,
+                  createdAt: uploaded?.createdAt ?? new Date().toISOString(),
+                  updatedAt: uploaded?.updatedAt ?? new Date().toISOString(),
+                }
+              : null,
+          }),
+        );
+
+        toast.success('Profile image updated.');
+      } catch (err) {
+        console.error('Failed to upload profile image', err);
+        toast.error('Unable to upload profile image right now.');
+      } finally {
+        setAvatarUploading(false);
+      }
+    },
+    [currentUser, dispatch],
+  );
+
+  const handleRemoveAvatar = useCallback(async () => {
+    if (!currentUser) return;
+    setAvatarUploading(true);
+    try {
+      await apiClient.delete('/uploads/profile-image');
+
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              profileImage: undefined,
+            }
+          : prev,
+      );
+
+      dispatch(
+        setUser({
+          ...currentUser,
+          profileImage: null,
+          profileImageId: null,
+          profileImageFile: null,
+        }),
+      );
+
+      toast.success('Profile image removed.');
+    } catch (err) {
+      console.error('Failed to remove profile image', err);
+      toast.error('Unable to remove profile image right now.');
+    } finally {
+      setAvatarUploading(false);
+    }
+  }, [currentUser, dispatch]);
 
   if (loading) {
     return (
@@ -396,9 +558,36 @@ export const EndUserProfile: React.FC = () => {
                       {(profile.firstName?.charAt(0) || profile.username?.charAt(0) || '?').toUpperCase()}
                     </div>
                   )}
-                  <div className="absolute bottom-0 right-0 rounded-full border border-white/60 bg-white/90 p-1 text-[11px] leading-none dark:border-white/20 dark:bg-zinc-900">
-                    {profile.profileVisibility === 'LOCKED' ? '🔒' : '🌐'}
-                  </div>
+                  {isOwner ? (
+                    <button
+                      type="button"
+                      onClick={handleTriggerAvatarUpload}
+                      disabled={avatarUploading}
+                      className="absolute bottom-0 right-0 rounded-full border border-white/60 bg-white/90 p-1 text-[11px] leading-none shadow-sm transition hover:scale-105 disabled:opacity-60 dark:border-white/20 dark:bg-zinc-900"
+                      title="Upload profile image"
+                    >
+                      ✏️
+                    </button>
+                  ) : (
+                    <div className="absolute bottom-0 right-0 rounded-full border border-white/60 bg-white/90 p-1 text-[11px] leading-none dark:border-white/20 dark:bg-zinc-900">
+                      {profile.profileVisibility === 'LOCKED' ? '🔒' : '🌐'}
+                    </div>
+                  )}
+                  {isOwner ? (
+                    <div className="absolute -top-2 -right-2 flex items-center gap-1">
+                      {profile.profileImage ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleRemoveAvatar()}
+                          disabled={avatarUploading}
+                          className="rounded-lg border border-white/70 bg-white/95 px-1.5 py-1 text-[11px] leading-none shadow-sm dark:border-white/15 dark:bg-zinc-900"
+                          title="Remove profile image"
+                        >
+                          🗑️
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="min-w-0">
@@ -426,6 +615,52 @@ export const EndUserProfile: React.FC = () => {
 
             {isOwner ? (
               <ProfileActionsBar actions={profileActions} />
+            ) : null}
+
+            {isOwner ? (
+              <section className="rounded-2xl border border-gray-200/70 bg-white/75 p-3 dark:border-white/10 dark:bg-black/20 sm:p-4">
+                <div className="grid gap-3 md:grid-cols-[220px_1fr] md:items-end">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Display chart</div>
+                    <div className="mt-1.5 inline-flex flex-wrap gap-1 rounded-xl border border-gray-200/80 bg-white p-1 dark:border-white/10 dark:bg-zinc-900/60">
+                      {[
+                        { value: 'UK', label: 'UK' },
+                        { value: 'US', label: 'US' },
+                        { value: 'NIGERIA', label: 'Nigeria' },
+                        { value: 'ASIA', label: 'Asia' },
+                        { value: 'HYBRID_UK_NIGERIA', label: 'Hybrid (UK + Nigeria)' },
+                      ].map((option) => {
+                        const active = displayChartFamily === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => void handleDisplayChartChange(option.value)}
+                            disabled={chartSaving}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                              active
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-zinc-800'
+                            }`}
+                            aria-pressed={active}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-indigo-200/60 bg-indigo-50/70 px-3 py-2 text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
+                    <div className="text-[11px] uppercase tracking-wide opacity-80">Computed size</div>
+                    <div className="mt-1 text-lg font-semibold">
+                      {chartLoading ? 'Loading...' : computedSize || 'Not available yet'}
+                    </div>
+                    <div className="mt-1 text-xs opacity-80">
+                      This updates when fittings are used in a custom-order size resolution.
+                    </div>
+                  </div>
+                </div>
+              </section>
             ) : null}
 
             <div className="mt-2 flex items-center gap-8 border-b border-gray-200/70 px-1 dark:border-white/10">
@@ -540,6 +775,16 @@ export const EndUserProfile: React.FC = () => {
             </section>
           </div>
         </OverlayPortal>
+      ) : null}
+
+      {isOwner ? (
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleAvatarSelected}
+        />
       ) : null}
     </div>
   );

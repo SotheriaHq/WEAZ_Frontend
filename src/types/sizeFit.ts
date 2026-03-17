@@ -5,6 +5,16 @@ export type LengthUnit = 'CM' | 'IN';
 export type WeightUnit = 'KG' | 'LBS';
 export type FitPreference = 'SLIM' | 'REGULAR' | 'LOOSE' | 'OVERSIZED';
 
+export interface BaselineMeasurementPoint {
+  key: string;
+  label: string;
+  description?: string | null;
+  category: string;
+  minValueCm?: number | null;
+  maxValueCm?: number | null;
+  required: boolean;
+}
+
 export interface SizeFitProfile {
   id: string;
   userId: string;
@@ -18,6 +28,10 @@ export interface SizeFitProfile {
   fitPreference: FitPreference | null;
   label: string;
   measurements: Record<string, unknown>;
+  measurementGender?: 'MEN' | 'WOMEN';
+  baselineMeasurementPoints?: BaselineMeasurementPoint[];
+  baselineRequiredKeys?: string[];
+  missingBaselineKeys?: string[];
   notes: string;
   lastUpdatedAt: string | null;
   nextReminderAt: string | null;

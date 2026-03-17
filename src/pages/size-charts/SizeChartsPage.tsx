@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
+import UniversalSelect from '@/components/forms/UniversalSelect';
 
 type ChartRow = {
   alpha: string;
@@ -82,6 +84,40 @@ const SizeTable: React.FC<{ title: string; rows: ChartRow[] }> = ({ title, rows 
 };
 
 const SizeChartsPage: React.FC = () => {
+  const [displayChartFamily, setDisplayChartFamily] = useState<CustomOrderChartFamily>('UK');
+
+  useEffect(() => {
+    let active = true;
+    void customOrdersBuyerApi
+      .getDisplayChartPreference()
+      .then((result) => {
+        if (active) {
+          setDisplayChartFamily(result.displayChartFamily);
+        }
+      })
+      .catch(() => {
+        // Keep default when auth/preference is unavailable.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const activeChartTitle = useMemo(() => {
+    if (displayChartFamily === 'NIGERIA') return 'Nigeria';
+    if (displayChartFamily === 'US') return 'US';
+    if (displayChartFamily === 'ASIA') return 'Asia';
+    return 'UK';
+  }, [displayChartFamily]);
+
+  const handleChartPreferenceChange = (next: CustomOrderChartFamily) => {
+    setDisplayChartFamily(next);
+    void customOrdersBuyerApi.updateDisplayChartPreference({
+      displayChartFamily: next,
+      updatedAtMs: Date.now(),
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100">
       <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
@@ -89,6 +125,22 @@ const SizeChartsPage: React.FC = () => {
           <h1 className="text-2xl md:text-3xl font-bold">Size Charts</h1>
           <p className="mt-2 text-sm md:text-base text-slate-600 dark:text-slate-400 max-w-3xl">
             Use this reference to convert common size systems and take measurements consistently before placing RTW or custom-fit orders.
+          </p>
+          <div className="mt-4 max-w-[280px]">
+            <UniversalSelect
+              label="Display chart preference"
+              value={displayChartFamily}
+              onChange={(value) => handleChartPreferenceChange(value as CustomOrderChartFamily)}
+              options={[
+                { value: 'UK', label: 'UK' },
+                { value: 'US', label: 'US' },
+                { value: 'NIGERIA', label: 'Nigeria' },
+                { value: 'ASIA', label: 'Asia' },
+              ]}
+            />
+          </div>
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            Active display chart: {activeChartTitle}. This preference updates custom-order composer labels only and does not alter locked order pricing snapshots.
           </p>
         </header>
 

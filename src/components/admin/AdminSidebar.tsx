@@ -20,9 +20,9 @@ const navItems: NavItem[] = [
   { key: 'users', label: 'Users', path: '/admin/users', emoji: '👤', permission: 'USERS_READ' },
   { key: 'brands', label: 'Brands', path: '/admin/brands', emoji: '🏷️', permission: 'BRANDS_READ' },
   { key: 'verification', label: 'Verification', path: '/admin/verification', emoji: '🪪', permission: 'BRANDS_VERIFY' },
-  { key: 'products', label: 'Products', path: '/admin/products', emoji: '📦', permission: 'PRODUCTS_READ' },
-  { key: 'collections', label: 'Collections', path: '/admin/collections', emoji: '🗂️', permission: 'COLLECTIONS_READ' },
-  { key: 'configurations', label: 'Configurations', path: '/admin/taxonomy', emoji: '🧬' },
+  { key: 'content', label: 'Content Management', path: '/admin/content', emoji: '🧰' },
+  { key: 'charts', label: 'Charts', path: '/admin/measurements', emoji: '📐', permission: 'MEASUREMENTS_READ' },
+  { key: 'configurations', label: 'Configurations', path: '/admin/taxonomy', emoji: '🧬', permission: 'TAXONOMY_READ' },
   { key: 'tags', label: 'Tags', path: '/admin/tags', emoji: '🏷️', permission: 'TAGS_READ' },
   { key: 'payouts', label: 'Payouts', path: '/admin/payouts', emoji: '💰', permission: 'PAYOUTS_READ' },
   { key: 'disputes', label: 'Disputes', path: '/admin/disputes', emoji: '⚖️', permission: 'DISPUTES_READ' },
@@ -37,19 +37,7 @@ const AdminSidebar: React.FC = () => {
   const { hasPermission, isSuperAdmin } = useAdminPermissions();
   const dispatch = useDispatch<AppDispatch>();
 
-  const configuredNavItems = navItems.map((item) => {
-    if (item.key !== 'configurations') return item;
-    const prefersTaxonomy = hasPermission('TAXONOMY_READ');
-    return {
-      ...item,
-      path: prefersTaxonomy ? '/admin/taxonomy' : '/admin/measurements',
-    };
-  });
-
-  const visibleItems = configuredNavItems.filter((item) => {
-    if (item.key === 'configurations') {
-      return hasPermission('TAXONOMY_READ') || hasPermission('MEASUREMENTS_READ');
-    }
+  const visibleItems = navItems.filter((item) => {
     if (item.superAdminOnly && !isSuperAdmin) return false;
     if (item.permission && !hasPermission(item.permission)) return false;
     return true;
@@ -58,12 +46,6 @@ const AdminSidebar: React.FC = () => {
   const getIsActive = (item: NavItem) => {
     if (item.path === '/admin') {
       return location.pathname === '/admin';
-    }
-    if (item.key === 'configurations') {
-      return (
-        location.pathname.startsWith('/admin/taxonomy') ||
-        location.pathname.startsWith('/admin/measurements')
-      );
     }
     return location.pathname.startsWith(item.path);
   };

@@ -27,8 +27,8 @@ import {
   FiPlus,
 } from "react-icons/fi";
 import { HiOutlineSparkles } from "react-icons/hi";
-import { isCustomSizingMode, isRtwSizingMode, normalizeSizingMode, type SizingMode } from '@/types/sizing';
-import CustomOrderOfferEditor from '@/components/custom-orders/CustomOrderOfferEditor';
+import { useMeasurementPoints } from '@/hooks/useMeasurementPoints';
+import CustomOrderConfigurationEditor from '@/components/custom-orders/CustomOrderConfigurationEditor';
 
 // Context & Hooks
 import TextField from "../../components/forms/TextField";
@@ -49,7 +49,6 @@ import { MediaProvider, useMediaStore } from "../../hooks/useMediaStore";
 import useCollectionUpload from "../../hooks/useCollectionUpload";
 import { useBrandProfile } from "../../hooks/UseBrandHook";
 import { finalizeCollectionUploads } from "@/api/collectionUploads";
-import SizingConfigurator from "@/components/sizing/SizingConfigurator";
 // ============================================================================
 
 type CategoryTypeOption = { id: string; name: string };
@@ -58,6 +57,41 @@ type CategoryOption = {
   slug: string;
   name: string;
   types: CategoryTypeOption[];
+};
+
+const DESIGN_SIZING_MODE = 'RTW_PLUS_FITTINGS';
+
+const normalizeMeasurementLabel = (value: string) =>
+  value.trim().toLowerCase().replace(/[\s_]+/g, ' ');
+
+const measurementKeyToLabel = (key: string) =>
+  key
+    .replace(/^BRAND_[^_]+_/, '')
+    .replace(/^(MEN|WOMEN|UNISEX)_/, '')
+    .replace(/_/g, ' ');
+
+const dedupeMeasurementKeysByLabel = (keys: string[]) => {
+  const seenKeys = new Set<string>();
+  const seenLabels = new Set<string>();
+  const deduped: string[] = [];
+
+  for (const rawKey of keys) {
+    const normalizedKey = String(rawKey ?? '').trim().toUpperCase();
+    if (!normalizedKey || seenKeys.has(normalizedKey)) {
+      continue;
+    }
+
+    const label = normalizeMeasurementLabel(measurementKeyToLabel(normalizedKey));
+    if (!label || seenLabels.has(label)) {
+      continue;
+    }
+
+    seenKeys.add(normalizedKey);
+    seenLabels.add(label);
+    deduped.push(normalizedKey);
+  }
+
+  return deduped;
 };
 
 const CreateDesignInner: React.FC = () => {
@@ -87,18 +121,8 @@ const CreateDesignInner: React.FC = () => {
   );
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
   const [metadataEditedAt, setMetadataEditedAt] = useState<Date | null>(null);
-  const [sizingMode, setSizingMode] = useState<
-    SizingMode
-  >("NONE");
-  const [rtwSizeSystem, setRtwSizeSystem] = useState<string>("ALPHA");
   const [customMeasurementKeys, setCustomMeasurementKeys] = useState<string[]>(
     [],
-  );
-  const [fitPreference, setFitPreference] = useState<
-    "SLIM" | "REGULAR" | "LOOSE" | "OVERSIZED" | ""
-  >("");
-  const [targetAgeGroup, setTargetAgeGroup] = useState<"ADULT" | "CHILD">(
-    "ADULT",
   );
 
   // UI state
@@ -245,13 +269,9 @@ const CreateDesignInner: React.FC = () => {
         setCategoryTypeId((d as any).subCategoryId || d.categoryTypeId || "");
         setType(d.type || "EVERYBODY");
         setVisibility(d.visibility || "PUBLIC");
-        setSizingMode(normalizeSizingMode(d.sizingMode));
-        setRtwSizeSystem(d.rtwSizeSystem || "ALPHA");
         setCustomMeasurementKeys(
-          Array.isArray(d.customMeasurementKeys) ? d.customMeasurementKeys : [],
+          Array.isArray(d.customMeasurementKeys) ? dedupeMeasurementKeysByLabel(d.customMeasurementKeys) : [],
         );
-        setFitPreference(d.fitPreference || "");
-        setTargetAgeGroup(d.targetAgeGroup || "ADULT");
         setMetadataEditedAt(
           d.metadataEditedAt ? new Date(d.metadataEditedAt) : null,
         );
@@ -461,6 +481,51 @@ const CreateDesignInner: React.FC = () => {
   // Get category name for summary
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const categoryTypeOptions = selectedCategory?.types ?? [];
+  const measurementGender = useMemo(
+    () => (type === 'MALE' ? 'MEN' : type === 'FEMALE' ? 'WOMEN' : 'UNISEX'),
+    [type],
+  );
+  const designMeasurementFilter = useMemo(
+    () => (measurementGender === 'UNISEX' ? undefined : { gender: measurementGender }),
+    [measurementGender],
+  );
+  const { points: designMeasurementPoints } = useMeasurementPoints(designMeasurementFilter);
+  const defaultDesignMeasurementKeys = useMemo(() => {
+    const prioritized = [...designMeasurementPoints].sort(
+      (left, right) => (left.sortOrder ?? Number.MAX_SAFE_INTEGER) - (right.sortOrder ?? Number.MAX_SAFE_INTEGER),
+    );
+    const seenLabels = new Set<string>();
+    const dedupedKeys: string[] = [];
+
+    for (const point of prioritized) {
+      const key = String(point?.key ?? '').trim().toUpperCase();
+      if (!key) {
+        continue;
+      }
+      const label = normalizeMeasurementLabel(point.label || measurementKeyToLabel(key));
+      if (!label || seenLabels.has(label)) {
+        continue;
+      }
+      seenLabels.add(label);
+      dedupedKeys.push(key);
+    }
+
+    return dedupeMeasurementKeysByLabel(dedupedKeys);
+  }, [designMeasurementPoints]);
+
+  useEffect(() => {
+    if (defaultDesignMeasurementKeys.length === 0) {
+      return;
+    }
+    setCustomMeasurementKeys((current) =>
+      current.length > 0 ? dedupeMeasurementKeysByLabel(current) : defaultDesignMeasurementKeys,
+    );
+  }, [defaultDesignMeasurementKeys]);
+
+  const normalizedCustomMeasurementKeys = useMemo(
+    () => dedupeMeasurementKeysByLabel(customMeasurementKeys),
+    [customMeasurementKeys],
+  );
 
   // Handlers
   const handleDelete = (itemId: string) => {
@@ -596,17 +661,11 @@ const CreateDesignInner: React.FC = () => {
           type,
           visibility,
           filterValueIds: getSelectedFilterValueIds(),
-          sizingMode: normalizeSizingMode(sizingMode),
-          rtwSizeSystem:
-            isRtwSizingMode(sizingMode)
-              ? rtwSizeSystem
-              : null,
-          customMeasurementKeys:
-            isCustomSizingMode(sizingMode)
-              ? customMeasurementKeys
-              : [],
-          fitPreference: fitPreference || null,
-          targetAgeGroup,
+          sizingMode: DESIGN_SIZING_MODE,
+          rtwSizeSystem: null,
+          customMeasurementKeys: normalizedCustomMeasurementKeys,
+          fitPreference: null,
+          targetAgeGroup: 'ADULT',
         } as any);
       } else {
         await uploadCollection(
@@ -625,17 +684,11 @@ const CreateDesignInner: React.FC = () => {
             visibility,
             filterValueIds: getSelectedFilterValueIds(),
             coverIndex,
-            sizingMode: normalizeSizingMode(sizingMode),
-            rtwSizeSystem:
-              isRtwSizingMode(sizingMode)
-                ? rtwSizeSystem
-                : undefined,
-            customMeasurementKeys:
-              isCustomSizingMode(sizingMode)
-                ? customMeasurementKeys
-                : [],
-            fitPreference: fitPreference || undefined,
-            targetAgeGroup,
+            sizingMode: DESIGN_SIZING_MODE,
+            rtwSizeSystem: undefined,
+            customMeasurementKeys: normalizedCustomMeasurementKeys,
+            fitPreference: undefined,
+            targetAgeGroup: 'ADULT',
           },
           undefined,
           false, // shouldPublish = false
@@ -711,17 +764,11 @@ const CreateDesignInner: React.FC = () => {
           visibility,
           coverMediaId: files[coverIndex]?.remoteId || undefined,
           filterValueIds: getSelectedFilterValueIds(),
-          sizingMode: normalizeSizingMode(sizingMode),
-          rtwSizeSystem:
-            isRtwSizingMode(sizingMode)
-              ? rtwSizeSystem
-              : null,
-          customMeasurementKeys:
-            isCustomSizingMode(sizingMode)
-              ? customMeasurementKeys
-              : [],
-          fitPreference: fitPreference || null,
-          targetAgeGroup,
+          sizingMode: DESIGN_SIZING_MODE,
+          rtwSizeSystem: null,
+          customMeasurementKeys: normalizedCustomMeasurementKeys,
+          fitPreference: null,
+          targetAgeGroup: 'ADULT',
         } as any);
 
         const currentIds = new Set(files.map((f) => f.id));
@@ -751,17 +798,11 @@ const CreateDesignInner: React.FC = () => {
               categoryTypeId,
               tags: finalTags,
               filterValueIds: getSelectedFilterValueIds(),
-              sizingMode: normalizeSizingMode(sizingMode),
-              rtwSizeSystem:
-                isRtwSizingMode(sizingMode)
-                  ? rtwSizeSystem
-                  : undefined,
-              customMeasurementKeys:
-                isCustomSizingMode(sizingMode)
-                  ? customMeasurementKeys
-                  : [],
-              fitPreference: fitPreference || undefined,
-              targetAgeGroup,
+              sizingMode: DESIGN_SIZING_MODE,
+              rtwSizeSystem: undefined,
+              customMeasurementKeys: normalizedCustomMeasurementKeys,
+              fitPreference: undefined,
+              targetAgeGroup: 'ADULT',
             },
           },
         );
@@ -787,17 +828,11 @@ const CreateDesignInner: React.FC = () => {
             visibility,
             filterValueIds: getSelectedFilterValueIds(),
             coverIndex,
-            sizingMode: normalizeSizingMode(sizingMode),
-            rtwSizeSystem:
-              isRtwSizingMode(sizingMode)
-                ? rtwSizeSystem
-                : undefined,
-            customMeasurementKeys:
-              isCustomSizingMode(sizingMode)
-                ? customMeasurementKeys
-                : [],
-            fitPreference: fitPreference || undefined,
-            targetAgeGroup,
+            sizingMode: DESIGN_SIZING_MODE,
+            rtwSizeSystem: undefined,
+            customMeasurementKeys: normalizedCustomMeasurementKeys,
+            fitPreference: undefined,
+            targetAgeGroup: 'ADULT',
           },
         );
         const newCollectionId = extractCollectionId(response);
@@ -856,6 +891,7 @@ const CreateDesignInner: React.FC = () => {
     setTagSearch("");
     setType("EVERYBODY");
     setVisibility("PUBLIC");
+    setCustomMeasurementKeys([]);
     setCoverIndex(0);
     setSelectedIndex(0);
     mediaStore.clear();
@@ -1025,16 +1061,16 @@ const CreateDesignInner: React.FC = () => {
               <div className="space-y-4 h-full min-w-0">
                 {/* Main Preview - NO background; media defines layout */}
                 <div className="relative rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-sm">
-                  <div className="relative w-full flex justify-center">
+                  <div className="relative w-full h-[360px] sm:h-[460px] lg:h-[620px] flex items-center justify-center overflow-hidden">
                     <AnimatePresence mode="wait">
                       {selectedFile && (
                         <motion.div
                           key={selectedFile.id || selectedFile.url}
-                          className="w-fit max-w-full"
-                          initial={{ opacity: 0.6, scale: 0.99 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.99 }}
-                          transition={{ duration: 0.25 }}
+                          className="w-full h-full flex items-center justify-center"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
                         >
                           <MediaRenderer
                             kind={
@@ -1042,7 +1078,9 @@ const CreateDesignInner: React.FC = () => {
                             }
                             src={selectedFile.url}
                             alt={selectedFile.file?.name || "Preview"}
-                            maxHeightClassName="max-h-[620px]"
+                            className="w-full h-full flex items-center justify-center"
+                            maxHeightClassName="max-h-full"
+                            maxWidthClassName="max-w-full"
                           />
                         </motion.div>
                       )}
@@ -1428,29 +1466,11 @@ const CreateDesignInner: React.FC = () => {
                 </label>
               </div>
 
-              <SizingConfigurator
-                contentType="design"
-                sizingMode={sizingMode}
-                onSizingModeChange={setSizingMode}
-                rtwSizeSystem={rtwSizeSystem}
-                onRtwSizeSystemChange={setRtwSizeSystem}
-                customMeasurementKeys={customMeasurementKeys}
-                onCustomMeasurementKeysChange={setCustomMeasurementKeys}
-                fitPreference={fitPreference}
-                onFitPreferenceChange={setFitPreference}
-                targetAgeGroup={targetAgeGroup}
-                onTargetAgeGroupChange={setTargetAgeGroup}
-                measurementGender={
-                  type === "MALE" ? "MEN" : type === "FEMALE" ? "WOMEN" : undefined
-                }
-                disabled={disabled}
-              />
-
-              <CustomOrderOfferEditor
+              <CustomOrderConfigurationEditor
                 sourceType="DESIGN"
                 sourceId={isEditMode ? id : undefined}
                 measurementKeys={customMeasurementKeys}
-                measurementGender={type === "MALE" ? "MEN" : type === "FEMALE" ? "WOMEN" : "UNISEX"}
+                measurementGender={measurementGender}
                 disabled={disabled}
               />
             </div>

@@ -1,14 +1,15 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import CustomOrderOfferEditor from '@/components/custom-orders/CustomOrderOfferEditor';
+import CustomOrderConfigurationEditor from '@/components/custom-orders/CustomOrderConfigurationEditor';
 
 const getStoreStatus = vi.fn();
 const listFabricRuleBases = vi.fn();
-const listBrandOffers = vi.fn();
+const getActiveForProduct = vi.fn();
+const getActiveForDesign = vi.fn();
 const createFabricRuleBasis = vi.fn();
-const createOffer = vi.fn();
-const updateOffer = vi.fn();
+const createConfiguration = vi.fn();
+const updateConfiguration = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -17,12 +18,13 @@ vi.mock('@/api/StoreApi', () => ({
 }));
 
 vi.mock('@/api/CustomOrderApi', () => ({
-  customOrderOffersApi: {
+  customOrderConfigurationsApi: {
     listFabricRuleBases: (...args: unknown[]) => listFabricRuleBases(...args),
-    listBrandOffers: (...args: unknown[]) => listBrandOffers(...args),
+    getActiveForProduct: (...args: unknown[]) => getActiveForProduct(...args),
+    getActiveForDesign: (...args: unknown[]) => getActiveForDesign(...args),
     createFabricRuleBasis: (...args: unknown[]) => createFabricRuleBasis(...args),
-    create: (...args: unknown[]) => createOffer(...args),
-    update: (...args: unknown[]) => updateOffer(...args),
+    create: (...args: unknown[]) => createConfiguration(...args),
+    update: (...args: unknown[]) => updateConfiguration(...args),
   },
 }));
 
@@ -33,7 +35,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-describe('CustomOrderOfferEditor', () => {
+describe('CustomOrderConfigurationEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getStoreStatus.mockResolvedValue({
@@ -47,7 +49,8 @@ describe('CustomOrderOfferEditor', () => {
       },
     });
     listFabricRuleBases.mockResolvedValue([]);
-    listBrandOffers.mockResolvedValue({ items: [], page: 1, limit: 10, total: 0 });
+    getActiveForProduct.mockResolvedValue(null);
+    getActiveForDesign.mockResolvedValue(null);
     createFabricRuleBasis.mockResolvedValue({
       id: 'basis-1',
       label: 'Dress block',
@@ -57,8 +60,8 @@ describe('CustomOrderOfferEditor', () => {
       createdAt: '2026-03-12T00:00:00.000Z',
       updatedAt: '2026-03-12T00:00:00.000Z',
     });
-    createOffer.mockResolvedValue({
-      id: 'offer-1',
+    createConfiguration.mockResolvedValue({
+      id: 'configuration-1',
       brandId: 'brand-1',
       sourceType: 'PRODUCT',
       sourceId: 'product-1',
@@ -100,18 +103,18 @@ describe('CustomOrderOfferEditor', () => {
   });
 
   it('shows the save-first state when the source has not been persisted yet', () => {
-    render(<CustomOrderOfferEditor sourceType="PRODUCT" measurementKeys={['bust', 'waist']} />);
+    render(<CustomOrderConfigurationEditor sourceType="PRODUCT" measurementKeys={['bust', 'waist']} />);
 
-    expect(screen.getByText('Save this product first. The custom-order offer attaches to a persisted source id.')).toBeInTheDocument();
+    expect(screen.getByText('Save this product first. The custom-order configuration attaches to a persisted source id.')).toBeInTheDocument();
     expect(getStoreStatus).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Create offer' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create configuration' })).toBeDisabled();
   });
 
-  it('creates a basis and saves a new custom-order offer for a persisted source', async () => {
+  it('creates a basis and saves a new custom-order configuration for a persisted source', async () => {
     const user = userEvent.setup();
 
     render(
-      <CustomOrderOfferEditor
+      <CustomOrderConfigurationEditor
         sourceType="PRODUCT"
         sourceId="product-1"
         measurementKeys={['bust', 'waist']}
@@ -122,11 +125,7 @@ describe('CustomOrderOfferEditor', () => {
     await waitFor(() => {
       expect(getStoreStatus).toHaveBeenCalled();
       expect(listFabricRuleBases).toHaveBeenCalledWith({ includeBrandOnly: true });
-      expect(listBrandOffers).toHaveBeenCalledWith('brand-1', {
-        sourceType: 'PRODUCT',
-        sourceId: 'product-1',
-        limit: 10,
-      });
+      expect(getActiveForProduct).toHaveBeenCalledWith('product-1');
     });
 
     await user.type(screen.getByPlaceholderText('New basis label'), 'Dress block');
@@ -143,10 +142,10 @@ describe('CustomOrderOfferEditor', () => {
     await user.type(screen.getByRole('textbox', { name: /buyer instructions/i }), 'Bring your final measurements.');
     await user.type(screen.getByPlaceholderText('120000'), '120000');
     await user.type(screen.getByPlaceholderText('10000'), '10000');
-    await user.click(screen.getByRole('button', { name: 'Create offer' }));
+    await user.click(screen.getByRole('button', { name: 'Create configuration' }));
 
     await waitFor(() => {
-      expect(createOffer).toHaveBeenCalledWith(
+      expect(createConfiguration).toHaveBeenCalledWith(
         expect.objectContaining({
           sourceType: 'PRODUCT',
           sourceId: 'product-1',
@@ -160,8 +159,8 @@ describe('CustomOrderOfferEditor', () => {
     });
 
     expect(toastSuccess).toHaveBeenCalledWith('Fabric-rule basis created.');
-    expect(toastSuccess).toHaveBeenCalledWith('Custom-order offer created.');
-    expect(screen.getByText('Offer v1')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Update offer' })).toBeInTheDocument();
+    expect(toastSuccess).toHaveBeenCalledWith('Custom-order configuration created.');
+    expect(screen.getByText('Configuration v1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Update configuration' })).toBeInTheDocument();
   });
 });

@@ -61,10 +61,16 @@ export type CustomOrderExtensionResponseStatus =
   | 'EXPIRED';
 
 export type CustomOrderExtensionTargetType = 'PRODUCTION' | 'DELIVERY' | 'BOTH';
+export type CustomOrderChartFamily = 'UK' | 'US' | 'NIGERIA' | 'ASIA' | 'HYBRID_UK_NIGERIA';
+export type CustomOrderResolverPolicy =
+  | 'PRIMARY_ONLY'
+  | 'MAX_OF_BOTH'
+  | 'WEIGHTED_AVERAGE_TO_NEAREST_BAND';
+export type CustomOrderQuoteStatus = 'AUTO_PRICED' | 'MANUAL_QUOTE_REQUIRED';
 
 export type CustomOrderRetentionHoldType = 'LEGAL' | 'SUPPORT';
 
-export interface CustomOrderOfferRule {
+export interface CustomOrderConfigurationRule {
   id: string;
   priority: number;
   conditionsJson: Record<string, unknown>;
@@ -72,14 +78,24 @@ export interface CustomOrderOfferRule {
   isFallback: boolean;
 }
 
-export interface CustomOrderOfferRuleInput {
+export interface CustomOrderConfigurationRuleInput {
   priority: number;
   conditionsJson: Record<string, unknown>;
   outputYards: string;
   isFallback?: boolean;
 }
 
-export interface CustomOrderOfferUpsertInput {
+export interface CustomOrderConfigurationSizeExtraYard {
+  sizeLabel: string;
+  extraYards: number;
+}
+
+export interface CustomOrderConfigurationYardProfile {
+  averageBaseYards?: number;
+  sizeExtraYards: CustomOrderConfigurationSizeExtraYard[];
+}
+
+export interface CustomOrderConfigurationUpsertInput {
   sourceType: CustomOrderSourceType;
   sourceId: string;
   title?: string;
@@ -101,10 +117,12 @@ export interface CustomOrderOfferUpsertInput {
   defectPolicy: string;
   fabricSourcingMode: 'BRAND_SOURCED' | 'BUYER_SUPPLIED' | 'EITHER';
   notes?: string;
-  rules: CustomOrderOfferRuleInput[];
+  averageBaseYards?: number;
+  sizeExtraYards?: CustomOrderConfigurationSizeExtraYard[];
+  rules: CustomOrderConfigurationRuleInput[];
 }
 
-export interface CustomOrderOffer {
+export interface CustomOrderConfiguration {
   id: string;
   brandId: string;
   sourceType: CustomOrderSourceType;
@@ -127,6 +145,7 @@ export interface CustomOrderOffer {
   defectPolicy: string;
   fabricSourcingMode: string;
   notes?: string | null;
+  yardProfile?: CustomOrderConfigurationYardProfile | null;
   isActive: boolean;
   currentVersion: number;
   brand?: {
@@ -139,7 +158,7 @@ export interface CustomOrderOffer {
     label: string;
     measurementKeys: string[];
   };
-  rules: CustomOrderOfferRule[];
+  rules: CustomOrderConfigurationRule[];
   versions?: Array<{
     id: string;
     version: number;
@@ -254,15 +273,35 @@ export interface CustomFabricRuleBasis {
   status: CustomFabricRuleBasisStatus;
   gender?: 'MEN' | 'WOMEN' | 'UNISEX' | null;
   moderationNotes?: string | null;
+  yardTemplate?: CustomFabricRuleBasisYardTemplate | null;
   reviewedById?: string | null;
   reviewedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface CustomFabricRuleBasisSizeMultiplier {
+  sizeLabel: string;
+  multiplier: number;
+}
+
+export interface CustomFabricRuleBasisYardTemplate {
+  averageBaseYards?: number;
+  sizeMultipliers: CustomFabricRuleBasisSizeMultiplier[];
+}
+
 export interface CreateCustomFabricRuleBasisInput {
   label: string;
   measurementKeys: string[];
+  gender?: 'MEN' | 'WOMEN' | 'UNISEX';
+}
+
+export interface CreateAdminCustomFabricRuleBasisInput extends CreateCustomFabricRuleBasisInput {
+}
+
+export interface UpdateAdminCustomFabricRuleBasisInput {
+  label?: string;
+  measurementKeys?: string[];
   gender?: 'MEN' | 'WOMEN' | 'UNISEX';
 }
 
@@ -311,7 +350,7 @@ export interface CustomOrderDetail {
     primaryMediaUrl?: string | null;
     brandName?: string | null;
   };
-  offerVersionId: string;
+  configurationVersionId: string;
   buyerPriceSummary: {
     grandTotal: number;
     subtotal?: number;
@@ -320,6 +359,18 @@ export interface CustomOrderDetail {
     rushFee?: number;
   };
   internalPriceBreakdown?: Record<string, unknown>;
+  quoteStatus?: CustomOrderQuoteStatus;
+  chartLock?: {
+    pricingChartFamily: CustomOrderChartFamily;
+    displayChartFamily: CustomOrderChartFamily;
+    resolverPolicy: CustomOrderResolverPolicy;
+    chartVersionId: string;
+    computedSize?: string | null;
+    noDirectMatch?: boolean;
+    conversionGuidance?: string | null;
+    quoteStatus?: CustomOrderQuoteStatus;
+  } | null;
+  exceptionDecision?: Record<string, unknown> | null;
   measurementSnapshot: Record<string, number>;
   measurementConfirmedAt?: string | null;
   currentProgressStage?: CustomOrderProgressStage | null;
@@ -348,17 +399,44 @@ export interface CustomOrderDetail {
 }
 
 export interface PricePreviewResponse {
-  checkoutIntentId: string;
-  offerId: string;
-  offerVersionId: string;
+  checkoutIntentId: string | null;
+  configurationId: string;
+  configurationVersionId: string;
   currency: string;
   buyerPriceSummary: {
     grandTotal: number;
     subtotal?: number;
     shippingFee?: number;
     rushFee?: number;
+  } | null;
+  priceLockExpiresAt: string | null;
+  quoteStatus: CustomOrderQuoteStatus;
+  pricingChartFamily?: CustomOrderChartFamily;
+  displayChartFamily?: CustomOrderChartFamily;
+  resolverPolicy?: CustomOrderResolverPolicy;
+  computedSize?: string | null;
+  chartVersionId?: string;
+  noDirectMatch?: boolean;
+  conversionGuidance?: string | null;
+}
+
+export interface DisplayChartPreference {
+  displayChartFamily: CustomOrderChartFamily;
+  updatedAtMs: number;
+}
+
+export interface CustomOrderExceptionReviewItem {
+  id: string;
+  createdAt: string;
+  payload: Record<string, unknown>;
+  customOrder: {
+    id: string;
+    brandId: string;
+    sourceTitleSnapshot: string;
+    sourceBrandNameSnapshot?: string | null;
+    status: CustomOrderStatus;
+    createdAt: string;
   };
-  priceLockExpiresAt: string;
 }
 
 export interface CustomOrderPaymentInitResult {
@@ -501,62 +579,182 @@ const withParams = <T extends Record<string, unknown>>(params?: T) => {
   return entries.length > 0 ? { params: Object.fromEntries(entries) } : undefined;
 };
 
-export const customOrderOffersApi = {
+const parseConfigurationYardProfile = (
+  notes?: string | null,
+): CustomOrderConfigurationYardProfile | null => {
+  const raw = String(notes ?? '');
+  const prefix = 'YARD_PROFILE:';
+  if (!raw.startsWith(prefix)) {
+    return null;
+  }
+
+  const body = raw.slice(prefix.length);
+  const jsonLine = body.split('\n')[0]?.trim();
+  if (!jsonLine) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(jsonLine) as {
+      averageBaseYards?: unknown;
+      sizeExtraYards?: Array<{ sizeLabel?: unknown; extraYards?: unknown }>;
+    };
+
+    const sizeExtraYards = Array.isArray(parsed.sizeExtraYards)
+      ? parsed.sizeExtraYards
+          .map((entry) => ({
+            sizeLabel: String(entry?.sizeLabel ?? '').trim(),
+            extraYards: Number(entry?.extraYards),
+          }))
+          .filter((entry) => entry.sizeLabel.length > 0 && Number.isFinite(entry.extraYards) && entry.extraYards >= 0)
+      : [];
+
+    const averageBaseYards =
+      typeof parsed.averageBaseYards === 'number' && Number.isFinite(parsed.averageBaseYards)
+        ? parsed.averageBaseYards
+        : undefined;
+
+    if (averageBaseYards == null && sizeExtraYards.length === 0) {
+      return null;
+    }
+
+    return {
+      averageBaseYards,
+      sizeExtraYards,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const hydrateConfiguration = (configuration: CustomOrderConfiguration): CustomOrderConfiguration => ({
+  ...configuration,
+  yardProfile: parseConfigurationYardProfile(configuration.notes),
+});
+
+const hydrateConfigurationPage = (
+  page: PaginatedCustomOrders<CustomOrderConfiguration>,
+): PaginatedCustomOrders<CustomOrderConfiguration> => ({
+  ...page,
+  items: page.items.map(hydrateConfiguration),
+});
+
+const toConfigurationPayload = (
+  payload: CustomOrderConfigurationUpsertInput | Partial<CustomOrderConfigurationUpsertInput>,
+) => {
+  const next = { ...payload } as Record<string, unknown>;
+  if (next.averageBaseYards === undefined) {
+    delete next.averageBaseYards;
+  }
+  if (!Array.isArray(next.sizeExtraYards)) {
+    delete next.sizeExtraYards;
+  }
+  return next;
+};
+
+const parseBasisTemplate = (moderationNotes?: string | null): CustomFabricRuleBasisYardTemplate | null => {
+  const raw = String(moderationNotes ?? '');
+  if (!raw.startsWith('YARD_TEMPLATE:')) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw.slice('YARD_TEMPLATE:'.length)) as {
+      averageBaseYards?: unknown;
+      sizeMultipliers?: Array<{ sizeLabel?: unknown; multiplier?: unknown }>;
+    };
+
+    const sizeMultipliers = Array.isArray(parsed.sizeMultipliers)
+      ? parsed.sizeMultipliers
+          .map((entry) => ({
+            sizeLabel: String(entry?.sizeLabel ?? '').trim(),
+            multiplier: Number(entry?.multiplier),
+          }))
+          .filter((entry) => entry.sizeLabel.length > 0 && Number.isFinite(entry.multiplier) && entry.multiplier > 0)
+      : [];
+
+    const averageBaseYards =
+      typeof parsed.averageBaseYards === 'number' && Number.isFinite(parsed.averageBaseYards)
+        ? parsed.averageBaseYards
+        : undefined;
+
+    return {
+      averageBaseYards,
+      sizeMultipliers,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const hydrateBasis = (basis: CustomFabricRuleBasis): CustomFabricRuleBasis => ({
+  ...basis,
+  yardTemplate: parseBasisTemplate(basis.moderationNotes),
+});
+
+const hydrateBasisList = (bases: CustomFabricRuleBasis[]) => bases.map(hydrateBasis);
+
+export const customOrderConfigurationsApi = {
+  async getActiveForProduct(productId: string) {
+    const response = await apiClient.get(`/products/${productId}/custom-order-configuration`);
+    return hydrateConfiguration(unwrapApiResponse<CustomOrderConfiguration>(response.data));
+  },
+
+  async getActiveForDesign(designId: string) {
+    const response = await apiClient.get(`/designs/${designId}/custom-order-configuration`);
+    return hydrateConfiguration(unwrapApiResponse<CustomOrderConfiguration>(response.data));
+  },
+
   async listVisible(params?: {
     page?: number;
     limit?: number;
-    sourceType?: CustomOrderSourceType;
-    sourceId?: string;
     isActive?: boolean;
   }) {
-    const response = await apiClient.get('/custom-order-offers', withParams(params));
-    return unwrapApiResponse<PaginatedCustomOrders<CustomOrderOffer>>(response.data);
+    const response = await apiClient.get('/custom-order-configurations', withParams(params));
+    return hydrateConfigurationPage(
+      unwrapApiResponse<PaginatedCustomOrders<CustomOrderConfiguration>>(response.data),
+    );
   },
 
-  async getById(offerId: string) {
-    const response = await apiClient.get(`/custom-order-offers/${offerId}`);
-    return unwrapApiResponse<CustomOrderOffer>(response.data);
+  async getById(configurationId: string) {
+    const response = await apiClient.get(`/custom-order-configurations/${configurationId}`);
+    return hydrateConfiguration(unwrapApiResponse<CustomOrderConfiguration>(response.data));
   },
 
-  async listBrandOffers(brandId: string, params?: {
-    page?: number;
-    limit?: number;
-    sourceType?: CustomOrderSourceType;
-    sourceId?: string;
-    isActive?: boolean;
-  }) {
-    const response = await apiClient.get(`/brands/${brandId}/custom-order-offers`, withParams(params));
-    return unwrapApiResponse<PaginatedCustomOrders<CustomOrderOffer>>(response.data);
+  async create(payload: CustomOrderConfigurationUpsertInput) {
+    const response = await apiClient.post('/custom-order-configurations', toConfigurationPayload(payload));
+    return hydrateConfiguration(unwrapApiResponse<CustomOrderConfiguration>(response.data));
   },
 
-  async create(payload: CustomOrderOfferUpsertInput) {
-    const response = await apiClient.post('/custom-order-offers', payload);
-    return unwrapApiResponse<CustomOrderOffer>(response.data);
-  },
-
-  async update(offerId: string, payload: Partial<CustomOrderOfferUpsertInput>) {
-    const response = await apiClient.patch(`/custom-order-offers/${offerId}`, payload);
-    return unwrapApiResponse<CustomOrderOffer>(response.data);
+  async update(configurationId: string, payload: Partial<CustomOrderConfigurationUpsertInput>) {
+    const response = await apiClient.patch(
+      `/custom-order-configurations/${configurationId}`,
+      toConfigurationPayload(payload),
+    );
+    return hydrateConfiguration(unwrapApiResponse<CustomOrderConfiguration>(response.data));
   },
 
   async listFabricRuleBases(params?: { includeBrandOnly?: boolean }) {
     const response = await apiClient.get('/custom-fabric-rule-bases', withParams(params));
-    return unwrapApiResponse<CustomFabricRuleBasis[]>(response.data);
+    return hydrateBasisList(unwrapApiResponse<CustomFabricRuleBasis[]>(response.data));
   },
 
   async createFabricRuleBasis(payload: CreateCustomFabricRuleBasisInput) {
     const response = await apiClient.post('/custom-fabric-rule-bases', payload);
-    return unwrapApiResponse<CustomFabricRuleBasis>(response.data);
+    return hydrateBasis(unwrapApiResponse<CustomFabricRuleBasis>(response.data));
   },
 };
 
 export const customOrdersBuyerApi = {
   async previewPrice(payload: {
-    offerId: string;
-    offerVersionId?: string;
+    configurationId: string;
+    configurationVersionId?: string;
     measurementValues: Record<string, number>;
     rushSelected?: boolean;
     shippingAddress?: Record<string, unknown>;
+    pricingChartFamily?: CustomOrderChartFamily;
+    displayChartFamily?: CustomOrderChartFamily;
+    resolverPolicy?: CustomOrderResolverPolicy;
   }) {
     const response = await apiClient.post('/custom-orders/price-preview', {
       ...payload,
@@ -567,14 +765,15 @@ export const customOrdersBuyerApi = {
 
   async create(payload: {
     checkoutIntentId: string;
-    offerId: string;
-    offerVersionId?: string;
+    configurationId: string;
+    configurationVersionId?: string;
     measurementValues: Record<string, number>;
     rushSelected: boolean;
     shippingAddress: Record<string, unknown>;
     contactInfo: Record<string, unknown>;
     customerName: string;
     idempotencyKey?: string;
+    noDirectMatchAcknowledged?: boolean;
   }) {
     const response = await apiClient.post('/custom-orders', {
       ...payload,
@@ -646,6 +845,16 @@ export const customOrdersBuyerApi = {
     const response = await apiClient.post(`/custom-orders/${orderId}/extension-requests/${requestId}/respond`, payload);
     return unwrapApiResponse<CustomOrderDetail>(response.data);
   },
+
+  async getDisplayChartPreference() {
+    const response = await apiClient.get('/custom-orders/preferences/display-chart');
+    return unwrapApiResponse<DisplayChartPreference>(response.data);
+  },
+
+  async updateDisplayChartPreference(payload: DisplayChartPreference) {
+    const response = await apiClient.post('/custom-orders/preferences/display-chart', payload);
+    return unwrapApiResponse<DisplayChartPreference>(response.data);
+  },
 };
 
 export const customOrdersBrandApi = {
@@ -699,6 +908,18 @@ export const customOrdersBrandApi = {
     note?: string;
   }) {
     const response = await apiClient.patch(`/brands/${brandId}/custom-orders/${orderId}/status`, payload);
+    return unwrapApiResponse<CustomOrderDetail>(response.data);
+  },
+
+  async requestExceptionReview(
+    brandId: string,
+    orderId: string,
+    payload: { reason: string; requestedQuoteTotal?: string },
+  ) {
+    const response = await apiClient.post(
+      `/brands/${brandId}/custom-orders/${orderId}/exception-review-requests`,
+      payload,
+    );
     return unwrapApiResponse<CustomOrderDetail>(response.data);
   },
 };
@@ -764,7 +985,7 @@ export const customOrdersAdminApi = {
 
   async getPendingFabricRuleBases() {
     const response = await apiClient.get('/admin/custom-fabric-rule-bases/pending');
-    return unwrapApiResponse<CustomFabricRuleBasis[]>(response.data);
+    return hydrateBasisList(unwrapApiResponse<CustomFabricRuleBasis[]>(response.data));
   },
 
   async reviewFabricRuleBasis(
@@ -772,7 +993,27 @@ export const customOrdersAdminApi = {
     payload: { status: CustomFabricRuleBasisStatus; moderationNotes?: string },
   ) {
     const response = await apiClient.patch(`/admin/custom-fabric-rule-bases/${basisId}/review`, payload);
-    return unwrapApiResponse<CustomFabricRuleBasis>(response.data);
+    return hydrateBasis(unwrapApiResponse<CustomFabricRuleBasis>(response.data));
+  },
+
+  async listFabricRuleBases(params?: { includeBrandOnly?: boolean }) {
+    const response = await apiClient.get('/admin/custom-fabric-rule-bases', withParams(params));
+    return hydrateBasisList(unwrapApiResponse<CustomFabricRuleBasis[]>(response.data));
+  },
+
+  async createFabricRuleBasis(payload: CreateAdminCustomFabricRuleBasisInput) {
+    const response = await apiClient.post('/admin/custom-fabric-rule-bases', payload);
+    return hydrateBasis(unwrapApiResponse<CustomFabricRuleBasis>(response.data));
+  },
+
+  async updateFabricRuleBasis(basisId: string, payload: UpdateAdminCustomFabricRuleBasisInput) {
+    const response = await apiClient.patch(`/admin/custom-fabric-rule-bases/${basisId}`, payload);
+    return hydrateBasis(unwrapApiResponse<CustomFabricRuleBasis>(response.data));
+  },
+
+  async deleteFabricRuleBasis(basisId: string) {
+    const response = await apiClient.delete(`/admin/custom-fabric-rule-bases/${basisId}`);
+    return unwrapApiResponse<{ id: string }>(response.data);
   },
 
   async remindBrand(orderId: string, note?: string) {
@@ -793,5 +1034,31 @@ export const customOrdersAdminApi = {
   async updateRetentionHold(orderId: string, payload: UpdateCustomOrderRetentionHoldInput) {
     const response = await apiClient.patch(`/admin/custom-orders/${orderId}/retention-hold`, payload);
     return unwrapApiResponse<Record<string, unknown>>(response.data);
+  },
+
+  async listExceptionReviews(params?: {
+    page?: number;
+    limit?: number;
+    brandId?: string;
+    status?: 'NEW' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+  }) {
+    const response = await apiClient.get('/admin/custom-orders/exception-reviews', withParams(params));
+    return unwrapApiResponse<PaginatedCustomOrders<CustomOrderExceptionReviewItem>>(response.data);
+  },
+
+  async decideExceptionReview(
+    orderId: string,
+    eventId: string,
+    payload: {
+      decision: 'APPROVED' | 'REJECTED' | 'REQUEST_MORE_INFO';
+      rationale: string;
+      approvedQuoteTotal?: string;
+    },
+  ) {
+    const response = await apiClient.post(
+      `/admin/custom-orders/${orderId}/exception-reviews/${eventId}/decide`,
+      payload,
+    );
+    return unwrapApiResponse<CustomOrderDetail>(response.data);
   },
 };

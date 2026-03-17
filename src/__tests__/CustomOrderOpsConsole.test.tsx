@@ -18,9 +18,16 @@ const adminGetById = vi.fn();
 const adminFlagRisk = vi.fn();
 const adminLedgerAllocations = vi.fn();
 const adminUpdateRetentionHold = vi.fn();
+const getBulkCustomOrderSummariesForBrand = vi.fn();
 
 vi.mock('@/api/StoreApi', () => ({
   getStoreStatus: (...args: unknown[]) => getStoreStatus(...args),
+}));
+
+vi.mock('@/api/MessagingApi', () => ({
+  messagingApi: {
+    getBulkCustomOrderSummariesForBrand: (...args: unknown[]) => getBulkCustomOrderSummariesForBrand(...args),
+  },
 }));
 
 vi.mock('@/api/CustomOrderApi', () => ({
@@ -52,6 +59,11 @@ vi.mock('@/api/CustomOrderApi', () => ({
   },
 }));
 
+vi.mock('@/components/messaging/OrderMessagesPanel', () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),
@@ -63,7 +75,7 @@ const brandOrderDetail = {
   id: 'order-1',
   status: 'PENDING_BRAND_ACCEPTANCE',
   paymentStatus: 'PAID',
-  offerVersionId: 'offer-v1',
+  configurationVersionId: 'configuration-v1',
   source: {
     type: 'PRODUCT',
     id: 'product-1',
@@ -128,6 +140,7 @@ describe('Custom-order operations consoles', () => {
     });
     brandGetById.mockResolvedValue(brandOrderDetail);
     brandAccept.mockResolvedValue(brandOrderDetail);
+    getBulkCustomOrderSummariesForBrand.mockResolvedValue({ items: [] });
 
     adminRiskDashboard.mockResolvedValue({
       overview: {
@@ -176,12 +189,19 @@ describe('Custom-order operations consoles', () => {
 
   it('requires confirmation before a brand accepts a custom order', async () => {
     render(
-      <MemoryRouter initialEntries={['/studio/custom-orders/order-1']}>
+      <MemoryRouter initialEntries={['/studio/custom-orders']}>
         <Routes>
+          <Route path="/studio/custom-orders" element={<CustomOrdersPage />} />
           <Route path="/studio/custom-orders/:orderId" element={<CustomOrdersPage />} />
         </Routes>
       </MemoryRouter>,
     );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Bespoke blazer/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Bespoke blazer/i }));
 
     await waitFor(() => {
       expect(screen.getByText('Brand review')).toBeInTheDocument();

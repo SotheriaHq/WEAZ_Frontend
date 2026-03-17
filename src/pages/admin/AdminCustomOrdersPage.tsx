@@ -9,6 +9,7 @@ import {
   type CustomOrderDisputeListItem,
   type CustomOrderDisputeResolution,
   type CustomOrderDisputeStatus,
+  type CustomOrderExceptionReviewItem,
   type CustomOrderLedgerAllocation,
   type CustomOrderListItem,
   type CustomOrderRefundReviewListItem,
@@ -17,6 +18,7 @@ import {
   type CustomOrderStaleItem,
   type CustomOrderStatus,
 } from '@/api/CustomOrderApi';
+import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   CustomOrderBadge,
   CustomOrderJsonBreakdown,
@@ -44,10 +46,12 @@ const AdminCustomOrdersPage: React.FC = () => {
   const [refundReviews, setRefundReviews] = useState<CustomOrderRefundReviewListItem[]>([]);
   const [staleOrders, setStaleOrders] = useState<CustomOrderStaleItem[]>([]);
   const [disputes, setDisputes] = useState<CustomOrderDisputeListItem[]>([]);
+  const [exceptionReviews, setExceptionReviews] = useState<CustomOrderExceptionReviewItem[]>([]);
   const [pendingBases, setPendingBases] = useState<CustomFabricRuleBasis[]>([]);
   const [ledgerAllocations, setLedgerAllocations] = useState<CustomOrderLedgerAllocation[]>([]);
   const [selected, setSelected] = useState<CustomOrderDetail | null>(null);
   const [selectedDisputeId, setSelectedDisputeId] = useState<string>('');
+  const [selectedExceptionReviewId, setSelectedExceptionReviewId] = useState<string>('');
   const [selectedBasisId, setSelectedBasisId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -61,6 +65,10 @@ const AdminCustomOrdersPage: React.FC = () => {
   const [disputeStatus, setDisputeStatus] = useState<CustomOrderDisputeStatus>('ADMIN_REVIEW');
   const [disputeResolution, setDisputeResolution] = useState<CustomOrderDisputeResolution>('NO_ACTION');
   const [disputeNotes, setDisputeNotes] = useState('');
+  const [exceptionStatusFilter, setExceptionStatusFilter] = useState<'ALL' | 'NEW' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED'>('ALL');
+  const [exceptionDecision, setExceptionDecision] = useState<'APPROVED' | 'REJECTED'>('APPROVED');
+  const [exceptionRationale, setExceptionRationale] = useState('');
+  const [exceptionApprovedQuoteTotal, setExceptionApprovedQuoteTotal] = useState('');
   const [basisStatus, setBasisStatus] = useState<CustomFabricRuleBasisStatus>('APPROVED_GLOBAL');
   const [basisNotes, setBasisNotes] = useState('');
   const [retentionHoldType, setRetentionHoldType] = useState<CustomOrderRetentionHoldType>('SUPPORT');
@@ -73,6 +81,11 @@ const AdminCustomOrdersPage: React.FC = () => {
   const selectedDispute = useMemo(
     () => disputes.find((entry) => entry.id === selectedDisputeId) ?? null,
     [disputes, selectedDisputeId],
+  );
+
+  const selectedExceptionReview = useMemo(
+    () => exceptionReviews.find((entry) => entry.id === selectedExceptionReviewId) ?? null,
+    [exceptionReviews, selectedExceptionReviewId],
   );
 
   const selectedBasis = useMemo(
@@ -95,11 +108,15 @@ const AdminCustomOrdersPage: React.FC = () => {
   };
 
   const loadSecondaryPanels = async (sequence: number) => {
-    const [refundData, staleData, disputeData, pendingBasesData] = await Promise.all([
+    const [refundData, staleData, disputeData, pendingBasesData, exceptionData] = await Promise.all([
       customOrdersAdminApi.getRefundReviews({ limit: 8 }),
       customOrdersAdminApi.getStaleOrders({ limit: 8 }),
       customOrdersAdminApi.listDisputes({ limit: 8 }),
       customOrdersAdminApi.getPendingFabricRuleBases(),
+      customOrdersAdminApi.listExceptionReviews({
+        limit: 12,
+        status: exceptionStatusFilter === 'ALL' ? undefined : exceptionStatusFilter,
+      }),
     ]);
 
     if (refreshSequenceRef.current !== sequence) {
@@ -110,6 +127,7 @@ const AdminCustomOrdersPage: React.FC = () => {
     setStaleOrders(staleData.items);
     setDisputes(disputeData.items);
     setPendingBases(pendingBasesData);
+    setExceptionReviews(exceptionData.items);
   };
 
   const refresh = async () => {
@@ -157,7 +175,7 @@ const AdminCustomOrdersPage: React.FC = () => {
 
   useEffect(() => {
     void refresh();
-  }, [deferredSearchQuery, orderId, statusFilter]);
+  }, [deferredSearchQuery, orderId, statusFilter, exceptionStatusFilter]);
 
   useEffect(() => {
     if (disputes.length > 0 && !selectedDisputeId) {
@@ -172,6 +190,27 @@ const AdminCustomOrdersPage: React.FC = () => {
       setDisputeNotes(selectedDispute.adminNotes ?? '');
     }
   }, [selectedDispute]);
+
+  useEffect(() => {
+    if (exceptionReviews.length > 0 && !selectedExceptionReviewId) {
+      setSelectedExceptionReviewId(exceptionReviews[0].id);
+    }
+  }, [exceptionReviews, selectedExceptionReviewId]);
+
+  useEffect(() => {
+    if (!selectedExceptionReview) {
+      setExceptionDecision('APPROVED');
+      setExceptionRationale('');
+      setExceptionApprovedQuoteTotal('');
+      return;
+    }
+
+    const payload = (selectedExceptionReview.payload ?? {}) as Record<string, unknown>;
+    const nextDecision = payload.status === 'REJECTED' ? 'REJECTED' : 'APPROVED';
+    setExceptionDecision(nextDecision);
+    setExceptionRationale(String(payload.rationale ?? payload.reason ?? ''));
+    setExceptionApprovedQuoteTotal(String(payload.approvedQuoteTotal ?? payload.requestedQuoteTotal ?? ''));
+  }, [selectedExceptionReview]);
 
   useEffect(() => {
     if (pendingBases.length > 0 && !selectedBasisId) {
@@ -244,13 +283,18 @@ const AdminCustomOrdersPage: React.FC = () => {
         <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
           <div className="flex flex-wrap gap-3">
             <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search custom orders" className="min-w-[220px] flex-1 rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950">
-              <option value="">All statuses</option>
-              <option value="DISPUTED">Disputed</option>
-              <option value="REFUND_IN_PROGRESS">Refund in progress</option>
-              <option value="PENDING_BRAND_ACCEPTANCE">Pending acceptance</option>
-              <option value="IN_PRODUCTION">In production</option>
-            </select>
+            <UniversalSelect
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: '', label: 'All statuses' },
+                { value: 'DISPUTED', label: 'Disputed' },
+                { value: 'REFUND_IN_PROGRESS', label: 'Refund in progress' },
+                { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pending acceptance' },
+                { value: 'IN_PRODUCTION', label: 'In production' },
+              ]}
+              className="min-w-[220px]"
+            />
           </div>
 
           <div className="mt-5 space-y-3">
@@ -302,7 +346,7 @@ const AdminCustomOrdersPage: React.FC = () => {
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <CustomOrderMetricCard label="Measurement confirmed" value={formatDateTime(selected.measurementConfirmedAt)} helper="Buyer-approved snapshot" />
-                <CustomOrderMetricCard label="Offer version" value={selected.offerVersionId} helper="Immutable pricing version" />
+                <CustomOrderMetricCard label="Configuration version" value={selected.configurationVersionId} helper="Immutable pricing version" />
                 <CustomOrderMetricCard label="Production deadline" value={formatDateTime(selected.promisedProductionAt)} helper={getRelativeDeadlineText(selected.promisedProductionAt)} />
                 <CustomOrderMetricCard label="Delivery deadline" value={formatDateTime(selected.promisedDeliveryAt)} helper={getRelativeDeadlineText(selected.promisedDeliveryAt)} />
               </div>
@@ -364,10 +408,15 @@ const AdminCustomOrdersPage: React.FC = () => {
                   <div className="text-xs text-slate-500 dark:text-slate-400">
                     Active hold: {selected.retentionHoldType ? `${selected.retentionHoldType} until ${formatDateTime(selected.retentionHoldUntil)}` : 'None'}
                   </div>
-                  <select value={retentionHoldType} onChange={(event) => setRetentionHoldType(event.target.value as CustomOrderRetentionHoldType)} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950">
-                    <option value="SUPPORT">Support hold</option>
-                    <option value="LEGAL">Legal hold</option>
-                  </select>
+                  <UniversalSelect
+                    value={retentionHoldType}
+                    onChange={(value) => setRetentionHoldType(value as CustomOrderRetentionHoldType)}
+                    options={[
+                      { value: 'SUPPORT', label: 'Support hold' },
+                      { value: 'LEGAL', label: 'Legal hold' },
+                    ]}
+                    className="mt-3"
+                  />
                   <textarea value={retentionHoldReason} onChange={(event) => setRetentionHoldReason(event.target.value)} rows={3} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Why must anonymization be blocked?" />
                   <input value={retentionHoldUntil} onChange={(event) => setRetentionHoldUntil(event.target.value)} type="datetime-local" className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" />
                   <div className="mt-3 flex flex-wrap gap-3">
@@ -492,6 +541,155 @@ const AdminCustomOrdersPage: React.FC = () => {
         </section>
       </div>
 
+      <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="text-lg font-semibold text-slate-900 dark:text-white">Exception review queue</div>
+          <UniversalSelect
+            value={exceptionStatusFilter}
+            onChange={(value) => setExceptionStatusFilter(value as 'ALL' | 'NEW' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED')}
+            options={[
+              { value: 'ALL', label: 'All statuses' },
+              { value: 'NEW', label: 'New' },
+              { value: 'IN_REVIEW', label: 'In review' },
+              { value: 'APPROVED', label: 'Approved' },
+              { value: 'REJECTED', label: 'Rejected' },
+              { value: 'EXPIRED', label: 'Expired' },
+            ]}
+            className="min-w-[220px]"
+          />
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="space-y-3">
+            {exceptionReviews.length === 0 ? (
+              <div className="rounded-2xl border border-black/10 px-4 py-3 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+                No exception review requests in this status.
+              </div>
+            ) : (
+              exceptionReviews.map((entry) => {
+                const payload = (entry.payload ?? {}) as Record<string, unknown>;
+                const status = String(payload.status ?? 'NEW');
+                return (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    onClick={() => setSelectedExceptionReviewId(entry.id)}
+                    className={`w-full rounded-2xl border px-4 py-4 text-left ${selectedExceptionReviewId === entry.id ? 'border-emerald-400 bg-emerald-500/10' : 'border-black/10 dark:border-white/10'}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-slate-900 dark:text-white">{entry.customOrder.sourceTitleSnapshot}</div>
+                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Brand {entry.customOrder.sourceBrandNameSnapshot ?? entry.customOrder.brandId}</div>
+                      </div>
+                      <CustomOrderBadge value={status} type="payment" />
+                    </div>
+                    <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">Requested {formatDateTime(entry.createdAt)}</div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
+            {!selectedExceptionReview ? (
+              <div className="text-sm text-slate-500 dark:text-slate-400">Select an exception request to review details and submit a decision.</div>
+            ) : (
+              <div className="space-y-3">
+                <div className="font-semibold text-slate-900 dark:text-white">{selectedExceptionReview.customOrder.sourceTitleSnapshot}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Request event: {selectedExceptionReview.id}</div>
+                <div className="rounded-2xl bg-black/[0.03] px-4 py-3 text-sm text-slate-600 dark:bg-white/[0.03] dark:text-slate-300">
+                  {String(((selectedExceptionReview.payload ?? {}) as Record<string, unknown>).reason ?? 'No reason provided.')}
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <UniversalSelect
+                    label="Decision"
+                    value={exceptionDecision}
+                    onChange={(value) => setExceptionDecision(value as 'APPROVED' | 'REJECTED')}
+                    options={[
+                      { value: 'APPROVED', label: 'Approve request' },
+                      { value: 'REJECTED', label: 'Reject request' },
+                    ]}
+                  />
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Approved quote total (optional)</span>
+                    <input value={exceptionApprovedQuoteTotal} onChange={(event) => setExceptionApprovedQuoteTotal(event.target.value)} className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="For example NGN 250000" />
+                  </label>
+                </div>
+                <textarea value={exceptionRationale} onChange={(event) => setExceptionRationale(event.target.value)} rows={4} className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Decision rationale" />
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    disabled={busy || exceptionRationale.trim().length < 5}
+                    onClick={() =>
+                      setPendingAction({
+                        title: 'Submit exception decision?',
+                        description: `This will ${exceptionDecision === 'APPROVED' ? 'approve' : 'reject'} the exception review request and append an auditable admin decision payload.`,
+                        confirmLabel: 'Submit decision',
+                        tone: exceptionDecision === 'REJECTED' ? 'danger' : 'default',
+                        execute: () =>
+                          runAction(
+                            () =>
+                              customOrdersAdminApi.decideExceptionReview(
+                                selectedExceptionReview.customOrder.id,
+                                selectedExceptionReview.id,
+                                {
+                                  decision: exceptionDecision,
+                                  rationale: exceptionRationale.trim(),
+                                  approvedQuoteTotal:
+                                    exceptionDecision === 'APPROVED'
+                                      ? exceptionApprovedQuoteTotal.trim() || undefined
+                                      : undefined,
+                                },
+                              ),
+                            'Exception review decision submitted',
+                          ),
+                      })
+                    }
+                    className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-black"
+                  >
+                    Submit decision
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || exceptionRationale.trim().length < 5}
+                    onClick={() =>
+                      setPendingAction({
+                        title: 'Request more information?',
+                        description: 'This keeps the exception request in review and asks the brand to provide clarifying details before final approval or rejection.',
+                        confirmLabel: 'Request more info',
+                        execute: () =>
+                          runAction(
+                            () =>
+                              customOrdersAdminApi.decideExceptionReview(
+                                selectedExceptionReview.customOrder.id,
+                                selectedExceptionReview.id,
+                                {
+                                  decision: 'REQUEST_MORE_INFO',
+                                  rationale: exceptionRationale.trim(),
+                                },
+                              ),
+                            'More information requested from brand',
+                          ),
+                      })
+                    }
+                    className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 dark:border-white/10 dark:text-white"
+                  >
+                    Request more info
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/admin/custom-orders/${selectedExceptionReview.customOrder.id}`)}
+                    className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 dark:border-white/10 dark:text-white"
+                  >
+                    Open order
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
           <div className="flex items-center justify-between gap-4">
@@ -539,20 +737,28 @@ const AdminCustomOrdersPage: React.FC = () => {
               ) : (
                 <div className="space-y-3">
                   <div className="font-semibold text-slate-900 dark:text-white">{selectedDispute.customOrder.sourceTitleSnapshot}</div>
-                  <select value={disputeStatus} onChange={(event) => setDisputeStatus(event.target.value as CustomOrderDisputeStatus)} className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950">
-                    <option value="OPEN">Open</option>
-                    <option value="BRAND_RESPONDED">Brand responded</option>
-                    <option value="ADMIN_REVIEW">Admin review</option>
-                    <option value="RESOLVED">Resolved</option>
-                    <option value="CLOSED">Closed</option>
-                  </select>
-                  <select value={disputeResolution} onChange={(event) => setDisputeResolution(event.target.value as CustomOrderDisputeResolution)} className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950">
-                    <option value="NO_ACTION">No action</option>
-                    <option value="FULL_REFUND">Full refund</option>
-                    <option value="PARTIAL_REFUND">Partial refund</option>
-                    <option value="REMAKE">Remake</option>
-                    <option value="ESCALATED">Escalated</option>
-                  </select>
+                  <UniversalSelect
+                    value={disputeStatus}
+                    onChange={(value) => setDisputeStatus(value as CustomOrderDisputeStatus)}
+                    options={[
+                      { value: 'OPEN', label: 'Open' },
+                      { value: 'BRAND_RESPONDED', label: 'Brand responded' },
+                      { value: 'ADMIN_REVIEW', label: 'Admin review' },
+                      { value: 'RESOLVED', label: 'Resolved' },
+                      { value: 'CLOSED', label: 'Closed' },
+                    ]}
+                  />
+                  <UniversalSelect
+                    value={disputeResolution}
+                    onChange={(value) => setDisputeResolution(value as CustomOrderDisputeResolution)}
+                    options={[
+                      { value: 'NO_ACTION', label: 'No action' },
+                      { value: 'FULL_REFUND', label: 'Full refund' },
+                      { value: 'PARTIAL_REFUND', label: 'Partial refund' },
+                      { value: 'REMAKE', label: 'Remake' },
+                      { value: 'ESCALATED', label: 'Escalated' },
+                    ]}
+                  />
                   <textarea value={disputeNotes} onChange={(event) => setDisputeNotes(event.target.value)} rows={4} className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Admin notes" />
                   <div className="flex flex-wrap gap-3">
                     <button
@@ -601,11 +807,15 @@ const AdminCustomOrdersPage: React.FC = () => {
                   <div className="rounded-2xl bg-black/[0.03] px-4 py-3 text-sm text-slate-600 dark:bg-white/[0.03] dark:text-slate-300">
                     Keys: {selectedBasis.measurementKeys.join(', ')}
                   </div>
-                  <select value={basisStatus} onChange={(event) => setBasisStatus(event.target.value as CustomFabricRuleBasisStatus)} className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950">
-                    <option value="APPROVED_GLOBAL">Approve global</option>
-                    <option value="BRAND_ONLY">Keep brand-only</option>
-                    <option value="REJECTED">Reject</option>
-                  </select>
+                  <UniversalSelect
+                    value={basisStatus}
+                    onChange={(value) => setBasisStatus(value as CustomFabricRuleBasisStatus)}
+                    options={[
+                      { value: 'APPROVED_GLOBAL', label: 'Approve global' },
+                      { value: 'BRAND_ONLY', label: 'Keep brand-only' },
+                      { value: 'REJECTED', label: 'Reject' },
+                    ]}
+                  />
                   <textarea value={basisNotes} onChange={(event) => setBasisNotes(event.target.value)} rows={4} className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Moderation notes" />
                   <button
                     type="button"
@@ -613,7 +823,7 @@ const AdminCustomOrdersPage: React.FC = () => {
                     onClick={() =>
                       setPendingAction({
                         title: 'Save moderation decision?',
-                        description: `This will mark the basis as ${basisStatus.replace(/_/g, ' ').toLowerCase()} and update its moderation notes for future offer authoring.`,
+                        description: `This will mark the basis as ${basisStatus.replace(/_/g, ' ').toLowerCase()} and update its moderation notes for future configuration authoring.`,
                         confirmLabel: 'Save decision',
                         tone: basisStatus === 'REJECTED' ? 'danger' : 'default',
                         execute: () => runAction(() => customOrdersAdminApi.reviewFabricRuleBasis(selectedBasis.id, { status: basisStatus, moderationNotes: basisNotes || undefined }), 'Fabric-rule basis reviewed'),
