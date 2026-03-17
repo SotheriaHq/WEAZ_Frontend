@@ -61,6 +61,8 @@ type CategoryOption = {
 };
 
 const DESIGN_SIZING_MODE_OPTIONS = [
+  { value: 'NONE', label: 'No size specification' },
+  { value: 'RTW', label: 'Ready-to-Wear (standard sizes only)' },
   { value: 'RTW_PLUS_FITTINGS', label: 'Ready-to-Wear + Fittings' },
   { value: 'CUSTOM', label: 'Custom Only' },
 ] as const;
@@ -276,7 +278,9 @@ const CreateDesignInner: React.FC = () => {
         setType(d.type || "EVERYBODY");
         setVisibility(d.visibility || "PUBLIC");
         setSizingMode(
-          d.sizingMode === 'CUSTOM' ? 'CUSTOM' : 'RTW_PLUS_FITTINGS',
+          d.sizingMode === 'CUSTOM' || d.sizingMode === 'RTW' || d.sizingMode === 'NONE'
+            ? d.sizingMode
+            : 'RTW_PLUS_FITTINGS',
         );
         setCustomMeasurementKeys(
           Array.isArray(d.customMeasurementKeys) ? dedupeMeasurementKeysByLabel(d.customMeasurementKeys) : [],
