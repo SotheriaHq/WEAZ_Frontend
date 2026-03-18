@@ -71,10 +71,14 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
        
       {/* Main Content Area */}
       <main
-        className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out"
+        className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
         style={{ marginLeft: mainMarginLeft }}
       >
-        <div className="p-0 sm:p-2">
+        {/* will-change removed from main — it was promoting the entire page to
+            its own GPU layer permanently, holding significant memory even when
+            not animating. The transition-[margin] is infrequent enough that
+            the browser handles it fine without a persistent compositing layer. */}
+        <div className="px-0 sm:px-2">
           {children || <Outlet />}
         </div>
       </main>

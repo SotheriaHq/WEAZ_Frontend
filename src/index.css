@@ -21,22 +21,19 @@ html {
     --brand-accent-strong: #b5952f;
     --brand-accent-rgb: 212, 175, 55;
 
-    /* Surface + Typography - Light Purple Tinted Theme */
-    --surface-primary: #faf8ff;
-    /* Soft lavender white */
-    --surface-secondary: #f5f3fa;
-    /* Light purple-gray */
-    --surface-muted: #ede9f7;
-    /* Muted lavender */
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --border-strong: rgba(147, 51, 234, 0.08);
-    /* Purple-tinted border */
+    /* Surface + Typography - Clean Editorial Theme */
+    --surface-primary: #ffffff;
+    --surface-secondary: #f5f5f4;  /* warm gray — no purple cast */
+    --surface-muted: #e7e5e4;      /* warm mid-gray for dividers, disabled */
+    --text-primary: #0d0d0d;       /* true near-black, warmer than blue-black */
+    --text-secondary: #78716c;     /* warm stone-gray */
+    --border-default: #e5e5e5;     /* standard 1px card/input border */
+    --border-strong: #d4d4d4;      /* stronger border for emphasis */
 
     /* Dark scheme helpers (kept for legacy selectors) */
-    --dark-bg-primary: #0f0f0f;
-    --dark-bg-secondary: #1a1a1a;
-    --dark-bg-tertiary: #272727;
+    --dark-bg-primary: #0a0a0a;
+    --dark-bg-secondary: #141414;
+    --dark-bg-tertiary: #1c1c1c;
     --dark-border: rgba(255, 255, 255, 0.1);
     --dark-glass-bg: rgba(255, 255, 255, 0.05);
     --dark-glass-light: rgba(255, 255, 255, 0.08);
@@ -57,29 +54,30 @@ html {
   }
 
   .dark {
-    --surface-primary: #0b0b10;
-    --surface-secondary: #11121b;
-    --surface-muted: #0f1117;
-    --text-primary: #f8fafc;
-    --text-secondary: #cbd5e1;
-    --border-strong: rgba(255, 255, 255, 0.08);
-    --neu-surface: #161a24;
-    --neu-surface-soft: #1b2030;
-    --neu-text: #f8fafc;
-    --neu-text-muted: #b9c2d3;
+    --surface-primary: #0a0a0a;    /* true near-black */
+    --surface-secondary: #141414;  /* slightly lifted dark surface */
+    --surface-muted: #1c1c1c;      /* raised dark surface */
+    --text-primary: #f5f5f5;
+    --text-secondary: #a3a3a3;     /* warm neutral gray, not cool blue */
+    --border-default: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --neu-surface: #161616;
+    --neu-surface-soft: #1c1c1c;
+    --neu-text: #f5f5f5;
+    --neu-text-muted: #a3a3a3;
     --neu-border: rgba(255, 255, 255, 0.08);
-    --neu-shadow-dark: rgba(0, 0, 0, 0.45);
-    --neu-shadow-light: rgba(255, 255, 255, 0.04);
+    --neu-shadow-dark: rgba(0, 0, 0, 0.5);
+    --neu-shadow-light: rgba(255, 255, 255, 0.03);
   }
 
   :root {
-    --neu-surface: #eef2f7;
-    --neu-surface-soft: #e7ecf3;
-    --neu-text: #0f172a;
-    --neu-text-muted: #475569;
-    --neu-border: rgba(148, 163, 184, 0.35);
-    --neu-shadow-dark: rgba(148, 163, 184, 0.36);
-    --neu-shadow-light: rgba(255, 255, 255, 0.95);
+    --neu-surface: #f0efee;           /* warm light surface — no lavender */
+    --neu-surface-soft: #e7e5e4;
+    --neu-text: #0d0d0d;
+    --neu-text-muted: #78716c;
+    --neu-border: rgba(163, 158, 153, 0.3);
+    --neu-shadow-dark: rgba(163, 158, 153, 0.32);
+    --neu-shadow-light: rgba(255, 255, 255, 0.9);
   }
 }
 
@@ -227,69 +225,46 @@ html {
   }
 
   .threadly-shell-bg {
-    background-color: #f8f4ff;
-    background-image:
-      radial-gradient(circle at 12% 10%, rgba(244, 114, 182, 0.2) 0%, transparent 24%),
-      radial-gradient(circle at 84% 12%, rgba(59, 130, 246, 0.16) 0%, transparent 24%),
-      radial-gradient(circle at 52% 36%, rgba(192, 132, 252, 0.14) 0%, transparent 30%),
-      radial-gradient(circle at 18% 82%, rgba(251, 191, 36, 0.1) 0%, transparent 24%),
-      linear-gradient(135deg, #f7efff 0%, #f8f4ff 30%, #f4f7ff 66%, #fff8fb 100%);
-    background-attachment: fixed;
+    /* Clean white — images own the colour story, background defers completely.
+       background-attachment: fixed removed: it forced full GPU repaint on every
+       scroll tick, causing jank on mid-range mobile devices. */
+    background-color: var(--surface-primary);
   }
 
   :is(.dark) .threadly-shell-bg {
-    background-color: #080b16;
-    background-image:
-      radial-gradient(circle at 16% 8%, rgba(168, 85, 247, 0.16) 0%, transparent 24%),
-      radial-gradient(circle at 86% 10%, rgba(56, 189, 248, 0.14) 0%, transparent 24%),
-      radial-gradient(circle at 50% 38%, rgba(99, 102, 241, 0.1) 0%, transparent 28%),
-      radial-gradient(circle at 18% 86%, rgba(236, 72, 153, 0.08) 0%, transparent 22%),
-      linear-gradient(180deg, #0e1222 0%, #0a0f1d 40%, #070b15 72%, #05070f 100%);
-    background-attachment: fixed;
+    background-color: var(--surface-primary); /* resolves to #0a0a0a in dark */
   }
 
   .threadly-chrome-surface {
-    @apply border backdrop-blur-xl;
-    background:
-      radial-gradient(circle at 0% 0%, rgba(244, 114, 182, 0.11) 0%, transparent 34%),
-      radial-gradient(circle at 100% 4%, rgba(59, 130, 246, 0.09) 0%, transparent 30%),
-      radial-gradient(circle at 24% 100%, rgba(251, 191, 36, 0.06) 0%, transparent 26%),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.62), rgba(248, 245, 255, 0.48));
-    border-color: rgba(255, 255, 255, 0.3);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.36),
-      0 18px 44px rgba(148, 163, 184, 0.14);
+    @apply border;
+    background-color: var(--surface-secondary);
+    border-color: var(--border-default);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   }
 
   :is(.dark) .threadly-chrome-surface {
-    background:
-      radial-gradient(circle at 4% 0%, rgba(168, 85, 247, 0.14) 0%, transparent 32%),
-      radial-gradient(circle at 96% 4%, rgba(59, 130, 246, 0.1) 0%, transparent 28%),
-      linear-gradient(180deg, rgba(19, 24, 39, 0.76), rgba(10, 12, 22, 0.84));
-    border-color: rgba(255, 255, 255, 0.1);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      0 18px 44px rgba(2, 6, 23, 0.34);
+    background-color: var(--surface-secondary);
+    border-color: var(--border-default);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   }
 
   .threadly-summary-surface {
-    @apply border backdrop-blur-xl;
-    color: #0f172a;
-    background:
-      radial-gradient(circle at top left, rgba(244, 114, 182, 0.12) 0%, transparent 34%),
-      radial-gradient(circle at top right, rgba(59, 130, 246, 0.1) 0%, transparent 28%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 245, 255, 0.9));
-    border-color: rgba(255, 255, 255, 0.52);
-    box-shadow: 0 28px 80px rgba(148, 163, 184, 0.22);
+    @apply border;
+    color: var(--text-primary);
+    background-color: var(--surface-primary);
+    border-color: var(--border-strong);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.05),
+      0 4px 16px rgba(0, 0, 0, 0.04);
   }
 
   :is(.dark) .threadly-summary-surface {
-    color: #f8fafc;
-    background:
-      radial-gradient(circle at top left, rgba(168, 85, 247, 0.14) 0%, transparent 36%),
-      linear-gradient(180deg, #17181f 0%, #10111a 100%);
-    border-color: rgba(255, 255, 255, 0.1);
-    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.35);
+    color: var(--text-primary);
+    background-color: var(--surface-secondary);
+    border-color: var(--border-default);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.3),
+      0 4px 16px rgba(0, 0, 0, 0.2);
   }
 
   .threadly-nav-surface {
@@ -299,14 +274,9 @@ html {
   }
 
   .threadly-nav-surface-muted {
-    background:
-      radial-gradient(circle at 0% 0%, rgba(244, 114, 182, 0.06) 0%, transparent 28%),
-      radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.05) 0%, transparent 26%),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.46), rgba(248, 245, 255, 0.34));
-    border-color: transparent;
-    box-shadow:
-      inset 0 -1px 0 rgba(255, 255, 255, 0.18),
-      0 10px 30px rgba(148, 163, 184, 0.08);
+    background-color: var(--surface-secondary);
+    border-bottom: 1px solid var(--border-default);
+    box-shadow: none;
   }
 
   :is(.dark) .threadly-nav-surface {
@@ -316,14 +286,9 @@ html {
   }
 
   :is(.dark) .threadly-nav-surface-muted {
-    background:
-      radial-gradient(circle at 0% 0%, rgba(168, 85, 247, 0.08) 0%, transparent 28%),
-      radial-gradient(circle at 100% 0%, rgba(56, 189, 248, 0.06) 0%, transparent 24%),
-      linear-gradient(90deg, rgba(11, 16, 32, 0.48), rgba(8, 12, 24, 0.42));
-    border-color: transparent;
-    box-shadow:
-      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-      0 10px 30px rgba(2, 6, 23, 0.16);
+    background-color: var(--surface-secondary);
+    border-bottom: 1px solid var(--border-default);
+    box-shadow: none;
   }
 
   .elev-1 {
@@ -342,33 +307,21 @@ html {
     @apply shadow-xl;
   }
 
-  /* Neumorphism modal system */
+  /* Modal surface system — neumorphic dual-shadows removed.
+     Dual-directional box-shadow required two GPU composite passes per modal.
+     color-mix(in srgb,...) also had limited browser coverage pre-2023.
+     Replaced with clean flat surfaces that read identically on all devices. */
   .neu-modal-surface {
-    background: radial-gradient(
-      140% 120% at 0% 0%,
-      var(--neu-surface) 0%,
-      var(--neu-surface-soft) 100%
-    );
+    background-color: var(--neu-surface);
     color: var(--neu-text);
     border: 1px solid var(--neu-border);
-    box-shadow:
-      14px 14px 28px var(--neu-shadow-dark),
-      -14px -14px 28px var(--neu-shadow-light);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
   }
 
   .neu-modal-inset {
-    background: radial-gradient(
-      120% 120% at 0% 0%,
-      var(--neu-surface-soft) 0%,
-      var(--neu-surface) 100%
-    );
+    background-color: var(--neu-surface-soft);
     color: var(--neu-text);
-    border: 1px solid color-mix(in srgb, var(--neu-border) 75%, transparent);
-    box-shadow:
-      inset 8px 8px 16px
-        color-mix(in srgb, var(--neu-shadow-dark) 85%, transparent),
-      inset -8px -8px 16px
-        color-mix(in srgb, var(--neu-shadow-light) 90%, transparent);
+    border: 1px solid var(--neu-border);
   }
 
   .neu-text-muted {
@@ -428,8 +381,8 @@ html {
   }
 
   .btn-frost-primary {
-    /* lighter purple gradient */
-    @apply btn-frost text-white bg-gradient-to-r from-purple-400 via-fuchsia-400 to-purple-500 hover:from-purple-500 hover:via-fuchsia-500 hover:to-purple-600 focus:ring-purple-300;
+    @apply btn-frost text-white bg-[#0d0d0d] hover:bg-[#1a1a1a] focus:ring-gray-600
+           dark:bg-white dark:text-[#0d0d0d] dark:hover:bg-gray-100 dark:focus:ring-gray-300;
   }
 
   .btn-frost-ghost {
@@ -565,35 +518,26 @@ html {
   }
 }
 
-/* Smooth theme transitions for key elements */
+/* Theme transition — scoped to structural chrome only.
+   Previously applied to every div/section/article which forced the browser to
+   track transition state on hundreds of elements simultaneously during theme
+   switch. Now scoped to the elements that actually change visually. */
 html,
 body,
 nav,
 aside,
-main,
-div,
-section,
-article,
 header,
 footer {
   transition:
-    background-color 0.3s ease,
-    border-color 0.3s ease !important;
+    background-color 0.25s ease,
+    border-color 0.25s ease;
 }
 
-/* Text color transitions */
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-p,
-span,
+/* Text transition on interactive elements only — not every span and p */
 a,
 button,
 label {
-  transition: color 0.3s ease !important;
+  transition: color 0.2s ease;
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -626,8 +570,121 @@ body.modal-open {
   overflow: hidden;
 }
 
+/* ─── Typography System ───────────────────────────────────────────────────── */
+
+/* Editorial tier — Playfair Display. For brand names, collection titles, heroes.
+   Font-weight 400 at large sizes IS the luxury signal — resist bolding it. */
+.type-editorial-hero {
+  font-family: 'Playfair Display', serif;
+  font-size: 3rem;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+.type-editorial-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.25rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+.type-editorial-label {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.75rem;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+/* Functional tier — Plus Jakarta Sans. For all UI chrome. */
+.type-ui-heading {
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--text-primary);
+}
+
+/* Spaced uppercase label — most immediate signal this is fashion, not SaaS */
+.type-ui-label {
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.type-ui-body {
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+.type-ui-meta {
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+/* title-text kept as alias — maps to Playfair now, not bold sans */
 .title-text {
-  @apply text-black dark:text-white font-bold;
+  font-family: 'Playfair Display', serif;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+/* title-gradient: gradient removed — solid editorial text.
+   bg-clip-text gradient is a paint operation on every visible frame. */
+.title-gradient {
+  font-family: 'Playfair Display', serif;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+/* Brand accent title — purple used once per page maximum */
+.title-brand {
+  font-family: 'Playfair Display', serif;
+  font-weight: 400;
+  color: var(--brand-primary);
+}
+
+/* ─── Layout & Spacing Utilities ─────────────────────────────────────────── */
+
+/* Standard public page wrapper — caps width, centres, adds consistent padding */
+.page-container {
+  @apply w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Vertical section breathing room */
+.section-gap {
+  @apply py-12 sm:py-16;
+}
+
+.section-gap-md {
+  @apply py-8 sm:py-12;
+}
+
+/* Fashion feed grid — more air than data grids */
+.feed-grid {
+  @apply grid gap-4 sm:gap-6 lg:gap-8;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* Product carousel grid */
+.product-grid {
+  @apply grid gap-3 sm:gap-4;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
 
 .custom-scrollbar {

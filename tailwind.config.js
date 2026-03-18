@@ -12,15 +12,15 @@ export default {
         serif: ['"Playfair Display"', 'serif'],
       },
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
+        border: "var(--border-default)",
+        input: "var(--border-default)",
+        ring: "var(--brand-primary)",
         background: "var(--surface-primary)",
         foreground: "var(--text-primary)",
         brand: {
-          primary: 'var(--brand-primary)', // #9333ea
+          primary: 'var(--brand-primary)',
           'primary-strong': 'var(--brand-primary-strong)',
-          accent: 'var(--brand-accent)',   // #d4af37
+          accent: 'var(--brand-accent)',
           dark: '#000000',
           gold: '#D4AF37',
         },
@@ -29,10 +29,32 @@ export default {
           secondary: 'var(--surface-secondary)',
           muted: 'var(--surface-muted)',
         },
+        border: {
+          DEFAULT: 'var(--border-default)',
+          strong: 'var(--border-strong)',
+        },
+        // Editorial text scale
+        ink: {
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+        },
         // Legacy/Direct overrides
         dark: '#000000',
-        'light-gray': '#f0f2f5',
+        'light-gray': '#f5f5f4',
         primary: '#9333EA',
+      },
+      fontSize: {
+        // Editorial scale — Playfair Display sizes
+        'display-xl': ['4rem',   { lineHeight: '1.05', letterSpacing: '-0.03em'  }],
+        'display-lg': ['3rem',   { lineHeight: '1.08', letterSpacing: '-0.025em' }],
+        'display-md': ['2.25rem',{ lineHeight: '1.1',  letterSpacing: '-0.02em'  }],
+        'display-sm': ['1.75rem',{ lineHeight: '1.15', letterSpacing: '-0.015em' }],
+        // UI scale — Plus Jakarta Sans
+        'ui-xl': ['1.25rem',  { lineHeight: '1.4',  letterSpacing: '-0.01em'  }],
+        'ui-lg': ['1.125rem', { lineHeight: '1.45', letterSpacing: '-0.005em' }],
+        'ui-md': ['1rem',     { lineHeight: '1.5',  letterSpacing: '0'        }],
+        'ui-sm': ['0.875rem', { lineHeight: '1.5',  letterSpacing: '0.005em'  }],
+        'ui-xs': ['0.75rem',  { lineHeight: '1.5',  letterSpacing: '0.01em'   }],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

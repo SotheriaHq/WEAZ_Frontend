@@ -95,7 +95,7 @@ export const ProfileLayout: React.FC = () => {
             {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
             <Navbar />
             <main
-              className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out"
+              className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
               style={{ marginLeft: mainMarginLeft }}
             >
               <div className="p-4 sm:p-6">
@@ -129,7 +129,7 @@ export const ProfileLayout: React.FC = () => {
         {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
         <Navbar />
         <main
-          className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out"
+          className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
           style={{ marginLeft: mainMarginLeft }}
         >
           <div className="p-4 sm:p-6">
@@ -155,10 +155,10 @@ export const ProfileLayout: React.FC = () => {
         {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
         <Navbar />
         <main
-          className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 will-change-[margin] ease-out"
+          className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
           style={{ marginLeft: mainMarginLeft }}
         >
-          <div className="p-0 sm:p-2">
+          <div className="px-0 sm:px-2">
             {location.pathname === '/profile' ? (
               user?.type === 'BRAND' ? <Profile /> : <EndUserProfile />
             ) : isVisitorRoute && routeBrandId && location.pathname === `/profile/${routeBrandId}` ? (
