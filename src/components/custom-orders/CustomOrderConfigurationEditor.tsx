@@ -337,22 +337,32 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
     let active = true;
 
     const load = async () => {
+      if (!sourceId) {
+        if (!active) return;
+        setBrandId(null);
+        setConfiguration(null);
+        setBases([]);
+        const nextForm = createDefaultForm(measurementKeys);
+        setForm(nextForm);
+        setRuleRows(buildRulesFromJson(nextForm.rulesJson));
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
         const status = await getStoreStatus();
         const basisPromise = customOrderConfigurationsApi.listFabricRuleBases({ includeBrandOnly: true });
-        const existingConfigurationPromise = sourceId
-          ? (async () => {
-              try {
-                if (sourceType === 'PRODUCT') {
-                  return await customOrderConfigurationsApi.getActiveForProduct(sourceId);
-                }
-                return await customOrderConfigurationsApi.getActiveForDesign(sourceId);
-              } catch {
-                return null;
-              }
-            })()
-          : Promise.resolve(null);
+        const existingConfigurationPromise = (async () => {
+          try {
+            if (sourceType === 'PRODUCT') {
+              return await customOrderConfigurationsApi.getActiveForProduct(sourceId);
+            }
+            return await customOrderConfigurationsApi.getActiveForDesign(sourceId);
+          } catch {
+            return null;
+          }
+        })();
 
         const [basisList, existingConfiguration] = await Promise.all([
           basisPromise,
@@ -440,6 +450,22 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
 
     return keys;
   }, [form.requiredMeasurementKeys, measurementKeys, measurementPointLabelMap, measurementPoints]);
+
+  const selectedMeasurementKeys = useMemo(
+    () =>
+      form.requiredMeasurementKeys.filter((key) =>
+        availableMeasurementKeys.includes(key),
+      ),
+    [availableMeasurementKeys, form.requiredMeasurementKeys],
+  );
+
+  const selectableMeasurementKeys = useMemo(
+    () =>
+      availableMeasurementKeys.filter(
+        (key) => !form.requiredMeasurementKeys.includes(key),
+      ),
+    [availableMeasurementKeys, form.requiredMeasurementKeys],
+  );
 
   const basisOptions = useMemo(
     () => [
@@ -722,17 +748,13 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
   };
 
   return (
-    <section className="mx-auto max-w-6xl rounded-3xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600 dark:text-emerald-300">Custom Configuration</div>
-          <h3 className="mt-2 text-xl font-semibold text-slate-900 dark:text-white">Custom-order configuration setup</h3>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Configure the production charge, yard rules, and customer-facing policies for this {sourceType.toLowerCase()}.
-          </p>
-        </div>
-        <div className="rounded-full border border-black/10 px-3 py-1 text-xs font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200">
-          {configuration ? `Configuration v${configuration.currentVersion}` : 'No configuration yet'}
+    <section className="rounded-xl border border-black/10 bg-white/80 p-3 dark:border-white/10 dark:bg-white/5">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <p className="text-xs text-slate-600 dark:text-slate-300">
+          Configure the production charge, yard rules, and customer-facing policies.
+        </p>
+        <div className="rounded-full border border-black/10 px-2.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200">
+          {configuration ? `Configuration v${configuration.currentVersion}` : 'No config yet'}
         </div>
       </div>
 
@@ -744,55 +766,61 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
 
       {loading ? <div className="mt-5 text-sm text-slate-500 dark:text-slate-400">Loading configuration workspace...</div> : null}
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        <label className="block sm:col-span-2 xl:col-span-3">
-          <span className={requiredFieldLabelClassName}>
-            Buyer instructions
-            <span className={infoBadgeClassName} title="Optional guidance shown to buyers before they submit measurements.">i</span>
-          </span>
-          <textarea value={form.buyerInstructionText} onChange={(event) => updateForm('buyerInstructionText', event.target.value)} disabled={disabled} rows={2} className={fieldClassName} />
-        </label>
+      {/* Buyer instructions — full row */}
+      <label className="block">
+        <span className={requiredFieldLabelClassName}>
+          Buyer instructions
+          <span className={infoBadgeClassName} title="Optional guidance shown to buyers before they submit measurements.">i</span>
+        </span>
+        <textarea value={form.buyerInstructionText} onChange={(event) => updateForm('buyerInstructionText', event.target.value)} disabled={disabled} rows={1} className={fieldClassName} />
+      </label>
+
+      {/* Charges row — two equal columns */}
+      <div className="mt-2 grid grid-cols-2 gap-2">
         <label className="block">
           <span className={requiredFieldLabelClassName}>
-            Base production charge <span className="text-rose-500">*</span>
-            <span className={infoBadgeClassName} title="Labor and production-only cost. Do not include fabric yard cost here.">i</span>
+            Base charge <span className="text-rose-500">*</span>
+            <span className={infoBadgeClassName} title="Labor and production-only cost, excluding fabric yard cost.">i</span>
           </span>
           <input value={form.baseProductionCharge} onChange={(event) => updateForm('baseProductionCharge', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="120000" />
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">This is separate from fabric cost per yard. Total preview combines both.</p>
         </label>
         <label className="block">
           <span className={requiredFieldLabelClassName}>
-            Fabric cost per yard <span className="text-rose-500">*</span>
-            <span className={infoBadgeClassName} title="Cost of fabric per yard used by the rule engine to compute yard component.">i</span>
+            Fabric / yard <span className="text-rose-500">*</span>
+            <span className={infoBadgeClassName} title="Cost of fabric per yard used by the yard-rule engine.">i</span>
           </span>
           <input value={form.fabricCostPerYard} onChange={(event) => updateForm('fabricCostPerYard', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="10000" />
         </label>
+      </div>
+
+      {/* Days row — three compact columns */}
+      <div className="mt-2 grid grid-cols-3 gap-2">
         <label className="block">
           <span className={requiredFieldLabelClassName}>
-            Production lead days <span className="text-rose-500">*</span>
-            <span className={infoBadgeClassName} title="Estimated days for production before dispatch.">i</span>
+            Lead days <span className="text-rose-500">*</span>
+            <span className={infoBadgeClassName} title="Production days before dispatch.">i</span>
           </span>
-          <input value={form.productionLeadDays} onChange={(event) => updateForm('productionLeadDays', event.target.value)} disabled={disabled} className={fieldClassName} />
+          <input value={form.productionLeadDays} onChange={(event) => updateForm('productionLeadDays', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="7" />
         </label>
         <label className="block">
           <span className={requiredFieldLabelClassName}>
-            Delivery min days <span className="text-rose-500">*</span>
+            Min delivery <span className="text-rose-500">*</span>
             <span className={infoBadgeClassName} title="Fastest delivery target after dispatch.">i</span>
           </span>
-          <input value={form.deliveryMinDays} onChange={(event) => updateForm('deliveryMinDays', event.target.value)} disabled={disabled} className={fieldClassName} />
+          <input value={form.deliveryMinDays} onChange={(event) => updateForm('deliveryMinDays', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="3" />
         </label>
         <label className="block">
           <span className={requiredFieldLabelClassName}>
-            Delivery max days <span className="text-rose-500">*</span>
+            Max delivery <span className="text-rose-500">*</span>
             <span className={infoBadgeClassName} title="Latest delivery target after dispatch.">i</span>
           </span>
-          <input value={form.deliveryMaxDays} onChange={(event) => updateForm('deliveryMaxDays', event.target.value)} disabled={disabled} className={fieldClassName} />
+          <input value={form.deliveryMaxDays} onChange={(event) => updateForm('deliveryMaxDays', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="7" />
         </label>
       </div>
 
-      <div className="mt-3 rounded-2xl border border-black/10 bg-black/[0.03] px-4 py-3 text-xs text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
-        Required fields are marked with <span className="font-semibold text-rose-500">*</span>. Hover each <span className={infoBadgeClassName}>i</span> marker to see what the field is used for.
-      </div>
+      <p className="mt-1.5 text-[10px] text-slate-400 dark:text-slate-500">
+        Fields marked <span className="text-rose-500 font-semibold">*</span> are required. Hover <span className={infoBadgeClassName}>i</span> for details.
+      </p>
 
       <div className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10">
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
@@ -802,15 +830,65 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
           What this section does: choose the exact measurement points buyers must submit, then group them under a reusable fabric-rule basis.
         </p>
-        <div className="mt-3 max-h-24 overflow-y-auto rounded-xl border border-black/5 p-2 pr-1 dark:border-white/10">
+        {/* Selected keys */}
+        <div className="mt-3">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Selected keys
+            {selectedMeasurementKeys.length > 0 && (
+              <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                {selectedMeasurementKeys.length}
+              </span>
+            )}
+          </div>
+          <div className="mt-2 min-h-[2.5rem] rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-2 dark:border-emerald-300/20 dark:bg-emerald-400/10">
+            {selectedMeasurementKeys.length === 0 ? (
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                Select measurement points below to build this basis.
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {selectedMeasurementKeys.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() =>
+                      updateForm(
+                        'requiredMeasurementKeys',
+                        form.requiredMeasurementKeys.filter((entry) => entry !== key),
+                      )
+                    }
+                    disabled={disabled}
+                    className="group inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/15 pl-2.5 pr-1.5 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-500/25 dark:border-emerald-300/20 dark:text-emerald-200"
+                    title="Remove measurement key"
+                  >
+                    {getMeasurementLabel(key)}
+                    <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500/20 text-[9px] leading-none group-hover:bg-emerald-500/40">×</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Available keys */}
+        <div className="mt-3 max-h-36 overflow-y-auto rounded-xl border border-black/5 p-2 pr-1 dark:border-white/10">
+          <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Available keys
+            {selectableMeasurementKeys.length > 0 && (
+              <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-bold tabular-nums dark:bg-white/[0.08]">
+                {selectableMeasurementKeys.length}
+              </span>
+            )}
+          </div>
           <div className="flex flex-wrap gap-1.5">
-          {availableMeasurementKeys.length === 0 ? (
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              No measurement points are available yet. Add a missing key manually below.
+          {selectableMeasurementKeys.length === 0 ? (
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              {availableMeasurementKeys.length === 0
+                ? 'No measurement points are available yet. Add a missing key manually below.'
+                : 'All available measurement points are selected.'}
             </div>
           ) : (
-            availableMeasurementKeys.map((key) => {
-              const selected = form.requiredMeasurementKeys.includes(key);
+            selectableMeasurementKeys.map((key) => {
               return (
                 <button
                   key={key}
@@ -818,15 +896,13 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
                   onClick={() =>
                     updateForm(
                       'requiredMeasurementKeys',
-                      selected
-                        ? form.requiredMeasurementKeys.filter((entry) => entry !== key)
-                        : [...form.requiredMeasurementKeys, key],
+                      [...form.requiredMeasurementKeys, key],
                     )
                   }
                   disabled={disabled}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${selected ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-200' : 'bg-black/[0.05] text-slate-600 dark:bg-white/[0.06] dark:text-slate-300'}`}
+                  className="rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-purple-500/10 hover:text-purple-700 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-purple-400/15 dark:hover:text-purple-300"
                 >
-                  {getMeasurementLabel(key)}
+                  + {getMeasurementLabel(key)}
                 </button>
               );
             })
@@ -851,8 +927,28 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
           </button>
         </div>
         {missingMeasurementKeys.length > 0 ? (
-          <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-            Unselected sizing keys: {missingMeasurementKeys.map((key) => getMeasurementLabel(key)).join(', ')}
+          <div className="mt-3">
+            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Unselected sizing keys
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {missingMeasurementKeys.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() =>
+                    updateForm(
+                      'requiredMeasurementKeys',
+                      [...form.requiredMeasurementKeys, key],
+                    )
+                  }
+                  disabled={disabled}
+                  className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-500/20 dark:border-amber-400/20 dark:text-amber-300"
+                >
+                  + {getMeasurementLabel(key)}
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -1170,14 +1266,18 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
         </div>
       </details>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs text-slate-500 dark:text-slate-400">
-          Save creates or updates the immutable custom-order configuration configuration for this source.
+      {sourceId ? (
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={handleSaveConfiguration}
+            disabled={disabled || saving}
+            className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-60"
+          >
+            {saving ? 'Saving…' : configuration ? 'Update configuration' : 'Create configuration'}
+          </button>
         </div>
-        <button type="button" onClick={handleSaveConfiguration} disabled={disabled || saving || !sourceId} className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-60">
-          {saving ? 'Saving configuration...' : configuration ? 'Update configuration' : 'Create configuration'}
-        </button>
-      </div>
+      ) : null}
     </section>
   );
 };

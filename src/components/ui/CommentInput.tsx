@@ -70,7 +70,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
         onClick={handleSubmit}
         className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white shadow-md hover:brightness-110 disabled:opacity-60"
       >
-        {busy ? <VLoader size={16} progress={52} phase="loading" showLabel={false} /> : <Send size={14} />}
+        {busy ? <VLoader size={16} phase="loading" showLabel={false} /> : <Send size={14} />}
       </button>
     </div>
   );

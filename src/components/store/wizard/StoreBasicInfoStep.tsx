@@ -78,7 +78,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
             <div className="inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300 bg-white/60 dark:bg-white/5 border border-gray-200/50 dark:border-white/10 backdrop-blur-sm rounded-full px-3 py-1.5">
               {saveState === 'saving' ? (
                 <>
-                  <VLoader size={14} progress={52} phase="loading" showLabel={false} />
+                  <VLoader size={14} phase="loading" showLabel={false} />
                   <span>Saving…</span>
                 </>
               ) : saveState === 'saved' ? (

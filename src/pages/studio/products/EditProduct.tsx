@@ -434,6 +434,9 @@ const EditProduct: React.FC = () => {
     newPrice: number;
   } | null>(null);
   const [pendingSaveDraft, setPendingSaveDraft] = useState(false);
+  // Custom order: on new product, hidden by default. On edit, shown if a
+  // configuration already exists (resolved via the editor's own load logic).
+  const [showCustomOrderForm, setShowCustomOrderForm] = useState(isEditMode);
   const [pendingStatusOverride, setPendingStatusOverride] = useState<
     FormState["status"] | null
   >(null);
@@ -640,85 +643,79 @@ const EditProduct: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     const loadCollections = async () => {
-      const loadCategoryTypes = async () => {
-        try {
-          const fetchedTypes = await brandApi.getCategoryTypes(undefined, true);
-          let resolvedTypes = Array.isArray(fetchedTypes) ? fetchedTypes : [];
-          if (resolvedTypes.length === 0) {
-            const categoriesWithTypes =
-              await brandApi.getCategoriesWithSubCategories(true);
-            const fallbackTypes = (categoriesWithTypes || [])
-              .flatMap((category) => category.types ?? [])
-              .filter((type) => Boolean(type?.id) && Boolean(type?.name));
-            resolvedTypes = fallbackTypes;
-          }
-          if (mounted) {
-            setCategoryTypes(resolvedTypes);
-          }
-        } catch (error) {
-          console.error("Failed to load sub-categories", error);
-          if (mounted) setCategoryTypes([]);
-        }
-      };
-
-      // Load taxonomy categories (standalone category/sub-category tree)
-      const loadTaxonomyCategories = async () => {
-        try {
-          const cats = await brandApi.getCategoriesWithSubCategories(true);
-          if (mounted && Array.isArray(cats)) {
-            setTaxonomyCategories(
-              cats.map((c: any) => ({
-                id: String(c.id),
-                name: String(c.name || ""),
-                types: (c.types || []).map((t: any) => ({
-                  id: String(t.id),
-                  name: String(t.name || ""),
-                })),
-              })),
-            );
-          }
-        } catch (error) {
-          console.error("Failed to load taxonomy categories", error);
-        }
-      };
-
       try {
-        if (!user?.id) {
-          if (mounted) {
-            setCategories([]);
-          }
-          await Promise.all([loadCategoryTypes(), loadTaxonomyCategories()]);
-          return;
+        // Run all three API calls in parallel to minimize total load time.
+        // getCategoriesWithSubCategories is shared so it's only called once.
+        const [collectionsResult, categoryTypesResult, categoriesWithSubResult] =
+          await Promise.allSettled([
+            user?.id
+              ? brandApi.getCollections(user.id, { visibility: "all", scope: "store" })
+              : Promise.resolve(null),
+            brandApi.getCategoryTypes(undefined, true),
+            brandApi.getCategoriesWithSubCategories(true),
+          ]);
+
+        if (!mounted) return;
+
+        // Process collections
+        if (user?.id) {
+          const collections =
+            collectionsResult.status === "fulfilled" ? collectionsResult.value : null;
+          const mapped: Category[] = (collections || [])
+            .filter((c: any) => Boolean(c?.isAvailableInStore))
+            .map((c: any) => ({
+              id: String(c.id),
+              name: String(c.title || c.name || "Untitled collection"),
+              slug: String(c.id),
+            }));
+          setCategories(mapped);
+          const categoryByCollection: Record<string, string> = {};
+          (collections || []).forEach((c: any) => {
+            if (c?.id && c?.categoryId) {
+              categoryByCollection[String(c.id)] = String(c.categoryId);
+            }
+          });
+          setCollectionCategoryById(categoryByCollection);
+        } else {
+          setCategories([]);
         }
 
-        const collections = await brandApi.getCollections(user.id, {
-          visibility: "all",
-          scope: "store",
-        });
-        if (!mounted) return;
-        const mapped: Category[] = (collections || [])
-          .filter((c: any) => Boolean(c?.isAvailableInStore))
-          .map((c: any) => ({
-            id: String(c.id),
-            name: String(c.title || c.name || "Untitled collection"),
-            slug: String(c.id),
-          }));
-        setCategories(mapped);
-        const categoryByCollection: Record<string, string> = {};
-        (collections || []).forEach((c: any) => {
-          if (c?.id && c?.categoryId) {
-            categoryByCollection[String(c.id)] = String(c.categoryId);
-          }
-        });
-        setCollectionCategoryById(categoryByCollection);
-        await Promise.all([loadCategoryTypes(), loadTaxonomyCategories()]);
+        // Process taxonomy categories (from shared fetch)
+        const categoriesWithSub =
+          categoriesWithSubResult.status === "fulfilled"
+            ? categoriesWithSubResult.value
+            : null;
+        if (Array.isArray(categoriesWithSub)) {
+          setTaxonomyCategories(
+            categoriesWithSub.map((c: any) => ({
+              id: String(c.id),
+              name: String(c.name || ""),
+              types: (c.types || []).map((t: any) => ({
+                id: String(t.id),
+                name: String(t.name || ""),
+              })),
+            })),
+          );
+        }
+
+        // Process category types (with fallback to shared categories result)
+        let resolvedTypes =
+          categoryTypesResult.status === "fulfilled" &&
+          Array.isArray(categoryTypesResult.value)
+            ? categoryTypesResult.value
+            : [];
+        if (resolvedTypes.length === 0 && Array.isArray(categoriesWithSub)) {
+          resolvedTypes = categoriesWithSub
+            .flatMap((category: any) => category.types ?? [])
+            .filter((type: any) => Boolean(type?.id) && Boolean(type?.name));
+        }
+        setCategoryTypes(resolvedTypes);
       } catch (error) {
         console.error("Failed to load collections", error);
         if (mounted) {
           setCategories([]);
           setCollectionCategoryById({});
         }
-        await Promise.all([loadCategoryTypes(), loadTaxonomyCategories()]);
       } finally {
         if (mounted) setCategoriesLoading(false);
       }
@@ -1267,26 +1264,22 @@ const EditProduct: React.FC = () => {
           toast.error("Sale price must be less than the price");
           return;
         }
-        if (form.variants.length > 0) {
-          if (hasDuplicateVariants) {
-            toast.error(
-              "Please remove duplicate variant options (same size/color)",
-            );
-            return;
-          }
+        if (form.variants.length === 0) {
+          toast.error("At least one variant (color/size) is required so customers can add this product to their bag.");
+          return;
+        }
+        if (hasDuplicateVariants) {
+          toast.error(
+            "Please remove duplicate variant options (same size/color)",
+          );
+          return;
+        }
+        {
           const invalid = form.variants.find(
             (v) => Number.isNaN(Number(v.stock)) || v.stock < 0,
           );
           if (invalid) {
             toast.error("Variant stock must be 0 or greater");
-            return;
-          }
-        } else {
-          if (
-            form.trackInventory &&
-            (Number.isNaN(Number(form.stock)) || form.stock < 0)
-          ) {
-            toast.error("Stock must be 0 or greater");
             return;
           }
         }
@@ -1438,7 +1431,8 @@ const EditProduct: React.FC = () => {
         } else {
           const created = await productApi.createProduct(payload);
 
-          // Upload pending media after we have a product id
+          // Build media upload list (needed for both flow paths)
+          let pendingUploads: Array<{ file: File; isPrimary: boolean }> = [];
           if (pendingMediaFiles.length > 0) {
             const pendingById = new Map(
               pendingMediaFiles.map((p) => [p.tempId, p]),
@@ -1457,24 +1451,35 @@ const EditProduct: React.FC = () => {
                 id:
                   (p as { id: string }).id || (p as { tempId: string }).tempId,
               }));
-            const uploads = normalizePrimary(orderedPending);
-
-            // Upload media in parallel for faster product creation
-            await Promise.all(
-              uploads.map((u) =>
-                productApi.uploadProductMedia(
-                  created.id,
-                  u.file,
-                  u.isPrimary,
-                ),
-              ),
-            );
+            pendingUploads = normalizePrimary(orderedPending);
           }
 
-          const successMessage = isCollectionFlow
-            ? "Product added to collection draft."
-            : isCollectionContext
-              ? "Product added to collection."
+          const doUploads = () =>
+            Promise.all(
+              pendingUploads.map((u) =>
+                productApi.uploadProductMedia(created.id, u.file, u.isPrimary),
+              ),
+            );
+
+          // For collection flow: navigate immediately and upload media in background
+          // so the user isn't blocked waiting for potentially large file uploads.
+          if (isCollectionFlow && returnTo && returnContext === "collection") {
+            if (pendingUploads.length > 0) {
+              void doUploads();
+            }
+            toast.success("Product added to collection draft.");
+            const joiner = returnTo.includes("?") ? "&" : "?";
+            navigate(`${returnTo}${joiner}productId=${created.id}`);
+            return;
+          }
+
+          // Non-collection flow: wait for uploads before navigating
+          if (pendingUploads.length > 0) {
+            await doUploads();
+          }
+
+          const successMessage = isCollectionContext
+            ? "Product added to collection."
             : effectiveDraft
               ? "Draft saved successfully"
               : "Product created successfully";
@@ -2909,12 +2914,47 @@ const EditProduct: React.FC = () => {
                   }
                 />
 
-                <CustomOrderConfigurationEditor
-                  sourceType="PRODUCT"
-                  sourceId={isEditMode ? productId : undefined}
-                  measurementKeys={form.customMeasurementKeys}
-                  disabled={saving}
-                />
+                {/* Custom order toggle — keeps form hidden until brand opts in */}
+                <div className="rounded-xl border border-gray-200/70 dark:border-white/10 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-base font-medium text-gray-900 dark:text-white">
+                        Custom Order
+                      </h2>
+                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                        Allow buyers to request this product with their own measurements.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={showCustomOrderForm}
+                      onClick={() => setShowCustomOrderForm((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                        showCustomOrderForm
+                          ? 'bg-purple-600'
+                          : 'bg-gray-200 dark:bg-gray-700'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                          showCustomOrderForm ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {showCustomOrderForm && (
+                    <div className="mt-4">
+                      <CustomOrderConfigurationEditor
+                        sourceType="PRODUCT"
+                        sourceId={isEditMode ? productId : undefined}
+                        measurementKeys={form.customMeasurementKeys}
+                        disabled={saving}
+                      />
+                    </div>
+                  )}
+                </div>
 
                 <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
                   <button

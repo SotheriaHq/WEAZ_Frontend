@@ -29,6 +29,7 @@ interface PrePublishConfirmModalProps {
   summary: CollectionSummary;
   entityLabel?: 'Collection' | 'Design';
   onViewPublished?: () => void;
+  loadingProgress?: number | null;
 }
 
 type ModalState = 'confirm' | 'loading' | 'success';
@@ -52,6 +53,7 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
   summary,
   entityLabel = 'Collection',
   onViewPublished,
+  loadingProgress = null,
 }) => {
   const [state, setState] = useState<ModalState>('confirm');
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
@@ -219,7 +221,7 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
                       />
                     )}
 
-                    {state === 'loading' && <LoadingContent key="loading" />}
+                    {state === 'loading' && <LoadingContent key="loading" progress={loadingProgress} />}
 
                     {state === 'success' && (
                       <SuccessContent
@@ -432,7 +434,7 @@ const SummaryRow: React.FC<{ label: string; value: string }> = ({ label, value }
 /**
  * Loading Content - Shows thread loader while publishing
  */
-const LoadingContent: React.FC = () => (
+const LoadingContent: React.FC<{ progress?: number | null }> = ({ progress = null }) => (
   <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
@@ -440,7 +442,7 @@ const LoadingContent: React.FC = () => (
     className="py-12 flex flex-col items-center justify-center"
   >
     <div className="mb-6">
-      <VLoader size={64} progress={66} phase="loading" />
+      <VLoader size={64} progress={progress} phase="loading" />
     </div>
     
     <h3 className="text-lg text-gray-900 dark:text-white font-medium mb-1">Publishing your design...</h3>

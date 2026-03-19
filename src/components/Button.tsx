@@ -34,7 +34,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || isLoading}
         {...props}
       >
-        {isLoading && <VLoader size={16} progress={56} phase="loading" showLabel={false} className="mr-2" />}
+        {isLoading && <VLoader size={16} phase="loading" showLabel={false} className="mr-2" />}
         {children}
       </button>
     );

@@ -98,7 +98,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <VLoader size={16} progress={64} phase="loading" showLabel={false} />
+                  <VLoader size={16} phase="loading" showLabel={false} />
                   Processing...
                 </span>
               ) : confirmText}

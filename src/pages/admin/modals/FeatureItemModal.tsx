@@ -5,6 +5,7 @@ import type { EligibleEntity } from '@/types/admin';
 import { unwrapApiResponse } from '@/types/auth';
 import { toast } from 'sonner';
 import useDebounce from '@/hooks/useDebounce';
+import ImageWithFallback from '@/components/ImageWithFallback';
 
 interface Props {
   onClose: () => void;
@@ -110,7 +111,7 @@ const FeatureItemModal: React.FC<Props> = ({ onClose, onSuccess }) => {
               >
                 <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-gray-200/70 bg-gray-100 dark:border-white/10 dark:bg-white/10">
                   {item.thumbnail ? (
-                    <img src={item.thumbnail} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
+                    <ImageWithFallback src={item.thumbnail} alt={item.name} fallbackName={item.name} fit="cover" className="h-10 w-10" rounded="lg" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">
                       {item.entityType === 'PRODUCT' ? '📦' : '🎨'}

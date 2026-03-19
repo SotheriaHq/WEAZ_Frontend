@@ -212,7 +212,7 @@ const BulkDeleteProductsModal: React.FC<BulkDeleteProductsModalProps> = ({
             <div className="px-6 pb-5">
               {loadingImpact ? (
                 <div className="flex flex-col items-center gap-3 py-10">
-                  <VLoader size={36} progress={48} phase="loading" showLabel={false} />
+                  <VLoader size={36} phase="loading" showLabel={false} />
                   <span className="text-sm text-gray-500 dark:text-zinc-400">Checking impact...</span>
                 </div>
               ) : (
@@ -410,7 +410,7 @@ const BulkDeleteProductsModal: React.FC<BulkDeleteProductsModalProps> = ({
               >
                 {isProcessing ? (
                   <span className="flex items-center justify-center gap-2">
-                    <VLoader size={16} progress={72} phase="loading" showLabel={false} />
+                    <VLoader size={16} phase="loading" showLabel={false} />
                     Deleting...
                   </span>
                 ) : (

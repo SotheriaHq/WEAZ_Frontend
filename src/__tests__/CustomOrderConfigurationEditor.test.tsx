@@ -107,7 +107,7 @@ describe('CustomOrderConfigurationEditor', () => {
 
     expect(screen.getByText('Save this product first. The custom-order configuration attaches to a persisted source id.')).toBeInTheDocument();
     expect(getStoreStatus).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Create configuration' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Create configuration' })).not.toBeInTheDocument();
   });
 
   it('creates a basis and saves a new custom-order configuration for a persisted source', async () => {

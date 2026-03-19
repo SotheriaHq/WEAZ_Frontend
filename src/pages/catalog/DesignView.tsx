@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Share2, Heart, MessageCircle, Eye, 
@@ -9,14 +9,13 @@ import {
   Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { AppDispatch, RootState } from '@/store';
+import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
 import AccessApi, { type AccessState } from '@/api/AccessApi';
 import ThreadButton from '@/components/ui/ThreadButton';
 import UnifiedCollectionComments from '@/components/collections/UnifiedCollectionComments';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { selectImageVariant } from '@/utils/selectImageVariant';
-import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { apiClient } from '@/api/httpClient';
 import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 
@@ -364,18 +363,12 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
 interface ProductGridProps {
   products: ProductItem[];
   isOwner?: boolean;
-  addingAll?: boolean;
-  onAddAll?: () => void;
-  onAddToCart: (productId: string) => void;
   onViewProduct: (productId: string) => void;
 }
 
 const ProductGrid: React.FC<ProductGridProps> = ({
   products,
   isOwner,
-  addingAll,
-  onAddAll,
-  onAddToCart,
   onViewProduct,
 }) => {
   return (
@@ -385,16 +378,11 @@ const ProductGrid: React.FC<ProductGridProps> = ({
           Products in this collection
           <span className="text-white/40 ml-2 text-base font-normal">({products.length} item{products.length === 1 ? '' : 's'})</span>
         </h2>
-        {!isOwner && onAddAll ? (
-          <button
-            type="button"
-            onClick={onAddAll}
-            disabled={addingAll}
-            className="group flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-white/15 text-white hover:bg-white/10 hover:border-white/30 transition-all duration-300 disabled:opacity-60"
-          >
-            <span className="font-medium text-sm">{addingAll ? 'Adding…' : 'Add all to cart'}</span>
-            <span className="text-sm">🛍️</span>
-          </button>
+        {!isOwner ? (
+          <div className="group flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-white/15 text-white/70">
+            <span className="font-medium text-sm">Custom order only</span>
+            <span className="text-sm">✂️</span>
+          </div>
         ) : null}
       </div>
 
@@ -414,11 +402,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({
             const price = formatPrice(product.price);
             const salePrice = onSale ? formatPrice(product.salePrice ?? null) : null;
             const image = product.thumbnail || product.images[0];
-            const canQuickAdd =
-              product.totalStock > 0 &&
-              product.sizes.length === 0 &&
-              product.colors.length === 0 &&
-              !product.hasVariants;
             const saleLabel = onSale && price && salePrice
               ? `-${Math.max(1, Math.round((1 - (product.salePrice ?? product.price) / product.price) * 100))}%`
               : null;
@@ -468,23 +451,13 @@ const ProductGrid: React.FC<ProductGridProps> = ({
                   </div>
                 </button>
                 <div className="px-5 pb-5 mt-auto">
-                  {canQuickAdd ? (
-                    <button
-                      type="button"
-                      onClick={() => onAddToCart(product.id)}
-                      className="w-full rounded-xl bg-purple-500 hover:bg-purple-400 text-white text-sm font-semibold py-2.5 transition-colors"
-                    >
-                      Add to cart
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onViewProduct(product.id)}
-                      className="w-full rounded-xl border border-white/20 text-sm font-semibold py-2.5 text-white/80 hover:text-white hover:border-white/40"
-                    >
-                      View options
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => onViewProduct(product.id)}
+                    className="w-full rounded-xl border border-white/20 text-sm font-semibold py-2.5 text-white/80 hover:text-white hover:border-white/40"
+                  >
+                    View options
+                  </button>
                 </div>
               </div>
             );
@@ -516,7 +489,7 @@ interface CommentsPanelProps {
   ownerId?: string;
   highlightCommentId?: string | null;
   price?: { min?: number | null; max?: number | null; saleMin?: number | null; saleMax?: number | null; saleEndAt?: string | null };
-  onAddToCart?: () => void;
+  onBagIt?: () => void;
   onToggleSave: () => void;
   isSaved: boolean;
   saveBusy: boolean;
@@ -533,7 +506,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
   ownerId,
   highlightCommentId,
   price,
-  onAddToCart,
+  onBagIt,
   onToggleSave,
   isSaved,
   saveBusy,
@@ -619,15 +592,15 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {onAddToCart ? (
+            {onBagIt ? (
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={onAddToCart}
+                onClick={onBagIt}
                 className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-shadow"
               >
                 <ShoppingCart className="w-4 h-4" />
-                <span>Add to Cart</span>
+                <span>Bag it</span>
               </motion.button>
             ) : null}
             <motion.button
@@ -907,7 +880,6 @@ const DesignView: React.FC = () => {
   const navigate = useNavigate();
   const me = useSelector((s: RootState) => s.user.profile);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
-  const dispatch = useDispatch<AppDispatch>();
 
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(false);
@@ -919,7 +891,6 @@ const DesignView: React.FC = () => {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [moreFromBrand, setMoreFromBrand] = useState<RelatedCollection[]>([]);
   const [youMightLike, setYouMightLike] = useState<RelatedCollection[]>([]);
-  const [addingAll, setAddingAll] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
   const [customConfigurationAvailable, setCustomConfigurationAvailable] = useState(false);
@@ -1135,65 +1106,6 @@ const DesignView: React.FC = () => {
     }
   };
 
-  const handleAddToCart = () => {
-    void handleAddAllToCart();
-  };
-
-  const handleAddAllToCart = async () => {
-    if (!isAuth) {
-      const returnTo = `${window.location.pathname}${window.location.search}`;
-      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
-      return;
-    }
-    const eligible = productItems.filter(
-      (p) =>
-        p.totalStock > 0 &&
-        p.sizes.length === 0 &&
-        p.colors.length === 0 &&
-        !p.hasVariants,
-    );
-    if (eligible.length === 0) {
-      toast.info('No products available for quick add');
-      return;
-    }
-    setAddingAll(true);
-    try {
-      const results = await Promise.all(
-        eligible.map((p) =>
-          dispatch(addToCart({ productId: p.id, quantity: 1 }))
-            .unwrap()
-            .then(() => true)
-            .catch(() => false),
-        ),
-      );
-      const successCount = results.filter(Boolean).length;
-      if (successCount > 0) {
-        dispatch(openCartDrawer());
-        toast.success(`Added ${successCount} item${successCount === 1 ? '' : 's'} to cart`);
-      }
-      if (successCount < eligible.length) {
-        toast.error('Some items could not be added to cart');
-      }
-    } finally {
-      setAddingAll(false);
-    }
-  };
-
-  const handleAddProductToCart = async (productId: string) => {
-    if (!isAuth) {
-      const returnTo = `${window.location.pathname}${window.location.search}`;
-      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
-      return;
-    }
-    try {
-      await dispatch(addToCart({ productId, quantity: 1 })).unwrap();
-      dispatch(openCartDrawer());
-      toast.success('Added to cart');
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to add to cart');
-    }
-  };
-
   useEffect(() => {
     let mounted = true;
     const loadSaved = async () => {
@@ -1360,7 +1272,7 @@ const DesignView: React.FC = () => {
             <div className="flex gap-3">
               {customConfigurationAvailable ? (
                 <button type="button" onClick={handleStartCustomOrder} disabled={openingCustomOrder} className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60">
-                  {openingCustomOrder ? 'Opening custom order...' : '✂️ Request Custom Order'}
+                  {openingCustomOrder ? 'Opening custom order...' : '🛍️ Bag it'}
                 </button>
               ) : null}
               <button type="button" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-white/80 hover:text-white transition-all text-sm font-medium">
@@ -1396,9 +1308,6 @@ const DesignView: React.FC = () => {
           <ProductGrid
             products={productItems}
             isOwner={isOwner}
-            addingAll={addingAll}
-            onAddAll={!isOwner && hasProducts ? handleAddAllToCart : undefined}
-            onAddToCart={handleAddProductToCart}
             onViewProduct={handleViewProduct}
           />
 
@@ -1433,7 +1342,7 @@ const DesignView: React.FC = () => {
                   saleMax: detail.saleMaxPrice,
                   saleEndAt: detail.saleEndAt,
                 }}
-                onAddToCart={!isOwner && hasProducts ? handleAddToCart : undefined}
+                onBagIt={!isOwner && customConfigurationAvailable ? handleStartCustomOrder : undefined}
                 onToggleSave={handleToggleSave}
                 isSaved={isSaved}
                 saveBusy={saveBusy}

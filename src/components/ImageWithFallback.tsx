@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import DefaultAvatar from './DefaultAvatar';
 import { brandApi } from '@/api/BrandApi';
 import MediaRenderer from './media/MediaRenderer';
+import { cn } from '@/lib/utils';
 
 interface ImageWithFallbackProps {
   src?: string | null;
@@ -85,6 +86,13 @@ const setCachedUrl = (fileId: string, url: string) => {
   setCache(cache);
 };
 
+const invalidateCachedUrl = (key: string) => {
+  const cache = getCache();
+  if (!cache[key]) return;
+  delete cache[key];
+  setCache(cache);
+};
+
 // In-flight dedup: prevents concurrent requests for the same fileId/src
 const inflight = new Map<string, Promise<string | null>>();
 
@@ -146,14 +154,15 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       // If src/fileId changed, reset error
       setHadError(false);
 
-      // Optimization: If src is already a signed URL (has query params), use it directly
-      if (src && (src.includes('?') || !src.includes('s3'))) {
+      // If no stable fileId is available, use src optimizations.
+      // When fileId exists, we prefer resolving by fileId to avoid stale signed URLs.
+      if (!fileId && src && (src.includes('?') || !src.includes('s3'))) {
         setResolved(src);
         return;
       }
 
       // Handle raw unsigned S3 URLs (contain '.s3.' but no '?' query params)
-      if (src && src.includes('.s3.') && !src.includes('?')) {
+      if (!fileId && src && src.includes('.s3.') && !src.includes('?')) {
         setLoaded(false);
         const url = await resolveSignedUrl(src, () => brandApi.getSignedS3Url(src));
         if (mounted) {
@@ -163,7 +172,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       }
 
       // Handle storage keys persisted without full host (e.g. "POST_IMAGE/.../file.jpg")
-      if (src && !src.includes('?') && !/^https?:\/\//i.test(src)) {
+      if (!fileId && src && !src.includes('?') && !/^https?:\/\//i.test(src)) {
         setLoaded(false);
         const url = await resolveSignedUrl(`key:${src}`, () => brandApi.getSignedS3KeyUrl(src));
         if (mounted) {
@@ -219,6 +228,9 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       setHadError(false);
       const key = fileId || src;
       if (!key) return;
+      // If the current URL failed to load, drop any cached mapping for this key
+      // so the retry path is forced to request a fresh signed URL.
+      invalidateCachedUrl(key);
       const fetcher = fileId
         ? () => brandApi.getSignedFileUrl(fileId)
         : () => brandApi.getSignedS3Url(src!);
@@ -231,11 +243,12 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   }, [hadError, fileId, src]);
 
   const showFallback = hadError || !resolved;
+  const wrapperClassName = cn(roundClass(rounded), containerClassName);
 
   return (
-    <div className={`${roundClass(rounded)}`} onClick={onClick}>
+    <div className={wrapperClassName} onClick={onClick}>
       {showFallback ? (
-        <DefaultAvatar name={fallbackName ?? alt} className={`w-full h-full ${roundClass(rounded)}`} />
+        <DefaultAvatar name={fallbackName ?? alt} className={cn('w-full h-full', roundClass(rounded), className)} />
       ) : (
         <MediaRenderer
           kind="image"
@@ -244,7 +257,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           fit={fit}
           onError={() => setHadError(true)}
           onLoad={() => setLoaded(true)}
-          className={containerClassName}
+          className="w-full h-full"
           mediaClassName={`transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${className ?? ''}`}
           maxHeightClassName={maxHeightClassName ?? 'max-h-[70vh]'}
           maxWidthClassName="max-w-full"

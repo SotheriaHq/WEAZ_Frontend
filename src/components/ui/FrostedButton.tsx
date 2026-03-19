@@ -40,7 +40,7 @@ export const FrostedButton: React.FC<FrostedButtonProps> = ({
     {...props}
   >
     {loading ? (
-      <VLoader size={16} progress={54} phase="loading" showLabel={false} className="text-current" />
+      <VLoader size={16} phase="loading" showLabel={false} className="text-current" />
     ) : (
       leftIcon
     )}

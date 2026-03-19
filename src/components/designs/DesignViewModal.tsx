@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Smile, Send, Link as LinkIcon, Bookmark, Share2, Store, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Smile, Send, Link as LinkIcon, Bookmark, Share2, Store, ChevronLeft, ChevronRight, ShoppingBag, Scissors } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import EmojiPicker, { Theme, type EmojiClickData } from 'emoji-picker-react';
 import { useSelector } from 'react-redux';
@@ -17,6 +17,13 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { formatPrice } from '@/utils/helpers';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import VLoader from '@/components/loaders/VLoader';
+import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
+import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
+import {
+  CONTENT_DISPLAY_FRAME_CLASS,
+  CONTENT_DISPLAY_MEDIA_CLASS,
+  CONTENT_DISPLAY_RENDERER_CLASS,
+} from '@/components/media/contentDisplayPresets';
 
 type Props = {
   open: boolean;
@@ -44,6 +51,10 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const [mediaItems, setMediaItems] = React.useState<ModalMedia[]>([]);
   const [activeMediaIndex, setActiveMediaIndex] = React.useState(0);
   const [loadingMedia, setLoadingMedia] = React.useState(false);
+  const [customComposerOpen, setCustomComposerOpen] = React.useState(false);
+  const [customConfigurationId, setCustomConfigurationId] = React.useState<string | null>(null);
+  const [openingCustomComposer, setOpeningCustomComposer] = React.useState(false);
+  const [resolvingCustomConfiguration, setResolvingCustomConfiguration] = React.useState(false);
 
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const authProfile = useSelector((s: RootState) => s.user.profile);
@@ -80,16 +91,30 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   };
 
   React.useEffect(() => {
-    if (!item) return;
+    if (!open || !item) return;
+
     setCommentCount(item.commentsCount ?? 0);
     const seeded: ModalMedia = {
       id: item.id,
       type: item.media?.type?.toUpperCase().includes('VIDEO') ? 'POST_VIDEO' : 'POST_IMAGE',
       url: item.media?.url || '',
     };
-    setMediaItems([seeded]);
+
+    // Avoid setting identical media state repeatedly when parent re-renders the same item object.
+    setMediaItems((current) => {
+      const existing = current[0];
+      if (
+        current.length === 1 &&
+        existing?.id === seeded.id &&
+        existing?.type === seeded.type &&
+        existing?.url === seeded.url
+      ) {
+        return current;
+      }
+      return [seeded];
+    });
     setActiveMediaIndex(0);
-  }, [item]);
+  }, [open, item?.id]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -152,6 +177,40 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
       mounted = false;
     };
   }, [open, item?.collectionId, item?.id, fallbackMedia]);
+
+  React.useEffect(() => {
+    let mounted = true;
+
+    const resolveCustomConfiguration = async () => {
+      if (!open || !item?.collectionId) {
+        if (mounted) {
+          setCustomConfigurationId(null);
+          setResolvingCustomConfiguration(false);
+        }
+        return;
+      }
+
+      setResolvingCustomConfiguration(true);
+      try {
+        const activeConfiguration = await customOrderConfigurationsApi.getActiveForDesign(item.collectionId);
+        if (!mounted) return;
+        setCustomConfigurationId(activeConfiguration?.id ?? null);
+      } catch {
+        if (!mounted) return;
+        // 404 is expected for designs without completed custom-order setup.
+        setCustomConfigurationId(null);
+      } finally {
+        if (mounted) {
+          setResolvingCustomConfiguration(false);
+        }
+      }
+    };
+
+    void resolveCustomConfiguration();
+    return () => {
+      mounted = false;
+    };
+  }, [open, item?.collectionId]);
 
   const onCommentCountChangeRef = React.useRef(onCommentCountChange);
   React.useEffect(() => {
@@ -268,14 +327,45 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     }
   };
 
-  const handleOpenCollectionProducts = () => {
+  const handleOpenDesignCustomOrder = async () => {
     if (isOwnBrandContent) {
-      toast.info('Brands cannot place orders on their own products.');
+      toast.info('Brands cannot place custom orders on their own designs.');
       return;
     }
-    if (!item.collectionId) return;
-    onClose();
-    navigate(`/collections/${item.collectionId}`);
+    if (!isAuth) {
+      toast.info('Please sign in to place a custom order.');
+      return;
+    }
+    if (!item.collectionId) {
+      toast.error('Design reference is unavailable for custom order.');
+      return;
+    }
+    if (openingCustomComposer) {
+      return;
+    }
+    if (resolvingCustomConfiguration) {
+      toast.info('Checking custom-order setup...');
+      return;
+    }
+
+    setOpeningCustomComposer(true);
+    try {
+      let resolvedConfigurationId = customConfigurationId;
+      if (!resolvedConfigurationId) {
+        const activeConfiguration = await customOrderConfigurationsApi.getActiveForDesign(item.collectionId);
+        resolvedConfigurationId = activeConfiguration?.id ?? null;
+      }
+      if (!resolvedConfigurationId) {
+        toast.error('Custom order configuration is unavailable for this design.');
+        return;
+      }
+      setCustomConfigurationId(resolvedConfigurationId);
+      setCustomComposerOpen(true);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to start custom order from this design.');
+    } finally {
+      setOpeningCustomComposer(false);
+    }
   };
 
   const handleOpenBrandCatalog = () => {
@@ -364,7 +454,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
       >
         <div
           ref={dialogRef}
-          className="relative w-[95vw] md:w-[72vw] max-w-[980px] neu-modal-surface rounded-[28px] overflow-hidden shadow-2xl border border-white/20"
+          className="relative w-[98vw] md:w-[88vw] max-w-[1360px] neu-modal-surface rounded-[28px] overflow-hidden shadow-2xl border border-white/20"
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -375,14 +465,14 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
             <X size={18} className="text-[color:var(--neu-text-muted)]" />
           </button>
 
-          <div className="grid md:grid-cols-[minmax(0,55%)_minmax(0,45%)] max-h-[90vh]">
-            <div className="relative h-[82vh] md:h-[90vh] min-w-0 overflow-y-auto overflow-x-hidden no-scrollbar bg-white/5 dark:bg-black/20 backdrop-blur-xl">
+          <div className="grid md:grid-cols-[minmax(0,58%)_minmax(0,42%)] max-h-[92vh]">
+            <div className={CONTENT_DISPLAY_FRAME_CLASS}>
               <MediaRenderer
                 kind={activeMedia?.type === 'POST_VIDEO' ? 'video' : 'image'}
                 src={activeMedia?.url || ''}
                 fit="contain" // Override MediaRenderer's default cover constraints
-                className="h-auto min-h-full w-full"
-                mediaClassName="w-full h-auto min-h-full object-cover"
+                className={CONTENT_DISPLAY_RENDERER_CLASS}
+                mediaClassName={CONTENT_DISPLAY_MEDIA_CLASS}
                 maxHeightClassName="" // remove max-h
                 allowScroll={true}
                 controls={true}
@@ -390,7 +480,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
               {loadingMedia ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/25">
-                  <VLoader size={30} progress={58} phase="loading" showLabel={false} />
+                  <VLoader size={30} phase="loading" showLabel={false} />
                 </div>
               ) : null}
 
@@ -425,16 +515,17 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               ) : null}
             </div>
 
-            <div className="h-[82vh] md:h-[90vh] min-w-0 p-3.5 md:p-4 bg-white/65 dark:bg-[#0f0b11]/70 text-slate-900 dark:text-white flex flex-col">
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between gap-3 pr-8">
+            <div className="h-[85vh] md:h-[92vh] min-w-0 p-3.5 md:p-4 bg-white/65 dark:bg-[#0f0b11]/70 text-slate-900 dark:text-white flex flex-col">
+              <div className="space-y-3">
+                {/* Brand row */}
+                <div className="flex items-center justify-between gap-2 pr-8">
                   <button
                     type="button"
                     onClick={handleOpenBrandCatalog}
-                    className="flex min-w-0 items-center gap-3 text-left"
+                    className="flex min-w-0 items-center gap-2.5 text-left group"
                     title={`Open ${brandLabel} catalog`}
                   >
-                    <div className="size-10 shrink-0 rounded-full overflow-hidden ring-2 ring-white/70 dark:ring-white/15">
+                    <div className="size-9 shrink-0 rounded-full overflow-hidden ring-1 ring-black/8 dark:ring-white/12">
                       <ImageWithFallback
                         src={avatar.src}
                         fileId={avatar.fileId}
@@ -442,13 +533,13 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                         fit="cover"
                         rounded="full"
                         fallbackName={avatarFallback}
-                        containerClassName="size-10 rounded-full"
-                        className="size-10 object-cover"
+                        containerClassName="size-9 rounded-full"
+                        className="size-9 object-cover"
                       />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">{brandLabel}</p>
-                      {item.username ? <p className="text-xs text-slate-500 dark:text-white/50 truncate">@{item.username}</p> : null}
+                      <p className="text-[13px] font-semibold truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{brandLabel}</p>
+                      {item.username ? <p className="text-[11px] text-slate-400 dark:text-white/40 truncate">@{item.username}</p> : null}
                     </div>
                   </button>
 
@@ -457,81 +548,98 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       type="button"
                       onClick={handleTogglePatch}
                       disabled={patchBusy}
-                      className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-xs font-semibold transition ${
+                      className={`rounded-full px-3 py-1 text-[10px] font-semibold tracking-wide uppercase transition ${
                         isPatched
-                          ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                          : 'border-fuchsia-300 bg-fuchsia-50 text-fuchsia-900 hover:bg-fuchsia-100'
-                      } ${patchBusy ? 'cursor-not-allowed opacity-70' : ''}`}
+                          ? 'bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400'
+                          : 'bg-fuchsia-500/10 text-fuchsia-700 hover:bg-fuchsia-500/20 dark:text-fuchsia-400'
+                      } ${patchBusy ? 'cursor-not-allowed opacity-60' : ''}`}
                       aria-live="polite"
                     >
-                      <span>{patchBusy ? 'Updating...' : isPatched ? 'Unpatch' : 'Patch'}</span>
+                      {patchBusy ? '...' : isPatched ? 'Patched' : 'Patch'}
                     </button>
                   ) : null}
                 </div>
 
+                {/* Title + description */}
                 <div>
-                  <h1 className="text-lg font-bold leading-tight mb-0.5">{item.collectionTitle}</h1>
+                  <h1 className="text-base font-bold leading-snug">{item.collectionTitle}</h1>
                   {item.collectionDescription ? (
-                    <p className="text-[12px] text-slate-600 dark:text-white/65 leading-relaxed">{item.collectionDescription}</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-white/55 leading-relaxed line-clamp-2">{item.collectionDescription}</p>
                   ) : null}
                 </div>
 
+                {/* Tags */}
                 {item.tags?.length ? (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {item.tags.map((tag) => (
-                      <span key={tag} className="px-2 py-0.5 rounded-full bg-white/75 border border-slate-200 text-[10px] font-semibold uppercase tracking-widest text-slate-700 dark:bg-white/10 dark:border-white/10 dark:text-white">
+                      <span key={tag} className="px-2 py-0.5 rounded-full bg-slate-100 text-[9px] font-semibold uppercase tracking-wider text-slate-600 dark:bg-white/8 dark:text-white/70">
                         {tag}
                       </span>
                     ))}
                   </div>
                 ) : null}
 
-                <div className="py-2 px-3 rounded-lg bg-emerald-50 border border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-700/30 inline-block">
-                  <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{saleBand || baseBand || 'Price on request'}</p>
+                {/* Price + Custom Order badge */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{saleBand || baseBand || 'Price on request'}</span>
                   {saleBand && baseBand ? (
-                    <p className="text-[10px] text-emerald-600/70 dark:text-emerald-500/60 line-through">{baseBand}</p>
+                    <span className="text-[10px] text-slate-400 line-through">{baseBand}</span>
+                  ) : null}
+                  {item.customAvailable ? (
+                    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-400">
+                      <Scissors className="h-3 w-3" />
+                      Custom
+                    </span>
                   ) : null}
                 </div>
 
-                <div className="flex flex-wrap gap-1.5">
+                {/* Action buttons — compact icon-led pills */}
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
-                    className="rounded-md px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[11px] font-semibold hover:opacity-90 transition shadow-sm"
-                    onClick={handleOpenCollectionProducts}
-                    title={isOwnBrandContent ? 'Brands cannot place orders on their own products' : 'Open collection'}
+                    type="button"
+                    disabled={openingCustomComposer}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-indigo-700 transition disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => {
+                      void handleOpenDesignCustomOrder();
+                    }}
+                    title={
+                      isOwnBrandContent
+                        ? 'Brands cannot place custom orders on their own designs'
+                        : resolvingCustomConfiguration
+                          ? 'Checking custom-order setup for this design'
+                          : !customConfigurationId
+                            ? 'Custom order is not configured for this design yet'
+                          : 'Start custom order from this design'
+                    }
                   >
-                    Add to Cart
+                    <ShoppingBag className="h-3 w-3" />
+                    {openingCustomComposer ? 'Loading...' : 'Bag it'}
                   </button>
                   <button
                     type="button"
                     onClick={handleToggleSave}
                     disabled={saveBusy}
-                    title={isOwnBrandContent ? 'Brands cannot save their own products' : 'Save item'}
-                    className="rounded-md px-2.5 py-1.5 bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold hover:bg-rose-200 transition dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-700/40 disabled:opacity-60"
+                    title={isOwnBrandContent ? 'Brands cannot save their own products' : isSaved ? 'Unsave' : 'Save'}
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 disabled:opacity-50"
                   >
-                    <span className="inline-flex items-center gap-1">
-                      <Bookmark className="h-3.5 w-3.5" />
-                      {isSaved ? 'Saved' : 'Save'}
-                    </span>
+                    <Bookmark className="h-3 w-3" />
+                    {isSaved ? 'Saved' : 'Save'}
                   </button>
                   <button
                     type="button"
                     onClick={handleShare}
-                    className="rounded-md px-2.5 py-1.5 bg-sky-100 text-sky-700 border border-sky-200 text-[11px] font-semibold hover:bg-sky-200 transition dark:bg-sky-900/30 dark:text-sky-400 dark:border-sky-700/40"
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                   >
-                    <span className="inline-flex items-center gap-1">
-                      <Share2 className="h-3.5 w-3.5" />
-                      Share
-                    </span>
+                    <Share2 className="h-3 w-3" />
+                    Share
                   </button>
                   <button
                     type="button"
                     onClick={handleOpenBrandCatalog}
-                    className="rounded-md px-2.5 py-1.5 bg-amber-100 text-amber-700 border border-amber-200 text-[11px] font-semibold hover:bg-amber-200 transition dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700/40"
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                   >
-                    <span className="inline-flex items-center gap-1">
-                      <Store className="h-3.5 w-3.5" />
-                      Store
-                    </span>
+                    <Store className="h-3 w-3" />
+                    Store
                   </button>
                 </div>
               </div>
@@ -635,6 +743,36 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           </div>
         </div>
       </div>
+
+      {customComposerOpen && customConfigurationId ? (
+        <OverlayPortal>
+          <div
+            className="fixed inset-0 z-layer-modal flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                setCustomComposerOpen(false);
+              }
+            }}
+          >
+            <div className="relative h-[92vh] w-[98vw] max-w-[1280px] overflow-y-auto rounded-3xl border border-white/20 bg-white/90 p-4 text-slate-900 shadow-2xl dark:bg-[#0d0b12] dark:text-white">
+              <button
+                type="button"
+                aria-label="Close custom order composer"
+                onClick={() => setCustomComposerOpen(false)}
+                className="sticky top-2 float-right z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/80 text-slate-700 shadow-sm hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+              >
+                <X size={16} />
+              </button>
+              <CustomOrderComposerPage
+                embedded
+                configurationIdOverride={customConfigurationId}
+                onClose={() => setCustomComposerOpen(false)}
+                onOrderCreated={() => setCustomComposerOpen(false)}
+              />
+            </div>
+          </div>
+        </OverlayPortal>
+      ) : null}
     </OverlayPortal>
   );
 };

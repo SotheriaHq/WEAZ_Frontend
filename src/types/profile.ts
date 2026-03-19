@@ -41,7 +41,14 @@ export interface CollectionDto {
   // Client-only status metadata for optimistic publish/progress states
   clientStatus?: 'publishing' | 'publish-failed';
   clientStatusMessage?: string;
-  clientStatusMeta?: { startedAt?: number; attempts?: number; offline?: boolean };
+  clientStatusMeta?: {
+    startedAt?: number;
+    attempts?: number;
+    offline?: boolean;
+    progress?: number;
+    previewUrl?: string;
+    taskId?: string;
+  };
 }
 
 export interface ReviewRatingDistributionItem {

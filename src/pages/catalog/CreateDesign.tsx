@@ -50,6 +50,11 @@ import useCollectionUpload from "../../hooks/useCollectionUpload";
 import { useBrandProfile } from "../../hooks/UseBrandHook";
 import { finalizeCollectionUploads } from "@/api/collectionUploads";
 import type { SizingMode } from '@/types/sizing';
+import {
+  createPublishTask,
+  updatePublishTask,
+  removePublishTask,
+} from '@/utils/publishTracker';
 // ============================================================================
 
 type CategoryTypeOption = { id: string; name: string };
@@ -285,6 +290,7 @@ const CreateDesignInner: React.FC = () => {
         setCustomMeasurementKeys(
           Array.isArray(d.customMeasurementKeys) ? dedupeMeasurementKeysByLabel(d.customMeasurementKeys) : [],
         );
+        setIsMadeToOrder(Boolean((d as any).customOrderEnabled));
         setMetadataEditedAt(
           d.metadataEditedAt ? new Date(d.metadataEditedAt) : null,
         );
@@ -678,6 +684,7 @@ const CreateDesignInner: React.FC = () => {
           sizingMode,
           rtwSizeSystem: null,
           customMeasurementKeys: normalizedCustomMeasurementKeys,
+          customOrderEnabled: isMadeToOrder,
           fitPreference: null,
           targetAgeGroup: 'ADULT',
         } as any);
@@ -701,6 +708,7 @@ const CreateDesignInner: React.FC = () => {
             sizingMode,
             rtwSizeSystem: undefined,
             customMeasurementKeys: normalizedCustomMeasurementKeys,
+            customOrderEnabled: isMadeToOrder,
             fitPreference: undefined,
             targetAgeGroup: 'ADULT',
           },
@@ -765,101 +773,216 @@ const CreateDesignInner: React.FC = () => {
       };
 
       if (isEditMode && id) {
-        await brandApi.updateCollection(id, {
+        // Build a preview URL from the existing cover
+        const editPreviewUrl: string | undefined = (() => {
+          const coverItem = files[coverIndex];
+          if (coverItem?.previewUrl) return coverItem.previewUrl;
+          if (coverItem?.url) return coverItem.url;
+          return undefined;
+        })();
+
+        const task = createPublishTask({
           title,
-          description,
-          minPrice: parsedMinPrice,
-          maxPrice: parsedMaxPrice,
-          isAvailableInStore: false,
-          tags: finalTags,
-          categoryId,
-          categoryTypeId,
-          type,
-          visibility,
-          coverMediaId: files[coverIndex]?.remoteId || undefined,
-          filterValueIds: getSelectedFilterValueIds(),
-          sizingMode,
-          rtwSizeSystem: null,
-          customMeasurementKeys: normalizedCustomMeasurementKeys,
-          fitPreference: null,
-          targetAgeGroup: 'ADULT',
-        } as any);
+          coverPreviewUrl: editPreviewUrl,
+          collectionId: id,
+          message: 'Updating design...',
+        });
 
-        const currentIds = new Set(files.map((f) => f.id));
-        const toDelete = Array.from(originalItemIds.current).filter(
-          (oid) => !currentIds.has(oid),
-        );
-        if (toDelete.length > 0) {
-          await Promise.all(
-            toDelete.map((itemId) => brandApi.deleteCollectionItem(id, itemId)),
-          );
-        }
-
-        await finalizeCollectionUploads(
-          id,
-          [],
-          true,
-          {
-            action: "publish",
-            coverIndex,
-            collectionMetadata: {
-              title,
-              description,
-              visibility,
-              type,
-              categoryId,
-              subCategoryId: categoryTypeId,
-              categoryTypeId,
-              tags: finalTags,
-              filterValueIds: getSelectedFilterValueIds(),
-              sizingMode,
-              rtwSizeSystem: undefined,
-              customMeasurementKeys: normalizedCustomMeasurementKeys,
-              fitPreference: undefined,
-              targetAgeGroup: 'ADULT',
-            },
-          },
-        );
-
-        toast.success("Design published");
-        setShowPublishModal(false);
-        navigate(`/profile?tab=Content&visibility=Public`, { replace: true });
-        return;
-      } else {
-        const response = await uploadCollection(
-          files,
-          title,
-          description,
-          parsedMinPrice,
-          parsedMaxPrice,
-          false,
-          finalTags,
-          {
-            categoryId,
-            subCategoryId: categoryTypeId,
-            categoryTypeId,
-            type,
-            visibility,
-            filterValueIds: getSelectedFilterValueIds(),
-            coverIndex,
-            sizingMode,
-            rtwSizeSystem: undefined,
-            customMeasurementKeys: normalizedCustomMeasurementKeys,
-            fitPreference: undefined,
-            targetAgeGroup: 'ADULT',
-          },
-        );
-        const newCollectionId = extractCollectionId(response);
-        toast.success("Design published");
         setShowPublishModal(false);
         navigate(`/profile?tab=Content&visibility=Public`, {
           replace: true,
           state: {
-            publishingCollectionId: newCollectionId,
+            publishingTaskId: task.id,
             publishingTitle: title,
-            publishingStartedAt: Date.now(),
+            publishingStartedAt: task.startedAt,
           },
         });
+
+        toast.info('Publishing in background. You can keep browsing your profile.');
+
+        void (async () => {
+          try {
+            updatePublishTask(task.id, { progress: 10, message: 'Updating metadata...' });
+
+            await brandApi.updateCollection(id, {
+              title,
+              description,
+              minPrice: parsedMinPrice,
+              maxPrice: parsedMaxPrice,
+              isAvailableInStore: false,
+              tags: finalTags,
+              categoryId,
+              categoryTypeId,
+              type,
+              visibility,
+              coverMediaId: files[coverIndex]?.remoteId || undefined,
+              filterValueIds: getSelectedFilterValueIds(),
+              sizingMode,
+              rtwSizeSystem: null,
+              customMeasurementKeys: normalizedCustomMeasurementKeys,
+              customOrderEnabled: isMadeToOrder,
+              fitPreference: null,
+              targetAgeGroup: 'ADULT',
+            } as any);
+
+            updatePublishTask(task.id, { progress: 40, message: 'Cleaning up items...' });
+
+            const currentIds = new Set(files.map((f) => f.id));
+            const toDelete = Array.from(originalItemIds.current).filter(
+              (oid) => !currentIds.has(oid),
+            );
+            if (toDelete.length > 0) {
+              await Promise.all(
+                toDelete.map((itemId) => brandApi.deleteCollectionItem(id, itemId)),
+              );
+            }
+
+            updatePublishTask(task.id, { status: 'finalizing', progress: 70, message: 'Finalizing...' });
+
+            await finalizeCollectionUploads(
+              id,
+              [],
+              true,
+              {
+                action: "publish",
+                coverIndex,
+                collectionMetadata: {
+                  title,
+                  description,
+                  visibility,
+                  type,
+                  categoryId,
+                  subCategoryId: categoryTypeId,
+                  categoryTypeId,
+                  tags: finalTags,
+                  filterValueIds: getSelectedFilterValueIds(),
+                  sizingMode,
+                  rtwSizeSystem: undefined,
+                  customMeasurementKeys: normalizedCustomMeasurementKeys,
+                  customOrderEnabled: isMadeToOrder,
+                  fitPreference: undefined,
+                  targetAgeGroup: 'ADULT',
+                },
+              },
+            );
+
+            updatePublishTask(task.id, {
+              status: 'published',
+              progress: 100,
+              collectionId: id,
+              coverPreviewUrl: undefined,
+              message: 'Published',
+            });
+            toast.success('Design published');
+            window.setTimeout(() => removePublishTask(task.id), 30_000);
+          } catch (backgroundError) {
+            const errMsg =
+              (backgroundError as any)?.response?.data?.message ||
+              (backgroundError instanceof Error ? backgroundError.message : 'Failed to publish design');
+            updatePublishTask(task.id, {
+              status: 'failed',
+              progress: 100,
+              message: 'Publish failed',
+              error: String(errMsg),
+            });
+            toast.error(String(errMsg));
+          }
+        })();
+        return;
+      } else {
+        const buildCoverPreviewDataUrl = async (): Promise<string | undefined> => {
+          const coverItem = files[coverIndex];
+          if (!coverItem || coverItem.kind !== 'image' || !coverItem.file) {
+            return undefined;
+          }
+          const file = coverItem.file;
+          if (file.size > 4 * 1024 * 1024) {
+            return undefined;
+          }
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : undefined);
+            reader.onerror = () => resolve(undefined);
+            reader.readAsDataURL(file);
+          });
+        };
+
+        const previewDataUrl = await buildCoverPreviewDataUrl();
+        const task = createPublishTask({
+          title,
+          coverPreviewUrl: previewDataUrl,
+          message: 'Preparing upload...',
+        });
+
+        setShowPublishModal(false);
+        navigate(`/profile?tab=Content&visibility=Public`, {
+          replace: true,
+          state: {
+            publishingTaskId: task.id,
+            publishingTitle: title,
+            publishingStartedAt: task.startedAt,
+          },
+        });
+
+        toast.info('Publishing in background. You can keep browsing your profile.');
+
+        void (async () => {
+          try {
+            const response = await uploadCollection(
+              files,
+              title,
+              description,
+              parsedMinPrice,
+              parsedMaxPrice,
+              false,
+              finalTags,
+              {
+                categoryId,
+                subCategoryId: categoryTypeId,
+                categoryTypeId,
+                type,
+                visibility,
+                filterValueIds: getSelectedFilterValueIds(),
+                coverIndex,
+                sizingMode,
+                rtwSizeSystem: undefined,
+                customMeasurementKeys: normalizedCustomMeasurementKeys,
+                customOrderEnabled: isMadeToOrder,
+                fitPreference: undefined,
+                targetAgeGroup: 'ADULT',
+              },
+              (value) => {
+                updatePublishTask(task.id, {
+                  status: value >= 100 ? 'finalizing' : 'uploading',
+                  progress: value >= 100 ? 96 : value,
+                  message: value >= 100 ? 'Finalizing design...' : 'Uploading media...',
+                });
+              },
+            );
+
+            const newCollectionId = extractCollectionId(response);
+            updatePublishTask(task.id, {
+              status: 'published',
+              progress: 100,
+              collectionId: newCollectionId,
+              coverPreviewUrl: undefined,
+              message: 'Published',
+            });
+            toast.success('Design published');
+            window.setTimeout(() => removePublishTask(task.id), 30_000);
+          } catch (backgroundError) {
+            const errMsg =
+              (backgroundError as any)?.response?.data?.message ||
+              (backgroundError instanceof Error ? backgroundError.message : 'Failed to publish design');
+            updatePublishTask(task.id, {
+              status: 'failed',
+              progress: 100,
+              message: 'Publish failed',
+              error: String(errMsg),
+            });
+            toast.error(String(errMsg));
+          }
+        })();
         return;
       }
     } catch (error) {
@@ -1480,13 +1603,15 @@ const CreateDesignInner: React.FC = () => {
                 </label>
               </div>
 
-              <CustomOrderConfigurationEditor
-                sourceType="DESIGN"
-                sourceId={isEditMode ? id : undefined}
-                measurementKeys={customMeasurementKeys}
-                measurementGender={measurementGender}
-                disabled={disabled}
-              />
+              {isMadeToOrder && (
+                <CustomOrderConfigurationEditor
+                  sourceType="DESIGN"
+                  sourceId={isEditMode ? id : undefined}
+                  measurementKeys={customMeasurementKeys}
+                  measurementGender={measurementGender}
+                  disabled={disabled}
+                />
+              )}
             </div>
           </FormSection>
 
@@ -1659,6 +1784,7 @@ const CreateDesignInner: React.FC = () => {
         summary={collectionSummary}
         entityLabel="Design"
         onViewPublished={handleViewPublishedDesign}
+        loadingProgress={isUploading ? progress : null}
       />
 
       {/* Cancel/Exit prompt */}

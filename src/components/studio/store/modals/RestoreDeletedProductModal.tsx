@@ -157,7 +157,7 @@ const RestoreDeletedProductModal: React.FC<RestoreDeletedProductModalProps> = ({
           >
             {loading ? (
               <>
-                <VLoader size={16} progress={66} phase="loading" showLabel={false} />
+                <VLoader size={16} phase="loading" showLabel={false} />
                 Restoring...
               </>
             ) : (

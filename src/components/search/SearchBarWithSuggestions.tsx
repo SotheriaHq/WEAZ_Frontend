@@ -51,6 +51,8 @@ interface SearchBarWithSuggestionsProps {
   initialValue?: string;
   showShortcutHint?: boolean;
   enableGlobalShortcut?: boolean;
+  /** When true, the search field starts as a collapsed emoji icon. Default: true */
+  collapsible?: boolean;
   onValueChange?: (value: string) => void;
   onSubmitQuery?: (query: string) => void;
   onNavigate?: (href: string) => void;
@@ -62,6 +64,7 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
   brandId,
   initialValue = '',
   enableGlobalShortcut = true,
+  collapsible = true,
   onValueChange,
   onSubmitQuery,
   onNavigate,
@@ -185,6 +188,7 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
         ariaAutocomplete="list"
         ariaControls={dropdownId}
         ariaActiveDescendant={activeDescendantId}
+        collapsible={collapsible}
         className="!max-w-none"
         onKeyDown={(event) => {
           if (!open || entries.length === 0) {

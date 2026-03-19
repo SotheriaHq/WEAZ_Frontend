@@ -363,6 +363,12 @@ const Market: React.FC = () => {
         threadsCount: typeof detail.totalThreads === 'number' ? detail.totalThreads : null,
         commentsCount: typeof detail.commentsCount === 'number' ? detail.commentsCount : null,
         collectionCollabCount: null,
+        customMeasurementKeys: Array.isArray(detail.customMeasurementKeys)
+          ? detail.customMeasurementKeys
+          : [],
+        customAvailable:
+          detail.customOrderEnabled === true ||
+          detail.customAvailable === true,
         tags: Array.isArray(detail.tags) ? detail.tags : [],
         media: {
           fileId: String(file.id ?? selectedMedia.id ?? ''),
@@ -714,10 +720,10 @@ const Market: React.FC = () => {
         <Masonry
           breakpointCols={{
             default: 3,
-            1920: 5,
-            1536: 4,
+            1920: 4,
+            1536: 3,
             1280: 3,
-            1024: 3,
+            1024: 2,
             768: 2,
             640: 1,
           }}
@@ -736,10 +742,10 @@ const Market: React.FC = () => {
         <Masonry
           breakpointCols={{
             default: 3,
-            1920: 5,
-            1536: 4,
+            1920: 4,
+            1536: 3,
             1280: 3,
-            1024: 3,
+            1024: 2,
             768: 2,
             640: 1,
           }}

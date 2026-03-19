@@ -14,6 +14,13 @@ import {
 import { createIdempotencyKey } from '@/api/idempotency';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 
+interface CustomOrderComposerPageProps {
+  configurationIdOverride?: string | null;
+  embedded?: boolean;
+  onClose?: () => void;
+  onOrderCreated?: (orderId: string) => void;
+}
+
 const fieldLabel = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 
 const isWeightKey = (key: string) => key.toUpperCase().includes('WEIGHT');
@@ -41,7 +48,12 @@ const formatCurrency = (value: number | undefined, currency = 'NGN') =>
 const inputClassName =
   'w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-400 dark:border-white/10 dark:bg-slate-950 dark:text-white';
 
-const CustomOrderComposerPage: React.FC = () => {
+const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
+  configurationIdOverride,
+  embedded = false,
+  onClose,
+  onOrderCreated,
+}) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const profile = useSelector((state: RootState) => state.user.profile);
@@ -66,7 +78,7 @@ const CustomOrderComposerPage: React.FC = () => {
   const [noDirectMatchAcknowledged, setNoDirectMatchAcknowledged] = useState(false);
   const createKeyRef = useRef(createIdempotencyKey());
 
-  const configurationId = searchParams.get('configurationId');
+  const configurationId = configurationIdOverride ?? searchParams.get('configurationId');
 
   useEffect(() => {
     setCustomerName([profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim());
@@ -313,8 +325,13 @@ const CustomOrderComposerPage: React.FC = () => {
         idempotencyKey: createKeyRef.current,
         noDirectMatchAcknowledged,
       });
-      toast.success('Custom order created. Continue to payment on the next screen.');
-      navigate(`/custom-orders/${order.id}`);
+      if (embedded) {
+        toast.success('Custom order created. Open your custom orders to continue payment.');
+        onOrderCreated?.(order.id);
+      } else {
+        toast.success('Custom order created. Continue to payment on the next screen.');
+        navigate(`/custom-orders/${order.id}`);
+      }
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to create custom order');
     } finally {
@@ -328,7 +345,7 @@ const CustomOrderComposerPage: React.FC = () => {
 
   if (!configuration) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
+      <div className={embedded ? 'w-full px-2 py-2' : 'mx-auto max-w-3xl px-4 py-10'}>
         <div className="rounded-3xl border border-black/10 bg-white/80 p-8 dark:border-white/10 dark:bg-white/5">
           <div className="text-lg font-semibold text-slate-900 dark:text-white">Custom order configuration unavailable</div>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
@@ -336,7 +353,13 @@ const CustomOrderComposerPage: React.FC = () => {
           </p>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              if (embedded) {
+                onClose?.();
+                return;
+              }
+              navigate(-1);
+            }}
             className="mt-5 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black"
           >
             Back
@@ -347,7 +370,7 @@ const CustomOrderComposerPage: React.FC = () => {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
+    <div className={embedded ? 'w-full px-2 py-2' : 'mx-auto max-w-6xl px-4 py-10'}>
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600 dark:text-emerald-300">Custom Order</div>
@@ -356,7 +379,17 @@ const CustomOrderComposerPage: React.FC = () => {
             Build the request, lock the price preview, then create the order and continue to payment.
           </p>
         </div>
-        <button type="button" onClick={() => navigate(-1)} className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200">
+        <button
+          type="button"
+          onClick={() => {
+            if (embedded) {
+              onClose?.();
+              return;
+            }
+            navigate(-1);
+          }}
+          className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200"
+        >
           Back
         </button>
       </div>

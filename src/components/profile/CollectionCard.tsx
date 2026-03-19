@@ -70,6 +70,10 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   const isPublishing = clientStatus === 'publishing';
   const publishFailed = clientStatus === 'publish-failed';
   const statusMessage = collection.clientStatusMessage || (isPublishing ? 'Publishing...' : publishFailed ? 'Publish failed' : undefined);
+  const publishProgress = typeof collection.clientStatusMeta?.progress === 'number'
+    ? Math.max(0, Math.min(100, Math.round(collection.clientStatusMeta.progress)))
+    : null;
+  const clientPreviewUrl = collection.clientStatusMeta?.previewUrl;
 
   const displayItemCount = itemCount || postsCount;
   const [resolvedCover, setResolvedCover] = useState<string | undefined>(coverImage && coverImage.length > 0 ? coverImage : undefined);
@@ -178,6 +182,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
 
   // The image to actually display: hover preview takes priority over resolved cover
   const displaySrc = resolvedHoverSrc || resolvedCover;
+  const resolvedDisplaySrc = displaySrc || (isPublishing ? clientPreviewUrl : undefined);
   const [accessOpen, setAccessOpen] = useState(false);
 
   // Compute compact price bands (align with MarketCard)
@@ -288,9 +293,11 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
           <div className="absolute inset-0 z-40 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-white px-4 text-center">
             {isPublishing ? (
               <>
-                <VLoader size={24} progress={62} phase="loading" showLabel={false} />
+                <VLoader size={24} progress={publishProgress} phase="loading" showLabel={false} />
                 <div className="text-sm font-medium">{statusMessage}</div>
-                <div className="text-xs text-white/70">You can keep browsing; we will finish this in the background.</div>
+                <div className="text-xs text-white/70">
+                  {publishProgress !== null ? `${publishProgress}% uploaded` : 'You can keep browsing; we will finish this in the background.'}
+                </div>
               </>
             ) : (
               <>
@@ -352,7 +359,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
               ))}
             </div>
           </>
-        ) : displaySrc ? (
+        ) : resolvedDisplaySrc ? (
           <>
             {!imgLoaded && (
               <div className="absolute inset-0 animate-pulse bg-white/10 dark:bg-white/5" />
@@ -360,12 +367,12 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
             
             {/* Check if video based on extension */}
             {(() => {
-              const isVideo = displaySrc.match(/\.(mp4|webm|mov|m4v)($|\?)/i);
+              const isVideo = resolvedDisplaySrc.match(/\.(mp4|webm|mov|m4v)($|\?)/i);
               if (isVideo) {
                 return (
                   <MediaRenderer
                     kind="video"
-                    src={displaySrc}
+                    src={resolvedDisplaySrc}
                     controls={false}
                     autoPlay
                     muted
@@ -382,7 +389,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
               return (
                 <MediaRenderer
                   kind="image"
-                  src={displaySrc}
+                  src={resolvedDisplaySrc}
                   alt={title}
                   fit="contain"
                   maxHeightClassName="max-h-none"

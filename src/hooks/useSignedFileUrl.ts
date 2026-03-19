@@ -62,15 +62,16 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     setError(null);
 
-    // Optimization: If initial is already a signed URL (has query params) or non-S3, use it.
-    if (initial && (initial.includes('?') || !initial.includes('s3'))) {
+    // If no stable fileId is available, use initial-url optimization.
+    // When fileId exists, prefer resolving by fileId to avoid stale signed URLs.
+    if (!fileId && initial && (initial.includes('?') || !initial.includes('s3'))) {
         setUrl(initial);
         setLoading(false);
         return;
     }
 
     // Handle unsigned S3 URLs (contain '.s3.' but no '?' query params) – sign via raw URL
-    if (initial && initial.includes('.s3.') && !initial.includes('?')) {
+    if (!fileId && initial && initial.includes('.s3.') && !initial.includes('?')) {
       setLoading(true);
       dedup(initial, () => brandApi.getSignedS3Url(initial)).then((signed) => {
         if (!cancelled) {

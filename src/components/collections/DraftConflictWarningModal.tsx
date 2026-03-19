@@ -210,7 +210,7 @@ export const DraftConflictWarningModal: React.FC<DraftConflictWarningModalProps>
             >
               {isTakingOver ? (
                 <>
-                  <VLoader size={16} progress={61} phase="loading" showLabel={false} />
+                  <VLoader size={16} phase="loading" showLabel={false} />
                   Taking over...
                 </>
               ) : (

@@ -14,6 +14,7 @@ import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
+import { CONTENT_DISPLAY_FRAME_CLASS, CONTENT_DISPLAY_MEDIA_CLASS } from '@/components/media/contentDisplayPresets';
 
 interface InlineProductDetailProps {
   product: StoreProduct;
@@ -449,9 +450,9 @@ export default function InlineProductDetail({
                 fileId={currentImage.fileId}
                 alt={product.name}
                 fit="contain"
-                maxHeightClassName="max-h-[85vh]"
-                className="block w-full h-auto max-h-[85vh] max-w-full"
-                containerClassName="w-full"
+                maxHeightClassName=""
+                className={CONTENT_DISPLAY_MEDIA_CLASS}
+                containerClassName={`${CONTENT_DISPLAY_FRAME_CLASS} rounded-2xl`}
                 rounded="xl"
               />
             ) : (

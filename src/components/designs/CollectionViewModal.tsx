@@ -99,7 +99,7 @@ const CollectionViewModal: React.FC<Props> = ({ open, collection, media, onClose
               <div
                 ref={dialogRef}
                 tabIndex={-1}
-                className="w-full max-w-4xl max-h-full neu-modal-surface bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-gray-200/70 dark:border-white/10 overflow-hidden flex flex-col text-gray-900 dark:text-gray-100"
+                className="w-full max-w-6xl max-h-full neu-modal-surface bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-gray-200/70 dark:border-white/10 overflow-hidden flex flex-col text-gray-900 dark:text-gray-100"
                 onClick={(e) => e.stopPropagation()}
               >
               {/* Header */}

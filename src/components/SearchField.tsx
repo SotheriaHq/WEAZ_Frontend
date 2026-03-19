@@ -20,6 +20,8 @@ interface SearchFieldProps {
   ariaControls?: string;
   ariaActiveDescendant?: string;
   ariaAutocomplete?: 'list' | 'none';
+  /** When true, the field starts collapsed as an emoji icon and expands on click. Default: true */
+  collapsible?: boolean;
 }
 
 const SearchField: React.FC<SearchFieldProps> = ({
@@ -41,6 +43,7 @@ const SearchField: React.FC<SearchFieldProps> = ({
   ariaControls,
   ariaActiveDescendant,
   ariaAutocomplete = 'none',
+  collapsible = true,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [internalValue, setInternalValue] = useState('');
@@ -49,6 +52,9 @@ const SearchField: React.FC<SearchFieldProps> = ({
   const inputValue = value ?? internalValue;
   const resolvedInputRef = inputRef ?? fallbackInputRef;
   const hasFilterItems = Boolean(showFilter && filterItems && filterItems.length > 0);
+
+  // Field is expanded when focused, has a value, or collapsible is disabled
+  const isExpanded = !collapsible || isFocused || Boolean(inputValue);
 
   const containerClassName = useMemo(
     () => `relative z-[80] flex-1 min-w-0 max-w-2xl ${className ?? ''}`,
@@ -71,9 +77,35 @@ const SearchField: React.FC<SearchFieldProps> = ({
     }
   }, [isFocused, resolvedInputRef]);
 
+  const handleExpand = () => {
+    setIsFocused(true);
+    onFocus?.();
+    // Focus the input after a tick so the DOM is ready
+    requestAnimationFrame(() => {
+      resolvedInputRef.current?.focus();
+    });
+  };
+
+  // Collapsed state: just the emoji button
+  if (!isExpanded) {
+    return (
+      <div ref={wrapperRef} className={containerClassName} role="search">
+        <button
+          type="button"
+          onClick={handleExpand}
+          className="flex items-center justify-center rounded-full p-2 text-xl transition-all duration-200 hover:scale-110 hover:bg-black/5 dark:hover:bg-white/10"
+          aria-label={ariaLabel}
+        >
+          🔎
+        </button>
+      </div>
+    );
+  }
+
+  // Expanded state: full input field
   return (
     <div ref={wrapperRef} className={containerClassName} role="search">
-      <div className="relative flex items-center">
+      <div className="relative flex items-center transition-all duration-200">
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">🔎</span>
         <input
           ref={resolvedInputRef}

@@ -15,6 +15,11 @@ import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import {
+  CONTENT_DISPLAY_FRAME_CLASS,
+  CONTENT_DISPLAY_MEDIA_CLASS,
+  CONTENT_DISPLAY_RENDERER_CLASS,
+} from '@/components/media/contentDisplayPresets';
 
 // Types
 export interface ProductDetailData {
@@ -356,7 +361,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               aria-modal="true"
               aria-label={product?.name ?? 'Product details'}
             >
-              <div ref={dialogRef} tabIndex={-1} className="w-full max-w-6xl max-h-full neu-modal-surface bg-white dark:bg-gray-950 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+              <div ref={dialogRef} tabIndex={-1} className="w-full max-w-[1360px] max-h-full neu-modal-surface bg-white dark:bg-gray-950 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
               {/* Close button */}
               <button
                 type="button"
@@ -373,14 +378,16 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   {/* Left - Image Gallery */}
                   <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 p-6">
                     {/* Main image */}
-                    <div className="relative rounded-2xl overflow-hidden shadow-lg">
+                    <div className={`${CONTENT_DISPLAY_FRAME_CLASS} rounded-2xl shadow-lg`}>
                       <MediaRenderer
                         kind="image"
                         src={product.images[selectedImage] || product.thumbnail || ''}
                         alt={product.name}
-                        maxHeightClassName="max-h-[60vh]"
-                        className="rounded-2xl"
-                        mediaClassName="rounded-2xl"
+                        fit="contain"
+                        maxHeightClassName=""
+                        allowScroll={true}
+                        className={CONTENT_DISPLAY_RENDERER_CLASS}
+                        mediaClassName={CONTENT_DISPLAY_MEDIA_CLASS}
                       />
                       
                       {/* Sale badge */}

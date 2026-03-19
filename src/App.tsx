@@ -43,7 +43,6 @@ import {
   StorefrontAliasRedirect,
 } from './pages/redirects/PublicAliasRedirects';
 import VerifiedBadgeMeaningPage from './pages/ui/VerifiedBadgeMeaningPage';
-import DesignPreview from './pages/DesignPreview';
 import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
@@ -213,7 +212,6 @@ const router = createBrowserRouter([
           { path: 'trending', element: <TrendingPlaceholder /> },
           { path: 'size-charts', element: <SizeChartsPage /> },
           { path: 'help/verified-badge', element: <VerifiedBadgeMeaningPage /> },
-          { path: 'design-preview', element: <DesignPreview /> },
           { path: 'settings', element: <SettingsHome /> },
           { path: 'settings/collections', element: <CollectionsSettings /> },
         ],

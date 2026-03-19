@@ -377,7 +377,7 @@ export const PriceChangePreviewModal: React.FC<PriceChangePreviewModalProps> = (
               >
                 {isConfirming ? (
                   <>
-                    <VLoader size={16} progress={72} phase="loading" showLabel={false} />
+                    <VLoader size={16} phase="loading" showLabel={false} />
                     Updating...
                   </>
                 ) : (

@@ -542,11 +542,12 @@ export const EndUserProfile: React.FC = () => {
     <div className="relative p-3 sm:p-5 lg:p-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-gradient-to-b from-fuchsia-500/10 via-indigo-500/5 to-transparent dark:from-fuchsia-400/10 dark:via-purple-500/10" />
       <div className="mx-auto w-full max-w-[1280px]">
-        <section className="rounded-[2rem] border border-gray-200/70 bg-white/70 p-4 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-black/20 sm:p-6">
+        <section className="rounded-[2rem] bg-white/60 p-4 backdrop-blur-md dark:bg-black/20 sm:p-6">
           <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            {/* Profile info row: avatar + name on left, computed size on right */}
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="flex min-w-0 items-center gap-4 sm:gap-5">
-                <div className="relative h-20 w-20 shrink-0 rounded-[1.5rem] border border-white/60 bg-white/60 p-1 shadow-md dark:border-white/15 dark:bg-white/5 sm:h-24 sm:w-24">
+                <div className="relative h-20 w-20 shrink-0 rounded-[1.5rem] bg-white/70 p-1 shadow-sm dark:bg-white/5 sm:h-24 sm:w-24">
                   {profile.profileImage ? (
                     <img
                       src={profile.profileImage}
@@ -563,13 +564,13 @@ export const EndUserProfile: React.FC = () => {
                       type="button"
                       onClick={handleTriggerAvatarUpload}
                       disabled={avatarUploading}
-                      className="absolute bottom-0 right-0 rounded-full border border-white/60 bg-white/90 p-1 text-[11px] leading-none shadow-sm transition hover:scale-105 disabled:opacity-60 dark:border-white/20 dark:bg-zinc-900"
+                      className="absolute bottom-0 right-0 rounded-full bg-white/90 p-1 text-[11px] leading-none shadow-sm transition hover:scale-105 disabled:opacity-60 dark:bg-zinc-900"
                       title="Upload profile image"
                     >
                       ✏️
                     </button>
                   ) : (
-                    <div className="absolute bottom-0 right-0 rounded-full border border-white/60 bg-white/90 p-1 text-[11px] leading-none dark:border-white/20 dark:bg-zinc-900">
+                    <div className="absolute bottom-0 right-0 rounded-full bg-white/90 p-1 text-[11px] leading-none dark:bg-zinc-900">
                       {profile.profileVisibility === 'LOCKED' ? '🔒' : '🌐'}
                     </div>
                   )}
@@ -580,7 +581,7 @@ export const EndUserProfile: React.FC = () => {
                           type="button"
                           onClick={() => void handleRemoveAvatar()}
                           disabled={avatarUploading}
-                          className="rounded-lg border border-white/70 bg-white/95 px-1.5 py-1 text-[11px] leading-none shadow-sm dark:border-white/15 dark:bg-zinc-900"
+                          className="rounded-lg bg-white/95 px-1.5 py-1 text-[11px] leading-none shadow-sm dark:bg-zinc-900"
                           title="Remove profile image"
                         >
                           🗑️
@@ -596,8 +597,8 @@ export const EndUserProfile: React.FC = () => {
                       {fullName}
                     </h1>
                     {isOwner ? (
-                      <span className="inline-flex items-center rounded-full border border-fuchsia-400/40 bg-fuchsia-500/10 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700 dark:text-fuchsia-300">
-                        🏷️ Your Profile
+                      <span className="inline-flex items-center rounded-full bg-fuchsia-500/10 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700 dark:text-fuchsia-300">
+                        Your Profile
                       </span>
                     ) : null}
                   </div>
@@ -605,65 +606,63 @@ export const EndUserProfile: React.FC = () => {
                     @{profile.username}
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-                    {profile.location ? <span>📍 {profile.location}</span> : null}
+                    {profile.location ? <span>{profile.location}</span> : null}
                     {profile.location ? (joinLabel ? <span className="h-1 w-1 rounded-full bg-gray-400/80 dark:bg-gray-500" /> : null) : null}
                     {joinLabel ? <span>{joinLabel}</span> : null}
                   </div>
                 </div>
               </div>
+
+              {/* Computed size — displayed parallel to profile image on desktop */}
+              {isOwner ? (
+                <div className="shrink-0 md:text-right">
+                  {/* Minimal chart tabs */}
+                  <div className="mb-1.5 inline-flex flex-wrap gap-0.5 rounded-lg bg-gray-100/80 p-0.5 dark:bg-white/5">
+                    {[
+                      { value: 'UK', label: 'UK' },
+                      { value: 'US', label: 'US' },
+                      { value: 'NIGERIA', label: 'NG' },
+                      { value: 'ASIA', label: 'Asia' },
+                      { value: 'HYBRID_UK_NIGERIA', label: 'Hybrid' },
+                    ].map((option) => {
+                      const active = displayChartFamily === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => void handleDisplayChartChange(option.value)}
+                          disabled={chartSaving}
+                          className={`rounded-md px-2 py-1 text-[10px] font-semibold transition ${
+                            active
+                              ? 'bg-indigo-600 text-white shadow-sm'
+                              : 'text-gray-500 hover:text-gray-800 hover:bg-white dark:text-gray-400 dark:hover:text-white dark:hover:bg-zinc-800'
+                          }`}
+                          aria-pressed={active}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Computed size display */}
+                  <div className="rounded-xl bg-indigo-50/60 px-3 py-2 dark:bg-indigo-500/10">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500/80 dark:text-indigo-400/70">Computed size</div>
+                    <div className="text-xl font-bold text-indigo-900 dark:text-indigo-200">
+                      {chartLoading ? '...' : computedSize || '—'}
+                    </div>
+                    <div className="text-[10px] text-indigo-700/50 dark:text-indigo-400/40">
+                      Updates with custom-order fittings
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {isOwner ? (
               <ProfileActionsBar actions={profileActions} />
             ) : null}
 
-            {isOwner ? (
-              <section className="rounded-2xl border border-gray-200/70 bg-white/75 p-3 dark:border-white/10 dark:bg-black/20 sm:p-4">
-                <div className="grid gap-3 md:grid-cols-[220px_1fr] md:items-end">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Display chart</div>
-                    <div className="mt-1.5 inline-flex flex-wrap gap-1 rounded-xl border border-gray-200/80 bg-white p-1 dark:border-white/10 dark:bg-zinc-900/60">
-                      {[
-                        { value: 'UK', label: 'UK' },
-                        { value: 'US', label: 'US' },
-                        { value: 'NIGERIA', label: 'Nigeria' },
-                        { value: 'ASIA', label: 'Asia' },
-                        { value: 'HYBRID_UK_NIGERIA', label: 'Hybrid (UK + Nigeria)' },
-                      ].map((option) => {
-                        const active = displayChartFamily === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => void handleDisplayChartChange(option.value)}
-                            disabled={chartSaving}
-                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
-                              active
-                                ? 'bg-indigo-600 text-white shadow-sm'
-                                : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-zinc-800'
-                            }`}
-                            aria-pressed={active}
-                          >
-                            {option.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-indigo-200/60 bg-indigo-50/70 px-3 py-2 text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
-                    <div className="text-[11px] uppercase tracking-wide opacity-80">Computed size</div>
-                    <div className="mt-1 text-lg font-semibold">
-                      {chartLoading ? 'Loading...' : computedSize || 'Not available yet'}
-                    </div>
-                    <div className="mt-1 text-xs opacity-80">
-                      This updates when fittings are used in a custom-order size resolution.
-                    </div>
-                  </div>
-                </div>
-              </section>
-            ) : null}
-
-            <div className="mt-2 flex items-center gap-8 border-b border-gray-200/70 px-1 dark:border-white/10">
+            <div className="mt-2 flex items-center gap-8 px-1">
               {tabs.map(({ key, icon }) => {
                 const active = activeTab === key;
                 return (

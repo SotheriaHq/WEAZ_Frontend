@@ -496,7 +496,7 @@ const OrderManagement: React.FC = () => {
                 <tr>
                   <td colSpan={8} className="px-6 py-16 text-center">
                     <div className="flex justify-center">
-                      <VLoader size={56} progress={58} phase="loading" />
+                      <VLoader size={56} phase="loading" />
                     </div>
                   </td>
                 </tr>

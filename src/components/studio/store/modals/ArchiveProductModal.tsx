@@ -252,7 +252,7 @@ const ArchiveProductModal: React.FC<ArchiveProductModalProps> = ({
           >
             {loading ? (
               <>
-                <VLoader size={16} progress={64} phase="loading" showLabel={false} />
+                <VLoader size={16} phase="loading" showLabel={false} />
                 {isArchiving ? 'Archiving...' : 'Restoring...'}
               </>
             ) : (

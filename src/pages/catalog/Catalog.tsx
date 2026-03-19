@@ -30,6 +30,14 @@ import { getStoreStatus, type StoreStatusResponse } from '../../api/StoreApi';
 import FrostedButton from '@/components/ui/FrostedButton';
 import CatalogShopTab from '@/components/catalog/CatalogShopTab';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
+import {
+  type PublishTask,
+  readPublishTasks,
+  subscribePublishTasks,
+  prunePublishTasks,
+  removePublishTask,
+  updatePublishTask,
+} from '@/utils/publishTracker';
 
 import ComingSoon from '../placeholders/ComingSoon';
 
@@ -86,7 +94,8 @@ const ProfilePage: React.FC = () => {
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
-  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; message?: string }>>({});
+  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string }>>({});
+  const [publishTasks, setPublishTasks] = useState<PublishTask[]>(() => readPublishTasks());
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -224,6 +233,14 @@ const ProfilePage: React.FC = () => {
     }
   }, [isOwner, displayData.logoImage, localAvatarPreview]);
 
+  useEffect(() => {
+    prunePublishTasks();
+    setPublishTasks(readPublishTasks());
+    return subscribePublishTasks(() => {
+      setPublishTasks(readPublishTasks());
+    });
+  }, []);
+
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -236,6 +253,34 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     const navState = (location.state as any) || {};
     const navToast = navState.toast as { type?: 'success' | 'info' | 'warning' | 'error'; message?: string } | undefined;
+    if (navState.publishingTaskId) {
+      const taskId = String(navState.publishingTaskId);
+      const task = publishTasks.find((entry) => entry.id === taskId);
+      const lookupId = task?.collectionId || taskId;
+      const startedAt = typeof navState.publishingStartedAt === 'number' ? navState.publishingStartedAt : task?.startedAt ?? Date.now();
+      setPublishingStates((prev) => ({
+        ...prev,
+        [lookupId]: {
+          status: task?.status === 'failed' ? 'failed' : 'publishing',
+          startedAt,
+          attempts: 0,
+          progress: task?.progress,
+          previewUrl: task?.coverPreviewUrl,
+          taskId,
+          message:
+            task?.message ||
+            (navState.publishingTitle
+              ? `Publishing "${navState.publishingTitle}"`
+              : 'Publishing your design'),
+        },
+      }));
+      if (isOwner && user?.id) {
+        void fetchCollections(user.id);
+      }
+      navigate(`${location.pathname}${location.search}`, { replace: true });
+      return;
+    }
+
     if (navState.publishingCollectionId) {
       const id = String(navState.publishingCollectionId);
       const startedAt = typeof navState.publishingStartedAt === 'number' ? navState.publishingStartedAt : Date.now();
@@ -245,6 +290,7 @@ const ProfilePage: React.FC = () => {
           status: 'publishing',
           startedAt,
           attempts: 0,
+          progress: typeof navState.publishingProgress === 'number' ? navState.publishingProgress : undefined,
           message: navState.publishingTitle ? `Publishing "${navState.publishingTitle}"` : 'Publishing your design',
         },
       }));
@@ -265,7 +311,7 @@ const ProfilePage: React.FC = () => {
       else toast.info(message);
       navigate(`${location.pathname}${location.search}`, { replace: true });
     }
-  }, [fetchCollections, isOwner, location.pathname, location.search, location.state, navigate, user?.id]);
+  }, [fetchCollections, isOwner, location.pathname, location.search, location.state, navigate, publishTasks, user?.id]);
 
   const isEditModalOpen = searchParams.get('modal') === 'brand-setup';
 
@@ -785,6 +831,76 @@ const ProfilePage: React.FC = () => {
     [isVisitorView, visitorCollections, collections]
   );
 
+  useEffect(() => {
+    if (publishTasks.length === 0) return;
+    setPublishingStates((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      publishTasks.forEach((task) => {
+        const key = task.collectionId || task.id;
+        if (task.collectionId && task.id !== key && next[task.id]) {
+          delete next[task.id];
+          changed = true;
+        }
+        const current = next[key];
+        const nextStatus = task.status === 'failed' ? 'failed' : 'publishing';
+        const nextMessage = task.error || task.message || (task.status === 'failed' ? 'Publish failed' : 'Publishing your design...');
+        if (
+          !current ||
+          current.status !== nextStatus ||
+          current.progress !== task.progress ||
+          current.message !== nextMessage ||
+          current.previewUrl !== task.coverPreviewUrl ||
+          current.taskId !== task.id
+        ) {
+          next[key] = {
+            status: nextStatus,
+            startedAt: task.startedAt,
+            attempts: current?.attempts ?? 0,
+            progress: task.progress,
+            previewUrl: task.coverPreviewUrl,
+            taskId: task.id,
+            message: nextMessage,
+          };
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [publishTasks]);
+
+  useEffect(() => {
+    const completed = publishTasks.filter((task) => task.status === 'published' && task.collectionId);
+    if (completed.length === 0) return;
+
+    const checkAndCleanup = async () => {
+      for (const task of completed) {
+        const collectionId = task.collectionId;
+        if (!collectionId) continue;
+        try {
+          if (!isVisitorView && user?.id) {
+            await fetchCollections(user.id);
+          }
+          const latest = !isVisitorView ? collections : visitorCollections;
+          const isLive = latest.some((entry) => entry.id === collectionId);
+          if (isLive) {
+            removePublishTask(task.id);
+            setPublishingStates((prev) => {
+              const next = { ...prev };
+              delete next[task.id];
+              delete next[collectionId];
+              return next;
+            });
+          }
+        } catch {
+          // Ignore transient failures; polling and task updates will retry.
+        }
+      }
+    };
+
+    void checkAndCleanup();
+  }, [collections, fetchCollections, isVisitorView, publishTasks, user?.id, visitorCollections]);
+
   const handleCollectionViewerBack = useCallback(() => {
     setSelectedCollectionId(null);
     setSearchParams((prev) => {
@@ -854,17 +970,68 @@ const ProfilePage: React.FC = () => {
   );
 
   const decoratedCollections = useMemo(() => {
-    return searchAndVisibilityFiltered.map((c) => {
+    const decorated = searchAndVisibilityFiltered.map((c) => {
       const pub = publishingStates[c.id];
       if (!pub) return c;
       return {
         ...c,
         clientStatus: pub.status === 'publishing' ? 'publishing' : 'publish-failed',
         clientStatusMessage: pub.message ?? (pub.status === 'publishing' ? 'Publishing...' : 'Publish failed'),
-        clientStatusMeta: { startedAt: pub.startedAt, attempts: pub.attempts, offline: !navigator.onLine },
+        clientStatusMeta: {
+          startedAt: pub.startedAt,
+          attempts: pub.attempts,
+          offline: !navigator.onLine,
+          progress: pub.progress,
+          previewUrl: pub.previewUrl,
+          taskId: pub.taskId,
+        },
       } as CollectionDto;
     });
-  }, [publishingStates, searchAndVisibilityFiltered]);
+
+    if (visibilityFilter !== 'Public') {
+      return decorated;
+    }
+
+    const decoratedIds = new Set(decorated.map((entry) => entry.id));
+    const placeholders: CollectionDto[] = Object.entries(publishingStates)
+      .filter(([key, state]) => {
+        if (decoratedIds.has(key)) return false;
+        if (!state.previewUrl) return false;
+        if (state.status !== 'publishing') return false;
+        const query = searchQuery.trim().toLowerCase();
+        if (!query) return true;
+        return (state.message ?? '').toLowerCase().includes(query);
+      })
+      .map(([key, state]) => {
+        const nowIso = new Date(state.startedAt || Date.now()).toISOString();
+        return {
+          id: key,
+          status: 'DRAFT',
+          name: state.message || 'Publishing design',
+          description: 'Uploading in background',
+          ownerId: user?.id || '',
+          title: state.message || 'Publishing design',
+          isPublic: true,
+          visibility: 'PUBLIC',
+          type: 'EVERYBODY',
+          coverImage: state.previewUrl,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+          clientStatus: 'publishing',
+          clientStatusMessage: state.message || 'Publishing your design...',
+          clientStatusMeta: {
+            startedAt: state.startedAt,
+            attempts: state.attempts,
+            offline: !navigator.onLine,
+            progress: state.progress,
+            previewUrl: state.previewUrl,
+            taskId: state.taskId,
+          },
+        } as CollectionDto;
+      });
+
+    return [...placeholders, ...decorated];
+  }, [publishingStates, searchAndVisibilityFiltered, searchQuery, user?.id, visibilityFilter]);
 
   const ownerContentError =
     visibilityFilter === 'Drafts'
@@ -883,17 +1050,26 @@ const ProfilePage: React.FC = () => {
 
   const handleRetryPublishCheck = useCallback(async (collectionId: string) => {
     if (!collectionId) return;
+    const state = publishingStates[collectionId];
+    const targetCollectionId = state?.taskId && state.taskId === collectionId ? null : collectionId;
+    if (!targetCollectionId) {
+      toast.info('Still preparing upload session. Progress is updating in real time.');
+      return;
+    }
     try {
       setPublishingStates((prev) => ({
         ...prev,
-        [collectionId]: {
+        [targetCollectionId]: {
           status: 'publishing',
-          startedAt: prev[collectionId]?.startedAt ?? Date.now(),
-          attempts: (prev[collectionId]?.attempts ?? 0) + 1,
+          startedAt: prev[targetCollectionId]?.startedAt ?? Date.now(),
+          attempts: (prev[targetCollectionId]?.attempts ?? 0) + 1,
+          progress: prev[targetCollectionId]?.progress,
+          previewUrl: prev[targetCollectionId]?.previewUrl,
+          taskId: prev[targetCollectionId]?.taskId,
           message: 'Checking publish status...',
         },
       }));
-      await brandApi.getCollectionDetail(collectionId);
+      await brandApi.getCollectionDetail(targetCollectionId);
       if (!isVisitorView && user?.id) {
         await fetchCollections(user.id);
       } else if (isVisitorView && routeBrandId) {
@@ -902,7 +1078,7 @@ const ProfilePage: React.FC = () => {
       }
       setPublishingStates((prev) => {
         const next = { ...prev };
-        delete next[collectionId];
+        delete next[targetCollectionId];
         return next;
       });
       toast.success('Design is live');
@@ -910,19 +1086,23 @@ const ProfilePage: React.FC = () => {
       console.error('Publish status check failed', error);
       setPublishingStates((prev) => ({
         ...prev,
-        [collectionId]: {
+        [targetCollectionId]: {
           status: 'failed',
-          startedAt: prev[collectionId]?.startedAt ?? Date.now(),
-          attempts: (prev[collectionId]?.attempts ?? 0) + 1,
+          startedAt: prev[targetCollectionId]?.startedAt ?? Date.now(),
+          attempts: (prev[targetCollectionId]?.attempts ?? 0) + 1,
+          progress: prev[targetCollectionId]?.progress,
+          previewUrl: prev[targetCollectionId]?.previewUrl,
+          taskId: prev[targetCollectionId]?.taskId,
           message: 'Publish is still processing. Try again shortly.',
         },
       }));
     }
-  }, [fetchCollections, isVisitorView, routeBrandId, user]);
+  }, [fetchCollections, isVisitorView, publishingStates, routeBrandId, user]);
 
   // Poll publish status for any pending ids
   useEffect(() => {
-    const pending = Object.entries(publishingStates).filter(([, state]) => state.status === 'publishing');
+    const pending = Object.entries(publishingStates)
+      .filter(([id, state]) => state.status === 'publishing' && (!state.taskId || state.taskId !== id));
     if (pending.length === 0) return;
 
     const poll = async () => {

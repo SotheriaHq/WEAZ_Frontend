@@ -278,7 +278,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                               disabled={isChecking}
                               className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 text-sm font-medium text-gray-700 dark:text-white transition-colors inline-flex items-center gap-2 disabled:opacity-60"
                             >
-                              {isChecking && <VLoader size={16} progress={55} phase="loading" showLabel={false} />}
+                              {isChecking && <VLoader size={16} phase="loading" showLabel={false} />}
                               {isChecking ? 'Checking' : 'Connect'}
                             </button>
                           )}

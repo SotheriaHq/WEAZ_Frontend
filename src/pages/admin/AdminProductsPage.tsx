@@ -634,7 +634,7 @@ const AdminProductsPage: React.FC = () => {
                       >
                         <div className="h-36 w-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-white/5 dark:to-white/10">
                           {item.entityThumbnail ? (
-                            <img src={item.entityThumbnail} alt={item.entityName ?? ''} className="h-full w-full object-cover" loading="lazy" />
+                            <ImageWithFallback src={item.entityThumbnail} alt={item.entityName ?? ''} fallbackName={item.entityName ?? ''} fit="cover" className="h-36 w-full" />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center text-3xl text-gray-400">⭐</div>
                           )}

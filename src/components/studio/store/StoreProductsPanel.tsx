@@ -2378,7 +2378,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             }}
             className={`transition-opacity duration-300 ease-out ${loading ? 'opacity-50' : 'opacity-100'}`}
           >
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 transition-all duration-300">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(252px,1fr))] gap-4 transition-all duration-300">
             {filteredProducts.map((product) => {
               const collectionLabel =
                 product.collection?.title ||
@@ -2662,16 +2662,39 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 </div>
               </div>
             )}
+            {/* Filter empty — products exist but none match the filter */}
             {!loading && filteredProducts.length === 0 && products.length > 0 && !showDraftCollectionsInProductArea && (
               <div className="col-span-full py-16 text-center text-gray-500 dark:text-gray-400">
                 No products match this filter.
               </div>
             )}
+            {/* Absolute empty — no products at all. Rendered here so it sits inside
+                the same card container rather than creating a second orphan box. */}
+            {!loading && products.length === 0 && !showDraftCollectionsInProductArea && (() => {
+              const getEmptyStateType = (): EmptyStateType => {
+                switch (filterStatus) {
+                  case 'archived': return 'no-archived';
+                  case 'deleted': return 'no-deleted';
+                  case 'draft': return 'no-drafts';
+                  default: return 'no-products';
+                }
+              };
+              return (
+                <div className="col-span-full">
+                  <StoreEmptyState
+                    type={getEmptyStateType()}
+                    isOwner={true}
+                    onAction={filterStatus === 'draft' ? () => navigate('/studio/store/products/new') : undefined}
+                  />
+                </div>
+              );
+            })()}
             </div>
           </div>
         </div>
 
-        {/* Pagination */}
+        {/* Pagination — only shown when there is at least one product */}
+        {products.length > 0 && (
         <div className="border-t border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 p-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -2742,30 +2765,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             </div>
           </div>
         </div>
+        )}
       </div>
       )}
-
-      {outletView === 'products' && !loading && products.length === 0 && !showDraftCollectionsInProductArea && (() => {
-        // Determine which empty state to show based on filter
-        const getEmptyStateType = (): EmptyStateType => {
-          switch (filterStatus) {
-            case 'archived': return 'no-archived';
-            case 'deleted': return 'no-deleted';
-            case 'draft': return 'no-drafts';
-            case 'active': return 'no-products';
-            default: return 'no-products';
-          }
-        };
-        return (
-          <div className="backdrop-blur-xl bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl shadow-xl mt-6">
-            <StoreEmptyState 
-              type={getEmptyStateType()} 
-              isOwner={true}
-              onAction={filterStatus === 'draft' ? () => navigate('/studio/store/products/new') : undefined}
-            />
-          </div>
-        );
-      })()}
 
       {outletView === 'products' && showBulkActions && (
         <div className="fixed bottom-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-full bg-purple-600 px-6 py-3 text-sm font-semibold text-white shadow-2xl">
@@ -2978,7 +2980,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 )}
                 {collectionGalleryLoading ? (
                   <div className="flex h-[50vh] w-full items-center justify-center">
-                    <VLoader size={42} progress={60} phase="loading" showLabel={false} />
+                    <VLoader size={42} phase="loading" showLabel={false} />
                   </div>
                 ) : !selectedCollectionGalleryImage ? (
                   <div className="flex h-[40vh] w-full items-center justify-center">

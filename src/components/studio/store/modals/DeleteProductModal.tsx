@@ -160,7 +160,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
             <div className="p-6">
               {loading ? (
                 <div className="py-8 text-center">
-                  <VLoader size={34} progress={46} phase="loading" showLabel={false} className="mx-auto" />
+                  <VLoader size={34} phase="loading" showLabel={false} className="mx-auto" />
                   <p className="text-gray-500 dark:text-gray-400 mt-3">Checking impact...</p>
                 </div>
               ) : impact ? (
@@ -320,7 +320,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
               >
                 {deleting ? (
                   <>
-                    <VLoader size={16} progress={74} phase="loading" showLabel={false} />
+                    <VLoader size={16} phase="loading" showLabel={false} />
                     Deleting...
                   </>
                 ) : (

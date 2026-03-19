@@ -210,7 +210,7 @@ const StoreMediaReviewStep: React.FC<StoreMediaReviewStepProps> = ({
             >
               {isAutoFixing ? (
                 <>
-                  <VLoader size={16} progress={60} phase="loading" showLabel={false} />
+                  <VLoader size={16} phase="loading" showLabel={false} />
                   Processing...
                 </>
               ) : (

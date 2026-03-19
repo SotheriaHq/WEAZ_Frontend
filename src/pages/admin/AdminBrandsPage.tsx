@@ -11,6 +11,7 @@ import FilterDropdown from '@/components/ui/FilterDropdown';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import BrandDetailModal from './modals/BrandDetailModal';
 import useDebounce from '@/hooks/useDebounce';
+import ImageWithFallback from '@/components/ImageWithFallback';
 
 type StoreFilter = 'ALL' | 'OPEN' | 'CLOSED';
 type StatusFilter = 'ALL' | 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
@@ -361,7 +362,7 @@ const AdminBrandsPage: React.FC = () => {
                       <div className="flex items-center gap-3">
                         <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-gray-200/70 bg-gray-100 dark:border-white/10 dark:bg-white/10">
                           {visual ? (
-                            <img src={visual} alt={brand.name ?? 'Brand'} className="h-full w-full object-cover" loading="lazy" />
+                            <ImageWithFallback src={visual} alt={brand.name ?? 'Brand'} fallbackName={brand.name ?? 'Brand'} fit="cover" className="h-11 w-11" rounded="xl" />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center text-sm font-bold text-gray-500 dark:text-gray-300">
                               {String(brand.name ?? 'BR').slice(0, 2).toUpperCase()}
@@ -449,7 +450,7 @@ const AdminBrandsPage: React.FC = () => {
               >
                 <div className="h-36 w-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-500/20 dark:to-purple-500/20">
                   {visual ? (
-                    <img src={visual} alt={brand.name ?? 'Brand'} className="h-full w-full object-cover" loading="lazy" />
+                    <ImageWithFallback src={visual} alt={brand.name ?? 'Brand'} fallbackName={brand.name ?? 'Brand'} fit="cover" className="h-36 w-full" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-3xl text-gray-500 dark:text-gray-300">🏷️</div>
                   )}

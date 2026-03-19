@@ -845,7 +845,7 @@ export const CollectionCartPreviewModal: React.FC<CollectionCartPreviewModalProp
             >
               {isAdding ? (
                 <>
-                  <VLoader size={16} progress={68} phase="loading" showLabel={false} />
+                  <VLoader size={16} phase="loading" showLabel={false} />
                   Adding to Cart...
                 </>
               ) : (

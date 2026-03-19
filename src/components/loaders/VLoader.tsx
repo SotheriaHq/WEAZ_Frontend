@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 export interface VLoaderProps {
   size?: number;
@@ -22,8 +22,62 @@ const VLoader: React.FC<VLoaderProps> = ({
   className = '',
 }) => {
   const normalized = useMemo(() => clampProgress(progress), [progress]);
-  const derivedProgress = normalized ?? (phase === 'complete' ? 100 : phase === 'finishing' ? 90 : phase === 'starting' ? 12 : 56);
-  const completion = Math.round(derivedProgress);
+  const [animatedProgress, setAnimatedProgress] = useState(phase === 'starting' ? 12 : 8);
+  const [displayProgress, setDisplayProgress] = useState(animatedProgress);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (normalized !== null) {
+      setAnimatedProgress(normalized);
+      return;
+    }
+    if (phase === 'complete') {
+      setAnimatedProgress(100);
+      return;
+    }
+    if (phase === 'finishing') {
+      setAnimatedProgress(94);
+      return;
+    }
+    if (phase === 'starting') {
+      setAnimatedProgress(12);
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setAnimatedProgress((current) => {
+        if (current >= 92) return 92;
+        const nextStep = current < 35 ? 4 : current < 70 ? 2 : 1;
+        return Math.min(92, current + nextStep);
+      });
+    }, 320);
+
+    return () => window.clearInterval(timer);
+  }, [normalized, phase]);
+
+  // Smoothly animate the display progress toward the target
+  const target = normalized ?? animatedProgress;
+  useEffect(() => {
+    let active = true;
+    const animate = () => {
+      if (!active) return;
+      setDisplayProgress((current) => {
+        const diff = target - current;
+        if (Math.abs(diff) < 0.5) return target;
+        // Ease toward target: move ~12% of the remaining distance per frame
+        return current + diff * 0.12;
+      });
+      rafRef.current = requestAnimationFrame(animate);
+    };
+    rafRef.current = requestAnimationFrame(animate);
+    return () => {
+      active = false;
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [target]);
+
+  const completion = Math.round(displayProgress);
+  const isActive = phase !== 'complete' && phase !== 'idle';
   const phaseLabel =
     phase === 'complete'
       ? 'Thread complete'
@@ -45,7 +99,7 @@ const VLoader: React.FC<VLoaderProps> = ({
       >
         <div className="relative flex h-full w-full items-center justify-center rounded-full bg-[#0f0f0f] text-white">
           <span
-            className={`text-[1.45rem] leading-none ${phase === 'complete' ? '' : 'animate-[spin_1.8s_linear_infinite]'}`}
+            className={`text-[1.45rem] leading-none ${isActive ? 'animate-[spin_1.8s_linear_infinite]' : ''}`}
             aria-hidden="true"
           >
             {phase === 'complete' ? '✅' : '🧵'}

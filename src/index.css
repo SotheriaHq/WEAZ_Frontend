@@ -9,6 +9,37 @@ html {
   text-rendering: geometricPrecision;
 }
 
+/* ─── Global thin blending scrollbars ─────────────────────────────────────── */
+/* Light mode: barely-there warm-gray thumb, transparent track */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 113, 108, 0.25) transparent;
+}
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(120, 113, 108, 0.25);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(120, 113, 108, 0.45);
+}
+/* Dark mode: white ghost thumb */
+.dark * {
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+.dark *::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
 /* Unified Dark Theme - YouTube-style consistency */
 @layer base {
   :root {
@@ -117,8 +148,8 @@ html {
   }
 
   .scrollbar-threadly::-webkit-scrollbar {
-    height: 10px;
-    width: 10px;
+    height: 4px;
+    width: 4px;
   }
 
   .scrollbar-threadly::-webkit-scrollbar-track {
@@ -471,9 +502,11 @@ html {
     @apply text-gray-800 bg-gray-200/70 dark:text-gray-200 dark:bg-gray-600/20;
   }
 
-  /* Unified search input styling */
+  /* Unified search input styling — uses system surface so it never clashes with page bg */
   .threadly-search-input {
-    @apply w-full rounded-xl bg-gray-100 dark:bg-white/5 border border-transparent px-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus:border-transparent;
+    @apply w-full rounded-xl border border-transparent px-4 py-2.5 text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus:border-transparent;
+    background-color: var(--surface-secondary);
+    color: var(--text-primary);
   }
 
   /* Theme-aware background utilities */
@@ -689,48 +722,31 @@ body.modal-open {
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #000000 transparent;
+  scrollbar-color: rgba(120, 113, 108, 0.2) transparent;
 }
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 1px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #000000;
-  border-radius: 2px;
+  background-color: rgba(120, 113, 108, 0.2);
+  border-radius: 999px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #000000;
-}
-
-/* Purple glassmorphism scrollbar for modals */
+/* Modal scrollbar — same subtle blending */
 .glass-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #8b5cf6 rgba(139, 92, 246, 0.1);
+  scrollbar-color: rgba(120, 113, 108, 0.2) transparent;
 }
-
-.glass-scrollbar::-webkit-scrollbar {
-  width: 6px;
+.dark .glass-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
-
-.glass-scrollbar::-webkit-scrollbar-track {
-  background: rgba(139, 92, 246, 0.1);
-  border-radius: 3px;
-}
-
+.glass-scrollbar::-webkit-scrollbar { width: 4px; }
+.glass-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .glass-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #8b5cf6, #a855f7);
-  border-radius: 3px;
+  background-color: rgba(120, 113, 108, 0.2);
+  border-radius: 999px;
 }
-
-.glass-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #7c3aed, #9333ea);
+.dark .glass-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Collection Creation Page - Design System Classes */
@@ -928,48 +944,34 @@ body.modal-open {
 
 .sidebar-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #000000 transparent;
+  scrollbar-color: rgba(120, 113, 108, 0.2) transparent;
 }
-
-.sidebar-scrollbar::-webkit-scrollbar {
-  width: 4px;
+.dark .sidebar-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
-
-.sidebar-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+.sidebar-scrollbar::-webkit-scrollbar { width: 4px; }
+.sidebar-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .sidebar-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #000000;
-  border-radius: 4px;
+  background-color: rgba(120, 113, 108, 0.2);
+  border-radius: 999px;
+}
+.dark .sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
-.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #4b5563;
-}
-
-/* Brands dropdown scrollbar - more visible for the specific dropdown */
+/* Dropdown scrollbar — slightly more visible so it's discoverable */
 .brands-dropdown-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #6b7280 #1f2937;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
-
-.brands-dropdown-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.brands-dropdown-scrollbar::-webkit-scrollbar-track {
-  background: #1f2937;
-  border-radius: 3px;
-}
-
+.brands-dropdown-scrollbar::-webkit-scrollbar { width: 4px; }
+.brands-dropdown-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .brands-dropdown-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #6b7280;
-  border-radius: 3px;
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
 }
-
 .brands-dropdown-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #9ca3af;
+  background-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Sleek scrollbar for notifications and other panels */
@@ -983,7 +985,7 @@ body.modal-open {
 }
 
 .sleek-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 .sleek-scrollbar::-webkit-scrollbar-track {
@@ -1153,7 +1155,7 @@ body.modal-open {
 /* Scrollbar for Modal Panels */
 /* Refined scrollbar for modal panes */
 .modal-scrollbar::-webkit-scrollbar {
-  width: 8px;
+  width: 4px;
 }
 
 .modal-scrollbar::-webkit-scrollbar-track {
@@ -1161,20 +1163,25 @@ body.modal-open {
 }
 
 .modal-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(34, 33, 34, 0.4);
-  /* purple-600/40 */
+  background-color: rgba(120, 113, 108, 0.25);
   border-radius: 99px;
   border: 0.5px solid transparent;
   background-clip: content-box;
 }
 
 .modal-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(23, 22, 23, 0.7);
+  background-color: rgba(120, 113, 108, 0.4);
+}
+.dark .modal-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .modal-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(21, 21, 21, 0.6) transparent;
+  scrollbar-color: rgba(120, 113, 108, 0.25) transparent;
+}
+.dark .modal-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
 /* Custom styles for Glassmorphism Emoji Picker */

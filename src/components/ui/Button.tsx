@@ -65,7 +65,7 @@ const Button: React.FC<ButtonProps> = ({
       disabled={disabled || loading}
       {...props}
     >
-      {loading && <VLoader size={16} progress={58} phase="loading" showLabel={false} />}
+      {loading && <VLoader size={16} phase="loading" showLabel={false} />}
       {icon && !loading && icon}
       {children}
     </button>
