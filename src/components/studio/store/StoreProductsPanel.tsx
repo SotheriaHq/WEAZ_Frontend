@@ -27,6 +27,8 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import VLoader from '@/components/loaders/VLoader';
 import { Select } from '@/components/ui/Select';
 import StoreEmptyState, { type EmptyStateType } from '@/components/designs/StoreEmptyState';
+import InlineProductDetail from '@/components/catalog/InlineProductDetail';
+import type { StoreProduct } from '@/components/designs/StoreProductCard';
 
 type StudioStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'DELETED';
 type OutletView = 'products' | 'collections';
@@ -284,6 +286,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const [collectionGallerySourceName, setCollectionGallerySourceName] = useState('');
   const [hoveredCollectionId, setHoveredCollectionId] = useState<string | null>(null);
   const [hoverPreviewFrame, setHoverPreviewFrame] = useState<Record<string, number>>({});
+  const [inlineProduct, setInlineProduct] = useState<StoreProduct | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -1161,16 +1164,54 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     navigate(`/studio/store?${params.toString()}`, { replace: true });
   };
 
-  const navigateToStudioProductDetails = (productId: string) => {
-    const params = new URLSearchParams();
-    if (activeCollectionId) {
-      params.set('collectionId', activeCollectionId);
-      if (activeCollection?.name) {
-        params.set('collectionTitle', activeCollection.name);
-      }
+  const navigateToStudioProductDetails = async (productId: string) => {
+    try {
+      const res = await productApi.getProduct(productId);
+      const data = (res as any)?.data ?? res;
+      // Map backend product to StoreProduct shape for InlineProductDetail
+      const mapped: StoreProduct = {
+        id: data.id,
+        collectionId: data.collectionId || '',
+        brandId: data.brandId || user?.id || '',
+        name: data.name || data.title || '',
+        description: data.description || '',
+        price: data.price ?? 0,
+        salePrice: data.salePrice ?? null,
+        effectivePrice: data.effectivePrice ?? data.salePrice ?? data.price ?? 0,
+        isOnSale: Boolean(data.isOnSale),
+        discountPercent: data.discountPercent ?? null,
+        thumbnail: data.thumbnail || null,
+        images: data.images || [],
+        media: data.media || [],
+        mediaIds: data.mediaIds || [],
+        sizes: data.sizes || [],
+        sizingMode: data.sizingMode,
+        customMeasurementKeys: data.customMeasurementKeys || [],
+        customAvailable: data.customAvailable ?? false,
+        sizeAvailability: data.sizeAvailability || [],
+        colors: data.colors || [],
+        variants: data.variants || [],
+        totalStock: data.totalStock ?? 0,
+        isLowStock: Boolean(data.isLowStock),
+        isOutOfStock: Boolean(data.isOutOfStock),
+        isFeatured: Boolean(data.isFeatured),
+        isActive: data.isActive,
+        archivedAt: data.archivedAt ?? null,
+        deletedAt: data.deletedAt ?? null,
+        publishAt: data.publishAt ?? null,
+        threadsCount: data.threadsCount ?? 0,
+        viewsCount: data.viewsCount ?? 0,
+        brand: {
+          id: data.brand?.id || user?.id || '',
+          name: data.brand?.name || user?.firstName || '',
+          logo: data.brand?.logo || '',
+          currency: data.brand?.currency || 'NGN',
+        },
+      };
+      setInlineProduct(mapped);
+    } catch {
+      toast.error('Failed to load product details.');
     }
-    const query = params.toString();
-    navigate(`/studio/store/products/${productId}${query ? `?${query}` : ''}`);
   };
 
   const handleCloseActiveCollectionView = () => {
@@ -1490,7 +1531,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
   return (
     <div className="space-y-6">
-      {outletView === 'products' && (
+      {outletView === 'products' && !inlineProduct && (
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
         <div className="p-4 sm:p-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1646,7 +1687,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       )}
 
       {/* ═══ UNIFIED COMMAND CENTER ═══ */}
-      {outletView === 'products' && (
+      {outletView === 'products' && !inlineProduct && (
       <div className="mb-6 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/95 dark:bg-[#111118]/95 backdrop-blur-xl shadow-lg overflow-hidden">
 
         {/* Header Row */}
@@ -1861,7 +1902,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       </div>
       )}
 
-      {outletView === 'collections' && (
+      {outletView === 'collections' && !inlineProduct && (
         <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
           <div className="border-b border-gray-200/80 dark:border-white/10 p-4 sm:p-6">
             <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -2365,8 +2406,19 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         </div>
       )}
 
+      {/* Inline Product Detail View */}
+      {inlineProduct && (
+        <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg p-4 sm:p-6">
+          <InlineProductDetail
+            product={inlineProduct}
+            onBack={() => setInlineProduct(null)}
+            brandName={inlineProduct.brand?.name}
+          />
+        </div>
+      )}
+
       {/* Products - with CSS containment for smooth tab transitions */}
-      {outletView === 'products' && (
+      {outletView === 'products' && !inlineProduct && (
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg">
         <div className="p-4 sm:p-6">
           <div

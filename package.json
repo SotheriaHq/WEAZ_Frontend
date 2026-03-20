@@ -12,6 +12,7 @@
     "test:watch": "vitest --watch"
   },
   "dependencies": {
+    "@emoji-mart/data": "^1.2.1",
     "@hookform/resolvers": "^5.1.1",
     "@reduxjs/toolkit": "^2.8.2",
     "@rollup/rollup-win32-x64-msvc": "^4.45.1",
@@ -19,6 +20,7 @@
     "axios": "^1.13.6",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "emoji-mart": "^5.6.0",
     "emoji-picker-react": "^4.15.0",
     "framer-motion": "^12.23.25",
     "lucide-react": "^0.525.0",

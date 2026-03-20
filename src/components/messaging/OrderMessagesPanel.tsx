@@ -5,16 +5,18 @@ import { useRealtime } from '@/realtime/RealtimeProvider';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 
-type ContextType = 'CUSTOM_ORDER' | 'STANDARD_ORDER';
+type ContextType = 'CUSTOM_ORDER' | 'STANDARD_ORDER' | 'INQUIRY';
 type ActorSurface = 'BUYER' | 'BRAND' | 'ADMIN';
 
 interface OrderMessagesPanelProps {
   contextType: ContextType;
-  orderId: string;
+  orderId?: string;
+  threadId?: string;
   title?: string;
   actorSurface?: ActorSurface;
   brandId?: string | null;
   readOnly?: boolean;
+  highlightMessageId?: string | null;
 }
 
 interface PendingAttachment {
@@ -57,10 +59,12 @@ const nextClientMessageId = () => {
 const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
   contextType,
   orderId,
+  threadId,
   title = 'Order messages',
   actorSurface = 'BUYER',
   brandId,
   readOnly = false,
+  highlightMessageId,
 }) => {
   const profile = useSelector((state: RootState) => state.user.profile);
   const actorId = profile?.id;
@@ -73,6 +77,9 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const attachmentsRef = useRef<PendingAttachment[]>([]);
+  const messageNodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const contextId = useMemo(() => orderId || threadId || '', [orderId, threadId]);
+  const useThreadTransport = actorSurface === 'BRAND' && Boolean(threadId);
 
   useEffect(() => {
     attachmentsRef.current = pendingAttachments;
@@ -89,20 +96,39 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
   }, []);
 
   const listMessages = useCallback(async () => {
-    if (!orderId) return;
+    if (!contextId) return;
+
+    if (useThreadTransport && threadId) {
+      const response = await messagingApi.listThreadMessages(threadId, { limit: 50 });
+      const sorted = [...response.items].sort(
+        (left, right) =>
+          new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+      );
+
+      setMessages(sorted);
+
+      const latestMessageId = sorted.at(-1)?.id;
+      if (latestMessageId) {
+        await messagingApi.markThreadReadById(threadId, latestMessageId);
+      }
+
+      return;
+    }
 
     const response =
-      actorSurface === 'ADMIN'
+      contextType === 'INQUIRY'
+        ? await messagingApi.listThreadMessages(contextId, { limit: 50 })
+        : actorSurface === 'ADMIN'
         ? contextType === 'CUSTOM_ORDER'
-          ? await messagingApi.listAdminCustomOrderMessages(orderId, { limit: 50 })
-          : await messagingApi.listAdminOrderMessages(orderId, { limit: 50 })
+          ? await messagingApi.listAdminCustomOrderMessages(contextId, { limit: 50 })
+          : await messagingApi.listAdminOrderMessages(contextId, { limit: 50 })
         : contextType === 'CUSTOM_ORDER'
           ? actorSurface === 'BRAND' && brandId
-            ? await messagingApi.listCustomOrderMessagesForBrand(brandId, orderId, { limit: 50 })
-            : await messagingApi.listCustomOrderMessages(orderId, { limit: 50 })
+            ? await messagingApi.listCustomOrderMessagesForBrand(brandId, contextId, { limit: 50 })
+            : await messagingApi.listCustomOrderMessages(contextId, { limit: 50 })
           : actorSurface === 'BRAND' && brandId
-            ? await messagingApi.listOrderMessagesForBrand(brandId, orderId, { limit: 50 })
-            : await messagingApi.listOrderMessages(orderId, { limit: 50 });
+            ? await messagingApi.listOrderMessagesForBrand(brandId, contextId, { limit: 50 })
+            : await messagingApi.listOrderMessages(contextId, { limit: 50 });
 
     const sorted = [...response.items].sort(
       (left, right) =>
@@ -114,46 +140,67 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
     if (actorSurface !== 'ADMIN') {
       const latestMessageId = sorted.at(-1)?.id;
       if (latestMessageId) {
-        if (contextType === 'CUSTOM_ORDER') {
+        if (contextType === 'INQUIRY') {
+          await messagingApi.markThreadReadById(contextId, latestMessageId);
+        } else if (contextType === 'CUSTOM_ORDER') {
           if (actorSurface === 'BRAND' && brandId) {
-            await messagingApi.markCustomOrderReadForBrand(brandId, orderId, latestMessageId);
+            await messagingApi.markCustomOrderReadForBrand(brandId, contextId, latestMessageId);
           } else {
-            await messagingApi.markCustomOrderRead(orderId, latestMessageId);
+            await messagingApi.markCustomOrderRead(contextId, latestMessageId);
           }
         } else if (actorSurface === 'BRAND' && brandId) {
-          await messagingApi.markOrderReadForBrand(brandId, orderId, latestMessageId);
+          await messagingApi.markOrderReadForBrand(brandId, contextId, latestMessageId);
         } else {
-          await messagingApi.markOrderRead(orderId, latestMessageId);
+          await messagingApi.markOrderRead(contextId, latestMessageId);
         }
       }
     }
-  }, [actorSurface, brandId, contextType, orderId]);
+  }, [actorSurface, brandId, contextId, contextType, threadId, useThreadTransport]);
 
   const loadSummary = useCallback(async () => {
-    if (!orderId) return;
+    if (!contextId) return;
 
     if (actorSurface === 'ADMIN') {
       setSummaryUnread(0);
       return;
     }
 
+    if (contextType === 'INQUIRY' || (useThreadTransport && threadId)) {
+      const inbox = await messagingApi.getInbox({
+        limit: 1,
+        q: threadId || contextId,
+      });
+      const matching = (inbox.items || []).find((item) => item.threadId === (threadId || contextId));
+      setSummaryUnread(Number(matching?.unreadCount ?? 0));
+      return;
+    }
+
     const summary =
       contextType === 'CUSTOM_ORDER'
         ? actorSurface === 'BRAND' && brandId
-          ? await messagingApi.getCustomOrderSummaryForBrand(brandId, orderId, true)
-          : await messagingApi.getCustomOrderSummary(orderId, true)
+          ? await messagingApi.getCustomOrderSummaryForBrand(brandId, contextId, true)
+          : await messagingApi.getCustomOrderSummary(contextId, true)
         : actorSurface === 'BRAND' && brandId
-          ? await messagingApi.getOrderSummaryForBrand(brandId, orderId, true)
-          : await messagingApi.getOrderSummary(orderId, true);
+          ? await messagingApi.getOrderSummaryForBrand(brandId, contextId, true)
+          : await messagingApi.getOrderSummary(contextId, true);
 
     setSummaryUnread(Number(summary?.unreadCount ?? 0));
-  }, [actorSurface, brandId, contextType, orderId]);
+  }, [actorSurface, brandId, contextId, contextType, threadId, useThreadTransport]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
       await Promise.all([listMessages(), loadSummary()]);
     } catch (error: any) {
+      console.error('[OrderMessagesPanel] refresh failed', {
+        contextType,
+        actorSurface,
+        brandId,
+        orderId,
+        threadId,
+        status: error?.response?.status,
+        message: error?.response?.data?.message || error?.message,
+      });
       toast.error(error?.response?.data?.message || 'Unable to load order messages');
     } finally {
       setLoading(false);
@@ -165,7 +212,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
   }, [refresh]);
 
   useEffect(() => {
-    if (!orderId) return;
+    if (!contextId) return;
 
     let intervalId: number | null = null;
     const setupPolling = () => {
@@ -196,9 +243,11 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
         window.clearInterval(intervalId);
       }
     };
-  }, [orderId, refresh]);
+  }, [contextId, refresh]);
 
   useEffect(() => {
+    if (!contextId) return;
+
     const unsubscribe = onNotification((payload) => {
       const type = String(payload?.type ?? '');
       const isMessageEvent =
@@ -211,9 +260,10 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
         return;
       }
 
-      const payloadOrderId =
-        String(payload?.payload?.customOrderId ?? payload?.payload?.orderId ?? '');
-      if (payloadOrderId !== String(orderId)) {
+      const payloadContextId = String(
+        payload?.payload?.threadId ?? payload?.payload?.customOrderId ?? payload?.payload?.orderId ?? '',
+      );
+      if (payloadContextId !== String(contextId)) {
         return;
       }
 
@@ -221,7 +271,31 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
     });
 
     return unsubscribe;
-  }, [onNotification, orderId, refresh]);
+  }, [contextId, onNotification, refresh]);
+
+  const handleComposerKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = (event) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    if (canSend) {
+      void handleSend();
+    }
+  };
+
+  useEffect(() => {
+    if (!highlightMessageId) return;
+    const targetNode = messageNodeRefs.current[highlightMessageId];
+    if (!targetNode) return;
+
+    targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    targetNode.classList.add('ring-2', 'ring-orange-400');
+    const timer = window.setTimeout(() => {
+      targetNode.classList.remove('ring-2', 'ring-orange-400');
+    }, 1800);
+    return () => window.clearTimeout(timer);
+  }, [highlightMessageId, messages]);
 
   const canSend = useMemo(() => {
     const hasBody = Boolean(input.trim());
@@ -286,17 +360,22 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
         clientMessageId: nextClientMessageId(),
         attachmentFileIds,
       };
-      if (contextType === 'CUSTOM_ORDER') {
+      if (!contextId) return;
+      if ((contextType === 'INQUIRY' || useThreadTransport) && threadId) {
+        await messagingApi.sendThreadMessage(threadId, payload);
+      } else if (contextType === 'INQUIRY') {
+        await messagingApi.sendThreadMessage(contextId, payload);
+      } else if (contextType === 'CUSTOM_ORDER') {
         if (actorSurface === 'BRAND' && brandId) {
-          await messagingApi.sendCustomOrderMessageForBrand(brandId, orderId, payload);
+          await messagingApi.sendCustomOrderMessageForBrand(brandId, contextId, payload);
         } else {
-          await messagingApi.sendCustomOrderMessage(orderId, payload);
+          await messagingApi.sendCustomOrderMessage(contextId, payload);
         }
       } else {
         if (actorSurface === 'BRAND' && brandId) {
-          await messagingApi.sendOrderMessageForBrand(brandId, orderId, payload);
+          await messagingApi.sendOrderMessageForBrand(brandId, contextId, payload);
         } else {
-          await messagingApi.sendOrderMessage(orderId, payload);
+          await messagingApi.sendOrderMessage(contextId, payload);
         }
       }
 
@@ -309,6 +388,17 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
       setPendingAttachments([]);
       await refresh();
     } catch (error: any) {
+      console.error('[OrderMessagesPanel] send failed', {
+        contextType,
+        actorSurface,
+        brandId,
+        orderId,
+        threadId,
+        hasBodyText: Boolean(bodyText),
+        attachmentCount: attachmentFileIds.length,
+        status: error?.response?.status,
+        message: error?.response?.data?.message || error?.message,
+      });
       toast.error(error?.response?.data?.message || 'Unable to send message');
     } finally {
       setSending(false);
@@ -347,6 +437,9 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
             return (
               <div
                 key={message.id}
+                ref={(node) => {
+                  messageNodeRefs.current[message.id] = node;
+                }}
                 className={`rounded-2xl border px-3 py-2 ${
                   mine
                     ? 'border-emerald-300/50 bg-emerald-50/70 dark:border-emerald-600/30 dark:bg-emerald-500/10'
@@ -388,6 +481,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
         <textarea
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onKeyDown={handleComposerKeyDown}
           rows={3}
           maxLength={4000}
           placeholder="Type a message for this order"

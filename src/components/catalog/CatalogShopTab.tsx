@@ -1,11 +1,8 @@
 import { memo, useState, useEffect, useMemo, useTransition, useCallback, useRef } from 'react';
 import {
-  ChevronDown,
-  ChevronUp,
   Bookmark,
   Search,
   PanelLeftClose,
-  PanelLeftOpen,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
@@ -42,6 +39,12 @@ const SORT_OPTIONS = [
   { value: 'price_desc', label: 'Price: High to Low' },
   { value: 'popular', label: 'Most Popular' },
 ];
+
+const COLOR_HEX_MAP: Record<string, string> = {
+  Black: '#000000', White: '#FFFFFF', Navy: '#1E3A5F', Red: '#DC2626',
+  Green: '#16A34A', Blue: '#2563EB', Pink: '#EC4899', Brown: '#92400E',
+  Gray: '#6B7280', Purple: '#9333EA', Yellow: '#EAB308', Orange: '#EA580C',
+};
 
 interface ProductCategory {
   id: string;
@@ -141,7 +144,10 @@ export default function CatalogShopTab({
   const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
   const [maxPrice, setMaxPrice] = useState<number | undefined>(undefined);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
-  
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [inStockOnly, setInStockOnly] = useState(false);
+
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [chipsCollapsed, setChipsCollapsed] = useState(false);
@@ -323,6 +329,7 @@ export default function CatalogShopTab({
         if (normalizedMinPrice !== undefined) params.minPrice = normalizedMinPrice;
         if (normalizedMaxPrice !== undefined) params.maxPrice = normalizedMaxPrice;
         if (onSale) params.onSale = 'true';
+        if (selectedCategory && selectedCategory !== 'ALL') params.category = selectedCategory;
 
         const response = await apiClient.get<Partial<ProductsResponse>>(`/brands/${brandId}/products`, { params });
         const payload = unwrapApiResponse<Partial<ProductsResponse>>(response.data);
@@ -359,6 +366,7 @@ export default function CatalogShopTab({
       normalizedMinPrice,
       onSale,
       page,
+      selectedCategory,
       sortBy,
     ]
   );
@@ -397,6 +405,46 @@ export default function CatalogShopTab({
     
     return [...staticCats, ...dynamicCats];
   }, [categories]);
+
+  // Collect available colors and sizes from loaded products
+  const availableColors = useMemo(() => {
+    const colorSet = new Set<string>();
+    for (const p of products) {
+      if (Array.isArray(p.colors)) {
+        for (const c of p.colors) colorSet.add(c);
+      }
+    }
+    return Array.from(colorSet).sort();
+  }, [products]);
+
+  const availableSizes = useMemo(() => {
+    const sizeSet = new Set<string>();
+    for (const p of products) {
+      if (Array.isArray(p.sizes)) {
+        for (const s of p.sizes) sizeSet.add(s);
+      }
+    }
+    return Array.from(sizeSet);
+  }, [products]);
+
+  // Client-side filtering for color, size, and in-stock
+  const filteredProducts = useMemo(() => {
+    let result = products;
+    if (selectedColors.length > 0) {
+      result = result.filter((p) =>
+        Array.isArray(p.colors) && p.colors.some((c) => selectedColors.includes(c))
+      );
+    }
+    if (selectedSizes.length > 0) {
+      result = result.filter((p) =>
+        Array.isArray(p.sizes) && p.sizes.some((s) => selectedSizes.includes(s))
+      );
+    }
+    if (inStockOnly) {
+      result = result.filter((p) => !p.isOutOfStock);
+    }
+    return result;
+  }, [products, selectedColors, selectedSizes, inStockOnly]);
 
   const isSystemStoreCollection = useCallback((collection: CollectionDto) => {
     if (collection.isSystemGenerated) return true;
@@ -461,6 +509,9 @@ export default function CatalogShopTab({
     setOnSale(false);
     setSelectedCategory('ALL');
     setSortBy('newest');
+    setSelectedColors([]);
+    setSelectedSizes([]);
+    setInStockOnly(false);
   };
 
   const handleOpenCollection = useCallback(
@@ -511,7 +562,7 @@ export default function CatalogShopTab({
     [isAuth],
   );
 
-  const showProductsEmpty = !error && !loading && products.length === 0;
+  const showProductsEmpty = !error && !loading && filteredProducts.length === 0;
 
   if (storeClosedPlaceholder) {
     return <div className="w-full">{storeClosedPlaceholder}</div>;
@@ -670,7 +721,7 @@ export default function CatalogShopTab({
       <div className="sticky top-0 z-30 bg-transparent py-4 -mx-4 px-6 mb-8 space-y-3 transition-all duration-300">
         <div className="flex gap-3 items-center">
           {/* Search Input with click-outside detection */}
-          <div 
+          <div
             ref={searchContainerRef}
             className={`transition-all duration-300 ease-out ${searchCollapsed ? 'w-11' : 'flex-1 max-w-[520px]'}`}
           >
@@ -694,24 +745,11 @@ export default function CatalogShopTab({
             )}
           </div>
 
-          {/* Toggle filters with emoji - Tooltip on hover */}
-          <div className="relative group">
-            <button
-              type="button"
-              onClick={() => setFiltersCollapsed((prev) => !prev)}
-              className="flex-shrink-0 h-9 w-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
-            >
-              {filtersCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-            </button>
-            <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-              {filtersCollapsed ? 'Show filters' : 'Hide filters'}
-            </span>
-          </div>
         </div>
 
         <div className="flex items-center justify-between gap-4">
           {/* Category Chips Scroll */}
-          <div className={`flex-1 transition-all duration-300 ease-out ${chipsCollapsed ? 'max-h-0 opacity-0 overflow-hidden py-0' : 'max-h-[200px] opacity-100 py-1'}`}>
+          <div className={`flex-1 transition-all duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${chipsCollapsed ? 'max-h-0 opacity-0 overflow-hidden py-0' : 'max-h-[200px] opacity-100 py-1'}`}>
             <div className="flex gap-2 overflow-x-auto no-scrollbar items-center pb-1">
               {displayCategories.map((cat) => {
                 const active = selectedCategory === cat.slug;
@@ -724,8 +762,8 @@ export default function CatalogShopTab({
                     })}
                     className={`
                       shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-200 border
-                      ${active 
-                        ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white border-transparent shadow-lg translate-y-[-1px]' 
+                      ${active
+                        ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white border-transparent shadow-lg translate-y-[-1px]'
                         : 'bg-white/80 dark:bg-white/5 text-gray-600 dark:text-gray-300 border-gray-200/80 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-400/50 hover:text-gray-900 dark:hover:text-white hover:bg-purple-50/60 dark:hover:bg-purple-500/10'}
                     `}
                   >
@@ -736,17 +774,7 @@ export default function CatalogShopTab({
             </div>
           </div>
 
-          {/* Toggle filters with emoji */}
-          <button
-            type="button"
-            onClick={() => setChipsCollapsed((prev) => !prev)}
-            className="flex-shrink-0 h-9 w-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
-            aria-label={chipsCollapsed ? 'Show filters' : 'Hide filters'}
-          >
-            {chipsCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-          </button>
-          
-          {/* Sort Dropdown */}
+          {/* Sort + count */}
           <div className="flex-shrink-0 flex items-center gap-2 pl-2 border-l border-gray-200 dark:border-white/10">
             <span className="text-xs text-gray-400 font-medium hidden sm:inline-block">
                {loading ? '...' : total} items
@@ -764,10 +792,10 @@ export default function CatalogShopTab({
 
       <div className="flex gap-6 items-start">
         {/* Desktop Filters Sidebar - Collapses horizontally to the side */}
-        <aside className={`hidden lg:block flex-shrink-0 transition-all duration-300 ease-in-out ${filtersCollapsed ? 'w-12' : 'w-72'}`}>
-          <div className={`sticky top-28 rounded-xl border border-gray-200/60 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] transition-all duration-300 ease-out overflow-hidden shadow-sm ${filtersCollapsed ? 'p-2' : 'p-5'}`}>
+        <aside className={`hidden lg:block flex-shrink-0 transition-[width] duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${filtersCollapsed ? 'w-12' : 'w-72'}`}>
+          <div className={`sticky top-28 rounded-xl border border-gray-200/60 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] transition-all duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] overflow-hidden shadow-sm ${filtersCollapsed ? 'p-2' : 'p-5'}`}>
             <div className="flex items-center justify-between">
-              <h4 className={`text-sm font-semibold text-gray-900 dark:text-white transition-all duration-300 whitespace-nowrap ${filtersCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>Filters</h4>
+              <h4 className={`text-sm font-semibold text-gray-900 dark:text-white transition-all duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] whitespace-nowrap ${filtersCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>Filters</h4>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -776,18 +804,31 @@ export default function CatalogShopTab({
                 >
                   Clear all
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setFiltersCollapsed((prev) => !prev)}
-                  className="h-8 w-8 flex-shrink-0 rounded-full border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 transition flex items-center justify-center"
-                  aria-label={filtersCollapsed ? 'Expand filters' : 'Collapse filters'}
-                >
-                  {filtersCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-                </button>
+                <div className="relative group">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextCollapsed = !filtersCollapsed;
+                      setFiltersCollapsed(nextCollapsed);
+                      setChipsCollapsed(nextCollapsed);
+                    }}
+                    className={`h-8 w-8 flex-shrink-0 rounded-full border transition-all flex items-center justify-center hover:scale-105 active:scale-95 ${
+                      filtersCollapsed
+                        ? 'border-purple-300 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                        : 'border-gray-200 dark:border-white/10 bg-white/70 dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10'
+                    }`}
+                    aria-label={filtersCollapsed ? 'Expand filters' : 'Collapse filters'}
+                  >
+                    {filtersCollapsed ? <span className="text-sm">🎛️</span> : <PanelLeftClose size={14} />}
+                  </button>
+                  <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                    {filtersCollapsed ? 'Show filters' : 'Hide filters'}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className={`transition-all duration-300 overflow-hidden ${filtersCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1200px] opacity-100 mt-4'}`}>
+            <div className={`transition-all duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] overflow-hidden ${filtersCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1200px] opacity-100 mt-4'}`}>
               <div className="space-y-6">
                 <div>
                   <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">Category</h5>
@@ -840,6 +881,87 @@ export default function CatalogShopTab({
                     On sale only
                   </label>
                 </div>
+
+                {/* In-Stock Only */}
+                <div className="border-t border-gray-200 dark:border-white/10 pt-4">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={inStockOnly}
+                      onChange={(e) => setInStockOnly(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-0"
+                    />
+                    In stock only
+                  </label>
+                </div>
+
+                {/* Color Filter */}
+                {availableColors.length > 0 && (
+                  <div className="border-t border-gray-200 dark:border-white/10 pt-4">
+                    <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">Color</h5>
+                    <div className="flex flex-wrap gap-2">
+                      {availableColors.map((color) => {
+                        const isSelected = selectedColors.includes(color);
+                        const hex = COLOR_HEX_MAP[color] ?? '#CBD5E1';
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() =>
+                              setSelectedColors((prev) =>
+                                isSelected ? prev.filter((c) => c !== color) : [...prev, color]
+                              )
+                            }
+                            className={`group relative h-8 w-8 rounded-full border-2 transition-all ${
+                              isSelected
+                                ? 'border-purple-600 ring-2 ring-purple-300 dark:ring-purple-500/40 scale-110'
+                                : 'border-gray-200 dark:border-white/20 hover:border-purple-400 hover:scale-105'
+                            }`}
+                            style={{ backgroundColor: hex }}
+                            aria-label={color}
+                            title={color}
+                          >
+                            {isSelected && (
+                              <span className="absolute inset-0 flex items-center justify-center">
+                                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke={hex === '#FFFFFF' || hex === '#EAB308' ? '#000' : '#fff'} strokeWidth="2.5"><path d="M3 8.5l3.5 3.5L13 4.5" /></svg>
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Size Filter */}
+                {availableSizes.length > 0 && (
+                  <div className="border-t border-gray-200 dark:border-white/10 pt-4">
+                    <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">Size</h5>
+                    <div className="flex flex-wrap gap-2">
+                      {availableSizes.map((size) => {
+                        const isSelected = selectedSizes.includes(size);
+                        return (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() =>
+                              setSelectedSizes((prev) =>
+                                isSelected ? prev.filter((s) => s !== size) : [...prev, size]
+                              )
+                            }
+                            className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                              isSelected
+                                ? 'bg-purple-600 border-purple-600 text-white shadow-md'
+                                : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-300'
+                            }`}
+                          >
+                            {size}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -886,7 +1008,7 @@ export default function CatalogShopTab({
                 </div>
               ) : null}
 
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 sm:gap-5">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(242px,1fr))] gap-4 sm:gap-5">
                 {showProductsEmpty ? (
                   <div className="col-span-full">
                     <StoreEmptyState type="no-products" isOwner={isOwner} />
@@ -894,7 +1016,7 @@ export default function CatalogShopTab({
                 ) : loading ? (
                   Array.from({ length: 8 }).map((_, idx) => <ProductCardSkeleton key={idx} />)
                 ) : (
-                  products.map((p) => (
+                  filteredProducts.map((p) => (
                     <StoreProductCard
                       key={p.id}
                       product={p}
@@ -927,15 +1049,23 @@ export default function CatalogShopTab({
       <FilterDrawer
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
-        filters={{ minPrice, maxPrice, onSale, category: selectedCategory, sortBy }}
+        filters={{
+          minPrice, maxPrice, onSale, category: selectedCategory, sortBy,
+          selectedColors, selectedSizes, inStockOnly,
+        }}
         onApply={(newFilters) => {
           if (newFilters.minPrice !== undefined) setMinPrice(newFilters.minPrice);
           if (newFilters.maxPrice !== undefined) setMaxPrice(newFilters.maxPrice);
           if (newFilters.onSale !== undefined) setOnSale(newFilters.onSale);
           if (newFilters.category !== undefined) setSelectedCategory(newFilters.category);
           if (newFilters.sortBy !== undefined) setSortBy(newFilters.sortBy);
+          if (newFilters.selectedColors !== undefined) setSelectedColors(newFilters.selectedColors);
+          if (newFilters.selectedSizes !== undefined) setSelectedSizes(newFilters.selectedSizes);
+          if (newFilters.inStockOnly !== undefined) setInStockOnly(newFilters.inStockOnly);
         }}
         categories={categories}
+        availableColors={availableColors}
+        availableSizes={availableSizes}
       />
     </div>
   );

@@ -1552,6 +1552,18 @@ export const brandApi = {
     }
   },
 
+  async getDashboardActivityFeed(brandId: string, limit = 12) {
+    try {
+      const response = await apiClient.get(`/brands/${brandId}/dashboard/activity-feed`, {
+        params: { limit },
+      });
+      return unwrapApiResponse<{ items: any[]; total: number }>(response.data);
+    } catch (error) {
+      console.error('Error fetching dashboard activity feed:', error);
+      return null;
+    }
+  },
+
   // ============================================
   // ORDERS
   // ============================================

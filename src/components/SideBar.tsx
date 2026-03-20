@@ -157,6 +157,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
       path: '/subscriptions',
       active: location.pathname === '/subscriptions',
     },
+    {
+      emoji: '💬',
+      label: 'Messages',
+      path: '/messages',
+      active: location.pathname === '/messages' || location.pathname.startsWith('/studio/messages'),
+    },
+    {
+      emoji: '📏',
+      label: 'Size Charts',
+      path: '/size-charts',
+      active: location.pathname === '/size-charts',
+    },
   ];
 
   const youLinks = [
@@ -166,12 +178,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
 
   const exploreLinks = [
     { emoji: '📈', label: 'Trending', path: '/trending', active: location.pathname === '/trending' },
-    {
-      emoji: '📏',
-      label: 'Size Charts',
-      path: '/size-charts',
-      active: location.pathname === '/size-charts',
-    },
   ];
 
   const mobileDockLinks = [

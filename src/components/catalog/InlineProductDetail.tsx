@@ -215,7 +215,21 @@ export default function InlineProductDetail({
   const inStockVariants = variants.filter((variant) => Number(variant.stock || 0) > 0);
   const compareAtPrice = (product as any).compareAtPrice as number | undefined;
   const isOutOfStock = !product.totalStock || product.totalStock <= 0;
-  const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
+  const ownerCandidates = [
+    product.brandId,
+    product.brand?.id,
+    (product as StoreProduct & { ownerId?: string }).ownerId,
+    (product as StoreProduct & { brand?: { ownerId?: string } }).brand?.ownerId,
+  ]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean);
+  const viewerCandidates = [
+    currentUser?.id,
+    (currentUser as { brandId?: string } | null)?.brandId,
+  ]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean);
+  const isOwnProduct = viewerCandidates.some((viewerId) => ownerCandidates.includes(viewerId));
   const isCustomOrderProduct = product.customAvailable === true;
 
   const availableSizes = useMemo(() => {
@@ -636,23 +650,27 @@ export default function InlineProductDetail({
                 Your product
               </div>
             )}
-            <button
-              type="button"
-              onClick={handleToggleWishlist}
-              disabled={wishlistBusy || isOwnProduct}
-              className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-pink-500 hover:border-pink-300 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-            >
-              <span aria-hidden="true">{isWishlisted ? '❤️' : '🤍'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleShare}
-              className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-purple-500 hover:border-purple-300 transition-all flex items-center justify-center"
-              aria-label="Share product"
-            >
-              <span aria-hidden="true">🔗</span>
-            </button>
+            {!isOwnProduct ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleToggleWishlist}
+                  disabled={wishlistBusy}
+                  className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-pink-500 hover:border-pink-300 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                >
+                  <span aria-hidden="true">{isWishlisted ? '❤️' : '🤍'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-purple-500 hover:border-purple-300 transition-all flex items-center justify-center"
+                  aria-label="Share product"
+                >
+                  <span aria-hidden="true">🔗</span>
+                </button>
+              </>
+            ) : null}
             <button
               type="button"
               onClick={() => {

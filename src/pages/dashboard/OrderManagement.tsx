@@ -3,9 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
+import { messagingApi, type ThreadSummaryByContextItem } from '@/api/MessagingApi';
 import OrderDetailsModal from '@/components/dashboard/OrderDetailsModal';
+import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import VLoader from '@/components/loaders/VLoader';
+import UniversalSelect from '@/components/forms/UniversalSelect';
+import { useRealtime } from '@/realtime/RealtimeProvider';
 
 type OrderLineItem = {
   id?: string;
@@ -72,6 +76,16 @@ const SORT_OPTIONS = [
   { label: 'Highest amount', value: 'amount-desc' },
   { label: 'Lowest amount', value: 'amount-asc' },
 ] as const;
+
+const STATUS_SELECT_OPTIONS = [
+  { label: 'All statuses', value: '' },
+  { label: 'Pending', value: 'PENDING' },
+  { label: 'Processing', value: 'PROCESSING' },
+  { label: 'Shipped', value: 'SHIPPED' },
+  { label: 'Delivered', value: 'DELIVERED' },
+  { label: 'Cancelled', value: 'CANCELLED' },
+  { label: 'Returned', value: 'RETURNED' },
+];
 
 const formatCurrency = (amount: number, currency: string) =>
   new Intl.NumberFormat('en-NG', {
@@ -226,8 +240,10 @@ const downloadCsv = (orders: OrderRecord[]) => {
 
 const OrderManagement: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
+  const { onNotification } = useRealtime();
   const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryByContextItem['summary']>>({});
   const [summary, setSummary] = useState<OrdersSummary>(EMPTY_SUMMARY);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -236,8 +252,11 @@ const OrderManagement: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
   const [selectedOrder, setSelectedOrder] = useState<{ id: string } | null>(null);
+  const [chatOrder, setChatOrder] = useState<{ id: string; customerName?: string } | null>(null);
 
   const preselectedOrderId = searchParams.get('orderId');
+  const preselectedMessageId = searchParams.get('messageId');
+  const shouldOpenChat = searchParams.get('openChat') === '1';
 
   const fetchOrders = useCallback(async () => {
     if (!user?.id) return;
@@ -252,19 +271,35 @@ const OrderManagement: React.FC = () => {
       });
 
       if (data) {
-        setOrders(Array.isArray(data.items) ? data.items : []);
+        const nextOrders = Array.isArray(data.items) ? data.items : [];
+        setOrders(nextOrders);
         setSummary(data.summary || EMPTY_SUMMARY);
         setTotalPages(Number(data.totalPages || data.meta?.totalPages || 1));
+
+        const orderIds = nextOrders.map((order: OrderRecord) => order.id).filter(Boolean);
+        if (orderIds.length > 0) {
+          const summaries = await messagingApi.getBulkOrderSummariesForBrand(user.id, orderIds, true);
+          setSummaryByOrderId(
+            (summaries.items || []).reduce<Record<string, ThreadSummaryByContextItem['summary']>>((acc, item) => {
+              acc[item.contextId] = item.summary;
+              return acc;
+            }, {}),
+          );
+        } else {
+          setSummaryByOrderId({});
+        }
       } else {
         setOrders([]);
         setSummary(EMPTY_SUMMARY);
         setTotalPages(1);
+        setSummaryByOrderId({});
       }
     } catch (error) {
       console.error('Failed to fetch orders', error);
       setOrders([]);
       setSummary(EMPTY_SUMMARY);
       setTotalPages(1);
+      setSummaryByOrderId({});
     } finally {
       setLoading(false);
     }
@@ -282,6 +317,35 @@ const OrderManagement: React.FC = () => {
     if (!preselectedOrderId) return;
     setSelectedOrder({ id: preselectedOrderId });
   }, [preselectedOrderId]);
+
+  useEffect(() => {
+    if (!preselectedOrderId || !shouldOpenChat) return;
+    setChatOrder({ id: preselectedOrderId });
+  }, [preselectedOrderId, shouldOpenChat]);
+
+  useEffect(() => {
+    const unsubscribe = onNotification((payload: any) => {
+      const type = String(payload?.type ?? '');
+      const isMessageEvent =
+        type === 'MESSAGE_RECEIVED' ||
+        type === 'MESSAGE_UNREAD_REMINDER' ||
+        type === 'MESSAGE_THREAD_REOPENED' ||
+        type === 'MESSAGE_MODERATED';
+
+      if (!isMessageEvent || !user?.id) return;
+      const payloadOrderId = String(payload?.payload?.orderId ?? '');
+      if (!payloadOrderId) return;
+
+      void messagingApi
+        .getOrderSummaryForBrand(user.id, payloadOrderId, true)
+        .then((summaryItem) => {
+          setSummaryByOrderId((prev) => ({ ...prev, [payloadOrderId]: summaryItem }));
+        })
+        .catch(() => undefined);
+    });
+
+    return unsubscribe;
+  }, [onNotification, user?.id]);
 
   const sortedOrders = useMemo(() => {
     const next = [...orders];
@@ -448,23 +512,16 @@ const OrderManagement: React.FC = () => {
               setPage(1);
             }}
           />
-          <select
-            aria-label="Filter by order status"
-            className="rounded-2xl border border-slate-200 bg-white/85 px-4 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+          <UniversalSelect
             value={statusFilter}
-            onChange={(event) => {
-              setStatusFilter(event.target.value);
+            onChange={(value) => {
+              setStatusFilter(value);
               setPage(1);
             }}
-          >
-            <option value="">All statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="PROCESSING">Processing</option>
-            <option value="SHIPPED">Shipped</option>
-            <option value="DELIVERED">Delivered</option>
-            <option value="CANCELLED">Cancelled</option>
-            <option value="RETURNED">Returned</option>
-          </select>
+            options={STATUS_SELECT_OPTIONS}
+            className="min-w-[200px]"
+            placeholder="All statuses"
+          />
           <button
             type="button"
             onClick={cycleSort}
@@ -486,6 +543,7 @@ const OrderManagement: React.FC = () => {
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Items</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Details</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Status</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Message</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Payment</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Amount</th>
                 <th className="px-6 py-4" />
@@ -494,7 +552,7 @@ const OrderManagement: React.FC = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center">
+                  <td colSpan={9} className="px-6 py-16 text-center">
                     <div className="flex justify-center">
                       <VLoader size={56} phase="loading" />
                     </div>
@@ -502,7 +560,7 @@ const OrderManagement: React.FC = () => {
                 </tr>
               ) : sortedOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <td colSpan={9} className="px-6 py-16 text-center text-sm text-slate-500 dark:text-slate-400">
                     No orders found matching your criteria.
                   </td>
                 </tr>
@@ -510,6 +568,9 @@ const OrderManagement: React.FC = () => {
                 sortedOrders.map((order) => {
                   const fit = summarizeOrderFit(order);
                   const previews = getPreviewItems(order);
+                  const summaryItem = summaryByOrderId[order.id] ?? null;
+                  const unreadCount = Number(summaryItem?.unreadCount ?? 0);
+                  const hasUnread = unreadCount > 0 || Boolean(summaryItem?.hasUnread);
 
                   return (
                     <tr
@@ -601,6 +662,26 @@ const OrderManagement: React.FC = () => {
                       </td>
 
                       <td className="px-6 py-4 align-top">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setChatOrder({ id: order.id, customerName: order.customerName });
+                          }}
+                          className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-lg transition hover:border-orange-300 hover:bg-orange-50 dark:border-white/10 dark:bg-white/5"
+                          aria-label={`Open message thread for order ${order.id}`}
+                          title="Open order chat"
+                        >
+                          💬
+                          {hasUnread ? (
+                            <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">
+                              {unreadCount > 99 ? '99+' : unreadCount || '•'}
+                            </span>
+                          ) : null}
+                        </button>
+                      </td>
+
+                      <td className="px-6 py-4 align-top">
                         <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getPaymentClasses(order.paymentStatus)}`}>
                           {order.paymentStatus || 'PENDING'}
                         </span>
@@ -685,6 +766,27 @@ const OrderManagement: React.FC = () => {
           orderId={selectedOrder.id}
           brandId={user.id}
           onStatusUpdate={fetchOrders}
+        />
+      ) : null}
+
+      {chatOrder && user?.id ? (
+        <OrderChatDrawer
+          open={Boolean(chatOrder)}
+          onClose={() => {
+            setChatOrder(null);
+            const next = new URLSearchParams(searchParams);
+            next.delete('openChat');
+            next.delete('messageId');
+            next.delete('thread');
+            setSearchParams(next, { replace: true });
+            void fetchOrders();
+          }}
+          orderId={chatOrder.id}
+          contextType="STANDARD_ORDER"
+          actorSurface="BRAND"
+          brandId={user.id}
+          customerName={chatOrder.customerName}
+          highlightMessageId={preselectedMessageId}
         />
       ) : null}
     </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
@@ -9,8 +9,9 @@ import { Select } from '@/components/ui/Select';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { getAvatarFallback } from '@/utils/profileImage';
 import { DraftExpiryStats as DraftExpiryStatsComponent } from '@/components/collections/DraftExpiryComponents';
-import { 
-  TrendingUp, 
+import VLoader from '@/components/loaders/VLoader';
+import {
+  TrendingUp,
   TrendingDown,
   ShoppingCart,
   ShoppingBag, 
@@ -33,6 +34,8 @@ import {
   Bell,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { normalizeNotification } from '@/utils/notificationAdapter';
+import { determineNotificationRoute } from '@/utils/notificationRouting';
 
 /**
  * Dashboard Home (Screen 2.1)
@@ -41,7 +44,9 @@ import { Link, useNavigate } from 'react-router-dom';
 const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
+  const notificationItems = useSelector((state: RootState) => state.notifications.items);
   const [overview, setOverview] = useState<any>(null);
+  const [activityFeed, setActivityFeed] = useState<any[]>([]);
   const [, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<'7d' | '30d' | 'ytd'>('30d');
@@ -53,14 +58,16 @@ const DashboardHome: React.FC = () => {
       setLoading(true);
       try {
         if (user?.id) {
-          const [overviewData, analyticsData, draftStatsData] = await Promise.all([
+          const [overviewData, analyticsData, activityFeedData, draftStatsData] = await Promise.all([
             brandApi.getDashboardOverview(user.id),
             brandApi.getDashboardAnalytics(user.id, range),
+            brandApi.getDashboardActivityFeed(user.id, 12),
             getDraftExpiryStats().catch(() => null),
           ]);
           const statusData = await getStoreStatus().catch(() => null);
           setOverview(overviewData);
           setAnalytics(analyticsData);
+          setActivityFeed(Array.isArray(activityFeedData?.items) ? activityFeedData.items : []);
           setDraftStats(draftStatsData);
           setStoreOpenStatus(statusData?.isStoreOpen ?? null);
         } else {
@@ -98,6 +105,7 @@ const DashboardHome: React.FC = () => {
             reviews: 0,
           }
         });
+        setActivityFeed([]);
         setAnalytics({
           salesChart: []
         });
@@ -121,7 +129,32 @@ const DashboardHome: React.FC = () => {
     (typeof (user as any)?.isStoreOpen === 'boolean' ? (user as any).isStoreOpen : false);
   const storeHealth = overview?.storeHealth || { score: 0, responseTime: 0, inventory: 0, reviews: 0 };
   const actionRequired = overview?.actionRequired || [];
-  const recentActivity = overview?.recentActivity || [];
+
+  const notificationActivity = useMemo(() => {
+    return (notificationItems || []).slice(0, 12).map((raw: any) => {
+      const normalized = normalizeNotification(raw);
+      const route = determineNotificationRoute(normalized);
+      const type = String(normalized.type || '').toUpperCase();
+
+      let mappedType: 'order' | 'patch' | 'stock' | 'review' = 'order';
+      if (type.includes('MESSAGE') || type.includes('FOLLOW') || type.includes('PATCH')) mappedType = 'patch';
+      if (type.includes('REVIEW')) mappedType = 'review';
+      if (type.includes('LOW_STOCK') || type.includes('OUT_OF_STOCK')) mappedType = 'stock';
+
+      return {
+        type: mappedType,
+        title: normalized.message || 'Recent update',
+        description: normalized.actor
+          ? `From ${normalized.actor.firstName || normalized.actor.username || 'system'}`
+          : 'System update',
+        time: getRelativeTime(normalized.createdAt),
+        action: route ? 'Open' : undefined,
+        route,
+      };
+    });
+  }, [notificationItems]);
+
+  const recentActivity = (activityFeed.length ? activityFeed : (overview?.recentActivity?.length ? overview.recentActivity : notificationActivity)) || [];
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(val);
@@ -141,7 +174,7 @@ const DashboardHome: React.FC = () => {
   if (loading && !overview) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+        <VLoader size={48} phase="loading" />
       </div>
     );
   }
@@ -346,7 +379,11 @@ const DashboardHome: React.FC = () => {
           ) : (
             <div className="space-y-4">
               {recentActivity.map((item: any, idx: number) => (
-                <ActivityItem key={idx} {...item} />
+                <ActivityItem
+                  key={idx}
+                  {...item}
+                  onAction={item.route ? () => navigate(item.route) : undefined}
+                />
               ))}
             </div>
           )}
@@ -490,7 +527,8 @@ const ActivityItem: React.FC<{
   description: string;
   time: string;
   action?: string;
-}> = ({ type, title, description, time, action }) => {
+  onAction?: () => void;
+}> = ({ type, title, description, time, action, onAction }) => {
   const iconMap = {
     order: { icon: <ShoppingCart className="w-4 h-4" />, bg: 'bg-green-500/20', color: 'text-green-500' },
     patch: { icon: <UserPlus className="w-4 h-4" />, bg: 'bg-indigo-500/20', color: 'text-indigo-500' },
@@ -512,7 +550,11 @@ const ActivityItem: React.FC<{
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>
         {action && (
-          <button className="mt-2 text-xs bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 px-2 py-1 rounded text-gray-700 dark:text-white transition-colors">
+          <button
+            type="button"
+            onClick={onAction}
+            className="mt-2 text-xs bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 px-2 py-1 rounded text-gray-700 dark:text-white transition-colors"
+          >
             {action}
           </button>
         )}
@@ -520,6 +562,22 @@ const ActivityItem: React.FC<{
     </div>
   );
 };
+
+function getRelativeTime(value?: string | null) {
+  if (!value) return 'Just now';
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return 'Just now';
+
+  const diffMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
+  if (diffMinutes < 1) return 'Just now';
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays}d ago`;
+}
 
 // Alert Item
 const AlertItem: React.FC<{

@@ -154,13 +154,34 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
 
   const handleBodyClick = useCallback((notification: NormalizedNotification) => {
     const payload = (notification.payload as Record<string, unknown> | undefined) ?? {};
+    const payloadTargetUrl = typeof payload.targetUrl === 'string' ? payload.targetUrl : null;
+    const explicitTargetUrl = typeof notification.targetUrl === 'string' ? notification.targetUrl : null;
+    const exactTargetUrl = payloadTargetUrl || explicitTargetUrl;
     const payloadOrderId = typeof payload.orderId === 'string' ? payload.orderId : null;
-    const route =
-      currentUser?.type === 'BRAND' &&
-      (notification.type === NotificationTypes.ORDER_PLACED || notification.type === NotificationTypes.ORDER_STATUS_UPDATED) &&
-      payloadOrderId
-        ? `/studio?tab=orders&orderId=${encodeURIComponent(payloadOrderId)}`
-        : determineNotificationRoute(notification);
+    const payloadCustomOrderId = typeof payload.customOrderId === 'string' ? payload.customOrderId : null;
+    const isBrand = currentUser?.type === 'BRAND';
+    const isOrderNotification =
+      notification.type === NotificationTypes.ORDER_PLACED ||
+      notification.type === NotificationTypes.ORDER_STATUS_UPDATED;
+    const isMessageNotification =
+      notification.type === NotificationTypes.MESSAGE_RECEIVED ||
+      notification.type === NotificationTypes.MESSAGE_UNREAD_REMINDER ||
+      notification.type === NotificationTypes.MESSAGE_THREAD_REOPENED ||
+      notification.type === NotificationTypes.MESSAGE_MODERATED;
+
+    let route: string;
+    if (exactTargetUrl) {
+      route = exactTargetUrl;
+    } else if (isBrand && isOrderNotification && payloadOrderId) {
+      route = `/studio?tab=orders&orderId=${encodeURIComponent(payloadOrderId)}`;
+    } else if (isBrand && isMessageNotification && payloadCustomOrderId) {
+      route = `/studio/messages?customOrderId=${encodeURIComponent(payloadCustomOrderId)}`;
+    } else if (isBrand && isMessageNotification && payloadOrderId) {
+      route = `/studio/messages?orderId=${encodeURIComponent(payloadOrderId)}`;
+    } else {
+      route = determineNotificationRoute(notification);
+    }
+
     const resolvedRoute = isAdminConsoleUser && route.startsWith('/profile') ? '/admin' : route;
     navigate(resolvedRoute);
     onClose();

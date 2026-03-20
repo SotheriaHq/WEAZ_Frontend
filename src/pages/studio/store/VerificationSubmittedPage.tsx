@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import Button from '@/components/ui/Button';
@@ -15,8 +15,20 @@ import {
 
 export default function VerificationSubmittedPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useSelector((state: RootState) => state.user.profile);
   const brandId = user?.id;
+
+  const originPath =
+    typeof (location.state as { from?: unknown } | null)?.from === 'string'
+      ? String((location.state as { from?: string }).from)
+      : '/studio/verification';
+  const originLabel =
+    originPath.startsWith('/studio/store')
+      ? 'Store'
+      : originPath.startsWith('/studio/verification')
+        ? 'Verification'
+        : 'Back';
 
   const [status, setStatus] = useState<VerificationStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,8 +71,8 @@ export default function VerificationSubmittedPage() {
   return (
     <div className="space-y-6">
       <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-        <Link to="/studio/store" className="transition hover:text-gray-700">
-          Store
+        <Link to={originPath} className="transition hover:text-gray-700">
+          {originLabel}
         </Link>
         <span>/</span>
         <Link

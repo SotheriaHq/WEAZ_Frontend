@@ -503,7 +503,7 @@ const AdminTaxonomyPage: React.FC = () => {
       .sort((left, right) => left.label.localeCompare(right.label))
       .map((point) => ({
         key: point.key,
-        label: point.label || formatMeasurementKeyLabel(point.key),
+        label: normalizeMeasurementLabel(point.label || formatMeasurementKeyLabel(point.key)),
       }));
   }, [allMeasurementPoints, configurationMeasurementGender]);
 

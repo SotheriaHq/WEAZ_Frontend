@@ -12,6 +12,7 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import { toast } from 'sonner';
+import VLoader from '@/components/loaders/VLoader';
 
 const FinancePage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
@@ -97,7 +98,7 @@ const FinancePage: React.FC = () => {
               className="bg-white dark:bg-black text-black dark:text-white px-6 py-3 rounded-xl font-semibold text-sm hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
             >
               {requesting ? (
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <VLoader size={16} phase="loading" showLabel={false} />
               ) : (
                 <ArrowUpRight className="w-4 h-4" />
               )}
@@ -147,7 +148,7 @@ const FinancePage: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <VLoader size={32} phase="loading" showLabel={false} />
                   </td>
                 </tr>
               ) : payouts.length === 0 ? (

@@ -71,6 +71,7 @@ const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
 const CustomOrdersIndexPage = lazy(() => import('./pages/custom-orders/CustomOrdersIndexPage'));
 const CustomOrderComposerPage = lazy(() => import('./pages/custom-orders/CustomOrderComposerPage'));
 const CustomOrderDetailPage = lazy(() => import('./pages/custom-orders/CustomOrderDetailPage'));
+const MessagingManagementPage = lazy(() => import('./pages/messages/MessagingManagementPage'));
 
 // Admin pages — lazy loaded for code splitting
 const AdminScaffold = lazy(() => import('./components/admin/AdminScaffold'));
@@ -355,6 +356,18 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: '/studio/messages',
+        element: (
+          <RequireBrand>
+            <RequireStoreSetup>
+              <StudioScaffold active="messages" onSelect={() => {}}>
+                <MessagingManagementPage />
+              </StudioScaffold>
+            </RequireStoreSetup>
+          </RequireBrand>
+        ),
+      },
+      {
         path: '/studio/shop/setup',
         element: <Navigate to="/studio/store/setup" replace />,
       },
@@ -435,6 +448,7 @@ const router = createBrowserRouter([
           { path: '/checkout/payment-return', element: <Layout><PaymentReturnPage /></Layout> },
           { path: '/checkout/confirmation', element: <Layout><OrderConfirmation /></Layout> },
           { path: '/orders', element: <Layout><MyOrders /></Layout> },
+          { path: '/messages', element: <Layout><MessagingManagementPage /></Layout> },
           { path: '/custom-orders', element: <Layout><CustomOrdersIndexPage /></Layout> },
           { path: '/custom-orders/new', element: <Layout><CustomOrderComposerPage /></Layout> },
           { path: '/custom-orders/:orderId', element: <Layout><CustomOrderDetailPage /></Layout> },

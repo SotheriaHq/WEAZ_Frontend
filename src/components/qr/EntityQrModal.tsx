@@ -16,6 +16,8 @@ export interface EntityQrModalProps {
   downloadFileName: string;
   logoUrl?: string | null;
   logoFileId?: string | null;
+  /** Username to embed visually in the QR code */
+  username?: string | null;
 }
 
 export const EntityQrModal: React.FC<EntityQrModalProps> = ({
@@ -27,6 +29,7 @@ export const EntityQrModal: React.FC<EntityQrModalProps> = ({
   downloadFileName,
   logoUrl,
   logoFileId,
+  username,
 }) => {
   const qrRootRef = useRef<HTMLDivElement | null>(null);
   const [logoMessage, setLogoMessage] = useState<string | null>(null);
@@ -115,6 +118,7 @@ export const EntityQrModal: React.FC<EntityQrModalProps> = ({
                 ref={qrRootRef}
                 value={url}
                 logo={{ url: logoUrl, fileId: logoFileId }}
+                username={username}
                 previewSize={236}
                 exportSize={960}
                 onLogoMessage={setLogoMessage}

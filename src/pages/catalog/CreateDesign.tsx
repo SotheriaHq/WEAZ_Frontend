@@ -8,6 +8,7 @@ import React, {
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import VLoader from "@/components/loaders/VLoader";
 import {
   FiArrowLeft,
   FiTrash2,
@@ -28,7 +29,9 @@ import {
 } from "react-icons/fi";
 import { HiOutlineSparkles } from "react-icons/hi";
 import { useMeasurementPoints } from '@/hooks/useMeasurementPoints';
-import CustomOrderConfigurationEditor from '@/components/custom-orders/CustomOrderConfigurationEditor';
+import CustomOrderConfigurationEditor, {
+  type CustomOrderConfigurationEditorHandle,
+} from '@/components/custom-orders/CustomOrderConfigurationEditor';
 
 // Context & Hooks
 import TextField from "../../components/forms/TextField";
@@ -113,6 +116,7 @@ const CreateDesignInner: React.FC = () => {
   const mediaStore = useMediaStore();
   const files = mediaStore.items;
   const navigate = useNavigate();
+  const customOrderEditorRef = useRef<CustomOrderConfigurationEditorHandle | null>(null);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -660,6 +664,17 @@ const CreateDesignInner: React.FC = () => {
     setSubmitIntent("draft");
     setIsSubmitting(true);
     try {
+      if (isEditMode && id && isMadeToOrder) {
+        const saved = await customOrderEditorRef.current?.saveConfiguration({
+          silentSuccess: true,
+        });
+        if (!saved) {
+          setIsSubmitting(false);
+          setSubmitIntent(null);
+          return;
+        }
+      }
+
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
       const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
       const draftTitle = title.trim() || "Untitled Draft";
@@ -708,7 +723,6 @@ const CreateDesignInner: React.FC = () => {
             sizingMode,
             rtwSizeSystem: undefined,
             customMeasurementKeys: normalizedCustomMeasurementKeys,
-            customOrderEnabled: isMadeToOrder,
             fitPreference: undefined,
             targetAgeGroup: 'ADULT',
           },
@@ -754,6 +768,17 @@ const CreateDesignInner: React.FC = () => {
     setSubmitIntent("publish");
     setIsSubmitting(true);
     try {
+      if (isEditMode && id && isMadeToOrder) {
+        const saved = await customOrderEditorRef.current?.saveConfiguration({
+          silentSuccess: true,
+        });
+        if (!saved) {
+          setIsSubmitting(false);
+          setSubmitIntent(null);
+          return;
+        }
+      }
+
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
       const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
       const finalTags = selectedTags.slice(0, 10);
@@ -777,7 +802,6 @@ const CreateDesignInner: React.FC = () => {
         const editPreviewUrl: string | undefined = (() => {
           const coverItem = files[coverIndex];
           if (coverItem?.previewUrl) return coverItem.previewUrl;
-          if (coverItem?.url) return coverItem.url;
           return undefined;
         })();
 
@@ -859,7 +883,6 @@ const CreateDesignInner: React.FC = () => {
                   sizingMode,
                   rtwSizeSystem: undefined,
                   customMeasurementKeys: normalizedCustomMeasurementKeys,
-                  customOrderEnabled: isMadeToOrder,
                   fitPreference: undefined,
                   targetAgeGroup: 'ADULT',
                 },
@@ -947,7 +970,6 @@ const CreateDesignInner: React.FC = () => {
                 sizingMode,
                 rtwSizeSystem: undefined,
                 customMeasurementKeys: normalizedCustomMeasurementKeys,
-                customOrderEnabled: isMadeToOrder,
                 fitPreference: undefined,
                 targetAgeGroup: 'ADULT',
               },
@@ -1159,7 +1181,7 @@ const CreateDesignInner: React.FC = () => {
               className="mb-6 p-4 rounded-2xl glass-panel-dark border border-purple-500/30"
             >
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-8 h-8 rounded-full border-2 border-purple-500/20 border-t-purple-500 animate-spin" />
+                <VLoader size={32} phase="loading" showLabel={false} />
                 <span className="text-white font-medium">
                   Uploading files... {progress}%
                 </span>
@@ -1605,10 +1627,12 @@ const CreateDesignInner: React.FC = () => {
 
               {isMadeToOrder && (
                 <CustomOrderConfigurationEditor
+                  ref={customOrderEditorRef}
                   sourceType="DESIGN"
                   sourceId={isEditMode ? id : undefined}
                   measurementKeys={customMeasurementKeys}
                   measurementGender={measurementGender}
+                  defaultBaseCharge={minPrice}
                   disabled={disabled}
                 />
               )}
@@ -1760,7 +1784,7 @@ const CreateDesignInner: React.FC = () => {
               className="flex-1 sm:flex-none py-3 px-6 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting && submitIntent === "publish" ? (
-                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                <VLoader size={16} phase="loading" showLabel={false} />
               ) : (
                 <HiOutlineSparkles className="w-5 h-5" />
               )}

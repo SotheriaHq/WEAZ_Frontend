@@ -118,6 +118,30 @@ export function determineNotificationRoute(notification: NormalizedNotification)
         case NotificationTypes.PRODUCT_UPLOAD:
             return target?.id ? `/products/${target.id}` : fallbackUrl;
 
+        case NotificationTypes.MESSAGE_RECEIVED:
+        case NotificationTypes.MESSAGE_UNREAD_REMINDER:
+        case NotificationTypes.MESSAGE_THREAD_REOPENED:
+        case NotificationTypes.MESSAGE_MODERATED:
+        {
+            if (typeof targetUrl === 'string' && targetUrl.trim().length > 0) {
+                return targetUrl;
+            }
+            const msgPayload = (payload as Record<string, unknown> | undefined) ?? {};
+            const msgOrderId = typeof msgPayload.orderId === 'string' ? msgPayload.orderId : null;
+            const msgCustomOrderId = typeof msgPayload.customOrderId === 'string' ? msgPayload.customOrderId : null;
+            const msgThreadId = typeof msgPayload.threadId === 'string' ? msgPayload.threadId : null;
+            if (msgCustomOrderId) {
+                return `/messages?customOrderId=${encodeURIComponent(msgCustomOrderId)}`;
+            }
+            if (msgOrderId) {
+                return `/messages?orderId=${encodeURIComponent(msgOrderId)}`;
+            }
+            if (msgThreadId) {
+                return `/messages?thread=${msgThreadId}`;
+            }
+            return '/messages';
+        }
+
         default:
             return fallbackUrl;
     }

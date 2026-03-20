@@ -5,8 +5,9 @@ import {
   useState,
 } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import VLoader from '@/components/loaders/VLoader';
 import VerificationHero from '@/components/studio/verification/VerificationHero';
 import {
   AUTHORITY_OPTIONS,
@@ -34,6 +35,7 @@ import type {
   VerificationStatusResponse,
 } from '@/types/verification';
 import { setUser } from '@/features/userSlice';
+import Modal from '@/components/ui/Modal';
 
 const DOCUMENT_UPLOADS = [
   { key: 'ownerPhotoKey', label: 'Owner selfie', documentType: 'OWNER_PHOTO' },
@@ -51,8 +53,11 @@ const DOCUMENT_UPLOADS = [
   },
 ] as const;
 
+type UploadFieldKey = (typeof DOCUMENT_UPLOADS)[number]['key'];
+
 export default function VerificationWizardPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.user.profile);
   const brandId = user?.id;
@@ -64,10 +69,25 @@ export default function VerificationWizardPage() {
   );
   const [stepIndex, setStepIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [hasDraft, setHasDraft] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [signing, setSigning] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
+  const [showSubmitPreview, setShowSubmitPreview] = useState(false);
+  const [uploadPreviewUrls, setUploadPreviewUrls] = useState<Partial<Record<UploadFieldKey, string>>>({});
+  const [lastSignedAt, setLastSignedAt] = useState<string | null>(null);
+
+  const originPath =
+    typeof (location.state as { from?: unknown } | null)?.from === 'string'
+      ? String((location.state as { from?: string }).from)
+      : '/studio/verification';
+  const originLabel =
+    originPath.startsWith('/studio/store')
+      ? 'Store'
+      : originPath.startsWith('/studio/verification')
+        ? 'Verification'
+        : 'Back';
 
   const signatureText = useMemo(
     () => buildSignatureText(form, letter),
@@ -113,6 +133,18 @@ export default function VerificationWizardPage() {
         if (draftData.draftData) {
           setForm((current) => mergeDraftIntoForm(current, draftData.draftData!));
         }
+        const loadedDraft = draftData?.draftData;
+        const loadedHasDraft =
+          !!draftData?.lastSavedAt ||
+          Object.values(loadedDraft ?? {}).some((value) => {
+            if (typeof value === 'string') return value.trim().length > 0;
+            if (typeof value === 'number') return Number.isFinite(value);
+            if (!value || typeof value !== 'object') return false;
+            return Object.values(value as Record<string, unknown>).some((nested) =>
+              typeof nested === 'string' ? nested.trim().length > 0 : nested != null,
+            );
+          });
+        setHasDraft(loadedHasDraft);
         const draftStep = Number(
           (draftData.draftData as Record<string, unknown> | null)?.currentStep ??
             1,
@@ -150,6 +182,59 @@ export default function VerificationWizardPage() {
     };
   }, [brandId, dispatch]);
 
+  useEffect(() => {
+    const lockedCountry = String((user as { brandCountry?: string } | null)?.brandCountry ?? '').trim() || 'Nigeria';
+    const lockedState = String((user as { brandState?: string } | null)?.brandState ?? '').trim();
+    if (!lockedCountry && !lockedState) return;
+
+    setForm((current) => {
+      const currentAddress = current.businessAddress ?? VERIFICATION_INITIAL_FORM.businessAddress!;
+      const nextCountry = lockedCountry || currentAddress.country || 'Nigeria';
+      const nextState = lockedState || currentAddress.state || '';
+      if (currentAddress.country === nextCountry && currentAddress.state === nextState) {
+        return current;
+      }
+      return mergeDraftIntoForm(current, {
+        businessAddress: {
+          ...currentAddress,
+          country: nextCountry,
+          state: nextState,
+        },
+      });
+    });
+  }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const syncPreviewUrls = async () => {
+      const uploads = DOCUMENT_UPLOADS.map((item) => {
+        const key = item.key as UploadFieldKey;
+        const s3Key = String(form[key] ?? '').trim();
+        return { key, s3Key };
+      }).filter((item) => item.s3Key.length > 0);
+
+      for (const item of uploads) {
+        if (uploadPreviewUrls[item.key]) {
+          continue;
+        }
+        try {
+          const signedUrl = await brandApi.getSignedS3KeyUrl(item.s3Key);
+          if (!cancelled && signedUrl) {
+            setUploadPreviewUrls((current) => ({ ...current, [item.key]: signedUrl }));
+          }
+        } catch {
+          // Best-effort preview fetch only.
+        }
+      }
+    };
+
+    void syncPreviewUrls();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form, uploadPreviewUrls]);
+
   const setField = <K extends keyof VerificationDraftData>(
     key: K,
     value: VerificationDraftData[K],
@@ -171,12 +256,20 @@ export default function VerificationWizardPage() {
     );
   };
 
-  const saveDraft = async (nextStep = stepIndex + 1) => {
+  const saveDraft = async (
+    nextStep = stepIndex + 1,
+    options?: { redirectToCatalog?: boolean; silent?: boolean },
+  ) => {
     if (!brandId) return;
     try {
       setSavingDraft(true);
       await brandApi.saveVerificationDraft(brandId, form, nextStep);
-      toast.success('Draft saved');
+      if (!options?.silent) {
+        toast.success('Draft saved');
+      }
+      if (options?.redirectToCatalog) {
+        navigate('/studio/store');
+      }
     } catch (error: any) {
       toast.error(
         error?.response?.data?.message || 'Unable to save verification draft',
@@ -238,6 +331,7 @@ export default function VerificationWizardPage() {
         letterVersion: letter.version,
       });
       setField('letterKey', response.letterKey);
+      setLastSignedAt(new Date().toISOString());
       toast.success('Verification letter signed');
     } catch (error: any) {
       toast.error(
@@ -324,9 +418,28 @@ export default function VerificationWizardPage() {
     try {
       validateStep(4);
       setSubmitting(true);
-      const payload = {
-        ...form,
+      // Submit endpoint accepts only verification fields; strip draft-only metadata like `currentStep`.
+      const payload: Record<string, unknown> = {
+        ownerLegalFirstName: form.ownerLegalFirstName,
+        ownerLegalLastName: form.ownerLegalLastName,
+        ownerDateOfBirth: form.ownerDateOfBirth,
+        ownerGender: form.ownerGender,
+        ownerPhoneNumber: form.ownerPhoneNumber,
+        ownerNin: form.ownerNin,
+        cacNumber: form.cacNumber,
         businessAddress: form.businessAddress,
+        idDocumentType: form.idDocumentType,
+        idDocumentNumber: form.idDocumentNumber,
+        idDocumentExpiryDate: form.idDocumentExpiryDate,
+        legalEntityType: form.legalEntityType,
+        authorityType: form.authorityType,
+        authorityProofDescription: form.authorityProofDescription,
+        ownerPhotoKey: form.ownerPhotoKey,
+        idDocumentFrontKey: form.idDocumentFrontKey,
+        idDocumentBackKey: form.idDocumentBackKey,
+        cacCertificateKey: form.cacCertificateKey,
+        authorityProofKey: form.authorityProofKey,
+        letterKey: form.letterKey,
       };
       if (status.verificationStatus === 'ADDITIONAL_INFO_REQUESTED') {
         await brandApi.resubmitVerificationInfo(brandId, payload);
@@ -365,6 +478,11 @@ export default function VerificationWizardPage() {
   };
 
   const step = VERIFICATION_STEPS[stepIndex];
+  const locationLockedLabel = useMemo(() => {
+    const country = String(form.businessAddress?.country ?? '').trim() || 'Nigeria';
+    const state = String(form.businessAddress?.state ?? '').trim() || 'Not set';
+    return `${state}, ${country}`;
+  }, [form.businessAddress?.country, form.businessAddress?.state]);
 
   if (loading) {
     return (
@@ -377,8 +495,8 @@ export default function VerificationWizardPage() {
   return (
     <div className="space-y-6">
       <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-        <Link to="/studio/store" className="transition hover:text-gray-700">
-          Store
+        <Link to={originPath} className="transition hover:text-gray-700">
+          {originLabel}
         </Link>
         <span>/</span>
         <Link
@@ -395,18 +513,12 @@ export default function VerificationWizardPage() {
         eyebrow="Verification application"
         title="Guided seller verification"
         description="Move through the same structured sequence every time: identity, business, authority, evidence, then review. Draft state is preserved as you go."
-        statusLabel={verificationStatusLabel(status?.verificationStatus)}
-        statusTone={verificationStatusTone(status?.verificationStatus)}
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <Button size="sm" variant="ghost" onClick={() => navigate('/studio/verification')}>
-              Back to status
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => void saveDraft()}>
-              {savingDraft ? 'Saving...' : 'Save draft'}
-            </Button>
-          </div>
+        statusLabel={
+          status?.verificationStatus === 'NOT_SUBMITTED' && hasDraft
+            ? 'Drafted'
+            : verificationStatusLabel(status?.verificationStatus)
         }
+        statusTone={verificationStatusTone(status?.verificationStatus)}
       />
 
       {wizardLockMessage ? (
@@ -426,9 +538,9 @@ export default function VerificationWizardPage() {
       ) : null}
 
       {!wizardLockMessage ? (
-      <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
-        <aside className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="space-y-3">
+      <div className="grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm lg:sticky lg:top-24">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             {VERIFICATION_STEPS.map((item, index) => {
               const isActive = index === stepIndex;
               const isComplete = index < stepIndex;
@@ -553,13 +665,18 @@ export default function VerificationWizardPage() {
               <Input
                 label="State"
                 value={form.businessAddress?.state ?? ''}
-                onChange={(event) => setAddressField('state', event.target.value)}
+                disabled
+                helperText="State is locked from your verified profile location. Update it from Settings after successful verification."
               />
               <Input
                 label="Country"
                 value={form.businessAddress?.country ?? ''}
-                onChange={(event) => setAddressField('country', event.target.value)}
+                disabled
+                helperText="Country is locked from your verified profile location."
               />
+              <div className="md:col-span-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-900">
+                Location used for verification: <span className="font-semibold">{locationLockedLabel}</span>
+              </div>
             </div>
           ) : null}
 
@@ -653,6 +770,40 @@ export default function VerificationWizardPage() {
                     <p className="mt-1 text-xs uppercase tracking-[0.18em] text-gray-400">
                       {value ? 'File ready' : 'No file selected'}
                     </p>
+                    {value ? (
+                      <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-2.5">
+                        <p className="truncate text-[11px] font-semibold text-emerald-800">
+                          {String(value).split('/').pop() || 'Uploaded file'}
+                        </p>
+                        <div className="mt-2 flex items-center gap-2">
+                          {uploadPreviewUrls[item.key as UploadFieldKey] ? (
+                            /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?|$)/i.test(uploadPreviewUrls[item.key as UploadFieldKey] as string)
+                              ? (
+                                <img
+                                  src={uploadPreviewUrls[item.key as UploadFieldKey] as string}
+                                  alt={`${item.label} preview`}
+                                  className="h-10 w-10 rounded-lg object-cover"
+                                />
+                              )
+                              : <span className="text-base" aria-hidden="true">📄</span>
+                          ) : (
+                            <VLoader size={14} phase="loading" showLabel={false} />
+                          )}
+                          {uploadPreviewUrls[item.key as UploadFieldKey] ? (
+                            <a
+                              href={uploadPreviewUrls[item.key as UploadFieldKey] as string}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] font-semibold text-emerald-800 underline decoration-emerald-300 underline-offset-2"
+                            >
+                              Open uploaded file
+                            </a>
+                          ) : (
+                            <span className="text-[11px] text-emerald-700">Preparing preview…</span>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="mt-4 flex items-center justify-between gap-3">
                       <span className="text-xs leading-6 text-gray-500">
                         JPEG, PNG, or PDF. Use a flat, readable capture.
@@ -674,7 +825,12 @@ export default function VerificationWizardPage() {
                         />
                         <span className="inline-flex rounded-full border border-sky-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700 shadow-sm">
                           {uploadingField === item.key
-                            ? 'Uploading...'
+                            ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <VLoader size={12} phase="loading" showLabel={false} />
+                                Uploading...
+                              </span>
+                            )
                             : value
                               ? 'Replace file'
                               : 'Upload file'}
@@ -724,13 +880,29 @@ export default function VerificationWizardPage() {
                     <p className="font-semibold text-gray-900">{letter.title}</p>
                     <p className="mt-3 whitespace-pre-line">{letter.body}</p>
                   </div>
+                  {form.letterKey ? (
+                    <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                      <p className="text-sm font-semibold text-emerald-900">✅ Letter signed and attached</p>
+                      <p className="mt-1 text-xs text-emerald-800">
+                        {lastSignedAt
+                          ? `Last signed ${new Date(lastSignedAt).toLocaleString()}.`
+                          : 'Your signature has been captured for this submission attempt.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                      <p className="text-xs text-amber-900">
+                        Sign the verification letter to confirm legal consent before submission.
+                      </p>
+                    </div>
+                  )}
                   <div className="mt-4 flex flex-wrap gap-3">
-                    <Button onClick={() => void handleSignLetter()} disabled={signing}>
-                      {signing
-                        ? 'Signing...'
-                        : form.letterKey
-                          ? 'Re-sign letter'
-                          : 'Sign letter'}
+                    <Button
+                      onClick={() => void handleSignLetter()}
+                      loading={signing}
+                      className="shadow-md"
+                    >
+                      {form.letterKey ? 'Re-sign letter' : 'Sign letter'}
                     </Button>
                     <Button variant="ghost" onClick={() => void saveDraft(5)}>
                       Save current review state
@@ -746,6 +918,19 @@ export default function VerificationWizardPage() {
               Step {stepIndex + 1} of {VERIFICATION_STEPS.length}
             </div>
             <div className="flex flex-wrap gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => void saveDraft(stepIndex + 1, { redirectToCatalog: true })}
+                loading={savingDraft}
+              >
+                Save draft
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/studio/verification', { state: { from: originPath } })}
+              >
+                Back to status
+              </Button>
               {stepIndex > 0 ? (
                 <Button
                   variant="ghost"
@@ -759,12 +944,13 @@ export default function VerificationWizardPage() {
                   Continue
                 </Button>
               ) : (
-                <Button onClick={() => void handleSubmit()} disabled={submitting}>
-                  {submitting
-                    ? 'Submitting...'
-                    : status?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED'
-                      ? 'Submit requested updates'
-                      : 'Submit verification'}
+                <Button
+                  onClick={() => setShowSubmitPreview(true)}
+                  className="shadow-md"
+                >
+                  {status?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED'
+                    ? 'Preview requested updates'
+                    : 'Preview submission package'}
                 </Button>
               )}
             </div>
@@ -772,6 +958,96 @@ export default function VerificationWizardPage() {
         </section>
       </div>
       ) : null}
+
+      <Modal
+        open={showSubmitPreview}
+        onClose={() => setShowSubmitPreview(false)}
+        title="Verification Submission Preview"
+        size="xl"
+      >
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+            Review exactly what will be submitted for approval. You can go back and edit before final submission.
+          </div>
+
+          <section className="rounded-2xl border border-gray-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Identity + Business</p>
+            <div className="mt-3 grid gap-2 text-sm text-gray-800 md:grid-cols-2">
+              <p><span className="font-semibold">Legal name:</span> {[form.ownerLegalFirstName, form.ownerLegalLastName].filter(Boolean).join(' ') || 'Not provided'}</p>
+              <p><span className="font-semibold">DOB:</span> {form.ownerDateOfBirth || 'Not provided'}</p>
+              <p><span className="font-semibold">Phone:</span> {form.ownerPhoneNumber || 'Not provided'}</p>
+              <p><span className="font-semibold">NIN:</span> {form.ownerNin || 'Not provided'}</p>
+              <p><span className="font-semibold">CAC number:</span> {form.cacNumber || 'Not provided'}</p>
+              <p><span className="font-semibold">Entity:</span> {form.legalEntityType || 'Not provided'}</p>
+              <p className="md:col-span-2"><span className="font-semibold">Address:</span> {form.businessAddress?.street || 'Not provided'}{form.businessAddress?.city ? `, ${form.businessAddress.city}` : ''}{form.businessAddress?.state ? `, ${form.businessAddress.state}` : ''}{form.businessAddress?.country ? `, ${form.businessAddress.country}` : ''}</p>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-gray-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Authority + Documents</p>
+            <div className="mt-3 grid gap-2 text-sm text-gray-800 md:grid-cols-2">
+              <p><span className="font-semibold">Authority type:</span> {form.authorityType || 'Not provided'}</p>
+              <p><span className="font-semibold">ID type:</span> {form.idDocumentType || 'Not provided'}</p>
+              <p><span className="font-semibold">ID number:</span> {form.idDocumentNumber || 'Not provided'}</p>
+              <p><span className="font-semibold">ID expiry:</span> {form.idDocumentExpiryDate || 'Not provided'}</p>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {DOCUMENT_UPLOADS.map((item) => {
+                const value = String(form[item.key as keyof VerificationDraftData] ?? '').trim();
+                if (!value) return null;
+                return (
+                  <div key={item.key} className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">{item.label}</p>
+                    <p className="mt-1 truncate text-xs text-emerald-900">{value.split('/').pop() || value}</p>
+                    {uploadPreviewUrls[item.key as UploadFieldKey] ? (
+                      <a
+                        href={uploadPreviewUrls[item.key as UploadFieldKey] as string}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex text-xs font-semibold text-emerald-800 underline decoration-emerald-300 underline-offset-2"
+                      >
+                        Open file
+                      </a>
+                    ) : (
+                      <span className="mt-2 inline-flex items-center gap-1 text-xs text-emerald-800">
+                        <VLoader size={12} phase="loading" showLabel={false} />
+                        Preparing preview
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-gray-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Consent Letter</p>
+            <p className="mt-2 text-sm text-gray-800">
+              {form.letterKey
+                ? 'Signed letter is attached and will be submitted with this attempt.'
+                : 'Letter is not signed yet. Please close this preview and sign before submitting.'}
+            </p>
+          </section>
+
+          <div className="flex flex-wrap justify-end gap-3 border-t border-gray-100 pt-4">
+            <Button variant="ghost" onClick={() => setShowSubmitPreview(false)}>
+              Close preview
+            </Button>
+            <Button
+              onClick={() => {
+                void handleSubmit();
+              }}
+              loading={submitting}
+              disabled={!form.letterKey}
+              className="shadow-md"
+            >
+              {status?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED'
+                ? 'Submit requested updates'
+                : 'Submit verification'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

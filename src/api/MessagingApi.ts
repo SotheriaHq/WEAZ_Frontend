@@ -59,6 +59,10 @@ export interface ThreadSummaryResponse {
   unreadCount?: number;
   responseRequired: boolean;
   lastMessageAt?: string | null;
+  mutedUntil?: string | null;
+  archivedAt?: string | null;
+  isMuted?: boolean;
+  isArchivedByActor?: boolean;
 }
 
 export interface ThreadSummaryByContextItem {
@@ -68,6 +72,45 @@ export interface ThreadSummaryByContextItem {
 
 export interface ThreadSummaryByContextResponse {
   items: ThreadSummaryByContextItem[];
+}
+
+export interface InboxItem {
+  threadId: string;
+  contextType: 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
+  orderId?: string | null;
+  customOrderId?: string | null;
+  inquiryId?: string | null;
+  title: string;
+  subtitle: string;
+  participant?: {
+    id: string;
+    username?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    profileImage?: string | null;
+  } | null;
+  lastMessageAt?: string | null;
+  createdAt: string;
+  unreadCount: number;
+  hasUnread: boolean;
+  mutedUntil?: string | null;
+  archivedAt?: string | null;
+  targetUrl?: string;
+}
+
+export interface InboxResponse {
+  items: InboxItem[];
+  hasNextPage: boolean;
+  endCursor: { cursorLastMessageAt: string; cursorThreadId: string } | null;
+}
+
+export interface ResolvedThreadRoute {
+  threadId: string;
+  contextType: 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
+  orderId?: string | null;
+  customOrderId?: string | null;
+  inquiryType?: string;
+  targetUrl: string;
 }
 
 const parseMessageList = (data: unknown): MessageListResponse => {
@@ -235,6 +278,40 @@ export const messagingApi = {
     return unwrapApiResponse<{ success: boolean; threadId?: string | null }>(response.data);
   },
 
+  async updateOrderThreadPreferences(
+    orderId: string,
+    payload: { archived?: boolean; markRead?: boolean; muteForHours?: number; unmute?: boolean },
+  ) {
+    const response = await apiClient.post(`/orders/${orderId}/messages/preferences`, payload);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async updateOrderThreadPreferencesForBrand(
+    brandId: string,
+    orderId: string,
+    payload: { archived?: boolean; markRead?: boolean; muteForHours?: number; unmute?: boolean },
+  ) {
+    const response = await apiClient.post(`/brands/${brandId}/orders/${orderId}/messages/preferences`, payload);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async updateCustomOrderThreadPreferences(
+    orderId: string,
+    payload: { archived?: boolean; markRead?: boolean; muteForHours?: number; unmute?: boolean },
+  ) {
+    const response = await apiClient.post(`/custom-orders/${orderId}/messages/preferences`, payload);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async updateCustomOrderThreadPreferencesForBrand(
+    brandId: string,
+    orderId: string,
+    payload: { archived?: boolean; markRead?: boolean; muteForHours?: number; unmute?: boolean },
+  ) {
+    const response = await apiClient.post(`/brands/${brandId}/custom-orders/${orderId}/messages/preferences`, payload);
+    return unwrapApiResponse<any>(response.data);
+  },
+
   async getOrderSummary(orderId: string, includeUnreadCount = true) {
     const response = await apiClient.get(`/orders/${orderId}/messages/summary`, {
       params: {
@@ -271,5 +348,109 @@ export const messagingApi = {
     });
 
     return unwrapApiResponse<ThreadSummaryByContextResponse>(response.data);
+  },
+
+  async requestOrderExtensionForBrand(
+    brandId: string,
+    orderId: string,
+    payload: { requestedExtraDays: number; reason: string },
+  ) {
+    const response = await apiClient.post(`/brands/${brandId}/orders/${orderId}/messages/extension-requests`, payload);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async respondToOrderExtension(
+    orderId: string,
+    requestMessageId: string,
+    payload: { response: 'ACCEPTED' | 'REJECTED' | 'COUNTERED'; counterDays?: number; note?: string },
+  ) {
+    const response = await apiClient.post(
+      `/orders/${orderId}/messages/extension-requests/${requestMessageId}/respond`,
+      payload,
+    );
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async openOrderDispute(orderId: string, payload: { description: string }) {
+    const response = await apiClient.post(`/orders/${orderId}/messages/disputes`, payload);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async openOrderDisputeForBrand(brandId: string, orderId: string, payload: { description: string }) {
+    const response = await apiClient.post(`/brands/${brandId}/orders/${orderId}/messages/disputes`, payload);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async requestCustomOrderExtensionForBrand(
+    brandId: string,
+    orderId: string,
+    payload: { targetType: 'PRODUCTION' | 'DELIVERY' | 'BOTH'; requestedExtraDays: number; reason: string },
+  ) {
+    const response = await apiClient.post(`/brands/${brandId}/custom-orders/${orderId}/messages/extension-requests`, payload);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async respondToCustomOrderExtension(
+    orderId: string,
+    requestId: string,
+    payload: { response: 'ACCEPTED' | 'REJECTED' | 'COUNTERED'; counterDays?: number },
+  ) {
+    const response = await apiClient.post(`/custom-orders/${orderId}/messages/extension-requests/${requestId}/respond`, payload);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async openCustomOrderDispute(
+    orderId: string,
+    payload: { issueType: 'WRONG_ITEM' | 'MATERIAL_DEFECT' | 'MEASUREMENT_NON_COMPLIANCE' | 'UNFINISHED_WORK' | 'NON_DELIVERY' | 'UNREASONABLE_DELAY' | 'OTHER'; description: string; evidenceJson?: Record<string, unknown> },
+  ) {
+    const response = await apiClient.post(`/custom-orders/${orderId}/messages/disputes`, payload);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async openCustomOrderDisputeForBrand(
+    brandId: string,
+    orderId: string,
+    payload: { issueType: 'WRONG_ITEM' | 'MATERIAL_DEFECT' | 'MEASUREMENT_NON_COMPLIANCE' | 'UNFINISHED_WORK' | 'NON_DELIVERY' | 'UNREASONABLE_DELAY' | 'OTHER'; description: string; evidenceJson?: Record<string, unknown> },
+  ) {
+    const response = await apiClient.post(`/brands/${brandId}/custom-orders/${orderId}/messages/disputes`, payload);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async getInbox(params?: {
+    cursorLastMessageAt?: string;
+    cursorThreadId?: string;
+    limit?: number;
+    filter?: 'all' | 'unread' | 'archived';
+    contextType?: 'all' | 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
+    q?: string;
+  }) {
+    const response = await apiClient.get('/messaging/inbox', { params });
+    return unwrapApiResponse<InboxResponse>(response.data);
+  },
+
+  async resolveThreadRoute(threadId: string) {
+    const response = await apiClient.get(`/messaging/threads/${threadId}/resolve`);
+    return unwrapApiResponse<ResolvedThreadRoute>(response.data);
+  },
+
+  async listThreadMessages(threadId: string, params?: { cursorCreatedAt?: string; cursorId?: string; limit?: number }) {
+    const response = await apiClient.get(`/messaging/threads/${threadId}/messages`, { params });
+    return parseMessageList(response.data);
+  },
+
+  async sendThreadMessage(threadId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[] }) {
+    const response = await apiClient.post(
+      `/messaging/threads/${threadId}/messages`,
+      payload,
+      { headers: { 'Idempotency-Key': payload.clientMessageId } },
+    );
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async markThreadReadById(threadId: string, upToMessageId?: string) {
+    const response = await apiClient.post(`/messaging/threads/${threadId}/read`, {
+      upToMessageId,
+    });
+    return unwrapApiResponse<{ success: boolean; threadId?: string | null }>(response.data);
   },
 };

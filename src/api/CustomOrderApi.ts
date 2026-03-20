@@ -694,15 +694,32 @@ const hydrateBasis = (basis: CustomFabricRuleBasis): CustomFabricRuleBasis => ({
 
 const hydrateBasisList = (bases: CustomFabricRuleBasis[]) => bases.map(hydrateBasis);
 
+const isNotFoundResponse = (error: any) =>
+  Number(error?.response?.status) === 404;
+
 export const customOrderConfigurationsApi = {
   async getActiveForProduct(productId: string) {
-    const response = await apiClient.get(`/products/${productId}/custom-order-configuration`);
-    return hydrateConfiguration(unwrapApiResponse<CustomOrderConfiguration>(response.data));
+    try {
+      const response = await apiClient.get(`/products/${productId}/custom-order-configuration`);
+      return hydrateConfiguration(unwrapApiResponse<CustomOrderConfiguration>(response.data));
+    } catch (error) {
+      if (isNotFoundResponse(error)) {
+        return null;
+      }
+      throw error;
+    }
   },
 
   async getActiveForDesign(designId: string) {
-    const response = await apiClient.get(`/designs/${designId}/custom-order-configuration`);
-    return hydrateConfiguration(unwrapApiResponse<CustomOrderConfiguration>(response.data));
+    try {
+      const response = await apiClient.get(`/designs/${designId}/custom-order-configuration`);
+      return hydrateConfiguration(unwrapApiResponse<CustomOrderConfiguration>(response.data));
+    } catch (error) {
+      if (isNotFoundResponse(error)) {
+        return null;
+      }
+      throw error;
+    }
   },
 
   async listVisible(params?: {

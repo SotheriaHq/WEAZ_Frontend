@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import Button from '@/components/ui/Button';
@@ -17,11 +17,13 @@ import type { VerificationInfoItem, VerificationStatusResponse } from '@/types/v
 
 export default function StoreVerificationPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.user.profile);
   const brandId = user?.id;
 
   const [status, setStatus] = useState<VerificationStatusResponse | null>(null);
+  const [hasDraft, setHasDraft] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -32,9 +34,24 @@ export default function StoreVerificationPage() {
     const load = async () => {
       try {
         setLoading(true);
-        const data = await brandApi.getVerificationStatus(brandId);
+        const [data, draft] = await Promise.all([
+          brandApi.getVerificationStatus(brandId),
+          brandApi.getVerificationDraft(brandId),
+        ]);
         if (!active) return;
         setStatus(data);
+        const draftData = draft?.draftData;
+        const draftHasValues =
+          !!draft?.lastSavedAt ||
+          Object.values(draftData ?? {}).some((value) => {
+            if (typeof value === 'string') return value.trim().length > 0;
+            if (typeof value === 'number') return Number.isFinite(value);
+            if (!value || typeof value !== 'object') return false;
+            return Object.values(value as Record<string, unknown>).some((nested) =>
+              typeof nested === 'string' ? nested.trim().length > 0 : nested != null,
+            );
+          });
+        setHasDraft(draftHasValues);
         if (user) {
           dispatch(
             setUser({
@@ -64,9 +81,20 @@ export default function StoreVerificationPage() {
   }, [brandId, dispatch]);
 
   const callToAction = useMemo(
-    () => getVerificationCallToAction(status),
-    [status],
+    () =>
+      status?.verificationStatus === 'NOT_SUBMITTED' && hasDraft
+        ? {
+            primaryLabel: 'Continue draft process',
+            primaryTo: '/studio/verification/apply',
+          }
+        : getVerificationCallToAction(status),
+    [hasDraft, status],
   );
+
+  const statusDisplayLabel =
+    status?.verificationStatus === 'NOT_SUBMITTED' && hasDraft
+      ? 'Drafted'
+      : verificationStatusLabel(status?.verificationStatus);
 
   const handleCancel = async () => {
     if (!brandId || !status) return;
@@ -122,6 +150,33 @@ export default function StoreVerificationPage() {
 
   const infoItems = status?.infoRequestedItems ?? [];
 
+  const handlePrimaryAction = () => {
+    if (
+      callToAction.primaryTo === '/studio/verification' &&
+      (status?.verificationStatus === 'PENDING' ||
+        status?.verificationStatus === 'IN_REVIEW')
+    ) {
+      const target = document.getElementById('verification-current-state');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      return;
+    }
+
+    navigate(callToAction.primaryTo, {
+      state: {
+        from: `${location.pathname}${location.search}${location.hash}`,
+      },
+    });
+  };
+
+  const heroPrimaryLabel =
+    callToAction.primaryTo === '/studio/verification' &&
+    (status?.verificationStatus === 'PENDING' ||
+      status?.verificationStatus === 'IN_REVIEW')
+      ? 'View status'
+      : callToAction.primaryLabel;
+
   if (loading) {
     return (
       <div className="rounded-[2rem] border border-gray-200 bg-white p-8 text-sm text-gray-500 shadow-sm">
@@ -144,22 +199,15 @@ export default function StoreVerificationPage() {
         eyebrow="Seller trust"
         title="Verification workspace"
         description="Track your status, review your badge state, and jump back into the submission flow only when action is required."
-        statusLabel={verificationStatusLabel(status?.verificationStatus)}
+        statusLabel={statusDisplayLabel}
         statusTone={verificationStatusTone(status?.verificationStatus)}
         actions={
           <div className="flex flex-wrap gap-3">
             <Button
               size="sm"
-              onClick={() => navigate(callToAction.primaryTo)}
+              onClick={handlePrimaryAction}
             >
-              {callToAction.primaryLabel}
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => navigate('/studio/verification/apply')}
-            >
-              Initiate verification
+              {heroPrimaryLabel}
             </Button>
             {status &&
             (status.verificationStatus === 'PENDING' ||
@@ -221,7 +269,16 @@ export default function StoreVerificationPage() {
             </ul>
           ) : null}
           <div className="mt-5">
-            <Button size="sm" onClick={() => navigate('/studio/verification/apply')}>
+            <Button
+              size="sm"
+              onClick={() =>
+                navigate('/studio/verification/apply', {
+                  state: {
+                    from: `${location.pathname}${location.search}${location.hash}`,
+                  },
+                })
+              }
+            >
               Continue with corrections
             </Button>
           </div>
@@ -230,7 +287,10 @@ export default function StoreVerificationPage() {
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-6">
-          <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
+          <section
+            id="verification-current-state"
+            className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm"
+          >
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
@@ -253,7 +313,7 @@ export default function StoreVerificationPage() {
                     Status
                   </p>
                   <p className="mt-2 text-sm font-semibold text-sky-900">
-                    {verificationStatusLabel(status?.verificationStatus)}
+                    {statusDisplayLabel}
                   </p>
                 </div>
                 <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
@@ -289,7 +349,7 @@ export default function StoreVerificationPage() {
           <VerificationHistoryPanel attempts={status?.attemptHistory ?? []} />
         </div>
 
-        <div className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-2">
           <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
               Next action
@@ -302,8 +362,8 @@ export default function StoreVerificationPage() {
               signing. The form saves draft data as you move through the steps.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <Button onClick={() => navigate(callToAction.primaryTo)}>
-                {callToAction.primaryLabel}
+              <Button onClick={handlePrimaryAction}>
+                {heroPrimaryLabel}
               </Button>
               <Button
                 variant="ghost"

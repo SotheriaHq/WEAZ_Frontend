@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { ShoppingBag, Eye, ImageOff, AlertTriangle, Package } from 'lucide-react';
+import { ShoppingBag, Eye, ImageOff } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
@@ -220,19 +220,19 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     <article
       className={`
         group relative
-        rounded-2xl
+        rounded-2xl overflow-hidden
+        aspect-[4/5]
+        shadow-sm hover:shadow-xl
         transition-all duration-300 ease-out
         cursor-pointer
-        overflow-hidden
-        aspect-[4/5]
         ${className}
       `}
       onClick={handleCardClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Full-bleed Image Container */}
-      <div className="absolute inset-0 bg-gray-50 dark:bg-zinc-800/50">
+      {/* Full-bleed Image */}
+      <div className="absolute inset-0 bg-gray-100 dark:bg-zinc-800/50">
         {/* Skeleton loader */}
         {!imgLoaded && !imgError && (
           <div className="absolute inset-0 animate-pulse">
@@ -263,72 +263,51 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             }}
           />
         ) : (
-          /* Fallback for missing/broken images */
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-zinc-800">
-            <ImageOff className="h-12 w-12 text-gray-300 dark:text-zinc-600 mb-2" strokeWidth={1.5} />
+            <ImageOff className="h-10 w-10 text-gray-300 dark:text-zinc-600 mb-1.5" strokeWidth={1.5} />
             <span className="text-xs text-gray-400 dark:text-zinc-500">No image</span>
           </div>
         )}
       </div>
 
-      {/* Image overlay gradient for better badge visibility */}
-      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/20 to-transparent pointer-events-none z-[1]" />
-
-      {/* Status Badges - Top Left */}
-      <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
-        {product.isFeatured && (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-semibold uppercase tracking-wider shadow-lg shadow-orange-500/25">
-            ⭐ Featured
+      {/* Status Indicators - Top Left — minimal emoji with hover tooltip */}
+      <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 z-10">
+        {ownerStatus && (
+          <span
+            className="group/badge relative text-base leading-none drop-shadow-md cursor-default"
+            title={ownerStatus.label}
+          >
+            {ownerStatus.emoji}
+            <span className="absolute left-full ml-1.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-semibold text-white bg-gray-900/90 backdrop-blur-sm whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none">
+              {ownerStatus.label}
+            </span>
           </span>
         )}
         {product.isOnSale && product.discountPercent && (
-          <span className="px-2 py-1 rounded-full bg-rose-500 text-white text-[10px] font-bold shadow-lg shadow-rose-500/25">
+          <span className="px-1.5 py-0.5 rounded-full bg-rose-500/90 text-white text-[10px] font-bold shadow-sm">
             -{product.discountPercent}%
           </span>
         )}
         {product.isLowStock && !product.isOutOfStock && (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/90 text-white text-[10px] font-semibold shadow-lg shadow-amber-500/25">
-            <AlertTriangle size={10} />
-            Low Stock
-          </span>
-        )}
-        {ownerStatus && (
           <span
-            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold shadow-lg ${ownerStatus.className}`}
+            className="group/badge relative text-base leading-none drop-shadow-md cursor-default"
+            title="Low Stock"
           >
-            <span>{ownerStatus.emoji}</span>
-            {ownerStatus.label}
+            ⚠️
+            <span className="absolute left-full ml-1.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-semibold text-white bg-gray-900/90 backdrop-blur-sm whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none">
+              Low Stock
+            </span>
           </span>
-        )}
-        {isCustomAvailable && (
-          <div className="relative inline-flex">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                setShowCustomLabel((prev) => !prev);
-              }}
-              onMouseEnter={() => setShowCustomLabel(true)}
-              onMouseLeave={() => setShowCustomLabel(false)}
-              onFocus={() => setShowCustomLabel(true)}
-              onBlur={() => setShowCustomLabel(false)}
-              className="inline-flex items-center justify-center rounded-full bg-purple-500/90 px-2 py-1 text-sm leading-none text-white shadow-lg shadow-purple-500/25"
-              aria-label="Custom available"
-              title="Custom available"
-            >
-              <span role="img" aria-hidden="true">{String.fromCodePoint(0x2702, 0xfe0f)}</span>
-            </button>
-            {showCustomLabel && (
-              <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded-full bg-black/80 px-2 py-1 text-[10px] font-semibold text-white shadow-lg backdrop-blur">
-                Custom Available
-              </span>
-            )}
-          </div>
         )}
         {isOwnerView && !product.isOutOfStock && (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/90 text-white text-[10px] font-semibold">
-            <Package size={10} />
-            {product.totalStock} in stock
+          <span
+            className="group/badge relative text-base leading-none drop-shadow-md cursor-default"
+            title={`${product.totalStock} in stock`}
+          >
+            📦
+            <span className="absolute left-full ml-1.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-semibold text-white bg-gray-900/90 backdrop-blur-sm whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none">
+              {product.totalStock} in stock
+            </span>
           </span>
         )}
       </div>
@@ -348,16 +327,28 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                 : 'Add to wishlist'
           }
           className={`
-            absolute top-2 right-2 z-10
-            p-2 rounded-full
+            absolute top-2.5 right-2.5 z-10
+            h-8 w-8 rounded-full
+            bg-white/80 dark:bg-black/40 backdrop-blur-sm
+            flex items-center justify-center
+            shadow-sm border border-white/30 dark:border-white/10
             transition-all duration-200 ease-out
             ${wishlistLoading || isOwnProduct ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110 active:scale-95'}
           `}
         >
-          <span role="img" aria-hidden="true" className="text-base leading-none">
+          <span role="img" aria-hidden="true" className="text-sm leading-none">
             {isProductWishlisted ? redHeartEmoji : whiteHeartEmoji}
           </span>
         </button>
+      )}
+
+      {/* Featured ribbon */}
+      {product.isFeatured && (
+        <div className="absolute top-0 right-0 z-[5]">
+          <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-bold uppercase tracking-wider px-3 py-1 rounded-bl-xl shadow-sm">
+            Featured
+          </div>
+        </div>
       )}
 
       {/* Owner View: Edit Overlay */}
@@ -378,7 +369,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               e.stopPropagation();
               onEdit?.(product);
             }}
-            className="px-6 py-3 bg-white text-gray-900 rounded-xl font-semibold text-sm shadow-xl hover:bg-gray-100 transition-all active:scale-95"
+            className="px-5 py-2.5 bg-white text-gray-900 rounded-xl font-semibold text-sm shadow-xl hover:bg-gray-100 transition-all active:scale-95"
           >
             Edit Product
           </button>
@@ -394,7 +385,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         </div>
       )}
 
-      {/* Frosted Glass Info Overlay */}
+      {/* Glassmorphism Info Overlay — bottom */}
       <div
         className="
           absolute inset-x-0 bottom-0 z-10
@@ -404,92 +395,83 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           p-3
         "
       >
-        <div className="flex flex-col gap-1.5">
-          {/* Product Name */}
-          <h3 className="text-sm font-semibold text-white line-clamp-1 leading-snug drop-shadow-sm">
-            {product.name}
-          </h3>
+        <h3 className="text-sm font-semibold text-white line-clamp-1 leading-snug drop-shadow-sm">
+          {product.name}
+        </h3>
 
-          {/* Brand Name */}
-          <p className="text-[11px] text-white/60 line-clamp-1">
-            {product.brand.name}
-          </p>
+        <p className="text-[11px] text-white/70 line-clamp-1 mt-0.5">
+          {product.brand.name}
+        </p>
 
-          {/* Price Section */}
-          <div className="flex items-baseline gap-2 flex-wrap">
+        <div className="flex items-center justify-between mt-1.5">
+          <div className="flex items-baseline gap-1.5">
             <span className={`text-sm font-bold drop-shadow-sm ${product.isOnSale ? 'text-rose-300' : 'text-white'}`}>
               {formatPrice(product.effectivePrice, product.brand.currency)}
             </span>
             {product.isOnSale && product.salePrice && (
-              <span className="text-xs text-white/50 line-through">
+              <span className="text-[11px] text-white/50 line-through">
                 {formatPrice(product.price, product.brand.currency)}
               </span>
             )}
           </div>
 
-          {/* Stock + Action Row */}
-          <div className="flex items-center justify-between mt-1">
-            {/* Stock indicator */}
-            <div className="flex items-center gap-2">
-              {!product.isOutOfStock && (
-                <span className={`text-[10px] font-medium flex items-center gap-1 ${
-                  product.isLowStock ? 'text-amber-300' : 'text-emerald-300'
-                }`}>
-                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${
-                    product.isLowStock ? 'bg-amber-400' : 'bg-emerald-400'
-                  }`} />
-                  {product.totalStock} in stock
-                </span>
-              )}
-              <span className="text-[10px] font-medium text-indigo-200/95 inline-flex items-center gap-1">
-                <span aria-hidden="true">🧵</span>
-                {product.threadsCount ?? 0}
-              </span>
-            </div>
+          {/* Quick actions */}
+          <div className="flex items-center gap-1">
+            {/* Custom badge */}
+            {isCustomAvailable && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setShowCustomLabel((prev) => !prev);
+                }}
+                onMouseEnter={() => setShowCustomLabel(true)}
+                onMouseLeave={() => setShowCustomLabel(false)}
+                onFocus={() => setShowCustomLabel(true)}
+                onBlur={() => setShowCustomLabel(false)}
+                className="inline-flex items-center gap-1 rounded-full bg-purple-500/80 backdrop-blur-sm px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm"
+                aria-label="Custom available"
+                title="Custom available"
+              >
+                <span role="img" aria-hidden="true">{String.fromCodePoint(0x2702, 0xfe0f)}</span>
+                {showCustomLabel && <span>Custom</span>}
+              </button>
+            )}
 
-            {/* Action buttons row */}
-            <div className="flex items-center gap-1.5 ml-auto">
-              {/* Add to Cart Button (Customer View) */}
-              {!isOwnerView && (
-                <button
-                  type="button"
-                  onClick={handleQuickAddToCart}
-                  disabled={cartLoading || product.isOutOfStock || isOwnProduct}
-                  title={
-                    isOwnProduct
-                      ? 'Brands cannot add their own products to cart'
-                      : product.isOutOfStock
-                        ? 'Item is out of stock'
-                        : 'Add to your shopping cart'
+            {!isOwnerView && (
+              <button
+                type="button"
+                onClick={handleQuickAddToCart}
+                disabled={cartLoading || product.isOutOfStock || isOwnProduct}
+                title={
+                  isOwnProduct
+                    ? 'Brands cannot add their own products to cart'
+                    : product.isOutOfStock
+                      ? 'Item is out of stock'
+                      : 'Add to cart'
+                }
+                className={`
+                  h-8 w-8 rounded-lg flex items-center justify-center
+                  transition-all duration-200
+                  ${product.isOutOfStock || isOwnProduct
+                    ? 'text-white/30 cursor-not-allowed'
+                    : 'text-white/80 hover:bg-white/15 hover:text-white active:scale-95'
                   }
-                  className={`
-                    p-2 rounded-lg
-                    transition-all duration-200
-                    ${product.isOutOfStock || isOwnProduct
-                      ? 'text-white/30 cursor-not-allowed'
-                      : 'text-white/90 hover:bg-white/20 hover:text-white active:scale-95'
-                    }
-                    ${cartLoading ? 'opacity-70 cursor-wait' : ''}
-                  `}
-                >
-                  <ShoppingBag size={16} />
-                </button>
-              )}
+                  ${cartLoading ? 'opacity-70 cursor-wait' : ''}
+                `}
+              >
+                <ShoppingBag size={15} />
+              </button>
+            )}
 
-              {/* Owner View: Engagement Stats */}
-              {isOwnerView && (
-                <>
-                  <span className="flex items-center gap-1 text-[10px] text-white/60">
-                    <span aria-hidden="true" className={product.threadsCount > 0 ? 'animate-pulse' : ''}>🧵</span>
-                    {product.threadsCount}
-                  </span>
-                  <span className="flex items-center gap-1 text-[10px] text-white/60">
-                    <Eye size={11} />
-                    {product.viewsCount}
-                  </span>
-                </>
-              )}
-            </div>
+            {isOwnerView && (
+              <div className="flex items-center gap-2 text-[10px] text-white/50">
+                <span className="inline-flex items-center gap-0.5">
+                  <Eye size={10} />
+                  {product.viewsCount}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

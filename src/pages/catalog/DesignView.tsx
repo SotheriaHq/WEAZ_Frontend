@@ -1189,7 +1189,7 @@ const DesignView: React.FC = () => {
       return;
     }
     if (!customConfigurationId) {
-      toast.error('Custom order is not available for this design yet.');
+      toast.error('This design is not configured for custom orders yet. Ask the brand to complete custom-order setup.');
       return;
     }
     if (openingCustomOrder) {
@@ -1246,7 +1246,6 @@ const DesignView: React.FC = () => {
   const commentsCount = (detail.commentsCount ?? detail._count?.comments ?? 0) +
     (detail.medias?.reduce((sum: number, m: any) => sum + (m?.commentsCount || 0), 0) || 0);
   const hasMedia = mediaItems.length > 0;
-  const hasProducts = productItems.length > 0;
   const mediaCount = detail._count?.medias ?? mediaItems.length;
   const itemCount = (mediaCount || 0) + productItems.length;
 

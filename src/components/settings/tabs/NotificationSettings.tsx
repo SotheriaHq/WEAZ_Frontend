@@ -46,6 +46,8 @@ interface NotificationSettingsData {
     newMessages: boolean;
     reminders: boolean;
     moderation: boolean;
+    desktop: boolean;
+    sound: boolean;
   };
 }
 
@@ -208,6 +210,16 @@ const NotificationSettings: React.FC = () => {
           id: 'moderation',
           label: 'Moderation Notices',
           description: 'Receive critical notices when support or moderation changes thread visibility',
+        },
+        {
+          id: 'desktop',
+          label: 'Desktop Notifications',
+          description: 'Show browser notifications when Threadly is open in the background',
+        },
+        {
+          id: 'sound',
+          label: 'Sound Alerts',
+          description: 'Play a short sound for new order messages',
         },
       ],
     },

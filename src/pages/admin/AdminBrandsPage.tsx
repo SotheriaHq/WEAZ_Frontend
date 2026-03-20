@@ -47,6 +47,16 @@ const normalizeStatus = (status: string | undefined | null): StatusFilter | 'UNK
   return 'UNKNOWN';
 };
 
+const verificationStatusTone = (status: string) => {
+  if (status === 'IN_REVIEW') {
+    return 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200';
+  }
+  if (status === 'ADDITIONAL_INFO_REQUESTED') {
+    return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200';
+  }
+  return 'border-gray-200 bg-gray-50 text-gray-700 dark:border-white/20 dark:bg-white/10 dark:text-gray-200';
+};
+
 const AdminBrandsPage: React.FC = () => {
   const { hasPermission } = useAdminPermissions();
   const canStoreOverride = hasPermission('BRANDS_STORE_OVERRIDE');
@@ -62,20 +72,48 @@ const AdminBrandsPage: React.FC = () => {
   const [confirmStore, setConfirmStore] = useState<{ brand: AdminBrand; nextOpen: boolean } | null>(null);
   const [verificationQueue, setVerificationQueue] = useState<VerificationQueueItem[]>([]);
   const [pendingVerificationCount, setPendingVerificationCount] = useState(0);
+  const [queueCursor, setQueueCursor] = useState<string | null>(null);
+  const [queueLoading, setQueueLoading] = useState(true);
+  const [queueLoadingMore, setQueueLoadingMore] = useState(false);
 
   useEffect(() => {
     let active = true;
-    const loadQueue = async () => {
+    const loadQueue = async (loadMore = false) => {
       try {
-        const response = await adminBrandsApi.getVerificationQueue({ limit: '5' });
-        const data = unwrapApiResponse<{ items?: VerificationQueueItem[]; totalPending?: number }>(response.data as any);
+        if (loadMore) {
+          setQueueLoadingMore(true);
+        } else {
+          setQueueLoading(true);
+        }
+
+        const response = await adminBrandsApi.getVerificationQueue({
+          limit: '8',
+          ...(loadMore && queueCursor ? { cursor: queueCursor } : {}),
+        });
+        const data = unwrapApiResponse<{ items?: VerificationQueueItem[]; nextCursor?: string; totalPending?: number }>(response.data as any);
         if (!active) return;
-        setVerificationQueue(data.items ?? []);
+
+        if (loadMore) {
+          setVerificationQueue((current) => [...current, ...(data.items ?? [])]);
+        } else {
+          setVerificationQueue(data.items ?? []);
+        }
+        setQueueCursor(data.nextCursor ?? null);
         setPendingVerificationCount(data.totalPending ?? 0);
       } catch {
         if (!active) return;
-        setVerificationQueue([]);
-        setPendingVerificationCount(0);
+        if (!loadMore) {
+          setVerificationQueue([]);
+          setPendingVerificationCount(0);
+          setQueueCursor(null);
+        }
+      } finally {
+        if (!active) return;
+        if (loadMore) {
+          setQueueLoadingMore(false);
+        } else {
+          setQueueLoading(false);
+        }
       }
     };
 
@@ -84,6 +122,25 @@ const AdminBrandsPage: React.FC = () => {
       active = false;
     };
   }, []);
+
+  const loadMoreQueue = useCallback(async () => {
+    if (!queueCursor || queueLoadingMore) return;
+
+    try {
+      setQueueLoadingMore(true);
+      const response = await adminBrandsApi.getVerificationQueue({ limit: '8', cursor: queueCursor });
+      const data = unwrapApiResponse<{ items?: VerificationQueueItem[]; nextCursor?: string; totalPending?: number }>(response.data as any);
+      setVerificationQueue((current) => [...current, ...(data.items ?? [])]);
+      setQueueCursor(data.nextCursor ?? null);
+      if (typeof data.totalPending === 'number') {
+        setPendingVerificationCount(data.totalPending);
+      }
+    } catch {
+      // Keep the existing preview intact when load-more fails.
+    } finally {
+      setQueueLoadingMore(false);
+    }
+  }, [queueCursor, queueLoadingMore]);
 
   const fetchPage = useCallback(
     async (cursor?: string, limit?: number) => {
@@ -259,24 +316,126 @@ const AdminBrandsPage: React.FC = () => {
             Open full queue
           </Link>
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {verificationQueue.length === 0 ? (
+        <div className="mt-4 rounded-2xl border border-sky-200/70 bg-white/70 dark:border-sky-500/20 dark:bg-white/5">
+          {queueLoading ? (
+            <div className="px-4 py-5 text-sm text-gray-500 dark:text-gray-300">Loading verification preview...</div>
+          ) : verificationQueue.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-sky-200 bg-white/70 px-4 py-5 text-sm text-gray-500 dark:border-sky-500/20 dark:bg-white/5 dark:text-gray-300">
               No verification items are waiting right now.
             </div>
           ) : (
-            verificationQueue.map((item) => (
-              <Link
-                key={item.id}
-                to={`/admin/brands/${item.id}/verification-review`}
-                className="rounded-2xl border border-white/80 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 dark:border-white/10 dark:bg-white/[0.04]"
-              >
-                <p className="text-sm font-bold text-gray-900 dark:text-white">{item.name || 'Unnamed brand'}</p>
-                <p className="mt-1 text-xs uppercase tracking-wide text-sky-700 dark:text-sky-300">{String(item.verificationStatus).replace(/_/g, ' ')}</p>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{item.owner?.firstName} {item.owner?.lastName}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{item.owner?.email}</p>
-              </Link>
-            ))
+            <>
+              <div className="space-y-2 p-3 md:hidden">
+                {verificationQueue.map((item) => (
+                  <article key={item.id} className="rounded-xl border border-sky-200/70 bg-white px-3 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{item.name || 'Unnamed brand'}</p>
+                        <p className="text-xs text-gray-500">{item.owner?.firstName} {item.owner?.lastName}</p>
+                        <p className="text-xs text-gray-500">{item.owner?.email ?? 'No owner email'}</p>
+                      </div>
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${verificationStatusTone(String(item.verificationStatus))}`}>
+                        {String(item.verificationStatus).replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600">
+                      <p><span className="font-semibold text-gray-800">Attempt:</span> {item.verificationAttemptNumber ?? 0}</p>
+                      <p><span className="font-semibold text-gray-800">Assigned:</span> {item.verificationReviewedById ? 'Claimed' : 'Unclaimed'}</p>
+                      <p className="col-span-2">
+                        <span className="font-semibold text-gray-800">Submitted:</span>{' '}
+                        {item.verificationSubmittedAt
+                          ? new Date(item.verificationSubmittedAt).toLocaleString()
+                          : 'Not available'}
+                      </p>
+                    </div>
+                    <div className="mt-2">
+                      <Link
+                        to={`/admin/brands/${item.id}/verification-review`}
+                        state={{ returnTo: '/admin/brands' }}
+                        className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-800"
+                      >
+                        Open
+                      </Link>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead>
+                    <tr className="border-b border-sky-100/80 bg-sky-50/60 text-left text-[11px] uppercase tracking-[0.16em] text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300">
+                      <th className="px-4 py-3">Brand</th>
+                      <th className="px-4 py-3">Owner</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Attempt</th>
+                      <th className="px-4 py-3">Submitted</th>
+                      <th className="px-4 py-3">Assigned</th>
+                      <th className="px-4 py-3">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {verificationQueue.map((item) => (
+                      <tr key={item.id} className="border-b border-sky-100/80 hover:bg-sky-50/40 dark:border-sky-500/10 dark:hover:bg-sky-500/10">
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-gray-900 dark:text-white">{item.name || 'Unnamed brand'}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{item.id.slice(0, 8)}</p>
+                        </td>
+                        <td className="px-4 py-3 text-gray-700 dark:text-gray-200">
+                          <p>{item.owner?.firstName} {item.owner?.lastName}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{item.owner?.email ?? 'No owner email'}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${verificationStatusTone(String(item.verificationStatus))}`}>
+                            {String(item.verificationStatus).replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-gray-800 dark:text-gray-200">{item.verificationAttemptNumber ?? 0}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                          {item.verificationSubmittedAt
+                            ? new Date(item.verificationSubmittedAt).toLocaleString()
+                            : 'Not available'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700 dark:text-gray-200">
+                          {item.verificationReviewedById ? 'Claimed' : 'Unclaimed'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Link
+                            to={`/admin/brands/${item.id}/verification-review`}
+                            state={{ returnTo: '/admin/brands' }}
+                            className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-800 transition hover:border-sky-300 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200"
+                          >
+                            Open
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-sky-100/80 px-4 py-3 text-xs text-gray-500 dark:border-sky-500/20 dark:text-gray-300">
+                <span>
+                  Showing {verificationQueue.length} of {pendingVerificationCount} active item{pendingVerificationCount === 1 ? '' : 's'}
+                </span>
+                <div className="flex items-center gap-2">
+                  {queueLoadingMore ? (
+                    <span>Loading more...</span>
+                  ) : null}
+                  {queueCursor ? (
+                    <button
+                      type="button"
+                      onClick={() => void loadMoreQueue()}
+                      disabled={queueLoadingMore}
+                      className="rounded-full border border-sky-200 bg-white px-3 py-1.5 font-semibold uppercase tracking-[0.16em] text-sky-700 transition hover:border-sky-300 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-500/30 dark:bg-white/5 dark:text-sky-200"
+                    >
+                      Load more
+                    </button>
+                  ) : (
+                    <span>Preview complete</span>
+                  )}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </section>

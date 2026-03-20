@@ -356,7 +356,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         resolvedConfigurationId = activeConfiguration?.id ?? null;
       }
       if (!resolvedConfigurationId) {
-        toast.error('Custom order configuration is unavailable for this design.');
+        toast.error('This design is not configured for custom orders yet. Ask the brand to complete custom-order setup.');
         return;
       }
       setCustomConfigurationId(resolvedConfigurationId);
@@ -465,7 +465,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
             <X size={18} className="text-[color:var(--neu-text-muted)]" />
           </button>
 
-          <div className="grid md:grid-cols-[minmax(0,58%)_minmax(0,42%)] max-h-[92vh]">
+          <div className="grid md:grid-cols-[minmax(0,58%)_minmax(0,42%)] h-[min(92vh,860px)]">
             <div className={CONTENT_DISPLAY_FRAME_CLASS}>
               <MediaRenderer
                 kind={activeMedia?.type === 'POST_VIDEO' ? 'video' : 'image'}
@@ -515,7 +515,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               ) : null}
             </div>
 
-            <div className="h-[85vh] md:h-[92vh] min-w-0 p-3.5 md:p-4 bg-white/65 dark:bg-[#0f0b11]/70 text-slate-900 dark:text-white flex flex-col">
+            <div className="h-full min-w-0 p-3.5 md:p-4 bg-white/65 dark:bg-[#0f0b11]/70 text-slate-900 dark:text-white flex flex-col overflow-hidden">
               <div className="space-y-3">
                 {/* Brand row */}
                 <div className="flex items-center justify-between gap-2 pr-8">
@@ -608,7 +608,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                         : resolvingCustomConfiguration
                           ? 'Checking custom-order setup for this design'
                           : !customConfigurationId
-                            ? 'Custom order is not configured for this design yet'
+                            ? 'This design is not configured for custom orders yet'
                           : 'Start custom order from this design'
                     }
                   >

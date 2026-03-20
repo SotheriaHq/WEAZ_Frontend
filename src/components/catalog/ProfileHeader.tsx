@@ -211,6 +211,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               }`}
               style={{ fontSize: 'clamp(1rem, 3vw, 1.5rem)' }}
             >
+              {profile.firstName} {profile.lastName}
               <Link
                 to={profile.verifiedExplanationUrl || '/help/verified-badge'}
                 state={{
@@ -226,7 +227,6 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               >
                 {profile.verificationBadgeVisible ? 'Verified' : 'Unverified'}
               </Link>
-              {profile.firstName} {profile.lastName}
             </h1>
             <p className={`inline-flex w-fit items-center gap-2 rounded-md px-2 py-1 text-sm font-semibold ${showBanner ? 'bg-black/35 text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]' : 'text-gray-700 dark:text-gray-300'}`}>
               <span aria-hidden="true">📍</span>

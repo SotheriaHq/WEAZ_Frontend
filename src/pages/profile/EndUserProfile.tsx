@@ -734,6 +734,7 @@ export const EndUserProfile: React.FC = () => {
         onClose={() => setIsQrOpen(false)}
         profileUrl={profileUrl}
         logoUrl={profile.profileImage}
+        username={profile.username}
       />
 
       {isReminderDialogOpen ? (

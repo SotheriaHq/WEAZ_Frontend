@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { adminBrandsApi } from '@/api/AdminApi';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { unwrapApiResponse } from '@/types/auth';
 import type {
   AdminVerificationDetails,
@@ -56,6 +57,8 @@ const isPdfDocument = (document: VerificationDocumentItem | null) =>
 
 export default function AdminBrandVerificationReviewPage() {
   const { id = '' } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [details, setDetails] = useState<AdminVerificationDetails | null>(null);
   const [reasons, setReasons] = useState<VerificationReason[]>([]);
   const [selectedReasonCodes, setSelectedReasonCodes] = useState<string[]>([]);
@@ -68,6 +71,8 @@ export default function AdminBrandVerificationReviewPage() {
   const [requestInfoMessage, setRequestInfoMessage] = useState('');
   const [noteText, setNoteText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [isRevealNinDialogOpen, setIsRevealNinDialogOpen] = useState(false);
+  const [isNinRevealed, setIsNinRevealed] = useState(false);
 
   const load = async () => {
     if (!id) return;
@@ -128,6 +133,10 @@ export default function AdminBrandVerificationReviewPage() {
   }, [id]);
 
   const latestAttempt = details?.latestAttempt as Record<string, any> | null;
+  const returnTo =
+    typeof (location.state as { returnTo?: unknown } | null)?.returnTo === 'string'
+      ? ((location.state as { returnTo?: string }).returnTo || '/admin/verification')
+      : '/admin/verification';
   const selectedDocument = useMemo(
     () =>
       details?.documents?.find((document) => document.key === selectedDocumentKey) ??
@@ -272,7 +281,7 @@ export default function AdminBrandVerificationReviewPage() {
       toast.success(
         decision === 'APPROVED' ? 'Verification approved' : 'Verification rejected',
       );
-      await withFreshDetails();
+      navigate(returnTo, { replace: true, state: { verificationActionCompleted: true } });
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to submit review decision');
     } finally {
@@ -348,11 +357,22 @@ export default function AdminBrandVerificationReviewPage() {
             Reassign to me
           </Button>
         </div>
+        <div className="mt-4 grid gap-2 text-xs text-gray-600 md:grid-cols-2 xl:grid-cols-3">
+          <p className="rounded-xl border border-gray-200 bg-white/70 px-3 py-2 break-words">
+            <span className="font-semibold text-gray-900">Claim:</span> take ownership of this review so you can submit final decisions.
+          </p>
+          <p className="rounded-xl border border-gray-200 bg-white/70 px-3 py-2 break-words">
+            <span className="font-semibold text-gray-900">Release:</span> put it back in queue so another admin can continue.
+          </p>
+          <p className="rounded-xl border border-gray-200 bg-white/70 px-3 py-2 break-words">
+            <span className="font-semibold text-gray-900">Reassign to me:</span> move an already-assigned review to your account.
+          </p>
+        </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
-          <section className="grid gap-4 md:grid-cols-3">
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="rounded-[1.5rem] border border-gray-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
                 Owner identity
@@ -361,8 +381,20 @@ export default function AdminBrandVerificationReviewPage() {
                 {latestAttempt?.ownerLegalFirstName} {latestAttempt?.ownerLegalLastName}
               </p>
               <p className="mt-2 text-sm text-gray-600">
-                NIN: {details.maskedOwnerNin || 'Not available'}
+                NIN:{' '}
+                {isNinRevealed
+                  ? latestAttempt?.ownerNin || details.maskedOwnerNin || 'Not available'
+                  : details.maskedOwnerNin || 'Not available'}
               </p>
+              {!isNinRevealed && latestAttempt?.ownerNin ? (
+                <button
+                  type="button"
+                  onClick={() => setIsRevealNinDialogOpen(true)}
+                  className="mt-2 inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-700 transition hover:bg-gray-100"
+                >
+                  Reveal NIN
+                </button>
+              ) : null}
               <p className="mt-1 text-sm text-gray-600">
                 DOB:{' '}
                 {latestAttempt?.ownerDateOfBirth
@@ -418,7 +450,7 @@ export default function AdminBrandVerificationReviewPage() {
                   Document workspace
                 </h2>
                 <p className="mt-2 text-sm leading-7 text-gray-600">
-                  Preview signed evidence directly from the review record. URLs are short-lived and refresh on page reload.
+                  Preview submitted evidence directly from this verification record. Links are secure, short-lived, and refresh when this page reloads.
                 </p>
               </div>
               {selectedDocument?.signedUrl ? (
@@ -433,7 +465,7 @@ export default function AdminBrandVerificationReviewPage() {
               ) : null}
             </div>
 
-            <div className="mt-5 grid gap-5 lg:grid-cols-[240px_1fr]">
+            <div className="mt-5 grid gap-5 xl:grid-cols-[240px_1fr]">
               <div className="space-y-3">
                 {(details.documents ?? []).map((document) => (
                   <button
@@ -447,11 +479,27 @@ export default function AdminBrandVerificationReviewPage() {
                     }`}
                   >
                     <p className="text-sm font-semibold text-gray-900">{document.label}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.18em] text-gray-400">
+                    <p className="mt-1 break-all text-xs uppercase tracking-[0.18em] text-gray-400">
                       {document.mimeType || 'Unknown type'}
                     </p>
                   </button>
                 ))}
+                <div className="rounded-[1.25rem] border border-indigo-200 bg-indigo-50 px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Signed verification letter</p>
+                  <p className="mt-2 text-sm font-semibold text-indigo-900">What this means</p>
+                  <p className="mt-2 text-sm leading-6 text-indigo-900/90">
+                    The owner confirms that submitted business and identity details are accurate, and accepts platform verification terms.
+                  </p>
+                  <p className="mt-2 text-xs text-indigo-800/80">
+                    Signature method: {String(latestAttempt?.signatureMethod || 'Not recorded').replace(/_/g, ' ')}
+                  </p>
+                  <p className="text-xs text-indigo-800/80">
+                    Letter version: {latestAttempt?.letterVersion ?? 'Not recorded'}
+                  </p>
+                  <p className="text-xs text-indigo-800/80">
+                    Signed at: {latestAttempt?.letterSignedAt ? new Date(latestAttempt.letterSignedAt).toLocaleString() : 'Not recorded'}
+                  </p>
+                </div>
               </div>
 
               <div className="overflow-hidden rounded-[1.5rem] border border-gray-200 bg-gray-50">
@@ -460,10 +508,10 @@ export default function AdminBrandVerificationReviewPage() {
                     <iframe
                       title={selectedDocument.label}
                       src={selectedDocument.signedUrl}
-                      className="h-[620px] w-full bg-white"
+                      className="h-[62vh] min-h-[420px] w-full bg-white"
                     />
                   ) : (
-                    <div className="flex min-h-[620px] items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_36%),linear-gradient(180deg,_#ffffff,_#f8fafc)] p-4">
+                    <div className="flex min-h-[420px] items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_36%),linear-gradient(180deg,_#ffffff,_#f8fafc)] p-4">
                       <img
                         src={selectedDocument.signedUrl}
                         alt={selectedDocument.label}
@@ -472,7 +520,7 @@ export default function AdminBrandVerificationReviewPage() {
                     </div>
                   )
                 ) : (
-                  <div className="flex min-h-[620px] items-center justify-center px-6 text-sm text-gray-500">
+                  <div className="flex min-h-[420px] items-center justify-center px-6 text-sm text-gray-500">
                     No reviewer preview is available for the selected document yet.
                   </div>
                 )}
@@ -656,6 +704,21 @@ export default function AdminBrandVerificationReviewPage() {
           </section>
         </div>
       </section>
+
+      <ConfirmDialog
+        open={isRevealNinDialogOpen}
+        title="Reveal full NIN?"
+        message="This shows sensitive identity data. Confirm only if this is required to complete the verification review."
+        confirmText="Reveal NIN"
+        cancelText="Cancel"
+        isDestructive
+        isLoading={saving}
+        onCancel={() => setIsRevealNinDialogOpen(false)}
+        onConfirm={() => {
+          setIsNinRevealed(true);
+          setIsRevealNinDialogOpen(false);
+        }}
+      />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import DesignCard from '@/components/designs/DesignCard';
 import DesignSkeleton from '@/components/designs/DesignSkeleton';
 // Category chips live directly on page; tag chips removed for now
 import DesignViewModal from '@/components/designs/DesignViewModal';
+import VLoader from '@/components/loaders/VLoader';
 import { setEngagementState } from '@/features/engagementSlice';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
@@ -791,7 +792,7 @@ const Market: React.FC = () => {
       {/* Soft overlay while refreshing/filtering (keeps layout stable) */}
       {(!loading && (refreshing || isPending)) && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/40 dark:bg-black/30 backdrop-blur-[2px] transition-opacity duration-300">
-          <div className="h-6 w-6 rounded-full border-2 border-white/70 border-t-transparent animate-spin" />
+          <VLoader size={24} phase="loading" showLabel={false} />
         </div>
       )}
       </div>

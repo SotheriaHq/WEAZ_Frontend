@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
+import VLoader from '@/components/loaders/VLoader';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
@@ -525,10 +526,21 @@ export default function ProductDetailsPage() {
   
   const isOutOfStock = variants.length > 0 ? (currentVariant?.stock === 0) : false;
   const isStudioStoreView = location.pathname.startsWith('/studio/store');
-  const isOwnProduct = Boolean(
-    currentUser?.id &&
-    (product.brandId === currentUser.id || product.brand?.id === currentUser.id),
-  );
+  const ownerCandidates = [
+    product.brandId,
+    product.brand?.id,
+    (product as ProductDto & { ownerId?: string }).ownerId,
+    (product as ProductDto & { brand?: { ownerId?: string } }).brand?.ownerId,
+  ]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean);
+  const viewerCandidates = [
+    currentUser?.id,
+    (currentUser as { brandId?: string } | null)?.brandId,
+  ]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean);
+  const isOwnProduct = viewerCandidates.some((viewerId) => ownerCandidates.includes(viewerId));
   const showAddToBag = !isStudioStoreView && !isOwnProduct;
   const compareAt = typeof product.compareAtPrice === 'number' && product.compareAtPrice > currentPrice
     ? product.compareAtPrice
@@ -691,7 +703,7 @@ export default function ProductDetailsPage() {
                   >
                     {savingMeasurements ? (
                       <>
-                        <span className="animate-spin text-sm">⏳</span> Saving...
+                        <VLoader size={16} phase="loading" showLabel={false} /> Saving...
                       </>
                     ) : (
                       <>

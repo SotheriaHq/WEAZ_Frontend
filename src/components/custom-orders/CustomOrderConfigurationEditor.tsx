@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { getStoreStatus } from '@/api/StoreApi';
 import { useMeasurementPoints } from '@/hooks/useMeasurementPoints';
@@ -18,7 +18,12 @@ interface CustomOrderConfigurationEditorProps {
   sourceId?: string;
   measurementKeys: string[];
   measurementGender?: 'MEN' | 'WOMEN' | 'UNISEX';
+  defaultBaseCharge?: string | number | null;
   disabled?: boolean;
+}
+
+export interface CustomOrderConfigurationEditorHandle {
+  saveConfiguration: (options?: { silentSuccess?: boolean }) => Promise<boolean>;
 }
 
 type ConfigurationFormState = {
@@ -97,15 +102,27 @@ type SizeExtraYardFormState = {
 const createRuleId = () =>
   `rule_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
+const stripMeasurementGenderPrefix = (value: string) =>
+  value
+    .trim()
+    .replace(/^BRAND[_\-\s]+[^_\-\s]+[_\-\s]+/i, '')
+    .replace(/^(MEN|WOMEN|WOMAN|UNISEX)[_\-\s]+/i, '');
+
 const formatMeasurementKeyLabel = (rawKey: string) => {
-  const noBrandPrefix = rawKey.replace(/^BRAND_[^_]+_/, '');
-  const noGenderPrefix = noBrandPrefix.replace(/^(MEN|WOMEN|UNISEX)_/, '');
+  const noGenderPrefix = stripMeasurementGenderPrefix(rawKey);
   return noGenderPrefix
-    .split('_')
+    .split(/[_\-\s]+/)
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(' ');
 };
+
+const normalizeMeasurementDisplayLabel = (rawLabel: string) =>
+  stripMeasurementGenderPrefix(rawLabel)
+    .split(/[_\-\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
 
 const normalizeMeasurementLabel = (value: string) =>
   value.trim().toLowerCase().replace(/[\s_]+/g, ' ');
@@ -258,6 +275,8 @@ const requiredFieldLabelClassName =
 const infoBadgeClassName =
   'inline-flex h-4 w-4 items-center justify-center rounded-full bg-black/[0.06] text-[10px] leading-none dark:bg-white/[0.1]';
 
+const KEY_CHIP_PREVIEW_LIMIT = 14;
+
 const mapConfigurationToForm = (configuration: CustomOrderConfiguration): ConfigurationFormState => ({
   buyerInstructionText: configuration.buyerInstructionText ?? '',
   requiredMeasurementKeys: configuration.requiredMeasurementKeys,
@@ -288,13 +307,14 @@ const mapConfigurationToForm = (configuration: CustomOrderConfiguration): Config
   ),
 });
 
-const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorProps> = ({
+const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditorHandle, CustomOrderConfigurationEditorProps>(({ 
   sourceType,
   sourceId,
   measurementKeys,
   measurementGender,
+  defaultBaseCharge,
   disabled = false,
-}) => {
+}, ref) => {
   const [brandId, setBrandId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -318,6 +338,20 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
     { sizeLabel: 'XXL', extraYards: '2' },
   ]);
   const [manualMeasurementKeyInput, setManualMeasurementKeyInput] = useState('');
+  const [hasEditedBaseCharge, setHasEditedBaseCharge] = useState(false);
+  const [showAllSelectedKeys, setShowAllSelectedKeys] = useState(false);
+  const [showAllPoolKeys, setShowAllPoolKeys] = useState(false);
+
+  const normalizedDefaultBaseCharge = useMemo(() => {
+    if (defaultBaseCharge == null) {
+      return '';
+    }
+    const parsed = Number(defaultBaseCharge);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return '';
+    }
+    return String(parsed);
+  }, [defaultBaseCharge]);
 
   const measurementFilter = useMemo(
     () => (measurementGender && measurementGender !== 'UNISEX' ? { gender: measurementGender } : undefined),
@@ -341,6 +375,7 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
         if (!active) return;
         setBrandId(null);
         setConfiguration(null);
+        setHasEditedBaseCharge(false);
         setBases([]);
         const nextForm = createDefaultForm(measurementKeys);
         setForm(nextForm);
@@ -374,28 +409,41 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
         setBases(basisList);
         setBrandId(status.brandId ?? existingConfiguration?.brandId ?? null);
         setConfiguration(existingConfiguration);
-        const nextForm = existingConfiguration ? mapConfigurationToForm(existingConfiguration) : createDefaultForm(measurementKeys);
-        setForm(nextForm);
-        setRuleRows(buildRulesFromJson(nextForm.rulesJson));
-        setAverageBaseYards(
-          existingConfiguration?.yardProfile?.averageBaseYards != null
-            ? String(existingConfiguration.yardProfile.averageBaseYards)
-            : '',
-        );
-        setSizeExtraRows(
-          existingConfiguration?.yardProfile?.sizeExtraYards?.length
-            ? existingConfiguration.yardProfile.sizeExtraYards.map((row) => ({
-                sizeLabel: row.sizeLabel,
-                extraYards: String(row.extraYards),
-              }))
-            : [
-                { sizeLabel: 'XL', extraYards: '1.5' },
-                { sizeLabel: 'XXL', extraYards: '2' },
-              ],
-        );
-        setRevisionPolicyPreset(parsePolicySelection(nextForm.revisionPolicy, REVISION_POLICY_OPTIONS));
-        setReturnPolicyPreset(parsePolicySelection(nextForm.returnPolicy, RETURN_POLICY_OPTIONS));
-        setDefectPolicyPreset(parsePolicySelection(nextForm.defectPolicy, DEFECT_POLICY_OPTIONS));
+
+        if (existingConfiguration) {
+          setHasEditedBaseCharge(false);
+          const nextForm = mapConfigurationToForm(existingConfiguration);
+          setForm(nextForm);
+          setRuleRows(buildRulesFromJson(nextForm.rulesJson));
+          setAverageBaseYards(
+            existingConfiguration.yardProfile?.averageBaseYards != null
+              ? String(existingConfiguration.yardProfile.averageBaseYards)
+              : '',
+          );
+          setSizeExtraRows(
+            existingConfiguration.yardProfile?.sizeExtraYards?.length
+              ? existingConfiguration.yardProfile.sizeExtraYards.map((row) => ({
+                  sizeLabel: row.sizeLabel,
+                  extraYards: String(row.extraYards),
+                }))
+              : [
+                  { sizeLabel: 'XL', extraYards: '1.5' },
+                  { sizeLabel: 'XXL', extraYards: '2' },
+                ],
+          );
+          setRevisionPolicyPreset(parsePolicySelection(nextForm.revisionPolicy, REVISION_POLICY_OPTIONS));
+          setReturnPolicyPreset(parsePolicySelection(nextForm.returnPolicy, RETURN_POLICY_OPTIONS));
+          setDefectPolicyPreset(parsePolicySelection(nextForm.defectPolicy, DEFECT_POLICY_OPTIONS));
+        } else {
+          setForm((current) => ({
+            ...current,
+            requiredMeasurementKeys:
+              current.requiredMeasurementKeys.length > 0
+                ? current.requiredMeasurementKeys
+                : measurementKeys,
+            fabricRuleBasisId: current.fabricRuleBasisId || basisList[0]?.id || '',
+          }));
+        }
       } catch (error: any) {
         if (!active) return;
         toast.error(error?.response?.data?.message || 'Unable to load custom-order configuration editor');
@@ -408,15 +456,51 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
     return () => {
       active = false;
     };
-  }, [measurementKeys, sourceId, sourceType]);
+  }, [sourceId, sourceType]);
 
-  const missingMeasurementKeys = useMemo(
-    () => measurementKeys.filter((key) => !form.requiredMeasurementKeys.includes(key)),
-    [form.requiredMeasurementKeys, measurementKeys],
-  );
+  useEffect(() => {
+    if (configuration || hasEditedBaseCharge) {
+      return;
+    }
+
+    setForm((current) => {
+      if (!normalizedDefaultBaseCharge) {
+        if (current.baseProductionCharge.trim().length > 0) {
+          return { ...current, baseProductionCharge: '' };
+        }
+        return current;
+      }
+
+      if (current.baseProductionCharge.trim() === normalizedDefaultBaseCharge) {
+        return current;
+      }
+
+      return {
+        ...current,
+        baseProductionCharge: normalizedDefaultBaseCharge,
+      };
+    });
+  }, [configuration, hasEditedBaseCharge, normalizedDefaultBaseCharge]);
+
+  useEffect(() => {
+    if (configuration || !sourceId) {
+      return;
+    }
+    if (form.fabricRuleBasisId || bases.length === 0) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      fabricRuleBasisId: current.fabricRuleBasisId || bases[0].id,
+    }));
+  }, [bases, configuration, form.fabricRuleBasisId, sourceId]);
 
   const measurementPointLabelMap = useMemo(() => {
-    const entries = measurementPoints.map((point) => [point.key, point.label] as const);
+    const entries = measurementPoints.map((point) => [
+      point.key,
+      normalizeMeasurementDisplayLabel(point.label || point.key),
+    ] as const);
     return new Map(entries);
   }, [measurementPoints]);
 
@@ -465,6 +549,22 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
         (key) => !form.requiredMeasurementKeys.includes(key),
       ),
     [availableMeasurementKeys, form.requiredMeasurementKeys],
+  );
+
+  const selectedKeysVisible = showAllSelectedKeys
+    ? selectedMeasurementKeys
+    : selectedMeasurementKeys.slice(0, KEY_CHIP_PREVIEW_LIMIT);
+  const selectedKeysHiddenCount = Math.max(
+    selectedMeasurementKeys.length - selectedKeysVisible.length,
+    0,
+  );
+
+  const poolKeysVisible = showAllPoolKeys
+    ? selectableMeasurementKeys
+    : selectableMeasurementKeys.slice(0, KEY_CHIP_PREVIEW_LIMIT);
+  const poolKeysHiddenCount = Math.max(
+    selectableMeasurementKeys.length - poolKeysVisible.length,
+    0,
   );
 
   const basisOptions = useMemo(
@@ -654,14 +754,14 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
     }
   };
 
-  const handleSaveConfiguration = async () => {
+  const handleSaveConfiguration = useCallback(async (options?: { silentSuccess?: boolean }) => {
     if (!sourceId) {
       toast.error('Save the product or design first, then configure its custom-order configuration.');
-      return;
+      return false;
     }
     if (!brandId) {
       toast.error('Brand context is unavailable for this store session.');
-      return;
+      return false;
     }
 
     let rules: CustomOrderConfigurationUpsertInput['rules'];
@@ -669,7 +769,7 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
       rules = normalizeRulePayload(ruleRows);
     } catch (error: any) {
       toast.error(error?.message || 'Fabric yard rules are invalid.');
-      return;
+      return false;
     }
 
     const payload: CustomOrderConfigurationUpsertInput = {
@@ -705,12 +805,12 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
 
     if (payload.averageBaseYards != null && (!Number.isFinite(payload.averageBaseYards) || payload.averageBaseYards <= 0)) {
       toast.error('Average base yards must be greater than zero.');
-      return;
+      return false;
     }
 
     if ((payload.sizeExtraYards ?? []).some((row) => !Number.isFinite(row.extraYards) || row.extraYards < 0)) {
       toast.error('Each size extra-yard value must be zero or greater.');
-      return;
+      return false;
     }
 
     const missingRequiredFields: string[] = [];
@@ -724,7 +824,7 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
 
     if (missingRequiredFields.length > 0) {
       toast.error(`Complete required fields: ${missingRequiredFields.join(', ')}`);
-      return;
+      return false;
     }
 
     setSaving(true);
@@ -739,13 +839,32 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
       setRevisionPolicyPreset(parsePolicySelection(mapped.revisionPolicy, REVISION_POLICY_OPTIONS));
       setReturnPolicyPreset(parsePolicySelection(mapped.returnPolicy, RETURN_POLICY_OPTIONS));
       setDefectPolicyPreset(parsePolicySelection(mapped.defectPolicy, DEFECT_POLICY_OPTIONS));
-      toast.success(configuration ? 'Custom-order configuration updated.' : 'Custom-order configuration created.');
+      if (!options?.silentSuccess) {
+        toast.success(configuration ? 'Custom-order configuration updated.' : 'Custom-order configuration created.');
+      }
+      return true;
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to save custom-order configuration');
+      return false;
     } finally {
       setSaving(false);
     }
-  };
+  }, [
+    averageBaseYards,
+    brandId,
+    configuration,
+    form,
+    measurementGender,
+    ruleRows,
+    sizeExtraRows,
+    sourceId,
+    sourceType,
+  ]);
+
+  useImperativeHandle(ref, () => ({
+    saveConfiguration: (options?: { silentSuccess?: boolean }) =>
+      handleSaveConfiguration(options),
+  }), [handleSaveConfiguration]);
 
   return (
     <section className="rounded-xl border border-black/10 bg-white/80 p-3 dark:border-white/10 dark:bg-white/5">
@@ -782,7 +901,16 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
             Base charge <span className="text-rose-500">*</span>
             <span className={infoBadgeClassName} title="Labor and production-only cost, excluding fabric yard cost.">i</span>
           </span>
-          <input value={form.baseProductionCharge} onChange={(event) => updateForm('baseProductionCharge', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="120000" />
+          <input
+            value={form.baseProductionCharge}
+            onChange={(event) => {
+              setHasEditedBaseCharge(true);
+              updateForm('baseProductionCharge', event.target.value);
+            }}
+            disabled={disabled}
+            className={fieldClassName}
+            placeholder="120000"
+          />
         </label>
         <label className="block">
           <span className={requiredFieldLabelClassName}>
@@ -828,12 +956,12 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
           <span className={infoBadgeClassName} title="This defines which buyer measurements are mandatory and which sizing basis this yard-rule setup belongs to.">i</span>
         </div>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          What this section does: choose the exact measurement points buyers must submit, then group them under a reusable fabric-rule basis.
+          Choose what is in use now and what is left in the pool.
         </p>
         {/* Selected keys */}
         <div className="mt-3">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Selected keys
+            In use
             {selectedMeasurementKeys.length > 0 && (
               <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
                 {selectedMeasurementKeys.length}
@@ -847,7 +975,7 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
               </div>
             ) : (
               <div className="flex flex-wrap gap-1.5">
-                {selectedMeasurementKeys.map((key) => (
+                {selectedKeysVisible.map((key) => (
                   <button
                     key={key}
                     type="button"
@@ -867,13 +995,24 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
                 ))}
               </div>
             )}
+
+            {selectedMeasurementKeys.length > KEY_CHIP_PREVIEW_LIMIT ? (
+              <button
+                type="button"
+                onClick={() => setShowAllSelectedKeys((current) => !current)}
+                disabled={disabled}
+                className="mt-2 rounded-full border border-emerald-500/25 px-3 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-500/20 disabled:opacity-60 dark:border-emerald-300/20 dark:text-emerald-200"
+              >
+                {showAllSelectedKeys ? 'Show less' : `Show more (${selectedKeysHiddenCount})`}
+              </button>
+            ) : null}
           </div>
         </div>
 
-        {/* Available keys */}
+        {/* Left in pool */}
         <div className="mt-3 max-h-36 overflow-y-auto rounded-xl border border-black/5 p-2 pr-1 dark:border-white/10">
           <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Available keys
+            Left in pool
             {selectableMeasurementKeys.length > 0 && (
               <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-bold tabular-nums dark:bg-white/[0.08]">
                 {selectableMeasurementKeys.length}
@@ -888,7 +1027,7 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
                 : 'All available measurement points are selected.'}
             </div>
           ) : (
-            selectableMeasurementKeys.map((key) => {
+            poolKeysVisible.map((key) => {
               return (
                 <button
                   key={key}
@@ -908,6 +1047,17 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
             })
           )}
           </div>
+
+          {selectableMeasurementKeys.length > KEY_CHIP_PREVIEW_LIMIT ? (
+            <button
+              type="button"
+              onClick={() => setShowAllPoolKeys((current) => !current)}
+              disabled={disabled}
+              className="mt-2 rounded-full border border-black/10 px-3 py-1 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-black/[0.04] disabled:opacity-60 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.08]"
+            >
+              {showAllPoolKeys ? 'Show less' : `Show more (${poolKeysHiddenCount})`}
+            </button>
+          ) : null}
         </div>
         <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
           <input
@@ -915,7 +1065,7 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
             onChange={(event) => setManualMeasurementKeyInput(event.target.value)}
             disabled={disabled}
             className={fieldClassName}
-            placeholder="Add missing measurement key (e.g. MEN_NECK_CIRCUMFERENCE)"
+            placeholder="Add missing measurement key (e.g. NECK_CIRCUMFERENCE)"
           />
           <button
             type="button"
@@ -926,32 +1076,6 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
             Add key
           </button>
         </div>
-        {missingMeasurementKeys.length > 0 ? (
-          <div className="mt-3">
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Unselected sizing keys
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {missingMeasurementKeys.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() =>
-                    updateForm(
-                      'requiredMeasurementKeys',
-                      [...form.requiredMeasurementKeys, key],
-                    )
-                  }
-                  disabled={disabled}
-                  className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-500/20 dark:border-amber-400/20 dark:text-amber-300"
-                >
-                  + {getMeasurementLabel(key)}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
         <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
           <UniversalSelect
             value={form.fabricRuleBasisId}
@@ -1266,20 +1390,13 @@ const CustomOrderConfigurationEditor: React.FC<CustomOrderConfigurationEditorPro
         </div>
       </details>
 
-      {sourceId ? (
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={handleSaveConfiguration}
-            disabled={disabled || saving}
-            className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-60"
-          >
-            {saving ? 'Saving…' : configuration ? 'Update configuration' : 'Create configuration'}
-          </button>
-        </div>
-      ) : null}
+      <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+        Custom-order configuration is saved automatically when you publish updates.
+      </p>
     </section>
   );
-};
+});
+
+CustomOrderConfigurationEditor.displayName = 'CustomOrderConfigurationEditor';
 
 export default CustomOrderConfigurationEditor;

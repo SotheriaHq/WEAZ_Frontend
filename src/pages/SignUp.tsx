@@ -13,6 +13,7 @@ import { addLocalNotification } from '../features/notificationsSlice';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiClient, persistAccessToken, dropStoredAccessToken } from '../api/httpClient';
 import '../styles/auth.css';
+import VLoader from '@/components/loaders/VLoader';
 
 const CONFETTI_STORAGE_KEY = 'threadly-signup-confetti';
 
@@ -662,7 +663,7 @@ const SignUpPage = () => {
                 >
                   {isLoading ? (
                     <span className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <VLoader size={16} phase="loading" showLabel={false} />
                       Creating Account...
                     </span>
                   ) : (

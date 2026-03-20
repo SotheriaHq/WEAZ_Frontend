@@ -14,6 +14,7 @@ const groups = [
       { key: 'store', label: 'Store', path: '/studio/store', emoji: '🛍️' },
       { key: 'custom-orders', label: 'Custom Orders', path: '/studio/custom-orders', emoji: '✂️' },
       { key: 'orders', label: 'Orders', path: '/studio?tab=orders', emoji: '📦' },
+      { key: 'messages', label: 'Messages', path: '/studio/messages', emoji: '💬' },
       { key: 'customers', label: 'Customers', path: '/studio?tab=customers', emoji: '👥' },
       { key: 'analytics', label: 'Analytics', path: '/studio?tab=analytics', emoji: '📈' },
       { key: 'finance', label: 'Finance', path: '/studio?tab=finance', emoji: '💰' },

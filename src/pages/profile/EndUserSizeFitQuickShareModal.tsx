@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Share2, X } from 'lucide-react';
+import { Share2, X } from 'lucide-react';
+import VLoader from '@/components/loaders/VLoader';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type { SizeFitSharePolicy, SizeFitSharesPayload } from '@/types/sizeFit';
 
@@ -125,7 +126,7 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
                   disabled={saving || !shareTarget.trim()}
                   className="rounded-lg bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-sm font-medium px-4 py-2 disabled:opacity-60 inline-flex items-center justify-center gap-2"
                 >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {saving ? <VLoader size={16} phase="loading" showLabel={false} /> : null}
                   Share
                 </button>
               </div>

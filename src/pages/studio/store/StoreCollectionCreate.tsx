@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { toast } from "sonner";
 import { X } from "lucide-react";
+import VLoader from "@/components/loaders/VLoader";
 import type { RootState } from "@/store";
 import { brandApi } from "@/api/BrandApi";
 import { apiClient } from "@/api/httpClient";
@@ -2345,7 +2346,7 @@ const StoreCollectionCreate: React.FC = () => {
             className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60 inline-flex items-center gap-2"
           >
             {submitting && (
-              <span className="h-3.5 w-3.5 rounded-full border-2 border-white/50 border-t-white animate-spin" />
+              <VLoader size={14} phase="loading" showLabel={false} />
             )}
             {submitting ? "Saving..." : "Save changes"}
           </button>
@@ -2358,7 +2359,7 @@ const StoreCollectionCreate: React.FC = () => {
               className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 inline-flex items-center gap-2"
             >
               {submitting && submitAction === "draft" && (
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-gray-500/40 border-t-gray-700 animate-spin" />
+                <VLoader size={14} phase="loading" showLabel={false} />
               )}
               {submitting && submitAction === "draft"
                 ? "Saving..."
@@ -2371,7 +2372,7 @@ const StoreCollectionCreate: React.FC = () => {
               className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60 inline-flex items-center gap-2"
             >
               {submitting && submitAction === "publish" && (
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/50 border-t-white animate-spin" />
+                <VLoader size={14} phase="loading" showLabel={false} />
               )}
               {submitting && submitAction === "publish"
                 ? "Publishing..."

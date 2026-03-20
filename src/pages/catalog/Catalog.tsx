@@ -36,7 +36,6 @@ import {
   subscribePublishTasks,
   prunePublishTasks,
   removePublishTask,
-  updatePublishTask,
 } from '@/utils/publishTracker';
 
 import ComingSoon from '../placeholders/ComingSoon';
@@ -901,6 +900,24 @@ const ProfilePage: React.FC = () => {
     void checkAndCleanup();
   }, [collections, fetchCollections, isVisitorView, publishTasks, user?.id, visitorCollections]);
 
+  // Auto-clear stale failed publish states for collections that exist on the server
+  useEffect(() => {
+    if (activeCollections.length === 0 || Object.keys(publishingStates).length === 0) return;
+    const serverIds = new Set(activeCollections.map((c) => c.id));
+    const staleFailed = Object.entries(publishingStates).filter(
+      ([id, state]) => state.status === 'failed' && serverIds.has(id),
+    );
+    if (staleFailed.length === 0) return;
+    setPublishingStates((prev) => {
+      const next = { ...prev };
+      for (const [id, state] of staleFailed) {
+        delete next[id];
+        if (state.taskId) removePublishTask(state.taskId);
+      }
+      return next;
+    });
+  }, [activeCollections, publishingStates]);
+
   const handleCollectionViewerBack = useCallback(() => {
     setSelectedCollectionId(null);
     setSearchParams((prev) => {
@@ -973,6 +990,12 @@ const ProfilePage: React.FC = () => {
     const decorated = searchAndVisibilityFiltered.map((c) => {
       const pub = publishingStates[c.id];
       if (!pub) return c;
+      // If the collection already exists on the server (has real data)
+      // and the publish state is failed, the server-side publish actually
+      // succeeded — skip the stale failed overlay.
+      if (pub.status === 'failed' && c.status && String(c.status).toUpperCase() === 'PUBLISHED') {
+        return c;
+      }
       return {
         ...c,
         clientStatus: pub.status === 'publishing' ? 'publishing' : 'publish-failed',

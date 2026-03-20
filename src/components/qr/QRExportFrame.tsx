@@ -14,7 +14,7 @@ export const QRExportFrame: React.FC<QRExportFrameProps> = ({
   children,
 }) => {
   return (
-    <div className="rounded-[1.75rem] border border-gray-200/80 bg-gradient-to-br from-white via-slate-50 to-emerald-50/70 p-4 shadow-sm dark:border-white/10 dark:from-zinc-900 dark:via-zinc-900 dark:to-emerald-950/20">
+    <div className="rounded-[1.75rem] border border-gray-200/80 bg-gradient-to-br from-white via-purple-50/30 to-indigo-50/50 p-4 shadow-sm dark:border-white/10 dark:from-zinc-900 dark:via-zinc-900 dark:to-purple-950/20">
       <div className="mb-3 px-1">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
           Threadly QR

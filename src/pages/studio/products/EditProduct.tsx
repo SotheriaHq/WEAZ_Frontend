@@ -15,9 +15,10 @@ import {
   CheckCircle,
   Video,
   X,
-  Loader2,
+
 } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import VLoader from "@/components/loaders/VLoader";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 
@@ -2002,7 +2003,7 @@ const EditProduct: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+          <VLoader size={48} phase="loading" />
           <p className="text-gray-400">Loading product...</p>
         </div>
       </div>
@@ -3274,7 +3275,7 @@ const EditProduct: React.FC = () => {
                 className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
               >
                 {(saving || submitLocked) && saveAction === "draft" && (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <VLoader size={16} phase="loading" showLabel={false} />
                 )}
                 Save as Draft
               </button>
@@ -3291,7 +3292,7 @@ const EditProduct: React.FC = () => {
                 className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
               >
                 {(saving || submitLocked) && saveAction === "draft" && (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <VLoader size={16} phase="loading" showLabel={false} />
                 )}
                 Save Changes
               </button>
@@ -3323,7 +3324,7 @@ const EditProduct: React.FC = () => {
               className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 text-white text-sm font-semibold rounded-lg shadow-lg shadow-purple-500/20 transition-all flex items-center gap-2"
             >
                 {(saving || submitLocked) && saveAction === "publish" && (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <VLoader size={16} phase="loading" showLabel={false} />
               )}
               {isDraftEditMode
                 ? "Publish Product"

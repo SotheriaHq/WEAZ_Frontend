@@ -30,6 +30,24 @@ const Button: React.FC<ButtonProps> = ({
   icon,
   ...props
 }) => {
+  const collectText = (node: React.ReactNode): string => {
+    if (typeof node === 'string' || typeof node === 'number') {
+      return String(node);
+    }
+    if (Array.isArray(node)) {
+      return node.map((item) => collectText(item)).join(' ');
+    }
+    if (React.isValidElement(node)) {
+      const element = node as React.ReactElement<{ children?: React.ReactNode }>;
+      return collectText(element.props?.children);
+    }
+    return '';
+  };
+
+  const inferredText = collectText(children).trim();
+  const inferredLoading = /\b(saving|loading|submitting|uploading|signing)\b/i.test(inferredText);
+  const showLoader = loading || Boolean(disabled && inferredLoading);
+
   const baseClasses = 'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
   const variantClasses = {
@@ -65,8 +83,8 @@ const Button: React.FC<ButtonProps> = ({
       disabled={disabled || loading}
       {...props}
     >
-      {loading && <VLoader size={16} phase="loading" showLabel={false} />}
-      {icon && !loading && icon}
+      {showLoader && <VLoader size={16} phase="loading" showLabel={false} />}
+      {icon && !showLoader && icon}
       {children}
     </button>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { adminBrandsApi } from '@/api/AdminApi';
@@ -7,6 +7,7 @@ import Select from '@/components/ui/Select';
 import { unwrapApiResponse } from '@/types/auth';
 import type { VerificationQueueItem } from '@/types/verification';
 import useDebounce from '@/hooks/useDebounce';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All active states' },
@@ -26,47 +27,53 @@ const statusTone = (status: string) => {
 };
 
 export default function AdminVerificationQueuePage() {
-  const [items, setItems] = useState<VerificationQueueItem[]>([]);
   const [totalPending, setTotalPending] = useState(0);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search.trim(), 250);
   const [status, setStatus] = useState('');
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
+  const fetchPage = useCallback(
+    async (cursor?: string, limit?: number) => {
       try {
-        setLoading(true);
         const response = await adminBrandsApi.getVerificationQueue({
-          limit: '100',
+          limit: String(limit ?? 50),
+          ...(cursor ? { cursor } : {}),
           ...(debouncedSearch ? { q: debouncedSearch } : {}),
           ...(status ? { status } : {}),
         });
+
         const data = unwrapApiResponse<{
           items?: VerificationQueueItem[];
+          nextCursor?: string;
           totalPending?: number;
         }>(response.data as never);
-        if (!active) return;
-        setItems(data.items ?? []);
-        setTotalPending(data.totalPending ?? 0);
+
+        if (typeof data.totalPending === 'number') {
+          setTotalPending(data.totalPending);
+        }
+
+        return {
+          items: data.items ?? [],
+          nextCursor: data.nextCursor,
+        };
       } catch (error: any) {
-        if (!active) return;
         toast.error(
           error?.response?.data?.message ||
             'Unable to load the verification queue',
         );
-      } finally {
-        if (active) setLoading(false);
+        return { items: [], nextCursor: undefined };
       }
-    };
+    },
+    [debouncedSearch, status],
+  );
 
-    void load();
-
-    return () => {
-      active = false;
-    };
-  }, [debouncedSearch, status]);
+  const {
+    items,
+    isLoading: loading,
+    isLoadingMore,
+    hasMore,
+    sentinelRef,
+  } = useInfiniteScroll<VerificationQueueItem>(fetchPage, { limit: 50 });
 
   const metrics = useMemo(() => {
     const inReview = items.filter(
@@ -114,6 +121,7 @@ export default function AdminVerificationQueuePage() {
             Visible items
           </p>
           <p className="mt-3 text-3xl font-black text-gray-900">{metrics.active}</p>
+          <p className="mt-1 text-xs text-gray-500">Loaded in this view</p>
         </div>
         <div className="rounded-[1.5rem] border border-sky-200 bg-sky-50 p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">
@@ -172,78 +180,105 @@ export default function AdminVerificationQueuePage() {
           </p>
         </div>
       ) : (
-        <section className="grid gap-4 xl:grid-cols-2">
-          {items.map((item) => (
-            <article
-              key={item.id}
-              className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm"
-            >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-                    {item.owner?.email ?? 'No owner email'}
-                  </p>
-                  <h2 className="mt-2 text-xl font-black text-gray-900">
-                    {item.name || 'Unnamed brand'}
-                  </h2>
-                  <p className="mt-2 text-sm text-gray-600">
-                    {item.owner?.firstName} {item.owner?.lastName}
-                  </p>
+        <>
+          <section className="space-y-3 md:hidden">
+            {items.map((item) => (
+              <article key={item.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{item.name || 'Unnamed brand'}</p>
+                    <p className="text-xs text-gray-500">{item.owner?.firstName} {item.owner?.lastName}</p>
+                    <p className="text-xs text-gray-500">{item.owner?.email ?? 'No owner email'}</p>
+                  </div>
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${statusTone(item.verificationStatus)}`}>
+                    {item.verificationStatus.replace(/_/g, ' ')}
+                  </span>
                 </div>
-                <div
-                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${statusTone(item.verificationStatus)}`}
-                >
-                  {item.verificationStatus.replace(/_/g, ' ')}
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
-                    Attempt
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-gray-900">
-                    {item.verificationAttemptNumber ?? 0}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
-                    Submitted
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-gray-900">
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-gray-600">
+                  <p><span className="font-semibold text-gray-800">Attempt:</span> {item.verificationAttemptNumber ?? 0}</p>
+                  <p><span className="font-semibold text-gray-800">Assigned:</span> {item.verificationReviewedById ? 'Claimed' : 'Unclaimed'}</p>
+                  <p className="col-span-2">
+                    <span className="font-semibold text-gray-800">Submitted:</span>{' '}
                     {item.verificationSubmittedAt
-                      ? new Date(item.verificationSubmittedAt).toLocaleDateString()
+                      ? new Date(item.verificationSubmittedAt).toLocaleString()
                       : 'Not available'}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
-                    Assigned
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-gray-900">
-                    {item.verificationReviewedById ? 'Claimed' : 'Unclaimed'}
-                  </p>
+                <div className="mt-3">
+                  <Link
+                    to={`/admin/brands/${item.id}/verification-review`}
+                    state={{ returnTo: '/admin/verification' }}
+                    className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-sky-800 transition hover:border-sky-300 hover:bg-sky-100"
+                  >
+                    Open
+                  </Link>
                 </div>
-              </div>
+              </article>
+            ))}
+          </section>
 
-              <div className="mt-5 flex items-center justify-between gap-3">
-                <p className="text-xs text-gray-500">
-                  Updated{' '}
-                  {item.updatedAt
-                    ? new Date(item.updatedAt).toLocaleString()
-                    : 'recently'}
-                </p>
-                <Link
-                  to={`/admin/brands/${item.id}/verification-review`}
-                  className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-sky-800 transition hover:border-sky-300 hover:bg-sky-100"
-                >
-                  Open review
-                </Link>
-              </div>
-            </article>
-          ))}
-        </section>
+          <section className="hidden overflow-x-auto rounded-[1.75rem] border border-gray-200 bg-white shadow-sm md:block">
+          <table className="w-full min-w-[860px] text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs uppercase tracking-[0.2em] text-gray-500">
+                <th className="px-4 py-3">Brand</th>
+                <th className="px-4 py-3">Owner</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Attempt</th>
+                <th className="px-4 py-3">Submitted</th>
+                <th className="px-4 py-3">Assigned</th>
+                <th className="px-4 py-3">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50/70">
+                  <td className="px-4 py-3">
+                    <p className="font-semibold text-gray-900">{item.name || 'Unnamed brand'}</p>
+                    <p className="text-xs text-gray-500">{item.id.slice(0, 8)}</p>
+                  </td>
+                  <td className="px-4 py-3 text-gray-700">
+                    <p>{item.owner?.firstName} {item.owner?.lastName}</p>
+                    <p className="text-xs text-gray-500">{item.owner?.email ?? 'No owner email'}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${statusTone(item.verificationStatus)}`}>
+                      {item.verificationStatus.replace(/_/g, ' ')}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-gray-900">{item.verificationAttemptNumber ?? 0}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {item.verificationSubmittedAt
+                      ? new Date(item.verificationSubmittedAt).toLocaleString()
+                      : 'Not available'}
+                  </td>
+                  <td className="px-4 py-3 text-gray-700">
+                    {item.verificationReviewedById ? 'Claimed' : 'Unclaimed'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      to={`/admin/brands/${item.id}/verification-review`}
+                      state={{ returnTo: '/admin/verification' }}
+                      className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-sky-800 transition hover:border-sky-300 hover:bg-sky-100"
+                    >
+                      Open
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </section>
+        </>
       )}
+
+      {isLoadingMore ? (
+        <div className="py-3 text-center text-sm text-gray-500">Loading more queue items...</div>
+      ) : null}
+      {hasMore ? <div ref={sentinelRef} className="h-px w-full" /> : null}
+      {!hasMore && items.length > 0 ? (
+        <div className="py-2 text-center text-xs text-gray-400">End of queue list</div>
+      ) : null}
     </div>
   );
 }

@@ -3,6 +3,12 @@ import { X, Filter, RotateCcw, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 
+const COLOR_HEX_MAP: Record<string, string> = {
+  Black: '#000000', White: '#FFFFFF', Navy: '#1E3A5F', Red: '#DC2626',
+  Green: '#16A34A', Blue: '#2563EB', Pink: '#EC4899', Brown: '#92400E',
+  Gray: '#6B7280', Purple: '#9333EA', Yellow: '#EAB308', Orange: '#EA580C',
+};
+
 interface ProductCategory {
   id: string;
   slug: string;
@@ -16,6 +22,9 @@ interface FilterState {
   category?: string;
   onSale: boolean;
   sortBy: string;
+  selectedColors: string[];
+  selectedSizes: string[];
+  inStockOnly: boolean;
 }
 
 interface FilterDrawerProps {
@@ -24,6 +33,8 @@ interface FilterDrawerProps {
   filters: FilterState;
   onApply: (filters: FilterState) => void;
   categories: ProductCategory[];
+  availableColors: string[];
+  availableSizes: string[];
 }
 
 export const FilterDrawer: React.FC<FilterDrawerProps> = ({
@@ -32,6 +43,8 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
   filters: initialFilters,
   onApply,
   categories,
+  availableColors,
+  availableSizes,
 }) => {
   const [localFilters, setLocalFilters] = useState<FilterState>(initialFilters);
 
@@ -54,6 +67,9 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
       category: 'ALL',
       onSale: false,
       sortBy: 'newest',
+      selectedColors: [],
+      selectedSizes: [],
+      inStockOnly: false,
     };
     setLocalFilters(cleared);
   };
@@ -180,19 +196,107 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
                   {/* Status / Sort */}
                   <section>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Status</h3>
-                    <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/10 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                      <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${localFilters.onSale ? 'bg-purple-600 border-purple-600' : 'border-gray-300 dark:border-white/20'}`}>
-                        {localFilters.onSale && <Check size={12} className="text-white" />}
-                      </div>
-                      <input 
-                        type="checkbox" 
-                        checked={localFilters.onSale} 
-                        onChange={(e) => setLocalFilters(prev => ({ ...prev, onSale: e.target.checked }))}
-                        className="hidden" 
-                      />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">On Sale Only</span>
-                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/10 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${localFilters.onSale ? 'bg-purple-600 border-purple-600' : 'border-gray-300 dark:border-white/20'}`}>
+                          {localFilters.onSale && <Check size={12} className="text-white" />}
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={localFilters.onSale}
+                          onChange={(e) => setLocalFilters(prev => ({ ...prev, onSale: e.target.checked }))}
+                          className="hidden"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">On Sale Only</span>
+                      </label>
+                      <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/10 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${localFilters.inStockOnly ? 'bg-purple-600 border-purple-600' : 'border-gray-300 dark:border-white/20'}`}>
+                          {localFilters.inStockOnly && <Check size={12} className="text-white" />}
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={localFilters.inStockOnly}
+                          onChange={(e) => setLocalFilters(prev => ({ ...prev, inStockOnly: e.target.checked }))}
+                          className="hidden"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">In Stock Only</span>
+                      </label>
+                    </div>
                   </section>
+
+                  {/* Color Filter */}
+                  {availableColors.length > 0 && (
+                    <section>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Color</h3>
+                      <div className="flex flex-wrap gap-3">
+                        {availableColors.map((color) => {
+                          const isSelected = localFilters.selectedColors.includes(color);
+                          const hex = COLOR_HEX_MAP[color] ?? '#CBD5E1';
+                          return (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() =>
+                                setLocalFilters((prev) => ({
+                                  ...prev,
+                                  selectedColors: isSelected
+                                    ? prev.selectedColors.filter((c) => c !== color)
+                                    : [...prev.selectedColors, color],
+                                }))
+                              }
+                              className={`group relative h-9 w-9 rounded-full border-2 transition-all ${
+                                isSelected
+                                  ? 'border-purple-600 ring-2 ring-purple-300 dark:ring-purple-500/40 scale-110'
+                                  : 'border-gray-200 dark:border-white/20 hover:border-purple-400 hover:scale-105'
+                              }`}
+                              style={{ backgroundColor: hex }}
+                              aria-label={color}
+                              title={color}
+                            >
+                              {isSelected && (
+                                <span className="absolute inset-0 flex items-center justify-center">
+                                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke={hex === '#FFFFFF' || hex === '#EAB308' ? '#000' : '#fff'} strokeWidth="2.5"><path d="M3 8.5l3.5 3.5L13 4.5" /></svg>
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Size Filter */}
+                  {availableSizes.length > 0 && (
+                    <section>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Size</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {availableSizes.map((size) => {
+                          const isSelected = localFilters.selectedSizes.includes(size);
+                          return (
+                            <button
+                              key={size}
+                              type="button"
+                              onClick={() =>
+                                setLocalFilters((prev) => ({
+                                  ...prev,
+                                  selectedSizes: isSelected
+                                    ? prev.selectedSizes.filter((s) => s !== size)
+                                    : [...prev.selectedSizes, size],
+                                }))
+                              }
+                              className={`px-3.5 py-2 text-xs font-medium rounded-xl border transition-all ${
+                                isSelected
+                                  ? 'bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-500/25'
+                                  : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-300'
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
                 </div>
 
                 {/* Footer */}

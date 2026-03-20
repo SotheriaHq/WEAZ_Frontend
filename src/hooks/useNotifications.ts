@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { useRealtime } from '@/realtime';
 import { toast } from 'sonner';
+import { NotificationsApi } from '@/api/NotificationsApi';
 import {
   fetchNotifications,
   fetchUnreadCount,
@@ -27,6 +28,26 @@ export function useNotificationsBootstrap() {
   const pollTimerRef = useRef<number | null>(null);
   const preloadedRef = useRef<Set<string>>(new Set());
   const prevUserRef = useRef<string | undefined>(undefined);
+  const messagingPrefsRef = useRef({ desktop: true, sound: false });
+  const lastSignalRef = useRef(0);
+
+  const playMessageTone = useCallback(() => {
+    const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 920;
+    gain.gain.value = 0.0001;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.06, ctx.currentTime + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
+    osc.stop(ctx.currentTime + 0.2);
+    window.setTimeout(() => void ctx.close(), 250);
+  }, []);
 
   // Initial fetch when authenticated
   useEffect(() => {
@@ -41,10 +62,21 @@ export function useNotificationsBootstrap() {
         dispatch(fetchNotifications({ limit: 30 }));
       }
       prevUserRef.current = userId;
+      void NotificationsApi.getSettings()
+        .then((settings) => {
+          messagingPrefsRef.current = {
+            desktop: settings?.messaging?.desktop !== false,
+            sound: Boolean(settings?.messaging?.sound),
+          };
+        })
+        .catch(() => {
+          messagingPrefsRef.current = { desktop: true, sound: false };
+        });
     } else {
       // User logged out; fully reset notifications state so next login re-fetches
       dispatch(resetState());
       prevUserRef.current = undefined;
+      messagingPrefsRef.current = { desktop: true, sound: false };
     }
   }, [userId, initialized, dispatch]);
 
@@ -54,6 +86,7 @@ export function useNotificationsBootstrap() {
     const { joinUser, onNotification, onNotificationDeleted } = realtime;
     joinUser(userId);
     const unsub = onNotification((payload: any) => {
+      const now = Date.now();
       dispatch(
         ingestRealtime({
           id: payload.id,
@@ -70,6 +103,33 @@ export function useNotificationsBootstrap() {
       if (payload.message) {
         toast.info(payload.message);
       }
+
+      const type = String(payload?.type || '').toUpperCase();
+      const isMessageSignal = type.includes('MESSAGE');
+      const notVisible = document.visibilityState !== 'visible';
+      if (!isMessageSignal) {
+        return;
+      }
+
+      if (now - lastSignalRef.current < 800) {
+        return;
+      }
+      lastSignalRef.current = now;
+
+      if (messagingPrefsRef.current.sound) {
+        playMessageTone();
+      }
+
+      if (messagingPrefsRef.current.desktop && notVisible && 'Notification' in window) {
+        if (Notification.permission === 'granted') {
+          new Notification('Threadly message', {
+            body: payload.message || 'You have a new order message',
+            tag: `threadly:${payload.id}`,
+          });
+        } else if (Notification.permission === 'default') {
+          void Notification.requestPermission();
+        }
+      }
     });
     const unsubDeleted = onNotificationDeleted((payload: any) => {
       if (!payload?.id) return;
@@ -79,7 +139,7 @@ export function useNotificationsBootstrap() {
       unsub();
       unsubDeleted();
     };
-  }, [userId, realtime, dispatch]);
+  }, [userId, realtime, dispatch, playMessageTone]);
 
   // Lightweight debounce for unread fetches
   const maybeFetchUnread = useCallback(() => {
