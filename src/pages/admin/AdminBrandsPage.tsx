@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { toast } from 'sonner';
 import { adminBrandsApi } from '@/api/AdminApi';
 import type { AdminBrand } from '@/types/admin';
@@ -256,6 +257,7 @@ const AdminBrandsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <AdminBreadcrumb segments={[{ label: 'Brands' }]} />
       <section className="rounded-3xl border border-indigo-200/40 bg-gradient-to-br from-white/95 via-[#f7f4ff] to-[#efe8ff] p-5 shadow-md shadow-indigo-500/10 dark:border-white/10 dark:from-white/10 dark:via-[#120d1d] dark:to-[#1a1327]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>

@@ -542,20 +542,20 @@ export const EndUserProfile: React.FC = () => {
     <div className="relative p-3 sm:p-5 lg:p-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-gradient-to-b from-fuchsia-500/10 via-indigo-500/5 to-transparent dark:from-fuchsia-400/10 dark:via-purple-500/10" />
       <div className="mx-auto w-full max-w-[1280px]">
-        <section className="rounded-[2rem] bg-white/60 p-4 backdrop-blur-md dark:bg-black/20 sm:p-6">
+        <section className="rounded-[2rem] p-4 sm:p-6">
           <div className="flex flex-col gap-5">
             {/* Profile info row: avatar + name on left, computed size on right */}
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="flex min-w-0 items-center gap-4 sm:gap-5">
-                <div className="relative h-20 w-20 shrink-0 rounded-[1.5rem] bg-white/70 p-1 shadow-sm dark:bg-white/5 sm:h-24 sm:w-24">
+                <div className="relative h-20 w-20 shrink-0 rounded-[1.5rem] bg-white/50 p-0.5 shadow-sm dark:bg-white/5 sm:h-24 sm:w-24">
                   {profile.profileImage ? (
                     <img
                       src={profile.profileImage}
                       alt={fullName}
-                      className="h-full w-full rounded-[1.2rem] object-cover"
+                      className="h-full w-full rounded-[1.3rem] object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center rounded-[1.2rem] bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 text-2xl font-bold text-gray-800 dark:text-white">
+                    <div className="flex h-full w-full items-center justify-center rounded-[1.3rem] bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 text-2xl font-bold text-gray-800 dark:text-white">
                       {(profile.firstName?.charAt(0) || profile.username?.charAt(0) || '?').toUpperCase()}
                     </div>
                   )}
@@ -617,7 +617,7 @@ export const EndUserProfile: React.FC = () => {
               {isOwner ? (
                 <div className="shrink-0 md:text-right">
                   {/* Minimal chart tabs */}
-                  <div className="mb-1.5 inline-flex flex-wrap gap-0.5 rounded-lg bg-gray-100/80 p-0.5 dark:bg-white/5">
+                  <div className="mb-1.5 inline-flex flex-wrap gap-0.5 rounded-lg bg-gray-100/60 p-0.5 dark:bg-white/5">
                     {[
                       { value: 'UK', label: 'UK' },
                       { value: 'US', label: 'US' },
@@ -645,7 +645,7 @@ export const EndUserProfile: React.FC = () => {
                     })}
                   </div>
                   {/* Computed size display */}
-                  <div className="rounded-xl bg-indigo-50/60 px-3 py-2 dark:bg-indigo-500/10">
+                  <div className="rounded-xl bg-indigo-50/40 px-3 py-2 dark:bg-indigo-500/10">
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500/80 dark:text-indigo-400/70">Computed size</div>
                     <div className="text-xl font-bold text-indigo-900 dark:text-indigo-200">
                       {chartLoading ? '...' : computedSize || '—'}

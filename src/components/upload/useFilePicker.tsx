@@ -46,7 +46,8 @@ export const useFilePicker = ({
         continue;
       }
       if (maxSizeBytes && f.size > maxSizeBytes) {
-        errs.push(`${f.name}: exceeds maximum size of ${Math.round(maxSizeBytes / 1024)} KB`);
+        const sizeMB = (maxSizeBytes / (1024 * 1024));
+        errs.push(`${f.name}: exceeds maximum size of ${sizeMB % 1 === 0 ? sizeMB : sizeMB.toFixed(1)} MB`);
         continue;
       }
       accepted.push(f);

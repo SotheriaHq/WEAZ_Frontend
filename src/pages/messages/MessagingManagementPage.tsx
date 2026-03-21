@@ -1,14 +1,24 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
-import { messagingApi, type InboxItem } from '@/api/MessagingApi';
-import OrderMessagesPanel from '@/components/messaging/OrderMessagesPanel';
+import { messagingApi, type InboxItem, type ThreadMessage } from '@/api/MessagingApi';
+import { customOrdersBuyerApi, customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
+import { useRealtime } from '@/realtime/RealtimeProvider';
+import ImageWithFallback from '@/components/ImageWithFallback';
+import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble';
+import ComposeArea from '@/components/messaging/ComposeArea';
+import ChatContactSidebar from '@/components/messaging/ChatContactSidebar';
 import VLoader from '@/components/loaders/VLoader';
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 
 type ConversationContext = 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
 type Surface = 'BRAND' | 'BUYER';
+type ActiveAction = null | 'extension-request' | 'dispute';
 
 type ConversationItem = {
   id: string;
@@ -21,6 +31,8 @@ type ConversationItem = {
   subtitle: string;
   participantName: string;
   participantId?: string | null;
+  participantImage?: string | null;
+  participantUsername?: string | null;
   status?: string | null;
   createdAt: string;
   lastMessageAt?: string | null;
@@ -30,32 +42,45 @@ type ConversationItem = {
   archivedAt?: string | null;
 };
 
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
+
 const FILTERS = [
   { label: 'All', value: 'all' },
   { label: 'Unread', value: 'unread' },
   { label: 'Orders', value: 'orders' },
-  { label: 'Custom Orders', value: 'custom' },
+  { label: 'Custom', value: 'custom' },
   { label: 'Inquiries', value: 'inquiry' },
   { label: 'Archived', value: 'archived' },
 ] as const;
 
-const SORTERS = [
-  { label: 'Newest', value: 'newest' },
-  { label: 'Oldest', value: 'oldest' },
-  { label: 'Unread first', value: 'unread' },
+const DISPUTE_ISSUE_TYPES = [
+  { label: 'Wrong Item', value: 'WRONG_ITEM' },
+  { label: 'Material Defect', value: 'MATERIAL_DEFECT' },
+  { label: 'Measurement Issue', value: 'MEASUREMENT_NON_COMPLIANCE' },
+  { label: 'Unfinished Work', value: 'UNFINISHED_WORK' },
+  { label: 'Non Delivery', value: 'NON_DELIVERY' },
+  { label: 'Unreasonable Delay', value: 'UNREASONABLE_DELAY' },
+  { label: 'Other', value: 'OTHER' },
 ] as const;
 
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
 const formatRelative = (value?: string | null) => {
-  if (!value) return 'No messages yet';
+  if (!value) return '';
   const ts = new Date(value).getTime();
-  if (Number.isNaN(ts)) return 'No messages yet';
+  if (Number.isNaN(ts)) return '';
   const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return 'Now';
+  if (mins < 60) return `${mins}m`;
   const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return `${hrs}h`;
   const days = Math.round(hrs / 24);
-  return `${days}d ago`;
+  if (days < 7) return `${days}d`;
+  return new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
 const mapInboxItem = (item: InboxItem): ConversationItem => ({
@@ -75,6 +100,8 @@ const mapInboxItem = (item: InboxItem): ConversationItem => ({
   participantName:
     item.participant?.firstName || item.participant?.username || item.participant?.lastName || 'Participant',
   participantId: item.participant?.id || null,
+  participantImage: item.participant?.profileImage || null,
+  participantUsername: item.participant?.username || null,
   createdAt: item.createdAt,
   lastMessageAt: item.lastMessageAt ?? null,
   unreadCount: Number(item.unreadCount ?? 0),
@@ -83,74 +110,284 @@ const mapInboxItem = (item: InboxItem): ConversationItem => ({
   archivedAt: item.archivedAt ?? null,
 });
 
+const nextClientMessageId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+/* ------------------------------------------------------------------ */
+/*  Inline Action Panels (bot-pattern cards)                           */
+/* ------------------------------------------------------------------ */
+
+const ExtensionRequestPanel: React.FC<{
+  onSubmit: (days: number, reason: string) => void;
+  onCancel: () => void;
+  loading: boolean;
+}> = ({ onSubmit, onCancel, loading }) => {
+  const [days, setDays] = useState(3);
+  const [reason, setReason] = useState('');
+
+  return (
+    <div className="mx-3 mb-2 rounded-2xl border border-orange-200/60 dark:border-orange-500/20 bg-orange-50/80 dark:bg-orange-500/5 p-3.5 backdrop-blur-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500/10 dark:bg-orange-500/20">
+          <svg className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <span className="text-xs font-semibold text-orange-800 dark:text-orange-300">Request Extra Time</span>
+      </div>
+      <div className="space-y-2">
+        <div>
+          <label className="text-[11px] font-medium text-gray-600 dark:text-gray-400">Extra days needed</label>
+          <input
+            type="number"
+            min={1}
+            max={30}
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+            className="mt-0.5 w-full rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-orange-400/50"
+          />
+        </div>
+        <div>
+          <label className="text-[11px] font-medium text-gray-600 dark:text-gray-400">Reason</label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={2}
+            placeholder="Brief reason for this extension..."
+            className="mt-0.5 w-full resize-none rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-orange-400/50"
+          />
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (days < 1) { toast.error('Days must be at least 1'); return; }
+              if (!reason.trim()) { toast.error('Reason is required'); return; }
+              onSubmit(days, reason.trim());
+            }}
+            disabled={loading}
+            className="rounded-lg bg-orange-500 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Sending...' : 'Send Request'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ExtensionResponsePanel: React.FC<{
+  requestedDays: number;
+  onRespond: (response: 'ACCEPTED' | 'REJECTED' | 'COUNTERED', counterDays?: number) => void;
+  loading: boolean;
+}> = ({ requestedDays, onRespond, loading }) => {
+  const [showCounter, setShowCounter] = useState(false);
+  const [counterDays, setCounterDays] = useState(Math.max(1, requestedDays - 1));
+
+  return (
+    <div className="mx-3 mb-2 rounded-2xl border border-blue-200/60 dark:border-blue-500/20 bg-blue-50/80 dark:bg-blue-500/5 p-3.5 backdrop-blur-sm">
+      <div className="flex items-center gap-2 mb-2.5">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/10 dark:bg-blue-500/20">
+          <svg className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div>
+          <span className="text-xs font-semibold text-blue-800 dark:text-blue-300">Extension Request</span>
+          <p className="text-[11px] text-blue-600/70 dark:text-blue-400/70">Brand requested +{requestedDays} extra days</p>
+        </div>
+      </div>
+
+      {showCounter ? (
+        <div className="space-y-2">
+          <div>
+            <label className="text-[11px] font-medium text-gray-600 dark:text-gray-400">Counter with days</label>
+            <input
+              type="number"
+              min={1}
+              max={30}
+              value={counterDays}
+              onChange={(e) => setCounterDays(Number(e.target.value))}
+              className="mt-0.5 w-full rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-indigo-400/50"
+            />
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <button type="button" onClick={() => setShowCounter(false)} disabled={loading} className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5">
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (counterDays < 1) { toast.error('Counter days must be at least 1'); return; }
+                onRespond('COUNTERED', counterDays);
+              }}
+              disabled={loading}
+              className="rounded-lg bg-indigo-500 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-600 disabled:opacity-50 transition-colors"
+            >
+              {loading ? 'Sending...' : 'Send Counter'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onRespond('ACCEPTED')}
+            disabled={loading}
+            className="flex-1 rounded-lg border border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 disabled:opacity-50 transition-colors"
+          >
+            Accept
+          </button>
+          <button
+            type="button"
+            onClick={() => onRespond('REJECTED')}
+            disabled={loading}
+            className="flex-1 rounded-lg border border-rose-300 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 disabled:opacity-50 transition-colors"
+          >
+            Reject
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCounter(true)}
+            disabled={loading}
+            className="flex-1 rounded-lg border border-indigo-300 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-2 text-xs font-semibold text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
+          >
+            Counter
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DisputePanel: React.FC<{
+  contextType: ConversationContext;
+  onSubmit: (issueType: string, description: string) => void;
+  onCancel: () => void;
+  loading: boolean;
+}> = ({ contextType, onSubmit, onCancel, loading }) => {
+  const [issueType, setIssueType] = useState('OTHER');
+  const [description, setDescription] = useState('');
+
+  return (
+    <div className="mx-3 mb-2 rounded-2xl border border-red-200/60 dark:border-red-500/20 bg-red-50/80 dark:bg-red-500/5 p-3.5 backdrop-blur-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500/10 dark:bg-red-500/20">
+          <svg className="h-3.5 w-3.5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <span className="text-xs font-semibold text-red-800 dark:text-red-300">Open Dispute</span>
+      </div>
+      <div className="space-y-2">
+        {contextType === 'CUSTOM_ORDER' && (
+          <div>
+            <label className="text-[11px] font-medium text-gray-600 dark:text-gray-400">Issue Type</label>
+            <select
+              value={issueType}
+              onChange={(e) => setIssueType(e.target.value)}
+              className="mt-0.5 w-full rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-red-400/50"
+            >
+              {DISPUTE_ISSUE_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div>
+          <label className="text-[11px] font-medium text-gray-600 dark:text-gray-400">Description</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            placeholder="Describe the issue..."
+            className="mt-0.5 w-full resize-none rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-red-400/50"
+          />
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!description.trim()) { toast.error('Description is required'); return; }
+              onSubmit(issueType, description.trim());
+            }}
+            disabled={loading}
+            className="rounded-lg bg-red-500 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Submitting...' : 'Submit Dispute'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/*  Main Component                                                     */
+/* ------------------------------------------------------------------ */
+
 const MessagingManagementPage: React.FC = () => {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const profile = useSelector((state: RootState) => state.user.profile);
   const surface: Surface = profile?.type === 'BRAND' ? 'BRAND' : 'BUYER';
   const brandId = surface === 'BRAND' ? profile?.id ?? null : null;
+  const actorId = profile?.id;
+  const { onNotification } = useRealtime();
 
+  /* ---- Conversation state ---- */
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'unread' | 'orders' | 'custom' | 'inquiry' | 'archived'>('all');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'unread'>('newest');
   const [query, setQuery] = useState('');
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [activeId, setActiveId] = useState<string>('');
   const highlightedMessageId = params.get('messageId');
 
-  const getContextId = (item: ConversationItem) => {
-    if (item.contextType === 'STANDARD_ORDER') {
-      return item.orderId || item.contextId || item.threadId;
-    }
-    if (item.contextType === 'CUSTOM_ORDER') {
-      return item.customOrderId || item.contextId || item.threadId;
-    }
+  /* ---- Message state ---- */
+  const [messages, setMessages] = useState<ThreadMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [customOrderDetail, setCustomOrderDetail] = useState<CustomOrderDetail | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [activeAction, setActiveAction] = useState<ActiveAction>(null);
+
+  /* ---- Refs ---- */
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const messageNodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  /* ---- Derived ---- */
+  const activeConversation = conversations.find((item) => item.id === activeId) || null;
+
+  const getContextId = useCallback((item: ConversationItem) => {
+    if (item.contextType === 'STANDARD_ORDER') return item.orderId || item.contextId || item.threadId;
+    if (item.contextType === 'CUSTOM_ORDER') return item.customOrderId || item.contextId || item.threadId;
     return item.threadId;
-  };
+  }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadConversations = async () => {
-      setLoading(true);
-      try {
-        const inbox = await messagingApi.getInbox({
-          limit: 100,
-          contextType: 'all',
-          filter: 'all',
-        });
-        const nextConversations = (inbox.items || []).map(mapInboxItem);
-
-        if (!cancelled) {
-          setConversations(nextConversations);
-        }
-      } catch (error: any) {
-        console.error('[MessagingManagementPage] inbox load failed', {
-          surface,
-          brandId,
-          status: error?.response?.status,
-          message: error?.response?.data?.message || error?.message,
-        });
-        if (!cancelled) {
-          toast.error(error?.response?.data?.message || 'Unable to load conversations');
-          setConversations([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void loadConversations();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [brandId, surface]);
+  const useThreadTransport = surface === 'BRAND' && Boolean(activeConversation?.threadId);
 
   const visibleConversations = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const q = query.trim().toLowerCase();
     let rows = conversations.filter((item) => {
       if (filter === 'archived') return Boolean(item.archivedAt);
       if (item.archivedAt) return false;
@@ -158,172 +395,429 @@ const MessagingManagementPage: React.FC = () => {
       if (filter === 'orders' && item.contextType !== 'STANDARD_ORDER') return false;
       if (filter === 'custom' && item.contextType !== 'CUSTOM_ORDER') return false;
       if (filter === 'inquiry' && item.contextType !== 'INQUIRY') return false;
-      if (!normalizedQuery) return true;
+      if (!q) return true;
       return (
-        item.title.toLowerCase().includes(normalizedQuery) ||
-        item.subtitle.toLowerCase().includes(normalizedQuery) ||
-        item.participantName.toLowerCase().includes(normalizedQuery) ||
-        item.threadId.toLowerCase().includes(normalizedQuery) ||
-        String(item.contextId || '').toLowerCase().includes(normalizedQuery)
+        item.title.toLowerCase().includes(q) ||
+        item.subtitle.toLowerCase().includes(q) ||
+        item.participantName.toLowerCase().includes(q)
       );
     });
 
     rows.sort((a, b) => {
-      if (sortBy === 'unread') {
-        if ((a.unreadCount > 0) !== (b.unreadCount > 0)) {
-          return a.unreadCount > 0 ? -1 : 1;
-        }
-      }
-
+      // Unread first
+      if ((a.unreadCount > 0) !== (b.unreadCount > 0)) return a.unreadCount > 0 ? -1 : 1;
       const aTs = new Date(a.lastMessageAt || a.createdAt).getTime();
       const bTs = new Date(b.lastMessageAt || b.createdAt).getTime();
-      return sortBy === 'oldest' ? aTs - bTs : bTs - aTs;
+      return bTs - aTs;
     });
 
     return rows;
-  }, [conversations, filter, query, sortBy]);
+  }, [conversations, filter, query]);
 
+  /* ---- Scroll helpers ---- */
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    });
+  }, []);
+
+  /* ---- Load conversations ---- */
   useEffect(() => {
-    if (conversations.length === 0) {
-      setActiveId('');
-      return;
-    }
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const inbox = await messagingApi.getInbox({ limit: 100, contextType: 'all', filter: 'all' });
+        if (!cancelled) setConversations((inbox.items || []).map(mapInboxItem));
+      } catch (error: any) {
+        if (!cancelled) {
+          toast.error(error?.response?.data?.message || 'Unable to load conversations');
+          setConversations([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [brandId, surface]);
+
+  /* ---- Auto-select from URL params ---- */
+  useEffect(() => {
+    if (conversations.length === 0) { setActiveId(''); return; }
 
     const queryOrderId = params.get('orderId');
     const queryCustomOrderId = params.get('customOrderId');
 
     if (queryOrderId) {
-      const targetId = conversations.find((item) => item.contextType === 'STANDARD_ORDER' && item.orderId === queryOrderId)?.id;
-      if (targetId) {
-        setActiveId(targetId);
-        return;
-      }
+      const t = conversations.find((i) => i.contextType === 'STANDARD_ORDER' && i.orderId === queryOrderId);
+      if (t) { setActiveId(t.id); return; }
     }
-
     if (queryCustomOrderId) {
-      const targetId = conversations.find((item) => item.contextType === 'CUSTOM_ORDER' && item.customOrderId === queryCustomOrderId)?.id;
-      if (targetId) {
-        setActiveId(targetId);
-        return;
-      }
+      const t = conversations.find((i) => i.contextType === 'CUSTOM_ORDER' && i.customOrderId === queryCustomOrderId);
+      if (t) { setActiveId(t.id); return; }
     }
 
     const queryThreadId = params.get('threadId') || params.get('thread');
     if (queryThreadId) {
-      const targetId = queryThreadId;
-      if (conversations.some((item) => item.id === targetId)) {
-        setActiveId(targetId);
-        return;
-      }
-
+      if (conversations.some((i) => i.id === queryThreadId)) { setActiveId(queryThreadId); return; }
       void messagingApi.resolveThreadRoute(queryThreadId).then((resolved) => {
         const next = new URLSearchParams(params);
         next.set('threadId', resolved.threadId);
         if (resolved.orderId) next.set('orderId', resolved.orderId);
         if (resolved.customOrderId) next.set('customOrderId', resolved.customOrderId);
         setParams(next, { replace: true });
-      }).catch((error: any) => {
-        console.error('[MessagingManagementPage] thread resolve failed', {
-          threadId: queryThreadId,
-          surface,
-          brandId,
-          status: error?.response?.status,
-          message: error?.response?.data?.message || error?.message,
-        });
-        // Keep UI usable if thread cannot be resolved (e.g. expired deep-link context)
-      });
+      }).catch(() => {});
     }
 
-    if (!activeId || !conversations.some((item) => item.id === activeId)) {
+    if (!activeId || !conversations.some((i) => i.id === activeId)) {
       setActiveId(conversations[0].id);
     }
   }, [activeId, conversations, params, setParams]);
 
-  const activeConversation = conversations.find((item) => item.id === activeId) || null;
+  /* ---- Load messages when active conversation changes ---- */
+  const fetchMessages = useCallback(async () => {
+    if (!activeConversation) return;
+    const contextId = getContextId(activeConversation);
+    const threadId = activeConversation.threadId;
+
+    if (useThreadTransport && threadId) {
+      const response = await messagingApi.listThreadMessages(threadId, { limit: 50 });
+      const sorted = [...response.items].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      setMessages(sorted);
+      const lastId = sorted.at(-1)?.id;
+      if (lastId) await messagingApi.markThreadReadById(threadId, lastId);
+      return;
+    }
+
+    const ct = activeConversation.contextType;
+    const response =
+      ct === 'INQUIRY'
+        ? await messagingApi.listThreadMessages(contextId, { limit: 50 })
+        : ct === 'CUSTOM_ORDER'
+          ? surface === 'BRAND' && brandId
+            ? await messagingApi.listCustomOrderMessagesForBrand(brandId, contextId, { limit: 50 })
+            : await messagingApi.listCustomOrderMessages(contextId, { limit: 50 })
+          : surface === 'BRAND' && brandId
+            ? await messagingApi.listOrderMessagesForBrand(brandId, contextId, { limit: 50 })
+            : await messagingApi.listOrderMessages(contextId, { limit: 50 });
+
+    const sorted = [...response.items].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    setMessages(sorted);
+
+    const lastId = sorted.at(-1)?.id;
+    if (lastId) {
+      if (ct === 'INQUIRY') {
+        await messagingApi.markThreadReadById(contextId, lastId);
+      } else if (ct === 'CUSTOM_ORDER') {
+        if (surface === 'BRAND' && brandId) await messagingApi.markCustomOrderReadForBrand(brandId, contextId, lastId);
+        else await messagingApi.markCustomOrderRead(contextId, lastId);
+      } else {
+        if (surface === 'BRAND' && brandId) await messagingApi.markOrderReadForBrand(brandId, contextId, lastId);
+        else await messagingApi.markOrderRead(contextId, lastId);
+      }
+    }
+  }, [activeConversation, brandId, getContextId, surface, useThreadTransport]);
+
+  const fetchCustomOrderDetail = useCallback(async () => {
+    if (!activeConversation || activeConversation.contextType !== 'CUSTOM_ORDER') {
+      setCustomOrderDetail(null);
+      return;
+    }
+    const contextId = getContextId(activeConversation);
+    try {
+      const detail = surface === 'BRAND' && brandId
+        ? await customOrdersBrandApi.getById(brandId, contextId)
+        : await customOrdersBuyerApi.getById(contextId);
+      setCustomOrderDetail(detail);
+    } catch {
+      setCustomOrderDetail(null);
+    }
+  }, [activeConversation, brandId, getContextId, surface]);
+
+  const refresh = useCallback(async () => {
+    setMessagesLoading(true);
+    try {
+      await Promise.all([fetchMessages(), fetchCustomOrderDetail()]);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to load messages');
+    } finally {
+      setMessagesLoading(false);
+      scrollToBottom();
+    }
+  }, [fetchMessages, fetchCustomOrderDetail, scrollToBottom]);
+
+  useEffect(() => {
+    if (!activeConversation) { setMessages([]); return; }
+    setActiveAction(null);
+    void refresh();
+  }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ---- Polling ---- */
+  useEffect(() => {
+    if (!activeConversation) return;
+    let intervalId: number | null = null;
+    const setup = () => {
+      if (intervalId) window.clearInterval(intervalId);
+      if (document.visibilityState === 'visible') {
+        intervalId = window.setInterval(() => void refresh(), 25000);
+      }
+    };
+    setup();
+    const onVis = () => { setup(); if (document.visibilityState === 'visible') void refresh(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { document.removeEventListener('visibilitychange', onVis); if (intervalId) window.clearInterval(intervalId); };
+  }, [activeConversation, refresh]);
+
+  /* ---- Real-time ---- */
+  useEffect(() => {
+    if (!activeConversation) return;
+    const contextId = getContextId(activeConversation);
+    const threadId = activeConversation.threadId;
+
+    const unsubscribe = onNotification((payload: any) => {
+      const type = String(payload?.type ?? '');
+      if (type !== 'MESSAGE_RECEIVED' && type !== 'MESSAGE_MODERATED' && type !== 'MESSAGE_UNREAD_REMINDER' && type !== 'MESSAGE_THREAD_REOPENED') return;
+      const pId = String(payload?.payload?.threadId ?? payload?.payload?.customOrderId ?? payload?.payload?.orderId ?? '');
+      if (pId !== contextId && pId !== threadId) return;
+      void refresh();
+    });
+    return unsubscribe;
+  }, [activeConversation, getContextId, onNotification, refresh]);
+
+  /* ---- Highlight message ---- */
+  useEffect(() => {
+    if (!highlightedMessageId) return;
+    const node = messageNodeRefs.current[highlightedMessageId];
+    if (!node) return;
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    node.classList.add('ring-2', 'ring-orange-400');
+    const t = window.setTimeout(() => node.classList.remove('ring-2', 'ring-orange-400'), 1800);
+    return () => window.clearTimeout(t);
+  }, [highlightedMessageId, messages]);
+
+  /* ---- Scroll on new messages ---- */
+  useEffect(() => { if (messages.length > 0) scrollToBottom(); }, [messages.length, scrollToBottom]);
+
+  /* ---- Extension request detection ---- */
+  const latestOpenExtensionRequest = useMemo(() => {
+    if (!activeConversation) return null;
+    if (activeConversation.contextType === 'CUSTOM_ORDER') {
+      if (!customOrderDetail?.extensionRequests?.length) return null;
+      const open = customOrderDetail.extensionRequests
+        .filter((r: any) => r.buyerResponseStatus === 'OPEN')
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const first = open[0];
+      return first ? { id: first.id, requestedExtraDays: first.requestedExtraDays } : null;
+    }
+    const extMsg = [...messages].reverse().find((m) => {
+      const meta = (m as any)?.metadataJson as Record<string, unknown> | undefined;
+      return String(meta?.eventType || '') === 'STANDARD_ORDER_EXTENSION_REQUESTED';
+    });
+    if (!extMsg) return null;
+    const meta = ((extMsg as any)?.metadataJson || {}) as Record<string, unknown>;
+    const days = Number(meta.requestedExtraDays || 0);
+    return { id: extMsg.id, requestedExtraDays: Number.isFinite(days) ? days : 0 };
+  }, [activeConversation, customOrderDetail, messages]);
+
+  /* ---- Handlers ---- */
+
+  const selectConversation = (item: ConversationItem) => {
+    setActiveId(item.id);
+    const next = new URLSearchParams();
+    next.set('threadId', item.threadId);
+    if (item.contextType === 'STANDARD_ORDER' && item.orderId) next.set('orderId', item.orderId);
+    else if (item.contextType === 'CUSTOM_ORDER' && item.customOrderId) next.set('customOrderId', item.customOrderId);
+    setParams(next, { replace: true });
+  };
 
   const updateThreadPrefs = async (
     item: ConversationItem,
     payload: { archived?: boolean; markRead?: boolean; muteForHours?: number; unmute?: boolean },
   ) => {
     if (surface === 'BRAND' && !brandId) return;
+    const contextId = getContextId(item);
 
     if (item.contextType === 'INQUIRY') {
-      if (payload.markRead) {
-        await messagingApi.markThreadReadById(item.threadId);
-      }
+      if (payload.markRead) await messagingApi.markThreadReadById(item.threadId);
     } else if (item.contextType === 'STANDARD_ORDER') {
-      const contextId = getContextId(item);
-      if (surface === 'BRAND') {
-        await messagingApi.updateOrderThreadPreferencesForBrand(brandId as string, contextId, payload);
-      } else {
-        await messagingApi.updateOrderThreadPreferences(contextId, payload);
-      }
+      if (surface === 'BRAND') await messagingApi.updateOrderThreadPreferencesForBrand(brandId as string, contextId, payload);
+      else await messagingApi.updateOrderThreadPreferences(contextId, payload);
     } else if (surface === 'BRAND') {
-      await messagingApi.updateCustomOrderThreadPreferencesForBrand(brandId as string, getContextId(item), payload);
+      await messagingApi.updateCustomOrderThreadPreferencesForBrand(brandId as string, contextId, payload);
     } else {
-      await messagingApi.updateCustomOrderThreadPreferences(getContextId(item), payload);
+      await messagingApi.updateCustomOrderThreadPreferences(contextId, payload);
     }
 
     setConversations((prev) => prev.map((entry) => {
       if (entry.id !== item.id) return entry;
-      const nextMutedUntil = payload.unmute
-        ? null
-        : payload.muteForHours
-          ? new Date(Date.now() + payload.muteForHours * 60 * 60 * 1000).toISOString()
-          : entry.mutedUntil ?? null;
-      const nextArchivedAt = payload.archived === undefined
-        ? entry.archivedAt ?? null
-        : payload.archived
-          ? new Date().toISOString()
-          : null;
       return {
         ...entry,
-        mutedUntil: nextMutedUntil,
-        archivedAt: nextArchivedAt,
+        mutedUntil: payload.unmute ? null : payload.muteForHours ? new Date(Date.now() + payload.muteForHours * 3600000).toISOString() : entry.mutedUntil ?? null,
+        archivedAt: payload.archived === undefined ? entry.archivedAt ?? null : payload.archived ? new Date().toISOString() : null,
         unreadCount: payload.markRead ? 0 : entry.unreadCount,
         hasUnread: payload.markRead ? false : entry.hasUnread,
       };
     }));
   };
 
-  const selectConversation = (item: ConversationItem) => {
-    setActiveId(item.id);
-    const next = new URLSearchParams(params);
-    next.delete('orderId');
-    next.delete('customOrderId');
-    next.delete('threadId');
-    next.delete('thread');
-    next.delete('messageId');
-    next.delete('openChat');
-    next.set('threadId', item.threadId);
-    if (item.contextType === 'STANDARD_ORDER' && item.orderId) {
-      next.set('orderId', item.orderId);
-    } else if (item.contextType === 'CUSTOM_ORDER' && item.customOrderId) {
-      next.set('customOrderId', item.customOrderId);
+  const handleSend = useCallback(async (bodyText: string, attachmentFileIds: string[]) => {
+    if (!activeConversation) return;
+    const contextId = getContextId(activeConversation);
+    const threadId = activeConversation.threadId;
+    const ct = activeConversation.contextType;
+    const payload = { bodyText: bodyText || undefined, clientMessageId: nextClientMessageId(), attachmentFileIds };
+
+    if ((ct === 'INQUIRY' || useThreadTransport) && threadId) {
+      await messagingApi.sendThreadMessage(threadId, payload);
+    } else if (ct === 'INQUIRY') {
+      await messagingApi.sendThreadMessage(contextId, payload);
+    } else if (ct === 'CUSTOM_ORDER') {
+      if (surface === 'BRAND' && brandId) await messagingApi.sendCustomOrderMessageForBrand(brandId, contextId, payload);
+      else await messagingApi.sendCustomOrderMessage(contextId, payload);
+    } else {
+      if (surface === 'BRAND' && brandId) await messagingApi.sendOrderMessageForBrand(brandId, contextId, payload);
+      else await messagingApi.sendOrderMessage(contextId, payload);
     }
-    setParams(next, { replace: true });
+
+    await refresh();
+  }, [activeConversation, brandId, getContextId, refresh, surface, useThreadTransport]);
+
+  const handleRequestExtension = useCallback(async (days: number, reason: string) => {
+    if (!activeConversation || surface !== 'BRAND' || !brandId) return;
+    const contextId = getContextId(activeConversation);
+    setActionLoading(true);
+    try {
+      if (activeConversation.contextType === 'CUSTOM_ORDER') {
+        await messagingApi.requestCustomOrderExtensionForBrand(brandId, contextId, { targetType: 'PRODUCTION', requestedExtraDays: days, reason });
+      } else {
+        await messagingApi.requestOrderExtensionForBrand(brandId, contextId, { requestedExtraDays: days, reason });
+      }
+      toast.success('Extension request sent.');
+      setActiveAction(null);
+      await refresh();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to send extension request.');
+    } finally {
+      setActionLoading(false);
+    }
+  }, [activeConversation, brandId, getContextId, refresh, surface]);
+
+  const handleRespondToExtension = useCallback(async (response: 'ACCEPTED' | 'REJECTED' | 'COUNTERED', counterDays?: number) => {
+    if (!activeConversation || !latestOpenExtensionRequest || surface !== 'BUYER') return;
+    const contextId = getContextId(activeConversation);
+    setActionLoading(true);
+    try {
+      if (activeConversation.contextType === 'CUSTOM_ORDER') {
+        await messagingApi.respondToCustomOrderExtension(contextId, latestOpenExtensionRequest.id, { response, counterDays });
+      } else {
+        await messagingApi.respondToOrderExtension(contextId, latestOpenExtensionRequest.id, { response, counterDays });
+      }
+      toast.success('Extension response submitted.');
+      await refresh();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to respond.');
+    } finally {
+      setActionLoading(false);
+    }
+  }, [activeConversation, getContextId, latestOpenExtensionRequest, refresh, surface]);
+
+  const handleOpenDispute = useCallback(async (issueType: string, description: string) => {
+    if (!activeConversation) return;
+    const contextId = getContextId(activeConversation);
+    setActionLoading(true);
+    try {
+      if (activeConversation.contextType === 'CUSTOM_ORDER') {
+        if (surface === 'BRAND' && brandId) {
+          await messagingApi.openCustomOrderDisputeForBrand(brandId, contextId, { issueType: issueType as any, description });
+        } else {
+          await messagingApi.openCustomOrderDispute(contextId, { issueType: issueType as any, description });
+        }
+      } else if (surface === 'BRAND' && brandId) {
+        await messagingApi.openOrderDisputeForBrand(brandId, contextId, { description });
+      } else {
+        await messagingApi.openOrderDispute(contextId, { description });
+      }
+      toast.success('Dispute submitted.');
+      setActiveAction(null);
+      await refresh();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to open dispute.');
+    } finally {
+      setActionLoading(false);
+    }
+  }, [activeConversation, brandId, getContextId, refresh, surface]);
+
+  /* ---- Message grouping by date ---- */
+  const groupedMessages = useMemo(() => {
+    const groups: { date: string; msgs: ThreadMessage[] }[] = [];
+    let lastDate = '';
+    for (const msg of messages) {
+      const d = formatDate(msg.createdAt);
+      if (d !== lastDate) {
+        groups.push({ date: d, msgs: [msg] });
+        lastDate = d;
+      } else {
+        groups[groups.length - 1].msgs.push(msg);
+      }
+    }
+    return groups;
+  }, [messages]);
+
+  /* ---- Context badge color ---- */
+  const contextDotColor = (ct: ConversationContext) => {
+    switch (ct) {
+      case 'STANDARD_ORDER': return 'bg-blue-500';
+      case 'CUSTOM_ORDER': return 'bg-purple-500';
+      case 'INQUIRY': return 'bg-amber-500';
+    }
   };
 
+  /* ================================================================ */
+  /*  RENDER                                                           */
+  /* ================================================================ */
+
   return (
-    <div className="grid min-h-[72vh] grid-cols-1 gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
-      <section className="rounded-2xl border border-gray-200 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-white/5">
-        <div className="mb-3">
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Message Management</h1>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Manage conversations from system, buyers, brands, and admins in one place.
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-2xl border border-gray-200/60 dark:border-white/8 bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
+
+      {/* ============================================================ */}
+      {/*  LEFT PANEL — Conversation List                               */}
+      {/* ============================================================ */}
+      <div className={`w-80 shrink-0 flex-col border-r border-gray-200/60 dark:border-white/8 bg-white/70 dark:bg-white/[0.02] ${activeId ? 'hidden lg:flex' : 'flex'}`}>
+        {/* Header */}
+        <div className="shrink-0 px-4 pt-4 pb-3">
+          <h1 className="text-base font-semibold text-gray-900 dark:text-white">Messages</h1>
+          <p className="text-[11px] text-gray-500 dark:text-gray-500 mt-0.5">
+            {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
           </p>
         </div>
 
-        <div className="mb-3 flex flex-wrap gap-2">
+        {/* Search */}
+        <div className="shrink-0 px-3 pb-2">
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search conversations..."
+              className="w-full rounded-xl border border-gray-200/60 dark:border-white/10 bg-gray-50 dark:bg-white/5 pl-8 pr-3 py-2 text-xs outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/20 transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="shrink-0 px-3 pb-2 flex flex-wrap gap-1">
           {FILTERS.map((tab) => (
             <button
               key={tab.value}
               type="button"
               onClick={() => setFilter(tab.value)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition-all ${
                 filter === tab.value
-                  ? 'border-orange-500 bg-orange-500 text-white'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-orange-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300'
+                  ? 'bg-purple-600 text-white shadow-sm shadow-purple-500/20'
+                  : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10'
               }`}
             >
               {tab.label}
@@ -331,165 +825,282 @@ const MessagingManagementPage: React.FC = () => {
           ))}
         </div>
 
-        <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by user, order ID, or message"
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-400 dark:border-white/10 dark:bg-white/5"
-          />
-          <div className="flex gap-2">
-            {SORTERS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setSortBy(option.value)}
-                className={`rounded-lg border px-2 py-1 text-[11px] font-semibold transition ${
-                  sortBy === option.value
-                    ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-black'
-                    : 'border-gray-200 bg-white text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="max-h-[58vh] space-y-2 overflow-y-auto pr-1">
+        {/* Conversation list */}
+        <div className="flex-1 overflow-y-auto px-2 pb-2">
           {loading ? (
-            <div className="py-12 text-center">
-              <VLoader size={40} phase="loading" className="mx-auto" />
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading conversations...</p>
+            <div className="flex flex-col items-center justify-center py-12">
+              <VLoader size={32} phase="loading" className="mx-auto" />
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Loading...</p>
             </div>
           ) : visibleConversations.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
-              No conversations found.
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <svg className="h-10 w-10 text-gray-300 dark:text-gray-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <p className="text-xs text-gray-500 dark:text-gray-400">No conversations found</p>
             </div>
           ) : (
-            visibleConversations.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => selectConversation(item)}
-                className={`w-full rounded-xl border p-3 text-left transition ${
-                  activeId === item.id
-                    ? 'border-orange-400 bg-orange-50/80 dark:bg-orange-500/10'
-                    : 'border-gray-200 bg-white hover:border-orange-300 dark:border-white/10 dark:bg-white/5'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{item.participantName}</p>
-                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">{item.title}</p>
-                    <p className="truncate text-xs text-gray-400 dark:text-gray-500">{item.subtitle}</p>
+            visibleConversations.map((item) => {
+              const isActive = activeId === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => selectConversation(item)}
+                  className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all mb-0.5 ${
+                    isActive
+                      ? 'bg-purple-50 dark:bg-purple-500/10 border-l-2 border-purple-500'
+                      : 'hover:bg-gray-50 dark:hover:bg-white/[0.03] border-l-2 border-transparent'
+                  }`}
+                >
+                  {/* Avatar */}
+                  <div className="relative shrink-0">
+                    <div className="h-10 w-10 rounded-full overflow-hidden">
+                      {item.participantImage ? (
+                        <ImageWithFallback
+                          fileId={item.participantImage}
+                          alt={item.participantName}
+                          fit="cover"
+                          className="h-10 w-10"
+                          rounded="full"
+                          fallbackName={item.participantName}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 text-sm font-bold text-white">
+                          {item.participantName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    {/* Context dot */}
+                    <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white dark:border-gray-900 ${contextDotColor(item.contextType)}`} />
                   </div>
-                  <div className="text-right">
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500">{formatRelative(item.lastMessageAt || item.createdAt)}</p>
-                    {item.unreadCount > 0 ? (
-                      <span className="mt-1 inline-flex min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                        {item.unreadCount > 99 ? '99+' : item.unreadCount}
+
+                  {/* Content */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className={`truncate text-[13px] ${isActive ? 'font-semibold text-purple-900 dark:text-purple-200' : item.hasUnread ? 'font-semibold text-gray-900 dark:text-white' : 'font-medium text-gray-700 dark:text-gray-300'}`}>
+                        {item.participantName}
                       </span>
-                    ) : null}
+                      <span className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
+                        {formatRelative(item.lastMessageAt || item.createdAt)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-1 mt-0.5">
+                      <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">{item.subtitle || item.title}</p>
+                      {item.unreadCount > 0 && (
+                        <span className="shrink-0 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-[9px] font-bold text-white">
+                          {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))
+                </button>
+              );
+            })
           )}
         </div>
-      </section>
+      </div>
 
-      <section className="rounded-2xl border border-gray-200 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-white/5">
+      {/* ============================================================ */}
+      {/*  CENTER PANEL — Active Chat                                   */}
+      {/* ============================================================ */}
+      <div className={`flex flex-1 flex-col min-w-0 ${!activeId ? 'hidden lg:flex' : 'flex'}`}>
         {!activeConversation ? (
-          <div className="flex h-full min-h-[320px] items-center justify-center text-center text-sm text-gray-500 dark:text-gray-400">
-            Select a thread to read and reply.
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center">
+              <svg className="h-16 w-16 text-gray-200 dark:text-gray-700 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Select a conversation to start messaging</p>
+            </div>
           </div>
         ) : (
           <>
-            <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white/80 px-4 py-3 dark:border-white/10 dark:bg-white/5">
-              <div>
-                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{activeConversation.title}</h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {activeConversation.participantName} · {activeConversation.status || 'Active'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
+            {/* Chat header */}
+            <div className="shrink-0 flex items-center justify-between gap-3 border-b border-gray-200/60 dark:border-white/8 bg-white/60 dark:bg-white/[0.02] backdrop-blur-sm px-4 py-3">
+              <div className="flex items-center gap-3 min-w-0">
+                {/* Mobile back button */}
                 <button
                   type="button"
-                  onClick={() => updateThreadPrefs(activeConversation, { markRead: true })}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-orange-300 dark:border-white/10 dark:text-gray-200"
+                  onClick={() => setActiveId('')}
+                  className="lg:hidden shrink-0 h-8 w-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/5"
                 >
-                  ✅ Mark read
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
                 </button>
-                {activeConversation.archivedAt ? (
-                  <button
-                    type="button"
-                    onClick={() => updateThreadPrefs(activeConversation, { archived: false })}
-                    disabled={activeConversation.contextType === 'INQUIRY'}
-                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-orange-300 dark:border-white/10 dark:text-gray-200"
-                  >
-                    📥 Unarchive
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => updateThreadPrefs(activeConversation, { archived: true })}
-                    disabled={activeConversation.contextType === 'INQUIRY'}
-                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-orange-300 dark:border-white/10 dark:text-gray-200"
-                  >
-                    📦 Archive
-                  </button>
-                )}
-                {activeConversation.mutedUntil ? (
-                  <button
-                    type="button"
-                    onClick={() => updateThreadPrefs(activeConversation, { unmute: true })}
-                    disabled={activeConversation.contextType === 'INQUIRY'}
-                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-orange-300 dark:border-white/10 dark:text-gray-200"
-                  >
-                    🔔 Unmute
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => updateThreadPrefs(activeConversation, { muteForHours: 24 })}
-                    disabled={activeConversation.contextType === 'INQUIRY'}
-                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-orange-300 dark:border-white/10 dark:text-gray-200"
-                  >
-                    🔕 Mute 24h
-                  </button>
-                )}
-                {activeConversation.participantId ? (
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/profile/${activeConversation.participantId}`)}
-                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-orange-300 dark:border-white/10 dark:text-gray-200"
-                  >
-                    View profile
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => navigate('/settings?tab=notifications')}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-orange-300 dark:border-white/10 dark:text-gray-200"
-                >
-                  Notification settings
-                </button>
-              </div>
-            </header>
 
-            <OrderMessagesPanel
-              contextType={activeConversation.contextType}
-              orderId={activeConversation.contextType === 'INQUIRY' ? undefined : getContextId(activeConversation)}
-              threadId={activeConversation.threadId}
-              title={`${activeConversation.participantName} conversation`}
-              actorSurface={surface}
-              brandId={brandId}
-              highlightMessageId={highlightedMessageId}
+                <div className="h-9 w-9 rounded-full overflow-hidden shrink-0">
+                  {activeConversation.participantImage ? (
+                    <ImageWithFallback
+                      fileId={activeConversation.participantImage}
+                      alt={activeConversation.participantName}
+                      fit="cover"
+                      className="h-9 w-9"
+                      rounded="full"
+                      fallbackName={activeConversation.participantName}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-500 to-fuchsia-500 text-sm font-bold text-white">
+                      {activeConversation.participantName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white truncate">{activeConversation.participantName}</h2>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{activeConversation.title}</p>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* Extension request (brand) */}
+                {surface === 'BRAND' && activeConversation.contextType !== 'INQUIRY' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAction(activeAction === 'extension-request' ? null : 'extension-request')}
+                    className={`rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                      activeAction === 'extension-request'
+                        ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
+                    }`}
+                    title="Request extension"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                )}
+
+                {/* Dispute (brand or buyer, not inquiry) */}
+                {activeConversation.contextType !== 'INQUIRY' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAction(activeAction === 'dispute' ? null : 'dispute')}
+                    className={`rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                      activeAction === 'dispute'
+                        ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
+                    }`}
+                    title="Open dispute"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </button>
+                )}
+
+                {/* Refresh */}
+                <button
+                  type="button"
+                  onClick={() => void refresh()}
+                  className="rounded-lg px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                  title="Refresh"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Messages area */}
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              {messagesLoading && messages.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <VLoader size={32} phase="loading" />
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <svg className="h-12 w-12 text-gray-200 dark:text-gray-700 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No messages yet</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Start the conversation</p>
+                </div>
+              ) : (
+                groupedMessages.map((group) => (
+                  <div key={group.date}>
+                    {/* Date separator */}
+                    <div className="flex items-center gap-3 my-3">
+                      <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/8" />
+                      <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">{group.date}</span>
+                      <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/8" />
+                    </div>
+                    {group.msgs.map((msg) => (
+                      <div key={msg.id} ref={(node) => { messageNodeRefs.current[msg.id] = node; }}>
+                        <MessageBubble message={msg} isOwn={!!actorId && msg.senderUserId === actorId} />
+                      </div>
+                    ))}
+                  </div>
+                ))
+              )}
+              <div ref={bottomRef} />
+            </div>
+
+            {/* Extension response panel (buyer side, when pending request) */}
+            {surface === 'BUYER' && latestOpenExtensionRequest && (
+              <ExtensionResponsePanel
+                requestedDays={latestOpenExtensionRequest.requestedExtraDays}
+                onRespond={handleRespondToExtension}
+                loading={actionLoading}
+              />
+            )}
+
+            {/* Inline action panels */}
+            {activeAction === 'extension-request' && (
+              <ExtensionRequestPanel
+                onSubmit={handleRequestExtension}
+                onCancel={() => setActiveAction(null)}
+                loading={actionLoading}
+              />
+            )}
+            {activeAction === 'dispute' && (
+              <DisputePanel
+                contextType={activeConversation.contextType}
+                onSubmit={handleOpenDispute}
+                onCancel={() => setActiveAction(null)}
+                loading={actionLoading}
+              />
+            )}
+
+            {/* Compose area */}
+            <ComposeArea
+              onSend={handleSend}
+              disabled={messagesLoading || sending}
+              placeholder="Type a message..."
             />
           </>
         )}
-      </section>
+      </div>
+
+      {/* ============================================================ */}
+      {/*  RIGHT PANEL — Contact Sidebar                                */}
+      {/* ============================================================ */}
+      {activeConversation && (
+        <div className="hidden xl:flex w-72 shrink-0 flex-col border-l border-gray-200/60 dark:border-white/8 bg-white/70 dark:bg-white/[0.02]">
+          <ChatContactSidebar
+            participant={activeConversation.participantId ? {
+              id: activeConversation.participantId,
+              name: activeConversation.participantName,
+              username: activeConversation.participantUsername,
+              profileImage: activeConversation.participantImage,
+            } : null}
+            contextType={activeConversation.contextType}
+            orderId={activeConversation.orderId}
+            customOrderId={activeConversation.customOrderId}
+            status={activeConversation.status}
+            mutedUntil={activeConversation.mutedUntil}
+            archivedAt={activeConversation.archivedAt}
+            messages={messages}
+            isInquiry={activeConversation.contextType === 'INQUIRY'}
+            onMarkRead={() => void updateThreadPrefs(activeConversation, { markRead: true })}
+            onToggleMute={() => void updateThreadPrefs(activeConversation, activeConversation.mutedUntil ? { unmute: true } : { muteForHours: 24 })}
+            onToggleArchive={() => void updateThreadPrefs(activeConversation, { archived: !activeConversation.archivedAt })}
+          />
+        </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { toast } from 'sonner';
 import {
   customOrdersAdminApi,
@@ -265,6 +266,7 @@ const AdminCustomOrdersPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <AdminBreadcrumb segments={[{ label: 'Custom Orders' }]} />
       <div>
         <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600 dark:text-emerald-300">Admin</div>
         <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">Custom orders</h1>

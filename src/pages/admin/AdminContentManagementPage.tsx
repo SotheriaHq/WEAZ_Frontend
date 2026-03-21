@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { adminCollectionsApi, adminDesignsApi, adminProductsApi } from '@/api/AdminApi';
@@ -245,17 +246,19 @@ const AdminContentManagementPage: React.FC = () => {
     }
   };
 
-  const productImage = (product: AdminProduct) => {
-    if (product.thumbnail?.trim()) return product.thumbnail;
+  const productImage = (product: AdminProduct): { src: string | null; fileId: string | null } => {
+    if (product.primaryMediaUrl?.trim()) return { src: product.primaryMediaUrl, fileId: null };
+    if (product.thumbnail?.trim()) return { src: product.thumbnail, fileId: null };
     if (Array.isArray(product.images)) {
       const hit = product.images.find((image) => typeof image === 'string' && image.trim());
-      if (hit) return hit;
+      if (hit) return { src: hit, fileId: null };
     }
-    return null;
+    return { src: null, fileId: null };
   };
 
   return (
     <div className="space-y-6">
+      <AdminBreadcrumb segments={[{ label: 'Content Management' }]} />
       <section className="rounded-3xl border border-purple-200/40 bg-gradient-to-br from-white/95 via-[#f8f3ff] to-[#efe6ff] p-5 shadow-md shadow-purple-500/10 dark:border-white/10 dark:from-white/10 dark:via-[#140c1d] dark:to-[#1a1026]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -332,12 +335,14 @@ const AdminContentManagementPage: React.FC = () => {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <ImageWithFallback
-                          src={productImage(product)}
+                          src={productImage(product).src}
+                          fileId={productImage(product).fileId}
                           alt={product.name}
                           fit="cover"
                           rounded="lg"
-                          className="h-12 w-12"
-                          containerClassName="h-12 w-12 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/10"
+                          className="h-12 w-12 object-cover"
+                          containerClassName="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/10"
+                          maxHeightClassName="max-h-12"
                           fallbackName={product.name}
                         />
                         <div>
@@ -422,8 +427,9 @@ const AdminContentManagementPage: React.FC = () => {
                           alt={design.title || 'Design'}
                           fit="cover"
                           rounded="lg"
-                          className="h-12 w-12"
-                          containerClassName="h-12 w-12 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/10"
+                          className="h-12 w-12 object-cover"
+                          containerClassName="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/10"
+                          maxHeightClassName="max-h-12"
                           fallbackName={design.title || 'Design'}
                         />
                         <div>
@@ -496,8 +502,9 @@ const AdminContentManagementPage: React.FC = () => {
                           alt={collection.title || 'Collection'}
                           fit="cover"
                           rounded="lg"
-                          className="h-12 w-12"
-                          containerClassName="h-12 w-12 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/10"
+                          className="h-12 w-12 object-cover"
+                          containerClassName="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/10"
+                          maxHeightClassName="max-h-12"
                           fallbackName={collection.title || 'Collection'}
                         />
                         <div>

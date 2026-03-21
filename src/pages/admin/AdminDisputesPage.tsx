@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { adminDisputesApi } from '@/api/AdminApi';
 import type { AdminDispute } from '@/types/admin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -38,6 +39,7 @@ const AdminDisputesPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <AdminBreadcrumb segments={[{ label: 'Disputes' }]} />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">⚖️ Disputes</h1>
         {hasPermission('DISPUTES_RESOLVE') && (

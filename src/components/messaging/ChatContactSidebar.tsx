@@ -1,0 +1,279 @@
+import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import ImageWithFallback from '@/components/ImageWithFallback';
+import type { ThreadMessage } from '@/api/MessagingApi';
+
+type ConversationContext = 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
+
+interface ChatContactSidebarProps {
+  participant: {
+    id: string;
+    name: string;
+    username?: string | null;
+    profileImage?: string | null;
+  } | null;
+  contextType: ConversationContext;
+  orderId?: string | null;
+  customOrderId?: string | null;
+  status?: string | null;
+  mutedUntil?: string | null;
+  archivedAt?: string | null;
+  messages: ThreadMessage[];
+  isInquiry: boolean;
+  onMarkRead: () => void;
+  onToggleMute: () => void;
+  onToggleArchive: () => void;
+}
+
+const contextLabel = (ct: ConversationContext) => {
+  switch (ct) {
+    case 'STANDARD_ORDER': return 'Standard Order';
+    case 'CUSTOM_ORDER': return 'Custom Order';
+    case 'INQUIRY': return 'Inquiry';
+  }
+};
+
+const contextColor = (ct: ConversationContext) => {
+  switch (ct) {
+    case 'STANDARD_ORDER': return 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400';
+    case 'CUSTOM_ORDER': return 'bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400';
+    case 'INQUIRY': return 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400';
+  }
+};
+
+const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
+  participant,
+  contextType,
+  orderId,
+  customOrderId,
+  status,
+  mutedUntil,
+  archivedAt,
+  messages,
+  isInquiry,
+  onMarkRead,
+  onToggleMute,
+  onToggleArchive,
+}) => {
+  const navigate = useNavigate();
+
+  const sharedMedia = useMemo(() => {
+    const images: { id: string; url: string; name: string }[] = [];
+    for (const msg of messages) {
+      if (!msg.attachments?.length) continue;
+      for (const att of msg.attachments) {
+        if (att.kind === 'IMAGE') {
+          images.push({ id: att.id, url: att.file.s3Url, name: att.file.originalName || 'Image' });
+        }
+      }
+    }
+    return images;
+  }, [messages]);
+
+  const sharedDocs = useMemo(() => {
+    const docs: { id: string; url: string; name: string; size?: number | null }[] = [];
+    for (const msg of messages) {
+      if (!msg.attachments?.length) continue;
+      for (const att of msg.attachments) {
+        if (att.kind === 'DOCUMENT') {
+          docs.push({ id: att.id, url: att.file.s3Url, name: att.file.originalName || 'Document', size: att.file.size });
+        }
+      }
+    }
+    return docs;
+  }, [messages]);
+
+  const referenceId = orderId || customOrderId;
+
+  return (
+    <div className="flex h-full flex-col overflow-y-auto">
+      {/* Profile section */}
+      <div className="flex flex-col items-center px-5 pt-6 pb-4">
+        <div className="relative">
+          <div className="h-20 w-20 rounded-full overflow-hidden ring-2 ring-gray-200/60 dark:ring-white/10">
+            {participant?.profileImage ? (
+              <ImageWithFallback
+                fileId={participant.profileImage}
+                alt={participant.name}
+                fit="cover"
+                className="h-20 w-20"
+                rounded="full"
+                fallbackName={participant.name}
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-500 to-fuchsia-500 text-2xl font-bold text-white">
+                {participant?.name?.charAt(0)?.toUpperCase() || '?'}
+              </div>
+            )}
+          </div>
+          {/* Online indicator */}
+          <div className="absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full border-2 border-white dark:border-gray-900 bg-emerald-500" />
+        </div>
+
+        <h3 className="mt-3 text-sm font-semibold text-gray-900 dark:text-white text-center">
+          {participant?.name || 'Unknown'}
+        </h3>
+        {participant?.username && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">@{participant.username}</p>
+        )}
+
+        {/* Context badge */}
+        <span className={`mt-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${contextColor(contextType)}`}>
+          {contextLabel(contextType)}
+        </span>
+
+        {/* Status */}
+        {status && (
+          <span className="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+            {status}
+          </span>
+        )}
+
+        {/* Reference ID */}
+        {referenceId && (
+          <p className="mt-1 text-[10px] text-gray-400 dark:text-gray-500 font-mono">
+            #{referenceId.slice(0, 12)}...
+          </p>
+        )}
+      </div>
+
+      <div className="mx-4 h-px bg-gray-200/60 dark:bg-white/8" />
+
+      {/* Quick actions */}
+      <div className="px-4 py-3 space-y-1">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+          Actions
+        </p>
+
+        {participant?.id && (
+          <button
+            type="button"
+            onClick={() => navigate(`/profile/${participant.id}`)}
+            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            View Profile
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={onMarkRead}
+          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          Mark as Read
+        </button>
+
+        {!isInquiry && (
+          <>
+            <button
+              type="button"
+              onClick={onToggleMute}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                {mutedUntil ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-3.536-8.536a5 5 0 000 7.072" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                )}
+              </svg>
+              {mutedUntil ? 'Unmute' : 'Mute 24h'}
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleArchive}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+              {archivedAt ? 'Unarchive' : 'Archive'}
+            </button>
+          </>
+        )}
+
+        <button
+          type="button"
+          onClick={() => navigate('/settings?tab=notifications')}
+          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Notification Settings
+        </button>
+      </div>
+
+      {/* Shared Media */}
+      {sharedMedia.length > 0 && (
+        <>
+          <div className="mx-4 h-px bg-gray-200/60 dark:bg-white/8" />
+          <div className="px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+              Shared Media ({sharedMedia.length})
+            </p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {sharedMedia.slice(0, 9).map((img) => (
+                <a
+                  key={img.id}
+                  href={img.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-white/5 hover:opacity-80 transition-opacity"
+                >
+                  <img src={img.url} alt={img.name} className="h-full w-full object-cover" loading="lazy" />
+                </a>
+              ))}
+            </div>
+            {sharedMedia.length > 9 && (
+              <p className="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 text-center">
+                +{sharedMedia.length - 9} more
+              </p>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Shared Documents */}
+      {sharedDocs.length > 0 && (
+        <>
+          <div className="mx-4 h-px bg-gray-200/60 dark:bg-white/8" />
+          <div className="px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+              Shared Files ({sharedDocs.length})
+            </p>
+            <div className="space-y-1.5">
+              {sharedDocs.slice(0, 5).map((doc) => (
+                <a
+                  key={doc.id}
+                  href={doc.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/8 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  <span className="truncate">{doc.name}</span>
+                  {doc.size ? (
+                    <span className="shrink-0 text-[10px] text-gray-400">{(doc.size / 1024).toFixed(0)}KB</span>
+                  ) : null}
+                </a>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default ChatContactSidebar;

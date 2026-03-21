@@ -493,7 +493,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
               <input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={onPickAttachments} disabled={uploading || sending} />
               {uploading ? 'Uploading...' : 'Attach files'}
             </label>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">Up to 5 files, max 25MB total, PDF or image</span>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">Up to 5 files, PDF or image</span>
           </div>
           {pendingAttachments.length > 0 ? (
             <div className="mt-3 space-y-2">

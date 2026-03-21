@@ -100,6 +100,7 @@ export interface AdminProduct {
   currency: string;
   thumbnail?: string | null;
   images?: string[];
+  primaryMediaUrl?: string | null;
   orderCount?: number;
   createdAt: string;
   updatedAt: string;

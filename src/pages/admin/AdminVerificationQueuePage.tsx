@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { toast } from 'sonner';
 import { adminBrandsApi } from '@/api/AdminApi';
 import Input from '@/components/ui/Input';
@@ -92,6 +93,7 @@ export default function AdminVerificationQueuePage() {
 
   return (
     <div className="space-y-6">
+      <AdminBreadcrumb segments={[{ label: 'Verification Queue' }]} />
       <section className="rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_28%),linear-gradient(135deg,_#f9fcff,_#ffffff_48%,_#f7f7ff)] p-6 shadow-[0_30px_80px_-40px_rgba(14,165,233,0.35)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>

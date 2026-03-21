@@ -21,6 +21,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import VLoader from "@/components/loaders/VLoader";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
+import { useUploadLimits } from "@/context/UploadLimitsContext";
 
 import { toast } from "sonner";
 import MediaRenderer from "@/components/media/MediaRenderer";
@@ -327,6 +328,7 @@ const formatCurrency = (amount: number, currency = "NGN"): string => {
 const EditProduct: React.FC = () => {
   const navigate = useNavigate();
   const { id: productId } = useParams<{ id: string }>();
+  const { getLimitMB } = useUploadLimits();
   const location = useLocation();
   const returnTo = useMemo(
     () => new URLSearchParams(location.search).get("returnTo"),
@@ -442,7 +444,7 @@ const EditProduct: React.FC = () => {
     FormState["status"] | null
   >(null);
 
-  const maxMediaCount = 4;
+  const maxMediaCount = 6;
   const canAddMoreMedia = mediaUrls.length < maxMediaCount;
   const hasPrimaryMedia = useMemo(
     () => mediaUrls.some((m) => m.isPrimary),
@@ -2245,7 +2247,7 @@ const EditProduct: React.FC = () => {
                   <Plus className="w-8 h-8 mb-2" />
                   <span className="text-sm font-medium">Add images</span>
                   <span className="text-xs text-gray-400 mt-1">
-                    Up to 4 images
+                    Up to 6 images
                   </span>
                 </button>
               )}
@@ -2256,11 +2258,31 @@ const EditProduct: React.FC = () => {
                 </p>
               )}
 
-              <div className="pt-4 border-t border-gray-200 dark:border-white/10">
+              <div className="pt-4 border-t border-gray-200 dark:border-white/10 space-y-2">
                 <p className="text-xs text-gray-500">
-                  Up to 4 images • Full preview • Cover required when images
-                  exist
+                  Up to 6 images • Cover required when images exist
                 </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { slot: 1, label: 'Front (Default Cover)' },
+                    { slot: 2, label: 'Left Side' },
+                    { slot: 3, label: 'Right Side' },
+                    { slot: 4, label: 'Back Side' },
+                    { slot: 5, label: 'Cover (if any)' },
+                    { slot: 6, label: 'Extra (if any)' },
+                  ].map(({ slot, label }) => (
+                    <span
+                      key={slot}
+                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
+                        mediaUrls.length >= slot
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                          : 'bg-gray-50 text-gray-400 dark:bg-white/5 dark:text-gray-500'
+                      }`}
+                    >
+                      <span className="font-bold">{slot}.</span> {label}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -2279,7 +2301,7 @@ const EditProduct: React.FC = () => {
                   Add Video
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  MP4, WebM up to 50MB
+                  MP4, WebM up to {getLimitMB('upload.maxSize.postVideo')}MB
                 </p>
               </div>
             </div>

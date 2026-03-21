@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { adminModerationApi, adminReviewsApi } from '@/api/AdminApi';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -187,6 +188,7 @@ const AdminModerationPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <AdminBreadcrumb segments={[{ label: 'Moderation' }]} />
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🛡️ Moderation Workspace</h1>

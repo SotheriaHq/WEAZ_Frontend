@@ -2,6 +2,22 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminDashboardApi } from '../../api/AdminApi';
 import { unwrapApiResponse } from '@/types/auth';
+import ImageWithFallback from '@/components/ImageWithFallback';
+
+type RecentLog = {
+  id: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  createdAt: string;
+  actorUserId: string;
+  actorName?: string | null;
+  actorImage?: string | null;
+  targetName?: string | null;
+  targetImage?: string | null;
+  targetStatus?: string | null;
+  targetRoute?: string | null;
+};
 
 type DashboardStats = {
   totalUsers: number;
@@ -10,7 +26,75 @@ type DashboardStats = {
   pendingVerifications: number;
   pendingPayouts: number;
   openDisputes: number;
-  recentLogs: { id: string; action: string; targetType: string; targetId: string; createdAt: string; actorUserId: string }[];
+  recentLogs: RecentLog[];
+};
+
+/** Human-readable label for raw audit action codes */
+const humanAction = (action: string): { label: string; verb: string } => {
+  const map: Record<string, { label: string; verb: string }> = {
+    ADMIN_BRAND_VERIFY: { label: 'Brand Verified', verb: 'verified' },
+    ADMIN_BRAND_REJECT: { label: 'Brand Rejected', verb: 'rejected' },
+    ADMIN_BRAND_SUSPEND: { label: 'Brand Suspended', verb: 'suspended' },
+    ADMIN_BRAND_UNSUSPEND: { label: 'Brand Unsuspended', verb: 'unsuspended' },
+    ADMIN_BRAND_STORE_OVERRIDE: { label: 'Store Override', verb: 'overrode store for' },
+    ADMIN_USER_SUSPEND: { label: 'User Suspended', verb: 'suspended' },
+    ADMIN_USER_UNSUSPEND: { label: 'User Unsuspended', verb: 'unsuspended' },
+    ADMIN_USER_DEACTIVATE: { label: 'User Deactivated', verb: 'deactivated' },
+    ADMIN_USER_NOTIFY: { label: 'User Notified', verb: 'notified' },
+    ADMIN_USER_DATA_WIPE: { label: 'User Data Wiped', verb: 'wiped data for' },
+    ADMIN_PRODUCT_MODERATE: { label: 'Product Moderated', verb: 'moderated' },
+    ADMIN_COLLECTION_MODERATE: { label: 'Content Moderated', verb: 'moderated' },
+    ADMIN_VERIFICATION_CLAIM: { label: 'Verification Claimed', verb: 'claimed verification for' },
+    ADMIN_VERIFICATION_NOTE_CREATE: { label: 'Verification Note', verb: 'added note on' },
+    ADMIN_VERIFICATION_NOTE_UPDATE: { label: 'Note Updated', verb: 'updated note on' },
+    ADMIN_VERIFICATION_NOTE_DELETE: { label: 'Note Deleted', verb: 'deleted note on' },
+    ADMIN_PAYOUT_PROCESS: { label: 'Payout Processed', verb: 'processed payout for' },
+    ADMIN_DISPUTE_RESOLVE: { label: 'Dispute Resolved', verb: 'resolved dispute for' },
+    ADMIN_TAG_BAN: { label: 'Tag Banned', verb: 'banned tag' },
+    ADMIN_TAG_UNBAN: { label: 'Tag Unbanned', verb: 'unbanned tag' },
+    ADMIN_TAG_ALIAS: { label: 'Tag Aliased', verb: 'aliased tag' },
+    ADMIN_FEATURED_ADD: { label: 'Featured Added', verb: 'featured' },
+    ADMIN_FEATURED_REMOVE: { label: 'Featured Removed', verb: 'unfeatured' },
+  };
+  if (map[action]) return map[action];
+  // Fallback: convert ADMIN_FOO_BAR to "Foo Bar"
+  const cleaned = action
+    .replace(/^ADMIN_/, '')
+    .split('_')
+    .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
+    .join(' ');
+  return { label: cleaned, verb: cleaned.toLowerCase() };
+};
+
+const actionColor = (action: string) => {
+  if (action.includes('VERIFY') || action.includes('UNSUSPEND') || action.includes('REPUBLISH'))
+    return 'text-emerald-600 dark:text-emerald-400';
+  if (action.includes('SUSPEND') || action.includes('REJECT') || action.includes('DELETE') || action.includes('WIPE'))
+    return 'text-rose-600 dark:text-rose-400';
+  if (action.includes('MODERATE') || action.includes('UNPUBLISH'))
+    return 'text-amber-600 dark:text-amber-400';
+  return 'text-indigo-600 dark:text-indigo-400';
+};
+
+const statusBadge = (status: string | null | undefined) => {
+  if (!status) return null;
+  const s = status.toUpperCase();
+  const styles: Record<string, string> = {
+    ACTIVE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
+    VERIFIED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
+    PENDING: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+    IN_REVIEW: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
+    SUSPENDED: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400',
+    DEACTIVATED: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400',
+    REJECTED: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400',
+  };
+  const style = styles[s] || 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400';
+  const label = s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ');
+  return (
+    <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${style}`}>
+      {label}
+    </span>
+  );
 };
 
 const AdminDashboard: React.FC = () => {
@@ -102,12 +186,15 @@ const AdminDashboard: React.FC = () => {
     return value.toLocaleString();
   };
 
-  const activityColor = (type: string) => {
-    if (type.toLowerCase().includes('user') || type.toLowerCase().includes('auth')) return 'bg-indigo-500';
-    if (type.toLowerCase().includes('brand') || type.toLowerCase().includes('store')) return 'bg-fuchsia-500';
-    if (type.toLowerCase().includes('dispute') || type.toLowerCase().includes('report')) return 'bg-amber-500';
-    if (type.toLowerCase().includes('product')) return 'bg-emerald-500';
-    return 'bg-gray-500';
+  const relativeTime = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
   };
 
   return (
@@ -144,8 +231,6 @@ const AdminDashboard: React.FC = () => {
                 card.changeType === 'up' ? 'text-emerald-600 dark:text-emerald-400' :
                 card.changeType === 'warning' ? `${colors.text}` : 'text-gray-500'
               }`}>
-                {card.changeType === 'up' && <span>📈</span>}
-                {card.changeType === 'warning' && <span>⚠️</span>}
                 <span>{card.change}</span>
               </div>
             </button>
@@ -169,11 +254,11 @@ const AdminDashboard: React.FC = () => {
         ))}
       </section>
 
-      {/* Middle Panels: Approval Queue + Live Activity */}
+      {/* Middle Panels: Recent Activity + Live Timeline */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Approval Queue / Recent Activity */}
+        {/* Recent Activity — no bg on items, more breathing room, real content */}
         <div className="lg:col-span-8 rounded-2xl border border-purple-200/30 dark:border-white/10 bg-gradient-to-br from-white/90 to-purple-50/40 dark:from-white/[0.05] dark:to-purple-900/10 backdrop-blur-sm overflow-hidden shadow-sm shadow-purple-500/10">
-          <div className="p-5 border-b border-gray-200/50 dark:border-white/5 flex justify-between items-center">
+          <div className="px-5 pt-5 pb-3 flex justify-between items-center">
             <h3 className="text-base font-bold text-gray-900 dark:text-white">Recent Activity</h3>
             <button
               onClick={() => navigate('/admin/audit')}
@@ -182,45 +267,91 @@ const AdminDashboard: React.FC = () => {
               View All
             </button>
           </div>
-          <div className="p-5">
+          <div className="px-5 pb-5">
             {loading ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-14 bg-gray-100 dark:bg-white/5 rounded-xl animate-pulse" />
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-white/10 animate-pulse shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3 w-3/4 bg-gray-200 dark:bg-white/10 rounded animate-pulse" />
+                      <div className="h-2 w-1/2 bg-gray-100 dark:bg-white/5 rounded animate-pulse" />
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : stats?.recentLogs && stats.recentLogs.length > 0 ? (
-              <div className="space-y-3">
-                {stats.recentLogs.slice(0, 5).map((log) => (
-                  <div
-                    key={log.id}
-                    className="flex items-center justify-between p-3 bg-gray-50/80 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white/80 ${
-                        log.action.includes('CREATE') ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' :
-                        log.action.includes('UPDATE') ? 'bg-indigo-500/20 text-indigo-600 dark:text-indigo-400' :
-                        log.action.includes('DELETE') ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400' :
-                        'bg-gray-500/20 text-gray-600 dark:text-gray-400'
-                      }`}>
-                        <span className="text-base">
-                          {log.action.includes('CREATE') ? '✨' :
-                           log.action.includes('UPDATE') ? '✏️' :
-                           log.action.includes('DELETE') ? '🗑️' : '📋'}
-                        </span>
+              <div className="divide-y divide-gray-100/80 dark:divide-white/5">
+                {stats.recentLogs.slice(0, 6).map((log) => {
+                  const { verb } = humanAction(log.action);
+                  const targetLabel = log.targetName || (log.targetId ? log.targetId.slice(0, 8) + '...' : '');
+                  return (
+                    <button
+                      key={log.id}
+                      type="button"
+                      onClick={() => {
+                        if (log.targetRoute) navigate(log.targetRoute);
+                        else navigate('/admin/audit');
+                      }}
+                      className="flex items-center gap-3 py-3.5 w-full text-left hover:bg-gray-50/50 dark:hover:bg-white/[0.03] transition-colors rounded-lg -mx-2 px-2 group"
+                    >
+                      {/* Target image or actor avatar */}
+                      <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-gray-100 dark:bg-white/10">
+                        {log.targetImage ? (
+                          <ImageWithFallback
+                            src={log.targetImage}
+                            alt={targetLabel}
+                            fit="cover"
+                            rounded="full"
+                            className="w-9 h-9"
+                            containerClassName="w-9 h-9"
+                            fallbackName={targetLabel}
+                          />
+                        ) : log.actorImage ? (
+                          <ImageWithFallback
+                            src={log.actorImage}
+                            alt={log.actorName || 'Admin'}
+                            fit="cover"
+                            rounded="full"
+                            className="w-9 h-9"
+                            containerClassName="w-9 h-9"
+                            fallbackName={log.actorName || 'Admin'}
+                          />
+                        ) : (
+                          <div className="w-9 h-9 flex items-center justify-center text-[11px] font-bold text-gray-500 dark:text-gray-400">
+                            {(log.actorName || 'A').charAt(0).toUpperCase()}
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">{log.action}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">
-                          {log.targetType} {log.targetId?.slice(0, 8)}…
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] leading-snug text-gray-700 dark:text-gray-200">
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {log.actorName || 'Admin'}
+                          </span>{' '}
+                          <span className={`font-medium ${actionColor(log.action)}`}>{verb}</span>{' '}
+                          {targetLabel && (
+                            <span className="font-semibold text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-fuchsia-400 transition-colors">
+                              {targetLabel}
+                            </span>
+                          )}
                         </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                            {relativeTime(log.createdAt)}
+                          </span>
+                          {log.targetStatus && statusBadge(log.targetStatus)}
+                        </div>
                       </div>
-                    </div>
-                    <span className="text-[10px] text-gray-400 uppercase tracking-wide whitespace-nowrap">
-                      {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                ))}
+
+                      {/* Chevron */}
+                      <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 shrink-0 group-hover:text-purple-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
@@ -232,10 +363,10 @@ const AdminDashboard: React.FC = () => {
 
         {/* Live Activity Timeline */}
         <div className="lg:col-span-4 rounded-2xl border border-purple-200/30 dark:border-white/10 bg-gradient-to-br from-white/90 to-indigo-50/30 dark:from-white/[0.05] dark:to-indigo-900/10 backdrop-blur-sm overflow-hidden flex flex-col shadow-sm shadow-indigo-500/10">
-          <div className="p-5 border-b border-gray-200/50 dark:border-white/5">
+          <div className="px-5 pt-5 pb-3">
             <h3 className="text-base font-bold text-gray-900 dark:text-white">Live Activity</h3>
           </div>
-          <div className="p-5 space-y-5 flex-1">
+          <div className="px-5 pb-5 space-y-1 flex-1">
             {loading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
@@ -243,25 +374,43 @@ const AdminDashboard: React.FC = () => {
                 ))}
               </div>
             ) : stats?.recentLogs && stats.recentLogs.length > 0 ? (
-              stats.recentLogs.slice(0, 4).map((log, i) => (
-                <div key={log.id} className="flex gap-3 relative">
-                  {i < Math.min(stats.recentLogs.length - 1, 3) && (
-                    <div className="absolute left-[5px] top-6 w-[1px] h-8 bg-gray-200 dark:bg-white/10" />
-                  )}
-                  <div className={`w-3 h-3 rounded-full mt-1 shrink-0 ring-4 ${
-                    activityColor(log.targetType || log.action)
-                  } ring-opacity-20 ${activityColor(log.targetType || log.action).replace('bg-', 'ring-')}`} />
-                  <div>
-                    <p className="text-xs font-bold text-gray-900 dark:text-white">{log.action}</p>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-500">
-                      {log.targetType} {log.targetId?.slice(0, 8)}
-                    </p>
-                    <p className="text-[10px] text-gray-400 mt-0.5 uppercase">
-                      {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                </div>
-              ))
+              stats.recentLogs.slice(0, 5).map((log, i) => {
+                const { label } = humanAction(log.action);
+                return (
+                  <button
+                    key={log.id}
+                    type="button"
+                    onClick={() => {
+                      if (log.targetRoute) navigate(log.targetRoute);
+                      else navigate('/admin/audit');
+                    }}
+                    className="flex gap-3 relative w-full text-left py-2.5 hover:bg-gray-50/50 dark:hover:bg-white/[0.03] rounded-lg -mx-1 px-1 transition-colors"
+                  >
+                    {/* Timeline line */}
+                    {i < Math.min((stats?.recentLogs?.length ?? 0) - 1, 4) && (
+                      <div className="absolute left-[6px] top-[30px] w-px h-[calc(100%-14px)] bg-gray-200/80 dark:bg-white/10" />
+                    )}
+                    {/* Dot */}
+                    <div className={`w-3 h-3 rounded-full mt-1.5 shrink-0 ${
+                      log.action.includes('VERIFY') || log.action.includes('UNSUSPEND') ? 'bg-emerald-500' :
+                      log.action.includes('SUSPEND') || log.action.includes('DELETE') || log.action.includes('WIPE') ? 'bg-rose-500' :
+                      log.action.includes('MODERATE') ? 'bg-amber-500' :
+                      'bg-indigo-500'
+                    }`} />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white leading-tight">{label}</p>
+                      {log.targetName && (
+                        <p className="text-[10px] font-medium text-gray-600 dark:text-gray-300 truncate">
+                          {log.targetName}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                        {relativeTime(log.createdAt)}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })
             ) : (
               <div className="text-center py-6 text-gray-400 dark:text-gray-500 text-sm">
                 No live activity
@@ -276,20 +425,22 @@ const AdminDashboard: React.FC = () => {
         {/* Quick Actions */}
         <div className="rounded-2xl border border-purple-200/30 dark:border-white/10 bg-gradient-to-br from-white/90 to-fuchsia-50/30 dark:from-white/[0.05] dark:to-fuchsia-900/10 backdrop-blur-sm p-5 shadow-sm shadow-fuchsia-500/10">
           <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Quick Actions</h3>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {[
-              { emoji: '👤', label: 'Manage Users', route: '/admin/users' },
-              { emoji: '🏷️', label: 'Manage Brands', route: '/admin/brands' },
-              { emoji: '🧰', label: 'Manage Content', route: '/admin/content' },
-              { emoji: '🧵', label: 'Review Designs', route: '/admin/content?tab=designs' },
+              { label: 'Manage Users', route: '/admin/users' },
+              { label: 'Manage Brands', route: '/admin/brands' },
+              { label: 'Manage Content', route: '/admin/content' },
+              { label: 'Review Designs', route: '/admin/content?tab=designs' },
             ].map((link) => (
               <button
                 key={link.route}
                 onClick={() => navigate(link.route)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors group"
               >
-                <span>{link.emoji}</span>
                 <span className="font-medium">{link.label}</span>
+                <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-purple-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
               </button>
             ))}
           </div>
@@ -298,27 +449,29 @@ const AdminDashboard: React.FC = () => {
         {/* Moderation Quick View */}
         <div className="rounded-2xl border border-purple-200/30 dark:border-white/10 bg-gradient-to-br from-white/90 to-amber-50/30 dark:from-white/[0.05] dark:to-amber-900/10 backdrop-blur-sm p-5 shadow-sm shadow-amber-500/10">
           <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Moderation</h3>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {[
-              { emoji: '🛡️', label: 'Content Moderation', route: '/admin/moderation' },
-              { emoji: '⚖️', label: 'Disputes', route: '/admin/disputes', count: stats?.openDisputes },
-              { emoji: '💰', label: 'Payouts', route: '/admin/payouts', count: stats?.pendingPayouts },
-              { emoji: '📋', label: 'Audit Log', route: '/admin/audit' },
+              { label: 'Content Moderation', route: '/admin/moderation' },
+              { label: 'Disputes', route: '/admin/disputes', count: stats?.openDisputes },
+              { label: 'Payouts', route: '/admin/payouts', count: stats?.pendingPayouts },
+              { label: 'Audit Log', route: '/admin/audit' },
             ].map((link) => (
               <button
                 key={link.route}
                 onClick={() => navigate(link.route)}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors group"
               >
-                <div className="flex items-center gap-3">
-                  <span>{link.emoji}</span>
-                  <span className="font-medium">{link.label}</span>
+                <span className="font-medium">{link.label}</span>
+                <div className="flex items-center gap-2">
+                  {link.count !== undefined && link.count > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400">
+                      {link.count}
+                    </span>
+                  )}
+                  <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-purple-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
-                {link.count !== undefined && link.count > 0 && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400">
-                    {link.count}
-                  </span>
-                )}
               </button>
             ))}
           </div>
@@ -327,20 +480,22 @@ const AdminDashboard: React.FC = () => {
         {/* System & Config */}
         <div className="rounded-2xl border border-purple-200/30 dark:border-white/10 bg-gradient-to-br from-white/90 to-indigo-50/30 dark:from-white/[0.05] dark:to-indigo-900/10 backdrop-blur-sm p-5 shadow-sm shadow-indigo-500/10">
           <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">System</h3>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {[
-              { emoji: '🧬', label: 'Taxonomy', route: '/admin/taxonomy' },
-              { emoji: '🏷️', label: 'Tags', route: '/admin/tags' },
-              { emoji: '📐', label: 'Measurements', route: '/admin/measurements' },
-              { emoji: '⚙️', label: 'Settings', route: '/admin/settings' },
+              { label: 'Taxonomy', route: '/admin/taxonomy' },
+              { label: 'Tags', route: '/admin/tags' },
+              { label: 'Measurements', route: '/admin/measurements' },
+              { label: 'Settings', route: '/admin/settings' },
             ].map((link) => (
               <button
                 key={link.route}
                 onClick={() => navigate(link.route)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors group"
               >
-                <span>{link.emoji}</span>
                 <span className="font-medium">{link.label}</span>
+                <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-purple-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
               </button>
             ))}
           </div>

@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { adminTagsApi } from '@/api/AdminApi';
 import type { AdminTagItem } from '@/types/admin';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
@@ -34,6 +35,7 @@ const AdminTagsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <AdminBreadcrumb segments={[{ label: 'Tags' }]} />
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🏷️ Tags</h1>
 
       <input

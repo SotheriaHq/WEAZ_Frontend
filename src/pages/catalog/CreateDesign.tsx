@@ -201,7 +201,7 @@ const CreateDesignInner: React.FC = () => {
   }, [metadataEditedAt]);
   const picker = useFilePicker({
     accept: ["image/*", "video/*"],
-    maxFiles: 20,
+    maxFiles: 6,
     onFiles: mediaStore.addFiles,
     disabled,
   });
@@ -1210,12 +1210,31 @@ const CreateDesignInner: React.FC = () => {
           {/* Media Section */}
           <section className="h-full min-w-0">
             {files.length === 0 ? (
-              <MediaUploadZone
-                onFilesUpload={mediaStore.addFiles}
-                picker={picker}
-                disabled={disabled}
-                maxFiles={20}
-              />
+              <div className="space-y-3">
+                <MediaUploadZone
+                  onFilesUpload={mediaStore.addFiles}
+                  picker={picker}
+                  disabled={disabled}
+                  maxFiles={6}
+                />
+                <div className="flex flex-wrap justify-center gap-1.5 px-2">
+                  {[
+                    { slot: 1, label: 'Front (Default Cover)' },
+                    { slot: 2, label: 'Left Side' },
+                    { slot: 3, label: 'Right Side' },
+                    { slot: 4, label: 'Back Side' },
+                    { slot: 5, label: 'Cover (if any)' },
+                    { slot: 6, label: 'Extra (if any)' },
+                  ].map(({ slot, label }) => (
+                    <span
+                      key={slot}
+                      className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:bg-white/5 dark:text-gray-500"
+                    >
+                      <span className="font-bold">{slot}.</span> {label}
+                    </span>
+                  ))}
+                </div>
+              </div>
             ) : (
               <div className="space-y-4 h-full min-w-0">
                 {/* Main Preview - NO background; media defines layout */}

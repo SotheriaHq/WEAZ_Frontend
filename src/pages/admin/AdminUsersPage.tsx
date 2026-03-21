@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { adminUsersApi } from '@/api/AdminApi';
 import type { AdminReactivationRequest, AdminUser } from '@/types/admin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -242,6 +243,7 @@ const AdminUsersPage: React.FC = () => {
 
   return (
     <div className="relative space-y-6">
+      <AdminBreadcrumb segments={[{ label: 'Users' }]} />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">👤 Users</h1>

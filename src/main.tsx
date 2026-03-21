@@ -9,6 +9,7 @@ import App from './App';
 import { RealtimeProvider } from './realtime';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { UploadLimitsProvider } from './context/UploadLimitsContext';
 import { Provider } from 'react-redux';
 import { store } from './store';
 
@@ -18,7 +19,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <RealtimeProvider>
         <ThemeProvider>
           <LanguageProvider>
-            <App />
+            <UploadLimitsProvider>
+              <App />
+            </UploadLimitsProvider>
           </LanguageProvider>
         </ThemeProvider>
       </RealtimeProvider>

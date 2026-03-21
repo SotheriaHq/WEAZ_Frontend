@@ -78,7 +78,7 @@ const CreateCollectionInner: React.FC = () => {
   const titleDescriptionLocked = isEditMode && collectionCreatedAt
     ? Date.now() > collectionCreatedAt.getTime() + 30 * 24 * 60 * 60 * 1000
     : false;
-  const picker = useFilePicker({ accept: ['image/*', 'video/*'], maxFiles: 20, onFiles: mediaStore.addFiles, disabled: disabled || isEditMode });
+  const picker = useFilePicker({ accept: ['image/*', 'video/*'], maxFiles: 10, onFiles: mediaStore.addFiles, disabled: disabled || isEditMode });
 
   useEffect(() => {
     let mounted = true;
