@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import type { ThreadMessage } from '@/api/MessagingApi';
 
@@ -56,6 +58,15 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
   onToggleArchive,
 }) => {
   const navigate = useNavigate();
+  const profile = useSelector((s: RootState) => s.user.profile);
+
+  const orderUrl = useMemo(() => {
+    if (contextType === 'INQUIRY') return null;
+    const prefix = profile?.type === 'BRAND' ? '/studio' : '';
+    if (contextType === 'CUSTOM_ORDER' && customOrderId) return `${prefix}/custom-orders/${customOrderId}`;
+    if (orderId) return `${prefix}/orders/${orderId}`;
+    return null;
+  }, [contextType, customOrderId, orderId, profile?.type]);
 
   const sharedMedia = useMemo(() => {
     const images: { id: string; url: string; name: string }[] = [];
@@ -107,7 +118,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
             )}
           </div>
           {/* Online indicator */}
-          <div className="absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full border-2 border-white dark:border-gray-900 bg-emerald-500" />
+            <div className="absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full border-2 border-white dark:border-transparent bg-emerald-400" />
         </div>
 
         <h3 className="mt-3 text-sm font-semibold text-gray-900 dark:text-white text-center">
@@ -155,6 +166,18 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
               <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
             View Profile
+          </button>
+        )}
+
+        {/* View Order — only for order-based contexts */}
+        {orderUrl && (
+          <button
+            type="button"
+            onClick={() => navigate(orderUrl)}
+            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+          >
+            <span className="text-sm" role="img" aria-label="order">📦</span>
+            View Order
           </button>
         )}
 

@@ -92,6 +92,7 @@ const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'));
 const AdminForceResetPasswordPage = lazy(() => import('./pages/admin/AdminForceResetPasswordPage'));
 const AdminResetPasswordPage = lazy(() => import('./pages/admin/AdminResetPasswordPage'));
 const AdminCustomOrdersPage = lazy(() => import('./pages/admin/AdminCustomOrdersPage'));
+const AdminMessagingPage = lazy(() => import('./pages/admin/AdminMessagingPage'));
 
 const AppRouteFallback: React.FC = () => (
   <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">Loading page...</div>
@@ -536,6 +537,7 @@ const router = createBrowserRouter([
           { path: 'measurements', element: <RequireAdminPermission permission="MEASUREMENTS_READ"><AdminMeasurementsPage /></RequireAdminPermission> },
           { path: 'payouts', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminPayoutsPage /></RequireAdminPermission> },
           { path: 'disputes', element: <RequireAdminPermission permission="DISPUTES_READ"><AdminDisputesPage /></RequireAdminPermission> },
+          { path: 'messaging', element: <RequireAdminPermission permission="MESSAGING_READ"><AdminMessagingPage /></RequireAdminPermission> },
           { path: 'moderation', element: <RequireAdminPermission permission="MODERATION_READ"><AdminModerationPage /></RequireAdminPermission> },
           { path: 'audit', element: <RequireAdminPermission permission="AUDIT_READ"><AdminAuditPage /></RequireAdminPermission> },
           { path: 'settings', element: <RequireAdminPermission permission="SYSTEM_SLA_READ"><AdminSettingsPage /></RequireAdminPermission> },

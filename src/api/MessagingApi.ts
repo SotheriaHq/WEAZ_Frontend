@@ -158,6 +158,48 @@ export const messagingApi = {
     return parseMessageList(response.data);
   },
 
+  async getAdminInbox(params?: {
+    cursorLastMessageAt?: string;
+    cursorThreadId?: string;
+    limit?: number;
+    filter?: 'all' | 'unread' | 'archived';
+    contextType?: 'all' | 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
+    q?: string;
+  }) {
+    const response = await apiClient.get('/admin/messaging/inbox', { params });
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async getAdminThread(threadId: string) {
+    const response = await apiClient.get(`/admin/messaging/threads/${threadId}`);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async getAdminThreadMessages(threadId: string, params?: { cursorCreatedAt?: string; cursorId?: string; limit?: number }) {
+    const response = await apiClient.get(`/admin/messaging/threads/${threadId}/messages`, { params });
+    return parseMessageList(response.data);
+  },
+
+  async adminHideMessage(messageId: string, reason: string) {
+    const response = await apiClient.post(`/admin/messaging/messages/${messageId}/hide`, { reason });
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async adminRedactMessage(messageId: string, reason: string) {
+    const response = await apiClient.post(`/admin/messaging/messages/${messageId}/redact`, { reason });
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async adminReopenThread(threadId: string) {
+    const response = await apiClient.post(`/admin/messaging/threads/${threadId}/reopen`);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async adminSendSystemMessage(threadId: string, payload: { bodyText: string }) {
+    const response = await apiClient.post(`/admin/messaging/threads/${threadId}/system-message`, payload);
+    return unwrapApiResponse<any>(response.data);
+  },
+
   async sendCustomOrderMessage(orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[] }) {
     const response = await apiClient.post(
       `/custom-orders/${orderId}/messages`,

@@ -130,59 +130,48 @@ const ExtensionRequestPanel: React.FC<{
   const [reason, setReason] = useState('');
 
   return (
-    <div className="mx-3 mb-2 rounded-2xl border border-orange-200/60 dark:border-orange-500/20 bg-orange-50/80 dark:bg-orange-500/5 p-3.5 backdrop-blur-sm">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500/10 dark:bg-orange-500/20">
-          <svg className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <span className="text-xs font-semibold text-orange-800 dark:text-orange-300">Request Extra Time</span>
+    <div className="mx-3 mb-2 rounded-xl border border-orange-200/60 dark:border-orange-500/20 bg-orange-50/80 dark:bg-orange-500/5 p-2.5 backdrop-blur-sm">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-sm" role="img" aria-label="clock">⏳</span>
+        <span className="text-[11px] font-semibold text-orange-800 dark:text-orange-300">Request Extra Time</span>
       </div>
-      <div className="space-y-2">
-        <div>
-          <label className="text-[11px] font-medium text-gray-600 dark:text-gray-400">Extra days needed</label>
+      <div className="flex items-start gap-2">
+        <div className="w-20 shrink-0">
+          <label className="text-[10px] font-medium text-gray-600 dark:text-gray-400">Days</label>
           <input
             type="number"
             min={1}
             max={30}
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
-            className="mt-0.5 w-full rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-orange-400/50"
+            className="mt-0.5 w-full rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-orange-400/50"
           />
         </div>
-        <div>
-          <label className="text-[11px] font-medium text-gray-600 dark:text-gray-400">Reason</label>
-          <textarea
+        <div className="flex-1 min-w-0">
+          <label className="text-[10px] font-medium text-gray-600 dark:text-gray-400">Reason</label>
+          <input
+            type="text"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            rows={2}
-            placeholder="Brief reason for this extension..."
-            className="mt-0.5 w-full resize-none rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-orange-400/50"
+            placeholder="Brief reason..."
+            className="mt-0.5 w-full rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-orange-400/50"
           />
         </div>
-        <div className="flex items-center justify-end gap-2 pt-1">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={loading}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (days < 1) { toast.error('Days must be at least 1'); return; }
-              if (!reason.trim()) { toast.error('Reason is required'); return; }
-              onSubmit(days, reason.trim());
-            }}
-            disabled={loading}
-            className="rounded-lg bg-orange-500 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
-          >
-            {loading ? 'Sending...' : 'Send Request'}
-          </button>
-        </div>
+      </div>
+      <div className="flex items-center justify-end gap-1.5 mt-2">
+        <button type="button" onClick={onCancel} disabled={loading} className="rounded-lg px-2.5 py-1 text-[11px] font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">Cancel</button>
+        <button
+          type="button"
+          onClick={() => {
+            if (days < 1) { toast.error('Days must be at least 1'); return; }
+            if (!reason.trim()) { toast.error('Reason is required'); return; }
+            onSubmit(days, reason.trim());
+          }}
+          disabled={loading}
+          className="rounded-lg bg-orange-500 px-3 py-1 text-[11px] font-semibold text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+        >
+          {loading ? 'Sending...' : 'Send Request'}
+        </button>
       </div>
     </div>
   );
@@ -282,14 +271,10 @@ const DisputePanel: React.FC<{
   const [description, setDescription] = useState('');
 
   return (
-    <div className="mx-3 mb-2 rounded-2xl border border-red-200/60 dark:border-red-500/20 bg-red-50/80 dark:bg-red-500/5 p-3.5 backdrop-blur-sm">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500/10 dark:bg-red-500/20">
-          <svg className="h-3.5 w-3.5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <span className="text-xs font-semibold text-red-800 dark:text-red-300">Open Dispute</span>
+    <div className="mx-3 mb-2 rounded-xl border border-red-200/60 dark:border-red-500/20 bg-red-50/80 dark:bg-red-500/5 p-2.5 backdrop-blur-sm">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-sm" role="img" aria-label="warning">⚠️</span>
+        <span className="text-[11px] font-semibold text-red-800 dark:text-red-300">Open Dispute</span>
       </div>
       <div className="space-y-2">
         {contextType === 'CUSTOM_ORDER' && (
@@ -298,7 +283,7 @@ const DisputePanel: React.FC<{
             <select
               value={issueType}
               onChange={(e) => setIssueType(e.target.value)}
-              className="mt-0.5 w-full rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-red-400/50"
+              className="mt-0.5 w-full rounded-lg border border-gray-200/60 dark:border-transparent bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-red-400/50"
             >
               {DISPUTE_ISSUE_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -313,7 +298,7 @@ const DisputePanel: React.FC<{
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
             placeholder="Describe the issue..."
-            className="mt-0.5 w-full resize-none rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-red-400/50"
+            className="mt-0.5 w-full resize-none rounded-lg border border-gray-200/60 dark:border-transparent bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-red-400/50"
           />
         </div>
         <div className="flex items-center justify-end gap-2 pt-1">
@@ -681,7 +666,18 @@ const MessagingManagementPage: React.FC = () => {
     }
 
     await refresh();
-  }, [activeConversation, brandId, getContextId, refresh, surface, useThreadTransport]);
+
+    // Update conversation list card with latest message preview
+    setConversations((prev) => prev.map((c) =>
+      c.id !== activeId ? c : {
+        ...c,
+        subtitle: bodyText || (attachmentFileIds.length > 0 ? '📎 Attachment' : c.subtitle),
+        lastMessageAt: new Date().toISOString(),
+        unreadCount: 0,
+        hasUnread: false,
+      }
+    ));
+  }, [activeConversation, activeId, brandId, getContextId, refresh, surface, useThreadTransport]);
 
   const handleRequestExtension = useCallback(async (days: number, reason: string) => {
     if (!activeConversation || surface !== 'BRAND' || !brandId) return;
@@ -778,12 +774,12 @@ const MessagingManagementPage: React.FC = () => {
   /* ================================================================ */
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-2xl border border-gray-200/60 dark:border-white/8 bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-2xl border border-gray-200/60 dark:border-transparent bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
 
       {/* ============================================================ */}
       {/*  LEFT PANEL — Conversation List                               */}
       {/* ============================================================ */}
-      <div className={`w-80 shrink-0 flex-col border-r border-gray-200/60 dark:border-white/8 bg-white/70 dark:bg-white/[0.02] ${activeId ? 'hidden lg:flex' : 'flex'}`}>
+      <div className={`w-80 shrink-0 flex-col border-r border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02] ${activeId ? 'hidden lg:flex' : 'flex'}`}>
         {/* Header */}
         <div className="shrink-0 px-4 pt-4 pb-3">
           <h1 className="text-base font-semibold text-gray-900 dark:text-white">Messages</h1>
@@ -802,7 +798,7 @@ const MessagingManagementPage: React.FC = () => {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search conversations..."
-              className="w-full rounded-xl border border-gray-200/60 dark:border-white/10 bg-gray-50 dark:bg-white/5 pl-8 pr-3 py-2 text-xs outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/20 transition-all"
+              className="w-full rounded-xl border border-gray-200/60 dark:border-transparent bg-gray-50 dark:bg-white/5 pl-8 pr-3 py-2 text-xs outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/20 transition-all"
             />
           </div>
         </div>
@@ -872,7 +868,7 @@ const MessagingManagementPage: React.FC = () => {
                       )}
                     </div>
                     {/* Context dot */}
-                    <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white dark:border-gray-900 ${contextDotColor(item.contextType)}`} />
+                    <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white dark:border-transparent ${contextDotColor(item.contextType)}`} />
                   </div>
 
                   {/* Content */}
@@ -917,7 +913,7 @@ const MessagingManagementPage: React.FC = () => {
         ) : (
           <>
             {/* Chat header */}
-            <div className="shrink-0 flex items-center justify-between gap-3 border-b border-gray-200/60 dark:border-white/8 bg-white/60 dark:bg-white/[0.02] backdrop-blur-sm px-4 py-3">
+            <div className="shrink-0 flex items-center justify-between gap-3 border-b border-gray-200/60 dark:border-white/[0.04] bg-white/60 dark:bg-white/[0.02] backdrop-blur-sm px-4 py-3">
               <div className="flex items-center gap-3 min-w-0">
                 {/* Mobile back button */}
                 <button
@@ -985,9 +981,26 @@ const MessagingManagementPage: React.FC = () => {
                     }`}
                     title="Open dispute"
                   >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
+                    <span className="text-base" role="img" aria-label="dispute">⚠️</span>
+                  </button>
+                )}
+
+                {/* View Order (not inquiry) */}
+                {activeConversation.contextType !== 'INQUIRY' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const prefix = surface === 'BRAND' ? '/studio' : '';
+                      if (activeConversation.contextType === 'CUSTOM_ORDER' && activeConversation.customOrderId) {
+                        navigate(`${prefix}/custom-orders/${activeConversation.customOrderId}`);
+                      } else if (activeConversation.orderId) {
+                        navigate(`${prefix}/orders/${activeConversation.orderId}`);
+                      }
+                    }}
+                    className="rounded-lg px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                    title="View Order"
+                  >
+                    <span className="text-base" role="img" aria-label="order">📦</span>
                   </button>
                 )}
 
@@ -1079,7 +1092,7 @@ const MessagingManagementPage: React.FC = () => {
       {/*  RIGHT PANEL — Contact Sidebar                                */}
       {/* ============================================================ */}
       {activeConversation && (
-        <div className="hidden xl:flex w-72 shrink-0 flex-col border-l border-gray-200/60 dark:border-white/8 bg-white/70 dark:bg-white/[0.02]">
+        <div className="hidden xl:flex w-72 shrink-0 flex-col border-l border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02]">
           <ChatContactSidebar
             participant={activeConversation.participantId ? {
               id: activeConversation.participantId,

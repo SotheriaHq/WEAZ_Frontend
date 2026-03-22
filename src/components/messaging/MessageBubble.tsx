@@ -45,7 +45,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn }) =>
   if (isSystem) {
     return (
       <div className="flex justify-center my-2">
-        <div className="max-w-[85%] rounded-xl bg-gray-100/80 dark:bg-white/5 border border-gray-200/50 dark:border-white/10 px-4 py-2 text-center">
+        <div className="max-w-[85%] rounded-xl bg-gray-100/80 dark:bg-white/5 border border-gray-200/50 dark:border-transparent px-4 py-2 text-center">
           <p className="text-xs text-gray-500 dark:text-gray-400 italic">
             {message.bodyText || 'System message'}
           </p>
@@ -67,7 +67,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn }) =>
           className={`rounded-2xl px-3.5 py-2 ${
             isOwn
               ? 'bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white rounded-br-md'
-              : 'bg-white/80 dark:bg-white/8 border border-gray-200/60 dark:border-white/10 text-gray-900 dark:text-gray-100 rounded-bl-md'
+              : 'bg-white/80 dark:bg-white/8 border border-gray-200/60 dark:border-transparent text-gray-900 dark:text-gray-100 rounded-bl-md'
           }`}
         >
           {isRedacted ? (

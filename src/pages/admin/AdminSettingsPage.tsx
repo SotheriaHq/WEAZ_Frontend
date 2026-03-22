@@ -6,6 +6,7 @@ import type { AdminSlaConfig, FeatureFlag } from '@/types/admin';
 import { toast } from 'sonner';
 import { unwrapApiResponse } from '@/types/auth';
 import { useUploadLimits } from '@/context/UploadLimitsContext';
+import UniversalSelect from '@/components/forms/UniversalSelect';
 
 type Tab = 'sla' | 'flags' | 'uploads';
 
@@ -28,6 +29,7 @@ const UPLOAD_KEY_LABELS: Record<string, { label: string; hint: string }> = {
 type SizeUnit = 'KB' | 'MB' | 'GB';
 const UNIT_BYTES: Record<SizeUnit, number> = { KB: 1024, MB: 1024 * 1024, GB: 1024 * 1024 * 1024 };
 const UNITS: SizeUnit[] = ['KB', 'MB', 'GB'];
+const UNIT_OPTIONS = UNITS.map((u) => ({ value: u, label: u }));
 
 /** Pick the best human-readable unit for a byte value. */
 const bestUnit = (bytes: number): SizeUnit => {
@@ -300,26 +302,23 @@ const AdminSettingsPage: React.FC = () => {
                       onChange={(e) => setEditedLimits((prev) => ({ ...prev, [key]: e.target.value }))}
                       className="flex-1 min-w-0 rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm text-right font-mono outline-none focus:ring-1 focus:ring-purple-400/50 transition-shadow"
                     />
-                    <select
+                    <UniversalSelect
                       value={unit}
-                      onChange={(e) => {
-                        const newUnit = e.target.value as SizeUnit;
+                      onChange={(newUnit) => {
+                        const nu = newUnit as SizeUnit;
                         const oldUnit = editedUnits[key] ?? 'MB';
                         const oldVal = Number(editedLimits[key]);
                         // Convert the current numeric value to the new unit
                         if (Number.isFinite(oldVal) && oldVal > 0) {
                           const bytes = unitToBytes(oldVal, oldUnit);
-                          const converted = bytesToUnit(bytes, newUnit);
+                          const converted = bytesToUnit(bytes, nu);
                           setEditedLimits((prev) => ({ ...prev, [key]: String(parseFloat(converted.toFixed(4))) }));
                         }
-                        setEditedUnits((prev) => ({ ...prev, [key]: newUnit }));
+                        setEditedUnits((prev) => ({ ...prev, [key]: nu }));
                       }}
-                      className="w-16 shrink-0 rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-1.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 outline-none focus:ring-1 focus:ring-purple-400/50 transition-shadow cursor-pointer"
-                    >
-                      {UNITS.map((u) => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
+                      options={UNIT_OPTIONS}
+                      className="w-20 shrink-0 [&_button]:!px-2 [&_button]:!py-1.5 [&_button]:!rounded-lg [&_button]:!text-xs"
+                    />
                   </div>
                   <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1.5">
                     Current: {formatBytes(currentBytes, bestUnit(currentBytes))}
