@@ -8,7 +8,7 @@ import { unwrapApiResponse } from '@/types/auth';
 import { useUploadLimits } from '@/context/UploadLimitsContext';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 
-type Tab = 'sla' | 'flags' | 'uploads';
+type Tab = 'sla' | 'flags' | 'uploads' | 'dashboard';
 
 /** Human-readable labels for upload config keys */
 const UPLOAD_KEY_LABELS: Record<string, { label: string; hint: string }> = {
@@ -52,6 +52,7 @@ const AdminSettingsPage: React.FC = () => {
   const [slaConfigs, setSlaConfigs] = useState<AdminSlaConfig[]>([]);
   const [featureFlags, setFeatureFlags] = useState<FeatureFlag[]>([]);
   const [uploadLimits, setUploadLimits] = useState<UploadLimits>({});
+  const [systemConfig, setSystemConfig] = useState<Record<string, string>>({});
   const [editedLimits, setEditedLimits] = useState<Record<string, string>>({});
   const [editedUnits, setEditedUnits] = useState<Record<string, SizeUnit>>({});
   const [loading, setLoading] = useState(true);
@@ -64,16 +65,20 @@ const AdminSettingsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [slaRes, flagsRes, limitsData] = await Promise.all([
+      const [slaRes, flagsRes, limitsData, configEntries] = await Promise.all([
         adminSlaApi.list(),
         adminFeatureFlagsApi.list(),
         configApi.getAdminUploadLimits(),
+        configApi.listSystemConfig(),
       ]);
       const slaPayload = unwrapApiResponse<AdminSlaConfig[] | { items?: AdminSlaConfig[] }>(slaRes.data as any);
       const flagsPayload = unwrapApiResponse<FeatureFlag[] | { items?: FeatureFlag[] }>(flagsRes.data as any);
       setSlaConfigs(Array.isArray(slaPayload) ? slaPayload : slaPayload?.items ?? []);
       setFeatureFlags(Array.isArray(flagsPayload) ? flagsPayload : flagsPayload?.items ?? []);
       setUploadLimits(limitsData);
+      setSystemConfig(
+        Object.fromEntries((configEntries ?? []).map((entry) => [entry.key, entry.value])),
+      );
 
       // Initialize edited values with best-fit units
       const initialValues: Record<string, string> = {};
@@ -153,7 +158,32 @@ const AdminSettingsPage: React.FC = () => {
     { value: 'sla', label: 'SLA Config' },
     { value: 'flags', label: 'Feature Flags' },
     { value: 'uploads', label: 'Upload Limits' },
+    { value: 'dashboard', label: 'Dashboard' },
   ];
+
+  const showDailySignupCount = (systemConfig['admin.dashboard.showDailySignupCount'] ?? 'true') === 'true';
+
+  const handleToggleDailySignupCount = async () => {
+    setSaving(true);
+    try {
+      const next = !showDailySignupCount;
+      await configApi.bulkUpdateConfig([
+        {
+          key: 'admin.dashboard.showDailySignupCount',
+          value: next ? 'true' : 'false',
+        },
+      ]);
+      setSystemConfig((prev) => ({
+        ...prev,
+        'admin.dashboard.showDailySignupCount': next ? 'true' : 'false',
+      }));
+      toast.success(`Daily signup card ${next ? 'enabled' : 'hidden'}.`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update dashboard setting');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -242,6 +272,37 @@ const AdminSettingsPage: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
+      ) : tab === 'dashboard' ? (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Dashboard Visibility</h2>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Control whether system admins see the daily user signup count card on the admin dashboard.
+            </p>
+          </div>
+          <div className="rounded-xl border border-gray-200/60 bg-white/60 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">Daily signup count</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {showDailySignupCount ? 'Visible on admin dashboard' : 'Hidden from admin dashboard'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleToggleDailySignupCount()}
+                disabled={saving}
+                className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                  showDailySignupCount
+                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300'
+                } disabled:opacity-60`}
+              >
+                {saving ? 'Saving...' : showDailySignupCount ? 'Visible' : 'Hidden'}
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         /* Upload Limits tab */

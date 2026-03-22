@@ -101,14 +101,14 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
       {/* Profile section */}
       <div className="flex flex-col items-center px-5 pt-6 pb-4">
         <div className="relative">
-          <div className="h-20 w-20 rounded-full overflow-hidden ring-2 ring-gray-200/60 dark:ring-white/10">
+          <div className="h-20 w-20 rounded-[1.5rem] overflow-hidden ring-2 ring-gray-200/60 dark:ring-white/10">
             {participant?.profileImage ? (
               <ImageWithFallback
                 fileId={participant.profileImage}
                 alt={participant.name}
                 fit="cover"
                 className="h-20 w-20"
-                rounded="full"
+                rounded="xl"
                 fallbackName={participant.name}
               />
             ) : (
@@ -162,9 +162,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
             onClick={() => navigate(`/profile/${participant.id}`)}
             className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
           >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
+            <span aria-hidden="true">👤</span>
             View Profile
           </button>
         )}
@@ -186,9 +184,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
           onClick={onMarkRead}
           className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
         >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
+          <span aria-hidden="true">✓</span>
           Mark as Read
         </button>
 
@@ -199,13 +195,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
               onClick={onToggleMute}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
             >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                {mutedUntil ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-3.536-8.536a5 5 0 000 7.072" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                )}
-              </svg>
+              <span aria-hidden="true">{mutedUntil ? '🔊' : '🔕'}</span>
               {mutedUntil ? 'Unmute' : 'Mute 24h'}
             </button>
 
@@ -214,9 +204,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
               onClick={onToggleArchive}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
             >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
+              <span aria-hidden="true">🗃️</span>
               {archivedAt ? 'Unarchive' : 'Archive'}
             </button>
           </>
@@ -227,10 +215,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
           onClick={() => navigate('/settings?tab=notifications')}
           className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
         >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
+          <span aria-hidden="true">⚙️</span>
           Notification Settings
         </button>
       </div>
@@ -282,9 +267,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
                   rel="noreferrer"
                   className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/8 transition-colors"
                 >
-                  <svg className="h-3.5 w-3.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
+                  <span aria-hidden="true" className="shrink-0">📄</span>
                   <span className="truncate">{doc.name}</span>
                   {doc.size ? (
                     <span className="shrink-0 text-[10px] text-gray-400">{(doc.size / 1024).toFixed(0)}KB</span>

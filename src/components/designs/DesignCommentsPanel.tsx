@@ -1,5 +1,4 @@
 import React from 'react';
-import { CheckCircle2, Smile } from 'lucide-react';
 import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
 import type { CommentV2Dto } from '@/types/comments';
 import { CommentsApi } from '@/api/CommentsApi';
@@ -22,9 +21,20 @@ type Props = {
   showComposer?: boolean;
   contentOwnerId?: string; // brand/content owner for delete gating
   currentUserId?: string; // viewer id
+  externalComment?: CommentV2Dto | null;
 };
 
-const DesignCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className, onCommentAdded, onCommentRemoved, showComposer = true, contentOwnerId, currentUserId }) => {
+const DesignCommentsPanel: React.FC<Props> = ({
+  mediaId,
+  collectionId,
+  className,
+  onCommentAdded,
+  onCommentRemoved,
+  showComposer = true,
+  contentOwnerId,
+  currentUserId,
+  externalComment,
+}) => {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const dispatch = useDispatch();
   const [items, setItems] = React.useState<CommentV2Dto[]>([]);
@@ -44,6 +54,14 @@ const DesignCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
     // Cap list to avoid excessive DOM nodes
     return merged.slice(0, 400);
   };
+
+  React.useEffect(() => {
+    if (!externalComment) return;
+    setItems((prev) => {
+      if (prev.some((comment) => comment.id === externalComment.id)) return prev;
+      return [externalComment, ...prev];
+    });
+  }, [externalComment]);
 
   const loadInitial = async () => {
     setBusy(true);
@@ -328,7 +346,7 @@ const DesignCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
             onClick={() => setShowEmojiPicker((p) => !p)}
             className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
           >
-            <Smile size={18} />
+            <span aria-hidden="true" className="text-base">🙂</span>
           </button>
           {showEmojiPicker && (
             <div className="absolute bottom-full right-0 mb-2 z-50 scrollbar-hide">
@@ -344,7 +362,7 @@ const DesignCommentsPanel: React.FC<Props> = ({ mediaId, collectionId, className
           )}
           {postedOk && (
             <div className="absolute -right-8 top-1/2 -translate-y-1/2 text-emerald-500">
-              <CheckCircle2 size={18} />
+              <span aria-hidden="true" className="text-base">✅</span>
             </div>
           )}
         </div>

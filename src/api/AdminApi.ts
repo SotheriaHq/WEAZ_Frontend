@@ -33,11 +33,26 @@ export const adminDashboardApi = {
     apiClient.get<{
       totalUsers: number;
       activeUsers30d: number;
+      dailySignupCount: number;
+      showDailySignupCount: boolean;
       totalBrands: number;
       pendingVerifications: number;
       pendingPayouts: number;
       openDisputes: number;
-      recentLogs: { id: string; action: string; targetType: string; targetId: string; createdAt: string; actorUserId: string }[];
+      recentLogs: {
+        id: string;
+        action: string;
+        targetType: string;
+        targetId: string;
+        createdAt: string;
+        actorUserId: string;
+        actorName?: string | null;
+        actorImage?: string | null;
+        targetName?: string | null;
+        targetImage?: string | null;
+        targetStatus?: string | null;
+        targetRoute?: string | null;
+      }[];
     }>('/admin/dashboard/stats'),
 };
 

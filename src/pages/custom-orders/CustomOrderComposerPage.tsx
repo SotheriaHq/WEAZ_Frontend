@@ -13,6 +13,7 @@ import {
 } from '@/api/CustomOrderApi';
 import { createIdempotencyKey } from '@/api/idempotency';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS, PRICING_CHART_OPTIONS } from '@/lib/sizeCharts';
 
 interface CustomOrderComposerPageProps {
   configurationIdOverride?: string | null;
@@ -226,6 +227,11 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
     [measurementPayload],
   );
 
+  const liveRecommendation = useMemo(
+    () => deriveSizeRecommendation(measurementPayload, displayChartFamily),
+    [displayChartFamily, measurementPayload],
+  );
+
   const handleLengthUnitChange = (nextUnit: 'CM' | 'IN') => {
     if (nextUnit === lengthUnit) return;
     setMeasurementValues((current) => {
@@ -436,25 +442,23 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                 label="Display chart"
                 value={displayChartFamily}
                 onChange={(value) => setDisplayChartFamily(value as CustomOrderChartFamily)}
-                options={[
-                  { value: 'UK', label: 'UK' },
-                  { value: 'US', label: 'US' },
-                  { value: 'NIGERIA', label: 'Nigeria' },
-                  { value: 'ASIA', label: 'Asia' },
-                ]}
+                options={DISPLAY_CHART_OPTIONS}
               />
               <UniversalSelect
                 label="Pricing chart"
                 value={pricingChartFamily}
                 onChange={(value) => setPricingChartFamily(value as CustomOrderChartFamily)}
-                options={[
-                  { value: 'HYBRID_UK_NIGERIA', label: 'Hybrid UK + Nigeria' },
-                  { value: 'UK', label: 'UK only' },
-                  { value: 'NIGERIA', label: 'Nigeria only' },
-                  { value: 'US', label: 'US only' },
-                  { value: 'ASIA', label: 'Asia only' },
-                ]}
+                options={PRICING_CHART_OPTIONS}
               />
+            </div>
+            <div className="mt-4 rounded-2xl border border-indigo-300/50 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100">
+              <div className="font-semibold">Live size recommendation</div>
+              <p className="mt-1">
+                {liveRecommendation.computedSize
+                  ? `${displayChartFamily} display resolves to ${liveRecommendation.computedSize}.`
+                  : 'Add bust/chest, waist, and hip values to compute a live size before preview.'}
+              </p>
+              {liveRecommendation.conversionGuidance ? <p className="mt-1">{liveRecommendation.conversionGuidance}</p> : null}
             </div>
             {hasPrefilledMeasurements ? (
               <div className="mt-4 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">

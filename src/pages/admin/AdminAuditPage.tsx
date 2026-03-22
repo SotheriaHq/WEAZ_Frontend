@@ -116,7 +116,7 @@ const renderState = (state: Record<string, unknown> | null): React.ReactNode => 
           const obj = value as Record<string, unknown>;
           display = (
             <span className="text-gray-700 dark:text-gray-200">
-              {obj.label || obj.code || obj.name || obj.message || JSON.stringify(value)}
+              {String(obj.label || obj.code || obj.name || obj.message || JSON.stringify(value))}
             </span>
           );
         } else {

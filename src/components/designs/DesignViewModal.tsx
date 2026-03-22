@@ -1,5 +1,4 @@
 import React from 'react';
-import { X, Smile, Send, Link as LinkIcon, Bookmark, Share2, Store, ChevronLeft, ChevronRight, ShoppingBag, Scissors } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import EmojiPicker, { Theme, type EmojiClickData } from 'emoji-picker-react';
 import { useSelector } from 'react-redux';
@@ -19,6 +18,7 @@ import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileIma
 import VLoader from '@/components/loaders/VLoader';
 import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
+import type { CommentV2Dto } from '@/types/comments';
 import {
   CONTENT_DISPLAY_FRAME_CLASS,
   CONTENT_DISPLAY_MEDIA_CLASS,
@@ -43,6 +43,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const [commentCount, setCommentCount] = React.useState<number>(0);
   const [commentText, setCommentText] = React.useState('');
   const [postingComment, setPostingComment] = React.useState(false);
+  const [externalComment, setExternalComment] = React.useState<CommentV2Dto | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const [isPatched, setIsPatched] = React.useState(false);
   const [patchBusy, setPatchBusy] = React.useState(false);
@@ -94,6 +95,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     if (!open || !item) return;
 
     setCommentCount(item.commentsCount ?? 0);
+    setExternalComment(null);
     const seeded: ModalMedia = {
       id: item.id,
       type: item.media?.type?.toUpperCase().includes('VIDEO') ? 'POST_VIDEO' : 'POST_IMAGE',
@@ -318,7 +320,9 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     }
     setPostingComment(true);
     try {
-      await CommentsApi.create('COLLECTION_MEDIA', activeMediaId, content);
+      const created = await CommentsApi.create('COLLECTION_MEDIA', activeMediaId, content);
+      setExternalComment(created);
+      setCommentCount((current) => current + 1);
       setCommentText('');
     } catch (e: any) {
       toast.error(e?.response?.data?.message ?? 'Failed to post comment');
@@ -462,7 +466,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
             className="absolute top-3 right-3 z-50 inline-flex items-center justify-center size-9 rounded-full neu-modal-inset"
             aria-label="Close"
           >
-            <X size={18} className="text-[color:var(--neu-text-muted)]" />
+            <span aria-hidden="true" className="text-lg text-[color:var(--neu-text-muted)]">×</span>
           </button>
 
           <div className="grid md:grid-cols-[minmax(0,58%)_minmax(0,42%)] h-[min(92vh,860px)]">
@@ -495,7 +499,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       setActiveMediaIndex((prev) => (prev - 1 + mediaItems.length) % mediaItems.length);
                     }}
                   >
-                    <ChevronLeft size={18} />
+                    <span aria-hidden="true" className="text-lg">‹</span>
                   </button>
                   <button
                     type="button"
@@ -506,7 +510,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       setActiveMediaIndex((prev) => (prev + 1) % mediaItems.length);
                     }}
                   >
-                    <ChevronRight size={18} />
+                    <span aria-hidden="true" className="text-lg">›</span>
                   </button>
                   <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
                     {activeMediaIndex + 1} / {mediaItems.length}
@@ -525,39 +529,44 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     className="flex min-w-0 items-center gap-2.5 text-left group"
                     title={`Open ${brandLabel} catalog`}
                   >
-                    <div className="size-9 shrink-0 rounded-full overflow-hidden ring-1 ring-black/8 dark:ring-white/12">
+                    <div className="size-9 shrink-0 rounded-2xl overflow-hidden ring-1 ring-black/8 dark:ring-white/12">
                       <ImageWithFallback
                         src={avatar.src}
                         fileId={avatar.fileId}
                         alt={brandLabel}
                         fit="cover"
-                        rounded="full"
+                        rounded="xl"
                         fallbackName={avatarFallback}
-                        containerClassName="size-9 rounded-full"
+                        containerClassName="size-9 rounded-2xl"
                         className="size-9 object-cover"
                       />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[13px] font-semibold truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{brandLabel}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[13px] font-semibold truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{brandLabel}</p>
+                        {canPatchBrand ? (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              void handleTogglePatch();
+                            }}
+                            disabled={patchBusy}
+                            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide shadow-sm transition ${
+                              isPatched
+                                ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 dark:text-emerald-300'
+                                : 'border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-700 hover:bg-fuchsia-500/25 dark:text-fuchsia-300'
+                            } ${patchBusy ? 'cursor-not-allowed opacity-60' : ''}`}
+                          >
+                            {patchBusy ? '...' : isPatched ? 'Patched' : 'Patch'}
+                          </button>
+                        ) : null}
+                      </div>
                       {item.username ? <p className="text-[11px] text-slate-400 dark:text-white/40 truncate">@{item.username}</p> : null}
                     </div>
                   </button>
 
-                  {canPatchBrand ? (
-                    <button
-                      type="button"
-                      onClick={handleTogglePatch}
-                      disabled={patchBusy}
-                      className={`rounded-full px-3 py-1 text-[10px] font-semibold tracking-wide uppercase transition ${
-                        isPatched
-                          ? 'bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400'
-                          : 'bg-fuchsia-500/10 text-fuchsia-700 hover:bg-fuchsia-500/20 dark:text-fuchsia-400'
-                      } ${patchBusy ? 'cursor-not-allowed opacity-60' : ''}`}
-                      aria-live="polite"
-                    >
-                      {patchBusy ? '...' : isPatched ? 'Patched' : 'Patch'}
-                    </button>
-                  ) : null}
                 </div>
 
                 {/* Title + description */}
@@ -572,7 +581,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                 {item.tags?.length ? (
                   <div className="flex flex-wrap gap-1.5">
                     {item.tags.map((tag) => (
-                      <span key={tag} className="px-2 py-0.5 rounded-full bg-slate-100 text-[9px] font-semibold uppercase tracking-wider text-slate-600 dark:bg-white/8 dark:text-white/70">
+                      <span key={tag} className="px-2 py-0.5 rounded-full bg-slate-100 text-[9px] font-semibold uppercase tracking-wider text-slate-700 dark:border dark:border-white/10 dark:bg-slate-800 dark:text-slate-100">
                         {tag}
                       </span>
                     ))}
@@ -586,8 +595,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     <span className="text-[10px] text-slate-400 line-through">{baseBand}</span>
                   ) : null}
                   {item.customAvailable ? (
-                    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-400">
-                      <Scissors className="h-3 w-3" />
+                    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-500/15 dark:text-purple-300">
+                      <span aria-hidden="true">✂️</span>
                       Custom
                     </span>
                   ) : null}
@@ -612,7 +621,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                           : 'Start custom order from this design'
                     }
                   >
-                    <ShoppingBag className="h-3 w-3" />
+                    <span aria-hidden="true">👜</span>
                     {openingCustomComposer ? 'Loading...' : 'Bag it'}
                   </button>
                   <button
@@ -622,7 +631,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     title={isOwnBrandContent ? 'Brands cannot save their own products' : isSaved ? 'Unsave' : 'Save'}
                     className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 disabled:opacity-50"
                   >
-                    <Bookmark className="h-3 w-3" />
+                    <span aria-hidden="true">🔖</span>
                     {isSaved ? 'Saved' : 'Save'}
                   </button>
                   <button
@@ -630,7 +639,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     onClick={handleShare}
                     className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                   >
-                    <Share2 className="h-3 w-3" />
+                    <span aria-hidden="true">🔗</span>
                     Share
                   </button>
                   <button
@@ -638,7 +647,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     onClick={handleOpenBrandCatalog}
                     className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                   >
-                    <Store className="h-3 w-3" />
+                    <span aria-hidden="true">🏬</span>
                     Store
                   </button>
                 </div>
@@ -654,6 +663,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                   onCommentAdded={() => setCommentCount((c) => c + 1)}
                   onCommentRemoved={() => setCommentCount((c) => Math.max(0, c - 1))}
                   showComposer={false}
+                  externalComment={externalComment}
                 />
               </div>
 
@@ -684,7 +694,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     aria-label="Emoji"
                     type="button"
                   >
-                    <Smile size={18} />
+                    <span aria-hidden="true" className="text-base">🙂</span>
                   </button>
                   <button
                     onClick={(e) => {
@@ -695,7 +705,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     className="p-1.5 rounded-full bg-purple-600 text-white disabled:opacity-40 hover:bg-purple-700 transition"
                     aria-label="Send"
                   >
-                    <Send size={14} />
+                    <span aria-hidden="true" className="text-sm">➤</span>
                   </button>
                 </div>
 
@@ -733,7 +743,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                 onClick={handleShare}
                 aria-label="Share this collection"
               >
-                <LinkIcon className="h-5 w-5" aria-hidden="true" />
+                <span aria-hidden="true" className="text-lg">🔗</span>
                 <span className="text-xs font-bold mt-1 drop-shadow">{item.collectionCollabCount ?? 0}</span>
               </button>
               <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 rounded-lg bg-black/85 px-2 py-1 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
@@ -761,7 +771,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                 onClick={() => setCustomComposerOpen(false)}
                 className="sticky top-2 float-right z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/80 text-slate-700 shadow-sm hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
               >
-                <X size={16} />
+                <span aria-hidden="true" className="text-base">×</span>
               </button>
               <CustomOrderComposerPage
                 embedded

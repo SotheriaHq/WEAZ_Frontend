@@ -189,9 +189,7 @@ const ExtensionResponsePanel: React.FC<{
     <div className="mx-3 mb-2 rounded-2xl border border-blue-200/60 dark:border-blue-500/20 bg-blue-50/80 dark:bg-blue-500/5 p-3.5 backdrop-blur-sm">
       <div className="flex items-center gap-2 mb-2.5">
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/10 dark:bg-blue-500/20">
-          <svg className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <span aria-hidden="true" className="text-sm text-blue-600 dark:text-blue-400">⏳</span>
         </div>
         <div>
           <span className="text-xs font-semibold text-blue-800 dark:text-blue-300">Extension Request</span>
@@ -351,10 +349,11 @@ const MessagingManagementPage: React.FC = () => {
   /* ---- Message state ---- */
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
-  const [sending, setSending] = useState(false);
+  const sending = false;
   const [customOrderDetail, setCustomOrderDetail] = useState<CustomOrderDetail | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<ActiveAction>(null);
+  const [showContactDetails, setShowContactDetails] = useState(false);
 
   /* ---- Refs ---- */
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -362,6 +361,34 @@ const MessagingManagementPage: React.FC = () => {
 
   /* ---- Derived ---- */
   const activeConversation = conversations.find((item) => item.id === activeId) || null;
+  const contactSidebarProps = activeConversation
+    ? {
+        participant: activeConversation.participantId
+          ? {
+              id: activeConversation.participantId,
+              name: activeConversation.participantName,
+              username: activeConversation.participantUsername,
+              profileImage: activeConversation.participantImage,
+            }
+          : null,
+        contextType: activeConversation.contextType,
+        orderId: activeConversation.orderId,
+        customOrderId: activeConversation.customOrderId,
+        status: activeConversation.status,
+        mutedUntil: activeConversation.mutedUntil,
+        archivedAt: activeConversation.archivedAt,
+        messages,
+        isInquiry: activeConversation.contextType === 'INQUIRY',
+        onMarkRead: () => void updateThreadPrefs(activeConversation, { markRead: true }),
+        onToggleMute: () =>
+          void updateThreadPrefs(activeConversation, activeConversation.mutedUntil ? { unmute: true } : { muteForHours: 24 }),
+        onToggleArchive: () => void updateThreadPrefs(activeConversation, { archived: !activeConversation.archivedAt }),
+      }
+    : null;
+
+  useEffect(() => {
+    setShowContactDetails(false);
+  }, [activeId]);
 
   const getContextId = useCallback((item: ConversationItem) => {
     if (item.contextType === 'STANDARD_ORDER') return item.orderId || item.contextId || item.threadId;
@@ -791,9 +818,7 @@ const MessagingManagementPage: React.FC = () => {
         {/* Search */}
         <div className="shrink-0 px-3 pb-2">
           <div className="relative">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <span aria-hidden="true" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">🔎</span>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -830,9 +855,7 @@ const MessagingManagementPage: React.FC = () => {
             </div>
           ) : visibleConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <svg className="h-10 w-10 text-gray-300 dark:text-gray-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
+              <span aria-hidden="true" className="mb-2 text-3xl text-gray-300 dark:text-gray-600">💬</span>
               <p className="text-xs text-gray-500 dark:text-gray-400">No conversations found</p>
             </div>
           ) : (
@@ -851,14 +874,14 @@ const MessagingManagementPage: React.FC = () => {
                 >
                   {/* Avatar */}
                   <div className="relative shrink-0">
-                    <div className="h-10 w-10 rounded-full overflow-hidden">
+                    <div className="h-10 w-10 rounded-2xl overflow-hidden">
                       {item.participantImage ? (
                         <ImageWithFallback
                           fileId={item.participantImage}
                           alt={item.participantName}
                           fit="cover"
                           className="h-10 w-10"
-                          rounded="full"
+                          rounded="xl"
                           fallbackName={item.participantName}
                         />
                       ) : (
@@ -904,9 +927,7 @@ const MessagingManagementPage: React.FC = () => {
         {!activeConversation ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
-              <svg className="h-16 w-16 text-gray-200 dark:text-gray-700 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
+              <span aria-hidden="true" className="mx-auto mb-3 block text-5xl text-gray-300 dark:text-gray-700">💬</span>
               <p className="text-sm text-gray-500 dark:text-gray-400">Select a conversation to start messaging</p>
             </div>
           </div>
@@ -921,19 +942,17 @@ const MessagingManagementPage: React.FC = () => {
                   onClick={() => setActiveId('')}
                   className="lg:hidden shrink-0 h-8 w-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/5"
                 >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                  </svg>
+                  <span aria-hidden="true" className="text-base">←</span>
                 </button>
 
-                <div className="h-9 w-9 rounded-full overflow-hidden shrink-0">
+                <div className="h-9 w-9 rounded-2xl overflow-hidden shrink-0">
                   {activeConversation.participantImage ? (
                     <ImageWithFallback
                       fileId={activeConversation.participantImage}
                       alt={activeConversation.participantName}
                       fit="cover"
                       className="h-9 w-9"
-                      rounded="full"
+                      rounded="xl"
                       fallbackName={activeConversation.participantName}
                     />
                   ) : (
@@ -963,9 +982,7 @@ const MessagingManagementPage: React.FC = () => {
                     }`}
                     title="Request extension"
                   >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <span aria-hidden="true" className="text-base">⏳</span>
                   </button>
                 )}
 
@@ -1011,9 +1028,15 @@ const MessagingManagementPage: React.FC = () => {
                   className="rounded-lg px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
                   title="Refresh"
                 >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
+                  <span aria-hidden="true" className="text-base">↺</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowContactDetails(true)}
+                  className="rounded-lg px-2.5 py-1.5 text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5 xl:hidden"
+                  title="Conversation details"
+                >
+                  <span aria-hidden="true" className="text-base">☰</span>
                 </button>
               </div>
             </div>
@@ -1026,9 +1049,7 @@ const MessagingManagementPage: React.FC = () => {
                 </div>
               ) : messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
-                  <svg className="h-12 w-12 text-gray-200 dark:text-gray-700 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
+                  <span aria-hidden="true" className="mb-2 text-4xl text-gray-300 dark:text-gray-700">💬</span>
                   <p className="text-sm text-gray-500 dark:text-gray-400">No messages yet</p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Start the conversation</p>
                 </div>
@@ -1093,27 +1114,34 @@ const MessagingManagementPage: React.FC = () => {
       {/* ============================================================ */}
       {activeConversation && (
         <div className="hidden xl:flex w-72 shrink-0 flex-col border-l border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02]">
-          <ChatContactSidebar
-            participant={activeConversation.participantId ? {
-              id: activeConversation.participantId,
-              name: activeConversation.participantName,
-              username: activeConversation.participantUsername,
-              profileImage: activeConversation.participantImage,
-            } : null}
-            contextType={activeConversation.contextType}
-            orderId={activeConversation.orderId}
-            customOrderId={activeConversation.customOrderId}
-            status={activeConversation.status}
-            mutedUntil={activeConversation.mutedUntil}
-            archivedAt={activeConversation.archivedAt}
-            messages={messages}
-            isInquiry={activeConversation.contextType === 'INQUIRY'}
-            onMarkRead={() => void updateThreadPrefs(activeConversation, { markRead: true })}
-            onToggleMute={() => void updateThreadPrefs(activeConversation, activeConversation.mutedUntil ? { unmute: true } : { muteForHours: 24 })}
-            onToggleArchive={() => void updateThreadPrefs(activeConversation, { archived: !activeConversation.archivedAt })}
-          />
+          {contactSidebarProps ? <ChatContactSidebar {...contactSidebarProps} /> : null}
         </div>
       )}
+      {activeConversation && showContactDetails && contactSidebarProps ? (
+        <div className="fixed inset-0 z-layer-modal xl:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/45"
+            onClick={() => setShowContactDetails(false)}
+            aria-label="Close conversation details"
+          />
+          <div className="absolute inset-y-0 right-0 w-[min(88vw,360px)] border-l border-gray-200/60 bg-white shadow-2xl dark:border-white/[0.04] dark:bg-[#111017]">
+            <div className="flex items-center justify-between border-b border-gray-200/60 px-4 py-3 dark:border-white/[0.04]">
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">Conversation details</div>
+              <button
+                type="button"
+                onClick={() => setShowContactDetails(false)}
+                className="rounded-lg px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5"
+              >
+                ×
+              </button>
+            </div>
+            <div className="h-[calc(100%-57px)]">
+              <ChatContactSidebar {...contactSidebarProps} />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

@@ -18,6 +18,7 @@ import type { SizeFitProfile, SizeFitSharesPayload } from '@/types/sizeFit';
 import ProfileActionsBar, { type ProfileAction } from '@/components/profile/ProfileActionsBar';
 import { buildProfileUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
+import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS } from '@/lib/sizeCharts';
 
 interface UserProfile {
   id: string;
@@ -77,6 +78,7 @@ export const EndUserProfile: React.FC = () => {
   const [sizeFitShares, setSizeFitShares] = useState<SizeFitSharesPayload | null>(null);
   const [displayChartFamily, setDisplayChartFamily] = useState<CustomOrderChartFamily>('UK');
   const [computedSize, setComputedSize] = useState<string | null>(null);
+  const [computedGuidance, setComputedGuidance] = useState<string | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
   const [chartSaving, setChartSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -172,20 +174,10 @@ export const EndUserProfile: React.FC = () => {
         const preference = await customOrdersBuyerApi.getDisplayChartPreference();
         if (!active) return;
         setDisplayChartFamily(preference.displayChartFamily);
-
-        const orders = await customOrdersBuyerApi.list({ page: 1, limit: 1 });
-        const latestOrderId = orders.items?.[0]?.id;
-        if (!latestOrderId) {
-          if (active) setComputedSize(null);
-          return;
-        }
-
-        const latestOrder = await customOrdersBuyerApi.getById(latestOrderId);
-        if (!active) return;
-        setComputedSize(latestOrder.chartLock?.computedSize ?? null);
       } catch (err) {
         if (active) {
           setComputedSize(null);
+          setComputedGuidance(null);
         }
         console.error('Failed to load display chart/computed size', err);
       } finally {
@@ -200,6 +192,14 @@ export const EndUserProfile: React.FC = () => {
       active = false;
     };
   }, [isOwner]);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    const measurements = (sizeFitProfile?.measurements as Record<string, unknown> | undefined) ?? {};
+    const recommendation = deriveSizeRecommendation(measurements, displayChartFamily);
+    setComputedSize(recommendation.computedSize);
+    setComputedGuidance(recommendation.conversionGuidance);
+  }, [displayChartFamily, isOwner, sizeFitProfile?.measurements]);
 
   useEffect(() => {
     setActiveTab((prev) => (availableTabs.includes(prev) ? prev : availableTabs[0]));
@@ -618,13 +618,7 @@ export const EndUserProfile: React.FC = () => {
                 <div className="shrink-0 md:text-right">
                   {/* Minimal chart tabs */}
                   <div className="mb-1.5 inline-flex flex-wrap gap-0.5 rounded-lg bg-gray-100/60 p-0.5 dark:bg-white/5">
-                    {[
-                      { value: 'UK', label: 'UK' },
-                      { value: 'US', label: 'US' },
-                      { value: 'NIGERIA', label: 'NG' },
-                      { value: 'ASIA', label: 'Asia' },
-                      { value: 'HYBRID_UK_NIGERIA', label: 'Hybrid' },
-                    ].map((option) => {
+                    {DISPLAY_CHART_OPTIONS.map((option) => {
                       const active = displayChartFamily === option.value;
                       return (
                         <button
@@ -639,7 +633,10 @@ export const EndUserProfile: React.FC = () => {
                           }`}
                           aria-pressed={active}
                         >
-                          {option.label}
+                          {option.label
+                            .replace('Nigeria', 'NG')
+                            .replace('UK-Nigeria Hybrid', 'UK-NG')
+                            .replace('US-Nigeria Hybrid', 'US-NG')}
                         </button>
                       );
                     })}
@@ -650,9 +647,16 @@ export const EndUserProfile: React.FC = () => {
                     <div className="text-xl font-bold text-indigo-900 dark:text-indigo-200">
                       {chartLoading ? '...' : computedSize || '—'}
                     </div>
-                    <div className="text-[10px] text-indigo-700/50 dark:text-indigo-400/40">
-                      Updates with custom-order fittings
+                    <div className="text-[10px] text-indigo-700/70 dark:text-indigo-300/70">
+                      {computedGuidance || 'Computed from your live measurement profile.'}
                     </div>
+                    {sizeFitProfile?.missingBaselineKeys?.length ? (
+                      <div className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">
+                        Update: {sizeFitProfile.missingBaselineKeys
+                          .map((key) => key.replace(/^WOMEN_|^MEN_|^UNISEX_/g, '').replace(/_/g, ' '))
+                          .join(', ')}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
