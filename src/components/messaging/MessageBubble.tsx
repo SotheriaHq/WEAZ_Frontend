@@ -4,6 +4,8 @@ import type { ThreadMessage } from '@/api/MessagingApi';
 interface MessageBubbleProps {
   message: ThreadMessage;
   isOwn: boolean;
+  /** When true, hidden/redacted messages are shown with a visual indicator (admin view). */
+  showModerated?: boolean;
 }
 
 const formatTime = (iso: string) => {
@@ -35,12 +37,13 @@ const senderName = (msg: ThreadMessage) => {
   }
 };
 
-const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, showModerated = false }) => {
   const isSystem = message.kind === 'SYSTEM' || message.kind === 'MODERATION_NOTICE';
   const isHidden = message.visibilityState === 'HIDDEN';
   const isRedacted = message.visibilityState === 'REDACTED';
 
-  if (isHidden) return null;
+  // Non-admin views: strictly hide hidden messages, show placeholder for redacted
+  if (isHidden && !showModerated) return null;
 
   if (isSystem) {
     return (
@@ -55,8 +58,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn }) =>
     );
   }
 
+  const isModerated = isHidden || isRedacted;
+
   return (
-    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-1.5 group`}>
+    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-1.5 group ${isModerated && showModerated ? 'opacity-60' : ''}`}>
       <div className={`max-w-[75%] min-w-[80px] ${isOwn ? 'order-1' : 'order-1'}`}>
         {!isOwn && (
           <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 ml-3 mb-0.5 block">
@@ -65,12 +70,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn }) =>
         )}
         <div
           className={`rounded-2xl px-3.5 py-2 ${
-            isOwn
-              ? 'bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white rounded-br-md'
-              : 'bg-white/80 dark:bg-white/8 border border-gray-200/60 dark:border-transparent text-gray-900 dark:text-gray-100 rounded-bl-md'
+            isModerated && showModerated
+              ? 'bg-red-50/80 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/40 text-gray-900 dark:text-gray-100 rounded-bl-md'
+              : isOwn
+                ? 'bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white rounded-br-md'
+                : 'bg-white/80 dark:bg-white/8 border border-gray-200/60 dark:border-transparent text-gray-900 dark:text-gray-100 rounded-bl-md'
           }`}
         >
-          {isRedacted ? (
+          {isRedacted && !showModerated ? (
             <p className="text-sm italic opacity-60">This message has been removed</p>
           ) : (
             <>

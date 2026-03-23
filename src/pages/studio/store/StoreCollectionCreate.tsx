@@ -302,6 +302,10 @@ const normalizeLinkedProduct = (raw: any): StoreProduct | null => {
         : new Date(0).toISOString(),
     collection: raw.collection,
     brand: raw.brand,
+    ...(Array.isArray(raw.media) ? { media: raw.media } : {}),
+    ...(Array.isArray(raw.mediaIds) ? { mediaIds: raw.mediaIds } : {}),
+    ...(typeof raw.coverImage === "string" ? { coverImage: raw.coverImage } : {}),
+    ...(typeof raw.coverUrl === "string" ? { coverUrl: raw.coverUrl } : {}),
   };
 };
 

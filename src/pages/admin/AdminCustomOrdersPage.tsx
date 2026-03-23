@@ -63,6 +63,8 @@ const AdminCustomOrdersPage: React.FC = () => {
   const [riskNote, setRiskNote] = useState('');
   const [refundReason, setRefundReason] = useState('');
   const [refundNote, setRefundNote] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelNote, setCancelNote] = useState('');
   const [disputeStatus, setDisputeStatus] = useState<CustomOrderDisputeStatus>('ADMIN_REVIEW');
   const [disputeResolution, setDisputeResolution] = useState<CustomOrderDisputeResolution>('NO_ACTION');
   const [disputeNotes, setDisputeNotes] = useState('');
@@ -507,6 +509,33 @@ const AdminCustomOrdersPage: React.FC = () => {
                     Flag risk
                   </button>
                 </div>
+              </div>
+
+              <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
+                <div className="text-sm font-semibold text-slate-900 dark:text-white">Super admin cancellation</div>
+                <input value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Cancellation reason" className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" />
+                <textarea value={cancelNote} onChange={(event) => setCancelNote(event.target.value)} rows={3} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Refund note" />
+                <button
+                  type="button"
+                  disabled={busy || selected.paymentStatus !== 'PAID' || cancelReason.trim().length < 3}
+                  onClick={() =>
+                    setPendingAction({
+                      title: 'Cancel this paid custom order?',
+                      description: 'Only a super admin can use this action. It moves the order into refund handling immediately and starts the full-refund workflow.',
+                      confirmLabel: 'Cancel and refund',
+                      tone: 'danger',
+                      execute: () => runAction(() => customOrdersAdminApi.cancelPaidOrder(selected.id, { reason: cancelReason.trim(), note: cancelNote.trim() || undefined }), 'Custom order cancelled and refund started'),
+                    })
+                  }
+                  className="mt-3 rounded-full bg-rose-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  Cancel paid order
+                </button>
+                {selected.paymentStatus !== 'PAID' ? (
+                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    This action is available only while the order is still in a paid state.
+                  </div>
+                ) : null}
               </div>
 
               <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">

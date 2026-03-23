@@ -137,7 +137,7 @@ export const addToCart = createAsyncThunk(
       const serverMessage =
         error?.response?.data?.message ||
         error?.message ||
-        'Failed to add to cart';
+        'Failed to bag item';
 
       if (
         typeof serverMessage === 'string' &&

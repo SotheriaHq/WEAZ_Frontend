@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  X, ShoppingCart, Minus, Plus, Star, ChevronRight, AlertTriangle, Check, Share2,
+  X, ShoppingBag, Minus, Plus, Star, ChevronRight, AlertTriangle, Check, Share2,
   ChevronDown, Truck, Ruler, Package, Sparkles, Copy
 } from 'lucide-react';
 import { FaInstagram, FaWhatsapp } from 'react-icons/fa';
@@ -242,11 +242,11 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const handleAddToCart = async () => {
     if (isOwnProduct) {
-      toast.info('Brands cannot add their own product to cart.');
+      toast.info('Brands cannot bag their own product.');
       return;
     }
     if (!isAuth) {
-      toast.info('Please sign in to add items to cart');
+      toast.info('Please sign in to bag items');
       return;
     }
 
@@ -269,7 +269,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         selectedColor: selectedColor || undefined,
       })).unwrap();
       
-      toast.success('Added to cart!');
+      toast.success('Bagged!');
       dispatch(openCartDrawer());
       onClose();
     } catch (error: any) {
@@ -278,7 +278,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         onClose();
         navigate(`/products/${product.id}`);
       } else {
-        toast.error(error || 'Failed to add to cart');
+        toast.error(error || 'Failed to bag item');
       }
     } finally {
       setIsAddingToCart(false);
@@ -624,17 +624,17 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Add to Cart & Wishlist */}
+                    {/* Bag it & Wishlist */}
                     <div className="flex flex-col gap-2.5 mb-6">
                       {!isOwnProduct ? (
                         <button
                           onClick={handleAddToCart}
                           disabled={isAddingToCart || isOutOfStock || (product.sizes.length > 0 && !selectedSize)}
-                          title="Add selected item to cart"
+                          title="Bag it"
                           className="w-full h-14 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                         >
-                          <ShoppingCart size={20} />
-                          {isAddingToCart ? 'Adding...' : 'Add to Cart'}
+                          <ShoppingBag size={20} />
+                          {isAddingToCart ? 'Bagging...' : '🛍️ Bag it'}
                         </button>
                       ) : (
                         <div className="w-full h-14 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 font-medium flex items-center justify-center">
@@ -941,16 +941,16 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     )}
                   </div>
                   
-                  {/* Add to Cart button */}
+                  {/* Bag it button */}
                   {!isOwnProduct ? (
                     <button
                       onClick={handleAddToCart}
                       disabled={isAddingToCart || isOutOfStock || (product.sizes.length > 0 && !selectedSize)}
-                      title="Add selected item to cart"
+                      title="Bag it"
                       className="flex-1 h-12 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                     >
-                      <ShoppingCart size={18} />
-                      {isAddingToCart ? 'Adding...' : isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+                      <ShoppingBag size={18} />
+                      {isAddingToCart ? 'Bagging...' : isOutOfStock ? 'Out of Stock' : '🛍️ Bag it'}
                     </button>
                   ) : (
                     <div className="flex-1 h-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 font-medium flex items-center justify-center">

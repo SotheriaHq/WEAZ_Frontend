@@ -551,22 +551,30 @@ html {
   }
 }
 
-/* Theme transition — scoped to structural chrome only.
-   Previously applied to every div/section/article which forced the browser to
-   track transition state on hundreds of elements simultaneously during theme
-   switch. Now scoped to the elements that actually change visually. */
-html,
-body,
-nav,
-aside,
-header,
-footer {
+/* Theme transition — universal approach using a brief class-based gate.
+   When the ThemeProvider flips the theme, it adds `theme-transitioning` to <html>
+   for ~300ms. During that window every element gets smooth, synchronized transitions.
+   Outside that window no elements carry a theme transition so there is zero perf cost. */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
   transition:
-    background-color 0.25s ease,
-    border-color 0.25s ease;
+    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    fill 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    stroke 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    background 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    outline-color 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  /* !important overrides component-level transitions to ensure ALL elements switch together.
+     Zero delay forces every element to start at the same instant. */
+  transition-delay: 0s !important;
 }
 
-/* Text transition on interactive elements only — not every span and p */
+/* Interactive elements always need quick transitions for hover/focus states */
 a,
 button,
 label {
@@ -786,15 +794,32 @@ body.modal-open {
 }
 
 .tag-badge-outline {
-  background: transparent;
-  color: #d1d5db;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(147, 51, 234, 0.06);
+  color: #6b7280;
+  border: 1.5px solid rgba(147, 51, 234, 0.18);
   transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+  letter-spacing: 0.01em;
+}
+
+:is(.dark) .tag-badge-outline {
+  background: rgba(168, 85, 247, 0.08);
+  color: #c4b5fd;
+  border-color: rgba(168, 85, 247, 0.25);
 }
 
 .tag-badge-outline:hover {
   border-color: #9333ea;
-  color: #a855f7;
+  color: #7c3aed;
+  background: rgba(147, 51, 234, 0.12);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(147, 51, 234, 0.15);
+}
+
+:is(.dark) .tag-badge-outline:hover {
+  color: #c084fc;
+  background: rgba(168, 85, 247, 0.18);
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.2);
 }
 
 /* Upload zone animations */

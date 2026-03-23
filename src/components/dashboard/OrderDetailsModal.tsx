@@ -239,7 +239,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                           ✅ Mark delivered
                         </button>
                       ) : null}
-                      {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' ? (
+                      {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && order.paymentStatus !== 'PAID' ? (
                         <button
                           onClick={() => handleStatusUpdate('CANCELLED')}
                           disabled={Boolean(updatingStatus)}

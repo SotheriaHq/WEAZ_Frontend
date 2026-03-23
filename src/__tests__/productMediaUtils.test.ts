@@ -1,31 +1,98 @@
-import { describe, expect, it } from 'vitest';
-import { normalizePrimary, reorderItems, setPrimary, validateMedia } from '../pages/studio/products/mediaUtils';
+import { describe, expect, it } from "vitest";
 
-describe('product media utils', () => {
-  it('auto-selects first image as cover when none set', () => {
-    const items = normalizePrimary([{ id: 'a' }, { id: 'b' }]);
+import {
+  normalizePrimary,
+  reorderItems,
+  setPrimary,
+  validateMedia,
+} from "@/pages/studio/products/mediaUtils";
+
+describe("validateMedia", () => {
+  it("auto-selects first image as cover when none set", () => {
+    const items = normalizePrimary([{ id: "a" }, { id: "b" }]);
     expect(items[0].isPrimary).toBe(true);
     expect(items[1].isPrimary).toBe(false);
   });
 
-  it('enforces cover required when images exist', () => {
-    const result = validateMedia([{ id: 'a', isPrimary: false }], 4);
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('cover');
+  it("allows empty media for in-progress drafts", () => {
+    expect(validateMedia([], 6, 4)).toEqual({ ok: true });
   });
 
-  it('enforces max 4 images', () => {
-    const result = validateMedia(
-      [{ id: '1' }, { id: '2' }, { id: '3' }, { id: '4' }, { id: '5' }],
-      4,
-    );
-    expect(result.ok).toBe(false);
+  it("requires four images when uploads exist", () => {
+    expect(
+      validateMedia(
+        [
+          { id: "front", isPrimary: true },
+          { id: "left" },
+          { id: "right" },
+        ],
+        6,
+        4,
+      ),
+    ).toEqual({
+      ok: false,
+      error: "Upload at least 4 images: front, left, right, and back",
+    });
   });
 
-  it('reorders items without changing cover', () => {
-    const items = setPrimary([{ id: 'a' }, { id: 'b' }, { id: 'c' }], 'b');
+  it("still requires a chosen cover image", () => {
+    expect(
+      validateMedia(
+        [
+          { id: "front" },
+          { id: "left" },
+          { id: "right" },
+          { id: "back" },
+        ],
+        6,
+        4,
+      ),
+    ).toEqual({
+      ok: false,
+      error: "Please choose a cover image",
+    });
+  });
+
+  it("accepts a complete four-view set with a primary image", () => {
+    expect(
+      validateMedia(
+        [
+          { id: "front", isPrimary: true },
+          { id: "left" },
+          { id: "right" },
+          { id: "back" },
+        ],
+        6,
+        4,
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it("enforces max image count", () => {
+    expect(
+      validateMedia(
+        [
+          { id: "1", isPrimary: true },
+          { id: "2" },
+          { id: "3" },
+          { id: "4" },
+          { id: "5" },
+          { id: "6" },
+          { id: "7" },
+        ],
+        6,
+        4,
+      ),
+    ).toEqual({
+      ok: false,
+      error: "You can upload up to 6 images",
+    });
+  });
+
+  it("keeps the chosen cover when items are reordered", () => {
+    const items = setPrimary([{ id: "a" }, { id: "b" }, { id: "c" }], "b");
     const reordered = reorderItems(items, 1, 0);
-    expect(reordered[0].id).toBe('b');
+    expect(reordered[0].id).toBe("b");
     expect(reordered[0].isPrimary).toBe(true);
   });
 });

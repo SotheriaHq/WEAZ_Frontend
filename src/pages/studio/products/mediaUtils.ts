@@ -24,9 +24,19 @@ export const reorderItems = <T>(items: T[], fromIndex: number, toIndex: number):
   return next;
 };
 
-export const validateMedia = (items: MediaItem[], max: number): { ok: boolean; error?: string } => {
+export const validateMedia = (
+  items: MediaItem[],
+  max: number,
+  minRequired = 4,
+): { ok: boolean; error?: string } => {
   if (items.length > max) {
     return { ok: false, error: `You can upload up to ${max} images` };
+  }
+  if (items.length > 0 && items.length < minRequired) {
+    return {
+      ok: false,
+      error: `Upload at least ${minRequired} images: front, left, right, and back`,
+    };
   }
   if (items.length > 0 && !items.some((item) => item.isPrimary)) {
     return { ok: false, error: 'Please choose a cover image' };

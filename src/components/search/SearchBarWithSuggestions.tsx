@@ -78,8 +78,8 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
   const [localRecent, setLocalRecent] = useState<string[]>(() => getRecentSearches());
   const dropdownId = useId().replace(/:/g, '-');
   const debouncedValue = useDebounce(value, 180);
-  const { suggestions, isLoading } = useSearchSuggestions(debouncedValue, {
-    enabled: open && (debouncedValue.trim().length === 0 || debouncedValue.trim().length >= 1),
+  const { suggestions, isLoading, error: suggestError } = useSearchSuggestions(debouncedValue, {
+    enabled: open,
     brandId,
   });
 
@@ -219,6 +219,7 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
         open={open}
         isLoading={isLoading}
         onSelect={handleSelect}
+        error={suggestError}
       />
 
       <div className="sr-only" aria-live="polite">

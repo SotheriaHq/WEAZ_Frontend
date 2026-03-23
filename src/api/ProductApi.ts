@@ -28,6 +28,7 @@ function buildStoreProductPayload(data: Partial<ProductCreateDto>) {
   if (data.description !== undefined) payload.description = data.description;
   if (data.currency !== undefined) payload.currency = data.currency;
   if (data.collectionId !== undefined) payload.collectionId = data.collectionId;
+  if ((data as any).categoryId !== undefined) payload.categoryId = (data as any).categoryId;
   if (data.subCategoryId !== undefined) {
     payload.subCategoryId = data.subCategoryId;
     payload.categoryTypeId = data.subCategoryId;
@@ -152,6 +153,7 @@ export interface ProductCreateDto {
   title: string;
   description?: string;
   collectionId?: string;
+  categoryId?: string;
   subCategoryId?: string;
   /** @deprecated Use subCategoryId */
   categoryTypeId?: string;
@@ -200,6 +202,7 @@ export interface ProductDto {
   description?: string;
   collectionId?: string;
   collectionIds?: string[];
+  categoryId?: string;
   subCategoryId?: string;
   /** @deprecated Use subCategoryId */
   categoryTypeId?: string;

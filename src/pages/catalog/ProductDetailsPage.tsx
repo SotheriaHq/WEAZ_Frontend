@@ -449,9 +449,9 @@ export default function ProductDetailsPage() {
         }),
       ).unwrap();
       dispatch(openCartDrawer());
-      toast.success('Added to bag');
+      toast.success('Bagged!');
     } catch (error: any) {
-      toast.error(error || 'Failed to add to bag');
+      toast.error(error || 'Failed to bag item');
     }
   };
 
@@ -604,9 +604,9 @@ export default function ProductDetailsPage() {
         }),
       ).unwrap();
       dispatch(openCartDrawer());
-      toast.success('Measurements saved & added to bag');
+      toast.success('Measurements saved & bagged!');
     } catch (err: any) {
-      toast.error(err || 'Failed to add to bag');
+      toast.error(err || 'Failed to bag item');
     } finally {
       setSavingMeasurements(false);
     }
@@ -708,7 +708,7 @@ export default function ProductDetailsPage() {
                     ) : (
                       <>
                         <ShoppingBag size={16} />
-                        Save Measurements & Add to Bag
+                        Save Measurements & Bag it
                       </>
                     )}
                   </button>
@@ -1001,7 +1001,7 @@ export default function ProductDetailsPage() {
                       }`}
                     >
                       <ShoppingBag size={18} />
-                      {isOutOfStock ? 'Sold Out' : 'Add to Cart'}
+                      {isOutOfStock ? 'Sold Out' : '🛍️ Bag it'}
                     </button>
                     <button
                       onClick={handleWishlist}

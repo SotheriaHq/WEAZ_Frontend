@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -29,12 +29,37 @@ import { Select } from '@/components/ui/Select';
 import StoreEmptyState, { type EmptyStateType } from '@/components/designs/StoreEmptyState';
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
+import { PRODUCT_STUDIO_SYNC_EVENT } from '@/utils/productStudioEvents';
 
 type StudioStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'DELETED';
 type OutletView = 'products' | 'collections';
 type ProductStatusFilter = 'all' | 'active' | 'draft' | 'featured' | 'archived' | 'deleted';
+type ProductSortBy = 'newest' | 'price_asc' | 'price_desc' | 'popular';
 type CollectionStatusFilter = 'all' | 'published' | 'draft' | 'archived';
 type CollectionSortBy = 'newest' | 'oldest' | 'title_asc' | 'title_desc' | 'items_desc';
+
+const PRODUCT_STATUS_OPTIONS: Array<{
+  value: ProductStatusFilter;
+  label: string;
+  icon: string;
+}> = [
+  { value: 'all', label: 'All', icon: '📦' },
+  { value: 'active', label: 'Published', icon: '✨' },
+  { value: 'draft', label: 'Product Drafts', icon: '📝' },
+  { value: 'featured', label: 'Featured', icon: '⭐' },
+  { value: 'archived', label: 'Archived', icon: '📁' },
+  { value: 'deleted', label: 'Deleted', icon: '🗑️' },
+];
+
+const PRODUCT_SORT_OPTIONS: Array<{
+  value: ProductSortBy;
+  label: string;
+}> = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'popular', label: 'Most viewed' },
+  { value: 'price_asc', label: 'Price low-high' },
+  { value: 'price_desc', label: 'Price high-low' },
+];
 
 interface BackendProduct {
   id: string;
@@ -212,6 +237,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const [filterStatus, setFilterStatus] = useState<ProductStatusFilter>('all');
   const [filterCollection, setFilterCollection] = useState<'all' | string>('all');
   const [filterStock, setFilterStock] = useState('all');
+  const [productSortBy, setProductSortBy] = useState<ProductSortBy>('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
 
@@ -453,7 +479,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   useEffect(() => {
     setCursorByPage({});
     setPage(1);
-  }, [filterCollection, filterStatus, limit, searchQuery, user?.id]);
+  }, [filterCollection, filterStatus, filterStock, limit, productSortBy, searchQuery, user?.id]);
 
   useEffect(() => {
     setCollectionPage(1);
@@ -651,7 +677,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           params: {
             page,
             limit,
-            sortBy: 'newest',
+            sortBy: productSortBy,
             cursor: cursor ?? undefined,
             search: searchQuery.trim() ? searchQuery.trim() : undefined,
             collectionId: filterCollection !== 'all' ? filterCollection : undefined,
@@ -695,7 +721,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     return () => {
       mounted = false;
     };
-  }, [filterCollection, filterStatus, limit, outletView, page, searchQuery, user?.id]);
+  }, [filterCollection, filterStatus, limit, outletView, page, productSortBy, searchQuery, user?.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -870,14 +896,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     }
   }, [loading, outletView, products]);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!user?.id) return;
     const cursor = page > 1 ? cursorByPage[page] : undefined;
     const productsRes = await apiClient.get<Partial<ProductsResponse>>(`/brands/${user.id}/products`, {
       params: {
         page,
         limit,
-        sortBy: 'newest',
+        sortBy: productSortBy,
         cursor: cursor ?? undefined,
         search: searchQuery.trim() ? searchQuery.trim() : undefined,
         collectionId: filterCollection !== 'all' ? filterCollection : undefined,
@@ -904,7 +930,36 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     if (typeof nextCursor === 'string' && nextCursor.length > 0) {
       setCursorByPage((prev) => ({ ...prev, [page + 1]: nextCursor }));
     }
-  };
+  }, [
+    cursorByPage,
+    filterCollection,
+    filterStatus,
+    limit,
+    page,
+    productSortBy,
+    searchQuery,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    if (outletView !== 'products') return;
+    if (typeof window === 'undefined') return;
+
+    const handleProductSync = () => {
+      void refresh();
+    };
+
+    window.addEventListener(
+      PRODUCT_STUDIO_SYNC_EVENT,
+      handleProductSync as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        PRODUCT_STUDIO_SYNC_EVENT,
+        handleProductSync as EventListener,
+      );
+    };
+  }, [outletView, refresh]);
 
   const handleDuplicate = async (productId: string) => {
     try {
@@ -1688,7 +1743,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
       {/* ═══ UNIFIED COMMAND CENTER ═══ */}
       {outletView === 'products' && !inlineProduct && (
-      <div className="mb-6 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/95 dark:bg-[#111118]/95 backdrop-blur-xl shadow-lg overflow-hidden">
+      <div className="mb-6 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/95 dark:bg-[#111118]/95 backdrop-blur-xl shadow-lg overflow-hidden lg:overflow-visible">
 
         {/* Header Row */}
         <div className="relative p-5 pb-4">
@@ -1734,7 +1789,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => setShowFiltersMenu((v) => !v)}
-                className={`h-11 w-11 rounded-xl border transition-all shadow-sm flex items-center justify-center ${
+                className={`h-11 w-11 rounded-xl border transition-all shadow-sm flex items-center justify-center lg:hidden ${
                   showFiltersMenu
                     ? 'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300'
                     : 'border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10'
@@ -1750,7 +1805,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           {showFiltersMenu && (
             <div
               ref={filtersMenuRef}
-              className="absolute right-5 top-[72px] z-40 w-[min(92vw,520px)] rounded-xl border border-gray-200/90 dark:border-white/10 bg-white/98 dark:bg-[#12121a]/98 p-3 shadow-2xl backdrop-blur-xl"
+              className="absolute right-5 top-[72px] z-40 w-[min(92vw,520px)] rounded-xl border border-gray-200/90 dark:border-white/10 bg-white/98 dark:bg-[#12121a]/98 p-3 shadow-2xl backdrop-blur-xl lg:hidden"
             >
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 {(
@@ -1779,7 +1834,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 ))}
               </div>
 
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <FilterDropdown
                   value={filterCollection}
                   onChange={setFilterCollection}
@@ -1799,9 +1854,81 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     { value: 'out_of_stock', label: 'Out of Stock' },
                   ]}
                 />
+                <FilterDropdown
+                  value={productSortBy}
+                  onChange={(value) => setProductSortBy(value as ProductSortBy)}
+                  options={PRODUCT_SORT_OPTIONS}
+                />
               </div>
             </div>
           )}
+        </div>
+
+        <div className="hidden border-t border-gray-200/80 bg-gradient-to-r from-white/90 via-purple-50/60 to-white/90 px-5 py-4 backdrop-blur-xl dark:border-white/10 dark:from-[#111118]/95 dark:via-[#161327]/95 dark:to-[#111118]/95 lg:sticky lg:top-24 lg:z-20 lg:flex lg:flex-wrap lg:items-start lg:justify-between lg:gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-purple-600 dark:text-purple-300">
+              Product Controls
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {PRODUCT_STATUS_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setFilterStatus(opt.value)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-all ${
+                    filterStatus === opt.value
+                      ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md shadow-purple-500/25'
+                      : 'border border-gray-200/80 bg-white/85 text-gray-600 hover:border-purple-200 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:text-white'
+                  }`}
+                >
+                  <span>{opt.icon}</span>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid w-full gap-3 xl:w-auto xl:grid-cols-3">
+            <div className="min-w-[210px]">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                📚 Collection
+              </p>
+              <FilterDropdown
+                value={filterCollection}
+                onChange={setFilterCollection}
+                disabled={collectionsLoading}
+                options={[
+                  { value: 'all', label: 'All Collections' },
+                  ...visibleCollections.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+              />
+            </div>
+            <div className="min-w-[210px]">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                📦 Stock
+              </p>
+              <FilterDropdown
+                value={filterStock}
+                onChange={setFilterStock}
+                options={[
+                  { value: 'all', label: 'All Stock' },
+                  { value: 'in_stock', label: 'In Stock' },
+                  { value: 'low_stock', label: 'Low Stock' },
+                  { value: 'out_of_stock', label: 'Out of Stock' },
+                ]}
+              />
+            </div>
+            <div className="min-w-[210px]">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                🧭 Sort
+              </p>
+              <FilterDropdown
+                value={productSortBy}
+                onChange={(value) => setProductSortBy(value as ProductSortBy)}
+                options={PRODUCT_SORT_OPTIONS}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Quick Actions */}
@@ -3253,5 +3380,3 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 };
 
 export default StoreProductsPanel;
-
-

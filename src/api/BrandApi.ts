@@ -15,6 +15,10 @@ import type {
   VerificationUploadInstruction,
   VerificationUploadResult,
 } from '../types/verification';
+import {
+  getRenderableProductMediaSources,
+  isRemoteMediaValue,
+} from '../utils/renderableMedia';
 
 export interface UpdateBrandProfilePayload {
   brandFullName?: string;
@@ -767,48 +771,18 @@ export const brandApi = {
             typeof b?.orderIndex === 'number' ? b.orderIndex : Number.MAX_SAFE_INTEGER;
           return aOrder - bOrder;
         });
-        const isRemoteMediaValue = (value: unknown): value is string => {
-          if (typeof value !== 'string') return false;
-          return (
-            value.startsWith('http') ||
-            value.startsWith('/') ||
-            value.startsWith('data:') ||
-            value.includes('://') ||
-            value.includes('?')
-          );
-        };
         const productCandidates = sortedProductLinks
           .map((link: any) => link?.product ?? link)
           .filter(Boolean);
         const firstProductWithCover = productCandidates.find((product: any) => {
-          if (typeof product?.thumbnail === 'string' && product.thumbnail.length > 0) return true;
-          return Array.isArray(product?.images)
-            ? product.images.some((img: any) => typeof img === 'string' && img.length > 0)
-            : false;
+          return getRenderableProductMediaSources(product).length > 0;
         });
-        const rawProductCoverValue =
-          typeof firstProductWithCover?.thumbnail === 'string'
-            ? firstProductWithCover.thumbnail
-            : Array.isArray(firstProductWithCover?.images)
-              ? firstProductWithCover.images.find((img: any) => typeof img === 'string' && img.length > 0)
-              : undefined;
-        const productCoverUrl = isRemoteMediaValue(rawProductCoverValue)
-          ? rawProductCoverValue
-          : undefined;
-        const productMedia = Array.isArray(firstProductWithCover?.media)
-          ? (firstProductWithCover.media as Array<{ id?: string; isPrimary?: boolean }>)
-          : [];
-        const productPrimaryMedia = productMedia.find((m) => m?.isPrimary) || productMedia[0];
-        const productCoverFileId =
-          (typeof productPrimaryMedia?.id === 'string' && !productPrimaryMedia.id.startsWith('http')
-            ? productPrimaryMedia.id
-            : undefined) ||
-          (Array.isArray(firstProductWithCover?.mediaIds)
-            ? firstProductWithCover.mediaIds.find((id: unknown) => typeof id === 'string' && !id.startsWith('http'))
-            : undefined) ||
-          (typeof rawProductCoverValue === 'string' && !isRemoteMediaValue(rawProductCoverValue)
-            ? rawProductCoverValue
-            : undefined);
+        const productRenderableSources = getRenderableProductMediaSources(
+          firstProductWithCover ?? null,
+        );
+        const primaryProductSource = productRenderableSources[0];
+        const productCoverUrl = primaryProductSource?.src ?? undefined;
+        const productCoverFileId = primaryProductSource?.fileId ?? undefined;
         const previewFromBackend = Array.isArray((backendItem as any)?.previewImages)
           ? ((backendItem as any).previewImages as Array<{ url?: string | null; fileId?: string | null }>)
           : [];
@@ -825,24 +799,15 @@ export const brandApi = {
           const seenPreviewValues = new Set<string>();
           productCandidates.forEach((product: any) => {
             const pName = typeof product?.name === 'string' ? product.name : undefined;
-            const thumbnail =
-              typeof product?.thumbnail === 'string' && product.thumbnail.length > 0
-                ? product.thumbnail
-                : undefined;
-            const images = Array.isArray(product?.images)
-              ? (product.images as unknown[])
-                .filter((img) => typeof img === 'string' && img.length > 0)
-                .map((img) => img as string)
-              : [];
-            [thumbnail, ...images].filter(Boolean).forEach((rawValue) => {
-              const value = String(rawValue);
-              if (seenPreviewValues.has(value)) return;
-              seenPreviewValues.add(value);
-              if (isRemoteMediaValue(value)) {
-                derivedPreviewImages.push({ url: value, productName: pName });
-              } else {
-                derivedPreviewImages.push({ fileId: value, productName: pName });
-              }
+            getRenderableProductMediaSources(product).forEach((source) => {
+              const key = `${source.src ?? ''}|${source.fileId ?? ''}`;
+              if (seenPreviewValues.has(key)) return;
+              seenPreviewValues.add(key);
+              derivedPreviewImages.push({
+                url: source.src ?? undefined,
+                fileId: source.fileId ?? undefined,
+                productName: pName,
+              });
             });
           });
         }

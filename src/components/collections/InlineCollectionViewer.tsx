@@ -335,9 +335,9 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
     try {
       await dispatch(addToCart({ productId, quantity: 1 })).unwrap();
       dispatch(openCartDrawer());
-      toast.success('Added to cart');
+      toast.success('Bagged!');
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to add to cart');
+      toast.error(e?.message || 'Failed to bag item');
     }
   };
 
@@ -653,7 +653,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                             onClick={() => handleAddProductToCart(product.id)}
                             className="w-full rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-2"
                           >
-                            Add to cart
+                            🛍️ Bag it
                           </button>
                         ) : (
                         <button

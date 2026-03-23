@@ -190,6 +190,21 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
+  async adminRestoreMessage(messageId: string) {
+    const response = await apiClient.post(`/admin/messaging/messages/${messageId}/restore`);
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async adminBulkHideMessages(messageIds: string[], reason: string) {
+    const response = await apiClient.post('/admin/messaging/messages/bulk-hide', { messageIds, reason });
+    return unwrapApiResponse<any>(response.data);
+  },
+
+  async adminBulkRedactMessages(messageIds: string[], reason: string) {
+    const response = await apiClient.post('/admin/messaging/messages/bulk-redact', { messageIds, reason });
+    return unwrapApiResponse<any>(response.data);
+  },
+
   async adminReopenThread(threadId: string) {
     const response = await apiClient.post(`/admin/messaging/threads/${threadId}/reopen`);
     return unwrapApiResponse<any>(response.data);

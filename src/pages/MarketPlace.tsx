@@ -14,6 +14,7 @@ import { fetchWishlist } from '@/features/wishlistSlice';
 import FeaturedSection from '@/components/FeaturedSection';
 import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { normalizeSizingMode } from '@/types/sizing';
 
 interface RawProductsPayload {
@@ -541,11 +542,12 @@ const MarketPlace: React.FC = () => {
 
       <AnimatePresence>
         {selectedProduct && (
+          <OverlayPortal>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[80] bg-black/60 p-3 backdrop-blur-sm sm:p-6"
+            className="fixed inset-0 z-layer-modal bg-black/60 p-3 backdrop-blur-sm sm:p-6"
           >
             <motion.div
               initial={{ opacity: 0, y: 18 }}
@@ -569,6 +571,7 @@ const MarketPlace: React.FC = () => {
               />
             </motion.div>
           </motion.div>
+          </OverlayPortal>
         )}
       </AnimatePresence>
 

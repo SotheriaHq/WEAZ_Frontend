@@ -79,6 +79,42 @@ const AdminMessagingPage: React.FC = () => {
   const [sendingSystem, setSendingSystem] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  /* ---- Bulk selection state ---- */
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<'hide' | 'redact' | null>(null);
+  const [bulkReason, setBulkReason] = useState('');
+  const [bulkModerating, setBulkModerating] = useState(false);
+
+  const moderatableMessageIds = useMemo(
+    () => messages.filter((m) => m.visibilityState === 'VISIBLE' && m.kind === 'USER').map((m) => m.id),
+    [messages],
+  );
+
+  const toggleBulkSelect = (id: string) => {
+    setBulkSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (bulkSelected.size === moderatableMessageIds.length) {
+      setBulkSelected(new Set());
+    } else {
+      setBulkSelected(new Set(moderatableMessageIds));
+    }
+  };
+
+  const exitBulkMode = () => {
+    setBulkMode(false);
+    setBulkSelected(new Set());
+    setBulkAction(null);
+    setBulkReason('');
+  };
+
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }));
   }, []);
@@ -180,6 +216,30 @@ const AdminMessagingPage: React.FC = () => {
       toast.error(err?.response?.data?.message || 'Moderation failed');
     } finally {
       setModerating(false);
+    }
+  };
+
+  const handleBulkModerate = async () => {
+    if (bulkSelected.size === 0 || !bulkAction || !bulkReason.trim()) {
+      toast.error('Select messages and provide a reason');
+      return;
+    }
+    setBulkModerating(true);
+    try {
+      const ids = Array.from(bulkSelected);
+      if (bulkAction === 'hide') {
+        await messagingApi.adminBulkHideMessages(ids, bulkReason.trim());
+        toast.success(`${ids.length} message(s) hidden`);
+      } else {
+        await messagingApi.adminBulkRedactMessages(ids, bulkReason.trim());
+        toast.success(`${ids.length} message(s) redacted`);
+      }
+      exitBulkMode();
+      if (activeThreadId) await loadThread(activeThreadId);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Bulk moderation failed');
+    } finally {
+      setBulkModerating(false);
     }
   };
 
@@ -367,6 +427,19 @@ const AdminMessagingPage: React.FC = () => {
                           🔓 Reopen
                         </button>
                       )}
+                      {canModerate && (
+                        <button
+                          type="button"
+                          onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}
+                          className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                            bulkMode
+                              ? 'bg-purple-600 text-white hover:bg-purple-700'
+                              : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20'
+                          }`}
+                        >
+                          {bulkMode ? '✕ Exit Bulk' : '☑️ Bulk Select'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => void loadThread(activeThreadId)}
@@ -376,6 +449,42 @@ const AdminMessagingPage: React.FC = () => {
                       </button>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Bulk selection toolbar */}
+              {bulkMode && (
+                <div className="px-4 py-2 bg-amber-50/60 dark:bg-amber-500/5 shrink-0 flex items-center gap-3 border-b border-amber-200/40 dark:border-amber-500/10">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={moderatableMessageIds.length > 0 && bulkSelected.size === moderatableMessageIds.length}
+                      onChange={toggleSelectAll}
+                      className="w-3.5 h-3.5 rounded accent-purple-600"
+                    />
+                    <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">Select All</span>
+                  </label>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                    {bulkSelected.size} of {moderatableMessageIds.length} selected
+                  </span>
+                  {bulkSelected.size > 0 && !bulkAction && (
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setBulkAction('hide')}
+                        className="rounded bg-amber-100 dark:bg-amber-500/20 px-2 py-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+                      >
+                        🙈 Hide {bulkSelected.size}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBulkAction('redact')}
+                        className="rounded bg-rose-100 dark:bg-rose-500/20 px-2 py-1 text-[10px] font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-200 dark:hover:bg-rose-500/30 transition-colors"
+                      >
+                        ✂️ Redact {bulkSelected.size}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -398,9 +507,23 @@ const AdminMessagingPage: React.FC = () => {
                         <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">{group.date}</span>
                         <div className="flex-1 h-px bg-gray-200/40 dark:bg-white/5" />
                       </div>
-                      {group.msgs.map((msg) => (
-                        <div key={msg.id} className="group relative">
-                          <MessageBubble message={msg} isOwn={false} />
+                      {group.msgs.map((msg) => {
+                        const isBulkCheckable = bulkMode && msg.visibilityState === 'VISIBLE' && msg.kind === 'USER';
+                        const isBulkChecked = bulkSelected.has(msg.id);
+                        return (
+                        <div key={msg.id} className={`group relative ${isBulkChecked ? 'bg-amber-50/40 dark:bg-amber-500/5 rounded-lg' : ''}`}>
+                          {isBulkCheckable && (
+                            <label className="absolute left-0 top-3 z-10 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isBulkChecked}
+                                onChange={() => toggleBulkSelect(msg.id)}
+                                className="w-3.5 h-3.5 rounded accent-purple-600"
+                              />
+                            </label>
+                          )}
+                          <div className={isBulkCheckable ? 'ml-6' : ''}>
+                          <MessageBubble message={msg} isOwn={false} showModerated />
                           {canModerate && msg.visibilityState === 'VISIBLE' && msg.kind === 'USER' && (
                             <div className="absolute top-1 right-1 hidden group-hover:flex items-center gap-1">
                               <button
@@ -422,12 +545,34 @@ const AdminMessagingPage: React.FC = () => {
                             </div>
                           )}
                           {msg.visibilityState !== 'VISIBLE' && (
-                            <span className="ml-2 text-[9px] font-semibold text-gray-400 dark:text-gray-500 uppercase">
-                              [{msg.visibilityState}]
-                            </span>
+                            <div className="ml-2 inline-flex items-center gap-1.5">
+                              <span className="text-[9px] font-semibold text-gray-400 dark:text-gray-500 uppercase">
+                                [{msg.visibilityState}]
+                              </span>
+                              {canModerate && (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      await messagingApi.adminRestoreMessage(msg.id);
+                                      toast.success('Message restored to visible');
+                                      if (activeThreadId) await loadThread(activeThreadId);
+                                    } catch (err: any) {
+                                      toast.error(err?.response?.data?.message || 'Failed to restore message');
+                                    }
+                                  }}
+                                  className="rounded bg-emerald-100 dark:bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-500/30 transition-colors"
+                                  title={msg.visibilityState === 'HIDDEN' ? 'Unhide message' : 'Unredact message'}
+                                >
+                                  {msg.visibilityState === 'HIDDEN' ? '👁️ Unhide' : '🔄 Restore'}
+                                </button>
+                              )}
+                            </div>
                           )}
+                          </div>
                         </div>
-                      ))}
+                      );
+                      })}
                     </div>
                   ))
                 )}
@@ -459,6 +604,36 @@ const AdminMessagingPage: React.FC = () => {
                       className="rounded-lg bg-red-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
                     >
                       {moderating ? '...' : 'Confirm'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Bulk moderation action bar */}
+              {bulkAction && bulkSelected.size > 0 && (
+                <div className="px-4 py-3 bg-red-50/50 dark:bg-red-500/5 shrink-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs font-semibold text-red-800 dark:text-red-300">
+                      {bulkAction === 'hide' ? '🙈 Hide' : '✂️ Redact'} {bulkSelected.size} message(s)
+                    </span>
+                    <button type="button" onClick={() => setBulkAction(null)} className="text-[10px] text-gray-500 hover:text-gray-700">✕</button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={bulkReason}
+                      onChange={(e) => setBulkReason(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') void handleBulkModerate(); }}
+                      placeholder="Moderation reason for all selected..."
+                      className="flex-1 rounded-lg bg-white dark:bg-white/5 px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-red-400/50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleBulkModerate()}
+                      disabled={bulkModerating || !bulkReason.trim()}
+                      className="rounded-lg bg-red-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                    >
+                      {bulkModerating ? '...' : 'Confirm'}
                     </button>
                   </div>
                 </div>

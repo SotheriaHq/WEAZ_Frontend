@@ -1479,11 +1479,25 @@ const ProfilePage: React.FC = () => {
                   <>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                       <div className="flex-1 w-full sm:w-auto">
-                        <SearchBarWithSuggestions
-                          placeholder="Search Threadly or filter this content with @brand and /tag"
-                          onValueChange={setSearchQuery}
-                          enableGlobalShortcut={false}
-                        />
+                        <div className="relative w-full">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">🔎</span>
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Filter designs by title or description..."
+                            className="w-full rounded-xl border border-gray-200 bg-white/80 py-2 pl-10 pr-10 text-sm text-gray-900 outline-none backdrop-blur-sm transition-colors focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:border-purple-400"
+                          />
+                          {searchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setSearchQuery('')}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full px-1.5 py-0.5 text-xs text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
+                            >
+                              &times;
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {/* Show create controls only for owner */}
                       {isOwner && (

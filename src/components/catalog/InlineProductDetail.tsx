@@ -299,11 +299,11 @@ export default function InlineProductDetail({
 
   const handleAddToBag = async () => {
     if (isOwnProduct) {
-      toast.info('You cannot add your own product to bag.');
+      toast.info('You cannot bag your own product.');
       return;
     }
     if (!isAuth) {
-      toast.info('Please sign in to add items to bag.');
+      toast.info('Please sign in to bag items.');
       return;
     }
     if (isOutOfStock) {
@@ -349,14 +349,14 @@ export default function InlineProductDetail({
         }),
       ).unwrap();
       // Drawer opens automatically via addToCart.fulfilled in cartSlice
-      toast.success('Added to bag');
+      toast.success('Bagged!');
     } catch (error: any) {
       if (typeof error === 'string' && error.includes('__MEASUREMENTS_REQUIRED__')) {
         setModalMeasurementValues({ ...measurementValues });
         setShowMeasurementModal(true);
         return;
       }
-      toast.error(error || 'Failed to add to bag');
+      toast.error(error || 'Failed to bag item');
     }
   };
 
@@ -430,7 +430,7 @@ export default function InlineProductDetail({
       ).unwrap();
 
       setShowMeasurementModal(false);
-      toast.success('Measurements saved and item added to bag');
+      toast.success('Measurements saved and item bagged!');
     } catch (error: any) {
       toast.error(error || 'Failed to save measurements');
     } finally {
@@ -643,7 +643,7 @@ export default function InlineProductDetail({
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:scale-100"
               >
                 <span aria-hidden="true">🛍️</span>
-                Add to bag
+                Bag it
               </button>
             ) : (
               <div className="flex-1 flex items-center justify-center px-6 py-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm font-medium text-gray-600 dark:text-gray-300">
@@ -770,7 +770,7 @@ export default function InlineProductDetail({
                     disabled={savingMeasurements}
                     className="w-full py-3 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50"
                   >
-                    {savingMeasurements ? '⏳ Saving...' : '🛍️ Save Measurements & Add to Bag'}
+                    {savingMeasurements ? '⏳ Saving...' : '🛍️ Save Measurements & Bag it'}
                   </button>
                   <button
                     type="button"

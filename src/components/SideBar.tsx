@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../store';
 import { closeSidebar, toggleSidebar, MOBILE_BREAKPOINT } from '../features/uiSlice';
+import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 
 const ThreadlyLogo = () => (
   <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -104,6 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
   const isMobile = liveViewportWidth < MOBILE_BREAKPOINT;
   const isProfileRoute = location.pathname === '/profile' || location.pathname.startsWith('/profile/');
   const isAdminConsoleUser = user?.role === 'SuperAdmin' || user?.role === 'Admin';
+  const storeSetupComplete = useStoreSetupStatus();
 
   const showOverlay = isSidebarOpen;
   const isRail = !showOverlay;
@@ -128,6 +130,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
     if (showOverlay) dispatch(closeSidebar());
   };
 
+  // Brands without complete store setup should not see Studio or Messages
+  const isBrandWithIncompleteSetup = user?.type === 'BRAND' && storeSetupComplete === false;
+
   const mainLinks = [
     {
       emoji: '👗',
@@ -141,7 +146,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
       path: '/market-place',
       active: location.pathname === '/market-place',
     },
-    ...(user?.type === 'BRAND'
+    ...(user?.type === 'BRAND' && !isBrandWithIncompleteSetup
       ? [
           {
             emoji: '🎬',
@@ -157,12 +162,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
       path: '/subscriptions',
       active: location.pathname === '/subscriptions',
     },
-    {
-      emoji: '💬',
-      label: 'Messages',
-      path: '/messages',
-      active: location.pathname === '/messages' || location.pathname.startsWith('/studio/messages'),
-    },
+    ...(!isBrandWithIncompleteSetup
+      ? [
+          {
+            emoji: '💬',
+            label: 'Messages',
+            path: '/messages',
+            active: location.pathname === '/messages' || location.pathname.startsWith('/studio/messages'),
+          },
+        ]
+      : []),
     {
       emoji: '📏',
       label: 'Size Charts',

@@ -59,6 +59,7 @@ import {
   updateStorePolicies,
   type CollectionPriceImpact,
 } from "@/api/StoreApi";
+import { emitProductStudioSync } from "@/utils/productStudioEvents";
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -444,6 +445,7 @@ const EditProduct: React.FC = () => {
     FormState["status"] | null
   >(null);
 
+  const minRequiredMediaCount = 4;
   const maxMediaCount = 6;
   const canAddMoreMedia = mediaUrls.length < maxMediaCount;
   const hasPrimaryMedia = useMemo(
@@ -1184,6 +1186,16 @@ const EditProduct: React.FC = () => {
     [],
   );
 
+  const notifyProductStudioSync = useCallback(
+    (reason: string, syncedProductId?: string) => {
+      emitProductStudioSync({
+        productId: syncedProductId || productId || undefined,
+        reason,
+      });
+    },
+    [productId],
+  );
+
   // =====================
   // Save / Submit
   // =====================
@@ -1245,14 +1257,20 @@ const EditProduct: React.FC = () => {
           toast.error("Please enter a product title");
           return;
         }
-        if (
-          form.categoryId &&
-          collectionCategoryById[form.categoryId] &&
-          !form.categoryTypeId
-        ) {
-          toast.error(
-            "Please select a sub-category for the selected collection.",
-          );
+        if (!form.description.trim()) {
+          toast.error("Please enter a product description");
+          return;
+        }
+        if (!form.taxonomyCategoryId) {
+          toast.error("Please select a category");
+          return;
+        }
+        if (!form.categoryTypeId) {
+          toast.error("Please select a sub-category");
+          return;
+        }
+        if (form.tags.length === 0) {
+          toast.error("Add at least one tag before publishing");
           return;
         }
         if (form.price <= 0) {
@@ -1288,7 +1306,11 @@ const EditProduct: React.FC = () => {
         }
       }
 
-      const mediaValidation = validateMedia(mediaUrls, maxMediaCount);
+      const mediaValidation = validateMedia(
+        mediaUrls,
+        maxMediaCount,
+        minRequiredMediaCount,
+      );
       if (!mediaValidation.ok) {
         toast.error(
           mediaValidation.error || "Please review your media selection",
@@ -1339,6 +1361,9 @@ const EditProduct: React.FC = () => {
         : form.categoryId || undefined;
 
       const payloadCategoryTypeId = form.categoryTypeId || undefined;
+      const payloadCategoryId = form.taxonomyCategoryId || undefined;
+      const finalStatus =
+        normalizedForcedStatus ?? (effectiveDraft ? "DRAFT" : form.status);
 
       setSaving(true);
       try {
@@ -1359,6 +1384,7 @@ const EditProduct: React.FC = () => {
             : form.title.trim(),
           description: form.description.trim() || undefined,
           collectionId: selectedCollectionId,
+          categoryId: payloadCategoryId,
           subCategoryId: payloadCategoryTypeId,
           categoryTypeId: payloadCategoryTypeId,
           tags: form.tags,
@@ -1385,8 +1411,7 @@ const EditProduct: React.FC = () => {
           allowBackorders: form.allowBackorders,
           stock: form.variants.length > 0 ? variantTotalStock : form.stock,
           lowStockThreshold: form.lowStockThreshold,
-          status:
-            normalizedForcedStatus ?? (effectiveDraft ? "DRAFT" : form.status),
+          status: finalStatus,
           isPhysicalProduct: form.isPhysicalProduct,
           customsRegion: resolvedCustomsRegion,
           mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
@@ -1422,6 +1447,7 @@ const EditProduct: React.FC = () => {
 
         if (isEditMode && productId) {
           await productApi.updateProduct(productId, payload);
+          notifyProductStudioSync("product-updated", productId);
           toast.success(
             isCollectionContext
               ? "Product updated for this collection."
@@ -1432,7 +1458,13 @@ const EditProduct: React.FC = () => {
             return;
           }
         } else {
-          const created = await productApi.createProduct(payload);
+          const shouldCreateAsDraftForUploads =
+            pendingMediaFiles.length > 0 && finalStatus === "ACTIVE";
+          const created = await productApi.createProduct(
+            shouldCreateAsDraftForUploads
+              ? { ...payload, status: "DRAFT" }
+              : payload,
+          );
 
           // Build media upload list (needed for both flow paths)
           let pendingUploads: Array<{ file: File; isPrimary: boolean }> = [];
@@ -1457,12 +1489,14 @@ const EditProduct: React.FC = () => {
             pendingUploads = normalizePrimary(orderedPending);
           }
 
-          const doUploads = () =>
-            Promise.all(
+          const doUploads = async () => {
+            await Promise.all(
               pendingUploads.map((u) =>
                 productApi.uploadProductMedia(created.id, u.file, u.isPrimary),
               ),
             );
+            notifyProductStudioSync("product-media-uploaded", created.id);
+          };
 
           // For collection flow: navigate immediately and upload media in background
           // so the user isn't blocked waiting for potentially large file uploads.
@@ -1470,6 +1504,7 @@ const EditProduct: React.FC = () => {
             if (pendingUploads.length > 0) {
               void doUploads();
             }
+            notifyProductStudioSync("product-created", created.id);
             toast.success("Product added to collection draft.");
             const joiner = returnTo.includes("?") ? "&" : "?";
             navigate(`${returnTo}${joiner}productId=${created.id}`);
@@ -1481,11 +1516,19 @@ const EditProduct: React.FC = () => {
             await doUploads();
           }
 
+          if (shouldCreateAsDraftForUploads) {
+            await productApi.updateProduct(created.id, {
+              ...payload,
+              status: finalStatus,
+            });
+          }
+
           const successMessage = isCollectionContext
             ? "Product added to collection."
             : effectiveDraft
               ? "Draft saved successfully"
               : "Product created successfully";
+          notifyProductStudioSync("product-created", created.id);
           toast.success(successMessage);
           if (returnTo && returnContext === "collection") {
             const joiner = returnTo.includes("?") ? "&" : "?";
@@ -1526,6 +1569,7 @@ const EditProduct: React.FC = () => {
       variantTotalStock,
       originalPrice,
       showPricePreview,
+      notifyProductStudioSync,
       returnContext,
       returnTo,
       syncShippingRegions,
@@ -1557,6 +1601,7 @@ const EditProduct: React.FC = () => {
         : form.categoryId || undefined;
 
       const payloadCategoryTypeId = form.categoryTypeId || undefined;
+      const payloadCategoryId = form.taxonomyCategoryId || undefined;
       const resolvedCustomsRegion = await syncShippingRegions({
         persistPolicy: !isCollectionContext,
       });
@@ -1567,6 +1612,7 @@ const EditProduct: React.FC = () => {
           : form.title.trim(),
         description: form.description.trim() || undefined,
         collectionId: selectedCollectionId,
+        categoryId: payloadCategoryId,
         subCategoryId: payloadCategoryTypeId,
         categoryTypeId: payloadCategoryTypeId,
         tags: form.tags,
@@ -1624,6 +1670,7 @@ const EditProduct: React.FC = () => {
       };
 
       await productApi.updateProduct(productId!, payload);
+      notifyProductStudioSync("product-updated", productId || undefined);
       toast.success("Product updated successfully");
       setOriginalPrice(form.price); // Update tracked price
       setHasChanges(false);
@@ -1661,6 +1708,7 @@ const EditProduct: React.FC = () => {
     isCollectionContext,
     returnTo,
     syncShippingRegions,
+    notifyProductStudioSync,
   ]);
 
   const triggerSave = useCallback(
@@ -1825,6 +1873,7 @@ const EditProduct: React.FC = () => {
             );
             return normalized;
           });
+          notifyProductStudioSync("product-media-uploaded", productId);
           toast.success(
             makePrimary ? "Cover image uploaded" : "Image uploaded",
           );
@@ -1853,13 +1902,14 @@ const EditProduct: React.FC = () => {
       if (isEditMode && productId && !mediaId.startsWith("pending-")) {
         try {
           await productApi.setPrimaryMedia(productId, mediaId);
+          notifyProductStudioSync("product-media-primary", productId);
           toast.success("Cover image updated");
         } catch (error) {
           toast.error("Failed to update cover image");
         }
       }
     },
-    [isEditMode, normalizePending, productId],
+    [isEditMode, normalizePending, notifyProductStudioSync, productId],
   );
 
   const handleDeleteMedia = useCallback(
@@ -1889,6 +1939,7 @@ const EditProduct: React.FC = () => {
           if (target.isPrimary && orderedIds[0]) {
             await productApi.setPrimaryMedia(productId, orderedIds[0]);
           }
+          notifyProductStudioSync("product-media-deleted", productId);
           toast.success("Image deleted");
         } catch (error) {
           toast.error("Failed to delete image");
@@ -1899,6 +1950,7 @@ const EditProduct: React.FC = () => {
     [
       isEditMode,
       mediaUrls,
+      notifyProductStudioSync,
       pendingMediaFiles,
       productId,
       revokeBlobUrl,
@@ -1927,12 +1979,13 @@ const EditProduct: React.FC = () => {
         try {
           await productApi.reorderProductMedia(productId, orderedIds);
           updateForm("mediaIds", orderedIds);
+          notifyProductStudioSync("product-media-reordered", productId);
         } catch (error) {
           toast.error("Failed to reorder images");
         }
       }
     },
-    [isEditMode, mediaUrls, productId, updateForm],
+    [isEditMode, mediaUrls, notifyProductStudioSync, productId, updateForm],
   );
 
   const handleDuplicate = useCallback(async () => {
@@ -2247,9 +2300,17 @@ const EditProduct: React.FC = () => {
                   <Plus className="w-8 h-8 mb-2" />
                   <span className="text-sm font-medium">Add images</span>
                   <span className="text-xs text-gray-400 mt-1">
-                    Up to 6 images
+                    Minimum 4, up to 6 images
                   </span>
                 </button>
+              )}
+
+              {mediaUrls.length > 0 &&
+                mediaUrls.length < minRequiredMediaCount && (
+                <p className="mt-3 text-xs text-orange-500">
+                  Upload all 4 required views before saving: front, left,
+                  right, and back.
+                </p>
               )}
 
               {!hasPrimaryMedia && mediaUrls.length > 0 && (
@@ -2261,6 +2322,9 @@ const EditProduct: React.FC = () => {
               <div className="pt-4 border-t border-gray-200 dark:border-white/10 space-y-2">
                 <p className="text-xs text-gray-500">
                   Up to 6 images • Cover required when images exist
+                </p>
+                <p className="text-[11px] text-gray-400">
+                  Minimum 4 images required: front, left, right, and back.
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {[
@@ -2973,6 +3037,7 @@ const EditProduct: React.FC = () => {
                         sourceType="PRODUCT"
                         sourceId={isEditMode ? productId : undefined}
                         measurementKeys={form.customMeasurementKeys}
+                        defaultBaseCharge={form.price > 0 ? form.price : null}
                         disabled={saving}
                       />
                     </div>

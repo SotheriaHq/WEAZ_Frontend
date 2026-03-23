@@ -50,7 +50,6 @@ const lifecycleOptions: CustomOrderStatus[] = [
 
 const statusFilterOptions = [
   { value: '', label: 'All statuses' },
-  { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pending brand acceptance' },
   { value: 'ACCEPTED', label: 'Accepted' },
   { value: 'IN_PRODUCTION', label: 'In production' },
   { value: 'IN_TRANSIT', label: 'In transit' },
@@ -67,8 +66,6 @@ const CustomOrdersPage: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [acceptNote, setAcceptNote] = useState('');
-  const [rejectReason, setRejectReason] = useState('');
   const [progressStage, setProgressStage] = useState<CustomOrderProgressStage>('ORDER_RECEIVED');
   const [progressNote, setProgressNote] = useState('');
   const [extensionReason, setExtensionReason] = useState('');
@@ -163,7 +160,7 @@ const CustomOrdersPage: React.FC = () => {
   const totals = useMemo(() => {
     return {
       total: orders.length,
-      pendingAcceptance: orders.filter((entry) => entry.status === 'PENDING_BRAND_ACCEPTANCE').length,
+      accepted: orders.filter((entry) => entry.status === 'ACCEPTED').length,
       liveProduction: orders.filter((entry) => ['ACCEPTED', 'IN_PRODUCTION', 'READY_FOR_DISPATCH', 'IN_TRANSIT'].includes(entry.status)).length,
     };
   }, [orders]);
@@ -208,11 +205,11 @@ const CustomOrdersPage: React.FC = () => {
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600 dark:text-emerald-300">Studio</div>
           <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">Custom orders</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Review paid orders, move production stages, and manage extension requests.</p>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Manage auto-accepted paid orders, publish production stages, and coordinate delivery updates.</p>
         </div>
         <div className="grid min-w-[260px] grid-cols-3 gap-3">
           <div className="rounded-2xl border border-black/10 bg-white/70 p-4 text-center dark:border-white/10 dark:bg-white/5"><div className="text-xs uppercase tracking-wide text-slate-500">Total</div><div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{totals.total}</div></div>
-          <div className="rounded-2xl border border-black/10 bg-white/70 p-4 text-center dark:border-white/10 dark:bg-white/5"><div className="text-xs uppercase tracking-wide text-slate-500">Pending</div><div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{totals.pendingAcceptance}</div></div>
+          <div className="rounded-2xl border border-black/10 bg-white/70 p-4 text-center dark:border-white/10 dark:bg-white/5"><div className="text-xs uppercase tracking-wide text-slate-500">Accepted</div><div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{totals.accepted}</div></div>
           <div className="rounded-2xl border border-black/10 bg-white/70 p-4 text-center dark:border-white/10 dark:bg-white/5"><div className="text-xs uppercase tracking-wide text-slate-500">Active</div><div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{totals.liveProduction}</div></div>
         </div>
       </div>
@@ -278,7 +275,7 @@ const CustomOrdersPage: React.FC = () => {
                   <CustomOrderBadge value={selected.currentProgressStage ?? 'ORDER_PLACED'} type="stage" />
                 </div>
                 <h2 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{selected.source.title}</h2>
-                <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">Payment: {selected.paymentStatus} • Current stage: {selected.currentProgressStage ?? 'Awaiting acceptance'}</div>
+                <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">Payment: {selected.paymentStatus} • Current stage: {selected.currentProgressStage ?? 'ORDER_RECEIVED'}</div>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -333,42 +330,16 @@ const CustomOrdersPage: React.FC = () => {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white">Brand review</div>
-                  <textarea value={acceptNote} onChange={(event) => setAcceptNote(event.target.value)} rows={3} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Acceptance note" />
-                  <div className="mt-3 flex gap-3">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        setPendingAction({
-                          title: 'Accept custom order?',
-                          description: 'This confirms the brand can fulfill the order at the locked price and timeline. The buyer has already paid in full.',
-                          confirmLabel: 'Accept order',
-                          execute: () => runAction((currentBrandId) => customOrdersBrandApi.accept(currentBrandId, selected.id, acceptNote), 'Custom order accepted'),
-                        })
-                      }
-                      className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-60"
-                    >
-                      Accept
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy || rejectReason.trim().length < 5}
-                      onClick={() =>
-                        setPendingAction({
-                          title: 'Reject custom order?',
-                          description: 'Rejecting this paid order will move it out of the acceptance flow and can trigger refund handling. Make sure the rejection reason is complete and accurate.',
-                          confirmLabel: 'Reject order',
-                          tone: 'danger',
-                          execute: () => runAction((currentBrandId) => customOrdersBrandApi.reject(currentBrandId, selected.id, rejectReason.trim()), 'Custom order rejected'),
-                        })
-                      }
-                      className="rounded-full bg-rose-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                    >
-                      Reject
-                    </button>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">Payment policy</div>
+                  <div className="mt-3 rounded-2xl bg-emerald-500/10 px-4 py-4 text-sm text-slate-700 dark:text-slate-200">
+                    <div className="font-semibold text-slate-900 dark:text-white">Paid orders are auto-accepted</div>
+                    <p className="mt-2">
+                      Once payment is confirmed, Threadly accepts the order automatically and moves it into production tracking.
+                    </p>
+                    <p className="mt-2">
+                      Brands cannot reject or cancel paid custom orders. Any cancellation after payment goes through super admin review with a full-refund workflow.
+                    </p>
                   </div>
-                  <input value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder="Rejection reason" className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" />
                 </div>
 
                 <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
@@ -485,7 +456,7 @@ const CustomOrdersPage: React.FC = () => {
               <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
                 <div className="text-sm font-semibold text-slate-900 dark:text-white">Exception review request</div>
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                  Use this when auto pricing appears unsafe before acceptance. Monthly quota is capped by platform policy.
+                  This is a legacy exception path for orders that are still waiting on brand acceptance. Monthly quota is capped by platform policy.
                 </p>
                 <textarea
                   value={exceptionReason}
@@ -525,7 +496,7 @@ const CustomOrdersPage: React.FC = () => {
                 </button>
                 {selected.status !== 'PENDING_BRAND_ACCEPTANCE' ? (
                   <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    Exception review requests are available only while the order is pending brand acceptance.
+                    Exception review requests are available only for legacy orders still waiting on brand acceptance.
                   </div>
                 ) : null}
               </div>

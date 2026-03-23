@@ -911,6 +911,14 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             className={fieldClassName}
             placeholder="120000"
           />
+          {hasEditedBaseCharge &&
+            normalizedDefaultBaseCharge &&
+            form.baseProductionCharge.trim() !== normalizedDefaultBaseCharge && (
+              <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                This differs from the product price ({Number(normalizedDefaultBaseCharge).toLocaleString()}).
+                The custom order base charge will be independent of the product price.
+              </p>
+            )}
         </label>
         <label className="block">
           <span className={requiredFieldLabelClassName}>

@@ -1,29 +1,33 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 
 interface StudioSidebarProps {
   active: string;
   onSelect: (key: string) => void;
 }
 
-const groups = [
-  {
-    title: 'Studio',
-    items: [
-      { key: 'overview', label: 'Dashboard', path: '/studio', emoji: '📊' },
-      { key: 'store', label: 'Store', path: '/studio/store', emoji: '🛍️' },
-      { key: 'custom-orders', label: 'Custom Orders', path: '/studio/custom-orders', emoji: '✂️' },
-      { key: 'orders', label: 'Orders', path: '/studio?tab=orders', emoji: '📦' },
-      { key: 'messages', label: 'Messages', path: '/studio/messages', emoji: '💬' },
-      { key: 'customers', label: 'Customers', path: '/studio?tab=customers', emoji: '👥' },
-      { key: 'analytics', label: 'Analytics', path: '/studio?tab=analytics', emoji: '📈' },
-      { key: 'finance', label: 'Finance', path: '/studio?tab=finance', emoji: '💰' },
-    ]
-  }
+const ALL_ITEMS = [
+  { key: 'overview', label: 'Dashboard', path: '/studio', emoji: '📊', requiresSetup: true },
+  { key: 'store', label: 'Store', path: '/studio/store', emoji: '🛍️', requiresSetup: false },
+  { key: 'custom-orders', label: 'Custom Orders', path: '/studio/custom-orders', emoji: '✂️', requiresSetup: true },
+  { key: 'orders', label: 'Orders', path: '/studio?tab=orders', emoji: '📦', requiresSetup: false },
+  { key: 'messages', label: 'Messages', path: '/studio/messages', emoji: '💬', requiresSetup: true },
+  { key: 'customers', label: 'Customers', path: '/studio?tab=customers', emoji: '👥', requiresSetup: false },
+  { key: 'analytics', label: 'Analytics', path: '/studio?tab=analytics', emoji: '📈', requiresSetup: false },
+  { key: 'finance', label: 'Finance', path: '/studio?tab=finance', emoji: '💰', requiresSetup: false },
 ];
 
 export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }) => {
   const navigate = useNavigate();
+  const storeSetupComplete = useStoreSetupStatus();
+
+  const groups = useMemo(() => {
+    const items = storeSetupComplete === false
+      ? ALL_ITEMS.filter((item) => !item.requiresSetup)
+      : ALL_ITEMS;
+    return [{ title: 'Studio', items }];
+  }, [storeSetupComplete]);
 
   const handleSelect = (key: string, path: string) => {
     onSelect(key);

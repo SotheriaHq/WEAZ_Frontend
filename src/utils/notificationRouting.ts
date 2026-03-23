@@ -96,7 +96,7 @@ export function determineNotificationRoute(notification: NormalizedNotification)
 
         case NotificationTypes.PRIVATE_ACCESS_APPROVED:
         case NotificationTypes.CONTRIBUTION_ACCEPTED:
-            return target?.id ? `/collections/${target.id}` : fallbackUrl;
+            return target?.id ? `/market?openDesign=${target.id}` : fallbackUrl;
 
         case NotificationTypes.PRIVATE_ACCESS_REQUESTED:
         case NotificationTypes.PRIVATE_ACCESS_REJECTED:

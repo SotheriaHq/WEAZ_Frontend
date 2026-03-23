@@ -4,6 +4,9 @@ import { FiX, FiPlay, FiStar, FiPlus } from 'react-icons/fi';
 import type { MediaItem, MediaItemKind } from '../../types/media';
 import MediaRenderer from '../media/MediaRenderer';
 
+/** Slot labels shown beneath each thumbnail to guide upload ordering */
+const SLOT_LABELS = ['Front', 'Left', 'Right', 'Back', 'Cover', 'Extra'];
+
 interface ThumbnailStripProps {
   items: MediaItem[];
   selectedIndex: number;
@@ -14,6 +17,8 @@ interface ThumbnailStripProps {
   onAddMore?: () => void;
   disabled?: boolean;
   progressById?: Record<string, number>;
+  /** Show slot labels (Front, Left, Right…) beneath thumbnails */
+  showSlotLabels?: boolean;
 }
 
 interface PreviewFile {
@@ -44,6 +49,7 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
   onAddMore,
   disabled = false,
   progressById,
+  showSlotLabels = false,
 }) => {
   const urlMap = useRef<Map<string, string>>(new Map());
 
@@ -173,8 +179,8 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
                       if (pf.id) onDelete(pf.id);
                     }}
                     className="
-                      absolute top-1 right-1 w-6 h-6 rounded-full 
-                      bg-black/70 hover:bg-red-500 
+                      absolute top-1 right-1 w-6 h-6 rounded-full
+                      bg-black/70 hover:bg-red-500
                       flex items-center justify-center
                       opacity-0 group-hover:opacity-100
                       transition-all duration-200
@@ -183,6 +189,15 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
                   >
                     <FiX className="w-3.5 h-3.5 text-white" />
                   </button>
+                )}
+
+                {/* Slot label */}
+                {showSlotLabels && idx < SLOT_LABELS.length && (
+                  <div className="absolute bottom-0 inset-x-0 bg-black/50 backdrop-blur-sm text-center py-0.5">
+                    <span className="text-[9px] font-semibold text-white/90 uppercase tracking-wide">
+                      {SLOT_LABELS[idx]}
+                    </span>
+                  </div>
                 )}
               </motion.div>
             );

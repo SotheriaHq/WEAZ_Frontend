@@ -151,11 +151,11 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const handleQuickAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isOwnProduct) {
-      toast.info('Brands cannot add their own product to cart.');
+      toast.info('Brands cannot bag their own product.');
       return;
     }
     if (!isAuth) {
-      toast.info('Please sign in to add to cart');
+      toast.info('Please sign in to bag items');
       return;
     }
 
@@ -174,9 +174,9 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     try {
       await dispatch(addToCart({ productId: product.id, quantity: 1 })).unwrap();
       dispatch(openCartDrawer());
-      toast.success('Added to cart');
+      toast.success('Bagged!');
     } catch (error: any) {
-      toast.error(error || 'Failed to add to cart');
+      toast.error(error || 'Failed to bag item');
     } finally {
       setCartLoading(false);
     }
@@ -445,10 +445,10 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                 disabled={cartLoading || product.isOutOfStock || isOwnProduct}
                 title={
                   isOwnProduct
-                    ? 'Brands cannot add their own products to cart'
+                    ? 'Brands cannot bag their own products'
                     : product.isOutOfStock
                       ? 'Item is out of stock'
-                      : 'Add to cart'
+                      : 'Bag it'
                 }
                 className={`
                   h-8 w-8 rounded-lg flex items-center justify-center

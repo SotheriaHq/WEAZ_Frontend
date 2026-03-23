@@ -29,6 +29,7 @@ import {
 } from "react-icons/fi";
 import { HiOutlineSparkles } from "react-icons/hi";
 import { useMeasurementPoints } from '@/hooks/useMeasurementPoints';
+import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import CustomOrderConfigurationEditor, {
   type CustomOrderConfigurationEditorHandle,
 } from '@/components/custom-orders/CustomOrderConfigurationEditor';
@@ -117,6 +118,7 @@ const CreateDesignInner: React.FC = () => {
   const files = mediaStore.items;
   const navigate = useNavigate();
   const customOrderEditorRef = useRef<CustomOrderConfigurationEditorHandle | null>(null);
+  const storeSetupComplete = useStoreSetupStatus();
 
   // Form state
   const [title, setTitle] = useState("");
@@ -398,9 +400,10 @@ const CreateDesignInner: React.FC = () => {
   }, [files.length, selectedIndex, coverIndex]);
 
   // Validation
+  const MIN_PUBLISH_IMAGES = 4; // Front, Left, Right, Back
   const isValid =
     title.trim().length > 0 &&
-    files.length > 0 &&
+    files.length >= MIN_PUBLISH_IMAGES &&
     selectedTags.length > 0 &&
     categoryId.trim().length > 0 &&
     categoryTypeId.trim().length > 0;
@@ -753,7 +756,8 @@ const CreateDesignInner: React.FC = () => {
     if (!isValid) {
       const reasons: string[] = [];
       if (title.trim().length === 0) reasons.push("a title");
-      if (files.length === 0) reasons.push("at least one file");
+      if (files.length < MIN_PUBLISH_IMAGES)
+        reasons.push(`at least ${MIN_PUBLISH_IMAGES} images (Front, Left, Right, Back)`);
       if (selectedTags.length === 0) reasons.push("at least one tag");
       if (categoryId.trim().length === 0) reasons.push("a category");
       if (categoryTypeId.trim().length === 0)
@@ -813,7 +817,7 @@ const CreateDesignInner: React.FC = () => {
         });
 
         setShowPublishModal(false);
-        navigate(`/profile?tab=Content&visibility=Public`, {
+        navigate(`/profile?tab=Content&visibility=${visibility === 'PRIVATE' ? 'Private' : 'Public'}`, {
           replace: true,
           state: {
             publishingTaskId: task.id,
@@ -938,7 +942,7 @@ const CreateDesignInner: React.FC = () => {
         });
 
         setShowPublishModal(false);
-        navigate(`/profile?tab=Content&visibility=Public`, {
+        navigate(`/profile?tab=Content&visibility=${visibility === 'PRIVATE' ? 'Private' : 'Public'}`, {
           replace: true,
           state: {
             publishingTaskId: task.id,
@@ -1032,7 +1036,7 @@ const CreateDesignInner: React.FC = () => {
 
   const handleViewPublishedDesign = () => {
     setShowPublishModal(false);
-    navigate(`/profile?tab=Content&visibility=Public`, { replace: true });
+    navigate(`/profile?tab=Content&visibility=${visibility === 'PRIVATE' ? 'Private' : 'Public'}`, { replace: true });
   };
 
   const handleGoToDrafts = () => {
@@ -1219,26 +1223,41 @@ const CreateDesignInner: React.FC = () => {
                 />
                 <div className="flex flex-wrap justify-center gap-1.5 px-2">
                   {[
-                    { slot: 1, label: 'Front (Default Cover)' },
-                    { slot: 2, label: 'Left Side' },
-                    { slot: 3, label: 'Right Side' },
-                    { slot: 4, label: 'Back Side' },
-                    { slot: 5, label: 'Cover (if any)' },
-                    { slot: 6, label: 'Extra (if any)' },
-                  ].map(({ slot, label }) => (
+                    { slot: 1, label: 'Front (Default Cover)', required: true },
+                    { slot: 2, label: 'Left Side', required: true },
+                    { slot: 3, label: 'Right Side', required: true },
+                    { slot: 4, label: 'Back Side', required: true },
+                    { slot: 5, label: 'Cover (if any)', required: false },
+                    { slot: 6, label: 'Extra (if any)', required: false },
+                  ].map(({ slot, label, required }) => (
                     <span
                       key={slot}
-                      className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:bg-white/5 dark:text-gray-500"
+                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
+                        required
+                          ? 'bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400'
+                          : 'bg-gray-50 text-gray-400 dark:bg-white/5 dark:text-gray-500'
+                      }`}
                     >
-                      <span className="font-bold">{slot}.</span> {label}
+                      <span className="font-bold">{slot}.</span> {label}{required && ' *'}
                     </span>
                   ))}
                 </div>
+                <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                  * Required for publishing — upload at least 4 images
+                </p>
               </div>
             ) : (
               <div className="space-y-4 h-full min-w-0">
                 {/* Main Preview - NO background; media defines layout */}
                 <div className="relative rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-sm">
+                  {/* Slot label badge on the preview */}
+                  {selectedIndex < 6 && (
+                    <div className="absolute top-3 left-3 z-10 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm">
+                      <span className="text-[10px] font-bold text-white/90 uppercase tracking-wide">
+                        {['Front', 'Left Side', 'Right Side', 'Back Side', 'Cover', 'Extra'][selectedIndex]}
+                      </span>
+                    </div>
+                  )}
                   <div className="relative w-full h-[360px] sm:h-[460px] lg:h-[620px] flex items-center justify-center overflow-hidden">
                     <AnimatePresence mode="wait">
                       {selectedFile && (
@@ -1317,6 +1336,7 @@ const CreateDesignInner: React.FC = () => {
                   onAddMore={picker.open}
                   disabled={disabled}
                   progressById={perFileProgress}
+                  showSlotLabels
                 />
 
                 {/* Hidden file input */}
@@ -1463,9 +1483,9 @@ const CreateDesignInner: React.FC = () => {
                                   initial={{ scale: 0.8, opacity: 0 }}
                                   animate={{ scale: 1, opacity: 1 }}
                                   exit={{ scale: 0.8, opacity: 0 }}
-                                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${tagStylePalette[idx % tagStylePalette.length]}`}
+                                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] font-semibold ${tagStylePalette[idx % tagStylePalette.length]}`}
                                 >
-                                  {tag}
+                                  #{tag}
                                   <button
                                     type="button"
                                     onClick={() => removeTag(tag)}
@@ -1521,17 +1541,26 @@ const CreateDesignInner: React.FC = () => {
                                 Popular Tags:
                               </p>
                               <div className="flex flex-wrap gap-2">
-                                {filteredSuggestions.map((tag) => (
-                                  <button
-                                    key={tag}
-                                    type="button"
-                                    onClick={() => addTag(tag)}
-                                    disabled={disabled}
-                                    className="tag-badge-outline px-3 py-1.5 rounded-full text-sm font-medium"
-                                  >
-                                    {tag}
-                                  </button>
-                                ))}
+                                {filteredSuggestions.map((tag) => {
+                                  const isSelected = selectedTags.some(
+                                    (t) => t.toLowerCase() === tag.toLowerCase(),
+                                  );
+                                  return (
+                                    <button
+                                      key={tag}
+                                      type="button"
+                                      onClick={() => addTag(tag)}
+                                      disabled={disabled || isSelected}
+                                      className={`tag-badge-outline px-3 py-1.5 rounded-full text-[13px] font-medium ${
+                                        isSelected
+                                          ? 'opacity-40 cursor-not-allowed ring-1 ring-purple-400/40'
+                                          : ''
+                                      }`}
+                                    >
+                                      #{tag}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -1625,12 +1654,12 @@ const CreateDesignInner: React.FC = () => {
                   </div>
                 </label>
 
-                <label className="flex items-start gap-3 p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 cursor-pointer hover:border-purple-500/30 transition-colors">
+                <label className={`flex items-start gap-3 p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 transition-colors ${storeSetupComplete === false ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-purple-500/30'}`}>
                   <input
                     type="checkbox"
                     checked={isMadeToOrder}
                     onChange={(e) => setIsMadeToOrder(e.target.checked)}
-                    disabled={disabled}
+                    disabled={disabled || storeSetupComplete === false}
                     className="w-5 h-5 mt-0.5 rounded border-gray-400 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-transparent"
                   />
                   <div>
@@ -1638,7 +1667,9 @@ const CreateDesignInner: React.FC = () => {
                       Made to Order
                     </span>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Show "Custom Order" badge on design
+                      {storeSetupComplete === false
+                        ? 'Complete your store setup to enable custom orders'
+                        : 'Show "Custom Order" badge on design'}
                     </p>
                   </div>
                 </label>

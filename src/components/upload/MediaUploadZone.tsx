@@ -90,7 +90,10 @@ const MediaUploadZone: React.FC<MediaUploadZoneProps> = ({
 
           {/* Upload limit info */}
           <p className="text-sm text-gray-500">
-            Up to {maxFiles} files • Images & videos supported
+            Up to {maxFiles} images • Cover required when images exist
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Minimum 4 required to publish: Front, Left Side, Right Side, Back Side
           </p>
 
           {/* Action buttons (mobile) */}

@@ -342,7 +342,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
             aria-label={resolvedIsDark ? 'Switch to light theme' : 'Switch to dark theme'}
             title={resolvedIsDark ? 'Switch to light theme' : 'Switch to dark theme'}
           >
-            <span aria-hidden="true" className="text-lg">{resolvedIsDark ? '🌙' : '🌞'}</span>
+            <span aria-hidden="true" className="text-lg">{resolvedIsDark ? '🌞' : '🌙'}</span>
           </button>
 
           {user ? (
@@ -365,9 +365,9 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
             type="button"
             onClick={() => dispatch(isCartOpen ? closeCartDrawer() : openCartDrawer())}
             className="relative hidden rounded-full p-2 text-xl transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 sm:flex"
-            aria-label="Cart"
+            aria-label="Bag"
           >
-            <span role="img" aria-hidden="true">🛒</span>
+            <span role="img" aria-hidden="true">🛍️</span>
             {cartQuantity > 0 ? (
               <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-xs font-bold text-white">
                 {cartQuantity > 99 ? '99+' : cartQuantity}

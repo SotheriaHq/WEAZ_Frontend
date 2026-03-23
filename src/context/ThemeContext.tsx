@@ -34,9 +34,24 @@ export function ThemeProvider({
   useLayoutEffect(() => {
     const root = window.document.documentElement;
     const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const newClass = isDark ? 'dark' : 'light';
+
+    // Only gate the transition when the theme actually changes class
+    const wasLight = root.classList.contains('light');
+    const wasDark = root.classList.contains('dark');
+    const isChanging = (newClass === 'dark' && wasLight) || (newClass === 'light' && wasDark);
+
+    if (isChanging) {
+      root.classList.add('theme-transitioning');
+    }
 
     root.classList.remove('light', 'dark');
-    root.classList.add(isDark ? 'dark' : 'light');
+    root.classList.add(newClass);
+
+    if (isChanging) {
+      const timer = setTimeout(() => root.classList.remove('theme-transitioning'), 300);
+      return () => clearTimeout(timer);
+    }
   }, [theme]);
 
   // Sync when system theme changes (only when theme is 'system') and across tabs
@@ -45,8 +60,10 @@ export function ThemeProvider({
     const handleMql = () => {
       if (theme === 'system') {
         const root = window.document.documentElement;
+        root.classList.add('theme-transitioning');
         root.classList.remove('light', 'dark');
         root.classList.add(mql.matches ? 'dark' : 'light');
+        setTimeout(() => root.classList.remove('theme-transitioning'), 300);
       }
     };
     mql.addEventListener?.('change', handleMql);

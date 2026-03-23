@@ -97,7 +97,7 @@ const VLoader: React.FC<VLoaderProps> = ({
         style={{ width: size, height: size, ...ringStyle }}
         aria-label={`${phaseLabel} ${completion}%`}
       >
-        <div className="relative flex h-full w-full items-center justify-center rounded-full bg-[#0f0f0f] text-white">
+        <div className="relative flex h-full w-full items-center justify-center rounded-full bg-transparent text-purple-600 dark:text-fuchsia-300">
           <span
             className={`text-[1.45rem] leading-none ${isActive ? 'animate-[spin_1.8s_linear_infinite]' : ''}`}
             aria-hidden="true"
@@ -109,7 +109,7 @@ const VLoader: React.FC<VLoaderProps> = ({
       {showLabel ? (
         <div className="mt-2 text-center">
           <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">{phaseLabel}</p>
-          <p className="text-[10px] text-slate-500 dark:text-slate-400">{completion}% complete</p>
+          <p className="text-sm font-extrabold text-purple-600 dark:text-fuchsia-300">{completion}% complete</p>
         </div>
       ) : null}
     </div>

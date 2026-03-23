@@ -1,7 +1,11 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import SettingsSidebar from '@/components/settings/SettingsSidebar';
+import { ChevronRight, Construction } from 'lucide-react';
+import SettingsSidebar, {
+  getGroupForKey,
+  getItemForKey,
+} from '@/components/settings/SettingsSidebar';
 import SecuritySettings from '@/components/settings/tabs/SecuritySettings';
 import PatchesSettings from '@/components/settings/tabs/PatchesSettings';
 import SubscriptionsSettings from '@/components/settings/tabs/SubscriptionsSettings';
@@ -14,77 +18,165 @@ import SizeFitSettings from '@/components/settings/tabs/SizeFitSettings';
 import HiddenContentSettings from './HiddenContentSettings';
 import type { RootState } from '@/store';
 
+/* ── Coming Soon placeholder ─────────────────────────────────────── */
+const ComingSoon: React.FC<{ title: string; description: string }> = ({
+  title,
+  description,
+}) => (
+  <div className="space-y-6">
+    <div>
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+        {title}
+      </h1>
+      <p className="text-gray-500 dark:text-gray-400">{description}</p>
+    </div>
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="p-4 rounded-full bg-gray-100 dark:bg-white/5 mb-4">
+        <Construction className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+      </div>
+      <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-1">
+        Coming Soon
+      </h3>
+      <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm">
+        We're building this section. It will be available in a future update.
+      </p>
+    </div>
+  </div>
+);
+
+/* ── Danger Zone (Store) ─────────────────────────────────────────── */
+const StoreDangerZone: React.FC = () => (
+  <div className="space-y-6">
+    <div>
+      <h1 className="text-2xl font-semibold text-red-600 dark:text-red-400 mb-2">
+        Danger Zone
+      </h1>
+      <p className="text-gray-500 dark:text-gray-400">
+        Irreversible actions for your store. Proceed with caution.
+      </p>
+    </div>
+    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
+      <h3 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">
+        Close Store
+      </h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        Permanently close your store. All active listings will be removed and
+        pending orders must be fulfilled first. This action cannot be undone.
+      </p>
+      <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
+        Close Store
+      </button>
+    </div>
+    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
+      <h3 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">
+        Delete Store Data
+      </h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        Request permanent deletion of all store data including products,
+        orders history, and analytics. This is irreversible.
+      </p>
+      <button className="px-4 py-2 border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded-lg text-sm font-medium transition-colors">
+        Request Data Deletion
+      </button>
+    </div>
+  </div>
+);
+
+/* ── Section map ─────────────────────────────────────────────────── */
 const sections: Record<string, React.ReactNode> = {
-  security: <SecuritySettings />,
-  patches: <PatchesSettings />,
-  subscriptions: <SubscriptionsSettings />,
+  // Personal
   account: <AccountSettings />,
+  security: <SecuritySettings />,
   notifications: <NotificationSettings />,
+  privacy: (
+    <ComingSoon
+      title="Privacy"
+      description="Control who can see your activity, message you, and access your data."
+    />
+  ),
   'profile-visibility': <ProfileVisibilitySettings />,
   'size-fits': <SizeFitSettings />,
   'hidden-content': <HiddenContentSettings />,
+  billing: (
+    <ComingSoon
+      title="Billing & Payments"
+      description="View invoices, manage payment methods, and track spending."
+    />
+  ),
+
+  // Brand
+  patches: <PatchesSettings />,
+  subscriptions: <SubscriptionsSettings />,
+
+  // Studio
   'store-general': <StoreGeneralSettings />,
   'store-social': (
-    <>
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Social & Verification</h1>
-      <p className="text-gray-500 dark:text-gray-400">Manage your store's social links and verification status.</p>
-    </>
+    <ComingSoon
+      title="Social & Links"
+      description="Connect your social accounts and manage verification badges for your store."
+    />
   ),
   'store-policies': <StorePoliciesSettings />,
   'store-payments': (
-    <>
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Payments & Payouts</h1>
-      <p className="text-gray-500 dark:text-gray-400">Manage your payment methods and payout settings.</p>
-    </>
+    <ComingSoon
+      title="Payments & Payouts"
+      description="Set up payout methods, view payout history, and configure payment preferences."
+    />
   ),
   'store-team': (
-    <>
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Team Members</h1>
-      <p className="text-gray-500 dark:text-gray-400">Manage who has access to your store settings.</p>
-    </>
+    <ComingSoon
+      title="Team Members"
+      description="Invite team members and manage who has access to your store settings."
+    />
   ),
   'store-notifications': <NotificationSettings />,
-  'store-danger': (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-red-600 dark:text-red-400 mb-2">Danger Zone</h1>
-      <p className="text-gray-500 dark:text-gray-400">Irreversible actions for your store.</p>
-      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
-        <h3 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">Close Store</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Permanently close your store. This action cannot be undone.
-        </p>
-        <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
-          Close Store
-        </button>
-      </div>
-    </div>
-  ),
-  privacy: (
-    <>
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Privacy</h1>
-      <p className="text-gray-500 dark:text-gray-400">Manage your privacy settings.</p>
-    </>
-  ),
-  billing: (
-    <>
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Billing & payments</h1>
-      <p className="text-gray-500 dark:text-gray-400">No invoices yet.</p>
-    </>
-  ),
-  advanced: (
-    <>
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Advanced settings</h1>
-      <p className="text-gray-500 dark:text-gray-400">Coming soon.</p>
-    </>
-  ),
+  'store-danger': <StoreDangerZone />,
 };
 
+/* ── Breadcrumbs ─────────────────────────────────────────────────── */
+const Breadcrumbs: React.FC<{ activeKey: string; onNavigate: (key: string) => void }> = ({
+  activeKey,
+  onNavigate,
+}) => {
+  const group = getGroupForKey(activeKey);
+  const item = getItemForKey(activeKey);
+
+  return (
+    <nav className="flex items-center gap-1.5 text-sm mb-6 flex-wrap">
+      <button
+        onClick={() => onNavigate('account')}
+        className="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+      >
+        Settings
+      </button>
+      {group && (
+        <>
+          <ChevronRight className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />
+          <span className="text-gray-400 dark:text-gray-500">
+            {group.label}
+          </span>
+        </>
+      )}
+      {item && (
+        <>
+          <ChevronRight className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />
+          <span className="text-gray-900 dark:text-white font-medium">
+            {item.label}
+          </span>
+        </>
+      )}
+    </nav>
+  );
+};
+
+/* ── Main component ──────────────────────────────────────────────── */
 const SettingsHome: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const me = useSelector((s: RootState) => s.user.profile);
   const isBrandUser = me?.type === 'BRAND';
   const active = searchParams.get('tab') || 'account';
-  const resolvedActive = !isBrandUser && active.startsWith('store-') ? 'account' : active;
+  const resolvedActive =
+    !isBrandUser && active.startsWith('store-') ? 'account' : active;
 
   const setActive = (key: string) => {
     setSearchParams({ tab: key });
@@ -92,13 +184,17 @@ const SettingsHome: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Local settings sidebar with its own panel */}
       <SettingsSidebar active={resolvedActive} onSelect={setActive} />
 
-      {/* Content area shifts for the settings sidebar only (global sidebar is hidden) */}
       <div className="min-h-screen pb-10 px-4 md:pl-[248px] pt-6">
         <div className="max-w-4xl mx-auto">
-          {sections[resolvedActive]}
+          <Breadcrumbs activeKey={resolvedActive} onNavigate={setActive} />
+          {sections[resolvedActive] ?? (
+            <ComingSoon
+              title="Not Found"
+              description="This settings section doesn't exist or has been moved."
+            />
+          )}
         </div>
       </div>
     </div>

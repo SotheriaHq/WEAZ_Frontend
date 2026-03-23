@@ -173,6 +173,7 @@ export interface AdminDesign {
   coverImage?: string | null;
   coverImageFileId?: string | null;
   orderCount?: number;
+  viewCount?: number;
   createdAt: string;
   updatedAt: string;
   owner?: { id: string; email: string; firstName: string; lastName: string };

@@ -50,6 +50,11 @@ const AdminContentManagementPage: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
+
+  // Designs-specific filters
+  const [designVisibility, setDesignVisibility] = useState<'' | 'PUBLIC' | 'PRIVATE'>('');
+  const [designStatus, setDesignStatus] = useState<'' | 'PUBLISHED' | 'ARCHIVED' | 'DRAFT'>('');
+  const [designSortBy, setDesignSortBy] = useState<'' | 'recent' | 'oldest' | 'views' | 'orders'>('');
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [designs, setDesigns] = useState<AdminDesign[]>([]);
   const [collections, setCollections] = useState<AdminCollection[]>([]);
@@ -110,13 +115,16 @@ const AdminContentManagementPage: React.FC = () => {
         return parsePage<AdminProduct>(res.data);
       }
       if (tab === 'designs') {
+        if (designVisibility) params.visibility = designVisibility;
+        if (designStatus) params.status = designStatus;
+        if (designSortBy) params.sortBy = designSortBy;
         const res = await adminDesignsApi.list(params);
         return parsePage<AdminDesign>(res.data);
       }
       const res = await adminCollectionsApi.list(params);
       return parsePage<AdminCollection>(res.data);
     },
-    [debouncedSearch, tab],
+    [debouncedSearch, designSortBy, designStatus, designVisibility, tab],
   );
 
   const loadPage = useCallback(
@@ -158,7 +166,7 @@ const AdminContentManagementPage: React.FC = () => {
     if (visibleTabs.length === 0) return;
     updateUrlTab(tab);
     void loadPage(false);
-  }, [tab, debouncedSearch, visibleTabs.length]);
+  }, [tab, debouncedSearch, designVisibility, designStatus, designSortBy, visibleTabs.length]);
 
   const currentItemsCount = useMemo(() => {
     if (tab === 'products') return products.length;
@@ -301,6 +309,51 @@ const AdminContentManagementPage: React.FC = () => {
             {currentItemsCount} loaded
           </div>
         </div>
+
+        {/* Designs-specific filters */}
+        {tab === 'designs' && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <select
+              value={designVisibility}
+              onChange={(event) => setDesignVisibility(event.target.value as '' | 'PUBLIC' | 'PRIVATE')}
+              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 outline-none focus:border-purple-400 dark:border-white/10 dark:bg-black/20 dark:text-gray-300"
+            >
+              <option value="">All visibility</option>
+              <option value="PUBLIC">Public</option>
+              <option value="PRIVATE">Private</option>
+            </select>
+            <select
+              value={designStatus}
+              onChange={(event) => setDesignStatus(event.target.value as '' | 'PUBLISHED' | 'ARCHIVED' | 'DRAFT')}
+              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 outline-none focus:border-purple-400 dark:border-white/10 dark:bg-black/20 dark:text-gray-300"
+            >
+              <option value="">All statuses</option>
+              <option value="PUBLISHED">Published</option>
+              <option value="ARCHIVED">Archived</option>
+              <option value="DRAFT">Draft</option>
+            </select>
+            <select
+              value={designSortBy}
+              onChange={(event) => setDesignSortBy(event.target.value as '' | 'recent' | 'oldest' | 'views' | 'orders')}
+              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 outline-none focus:border-purple-400 dark:border-white/10 dark:bg-black/20 dark:text-gray-300"
+            >
+              <option value="">Sort: Newest</option>
+              <option value="recent">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="views">Most viewed</option>
+              <option value="orders">Most ordered</option>
+            </select>
+            {(designVisibility || designStatus || designSortBy) && (
+              <button
+                type="button"
+                onClick={() => { setDesignVisibility(''); setDesignStatus(''); setDesignSortBy(''); }}
+                className="rounded-lg px-2 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-500/10"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       {error && (
@@ -406,13 +459,16 @@ const AdminContentManagementPage: React.FC = () => {
           )}
 
           {tab === 'designs' && (
-            <table className="w-full min-w-[860px] text-sm">
+            <table className="w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-gray-200/80 text-left text-xs uppercase tracking-wide text-gray-500 dark:border-white/10 dark:text-gray-400">
                   <th className="px-4 py-3">Design</th>
                   <th className="px-4 py-3">Owner</th>
+                  <th className="px-4 py-3">Visibility</th>
+                  <th className="px-4 py-3">Views</th>
                   <th className="px-4 py-3">Orders</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Uploaded</th>
                   {canModerateCollections && <th className="px-4 py-3">Actions</th>}
                 </tr>
               </thead>
@@ -439,11 +495,30 @@ const AdminContentManagementPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{design.owner?.email || design.ownerId}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        design.visibility === 'PUBLIC'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                          : 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400'
+                      }`}>
+                        {design.visibility === 'PUBLIC' ? 'Public' : 'Private'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{design.viewCount ?? 0}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{design.orderCount ?? 0}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        design.status === 'PUBLISHED'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300'
+                          : design.status === 'ARCHIVED'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                            : 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400'
+                      }`}>
                         {design.status}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      {new Date(design.createdAt).toLocaleDateString()}
                     </td>
                     {canModerateCollections && (
                       <td className="px-4 py-3">

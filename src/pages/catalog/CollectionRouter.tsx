@@ -5,13 +5,12 @@
  * Detects whether the ID refers to a design collection or a store collection
  * and renders the appropriate view.
  *
- * - Store collections → renders `CollectionView` (InlineCollectionViewer-based)
- * - Design collections → renders `DesignView`
+ * - Store collections → renders `InlineStoreCollectionView` with product drill-down
+ * - Design collections → redirects to `/market?openDesign=<id>` (modal view)
  */
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { brandApi } from '@/api/BrandApi';
-import DesignView from './DesignView';
 import { Layout } from '@/components/Layout';
 import InlineStoreCollectionView from '@/components/catalog/InlineStoreCollectionView';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
@@ -39,12 +38,15 @@ const CollectionRouter: React.FC = () => {
         if (d?.isAvailableInStore === true || d?.domain === 'STORE') {
           setType('store');
         } else {
-          setType('design');
+          // Design collections open in the modal on the market page
+          navigate(`/market?openDesign=${id}`, { replace: true });
+          return;
         }
       } catch {
         if (mounted) {
-          // Fallback to design view — it has its own error handling (locks, 404, etc.)
-          setType('design');
+          // Fallback: open as design modal on market page
+          navigate(`/market?openDesign=${id}`, { replace: true });
+          return;
         }
       } finally {
         if (mounted) setLoading(false);
@@ -59,17 +61,19 @@ const CollectionRouter: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full bg-gray-50 dark:bg-black flex items-center justify-center">
-        <div className="animate-pulse space-y-4 w-full max-w-4xl px-6 pt-24">
-          <div className="h-6 w-40 bg-gray-200 dark:bg-gray-800 rounded-lg" />
-          <div className="h-10 w-72 bg-gray-200 dark:bg-gray-800 rounded-lg" />
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="aspect-[3/4] bg-gray-200 dark:bg-gray-800 rounded-xl" />
-            ))}
+      <Layout>
+        <div className="min-h-screen w-full bg-gray-50 dark:bg-black flex items-center justify-center">
+          <div className="animate-pulse space-y-4 w-full max-w-4xl px-6 pt-24">
+            <div className="h-6 w-40 bg-gray-200 dark:bg-gray-800 rounded-lg" />
+            <div className="h-10 w-72 bg-gray-200 dark:bg-gray-800 rounded-lg" />
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="aspect-[3/4] bg-gray-200 dark:bg-gray-800 rounded-xl" />
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
@@ -98,8 +102,8 @@ const CollectionRouter: React.FC = () => {
     );
   }
 
-  // Design collections use the existing DesignView
-  return <DesignView />;
+  // If we somehow reach here without a type, redirect to market
+  return null;
 };
 
 export default CollectionRouter;

@@ -165,9 +165,9 @@ const WishlistDrawer: React.FC = () => {
       await dispatch(addToCart({ productId: product.id, quantity: 1 })).unwrap();
       dispatch(closeWishlistDrawer());
       dispatch(openCartDrawer());
-      toast.success('Added to cart');
+      toast.success('Bagged!');
     } catch (error: any) {
-      toast.error(error || 'Failed to add to cart');
+      toast.error(error || 'Failed to bag item');
     }
   };
 
@@ -435,7 +435,7 @@ const WishlistDrawer: React.FC = () => {
                                       className={`ml-auto shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20 border border-indigo-100 dark:border-indigo-500/20`}
                                     >
                                       <ShoppingCart size={12} />
-                                      {requiresOptionSelection(product) ? 'Select Options' : 'Add to Cart'}
+                                      {requiresOptionSelection(product) ? 'Select Options' : '🛍️ Bag it'}
                                     </button>
                                   )}
                                 </div>

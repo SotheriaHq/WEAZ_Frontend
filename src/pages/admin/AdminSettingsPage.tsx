@@ -8,7 +8,7 @@ import { unwrapApiResponse } from '@/types/auth';
 import { useUploadLimits } from '@/context/UploadLimitsContext';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 
-type Tab = 'sla' | 'flags' | 'uploads' | 'dashboard';
+type Tab = 'sla' | 'flags' | 'uploads' | 'dashboard' | 'messaging';
 
 /** Human-readable labels for upload config keys */
 const UPLOAD_KEY_LABELS: Record<string, { label: string; hint: string }> = {
@@ -159,9 +159,44 @@ const AdminSettingsPage: React.FC = () => {
     { value: 'flags', label: 'Feature Flags' },
     { value: 'uploads', label: 'Upload Limits' },
     { value: 'dashboard', label: 'Dashboard' },
+    { value: 'messaging', label: 'Messaging Rules' },
   ];
 
   const showDailySignupCount = (systemConfig['admin.dashboard.showDailySignupCount'] ?? 'true') === 'true';
+
+  /* ---- Messaging auto-hide rules (derived from systemConfig) ---- */
+  const MESSAGING_RULES: { key: string; label: string; hint: string; type: 'toggle' | 'hours' }[] = [
+    { key: 'messaging.autoHide.unverifiedUsers', label: 'Hide messages from unverified users', hint: 'Automatically hide messages sent by users who have not verified their account', type: 'toggle' },
+    { key: 'messaging.autoHide.unverifiedUsersDelayHours', label: 'Delay before hiding (hours)', hint: 'Hide messages from unverified users after this many hours', type: 'hours' },
+    { key: 'messaging.autoHide.incompleteStoreSetup', label: 'Hide messages from brands without store setup', hint: 'Automatically hide messages from brands that have not completed their store setup', type: 'toggle' },
+    { key: 'messaging.autoHide.incompleteStoreSetupDelayHours', label: 'Delay before hiding (hours)', hint: 'Hide messages from incomplete-setup brands after this many hours', type: 'hours' },
+    { key: 'messaging.autoHide.newAccounts', label: 'Hide messages from new accounts', hint: 'Automatically hide messages from accounts less than N hours old', type: 'toggle' },
+    { key: 'messaging.autoHide.newAccountsDelayHours', label: 'New account age threshold (hours)', hint: 'Accounts younger than this are considered "new"', type: 'hours' },
+  ];
+
+  const [messagingDirty, setMessagingDirty] = useState<Record<string, string>>({});
+
+  const getMessagingVal = (key: string) => messagingDirty[key] ?? systemConfig[key] ?? '';
+  const setMessagingVal = (key: string, val: string) => setMessagingDirty((prev) => ({ ...prev, [key]: val }));
+  const hasMessagingChanges = Object.keys(messagingDirty).some((k) => messagingDirty[k] !== (systemConfig[k] ?? ''));
+
+  const handleSaveMessagingRules = async () => {
+    const entries = Object.entries(messagingDirty)
+      .filter(([k, v]) => v !== (systemConfig[k] ?? ''))
+      .map(([key, value]) => ({ key, value }));
+    if (entries.length === 0) return;
+    setSaving(true);
+    try {
+      await configApi.bulkUpdateConfig(entries);
+      toast.success('Messaging rules saved');
+      setMessagingDirty({});
+      await fetchData();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to save messaging rules');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleToggleDailySignupCount = async () => {
     setSaving(true);
@@ -302,6 +337,75 @@ const AdminSettingsPage: React.FC = () => {
                 {saving ? 'Saving...' : showDailySignupCount ? 'Visible' : 'Hidden'}
               </button>
             </div>
+          </div>
+        </div>
+      ) : tab === 'messaging' ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Auto-Hide Message Rules</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Configure global rules that automatically hide messages matching certain criteria.
+                These rules are evaluated by the backend when messages are sent.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveMessagingRules}
+              disabled={!hasMessagingChanges || saving}
+              className="shrink-0 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {MESSAGING_RULES.map((rule) => {
+              const val = getMessagingVal(rule.key);
+              if (rule.type === 'toggle') {
+                const isEnabled = val === 'true';
+                return (
+                  <div key={rule.key} className="rounded-xl border border-gray-200/60 bg-white/60 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{rule.label}</div>
+                        <div className="text-[11px] text-gray-500 dark:text-gray-400">{rule.hint}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMessagingVal(rule.key, isEnabled ? 'false' : 'true')}
+                        className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                          isEnabled
+                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-300'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300'
+                        }`}
+                      >
+                        {isEnabled ? 'Enabled' : 'Disabled'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+              // hours input
+              return (
+                <div key={rule.key} className="rounded-xl border border-gray-200/60 bg-white/60 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{rule.label}</div>
+                      <div className="text-[11px] text-gray-500 dark:text-gray-400">{rule.hint}</div>
+                    </div>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={val || '24'}
+                      onChange={(e) => setMessagingVal(rule.key, e.target.value)}
+                      className="w-20 shrink-0 rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm text-right font-mono outline-none focus:ring-1 focus:ring-purple-400/50"
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : (

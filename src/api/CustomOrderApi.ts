@@ -1054,6 +1054,11 @@ export const customOrdersAdminApi = {
     return unwrapApiResponse<CustomOrderDetail>(response.data);
   },
 
+  async cancelPaidOrder(orderId: string, payload: { reason: string; note?: string }) {
+    const response = await apiClient.post(`/admin/custom-orders/${orderId}/cancel`, payload);
+    return unwrapApiResponse<Record<string, unknown>>(response.data);
+  },
+
   async updateRetentionHold(orderId: string, payload: UpdateCustomOrderRetentionHoldInput) {
     const response = await apiClient.patch(`/admin/custom-orders/${orderId}/retention-hold`, payload);
     return unwrapApiResponse<Record<string, unknown>>(response.data);

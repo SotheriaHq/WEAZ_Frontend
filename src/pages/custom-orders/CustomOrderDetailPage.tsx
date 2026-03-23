@@ -199,7 +199,7 @@ const CustomOrderDetailPage: React.FC = () => {
 
     const approved = await confirm({
       title: 'Cancel this custom order?',
-      message: 'Use this before brand acceptance only. Cancelling now stops the current order request and can affect payment handling.',
+      message: 'Use this before payment confirmation only. Cancelling now stops the current order request and can affect payment handling.',
       confirmText: 'Cancel order',
       cancelText: 'Keep order',
       isDestructive: true,
@@ -519,7 +519,7 @@ const CustomOrderDetailPage: React.FC = () => {
                 </div>
 
                 <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white">Cancel before brand acceptance</div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">Cancel before payment confirmation</div>
                   <textarea value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} rows={3} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Explain the cancellation reason" />
                   <button type="button" disabled={busy || !canCancel || cancelReason.trim().length < 3} onClick={() => void handleCancelOrder()} className="mt-3 rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white">
                     Cancel custom order
