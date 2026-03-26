@@ -65,7 +65,6 @@ const StoreVerificationPage = lazy(() => import('./pages/studio/store/StoreVerif
 const VerificationWizardPage = lazy(() => import('./pages/studio/store/VerificationWizardPage'));
 const VerificationSubmittedPage = lazy(() => import('./pages/studio/store/VerificationSubmittedPage'));
 const StoreCollectionCreate = lazy(() => import('./pages/studio/store/StoreCollectionCreate'));
-const CustomOrdersPage = lazy(() => import('./pages/studio/CustomOrdersPage'));
 const MyOrders = lazy(() => import('./pages/orders/MyOrders'));
 const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
 const CustomOrdersIndexPage = lazy(() => import('./pages/custom-orders/CustomOrdersIndexPage'));
@@ -180,6 +179,18 @@ const LegacyProductEditRedirect: React.FC = () => {
   return <Navigate to={id ? `/studio/store/products/${id}/edit` : '/studio/store'} replace />;
 };
 
+const LegacyStudioCustomOrdersRedirect: React.FC = () => {
+  const { orderId } = useParams<{ orderId: string }>();
+  const params = new URLSearchParams({
+    tab: 'orders',
+    orderTab: 'custom',
+  });
+  if (orderId) {
+    params.set('customOrderId', orderId);
+  }
+  return <Navigate to={`/studio?${params.toString()}`} replace />;
+};
+
 const profileChildren = [
   { index: true, element: <Profile /> },
   {
@@ -283,7 +294,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/studio/store/custom-orders',
-        element: <Navigate to="/studio/custom-orders" replace />,
+        element: <Navigate to="/studio?tab=orders&orderTab=custom" replace />,
       },
       {
         path: '/studio/store/collections/new',
@@ -335,27 +346,11 @@ const router = createBrowserRouter([
       },
       {
         path: '/studio/custom-orders',
-        element: (
-          <RequireBrand>
-            <RequireStoreSetup>
-              <StudioScaffold active="custom-orders" onSelect={() => {}}>
-                <CustomOrdersPage />
-              </StudioScaffold>
-            </RequireStoreSetup>
-          </RequireBrand>
-        ),
+        element: <LegacyStudioCustomOrdersRedirect />,
       },
       {
         path: '/studio/custom-orders/:orderId',
-        element: (
-          <RequireBrand>
-            <RequireStoreSetup>
-              <StudioScaffold active="custom-orders" onSelect={() => {}}>
-                <CustomOrdersPage />
-              </StudioScaffold>
-            </RequireStoreSetup>
-          </RequireBrand>
-        ),
+        element: <LegacyStudioCustomOrdersRedirect />,
       },
       {
         path: '/studio/messages',

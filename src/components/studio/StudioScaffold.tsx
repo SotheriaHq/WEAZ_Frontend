@@ -28,13 +28,13 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
   }, [dispatch]);
 
   return (
-    <div className="min-h-screen threadly-shell-bg">
+    <div className="min-h-screen threadly-shell-bg overflow-x-clip">
       <Navbar minimal={false} />
       <Sidebar overlayOnly />
       <StudioSidebar active={active} onSelect={onSelect} />
 
-      <div className="min-h-screen pb-10 px-4 md:pl-[220px] pt-20">
-        <div className="max-w-6xl mx-auto">{children}</div>
+      <div className="min-h-screen px-3 pb-28 pt-20 sm:px-4 lg:pb-10 lg:pl-[236px]">
+        <div className="mx-auto max-w-6xl min-w-0">{children}</div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyOrders, type Order } from '@/api/StoreApi';
 import { toast } from 'sonner';
@@ -7,6 +7,26 @@ import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
 import VLoader from '@/components/loaders/VLoader';
 import { messagingApi, type ThreadSummaryResponse } from '@/api/MessagingApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import UniversalSelect from '@/components/forms/UniversalSelect';
+
+type BuyerOrderTab = 'all' | 'active' | 'awaiting' | 'completed' | 'cancelled';
+
+const tabConfig: Array<{ key: BuyerOrderTab; label: string }> = [
+  { key: 'all', label: 'All orders' },
+  { key: 'active', label: 'In progress' },
+  { key: 'awaiting', label: 'Action needed' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'cancelled', label: 'Cancelled' },
+];
+
+const statusFilterOptions = [
+  { value: 'ALL', label: 'All statuses' },
+  { value: 'PROCESSING', label: 'Processing' },
+  { value: 'SHIPPED', label: 'Shipped' },
+  { value: 'DELIVERED', label: 'Delivered' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+  { value: 'PENDING', label: 'Pending' },
+];
 
 const statusIcon = (status: string) => {
   switch (status) {
@@ -43,6 +63,9 @@ const MyOrders: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [activeTab, setActiveTab] = useState<BuyerOrderTab>('all');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
   const [activeReviewItem, setActiveReviewItem] = useState<any | null>(null);
   const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
 
@@ -80,14 +103,112 @@ const MyOrders: React.FC = () => {
   const formatCurrency = (amount: number, currency: string) =>
     new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
 
+  const stats = useMemo(() => {
+    const total = orders.length;
+    const active = orders.filter((order) => ['PROCESSING', 'SHIPPED'].includes(order.status)).length;
+    const actionNeeded = orders.filter(
+      (order) => order.paymentStatus !== 'PAID' || order.status === 'SHIPPED',
+    ).length;
+    const completed = orders.filter((order) => order.status === 'DELIVERED').length;
+
+    return { total, active, actionNeeded, completed };
+  }, [orders]);
+
+  const filteredOrders = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return orders.filter((order) => {
+      const statusMatch =
+        statusFilter === 'ALL' ||
+        (statusFilter === 'PENDING'
+          ? order.paymentStatus !== 'PAID'
+          : order.status === statusFilter);
+
+      const tabMatch =
+        activeTab === 'all' ||
+        (activeTab === 'active' && ['PROCESSING', 'SHIPPED'].includes(order.status)) ||
+        (activeTab === 'awaiting' && (order.paymentStatus !== 'PAID' || order.status === 'SHIPPED')) ||
+        (activeTab === 'completed' && order.status === 'DELIVERED') ||
+        (activeTab === 'cancelled' && order.status === 'CANCELLED');
+
+      const searchableText = [
+        order.id,
+        order.status,
+        order.items?.map((item) => item.name).join(' '),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      const queryMatch = query.length === 0 || searchableText.includes(query);
+
+      return statusMatch && tabMatch && queryMatch;
+    });
+  }, [activeTab, orders, searchQuery, statusFilter]);
+
   return (
     <div className="max-w-5xl mx-auto py-8 px-4 space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Your Orders</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {!loading && orders.length > 0 ? `${orders.length} order${orders.length === 1 ? '' : 's'}` : 'Track everything you have purchased.'}
+          Track, manage, and follow updates for everything you have purchased.
         </p>
       </div>
+
+      {!loading && orders.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.03]">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Total orders</p>
+            <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+          </div>
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-500/20 dark:bg-blue-500/10">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">In progress</p>
+            <p className="mt-2 text-2xl font-bold text-blue-900 dark:text-blue-200">{stats.active}</p>
+          </div>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Action needed</p>
+            <p className="mt-2 text-2xl font-bold text-amber-900 dark:text-amber-200">{stats.actionNeeded}</p>
+          </div>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Completed</p>
+            <p className="mt-2 text-2xl font-bold text-emerald-900 dark:text-emerald-200">{stats.completed}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {!loading && orders.length > 0 ? (
+        <div className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="flex flex-wrap gap-2">
+            {tabConfig.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                  activeTab === tab.key
+                    ? 'bg-black text-white dark:bg-white dark:text-black'
+                    : 'border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search by order id or item name"
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+            />
+            <UniversalSelect
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={statusFilterOptions}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20">
@@ -113,7 +234,14 @@ const MyOrders: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          {orders.map((order) => {
+          {filteredOrders.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-white/80 p-10 text-center dark:border-white/15 dark:bg-white/[0.03]">
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">No orders match your current filters.</p>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Try a different tab, clear your search, or switch the status filter.</p>
+            </div>
+          ) : null}
+
+          {filteredOrders.map((order) => {
             const summary = summaryByOrderId[order.id];
             const unreadCount = Number(summary?.unreadCount ?? 0);
             const firstItem = order.items?.[0];
@@ -192,7 +320,14 @@ const MyOrders: React.FC = () => {
                           </button>
                         )}
                       </div>
-                      <span aria-hidden="true" className="text-base text-gray-300 transition-colors group-hover:text-gray-500 dark:text-gray-600 dark:group-hover:text-gray-400">›</span>
+                      <div className="flex items-center gap-2">
+                        {order.status === 'SHIPPED' ? (
+                          <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                            📬 Confirm receipt in details
+                          </span>
+                        ) : null}
+                        <span aria-hidden="true" className="text-base text-gray-300 transition-colors group-hover:text-gray-500 dark:text-gray-600 dark:group-hover:text-gray-400">›</span>
+                      </div>
                     </div>
                   </div>
                 </div>

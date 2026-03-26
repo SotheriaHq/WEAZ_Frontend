@@ -466,7 +466,7 @@ export default function StoreManagement() {
         <button
           type="button"
           onClick={() => setAnalyticsCollapsed(false)}
-          className="fixed bottom-20 right-6 z-40 flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 text-sm font-semibold text-white shadow-2xl"
+          className="fixed bottom-24 right-3 z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 text-sm font-semibold text-white shadow-2xl sm:right-6 lg:bottom-20"
           aria-label="Open analytics panel"
         >
           📊 Analytics
@@ -475,7 +475,7 @@ export default function StoreManagement() {
       ) : null}
 
       {analyticsOpen && !analyticsCollapsed ? (
-        <aside className="fixed bottom-6 right-6 top-24 z-40 w-[320px] max-w-[90vw] overflow-y-auto rounded-2xl border border-gray-200 bg-white/95 shadow-2xl dark:border-white/10 dark:bg-white/5">
+        <aside className="fixed inset-x-3 bottom-24 top-[88px] z-40 w-auto max-w-[94vw] overflow-y-auto rounded-2xl border border-gray-200 bg-white/95 shadow-2xl sm:inset-x-auto sm:bottom-6 sm:right-6 sm:top-24 sm:w-[320px] sm:max-w-[90vw] dark:border-white/10 dark:bg-white/5">
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <div>
               <h3 className="text-base font-bold text-gray-900 dark:text-white">

@@ -1803,7 +1803,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               {/* Expandable emoji search */}
               <div
                 ref={searchContainerRef}
-                className={`transition-all duration-300 ease-out ${searchCollapsed ? 'w-11' : 'flex-1 min-w-[220px] max-w-[320px]'}`}
+                className={`transition-all duration-300 ease-out ${searchCollapsed ? 'w-11' : 'w-full sm:flex-1 sm:min-w-[220px] sm:max-w-[320px]'}`}
               >
                 {searchCollapsed ? (
                   <button
@@ -1933,7 +1933,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         </div>
 
         {/* Quick Actions */}
-        <div className="px-5 pt-4 pb-4 flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-5 pb-4 pt-4">
           <button
             type="button"
             onClick={() => setShowQuickActions((v) => !v)}
@@ -1948,7 +1948,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           </button>
           <div
             className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ease-out ${
-              showQuickActions ? 'max-w-[800px] opacity-100' : 'max-w-0 opacity-0'
+              showQuickActions ? 'max-w-[calc(100vw-7rem)] opacity-100 sm:max-w-[800px]' : 'max-w-0 opacity-0'
             }`}
           >
             <button
@@ -2005,7 +2005,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               </button>
               <div
                 className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ease-out ${
-                  showDrafts ? 'max-w-[600px] opacity-100' : 'max-w-0 opacity-0'
+                  showDrafts ? 'max-w-[calc(100vw-7rem)] opacity-100 sm:max-w-[600px]' : 'max-w-0 opacity-0'
                 }`}
               >
                 {draftCollectionsLoading ? (

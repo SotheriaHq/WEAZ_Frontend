@@ -83,7 +83,7 @@ const getStatusDescription = (order: Order) => {
 
   switch (order.status) {
     case 'SHIPPED':
-      return 'The brand has shipped this order. Once it is marked delivered, the receipt confirmation button will appear here.';
+      return 'The brand has shipped this order. If the package has reached you, confirm receipt below to complete the order.';
     case 'DELIVERED':
       return 'The brand marked this order delivered. If the package has reached you, confirm receipt below.';
     case 'PROCESSING':
@@ -313,7 +313,7 @@ const OrderDetail: React.FC = () => {
               <div className="rounded-2xl border border-blue-300/70 bg-blue-50/80 px-4 py-4 text-sm text-blue-900 dark:border-blue-800/40 dark:bg-blue-500/10 dark:text-blue-100">
                 <p className="font-semibold">In transit</p>
                 <p className="mt-1">
-                  This order has been shipped. When the brand marks it delivered, the receipt confirmation button will appear on this page automatically.
+                  This order has been shipped. Confirm receipt as soon as your package reaches you to complete the order and release payment.
                 </p>
               </div>
             ) : null}

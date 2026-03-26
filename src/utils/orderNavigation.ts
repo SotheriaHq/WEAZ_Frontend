@@ -28,7 +28,21 @@ export const buildOrderRoute = ({
     }
 
     if (surface === 'BRAND') {
-      return `/studio/custom-orders/${encodeURIComponent(customOrderId)}`;
+      const params = new URLSearchParams({
+        tab: 'orders',
+        orderTab: 'custom',
+        customOrderId,
+      });
+
+      if (openChat) {
+        params.set('openChat', '1');
+      }
+
+      if (messageId) {
+        params.set('messageId', messageId);
+      }
+
+      return `/studio?${params.toString()}`;
     }
 
     if (surface === 'ADMIN') {

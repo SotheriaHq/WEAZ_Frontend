@@ -677,7 +677,7 @@ export const EndUserProfile: React.FC = () => {
               <ProfileActionsBar actions={profileActions} />
             ) : null}
 
-            <div className="mt-2 flex items-center gap-8 px-1">
+            <div className="mt-2 flex items-center gap-4 overflow-x-auto scrollbar-hide px-1 sm:gap-8">
               {tabs.map(({ key, icon }) => {
                 const active = activeTab === key;
                 return (
@@ -691,8 +691,8 @@ export const EndUserProfile: React.FC = () => {
                         : 'border-b-2 border-transparent text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
                     }`}
                   >
-                    <span>{icon}</span>
-                    <span>{key}</span>
+                    <span className="leading-none">{icon}</span>
+                    <span className="whitespace-nowrap">{key}</span>
                   </button>
                 );
               })}

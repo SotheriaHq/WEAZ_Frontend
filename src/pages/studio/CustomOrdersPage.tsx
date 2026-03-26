@@ -1,5 +1,5 @@
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { getStoreStatus } from '@/api/StoreApi';
 import {
@@ -58,7 +58,9 @@ const statusFilterOptions = [
 
 const CustomOrdersPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { orderId } = useParams<{ orderId: string }>();
+  const selectedOrderId = orderId ?? searchParams.get('customOrderId') ?? null;
   const [brandId, setBrandId] = useState<string | null>(null);
   const [orders, setOrders] = useState<CustomOrderListItem[]>([]);
   const [selected, setSelected] = useState<CustomOrderDetail | null>(null);
@@ -134,8 +136,8 @@ const CustomOrdersPage: React.FC = () => {
         );
       }
 
-      if (orderId) {
-        void loadDetail(status.brandId, orderId, sequence).catch((error: any) => {
+      if (selectedOrderId) {
+        void loadDetail(status.brandId, selectedOrderId, sequence).catch((error: any) => {
           if (refreshSequenceRef.current !== sequence) {
             return;
           }
@@ -155,7 +157,7 @@ const CustomOrdersPage: React.FC = () => {
 
   useEffect(() => {
     void refresh();
-  }, [deferredSearchQuery, orderId, statusFilter]);
+  }, [deferredSearchQuery, selectedOrderId, statusFilter]);
 
   const totals = useMemo(() => {
     return {
@@ -207,7 +209,7 @@ const CustomOrdersPage: React.FC = () => {
           <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">Custom orders</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Manage auto-accepted paid orders, publish production stages, and coordinate delivery updates.</p>
         </div>
-        <div className="grid min-w-[260px] grid-cols-3 gap-3">
+        <div className="grid w-full grid-cols-3 gap-2 sm:min-w-[260px] sm:gap-3">
           <div className="rounded-2xl border border-black/10 bg-white/70 p-4 text-center dark:border-white/10 dark:bg-white/5"><div className="text-xs uppercase tracking-wide text-slate-500">Total</div><div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{totals.total}</div></div>
           <div className="rounded-2xl border border-black/10 bg-white/70 p-4 text-center dark:border-white/10 dark:bg-white/5"><div className="text-xs uppercase tracking-wide text-slate-500">Accepted</div><div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{totals.accepted}</div></div>
           <div className="rounded-2xl border border-black/10 bg-white/70 p-4 text-center dark:border-white/10 dark:bg-white/5"><div className="text-xs uppercase tracking-wide text-slate-500">Active</div><div className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{totals.liveProduction}</div></div>
@@ -217,12 +219,12 @@ const CustomOrdersPage: React.FC = () => {
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
           <div className="flex flex-wrap gap-3">
-            <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search title" className="min-w-[220px] flex-1 rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" />
+            <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search title" className="w-full flex-1 rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm sm:min-w-[220px] dark:border-white/10 dark:bg-slate-950" />
             <UniversalSelect
               value={statusFilter}
               onChange={setStatusFilter}
               options={statusFilterOptions}
-              className="min-w-[230px]"
+              className="w-full sm:w-auto sm:min-w-[230px]"
             />
           </div>
 
@@ -237,7 +239,11 @@ const CustomOrdersPage: React.FC = () => {
               <button
                 key={entry.id}
                 type="button"
-                onClick={() => navigate(`/studio/custom-orders/${entry.id}`)}
+                onClick={() =>
+                  navigate(
+                    `/studio?tab=orders&orderTab=custom&customOrderId=${encodeURIComponent(entry.id)}`,
+                  )
+                }
                 className={`w-full rounded-2xl border px-4 py-4 text-left transition ${selected?.id === entry.id ? 'border-emerald-400 bg-emerald-500/10' : 'border-black/10 bg-white/70 hover:border-emerald-300 dark:border-white/10 dark:bg-white/[0.03]'}`}
               >
                 <div className="flex items-center justify-between gap-4">

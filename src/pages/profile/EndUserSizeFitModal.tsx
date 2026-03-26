@@ -247,7 +247,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                     No baseline measurement points are available for your profile yet.
                   </div>
                 ) : null}
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_180px] gap-3">
+                <div className="mt-3 grid grid-cols-1 lg:grid-cols-[1fr_180px] gap-3">
                   <label className="text-xs text-[color:var(--neu-text-muted)]">
                     <span className="block mb-1">Fit Notes</span>
                     <textarea
@@ -290,7 +290,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                   Permissions & Visibility
                 </summary>
 
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
                   <UniversalSelect
                     label="Visibility"
                     value={visibility}

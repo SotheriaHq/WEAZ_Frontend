@@ -307,7 +307,7 @@ export default function StoreVerificationPage() {
                   signal aligned with the real store state.
                 </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[280px]">
+              <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[280px]">
                 <div className="rounded-3xl border border-sky-200 bg-sky-50 px-4 py-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-600">
                     Status

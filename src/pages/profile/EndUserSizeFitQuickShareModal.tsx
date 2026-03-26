@@ -107,7 +107,7 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
                     : 'People can re-share according to your policy.'}
               </p>
 
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
+              <div className="mt-4 grid grid-cols-1 lg:grid-cols-[1fr_1fr_auto] gap-3">
                 <input
                   value={shareTarget}
                   onChange={(event) => setShareTarget(event.target.value)}

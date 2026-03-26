@@ -238,8 +238,8 @@ const FinancePage: React.FC = () => {
             Credits released into your brand wallet after shipment, delivery, or custom-order milestones.
           </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[620px] text-left text-sm sm:min-w-[700px] lg:min-w-[760px]">
             <thead className="bg-gray-50 text-gray-500 dark:bg-gray-800/50 dark:text-gray-400">
               <tr>
                 <th className="px-6 py-4 font-medium">Transaction</th>
@@ -310,8 +310,8 @@ const FinancePage: React.FC = () => {
         <div className="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
           <h2 className="text-lg font-semibold">Payout History</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px] text-left text-sm">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[560px] text-left text-sm sm:min-w-[620px] lg:min-w-[680px]">
             <thead className="bg-gray-50 text-gray-500 dark:bg-gray-800/50 dark:text-gray-400">
               <tr>
                 <th className="px-6 py-4 font-medium">Reference</th>

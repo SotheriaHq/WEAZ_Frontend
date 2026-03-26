@@ -538,9 +538,9 @@ export default function VerificationWizardPage() {
       ) : null}
 
       {!wizardLockMessage ? (
-      <div className="grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm lg:sticky lg:top-24">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+      <div className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm xl:sticky xl:top-24">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             {VERIFICATION_STEPS.map((item, index) => {
               const isActive = index === stepIndex;
               const isComplete = index < stepIndex;

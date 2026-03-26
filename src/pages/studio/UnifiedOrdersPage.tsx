@@ -33,7 +33,7 @@ const UnifiedOrdersPage: React.FC = () => {
     <div className="space-y-0">
       {/* Tab bar */}
       <div className="sticky top-0 z-10 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-gray-200/50 dark:border-white/10">
-        <div className="flex items-center gap-1 px-4 py-2 sm:px-6">
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide px-2 py-2 sm:px-6">
           {TABS.map((tab) => {
             const isActive = activeTab === tab.key;
             return (
@@ -41,7 +41,7 @@ const UnifiedOrdersPage: React.FC = () => {
                 key={tab.key}
                 type="button"
                 onClick={() => handleTabChange(tab.key)}
-                className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                className={`whitespace-nowrap flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${
                   isActive
                     ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'

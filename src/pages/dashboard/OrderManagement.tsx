@@ -577,8 +577,8 @@ const OrderManagement: React.FC = () => {
       </section>
 
       <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(145deg,rgba(255,255,255,0.94),rgba(255,255,255,0.78))] shadow-[0_24px_60px_rgba(15,23,42,0.09)] dark:border-white/10 dark:bg-[linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] dark:shadow-none">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] border-collapse text-left">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[900px] border-collapse text-left sm:min-w-[980px] lg:min-w-[1080px]">
             <thead>
               <tr className="border-b border-slate-200/80 bg-slate-100/80 dark:border-white/10 dark:bg-white/[0.03]">
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Order ID</th>
@@ -589,7 +589,7 @@ const OrderManagement: React.FC = () => {
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Message</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Payment</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Amount</th>
-                <th className="px-6 py-4" />
+                <th className="sticky right-0 bg-slate-100/95 px-6 py-4 dark:bg-zinc-900" />
               </tr>
             </thead>
             <tbody>
@@ -734,7 +734,7 @@ const OrderManagement: React.FC = () => {
                         <p className="text-sm font-black">{formatCurrency(normalizeAmount(order.totalAmount), order.currency)}</p>
                       </td>
 
-                      <td className="px-6 py-4 text-right align-top">
+                      <td className="sticky right-0 bg-white/95 px-6 py-4 text-right align-top dark:bg-zinc-900">
                         <button
                           type="button"
                           onClick={(event) => {
