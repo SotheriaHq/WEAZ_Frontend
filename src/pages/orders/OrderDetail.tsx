@@ -147,8 +147,9 @@ const OrderDetail: React.FC = () => {
     };
   }, [navigate, orderId]);
 
+  // Buyer can confirm delivery once the brand has shipped (new flow) or marked delivered (legacy)
   const canConfirmDelivery =
-    order?.status === 'DELIVERED' &&
+    (order?.status === 'SHIPPED' || order?.status === 'DELIVERED') &&
     order.paymentStatus === 'PAID' &&
     !order.buyerConfirmedDeliveryAt;
 
@@ -191,26 +192,20 @@ const OrderDetail: React.FC = () => {
       {
         key: 'shipped',
         label: 'Order shipped',
-        detail: 'Your package is in transit to you.',
+        detail: 'Your package has been dispatched and is in transit.',
         complete: isShippedOrLater,
-        current: order.status === 'SHIPPED',
+        current: order.status === 'SHIPPED' && !order.buyerConfirmedDeliveryAt,
         time: order.status === 'SHIPPED' ? order.updatedAt : null,
       },
       {
-        key: 'delivered',
-        label: 'Delivered',
-        detail: 'The brand marked the order as delivered.',
-        complete: isDeliveredOrLater,
-        current: order.status === 'DELIVERED' && !order.buyerConfirmedDeliveryAt,
-        time: order.deliveredAt,
-      },
-      {
         key: 'confirmed',
-        label: 'Receipt confirmed by you',
-        detail: 'This is completed when you confirm that the package reached you.',
-        complete: Boolean(order.buyerConfirmedDeliveryAt),
-        current: false,
-        time: order.buyerConfirmedDeliveryAt,
+        label: 'Delivered & Confirmed',
+        detail: order.buyerConfirmedDeliveryAt
+          ? 'You confirmed receipt of this order.'
+          : 'Confirm delivery once you receive your package to complete the order.',
+        complete: Boolean(order.buyerConfirmedDeliveryAt) || isDeliveredOrLater,
+        current: order.status === 'SHIPPED' && !order.buyerConfirmedDeliveryAt,
+        time: order.buyerConfirmedDeliveryAt || order.deliveredAt,
       },
     ];
   }, [order]);
@@ -325,18 +320,18 @@ const OrderDetail: React.FC = () => {
 
             {canConfirmDelivery ? (
               <div className="rounded-2xl border border-emerald-300/70 bg-emerald-50/80 px-4 py-4 text-sm text-emerald-900 dark:border-emerald-800/40 dark:bg-emerald-500/10 dark:text-emerald-100">
-                <p className="font-semibold">Your package has arrived?</p>
+                <p className="font-semibold">Have you received your package?</p>
                 <p className="mt-1">
-                  Confirming receipt tells the system you got the order successfully.
+                  Once you confirm delivery, the order is marked as complete. This releases payment to the brand and finalizes the transaction.
                 </p>
                 <div className="mt-3">
                   <button
                     type="button"
                     onClick={() => void handleConfirmDelivery()}
                     disabled={confirmingDelivery}
-                    className="rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-black transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-full bg-emerald-500 px-5 py-2.5 text-sm font-bold text-black transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {confirmingDelivery ? 'Confirming...' : 'I have received this order'}
+                    {confirmingDelivery ? 'Confirming...' : 'Delivered & Confirmed'}
                   </button>
                 </div>
               </div>

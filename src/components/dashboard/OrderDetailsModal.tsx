@@ -270,13 +270,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                         </button>
                       ) : null}
                       {order.status === 'SHIPPED' ? (
-                        <button
-                          onClick={() => handleStatusUpdate('DELIVERED')}
-                          disabled={Boolean(updatingStatus)}
-                          className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                          ✅ Mark delivered
-                        </button>
+                        <div className="flex items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50/80 px-4 py-2.5 dark:border-sky-500/20 dark:bg-sky-500/10">
+                          <span className="text-sm">📦</span>
+                          <span className="text-xs font-medium text-sky-700 dark:text-sky-300">
+                            Awaiting buyer delivery confirmation
+                          </span>
+                        </div>
                       ) : null}
                       {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && order.paymentStatus !== 'PAID' ? (
                         <button

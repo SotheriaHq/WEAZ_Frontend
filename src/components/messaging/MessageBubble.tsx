@@ -39,6 +39,20 @@ const senderName = (msg: ThreadMessage) => {
   }
 };
 
+/** SVG tick icons matching WhatsApp style */
+const SingleTick: React.FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 16 12" fill="none" className={className} width="16" height="12">
+    <path d="M1.5 6.5L5.5 10.5L14.5 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const DoubleTick: React.FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 22 12" fill="none" className={className} width="20" height="12">
+    <path d="M1.5 6.5L5.5 10.5L14.5 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M7.5 6.5L11.5 10.5L20.5 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, showModerated = false, onRetry }) => {
   const isSystem = message.kind === 'SYSTEM' || message.kind === 'MODERATION_NOTICE';
   const isHidden = message.visibilityState === 'HIDDEN';
@@ -61,6 +75,67 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
   }
 
   const isModerated = isHidden || isRedacted;
+  const optimistic = (message as any)._optimistic as 'sending' | 'failed' | undefined;
+  const deliveryStatus = message.deliveryStatus ?? 'SENT';
+
+  // Determine tick display for own messages
+  const renderTicks = () => {
+    if (!isOwn) return null;
+
+    // Optimistic sending state
+    if (optimistic === 'sending') {
+      return (
+        <span className="inline-flex items-center" title="Sending...">
+          <svg viewBox="0 0 16 16" fill="none" width="14" height="14" className="animate-spin text-white/50">
+            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="8" strokeLinecap="round" />
+          </svg>
+        </span>
+      );
+    }
+
+    // Failed state
+    if (optimistic === 'failed') {
+      return (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onRetry?.(); }}
+          className="inline-flex items-center gap-0.5 text-red-300 hover:text-red-100 font-semibold"
+          title="Failed to send. Tap to retry."
+        >
+          <svg viewBox="0 0 16 16" fill="none" width="12" height="12">
+            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M8 4.5V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="8" cy="11.5" r="0.75" fill="currentColor" />
+          </svg>
+          <span className="text-[10px]">Retry</span>
+        </button>
+      );
+    }
+
+    // Delivered states from server
+    if (deliveryStatus === 'READ') {
+      return (
+        <span className="inline-flex items-center" title="Read">
+          <DoubleTick className="text-sky-300" />
+        </span>
+      );
+    }
+
+    if (deliveryStatus === 'DELIVERED') {
+      return (
+        <span className="inline-flex items-center" title="Delivered">
+          <DoubleTick className="text-white/60" />
+        </span>
+      );
+    }
+
+    // SENT - single tick
+    return (
+      <span className="inline-flex items-center" title="Sent">
+        <SingleTick className="text-white/60" />
+      </span>
+    );
+  };
 
   return (
     <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-1.5 group ${isModerated && showModerated ? 'opacity-60' : ''}`}>
@@ -115,7 +190,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
                           isOwn ? 'text-white/90 hover:text-white' : 'text-purple-600 dark:text-purple-400 hover:underline'
                         }`}
                       >
-                        📎 {att.file.originalName || 'Document'}
+                        <span>📎 {att.file.originalName || 'Document'}</span>
                         {att.file.size ? ` (${(att.file.size / 1024).toFixed(0)}KB)` : ''}
                       </a>
                     );
@@ -126,22 +201,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
           )}
           <div className={`flex items-center justify-end gap-1 mt-0.5 ${isOwn ? 'text-white/60' : 'text-gray-400 dark:text-gray-500'}`}>
             <span className="text-[10px]">{formatTime(message.createdAt)}</span>
-            {isOwn && (message as any)._optimistic === 'sending' && (
-              <span className="text-[10px] animate-pulse" title="Sending">○</span>
-            )}
-            {isOwn && (message as any)._optimistic === 'failed' && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onRetry?.(); }}
-                className="text-[10px] text-red-300 hover:text-red-100 font-semibold"
-                title="Failed to send. Tap to retry."
-              >
-                ⚠ Failed
-              </button>
-            )}
-            {isOwn && !(message as any)._optimistic && (
-              <span className="text-[10px]" title="Delivered">✓</span>
-            )}
+            {renderTicks()}
           </div>
         </div>
       </div>

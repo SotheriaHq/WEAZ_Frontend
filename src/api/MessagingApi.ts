@@ -36,6 +36,8 @@ export interface ThreadMessage {
   visibilityState: 'VISIBLE' | 'HIDDEN' | 'REDACTED';
   bodyText?: string | null;
   createdAt: string;
+  /** Delivery status: SENT (single tick), DELIVERED (double tick), READ (colored double tick) */
+  deliveryStatus?: 'SENT' | 'DELIVERED' | 'READ';
   sender?: {
     id: string;
     username?: string | null;

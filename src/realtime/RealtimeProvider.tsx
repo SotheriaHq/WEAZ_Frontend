@@ -41,6 +41,7 @@ interface RealtimeContextValue {
   onComment: (room: string, handler: CommentHandler) => () => void;
   onNotification: (handler: (payload: any) => void) => () => void;
   onNotificationDeleted: (handler: (payload: any) => void) => () => void;
+  onMessageEvent: (event: string, handler: (payload: any) => void) => () => void;
   socketConnected: boolean;
   degraded: boolean;
 }
@@ -325,6 +326,13 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     return () => { s.off('notification.deleted', handler); };
   }, []);
 
+  const onMessageEvent = useCallback((event: string, handler: (payload: any) => void) => {
+    const s = socketRef.current;
+    if (!s) return () => void 0;
+    s.on(event, handler);
+    return () => { s.off(event, handler); };
+  }, []);
+
   const value = React.useMemo<RealtimeContextValue>(() => ({
     joinCollection,
     joinCollectionMedia,
@@ -334,9 +342,10 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     onComment,
     onNotification,
     onNotificationDeleted,
+    onMessageEvent,
     socketConnected,
     degraded,
-  }), [joinCollection, joinCollectionMedia, joinUser, joinComment, onThread, onComment, onNotification, onNotificationDeleted, socketConnected, degraded]);
+  }), [joinCollection, joinCollectionMedia, joinUser, joinComment, onThread, onComment, onNotification, onNotificationDeleted, onMessageEvent, socketConnected, degraded]);
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;
 };

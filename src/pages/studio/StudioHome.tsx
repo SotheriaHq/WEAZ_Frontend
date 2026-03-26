@@ -2,7 +2,7 @@ import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import StudioScaffold from '@/components/studio/StudioScaffold';
 import DashboardHome from '@/pages/dashboard/DashboardHome';
-import OrderManagement from '@/pages/dashboard/OrderManagement';
+import UnifiedOrdersPage from '@/pages/studio/UnifiedOrdersPage';
 import AnalyticsPage from '@/pages/dashboard/AnalyticsPage';
 import FinancePage from '@/pages/dashboard/FinancePage';
 import CustomersPage from '@/pages/dashboard/CustomersPage';
@@ -12,7 +12,7 @@ import MessagingManagementPage from '@/pages/messages/MessagingManagementPage';
 const sections: Record<string, React.ReactNode> = {
   overview: <DashboardHome />,
   store: <StoreManagement />,
-  orders: <OrderManagement />,
+  orders: <UnifiedOrdersPage />,
   messages: <MessagingManagementPage />,
   customers: <CustomersPage />,
   analytics: <AnalyticsPage />,

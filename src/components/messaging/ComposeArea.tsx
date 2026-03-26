@@ -182,7 +182,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
   }, [handleSend]);
 
   return (
-    <div className="border-t border-gray-200/50 dark:border-white/10 bg-white/60 dark:bg-black/20 backdrop-blur-sm p-3">
+    <div className="shrink-0 border-t border-gray-200/50 bg-white/60 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm dark:border-white/10 dark:bg-black/20">
       {/* Pending attachments */}
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">

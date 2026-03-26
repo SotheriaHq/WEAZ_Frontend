@@ -35,7 +35,7 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
 }) => {
   const profile = useSelector((s: RootState) => s.user.profile);
   const myId = profile?.id;
-  const { onNotification } = useRealtime();
+  const { onNotification, onMessageEvent } = useRealtime();
 
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,14 +134,25 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
   // Real-time subscription
   useEffect(() => {
     if (!open || !orderId) return;
-    const unsub = onNotification((payload: any) => {
+    const unsubNotif = onNotification((payload: any) => {
       const type = String(payload?.type ?? '');
       if (type !== 'MESSAGE_RECEIVED' && type !== 'MESSAGE_MODERATED') return;
       const pOrderId = String(payload?.payload?.customOrderId ?? payload?.payload?.orderId ?? '');
       if (pOrderId !== orderId) return;
       void fetchMessages().then(scrollToBottom);
     });
-    return unsub;
+    // Listen for direct message.read and thread.updated WebSocket events to update tick status
+    const unsubRead = onMessageEvent('message.read', (payload: any) => {
+      const pOrderId = String(payload?.customOrderId ?? payload?.orderId ?? '');
+      if (pOrderId !== orderId) return;
+      void fetchMessages();
+    });
+    const unsubThread = onMessageEvent('thread.updated', (payload: any) => {
+      const pOrderId = String(payload?.customOrderId ?? payload?.orderId ?? '');
+      if (pOrderId !== orderId) return;
+      void fetchMessages();
+    });
+    return () => { unsubNotif(); unsubRead(); unsubThread(); };
   }, [open, orderId, onNotification, fetchMessages, scrollToBottom]);
 
   const handleRequestExtension = useCallback(async () => {
@@ -381,7 +392,7 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 z-layer-drawer h-dvh w-full max-w-md flex flex-col bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl shadow-2xl border-l border-gray-200/50 dark:border-white/10 transform transition-transform duration-300 ease-out">
+      <div className="fixed right-0 top-0 z-layer-drawer flex h-dvh max-h-dvh w-full max-w-md min-h-0 flex-col overflow-hidden border-l border-gray-200/50 bg-white/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out dark:border-white/10 dark:bg-zinc-900/95">
         {/* Header */}
         <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200/50 dark:border-white/10">
           <div className="min-w-0">
@@ -460,7 +471,7 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
         ) : null}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 pb-6 space-y-1">
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <span className="text-sm text-gray-500 dark:text-gray-400 animate-pulse">Loading messages…</span>

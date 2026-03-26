@@ -10,7 +10,6 @@ interface StudioSidebarProps {
 const ALL_ITEMS = [
   { key: 'overview', label: 'Dashboard', path: '/studio', emoji: '📊', requiresSetup: true },
   { key: 'store', label: 'Store', path: '/studio/store', emoji: '🛍️', requiresSetup: false },
-  { key: 'custom-orders', label: 'Custom Orders', path: '/studio/custom-orders', emoji: '✂️', requiresSetup: true },
   { key: 'orders', label: 'Orders', path: '/studio?tab=orders', emoji: '📦', requiresSetup: false },
   { key: 'messages', label: 'Messages', path: '/studio/messages', emoji: '💬', requiresSetup: true },
   { key: 'customers', label: 'Customers', path: '/studio?tab=customers', emoji: '👥', requiresSetup: false },

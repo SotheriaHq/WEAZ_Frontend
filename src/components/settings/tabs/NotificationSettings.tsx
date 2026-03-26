@@ -48,6 +48,8 @@ interface NotificationSettingsData {
     moderation: boolean;
     desktop: boolean;
     sound: boolean;
+    readReceipts: boolean;
+    deliveryReceipts: boolean;
   };
 }
 
@@ -220,6 +222,16 @@ const NotificationSettings: React.FC = () => {
           id: 'sound',
           label: 'Sound Alerts',
           description: 'Play a short sound for new order messages',
+        },
+        {
+          id: 'readReceipts',
+          label: 'Read Receipts',
+          description: 'Show blue ticks when your messages are read, and let others know when you read theirs. When off, no read receipts are shown or sent.',
+        },
+        {
+          id: 'deliveryReceipts',
+          label: 'Delivery Receipts',
+          description: 'Show double ticks when messages are delivered. When off, all messages display a single tick only — both for you and people messaging you.',
         },
       ],
     },
