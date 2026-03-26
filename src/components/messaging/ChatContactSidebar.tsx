@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import type { ThreadMessage } from '@/api/MessagingApi';
+import { buildOrderRoute } from '@/utils/orderNavigation';
 
 type ConversationContext = 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
 
@@ -61,11 +62,12 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
   const profile = useSelector((s: RootState) => s.user.profile);
 
   const orderUrl = useMemo(() => {
-    if (contextType === 'INQUIRY') return null;
-    const prefix = profile?.type === 'BRAND' ? '/studio' : '';
-    if (contextType === 'CUSTOM_ORDER' && customOrderId) return `${prefix}/custom-orders/${customOrderId}`;
-    if (orderId) return `${prefix}/orders/${orderId}`;
-    return null;
+    return buildOrderRoute({
+      surface: profile?.type === 'BRAND' ? 'BRAND' : 'BUYER',
+      contextType,
+      orderId,
+      customOrderId,
+    });
   }, [contextType, customOrderId, orderId, profile?.type]);
 
   const sharedMedia = useMemo(() => {

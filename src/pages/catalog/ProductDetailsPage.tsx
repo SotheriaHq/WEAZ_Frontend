@@ -30,13 +30,7 @@ import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import ProductReviewSection from '@/components/reviews/ProductReviewSection';
 import { isRtwSizingMode, normalizeSizingMode } from '@/types/sizing';
 import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
-
-const prettifyMeasurementKey = (value: string) =>
-  value
-    .split('_')
-    .filter(Boolean)
-    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-    .join(' ');
+import { formatMeasurementLabel } from '@/utils/measurementLabels';
 
 const findMappedColorValue = (
   map: Record<string, string> | undefined,
@@ -672,7 +666,7 @@ export default function ProductDetailsPage() {
                     return (
                       <label key={key} className="flex flex-col gap-1">
                         <span className={`text-xs font-medium flex items-center gap-1.5 ${isMissing ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                          {prettifyMeasurementKey(key)}
+                          {formatMeasurementLabel(key)}
                           {isMissing && <span className="text-[10px]">(required)</span>}
                         </span>
                         <input

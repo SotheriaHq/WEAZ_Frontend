@@ -40,6 +40,10 @@ export interface PaymentInitResult {
   reference: string;
   gateway: string;
   status: PaymentAttemptStatus;
+  currency: string;
+  settlementCurrency: string;
+  settlementAmount: number;
+  exchangeRateSnapshotId?: string;
   channel?: string;
   authorizationUrl?: string;
   callbackUrl?: string;
@@ -62,6 +66,9 @@ export interface PaymentVerifyResult {
   reference: string;
   amount: number;
   currency: string;
+  settlementCurrency: string;
+  settlementAmount: number;
+  exchangeRateSnapshotId?: string;
   paidAt?: string;
   channel?: string;
   gatewayResponse?: string;
@@ -76,6 +83,10 @@ export interface PaymentAttemptSummary {
   providerMode: 'mock' | 'live';
   paymentMethod: CheckoutPaymentMethod;
   status: PaymentAttemptStatus;
+  currency: string;
+  settlementCurrency: string;
+  settlementAmount: number;
+  exchangeRateSnapshotId?: string;
   channel?: string;
   authorizationUrl?: string;
   callbackUrl?: string;

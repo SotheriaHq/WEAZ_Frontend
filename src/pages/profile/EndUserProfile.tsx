@@ -78,6 +78,7 @@ export const EndUserProfile: React.FC = () => {
   const [sizeFitShares, setSizeFitShares] = useState<SizeFitSharesPayload | null>(null);
   const [displayChartFamily, setDisplayChartFamily] = useState<CustomOrderChartFamily>('UK');
   const [computedSize, setComputedSize] = useState<string | null>(null);
+  const [computedAlphaSize, setComputedAlphaSize] = useState<string | null>(null);
   const [computedGuidance, setComputedGuidance] = useState<string | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
   const [chartSaving, setChartSaving] = useState(false);
@@ -196,10 +197,15 @@ export const EndUserProfile: React.FC = () => {
   useEffect(() => {
     if (!isOwner) return;
     const measurements = (sizeFitProfile?.measurements as Record<string, unknown> | undefined) ?? {};
-    const recommendation = deriveSizeRecommendation(measurements, displayChartFamily);
+    const recommendation = deriveSizeRecommendation(
+      measurements,
+      displayChartFamily,
+      sizeFitProfile?.measurementGender ?? null,
+    );
     setComputedSize(recommendation.computedSize);
+    setComputedAlphaSize(recommendation.alphaSize);
     setComputedGuidance(recommendation.conversionGuidance);
-  }, [displayChartFamily, isOwner, sizeFitProfile?.measurements]);
+  }, [displayChartFamily, isOwner, sizeFitProfile?.measurementGender, sizeFitProfile?.measurements]);
 
   useEffect(() => {
     setActiveTab((prev) => (availableTabs.includes(prev) ? prev : availableTabs[0]));
@@ -645,8 +651,13 @@ export const EndUserProfile: React.FC = () => {
                   <div className="rounded-xl bg-indigo-50/40 px-3 py-2 dark:bg-indigo-500/10">
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500/80 dark:text-indigo-400/70">Computed size</div>
                     <div className="text-xl font-bold text-indigo-900 dark:text-indigo-200">
-                      {chartLoading ? '...' : computedSize || '—'}
+                      {chartLoading ? 'Loading…' : computedSize || '—'}
                     </div>
+                    {computedAlphaSize ? (
+                      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-600/80 dark:text-indigo-300/80">
+                        Alpha fit {computedAlphaSize}
+                      </div>
+                    ) : null}
                     <div className="text-[10px] text-indigo-700/70 dark:text-indigo-300/70">
                       {computedGuidance || 'Computed from your live measurement profile.'}
                     </div>

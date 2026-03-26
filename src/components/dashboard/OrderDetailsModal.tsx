@@ -5,7 +5,7 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 import VLoader from '@/components/loaders/VLoader';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getSizingModeLabel } from '@/types/sizing';
-import OrderMessagesPanel from '@/components/messaging/OrderMessagesPanel';
+import { formatMeasurementLabel } from '@/utils/measurementLabels';
 
 interface OrderDetailsModalProps {
   isOpen: boolean;
@@ -20,34 +20,71 @@ const formatCurrency = (amount: number, currency: string) => {
 };
 
 const prettifyMeasurementKey = (key: string) =>
-  key
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  formatMeasurementLabel(key);
 
 const isLikelyFileId = (value?: string | null) =>
   Boolean(value && !/^https?:/i.test(value) && /^[0-9a-f-]{30,}$/i.test(value));
-
-const getStatusTone = (status?: string | null) => {
-  switch (String(status || '').toUpperCase()) {
-    case 'DELIVERED':
-      return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20';
-    case 'PENDING':
-      return 'bg-amber-500/12 text-amber-700 dark:text-amber-300 border border-amber-500/20';
-    case 'PROCESSING':
-      return 'bg-blue-500/12 text-blue-700 dark:text-blue-300 border border-blue-500/20';
-    case 'SHIPPED':
-      return 'bg-indigo-500/12 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20';
-    case 'CANCELLED':
-      return 'bg-rose-500/12 text-rose-700 dark:text-rose-300 border border-rose-500/20';
-    default:
-      return 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border border-slate-500/20';
-  }
-};
 
 const getPaymentTone = (status?: string | null) =>
   String(status || '').toUpperCase() === 'PAID'
     ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
     : 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border border-slate-500/20';
+
+const ORDER_STEPS = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'] as const;
+const STEP_META: Record<string, { label: string; icon: string }> = {
+  PENDING: { label: 'Pending', icon: '🕐' },
+  PROCESSING: { label: 'Processing', icon: '🧵' },
+  SHIPPED: { label: 'Shipped', icon: '🚚' },
+  DELIVERED: { label: 'Delivered', icon: '✅' },
+};
+
+const OrderStatusStepper: React.FC<{ status: string }> = ({ status }) => {
+  const upperStatus = String(status || '').toUpperCase();
+  const isCancelled = upperStatus === 'CANCELLED';
+  const activeIndex = ORDER_STEPS.indexOf(upperStatus as any);
+
+  if (isCancelled) {
+    return (
+      <div className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 dark:border-rose-500/20 dark:bg-rose-500/10">
+        <span className="text-lg">✖</span>
+        <span className="text-sm font-bold text-rose-700 dark:text-rose-300">Order Cancelled</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-0">
+      {ORDER_STEPS.map((step, idx) => {
+        const isCompleted = activeIndex >= 0 && idx < activeIndex;
+        const isCurrent = idx === activeIndex;
+        const meta = STEP_META[step];
+        return (
+          <React.Fragment key={step}>
+            {idx > 0 && (
+              <div className={`h-0.5 flex-1 min-w-[20px] transition-colors duration-500 ${isCompleted || isCurrent ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-white/10'}`} />
+            )}
+            <div className="flex flex-col items-center gap-1">
+              <div
+                className={`flex h-9 w-9 items-center justify-center rounded-full text-sm transition-all duration-500 ${
+                  isCompleted
+                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
+                    : isCurrent
+                      ? 'bg-orange-500 text-white shadow-md shadow-orange-500/30 ring-4 ring-orange-500/20'
+                      : 'border border-slate-200 bg-slate-50 text-slate-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-500'
+                }`}
+              >
+                {isCompleted ? '✓' : meta.icon}
+              </div>
+              <span className={`text-[10px] font-semibold whitespace-nowrap ${
+                isCurrent ? 'text-orange-600 dark:text-orange-400' : isCompleted ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
+              }`}>{meta.label}</span>
+            </div>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+};
 
 const extractMeasurements = (snapshot: Record<string, any> | null | undefined) => {
   if (!snapshot || typeof snapshot !== 'object') return [] as Array<{ key: string; label: string; value: string }>;
@@ -176,20 +213,22 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${getStatusTone(order?.status)}`}>
-                    {order?.status || 'Loading'}
-                  </span>
-                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${getPaymentTone(order?.paymentStatus)}`}>
-                    {order?.paymentStatus || 'Pending'}
-                  </span>
-                </div>
+                <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${getPaymentTone(order?.paymentStatus)}`}>
+                  {order?.paymentStatus || 'Pending'}
+                </span>
                 <button onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white/80 text-lg text-slate-500 transition hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:text-white" aria-label="Close">
                   ×
                 </button>
               </div>
             </div>
           </div>
+
+          {/* Order status progression */}
+          {order && (
+            <div className="border-b border-slate-200/80 bg-slate-50/50 px-6 py-4 dark:border-white/10 dark:bg-white/[0.02]">
+              <OrderStatusStepper status={order.status} />
+            </div>
+          )}
 
           <div className="flex-1 overflow-y-auto p-6 scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden space-y-6 overscroll-contain md:p-7">
             {loading ? (
@@ -304,13 +343,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   </div>
                 </section>
 
-                <OrderMessagesPanel
-                  contextType="STANDARD_ORDER"
-                  orderId={orderId}
-                  title="Brand order conversation"
-                  actorSurface="BRAND"
-                  brandId={brandId}
-                />
 
                 <section className="space-y-4">
                   <div className="flex items-center justify-between">

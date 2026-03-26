@@ -246,10 +246,13 @@ const OrderManagement: React.FC = () => {
   const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryByContextItem['summary']>>({});
   const [summary, setSummary] = useState<OrdersSummary>(EMPTY_SUMMARY);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => {
+    const parsed = Number(searchParams.get('page') || 1);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  });
   const [totalPages, setTotalPages] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>(() => searchParams.get('status') || '');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
   const [selectedOrder, setSelectedOrder] = useState<{ id: string } | null>(null);
   const [chatOrder, setChatOrder] = useState<{ id: string; customerName?: string } | null>(null);
@@ -278,13 +281,18 @@ const OrderManagement: React.FC = () => {
 
         const orderIds = nextOrders.map((order: OrderRecord) => order.id).filter(Boolean);
         if (orderIds.length > 0) {
-          const summaries = await messagingApi.getBulkOrderSummariesForBrand(user.id, orderIds, true);
-          setSummaryByOrderId(
-            (summaries.items || []).reduce<Record<string, ThreadSummaryByContextItem['summary']>>((acc, item) => {
-              acc[item.contextId] = item.summary;
-              return acc;
-            }, {}),
-          );
+          try {
+            const summaries = await messagingApi.getBulkOrderSummariesForBrand(user.id, orderIds, true);
+            setSummaryByOrderId(
+              (summaries.items || []).reduce<Record<string, ThreadSummaryByContextItem['summary']>>((acc, item) => {
+                acc[item.contextId] = item.summary;
+                return acc;
+              }, {}),
+            );
+          } catch (summaryError) {
+            console.warn('Failed to fetch order message summaries', summaryError);
+            setSummaryByOrderId({});
+          }
         } else {
           setSummaryByOrderId({});
         }
@@ -322,6 +330,41 @@ const OrderManagement: React.FC = () => {
     if (!preselectedOrderId || !shouldOpenChat) return;
     setChatOrder({ id: preselectedOrderId });
   }, [preselectedOrderId, shouldOpenChat]);
+
+  useEffect(() => {
+    const nextStatus = searchParams.get('status') || '';
+    const nextQuery = searchParams.get('q') || '';
+    const nextPage = Number(searchParams.get('page') || 1);
+
+    if (nextStatus !== statusFilter) {
+      setStatusFilter(nextStatus);
+    }
+    if (nextQuery !== searchQuery) {
+      setSearchQuery(nextQuery);
+    }
+    if (Number.isFinite(nextPage) && nextPage > 0 && nextPage !== page) {
+      setPage(nextPage);
+    }
+  }, [page, searchParams, searchQuery, statusFilter]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+
+    if (statusFilter) next.set('status', statusFilter);
+    else next.delete('status');
+
+    if (searchQuery.trim()) next.set('q', searchQuery.trim());
+    else next.delete('q');
+
+    if (page > 1) next.set('page', String(page));
+    else next.delete('page');
+
+    const current = searchParams.toString();
+    const target = next.toString();
+    if (current !== target) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [page, searchParams, searchQuery, setSearchParams, statusFilter]);
 
   useEffect(() => {
     const unsubscribe = onNotification((payload: any) => {
@@ -480,7 +523,7 @@ const OrderManagement: React.FC = () => {
         ))}
       </section>
 
-      <section className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      <section className="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
         <div className="flex w-full items-center gap-2 overflow-x-auto pb-2 scrollbar-hide xl:w-auto xl:pb-0">
           {STATUS_TABS.map((tab) => {
             const active = statusFilter === tab.value;
@@ -501,11 +544,11 @@ const OrderManagement: React.FC = () => {
           })}
         </div>
 
-        <div className="flex w-full flex-col gap-3 sm:flex-row xl:w-auto">
+        <div className="grid w-full min-w-0 gap-3 md:grid-cols-2 2xl:w-auto 2xl:min-w-[min(100%,760px)] 2xl:grid-cols-[minmax(320px,1fr)_220px_auto]">
           <input
             type="text"
             placeholder="Search by order ID or customer name..."
-            className="w-full rounded-2xl border border-slate-200 bg-white/85 px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-slate-500 xl:w-80"
+            className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white/85 px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-slate-500"
             value={searchQuery}
             onChange={(event) => {
               setSearchQuery(event.target.value);
@@ -519,13 +562,13 @@ const OrderManagement: React.FC = () => {
               setPage(1);
             }}
             options={STATUS_SELECT_OPTIONS}
-            className="min-w-[200px]"
+            className="min-w-0 md:min-w-[200px]"
             placeholder="All statuses"
           />
           <button
             type="button"
             onClick={cycleSort}
-            className="rounded-2xl border border-slate-200 bg-white/85 px-4 py-2.5 text-sm font-medium text-slate-700 outline-none transition hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:text-white"
+            className="rounded-2xl border border-slate-200 bg-white/85 px-4 py-2.5 text-sm font-medium text-slate-700 outline-none transition hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:text-white 2xl:justify-self-end"
             aria-label="Cycle order sort"
           >
             Sort by: {SORT_OPTIONS.find((option) => option.value === sortBy)?.label || 'Newest'}

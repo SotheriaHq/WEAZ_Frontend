@@ -334,7 +334,7 @@ const AdminDashboard: React.FC = () => {
               { label: 'Manage Users', route: '/admin/users' },
               { label: 'Manage Brands', route: '/admin/brands' },
               { label: 'Manage Content', route: '/admin/content' },
-              { label: 'Review Designs', route: '/admin/content?tab=designs' },
+              { label: 'Finance Workspace', route: '/admin/finance' },
             ],
           },
           {

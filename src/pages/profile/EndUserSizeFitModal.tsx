@@ -35,7 +35,6 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
   const toInches = (cm: number) => cm / 2.54;
   const toCentimeters = (inch: number) => inch * 2.54;
   const round = (value: number) => Math.round(value * 100) / 100;
-  const isWeightKey = (key: string) => key.toUpperCase().includes('WEIGHT');
 
   const [values, setValues] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState('');
@@ -58,7 +57,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
       const raw = profile.measurements?.[point.key];
       if (typeof raw === 'number') {
         nextValues[point.key] =
-          preferredLengthUnit === 'IN' && !isWeightKey(point.key)
+          preferredLengthUnit === 'IN'
             ? String(round(toInches(raw)))
             : String(raw);
         continue;
@@ -95,7 +94,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
       const parsed = Number(value);
       if (Number.isFinite(parsed)) {
         measurements[point.key] =
-          lengthUnit === 'IN' && !isWeightKey(point.key)
+          lengthUnit === 'IN'
             ? round(toCentimeters(parsed))
             : parsed;
       } else {
@@ -115,7 +114,6 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
     setValues((current) => {
       const converted: Record<string, string> = { ...current };
       for (const point of baselinePoints) {
-        if (isWeightKey(point.key)) continue;
         const raw = current[point.key];
         const parsed = Number(raw);
         if (!Number.isFinite(parsed)) continue;
@@ -219,16 +217,16 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                           Range: {
                             point.minValueCm == null
                               ? '-'
-                              : lengthUnit === 'IN' && !isWeightKey(point.key)
+                              : lengthUnit === 'IN'
                                 ? round(toInches(point.minValueCm))
                                 : point.minValueCm
                           } to {
                             point.maxValueCm == null
                               ? '-'
-                              : lengthUnit === 'IN' && !isWeightKey(point.key)
+                              : lengthUnit === 'IN'
                                 ? round(toInches(point.maxValueCm))
                                 : point.maxValueCm
-                          } {lengthUnit === 'IN' && !isWeightKey(point.key) ? 'in' : 'cm'}
+                          } {lengthUnit === 'IN' ? 'in' : 'cm'}
                         </span>
                       ) : null}
                       <input
@@ -281,7 +279,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                     disabled={saving || baselinePoints.length === 0}
                     className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 disabled:opacity-60"
                   >
-                    {saving ? 'Saving...' : 'Save Measurements'}
+                    {saving ? 'Saving…' : 'Save Measurements'}
                   </button>
                 </div>
               </details>
@@ -334,7 +332,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                     disabled={saving}
                     className="rounded-xl border border-gray-300/80 dark:border-white/20 text-sm font-medium px-4 py-2 hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-60"
                   >
-                    {saving ? 'Saving...' : 'Save Permission Settings'}
+                    {saving ? 'Saving…' : 'Save Permission Settings'}
                   </button>
                 </div>
               </details>

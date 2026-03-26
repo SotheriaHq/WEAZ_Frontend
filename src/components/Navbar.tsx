@@ -64,6 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const { theme, setTheme } = useTheme();
   const { setLanguage, translate } = useLanguage();
   const { profile: userProfile, isAuthenticated } = useSelector((state: RootState) => state.user);
+  const isSidebarOpen = useSelector((state: RootState) => state.ui.isSidebarOpen);
   const { unreadCount } = useSelector((state: RootState) => state.notifications);
   const cartQuantity = useSelector(selectCartTotalQuantity);
   const isCartOpen = useSelector(selectCartIsDrawerOpen);
@@ -134,6 +135,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
       (error) => void error,
     );
   };
+  const profileHomeRoute = user ? getProfileOrHomeUrl(user) : '/profile';
+  const ordersRoute = user?.type === 'BRAND' ? '/studio?tab=orders' : '/orders';
+  const savedRoute = user?.type === 'BRAND' ? '/profile?tab=Content' : profileHomeRoute;
+  const helpRoute = '/help/verified-badge';
 
   const MenuButton = ({
     icon,
@@ -196,13 +201,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                 {user.type === 'BRAND' ? (
                   <MenuButton icon="🧵" label="Dashboard" onClick={() => { navigate('/studio'); setShowProfileMenu(false); }} />
                 ) : null}
-                <MenuButton icon="👤" label={translate('profile')} onClick={() => { navigate(getProfileOrHomeUrl(user)); setShowProfileMenu(false); }} />
+                <MenuButton icon="👤" label={translate('profile')} onClick={() => { navigate(profileHomeRoute); setShowProfileMenu(false); }} />
                 <MenuButton icon="⚙️" label={translate('settings')} onClick={() => { navigate('/settings'); setShowProfileMenu(false); }} />
               </div>
 
               <div className="border-t border-gray-200 py-2 dark:border-gray-700">
-                <MenuButton icon="📦" label="My Orders" />
-                <MenuButton icon="🤍" label="Saved" />
+                <MenuButton icon="📦" label="My Orders" onClick={() => { navigate(ordersRoute); setShowProfileMenu(false); }} />
+                <MenuButton icon="🤍" label="Saved" onClick={() => { navigate(savedRoute); setShowProfileMenu(false); }} />
               </div>
             </>
           ) : (
@@ -234,7 +239,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
               </div>
             ) : null}
             <MenuButton icon="📍" label={translate('location')} onClick={handleLocationShare} />
-            <MenuButton icon="🆘" label="Help" />
+            <MenuButton icon="🆘" label="Help" onClick={() => { navigate(helpRoute); setShowProfileMenu(false); }} />
           </div>
 
           {user ? (
@@ -286,30 +291,32 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
       }
     >
       <div className="flex h-full items-center justify-between gap-4">
-        <div className="flex min-w-[180px] shrink-0 items-center">
+        <div className="flex shrink-0 items-center">
           {!minimal ? (
             <button
               type="button"
               onClick={() => dispatch(toggleSidebar())}
-              className="mr-1 inline-flex items-center justify-center rounded-full p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 sm:mr-3"
+              className="mr-1 inline-flex items-center justify-center rounded-full p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
               aria-label="Toggle sidebar"
             >
               <span className="text-xl">🍔</span>
             </button>
           ) : null}
 
-          <div
-            className="flex cursor-pointer items-center"
-            onClick={() => {
-              dispatch(closeSidebar());
-              navigate('/');
-            }}
-          >
-            <ThreadlyLogo />
-            <span className="ml-2 max-w-[200px] truncate text-lg font-bold tracking-tight text-gray-900 dark:text-white" title="Threadly">
-              Threadly
-            </span>
-          </div>
+          {!isSidebarOpen && (
+            <div
+              className="flex cursor-pointer items-center"
+              onClick={() => {
+                dispatch(closeSidebar());
+                navigate('/');
+              }}
+            >
+              <ThreadlyLogo />
+              <span className="ml-1.5 max-w-[200px] truncate text-lg font-bold tracking-tight text-gray-900 dark:text-white" title="Threadly">
+                Threadly
+              </span>
+            </div>
+          )}
         </div>
 
         {!minimal ? (

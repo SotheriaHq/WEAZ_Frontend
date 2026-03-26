@@ -58,7 +58,9 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
           (d) =>
             d.appliesTo.includes(entityType) &&
             d.name !== "Designer Location" &&
-            d.name !== "Price Range"
+            d.name !== "Price Range" &&
+            d.name !== "Color Family" &&
+            d.name !== "Fit / Shape"
         );
         setDimensions(applicable);
       } catch (error) {

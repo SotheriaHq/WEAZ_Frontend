@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
@@ -23,6 +23,7 @@ import { buildStorefrontUrl } from '@/utils/publicLinks';
 
 export default function StoreManagement() {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useSelector((state: RootState) => state.user.profile);
 
   const [loading, setLoading] = useState(true);
@@ -100,6 +101,9 @@ export default function StoreManagement() {
 
   const kpis = overview?.kpis || {};
   const recentOrders = overview?.recentOrders || [];
+  const routeSearchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const returnTo = routeSearchParams.get('returnTo');
+  const returnLabel = routeSearchParams.get('returnLabel') || 'Back';
   const verificationMarker = user?.verificationBadgeVisible
     ? '✅'
     : user?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED'
@@ -303,6 +307,19 @@ export default function StoreManagement() {
 
   return (
     <div className="animate-in fade-in space-y-8 duration-500">
+      {returnTo ? (
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate(returnTo)}
+            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-purple-300 hover:text-purple-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-purple-500/30 dark:hover:text-white"
+          >
+            <span aria-hidden="true">←</span>
+            {returnLabel}
+          </button>
+        </div>
+      ) : null}
+
       <div className="sticky top-0 z-30">
         <div className="rounded-2xl border border-gray-200/60 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/90">
           <div className="flex items-center gap-4">

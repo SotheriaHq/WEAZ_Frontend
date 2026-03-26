@@ -241,13 +241,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
           <div className="h-16 shrink-0 border-b border-gray-200/50 px-4 sm:px-5 dark:border-white/10 flex items-center justify-start">
             <button
               onClick={() => dispatch(toggleSidebar())}
-              className="inline-flex h-9 w-9 items-center justify-center mr-2 sm:mr-3 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"
+              className="inline-flex h-9 w-9 items-center justify-center mr-1 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"
             >
               <span className="text-xl">🍔</span>
             </button>
             <div className="flex items-center cursor-pointer" onClick={() => handleLinkClick('/')}>
               <ThreadlyLogo />
-              <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight">
+              <span className="ml-1.5 text-lg font-bold text-gray-900 dark:text-white tracking-tight">
                 Threadly
               </span>
             </div>

@@ -83,10 +83,39 @@ export interface AdminPayout {
   brandId: string;
   amount: string;
   currency: string;
-  status: 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED';
+  status:
+    | 'PENDING_APPROVAL'
+    | 'APPROVED'
+    | 'PROCESSING'
+    | 'PAID'
+    | 'FAILED'
+    | 'REJECTED'
+    | 'ON_HOLD'
+    | 'RECONCILIATION_REVIEW';
   reference: string | null;
+  gatewayReference?: string | null;
+  statusReason?: string | null;
+  failureReason?: string | null;
+  approvedAt?: string | null;
+  claimedAt?: string | null;
+  processedAt?: string | null;
+  paidAt?: string | null;
+  assignedAdminId?: string | null;
+  assignedAt?: string | null;
   createdAt: string;
   brand?: { id: string; name: string };
+  assignedAdmin?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+  approvedBy?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
 }
 
 export interface AdminProduct {
@@ -198,15 +227,28 @@ export interface AdminTagItem {
 export interface AdminDispute {
   id: string;
   type: 'ORDER' | 'PRODUCT' | 'SIZING' | 'GENERAL';
-  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+  status: 'OPEN' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'REOPENED';
   description: string;
   reporterId: string;
   assignedToId: string | null;
+  assignedAt?: string | null;
   resolvedById: string | null;
   resolution: string | null;
   adminNotes: string | null;
   createdAt: string;
   updatedAt: string;
+  reporter?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+  assignedTo?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  } | null;
 }
 
 export interface AdminAuditLog {
@@ -247,4 +289,100 @@ export interface NotificationTemplate {
   id: string;
   subject: string;
   body: string;
+}
+
+export interface AdminCommissionRule {
+  id: string;
+  name: string;
+  scope: 'PLATFORM' | 'BRAND';
+  brandId?: string | null;
+  currency?: string | null;
+  ratePercent: string;
+  minFeeAmount?: string | null;
+  maxFeeAmount?: string | null;
+  isDefault: boolean;
+  isActive: boolean;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  createdById?: string | null;
+  updatedById?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminReconciliationRun {
+  id: string;
+  scope: 'PAYMENTS' | 'PAYOUTS' | 'LEDGER_INTEGRITY';
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED';
+  startedById?: string | null;
+  filtersJson?: Record<string, unknown> | null;
+  summaryJson?: Record<string, unknown> | null;
+  errorMessage?: string | null;
+  startedAt: string;
+  completedAt?: string | null;
+  failedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    items: number;
+  };
+}
+
+export interface AdminReconciliationItem {
+  id: string;
+  runId: string;
+  status: 'MATCHED' | 'UNMATCHED_INTERNAL' | 'DISCREPANCY' | 'RESOLVED';
+  referenceType: string;
+  referenceId?: string | null;
+  expectedAmount?: string | null;
+  actualAmount?: string | null;
+  currency?: string | null;
+  summary: string;
+  detailsJson?: Record<string, unknown> | null;
+  assignedAdminId?: string | null;
+  assignedAt?: string | null;
+  releasedAt?: string | null;
+  resolvedById?: string | null;
+  resolvedAt?: string | null;
+  resolutionNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminFinancialDocument {
+  id: string;
+  type:
+    | 'BUYER_RECEIPT'
+    | 'BRAND_SETTLEMENT_STATEMENT'
+    | 'PLATFORM_COMMISSION_INVOICE'
+    | 'CREDIT_NOTE';
+  status: 'GENERATED' | 'VOIDED';
+  documentNumber: string;
+  paymentAttemptId?: string | null;
+  payoutId?: string | null;
+  orderId?: string | null;
+  customOrderId?: string | null;
+  currency: string;
+  grossAmount: string;
+  commissionAmount?: string | null;
+  netAmount?: string | null;
+  metadataJson?: Record<string, unknown> | null;
+  contentHtml?: string | null;
+  issuedAt: string;
+  voidedAt?: string | null;
+  emailSentAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminFinanceOverview {
+  currency: string;
+  gmv: number;
+  totalCommissions: number;
+  totalPayouts: number;
+  totalRefunds: number;
+  activeCommissionRules: number;
+  unresolvedReconciliationItems: number;
+  recentRuns: AdminReconciliationRun[];
+  recentDocuments: AdminFinancialDocument[];
 }

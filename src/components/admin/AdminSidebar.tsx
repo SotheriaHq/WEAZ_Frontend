@@ -24,6 +24,7 @@ const navItems: NavItem[] = [
   { key: 'charts', label: 'Charts', path: '/admin/measurements', emoji: '📐', permission: 'MEASUREMENTS_READ' },
   { key: 'configurations', label: 'Configurations', path: '/admin/taxonomy', emoji: '🧬', permission: 'TAXONOMY_READ' },
   { key: 'tags', label: 'Tags', path: '/admin/tags', emoji: '🏷️', permission: 'TAGS_READ' },
+  { key: 'finance', label: 'Finance', path: '/admin/finance', emoji: '🏦', permission: 'PAYOUTS_READ' },
   { key: 'payouts', label: 'Payouts', path: '/admin/payouts', emoji: '💰', permission: 'PAYOUTS_READ' },
   { key: 'disputes', label: 'Disputes', path: '/admin/disputes', emoji: '⚖️', permission: 'DISPUTES_READ' },
   { key: 'messaging', label: 'Messaging', path: '/admin/messaging', emoji: '💬', permission: 'MESSAGING_READ' },

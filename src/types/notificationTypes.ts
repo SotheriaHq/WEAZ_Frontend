@@ -385,7 +385,7 @@ export const NotificationRegistry: Record<
     trackingCategory: 'engagement',
   },
   [NotificationTypes.MESSAGE_RECEIVED]: {
-    actionText: 'sent a new order message',
+    actionText: 'sent a new message',
     actionKey: 'notification.action.message_received',
     iconKey: 'mail',
     routePattern: () => null,

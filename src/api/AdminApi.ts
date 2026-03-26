@@ -17,6 +17,11 @@ import type {
   FeaturedItem,
   FeaturedSlotsSummary,
   EligibleEntity,
+  AdminCommissionRule,
+  AdminReconciliationRun,
+  AdminReconciliationItem,
+  AdminFinancialDocument,
+  AdminFinanceOverview,
 } from '../types/admin';
 import type {
   AdminVerificationDetails,
@@ -225,8 +230,11 @@ export const adminTagsApi = {
 export const adminPayoutsApi = {
   list: (params?: Record<string, string>) =>
     apiClient.get<AdminPayout[] | Paginated<AdminPayout>>('/admin/payouts', { params }),
-  updateStatus: (id: string, status: string) =>
-    apiClient.patch(`/admin/payouts/${id}/status`, { status }),
+  updateStatus: (id: string, status: string, reason?: string) =>
+    apiClient.patch(`/admin/payouts/${id}/status`, { status, reason }),
+  claim: (id: string) => apiClient.post<AdminPayout>(`/admin/payouts/${id}/claim`),
+  release: (id: string, reason?: string) =>
+    apiClient.post<AdminPayout>(`/admin/payouts/${id}/release`, { reason }),
 };
 
 // ── Disputes ──
@@ -237,6 +245,9 @@ export const adminDisputesApi = {
     apiClient.post<AdminDispute>('/admin/disputes', data),
   update: (id: string, data: Record<string, unknown>) =>
     apiClient.patch(`/admin/disputes/${id}`, data),
+  claim: (id: string) => apiClient.post<AdminDispute>(`/admin/disputes/${id}/claim`),
+  release: (id: string, reason?: string) =>
+    apiClient.post<AdminDispute>(`/admin/disputes/${id}/release`, { reason }),
   reopen: (id: string, reason: string) =>
     apiClient.post(`/admin/disputes/${id}/reopen`, { reason }),
 };
@@ -311,4 +322,55 @@ export const adminBreakGlassApi = {
     firstName: string;
     lastName: string;
   }) => apiClient.post('/admin/break-glass/recover-superadmin', data),
+};
+
+// —— Finance ——
+export const adminFinanceApi = {
+  getOverview: () =>
+    apiClient.get<AdminFinanceOverview>('/admin/finance/overview'),
+  listCommissionRules: () =>
+    apiClient.get<AdminCommissionRule[]>('/admin/finance/commission-rules'),
+  createCommissionRule: (data: {
+    name: string;
+    scope?: 'PLATFORM' | 'BRAND';
+    brandId?: string | null;
+    currency?: string | null;
+    ratePercent: number;
+    minFeeAmount?: number | null;
+    maxFeeAmount?: number | null;
+    isDefault?: boolean;
+    isActive?: boolean;
+    effectiveFrom?: string;
+    effectiveTo?: string | null;
+  }) => apiClient.post<AdminCommissionRule>('/admin/finance/commission-rules', data),
+  updateCommissionRule: (
+    id: string,
+    data: {
+      name?: string;
+      currency?: string | null;
+      ratePercent?: number;
+      minFeeAmount?: number | null;
+      maxFeeAmount?: number | null;
+      isDefault?: boolean;
+      isActive?: boolean;
+      effectiveFrom?: string;
+      effectiveTo?: string | null;
+    },
+  ) => apiClient.patch<AdminCommissionRule>(`/admin/finance/commission-rules/${id}`, data),
+  createReconciliationRun: (data: { scope: 'PAYMENTS' | 'PAYOUTS' | 'LEDGER_INTEGRITY' }) =>
+    apiClient.post<AdminReconciliationRun>('/admin/finance/reconciliation-runs', data),
+  listReconciliationRuns: (params?: Record<string, string>) =>
+    apiClient.get<AdminReconciliationRun[]>('/admin/finance/reconciliation-runs', { params }),
+  listReconciliationItems: (params?: Record<string, string>) =>
+    apiClient.get<AdminReconciliationItem[]>('/admin/finance/reconciliation-items', { params }),
+  claimReconciliationItem: (id: string) =>
+    apiClient.post<AdminReconciliationItem>(`/admin/finance/reconciliation-items/${id}/claim`),
+  releaseReconciliationItem: (id: string, reason?: string) =>
+    apiClient.post<AdminReconciliationItem>(`/admin/finance/reconciliation-items/${id}/release`, { reason }),
+  resolveReconciliationItem: (id: string, note: string) =>
+    apiClient.post<AdminReconciliationItem>(`/admin/finance/reconciliation-items/${id}/resolve`, { note }),
+  listDocuments: (params?: Record<string, string>) =>
+    apiClient.get<AdminFinancialDocument[]>('/admin/finance/documents', { params }),
+  getDocument: (id: string) =>
+    apiClient.get<AdminFinancialDocument>(`/admin/finance/documents/${id}`),
 };

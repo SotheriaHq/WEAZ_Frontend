@@ -11,6 +11,7 @@ import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble'
 import ComposeArea from '@/components/messaging/ComposeArea';
 import ChatContactSidebar from '@/components/messaging/ChatContactSidebar';
 import VLoader from '@/components/loaders/VLoader';
+import { buildOrderRoute } from '@/utils/orderNavigation';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -1007,11 +1008,14 @@ const MessagingManagementPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      const prefix = surface === 'BRAND' ? '/studio' : '';
-                      if (activeConversation.contextType === 'CUSTOM_ORDER' && activeConversation.customOrderId) {
-                        navigate(`${prefix}/custom-orders/${activeConversation.customOrderId}`);
-                      } else if (activeConversation.orderId) {
-                        navigate(`${prefix}/orders/${activeConversation.orderId}`);
+                      const route = buildOrderRoute({
+                        surface,
+                        contextType: activeConversation.contextType,
+                        orderId: activeConversation.orderId,
+                        customOrderId: activeConversation.customOrderId,
+                      });
+                      if (route) {
+                        navigate(route);
                       }
                     }}
                     className="rounded-lg px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"

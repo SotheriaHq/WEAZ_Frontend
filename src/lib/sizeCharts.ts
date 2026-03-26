@@ -30,6 +30,7 @@ export type ChartSourceReference = {
 export type SizeRecommendation = {
   displayChartFamily: CustomOrderChartFamily;
   computedSize: string | null;
+  alphaSize: string | null;
   noDirectMatch: boolean;
   conversionGuidance: string | null;
   missingMeasurementKeys: string[];
@@ -173,6 +174,79 @@ const pickMeasurement = (measurements: Record<string, unknown>, candidates: stri
   return null;
 };
 
+const inferMeasurementGender = (
+  measurements: Record<string, unknown>,
+  measurementGender?: 'MEN' | 'WOMEN' | null,
+): 'MEN' | 'WOMEN' => {
+  if (measurementGender === 'MEN' || measurementGender === 'WOMEN') {
+    return measurementGender;
+  }
+
+  const keys = Object.keys(measurements);
+  if (keys.some((key) => key.startsWith('MEN_'))) {
+    return 'MEN';
+  }
+  return 'WOMEN';
+};
+
+const normalizeLabelToken = (value: string) =>
+  value
+    .toUpperCase()
+    .replace(/\b(UK|US|NG|ASIA)\b/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+
+const extractNumericToken = (value: string) => {
+  const match = value.match(/\d+/);
+  return match ? Number(match[0]) : null;
+};
+
+const matchesAlphaRowValue = (rowValue: string, label: string) => {
+  const normalizedRowValue = normalizeLabelToken(rowValue);
+  const normalizedLabel = normalizeLabelToken(label);
+  if (!normalizedRowValue || !normalizedLabel) return false;
+  if (normalizedRowValue === normalizedLabel) return true;
+
+  const labelNumber = extractNumericToken(normalizedLabel);
+  if (labelNumber == null) return false;
+
+  if (normalizedRowValue.includes('-')) {
+    const [startRaw, endRaw] = normalizedRowValue.split('-', 2);
+    const start = extractNumericToken(startRaw);
+    const end = extractNumericToken(endRaw);
+    if (start == null || end == null) return false;
+    return labelNumber >= start && labelNumber <= end;
+  }
+
+  const rowNumber = extractNumericToken(normalizedRowValue);
+  return rowNumber != null ? rowNumber === labelNumber : false;
+};
+
+const resolveAlphaSize = (
+  label: string | null,
+  displayChartFamily: CustomOrderChartFamily,
+  measurementGender: 'MEN' | 'WOMEN',
+): string | null => {
+  if (!label) return null;
+
+  const asiaMatch = label.match(/^ASIA\s+(.+)$/i);
+  if (asiaMatch?.[1]) {
+    return asiaMatch[1].trim().toUpperCase();
+  }
+
+  const rows = measurementGender === 'MEN' ? MEN_ALPHA_ROWS : WOMEN_ALPHA_ROWS;
+  const normalizedLabel = label.toUpperCase().trim();
+  const columnKey: keyof Pick<AlphaDisplayRow, 'uk' | 'us' | 'nigeria'> =
+    displayChartFamily === 'US' || normalizedLabel.startsWith('US ')
+      ? 'us'
+      : displayChartFamily === 'NIGERIA' || normalizedLabel.startsWith('NG ')
+        ? 'nigeria'
+        : 'uk';
+
+  const match = rows.find((row) => matchesAlphaRowValue(row[columnKey], normalizedLabel));
+  return match?.alpha ?? null;
+};
+
 const computeCandidate = (
   family: Exclude<CustomOrderChartFamily, 'HYBRID_UK_NIGERIA' | 'HYBRID_US_NIGERIA'>,
   measurements: Record<string, unknown>,
@@ -238,11 +312,13 @@ const computeCandidate = (
 export const deriveSizeRecommendation = (
   measurements: Record<string, unknown>,
   displayChartFamily: CustomOrderChartFamily,
+  measurementGender?: 'MEN' | 'WOMEN' | null,
 ): SizeRecommendation => {
   const uk = computeCandidate('UK', measurements);
   const us = computeCandidate('US', measurements);
   const nigeria = computeCandidate('NIGERIA', measurements);
   const asia = computeCandidate('ASIA', measurements);
+  const resolvedMeasurementGender = inferMeasurementGender(measurements, measurementGender);
 
   const missingMeasurementKeys = Array.from(
     new Set([...uk.missingMeasurementKeys, ...us.missingMeasurementKeys, ...nigeria.missingMeasurementKeys]),
@@ -252,6 +328,7 @@ export const deriveSizeRecommendation = (
     return {
       displayChartFamily,
       computedSize: null,
+      alphaSize: null,
       noDirectMatch: false,
       conversionGuidance: 'Update your bust, waist, and hip measurements to compute a live size.',
       missingMeasurementKeys,
@@ -271,6 +348,7 @@ export const deriveSizeRecommendation = (
   return {
     displayChartFamily,
     computedSize: resolved?.label ?? null,
+    alphaSize: resolveAlphaSize(resolved?.label ?? null, displayChartFamily, resolvedMeasurementGender),
     noDirectMatch: Boolean(resolved?.noDirectMatch),
     conversionGuidance:
       resolved?.noDirectMatch && resolved?.nearestLabel

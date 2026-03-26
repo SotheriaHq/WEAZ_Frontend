@@ -1,10 +1,12 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import BrandedQRCode from './BrandedQRCode';
 import QRExportFrame from './QRExportFrame';
 import { buildOrderUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { downloadQrPng } from '@/utils/qrExport';
 import { sanitizeQrFilename } from '@/utils/qrFilename';
+import type { RootState } from '@/store';
 
 export interface OrderQrCardProps {
   orderId: string;
@@ -21,6 +23,9 @@ const OrderQrCard: React.FC<OrderQrCardProps> = ({
   logoUrl,
   logoFileId,
 }) => {
+  const currentUsername = useSelector(
+    (state: RootState) => state.user.profile?.username?.trim() || null,
+  );
   const qrRootRef = useRef<HTMLDivElement | null>(null);
   const [logoMessage, setLogoMessage] = useState<string | null>(null);
   const url = useMemo(() => buildOrderUrl(orderId), [orderId]);
@@ -62,9 +67,10 @@ const OrderQrCard: React.FC<OrderQrCardProps> = ({
             <BrandedQRCode
               ref={qrRootRef}
               value={url}
-              logo={{ url: logoUrl, fileId: logoFileId }}
+              logo={currentUsername ? null : { url: logoUrl, fileId: logoFileId }}
               previewSize={228}
               exportSize={960}
+              username={currentUsername}
               onLogoMessage={setLogoMessage}
             />
           </QRExportFrame>

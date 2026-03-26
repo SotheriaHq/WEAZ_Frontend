@@ -1034,6 +1034,16 @@ const EditProduct: React.FC = () => {
     [],
   );
 
+  const syncPersistedMediaIds = useCallback(
+    (items: Array<{ id: string }>) => {
+      updateForm(
+        "mediaIds",
+        items.map((item) => item.id).filter((id) => !id.startsWith("pending-")),
+      );
+    },
+    [updateForm],
+  );
+
   const addVariant = useCallback(() => {
     const next: ProductVariant = {
       size: "",
@@ -1491,8 +1501,12 @@ const EditProduct: React.FC = () => {
 
           const doUploads = async () => {
             await Promise.all(
-              pendingUploads.map((u) =>
-                productApi.uploadProductMedia(created.id, u.file, u.isPrimary),
+              pendingUploads.map((upload) =>
+                productApi.uploadProductMedia(
+                  created.id,
+                  upload.file,
+                  upload.isPrimary,
+                ),
               ),
             );
             notifyProductStudioSync("product-media-uploaded", created.id);
@@ -1781,14 +1795,23 @@ const EditProduct: React.FC = () => {
   );
 
   const pushMediaPreviews = useCallback(
-    (files: File[], { makePrimary }: { makePrimary: boolean }) => {
-      if (!files.length) return;
+    (
+      files: File[],
+      { makePrimary }: { makePrimary: boolean },
+    ): Array<{
+      id: string;
+      tempId: string;
+      file: File;
+      previewUrl: string;
+      isPrimary: boolean;
+    }> => {
+      if (!files.length) return [];
 
       const remaining = Math.max(0, maxMediaCount - mediaUrls.length);
       const toAdd = files.slice(0, remaining);
       if (toAdd.length === 0) {
         toast.error(`You can upload up to ${maxMediaCount} images`);
-        return;
+        return [];
       }
 
       const now = Date.now();
@@ -1829,6 +1852,8 @@ const EditProduct: React.FC = () => {
         }
         return normalizePrimary(next);
       });
+
+      return nextPending;
     },
     [mediaUrls.length, normalizePending],
   );
@@ -1849,38 +1874,77 @@ const EditProduct: React.FC = () => {
 
     if (isEditMode && productId) {
       const uploadQueue = files.slice(0, maxMediaCount - mediaUrls.length);
-      const shouldMakePrimary = !hasPrimaryMedia && uploadQueue.length > 0;
+      const queuedPreviews = pushMediaPreviews(uploadQueue, {
+        makePrimary: !hasPrimaryMedia,
+      });
+      if (!queuedPreviews.length) return;
 
-      for (const [index, file] of uploadQueue.entries()) {
-        try {
-          const makePrimary = shouldMakePrimary && index === 0;
-          const uploaded = await productApi.uploadProductMedia(
-            productId,
-            file,
-            makePrimary,
-          );
-          setMediaUrls((prev) => {
-            const next = [
-              ...prev,
-              { id: uploaded.id, url: uploaded.url, isPrimary: makePrimary },
-            ];
-            const normalized = normalizePrimary(next);
-            updateForm(
-              "mediaIds",
-              normalized
-                .map((m) => m.id)
-                .filter((id) => !id.startsWith("pending-")),
+      const results = await Promise.all(
+        queuedPreviews.map(async (pending) => {
+          try {
+            const uploaded = await productApi.uploadProductMedia(
+              productId,
+              pending.file,
+              pending.isPrimary,
             );
-            return normalized;
-          });
-          notifyProductStudioSync("product-media-uploaded", productId);
-          toast.success(
-            makePrimary ? "Cover image uploaded" : "Image uploaded",
-          );
-        } catch (err) {
-          console.error("Upload failed", err);
-          toast.error("Failed to upload image");
-        }
+
+            setMediaUrls((prev) => {
+              const next = prev.map((item) =>
+                item.id === pending.tempId
+                  ? {
+                      id: uploaded.id,
+                      url: uploaded.url,
+                      isPrimary: item.isPrimary,
+                    }
+                  : item,
+              );
+              const normalized = normalizePrimary(next);
+              syncPersistedMediaIds(normalized);
+              return normalized;
+            });
+            setPendingMediaFiles((prev) =>
+              normalizePending(
+                prev.filter((item) => item.tempId !== pending.tempId),
+              ),
+            );
+
+            return { ok: true as const };
+          } catch (err) {
+            console.error("Upload failed", err);
+            setMediaUrls((prev) => {
+              const next = normalizePrimary(
+                prev.filter((item) => item.id !== pending.tempId),
+              );
+              syncPersistedMediaIds(next);
+              return next;
+            });
+            setPendingMediaFiles((prev) =>
+              normalizePending(
+                prev.filter((item) => item.tempId !== pending.tempId),
+              ),
+            );
+            return { ok: false as const };
+          }
+        }),
+      );
+
+      const successCount = results.filter((result) => result.ok).length;
+      const failedCount = results.length - successCount;
+
+      if (successCount > 0) {
+        notifyProductStudioSync("product-media-uploaded", productId);
+        toast.success(
+          successCount === 1
+            ? "Image uploaded"
+            : `${successCount} images uploaded`,
+        );
+      }
+      if (failedCount > 0) {
+        toast.error(
+          failedCount === 1
+            ? "Failed to upload 1 image"
+            : `Failed to upload ${failedCount} images`,
+        );
       }
       return;
     }
@@ -2196,11 +2260,17 @@ const EditProduct: React.FC = () => {
                           mediaClassName="w-full h-full object-contain"
                         />
 
-                        {mediaUrls[carouselIndex].isPrimary && (
-                          <div className="absolute top-2 left-2 px-2 py-1 bg-black/70 backdrop-blur-sm rounded text-[10px] font-semibold text-white">
-                            Cover
-                          </div>
-                        )}
+                        {/* Slot label overlay */}
+                        <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                          {mediaUrls[carouselIndex].isPrimary && (
+                            <span className="px-2 py-1 bg-black/70 backdrop-blur-sm rounded text-[10px] font-semibold text-white">
+                              Cover
+                            </span>
+                          )}
+                          <span className="px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-[10px] font-medium text-white/90">
+                            {carouselIndex + 1}. {['Front', 'Left Side', 'Right Side', 'Back Side', 'Cover', 'Extra'][carouselIndex] ?? `Image ${carouselIndex + 1}`}
+                          </span>
+                        </div>
 
                         {/* Action buttons - Set cover + Delete only */}
                         <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 px-3 py-3 bg-gradient-to-t from-black/80 to-transparent">
@@ -2319,34 +2389,13 @@ const EditProduct: React.FC = () => {
                 </p>
               )}
 
-              <div className="pt-4 border-t border-gray-200 dark:border-white/10 space-y-2">
+              <div className="pt-4 border-t border-gray-200 dark:border-white/10">
                 <p className="text-xs text-gray-500">
                   Up to 6 images • Cover required when images exist
                 </p>
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[11px] text-gray-400 mt-1">
                   Minimum 4 images required: front, left, right, and back.
                 </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { slot: 1, label: 'Front (Default Cover)' },
-                    { slot: 2, label: 'Left Side' },
-                    { slot: 3, label: 'Right Side' },
-                    { slot: 4, label: 'Back Side' },
-                    { slot: 5, label: 'Cover (if any)' },
-                    { slot: 6, label: 'Extra (if any)' },
-                  ].map(({ slot, label }) => (
-                    <span
-                      key={slot}
-                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
-                        mediaUrls.length >= slot
-                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
-                          : 'bg-gray-50 text-gray-400 dark:bg-white/5 dark:text-gray-500'
-                      }`}
-                    >
-                      <span className="font-bold">{slot}.</span> {label}
-                    </span>
-                  ))}
-                </div>
               </div>
             </div>
 

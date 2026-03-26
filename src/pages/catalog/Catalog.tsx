@@ -29,7 +29,6 @@ import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedF
 import { getStoreStatus, type StoreStatusResponse } from '../../api/StoreApi';
 import FrostedButton from '@/components/ui/FrostedButton';
 import CatalogShopTab from '@/components/catalog/CatalogShopTab';
-import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 import {
   type PublishTask,
   readPublishTasks,

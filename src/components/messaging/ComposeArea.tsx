@@ -87,12 +87,21 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
 
     setUploading(true);
     try {
-      const uploaded: PendingFile[] = [];
-      for (const file of selectedFiles) {
-        const res = await messagingApi.uploadMessageAttachment(file);
-        const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
-        uploaded.push({ fileId: res.id, fileName: res.originalName || file.name, previewUrl: preview });
-      }
+      const uploaded = (await Promise.all(
+        selectedFiles.map(async (file) => {
+          const res = await messagingApi.uploadMessageAttachment(file);
+          if (!res?.id) {
+            throw new Error('Attachment upload completed without a file ID');
+          }
+
+          const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+          return {
+            fileId: res.id,
+            fileName: res.originalName || res.fileName || file.name,
+            previewUrl: preview,
+          } satisfies PendingFile;
+        }),
+      ));
       setFiles(prev => [...prev, ...uploaded]);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Upload failed');
@@ -147,7 +156,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
   const handleSend = useCallback(async () => {
     if (!canSend) return;
     const body = text.trim();
-    const attIds = files.map(f => f.fileId);
+    const attIds = files.map((f) => f.fileId).filter(Boolean);
 
     setSending(true);
     try {

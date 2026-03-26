@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Settings,
   CheckCircle,
-  Shield,
   Wallet,
   Users,
   Bell,
@@ -20,7 +19,6 @@ import {
   CreditCard,
   FileText,
   Link2,
-  Store,
   Menu,
   X,
 } from 'lucide-react';

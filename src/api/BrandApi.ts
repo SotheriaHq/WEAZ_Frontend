@@ -1583,6 +1583,30 @@ export const brandApi = {
     }
   },
 
+  async getPayoutOverview(brandId: string) {
+    try {
+      const response = await apiClient.get(`/brands/${brandId}/payouts/overview`);
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error fetching payout overview:', error);
+      return null;
+    }
+  },
+
+  async getIncomingTransactions(brandId: string, params?: { page?: number; limit?: number }) {
+    try {
+      const query = new URLSearchParams();
+      if (params?.page) query.append('page', String(params.page));
+      if (params?.limit) query.append('limit', String(params.limit));
+      const suffix = query.toString();
+      const response = await apiClient.get(`/brands/${brandId}/payouts/incoming${suffix ? `?${suffix}` : ''}`);
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error fetching incoming transactions:', error);
+      return null;
+    }
+  },
+
   async requestPayout(brandId: string, amount: number) {
     try {
       const response = await apiClient.post(`/brands/${brandId}/payouts/request`, { amount });

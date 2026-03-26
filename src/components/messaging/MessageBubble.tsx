@@ -2,10 +2,12 @@ import React, { memo } from 'react';
 import type { ThreadMessage } from '@/api/MessagingApi';
 
 interface MessageBubbleProps {
-  message: ThreadMessage;
+  message: ThreadMessage & { _optimistic?: 'sending' | 'failed' };
   isOwn: boolean;
   /** When true, hidden/redacted messages are shown with a visual indicator (admin view). */
   showModerated?: boolean;
+  /** Called when user clicks retry on a failed optimistic message */
+  onRetry?: () => void;
 }
 
 const formatTime = (iso: string) => {
@@ -37,7 +39,7 @@ const senderName = (msg: ThreadMessage) => {
   }
 };
 
-const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, showModerated = false }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, showModerated = false, onRetry }) => {
   const isSystem = message.kind === 'SYSTEM' || message.kind === 'MODERATION_NOTICE';
   const isHidden = message.visibilityState === 'HIDDEN';
   const isRedacted = message.visibilityState === 'REDACTED';
@@ -122,8 +124,24 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
               )}
             </>
           )}
-          <div className={`flex justify-end mt-0.5 ${isOwn ? 'text-white/60' : 'text-gray-400 dark:text-gray-500'}`}>
+          <div className={`flex items-center justify-end gap-1 mt-0.5 ${isOwn ? 'text-white/60' : 'text-gray-400 dark:text-gray-500'}`}>
             <span className="text-[10px]">{formatTime(message.createdAt)}</span>
+            {isOwn && (message as any)._optimistic === 'sending' && (
+              <span className="text-[10px] animate-pulse" title="Sending">○</span>
+            )}
+            {isOwn && (message as any)._optimistic === 'failed' && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onRetry?.(); }}
+                className="text-[10px] text-red-300 hover:text-red-100 font-semibold"
+                title="Failed to send. Tap to retry."
+              >
+                ⚠ Failed
+              </button>
+            )}
+            {isOwn && !(message as any)._optimistic && (
+              <span className="text-[10px]" title="Delivered">✓</span>
+            )}
           </div>
         </div>
       </div>

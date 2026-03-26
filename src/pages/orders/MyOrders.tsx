@@ -2,39 +2,43 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyOrders, type Order } from '@/api/StoreApi';
 import { toast } from 'sonner';
-import { BadgeCheck, Package, Truck } from 'lucide-react';
 import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
 import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
 import VLoader from '@/components/loaders/VLoader';
 import { messagingApi, type ThreadSummaryResponse } from '@/api/MessagingApi';
+import ImageWithFallback from '@/components/ImageWithFallback';
 
 const statusIcon = (status: string) => {
   switch (status) {
     case 'SHIPPED':
-      return <Truck className="w-4 h-4" />;
+      return '🚚';
     case 'DELIVERED':
-      return <BadgeCheck className="w-4 h-4" />;
+      return '✅';
+    case 'PROCESSING':
+      return '🧵';
     default:
-      return <Package className="w-4 h-4" />;
+      return '📦';
   }
 };
 
 const statusTone = (status: string) => {
   switch (status) {
     case 'DELIVERED':
-      return 'bg-green-100 text-green-700';
+      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300';
     case 'SHIPPED':
-      return 'bg-blue-100 text-blue-700';
+      return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300';
     case 'PROCESSING':
-      return 'bg-amber-100 text-amber-700';
+      return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300';
+    case 'CANCELLED':
+      return 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300';
     default:
-      return 'bg-gray-100 text-gray-700';
+      return 'bg-gray-100 text-gray-700 dark:bg-gray-500/15 dark:text-gray-300';
   }
 };
 
 const MyOrders: React.FC = () => {
   const navigate = useNavigate();
-  const { flags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
+  const { flags } = useReviewRuntimeFlags();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -73,172 +77,164 @@ const MyOrders: React.FC = () => {
     void loadOrders();
   }, [loadOrders]);
 
+  const formatCurrency = (amount: number, currency: string) =>
+    new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(amount);
+
   return (
-    <div className="max-w-5xl mx-auto py-10 px-4 space-y-6">
-      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-        <button type="button" onClick={() => navigate(-1)} className="font-semibold transition-colors hover:text-black dark:hover:text-white">
-          Back
-        </button>
-        <span>/</span>
-        <button type="button" onClick={() => navigate('/')} className="transition-colors hover:text-black dark:hover:text-white">
-          Home
-        </button>
-        <span>/</span>
-        <span className="font-medium text-gray-900 dark:text-white">Orders</span>
+    <div className="max-w-5xl mx-auto py-8 px-4 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Your Orders</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          {!loading && orders.length > 0 ? `${orders.length} order${orders.length === 1 ? '' : 's'}` : 'Track everything you have purchased.'}
+        </p>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Your Orders</h1>
-          <p className="text-gray-500 text-sm">Track everything you have purchased.</p>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <VLoader size={48} phase="loading" />
+          <p className="mt-4 text-sm text-gray-500">Loading orders...</p>
         </div>
-      </div>
+      ) : orders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center mb-4">
+            <span aria-hidden="true" className="text-3xl text-gray-400">📦</span>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No orders yet</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-sm">
+            When you make a purchase, your orders will appear here.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="mt-4 rounded-full bg-black px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200 transition-colors"
+          >
+            Start shopping
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {orders.map((order) => {
+            const summary = summaryByOrderId[order.id];
+            const unreadCount = Number(summary?.unreadCount ?? 0);
+            const firstItem = order.items?.[0];
+            const thumbnail = firstItem?.thumbnail || null;
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-        <div className="divide-y divide-gray-100 dark:divide-gray-800">
-          {loading ? (
-            <div className="p-8 text-center text-gray-500">
-              <VLoader size={48} phase="loading" className="mx-auto" />
-              <p className="mt-3">Loading orders...</p>
-            </div>
-          ) : orders.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">You have not placed any orders yet.</div>
-          ) : (
-            orders.map((order) => (
-              (() => {
-                const summary = summaryByOrderId[order.id];
-                const unreadCount = Number(summary?.unreadCount ?? 0);
-                return (
-              <div key={order.id} className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <span className="font-mono text-gray-800 dark:text-gray-200">#{order.id.slice(0, 8)}</span>
-                    <span>·</span>
-                    <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+            return (
+              <div
+                key={order.id}
+                onClick={() => navigate(`/orders/${order.id}`)}
+                className="group relative cursor-pointer rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-gray-300 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:bg-white/[0.05]"
+              >
+                <div className="flex gap-4">
+                  {/* Thumbnail */}
+                  <div className="shrink-0 h-20 w-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-white/5">
+                    {thumbnail ? (
+                      <ImageWithFallback
+                        src={thumbnail}
+                        alt={firstItem?.name || 'Order'}
+                        fit="cover"
+                        rounded="xl"
+                        className="h-full w-full object-cover"
+                        containerClassName="h-full w-full"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-2xl text-gray-300 dark:text-gray-600">
+                        <span aria-hidden="true">📦</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="font-medium text-lg">{order.customerName}</div>
-                  {order.paymentStatus !== 'PAID' && order.paymentReference ? (
-                    <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-                      ⏳ Payment pending
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                            {order.items.map((i) => i.name).join(', ')}
+                          </h3>
+                          {unreadCount > 0 && (
+                            <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-500/15 dark:text-purple-300">
+                              💬 {unreadCount}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          #{order.id.slice(0, 8).toUpperCase()} · {new Date(order.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm font-bold text-gray-900 dark:text-white">
+                          {formatCurrency(Number(order.totalAmount), order.currency || 'NGN')}
+                        </div>
+                      </div>
                     </div>
-                  ) : null}
-                  <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                    {order.items.slice(0, 3).map((item) => (
-                      <span key={item.productId} className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
-                        {item.name} × {item.quantity}
-                      </span>
-                    ))}
-                    {order.items.length > 3 && <span className="text-gray-400">+{order.items.length - 3} more</span>}
+
+                    <div className="flex items-center justify-between mt-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${statusTone(order.status)}`}>
+                          <span aria-hidden="true">{statusIcon(order.status)}</span>
+                          {order.status}
+                        </div>
+                        {order.items.length > 1 && (
+                          <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                            {order.items.length} items
+                          </span>
+                        )}
+                        {order.paymentStatus !== 'PAID' && order.paymentReference && (
+                          <button
+                            className="text-[11px] font-semibold text-amber-600 hover:underline dark:text-amber-400"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/checkout/confirmation?reference=${encodeURIComponent(order.paymentReference!)}`);
+                            }}
+                          >
+                            Resume payment
+                          </button>
+                        )}
+                      </div>
+                      <span aria-hidden="true" className="text-base text-gray-300 transition-colors group-hover:text-gray-500 dark:text-gray-600 dark:group-hover:text-gray-400">›</span>
+                    </div>
                   </div>
-                  {summary?.hasUnread ? (
-                    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200">
-                      💬 {unreadCount > 0 ? `${unreadCount} unread message${unreadCount === 1 ? '' : 's'}` : 'New messages'}
-                    </div>
-                  ) : null}
-                  {order.orderItems?.length ? (
-                    <div className="space-y-2 pt-2">
-                      {!reviewFlagsLoading && !flags.writeEnabled ? (
-                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                          Reviews are temporarily unavailable.
-                        </div>
-                      ) : null}
-                      {order.orderItems.map((item) => (
-                        <div key={item.orderItemId || item.id || `${order.id}-${item.productId}`} className="rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm dark:border-gray-800 dark:bg-gray-950/50">
-                          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                            <div className="space-y-1">
-                              <div className="font-medium text-gray-900 dark:text-gray-100">
-                                {item.productName || item.name}
-                              </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                {[
-                                  item.selectedSize ? `Size ${item.selectedSize}` : null,
-                                  item.selectedColor ? `Color ${item.selectedColor}` : null,
-                                ].filter(Boolean).join(' / ') || 'Purchase details available in order.'}
-                              </div>
-                            </div>
-
-                            {flags.writeEnabled && item.reviewState === 'CAN_CREATE' ? (
-                              <button
-                                type="button"
-                                onClick={() => setActiveReviewItem(item)}
-                                className="rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-black transition-colors hover:bg-emerald-400"
-                              >
-                                ⭐ Write review
-                              </button>
-                            ) : null}
-
-                            {flags.writeEnabled && item.reviewState === 'ALREADY_REVIEWED' ? (
-                              <button
-                                type="button"
-                                onClick={() => setActiveReviewItem(item)}
-                                className="rounded-full border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-700 transition-colors hover:border-emerald-300 hover:text-emerald-700 dark:border-gray-700 dark:text-gray-200 dark:hover:border-emerald-400/40 dark:hover:text-emerald-200"
-                              >
-                                ✅ Edit review
-                              </button>
-                            ) : null}
-
-                            {item.reviewState === 'BLOCKED_BY_DISPUTE' ? (
-                              <div className="text-xs font-semibold text-rose-600 dark:text-rose-300">
-                                🛑 Review paused while a sizing dispute is open.
-                              </div>
-                            ) : null}
-
-                            {item.reviewState === 'NOT_DELIVERED' ? (
-                              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                                📦 Review unlocks after delivery.
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${statusTone(order.status)}`}>
-                    {statusIcon(order.status)}
-                    {order.status}
-                  </div>
-                  <div className="text-right">
-                    <div className="text-lg font-semibold">
-                      {new Intl.NumberFormat('en-NG', { style: 'currency', currency: order.currency || 'NGN' }).format(Number(order.totalAmount))}
-                    </div>
-                    {order.paymentStatus !== 'PAID' && order.paymentReference ? (
+                {/* Review actions */}
+                {order.orderItems?.some((item) => item.reviewState === 'CAN_CREATE' || item.reviewState === 'ALREADY_REVIEWED') && flags.writeEnabled && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-white/5 flex flex-wrap gap-2">
+                    {order.orderItems.filter((item) => item.reviewState === 'CAN_CREATE' || item.reviewState === 'ALREADY_REVIEWED').map((item) => (
                       <button
-                        className="block w-full text-sm text-amber-700 hover:underline dark:text-amber-300"
-                        onClick={() => navigate(`/checkout/confirmation?reference=${encodeURIComponent(order.paymentReference!)}`)}
+                        key={item.orderItemId || item.id || item.productId}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setActiveReviewItem(item); }}
+                        className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                          item.reviewState === 'CAN_CREATE'
+                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300'
+                            : 'border border-gray-200 text-gray-600 hover:border-emerald-300 hover:text-emerald-700 dark:border-white/10 dark:text-gray-300'
+                        }`}
                       >
-                        Resume payment
+                        {item.reviewState === 'CAN_CREATE' ? '⭐ Review' : '✅ Edit review'} {item.productName || item.name}
                       </button>
-                    ) : null}
-                    <button
-                      className="text-sm text-black dark:text-white hover:underline"
-                      onClick={() => navigate(`/orders/${order.id}`)}
-                    >
-                      View details
-                    </button>
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
-                );
-              })()
-            ))
-          )}
+            );
+          })}
         </div>
+      )}
 
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-500">
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-gray-500">
           <span>Page {page} of {totalPages}</span>
           <div className="flex items-center gap-2">
             <button
-              className="px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-50"
+              className="px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 font-medium disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
               disabled={page === 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
               Previous
             </button>
             <button
-              className="px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-50"
+              className="px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 font-medium disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             >
@@ -246,7 +242,7 @@ const MyOrders: React.FC = () => {
             </button>
           </div>
         </div>
-      </div>
+      )}
         <ReviewComposerModal
           open={Boolean(activeReviewItem)}
           onClose={() => setActiveReviewItem(null)}

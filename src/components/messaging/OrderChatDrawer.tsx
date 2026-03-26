@@ -310,23 +310,51 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
       attachmentFileIds,
     };
 
-    if (contextType === 'CUSTOM_ORDER') {
-      if (actorSurface === 'BRAND' && brandId) {
-        await messagingApi.sendCustomOrderMessageForBrand(brandId, orderId, payload);
-      } else {
-        await messagingApi.sendCustomOrderMessage(orderId, payload);
-      }
-    } else {
-      if (actorSurface === 'BRAND' && brandId) {
-        await messagingApi.sendOrderMessageForBrand(brandId, orderId, payload);
-      } else {
-        await messagingApi.sendOrderMessage(orderId, payload);
-      }
-    }
+    // Optimistic: add message to local list immediately
+    const optimisticMsg: ThreadMessage & { _optimistic?: 'sending' | 'failed' } = {
+      id: clientMessageId,
+      threadId: '',
+      senderUserId: myId ?? null,
+      senderRole: actorSurface === 'BRAND' ? 'BRAND_OWNER' : actorSurface === 'ADMIN' ? 'ADMIN' : 'BUYER',
+      kind: 'USER',
+      visibilityState: 'VISIBLE',
+      bodyText: bodyText || null,
+      createdAt: new Date().toISOString(),
+      sender: profile ? { id: profile.id, username: profile.username ?? null, firstName: profile.firstName ?? null, lastName: profile.lastName ?? null, profileImage: profile.profileImage ?? null } : null,
+      attachments: [],
+      _optimistic: 'sending',
+    };
 
-    await fetchMessages();
+    setMessages((prev) => [...prev, optimisticMsg]);
     scrollToBottom();
-  }, [actorSurface, brandId, contextType, orderId, fetchMessages, scrollToBottom]);
+
+    try {
+      if (contextType === 'CUSTOM_ORDER') {
+        if (actorSurface === 'BRAND' && brandId) {
+          await messagingApi.sendCustomOrderMessageForBrand(brandId, orderId, payload);
+        } else {
+          await messagingApi.sendCustomOrderMessage(orderId, payload);
+        }
+      } else {
+        if (actorSurface === 'BRAND' && brandId) {
+          await messagingApi.sendOrderMessageForBrand(brandId, orderId, payload);
+        } else {
+          await messagingApi.sendOrderMessage(orderId, payload);
+        }
+      }
+
+      // Replace optimistic message with real data
+      await fetchMessages();
+      scrollToBottom();
+    } catch {
+      // Mark the optimistic message as failed
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === clientMessageId ? { ...m, _optimistic: 'failed' } : m,
+        ),
+      );
+    }
+  }, [actorSurface, brandId, contextType, orderId, fetchMessages, scrollToBottom, myId, profile]);
 
   if (!open) return null;
 
@@ -347,13 +375,13 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 z-layer-drawer bg-black/30 backdrop-blur-sm transition-opacity"
         onClick={onClose}
         aria-hidden
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 z-50 h-full w-full max-w-md flex flex-col bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl shadow-2xl border-l border-gray-200/50 dark:border-white/10 transform transition-transform duration-300 ease-out">
+      <div className="fixed right-0 top-0 z-layer-drawer h-dvh w-full max-w-md flex flex-col bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl shadow-2xl border-l border-gray-200/50 dark:border-white/10 transform transition-transform duration-300 ease-out">
         {/* Header */}
         <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200/50 dark:border-white/10">
           <div className="min-w-0">

@@ -15,6 +15,7 @@ import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { CONTENT_DISPLAY_FRAME_CLASS, CONTENT_DISPLAY_MEDIA_CLASS } from '@/components/media/contentDisplayPresets';
+import { formatMeasurementLabel } from '@/utils/measurementLabels';
 
 interface InlineProductDetailProps {
   product: StoreProduct;
@@ -739,7 +740,7 @@ export default function InlineProductDetail({
                     return (
                       <label key={key} className="flex flex-col gap-1">
                         <span className={`text-xs font-medium ${isMissing ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                          {key.replace(/_/g, ' ')}
+                          {formatMeasurementLabel(key)}
                           {isMissing ? ' (required)' : ''}
                         </span>
                         <input

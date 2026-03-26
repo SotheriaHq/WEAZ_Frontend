@@ -18,7 +18,6 @@ import {
   formatDateTime,
   getRelativeDeadlineText,
 } from '@/components/custom-orders/CustomOrderUi';
-import OrderMessagesPanel from '@/components/messaging/OrderMessagesPanel';
 import { useConfirm } from '@/components/ui/useConfirm';
 
 const formatCurrency = (value: number | undefined, currency = 'NGN') =>
@@ -490,11 +489,19 @@ const CustomOrderDetailPage: React.FC = () => {
                   </button>
                 </div>
 
-                <OrderMessagesPanel
-                  contextType="CUSTOM_ORDER"
-                  orderId={order.id}
-                  title="Custom-order conversation"
-                />
+                <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">Conversation</div>
+                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    Continue messaging from the dedicated chat workspace so order receipt details stay focused on the order itself.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/messages?customOrderId=${encodeURIComponent(order.id)}`)}
+                    className="mt-3 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-black"
+                  >
+                    Open conversation
+                  </button>
+                </div>
 
                 <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
                   <div className="text-sm font-semibold text-slate-900 dark:text-white">Report issue</div>

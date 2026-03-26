@@ -318,16 +318,21 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
 
     setUploading(true);
     try {
-      const uploaded: PendingAttachment[] = [];
-      for (const file of files) {
-        const response = await messagingApi.uploadMessageAttachment(file);
-        const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
-        uploaded.push({
-          fileId: response.id,
-          fileName: response.originalName || response.fileName || file.name,
-          previewUrl,
-        });
-      }
+      const uploaded = await Promise.all(
+        files.map(async (file) => {
+          const response = await messagingApi.uploadMessageAttachment(file);
+          if (!response?.id) {
+            throw new Error('Attachment upload completed without a file ID');
+          }
+
+          const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+          return {
+            fileId: response.id,
+            fileName: response.originalName || response.fileName || file.name,
+            previewUrl,
+          } satisfies PendingAttachment;
+        }),
+      );
 
       setPendingAttachments((prev) => [...prev, ...uploaded]);
     } catch (error: any) {
@@ -350,7 +355,9 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
 
   const handleSend = async () => {
     const bodyText = input.trim();
-    const attachmentFileIds = pendingAttachments.map((attachment) => attachment.fileId);
+    const attachmentFileIds = pendingAttachments
+      .map((attachment) => attachment.fileId)
+      .filter(Boolean);
     if (!bodyText && attachmentFileIds.length === 0) return;
 
     setSending(true);
@@ -423,7 +430,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
         </button>
       </div>
 
-      <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1">
+      <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1 scrollbar-hide">
         {loading ? (
           <div className="text-sm text-slate-500 dark:text-slate-400">Loading messages...</div>
         ) : messages.length === 0 ? (

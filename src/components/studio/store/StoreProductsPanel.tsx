@@ -61,6 +61,17 @@ const PRODUCT_SORT_OPTIONS: Array<{
   { value: 'price_desc', label: 'Price high-low' },
 ];
 
+const PRODUCT_STATUS_FILTER_VALUES = new Set<ProductStatusFilter>(
+  PRODUCT_STATUS_OPTIONS.map((option) => option.value),
+);
+const COLLECTION_STATUS_FILTER_VALUES = new Set<CollectionStatusFilter>([
+  'all',
+  'published',
+  'draft',
+  'archived',
+]);
+const STOCK_FILTER_VALUES = new Set(['all', 'in_stock', 'low_stock', 'out_of_stock']);
+
 interface BackendProduct {
   id: string;
   name: string;
@@ -507,6 +518,42 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       setActiveCollectionId(routeCollectionId);
     }
   }, [location.search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const productStatus = params.get('productStatus');
+    const stock = params.get('stock');
+    const query = params.get('q');
+    const collectionStatus = params.get('collectionStatus');
+
+    if (productStatus && PRODUCT_STATUS_FILTER_VALUES.has(productStatus as ProductStatusFilter)) {
+      setFilterStatus(productStatus as ProductStatusFilter);
+    } else if (!productStatus) {
+      setFilterStatus('all');
+    }
+
+    if (stock && STOCK_FILTER_VALUES.has(stock)) {
+      setFilterStock(stock);
+    } else if (!stock) {
+      setFilterStock('all');
+    }
+
+    if (typeof query === 'string' && query !== searchQuery) {
+      setSearchQuery(query);
+    }
+    if (!query && searchQuery) {
+      setSearchQuery('');
+    }
+
+    if (
+      collectionStatus &&
+      COLLECTION_STATUS_FILTER_VALUES.has(collectionStatus as CollectionStatusFilter)
+    ) {
+      setCollectionStatusFilter(collectionStatus as CollectionStatusFilter);
+    } else if (!collectionStatus) {
+      setCollectionStatusFilter('all');
+    }
+  }, [location.search, searchQuery]);
 
   useEffect(() => {
     if (outletView !== 'products') return;
@@ -1864,70 +1911,24 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           )}
         </div>
 
-        <div className="hidden border-t border-gray-200/80 bg-gradient-to-r from-white/90 via-purple-50/60 to-white/90 px-5 py-4 backdrop-blur-xl dark:border-white/10 dark:from-[#111118]/95 dark:via-[#161327]/95 dark:to-[#111118]/95 lg:sticky lg:top-24 lg:z-20 lg:flex lg:flex-wrap lg:items-start lg:justify-between lg:gap-4">
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-purple-600 dark:text-purple-300">
-              Product Controls
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {PRODUCT_STATUS_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setFilterStatus(opt.value)}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-all ${
-                    filterStatus === opt.value
-                      ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md shadow-purple-500/25'
-                      : 'border border-gray-200/80 bg-white/85 text-gray-600 hover:border-purple-200 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:text-white'
-                  }`}
-                >
-                  <span>{opt.icon}</span>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid w-full gap-3 xl:w-auto xl:grid-cols-3">
-            <div className="min-w-[210px]">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                📚 Collection
-              </p>
-              <FilterDropdown
-                value={filterCollection}
-                onChange={setFilterCollection}
-                disabled={collectionsLoading}
-                options={[
-                  { value: 'all', label: 'All Collections' },
-                  ...visibleCollections.map((c) => ({ value: c.id, label: c.name })),
-                ]}
-              />
-            </div>
-            <div className="min-w-[210px]">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                📦 Stock
-              </p>
-              <FilterDropdown
-                value={filterStock}
-                onChange={setFilterStock}
-                options={[
-                  { value: 'all', label: 'All Stock' },
-                  { value: 'in_stock', label: 'In Stock' },
-                  { value: 'low_stock', label: 'Low Stock' },
-                  { value: 'out_of_stock', label: 'Out of Stock' },
-                ]}
-              />
-            </div>
-            <div className="min-w-[210px]">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                🧭 Sort
-              </p>
-              <FilterDropdown
-                value={productSortBy}
-                onChange={(value) => setProductSortBy(value as ProductSortBy)}
-                options={PRODUCT_SORT_OPTIONS}
-              />
-            </div>
+        {/* Desktop status filter buttons */}
+        <div className="hidden border-t border-gray-200/80 bg-white/92 px-5 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:sticky lg:top-24 lg:z-20 lg:block">
+          <div className="flex flex-wrap items-center gap-2">
+            {PRODUCT_STATUS_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setFilterStatus(opt.value)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-all ${
+                  filterStatus === opt.value
+                    ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md shadow-purple-500/25'
+                    : 'border border-gray-200/80 bg-white/85 text-gray-600 hover:border-purple-200 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:text-white'
+                }`}
+              >
+                <span>{opt.icon}</span>
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -2547,10 +2548,37 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       {/* Products - with CSS containment for smooth tab transitions */}
       {outletView === 'products' && !inlineProduct && (
       <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg">
+        {/* Inline filter dropdowns */}
+        <div className="hidden lg:flex items-center gap-3 px-4 pt-4 sm:px-6 sm:pt-5">
+          <FilterDropdown
+            value={filterCollection}
+            onChange={setFilterCollection}
+            disabled={collectionsLoading}
+            options={[
+              { value: 'all', label: 'All Collections' },
+              ...visibleCollections.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+          />
+          <FilterDropdown
+            value={filterStock}
+            onChange={setFilterStock}
+            options={[
+              { value: 'all', label: 'All Stock' },
+              { value: 'in_stock', label: 'In Stock' },
+              { value: 'low_stock', label: 'Low Stock' },
+              { value: 'out_of_stock', label: 'Out of Stock' },
+            ]}
+          />
+          <FilterDropdown
+            value={productSortBy}
+            onChange={(value) => setProductSortBy(value as ProductSortBy)}
+            options={PRODUCT_SORT_OPTIONS}
+          />
+        </div>
         <div className="p-4 sm:p-6">
           <div
             ref={listRef}
-            style={{ 
+            style={{
               minHeight: listMinHeight || 'auto',
               contain: 'layout style',
               willChange: 'contents',

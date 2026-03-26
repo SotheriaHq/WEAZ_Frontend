@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { Link, useNavigate } from 'react-router-dom';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
 import { getDraftExpiryStats, type DraftExpiryStats } from '@/api/collectionUploads';
@@ -10,37 +11,108 @@ import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { getAvatarFallback } from '@/utils/profileImage';
 import { DraftExpiryStats as DraftExpiryStatsComponent } from '@/components/collections/DraftExpiryComponents';
 import VLoader from '@/components/loaders/VLoader';
-import {
-  TrendingUp,
-  TrendingDown,
-  ShoppingCart,
-  ShoppingBag, 
-  AlertCircle, 
-  DollarSign,
-  Eye,
-  UserPlus,
-  Shirt,
-  Star,
-  Percent,
-  Wallet,
-  Plus,
-  Layers,
-  Wand2,
-  Ticket,
-  ExternalLink,
-  AlertTriangle,
-  Camera,
-  CreditCard,
-  Bell,
-} from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
 import { normalizeNotification } from '@/utils/notificationAdapter';
 import { determineNotificationRoute } from '@/utils/notificationRouting';
 
-/**
- * Dashboard Home (Screen 2.1)
- * Glassmorphism design with metrics grid, quick actions, activity feed
- */
+type ActivityTone = 'order' | 'patch' | 'stock' | 'review';
+
+type ActivityItemViewModel = {
+  id: string;
+  type: ActivityTone;
+  category: string;
+  title: string;
+  description: string;
+  time: string;
+  action?: string;
+  route?: string;
+};
+
+const stripHtml = (value?: string | null) =>
+  String(value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normalizeBrandDashboardRoute = (route?: string | null) => {
+  if (!route) return undefined;
+
+  if (route.startsWith('/studio/messages')) {
+    return route.replace('/studio/messages', '/messages');
+  }
+
+  if (route.startsWith('/orders')) {
+    const [, search = ''] = route.split('?');
+    return `/studio?tab=orders${search ? `&${search}` : ''}`;
+  }
+
+  return route;
+};
+
+const buildDashboardReturnQuery = () => {
+  const params = new URLSearchParams();
+  params.set('returnTo', '/studio?tab=dashboard');
+  params.set('returnLabel', 'Back to dashboard');
+  return params.toString();
+};
+
+const deriveActivityTone = (item: any): ActivityTone => {
+  const haystack = [
+    item?.type,
+    item?.title,
+    item?.description,
+    item?.route,
+  ]
+    .map((value) => String(value || '').toUpperCase())
+    .join(' ');
+
+  if (haystack.includes('REVIEW')) return 'review';
+  if (
+    haystack.includes('STOCK') ||
+    haystack.includes('INVENTORY') ||
+    haystack.includes('LOW_STOCK') ||
+    haystack.includes('OUT_OF_STOCK')
+  ) {
+    return 'stock';
+  }
+  if (
+    haystack.includes('MESSAGE') ||
+    haystack.includes('PATCH') ||
+    haystack.includes('FOLLOW')
+  ) {
+    return 'patch';
+  }
+  return 'order';
+};
+
+const getActivityCategoryLabel = (tone: ActivityTone) => {
+  switch (tone) {
+    case 'patch':
+      return 'Messages';
+    case 'stock':
+      return 'Inventory';
+    case 'review':
+      return 'Reviews';
+    default:
+      return 'Orders';
+  }
+};
+
+function getRelativeTime(value?: string | null) {
+  if (!value) return 'Just now';
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return 'Just now';
+
+  const diffMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
+  if (diffMinutes < 1) return 'Just now';
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
 const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
@@ -57,25 +129,25 @@ const DashboardHome: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        if (user?.id) {
-          const [overviewData, analyticsData, activityFeedData, draftStatsData] = await Promise.all([
-            brandApi.getDashboardOverview(user.id),
-            brandApi.getDashboardAnalytics(user.id, range),
-            brandApi.getDashboardActivityFeed(user.id, 12),
-            getDraftExpiryStats().catch(() => null),
-          ]);
-          const statusData = await getStoreStatus().catch(() => null);
-          setOverview(overviewData);
-          setAnalytics(analyticsData);
-          setActivityFeed(Array.isArray(activityFeedData?.items) ? activityFeedData.items : []);
-          setDraftStats(draftStatsData);
-          setStoreOpenStatus(statusData?.isStoreOpen ?? null);
-        } else {
+        if (!user?.id) {
           throw new Error('No user ID');
         }
+
+        const [overviewData, analyticsData, activityFeedData, draftStatsData, statusData] = await Promise.all([
+          brandApi.getDashboardOverview(user.id),
+          brandApi.getDashboardAnalytics(user.id, range),
+          brandApi.getDashboardActivityFeed(user.id, 12),
+          getDraftExpiryStats().catch(() => null),
+          getStoreStatus().catch(() => null),
+        ]);
+
+        setOverview(overviewData);
+        setAnalytics(analyticsData);
+        setActivityFeed(Array.isArray(activityFeedData?.items) ? activityFeedData.items : []);
+        setDraftStats(draftStatsData);
+        setStoreOpenStatus(statusData?.isStoreOpen ?? null);
       } catch (error) {
         console.warn('Failed to fetch dashboard data, using demo data', error);
-        // Demo/empty state data
         setOverview({
           kpis: {
             totalRevenue: 0,
@@ -103,18 +175,17 @@ const DashboardHome: React.FC = () => {
             responseTime: 0,
             inventory: 0,
             reviews: 0,
-          }
+          },
         });
         setActivityFeed([]);
-        setAnalytics({
-          salesChart: []
-        });
+        setAnalytics({ salesChart: [] });
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
-  }, [user?.id, user?.brandFullName, user?.username, range]);
+
+    void fetchData();
+  }, [range, user?.brandFullName, user?.id, user?.username]);
 
   const kpis = overview?.kpis || {};
   const store = overview?.store || {};
@@ -130,23 +201,32 @@ const DashboardHome: React.FC = () => {
   const storeHealth = overview?.storeHealth || { score: 0, responseTime: 0, inventory: 0, reviews: 0 };
   const actionRequired = overview?.actionRequired || [];
 
+  const normalizedActionRequired = useMemo(() => {
+    return actionRequired.map((item: any) => ({
+      ...item,
+      link: normalizeBrandDashboardRoute(item?.link),
+    }));
+  }, [actionRequired]);
+
   const notificationActivity = useMemo(() => {
     return (notificationItems || []).slice(0, 12).map((raw: any) => {
       const normalized = normalizeNotification(raw);
-      const route = determineNotificationRoute(normalized);
+      const route = normalizeBrandDashboardRoute(determineNotificationRoute(normalized));
       const type = String(normalized.type || '').toUpperCase();
 
-      let mappedType: 'order' | 'patch' | 'stock' | 'review' = 'order';
+      let mappedType: ActivityTone = 'order';
       if (type.includes('MESSAGE') || type.includes('FOLLOW') || type.includes('PATCH')) mappedType = 'patch';
       if (type.includes('REVIEW')) mappedType = 'review';
       if (type.includes('LOW_STOCK') || type.includes('OUT_OF_STOCK')) mappedType = 'stock';
 
       return {
+        id: normalized.id || undefined,
         type: mappedType,
-        title: normalized.message || 'Recent update',
+        title: stripHtml(normalized.message || 'Recent update') || 'Recent update',
         description: normalized.actor
           ? `From ${normalized.actor.firstName || normalized.actor.username || 'system'}`
           : 'System update',
+        createdAt: normalized.createdAt,
         time: getRelativeTime(normalized.createdAt),
         action: route ? 'Open' : undefined,
         route,
@@ -154,11 +234,48 @@ const DashboardHome: React.FC = () => {
     });
   }, [notificationItems]);
 
-  const recentActivity = (activityFeed.length ? activityFeed : (overview?.recentActivity?.length ? overview.recentActivity : notificationActivity)) || [];
+  const recentActivity = useMemo<ActivityItemViewModel[]>(() => {
+    const source =
+      (activityFeed.length
+        ? activityFeed
+        : overview?.recentActivity?.length
+          ? overview.recentActivity
+          : notificationActivity) || [];
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(val);
-  };
+    return source.map((item: any, index: number) => {
+      const type = deriveActivityTone(item);
+      const route = normalizeBrandDashboardRoute(item?.route);
+
+      return {
+        id: item?.id || `${type}-${index}`,
+        type,
+        category: getActivityCategoryLabel(type),
+        title: stripHtml(item?.title || 'Recent update') || 'Recent update',
+        description: stripHtml(item?.description || 'System update') || 'System update',
+        time: item?.time || getRelativeTime(item?.createdAt),
+        action: route ? item?.action || 'Open' : undefined,
+        route,
+      };
+    });
+  }, [activityFeed, notificationActivity, overview?.recentActivity]);
+
+  const activitySummary = useMemo(() => {
+    return recentActivity.reduce(
+      (acc, item) => {
+        const route = String(item.route || '');
+        acc.total += 1;
+        if (route.includes('/messages')) acc.messages += 1;
+        else if (route.includes('custom-orders')) acc.customOrders += 1;
+        else if (route.includes('order')) acc.orders += 1;
+        else acc.updates += 1;
+        return acc;
+      },
+      { total: 0, orders: 0, customOrders: 0, messages: 0, updates: 0 },
+    );
+  }, [recentActivity]);
+
+  const formatCurrency = (val: number) =>
+    new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(val);
 
   const formatNumber = (val: number) => {
     if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
@@ -173,7 +290,7 @@ const DashboardHome: React.FC = () => {
 
   if (loading && !overview) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex h-96 items-center justify-center">
         <VLoader size={48} phase="loading" />
       </div>
     );
@@ -181,11 +298,10 @@ const DashboardHome: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Store Header Card */}
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
-        <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#1a1a1a]">
+        <div className="flex flex-col items-start justify-between gap-4 px-6 py-4 md:flex-row md:items-center">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 flex items-center justify-center">
+            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
               {resolvedLogoUrl ? (
                 <MediaRenderer
                   kind="image"
@@ -195,20 +311,26 @@ const DashboardHome: React.FC = () => {
                   mediaClassName="h-full w-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-600 to-indigo-600 text-lg font-bold text-white">
                   {avatarFallback}
                 </div>
               )}
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+              <h1 className="flex items-center gap-3 text-xl font-bold text-gray-900 dark:text-white">
                 {displayStoreName}
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1.5 ${
-                  resolvedIsLive 
-                    ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/20'
-                    : 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20'
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${resolvedIsLive ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                <span
+                  className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
+                    resolvedIsLive
+                      ? 'border-green-500/20 bg-green-500/20 text-green-600 dark:text-green-400'
+                      : 'border-yellow-500/20 bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      resolvedIsLive ? 'bg-green-500' : 'bg-yellow-500'
+                    }`}
+                  />
                   {resolvedIsLive ? 'LIVE' : 'DRAFT'}
                 </span>
               </h1>
@@ -218,28 +340,25 @@ const DashboardHome: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/studio/store')}
-              className="px-4 py-2 bg-white/50 dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2"
-            >
-              <ExternalLink className="w-4 h-4" />
-              View Store
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/studio/store')}
+            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white/50 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 dark:border-white/10 dark:bg-white/10 dark:text-gray-300 dark:hover:text-white"
+          >
+            <span aria-hidden="true">🏪</span>
+            View Store
+          </button>
         </div>
       </div>
 
-      {/* Metrics Section */}
       <section>
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Overview</h2>
           <Select
             variant="filter"
             aria-label="Select date range"
             value={range}
-            onChange={(e) => setRange(e.target.value as any)}
+            onChange={(event) => setRange(event.target.value as '7d' | '30d' | 'ytd')}
             fullWidth={false}
           >
             <option value="30d">Last 30 Days</option>
@@ -248,189 +367,201 @@ const DashboardHome: React.FC = () => {
           </Select>
         </div>
 
-        {/* Metrics Grid - 8 cards in 2 rows */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard
             title="Total Revenue"
             value={formatCurrency(kpis.totalRevenue || 0)}
-            icon={<DollarSign className="w-4 h-4" />}
-            iconBg="bg-green-500/10"
-            iconColor="text-green-500"
+            marker="💰"
+            markerClassName="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
             trend="+12%"
             trendUp
           />
           <MetricCard
             title="Orders"
             value={(kpis.totalOrders || 0).toString()}
-            icon={<ShoppingCart className="w-4 h-4" />}
-            iconBg="bg-blue-500/10"
-            iconColor="text-blue-500"
+            marker="📦"
+            markerClassName="bg-blue-500/15 text-blue-600 dark:text-blue-400"
             subtitle="Avg. 5.2/day"
           />
           <MetricCard
             title="Conversion Rate"
             value={`${kpis.conversionRate || 0}%`}
-            icon={<Percent className="w-4 h-4" />}
-            iconBg="bg-purple-500/10"
-            iconColor="text-purple-500"
+            marker="📈"
+            markerClassName="bg-violet-500/15 text-violet-600 dark:text-violet-400"
             trend="-0.4%"
             trendUp={false}
           />
           <MetricCard
             title="Avg Order Value"
             value={formatCurrency(kpis.avgOrderValue || 0)}
-            icon={<Wallet className="w-4 h-4" />}
-            iconBg="bg-orange-500/10"
-            iconColor="text-orange-500"
+            marker="🧾"
+            markerClassName="bg-orange-500/15 text-orange-600 dark:text-orange-400"
             trend="+5%"
             trendUp
           />
           <MetricCard
             title="Store Views"
             value={formatNumber(kpis.storeViews || 0)}
-            icon={<Eye className="w-4 h-4" />}
-            iconBg="bg-pink-500/10"
-            iconColor="text-pink-500"
+            marker="👀"
+            markerClassName="bg-pink-500/15 text-pink-600 dark:text-pink-400"
             subtitle="Unique visitors"
           />
           <MetricCard
             title="Patches"
             value={formatNumber(kpis.patches || 0)}
-            icon={<UserPlus className="w-4 h-4" />}
-            iconBg="bg-indigo-500/10"
-            iconColor="text-indigo-500"
+            marker="🤝"
+            markerClassName="bg-indigo-500/15 text-indigo-600 dark:text-indigo-400"
             trend="+89 this week"
             trendUp
           />
           <MetricCard
             title="Active Products"
             value={(kpis.activeProducts || 0).toString()}
-            icon={<Shirt className="w-4 h-4" />}
-            iconBg="bg-teal-500/10"
-            iconColor="text-teal-500"
-            subtitle={kpis.activeProducts > 0 ? "3 low stock" : "Add products"}
+            marker="🪡"
+            markerClassName="bg-cyan-500/15 text-cyan-600 dark:text-cyan-400"
+            subtitle={kpis.activeProducts > 0 ? '3 low stock' : 'Add products'}
           />
           <MetricCard
             title="Reviews"
-            value={kpis.reviewScore ? `${kpis.reviewScore} / 5.0` : "0"}
-            icon={<Star className="w-4 h-4" />}
-            iconBg="bg-yellow-500/10"
-            iconColor="text-yellow-500"
-            subtitle={kpis.reviewCount ? `Based on ${kpis.reviewCount} reviews` : "No reviews yet"}
+            value={kpis.reviewScore ? `${kpis.reviewScore} / 5.0` : '0'}
+            marker="⭐"
+            markerClassName="bg-amber-500/15 text-amber-600 dark:text-amber-400"
+            subtitle={kpis.reviewCount ? `Based on ${kpis.reviewCount} reviews` : 'No reviews yet'}
           />
         </div>
       </section>
 
-      {/* Quick Actions */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Quick Actions</h2>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <QuickActionButton
-            icon={<Plus className="w-5 h-5" />}
+            marker="➕"
             label="Add Product"
-            baseColor="bg-purple-500/20 text-purple-500"
-            hoverColor="hover:bg-purple-500/10 hover:border-purple-500/30"
+            accentClassName="bg-purple-500/20 text-purple-500"
+            hoverClassName="hover:bg-purple-500/10 hover:border-purple-500/30"
             onClick={() => navigate('/studio/store/products/new')}
           />
           <QuickActionButton
-            icon={<Layers className="w-5 h-5" />}
+            marker="🗂️"
             label="Create Collection"
-            baseColor="bg-blue-500/20 text-blue-500"
-            hoverColor="hover:bg-blue-500/10 hover:border-blue-500/30"
+            accentClassName="bg-blue-500/20 text-blue-500"
+            hoverClassName="hover:bg-blue-500/10 hover:border-blue-500/30"
             onClick={() => navigate('/studio/store/collections/new')}
           />
           <QuickActionButton
-            icon={<Wand2 className="w-5 h-5" />}
+            marker="🎨"
             label="Style a Look"
-            baseColor="bg-pink-500/20 text-pink-500"
-            hoverColor="hover:bg-pink-500/10 hover:border-pink-500/30"
+            accentClassName="bg-pink-500/20 text-pink-500"
+            hoverClassName="hover:bg-pink-500/10 hover:border-pink-500/30"
             onClick={() => navigate('/profile/collections/create')}
           />
           <QuickActionButton
-            icon={<Ticket className="w-5 h-5" />}
+            marker="🎟️"
             label="Create Promo"
-            baseColor="bg-green-500/20 text-green-500"
-            hoverColor="hover:bg-green-500/10 hover:border-green-500/30"
+            accentClassName="bg-green-500/20 text-green-500"
+            hoverClassName="hover:bg-green-500/10 hover:border-green-500/30"
           />
         </div>
       </section>
 
-      {/* Split Layout: Activity & Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Activity Feed */}
-        <div className="lg:col-span-2 bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-200 dark:border-white/10 p-6">
-          <div className="flex items-center justify-between mb-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="flex min-h-[620px] flex-col rounded-2xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-[#1a1a1a] lg:col-span-2">
+          <div className="mb-6 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h2>
-            <Link to="/studio?tab=orders" className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300">
+            <Link
+              to="/studio?tab=orders"
+              className="text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+            >
               View All
             </Link>
           </div>
 
+          {recentActivity.length > 0 ? (
+            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <ActivitySummaryPill label="All" value={activitySummary.total} />
+              <ActivitySummaryPill label="Orders" value={activitySummary.orders + activitySummary.customOrders} />
+              <ActivitySummaryPill label="Messages" value={activitySummary.messages} />
+              <ActivitySummaryPill label="Updates" value={activitySummary.updates} />
+            </div>
+          ) : null}
+
           {recentActivity.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
-                <ShoppingBag className="w-8 h-8 text-gray-400" />
+            <div className="flex flex-1 items-center justify-center py-12 text-center">
+              <div>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-3xl dark:bg-gray-800">
+                  <span aria-hidden="true">🗂️</span>
+                </div>
+                <h3 className="mb-1 font-medium text-gray-900 dark:text-white">No activity yet</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Orders, patches, and reviews will appear here
+                </p>
               </div>
-              <h3 className="text-gray-900 dark:text-white font-medium mb-1">No activity yet</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Orders, patches, and reviews will appear here
-              </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {recentActivity.map((item: any, idx: number) => (
-                <ActivityItem
-                  key={idx}
-                  {...item}
-                  onAction={item.route ? () => navigate(item.route) : undefined}
-                />
-              ))}
+            <div className="flex-1 overflow-hidden">
+              <div className="h-full overflow-y-auto pr-1 scrollbar-hide">
+                <div className="space-y-3 pr-1">
+                  {recentActivity.map((item) => (
+                    <ActivityItem
+                      key={item.id}
+                      {...item}
+                      onAction={item.route ? () => navigate(item.route!) : undefined}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Right Column */}
         <div className="space-y-6">
-          {/* Action Required */}
-          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-200 dark:border-white/10 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-              <Bell className="w-5 h-5 text-purple-500" />
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-[#1a1a1a]">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+              <span aria-hidden="true">🔔</span>
               Action Required
             </h2>
-            
-            {actionRequired.length === 0 ? (
-              <div className="text-center py-6">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  No pending actions 🎉
-                </p>
+
+            {normalizedActionRequired.length === 0 ? (
+              <div className="py-6 text-center">
+                <p className="text-sm text-gray-500 dark:text-gray-400">No pending actions 🎉</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {actionRequired.map((action: any, idx: number) => (
-                  <AlertItem key={idx} {...action} />
+                {normalizedActionRequired.map((action: any, index: number) => (
+                  <AlertItem key={`${action?.title || action?.message || 'action'}-${index}`} {...action} />
                 ))}
               </div>
             )}
           </div>
 
-          {/* Store Health */}
-          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-200 dark:border-white/10 p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-[#1a1a1a]">
+            <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Store Health</h2>
-              <a href="#" className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300">
+              <a
+                href="#"
+                className="text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+              >
                 Improve Score
               </a>
             </div>
 
             <div className="flex items-center gap-6">
-              {/* Circular Progress */}
-              <div className="relative w-24 h-24 flex-shrink-0">
-                <svg className="w-full h-full transform -rotate-90">
+              <div className="relative h-24 w-24 flex-shrink-0">
+                <svg className="h-full w-full -rotate-90 transform">
                   <circle cx="48" cy="48" r="40" stroke="rgba(128,128,128,0.1)" strokeWidth="8" fill="none" />
-                  <circle 
-                    cx="48" cy="48" r="40" 
-                    stroke={storeHealth.score >= 70 ? '#10b981' : storeHealth.score >= 40 ? '#f59e0b' : '#ef4444'} 
-                    strokeWidth="8" fill="none"
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r="40"
+                    stroke={
+                      storeHealth.score >= 70
+                        ? '#10b981'
+                        : storeHealth.score >= 40
+                          ? '#f59e0b'
+                          : '#ef4444'
+                    }
+                    strokeWidth="8"
+                    fill="none"
                     strokeDasharray="251.2"
                     strokeDashoffset={251.2 - (251.2 * (storeHealth.score || 0) / 100)}
                     strokeLinecap="round"
@@ -438,13 +569,12 @@ const DashboardHome: React.FC = () => {
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center flex-col">
                   <span className="text-2xl font-bold text-gray-900 dark:text-white">{storeHealth.score || 0}</span>
-                  <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase">
+                  <span className="text-[10px] uppercase text-gray-500 dark:text-gray-400">
                     {storeHealth.score >= 70 ? 'Good' : storeHealth.score >= 40 ? 'Fair' : 'Low'}
                   </span>
                 </div>
               </div>
 
-              {/* Progress Bars */}
               <div className="flex-1 space-y-3">
                 <HealthBar label="Response Time" value={storeHealth.responseTime || 0} color="green" />
                 <HealthBar label="Inventory" value={storeHealth.inventory || 0} color="yellow" />
@@ -453,133 +583,134 @@ const DashboardHome: React.FC = () => {
             </div>
           </div>
 
-          {/* Draft Expiry Stats */}
-          {draftStats && draftStats.totalDrafts > 0 && (
+          {draftStats && draftStats.totalDrafts > 0 ? (
             <DraftExpiryStatsComponent
               total={draftStats.totalDrafts}
               expiringSoon={draftStats.expiringIn7Days}
               expiringToday={draftStats.expiringToday}
-              onViewAll={() => navigate('/studio/collections?filter=drafts')}
+              onViewAll={() =>
+                navigate(`/studio/store?view=collections&collectionStatus=draft&${buildDashboardReturnQuery()}`)
+              }
             />
-          )}
+          ) : null}
         </div>
       </div>
     </div>
   );
 };
 
-// Metric Card Component
 const MetricCard: React.FC<{
   title: string;
   value: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  iconColor: string;
+  marker: string;
+  markerClassName: string;
   trend?: string;
   trendUp?: boolean;
   subtitle?: string;
-}> = ({ title, value, icon, iconBg, iconColor, trend, trendUp, subtitle }) => (
-  <div className="bg-white dark:bg-[#1a1a1a] p-5 rounded-xl border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 transition-all hover:-translate-y-0.5 cursor-pointer shadow-sm">
-    <div className="flex justify-between items-start mb-2">
+}> = ({ title, value, marker, markerClassName, trend, trendUp, subtitle }) => (
+  <div className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-gray-300 dark:border-white/10 dark:bg-[#1a1a1a] dark:hover:border-white/20">
+    <div className="mb-2 flex items-start justify-between">
       <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-      <div className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center ${iconColor}`}>
-        {icon}
+      <div className={`flex h-8 w-8 items-center justify-center rounded-lg text-base ${markerClassName}`}>
+        <span aria-hidden="true">{marker}</span>
       </div>
     </div>
-    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{value}</h3>
-    {trend && (
-      <p className={`text-xs flex items-center gap-1 ${trendUp ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-        {trendUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+    <h3 className="mb-1 text-2xl font-bold text-gray-900 dark:text-white">{value}</h3>
+    {trend ? (
+      <p
+        className={`flex items-center gap-1 text-xs ${
+          trendUp ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'
+        }`}
+      >
+        <span aria-hidden="true">{trendUp ? '↗' : '↘'}</span>
         {trend}
-        <span className="text-gray-400 dark:text-gray-500 ml-1">vs last month</span>
+        <span className="ml-1 text-gray-400 dark:text-gray-500">vs last month</span>
       </p>
-    )}
-    {subtitle && <p className="text-xs text-gray-400 dark:text-gray-500">{subtitle}</p>}
+    ) : null}
+    {subtitle ? <p className="text-xs text-gray-400 dark:text-gray-500">{subtitle}</p> : null}
   </div>
 );
 
-// Quick Action Button
 const QuickActionButton: React.FC<{
-  icon: React.ReactNode;
+  marker: string;
   label: string;
-  baseColor: string;
-  hoverColor: string;
+  accentClassName: string;
+  hoverClassName: string;
   onClick?: () => void;
-}> = ({ icon, label, baseColor, hoverColor, onClick }) => (
+}> = ({ marker, label, accentClassName, hoverClassName, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`group bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 p-4 rounded-xl flex flex-col items-center justify-center gap-3 transition-all hover:-translate-y-0.5 ${hoverColor}`}
+    className={`group flex flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-4 transition-all hover:-translate-y-0.5 dark:border-white/10 dark:bg-[#1a1a1a] ${hoverClassName}`}
   >
-    <div className={`w-10 h-10 rounded-full ${baseColor} flex items-center justify-center transition-colors group-hover:scale-110`}>
-      {icon}
+    <div className={`flex h-10 w-10 items-center justify-center rounded-full text-lg transition-colors group-hover:scale-110 ${accentClassName}`}>
+      <span aria-hidden="true">{marker}</span>
     </div>
-    <span className="text-sm font-medium text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white">
+    <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">
       {label}
     </span>
   </button>
 );
 
-// Activity Item
-const ActivityItem: React.FC<{
-  type: 'order' | 'patch' | 'stock' | 'review';
-  title: string;
-  description: string;
-  time: string;
-  action?: string;
-  onAction?: () => void;
-}> = ({ type, title, description, time, action, onAction }) => {
-  const iconMap = {
-    order: { icon: <ShoppingCart className="w-4 h-4" />, bg: 'bg-green-500/20', color: 'text-green-500' },
-    patch: { icon: <UserPlus className="w-4 h-4" />, bg: 'bg-indigo-500/20', color: 'text-indigo-500' },
-    stock: { icon: <AlertTriangle className="w-4 h-4" />, bg: 'bg-orange-500/20', color: 'text-orange-500' },
-    review: { icon: <Star className="w-4 h-4" />, bg: 'bg-yellow-500/20', color: 'text-yellow-500' },
+const ActivitySummaryPill: React.FC<{ label: string; value: number }> = ({ label, value }) => (
+  <div className="rounded-2xl border border-gray-200 bg-gray-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">{label}</p>
+    <p className="mt-1 text-lg font-bold text-gray-900 dark:text-white">{value}</p>
+  </div>
+);
+
+const ActivityItem: React.FC<ActivityItemViewModel & { onAction?: () => void }> = ({
+  type,
+  category,
+  title,
+  description,
+  time,
+  action,
+  onAction,
+}) => {
+  const iconMap: Record<ActivityTone, { marker: string; bg: string; color: string }> = {
+    order: { marker: '📦', bg: 'bg-green-500/20', color: 'text-green-500' },
+    patch: { marker: '💬', bg: 'bg-indigo-500/20', color: 'text-indigo-500' },
+    stock: { marker: '🪡', bg: 'bg-orange-500/20', color: 'text-orange-500' },
+    review: { marker: '⭐', bg: 'bg-yellow-500/20', color: 'text-yellow-500' },
   };
 
-  const { icon, bg, color } = iconMap[type] || iconMap.order;
+  const { marker, bg, color } = iconMap[type] || iconMap.order;
 
   return (
-    <div className="flex gap-4 items-start p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-      <div className={`w-10 h-10 rounded-full ${bg} ${color} flex items-center justify-center flex-shrink-0`}>
-        {icon}
-      </div>
-      <div className="flex-1">
-        <div className="flex justify-between items-start">
-          <p className="text-sm text-gray-900 dark:text-white font-medium">{title}</p>
-          <span className="text-xs text-gray-400 dark:text-gray-500">{time}</span>
+    <div className="rounded-2xl border border-gray-200/80 bg-gray-50/70 p-4 transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.025] dark:hover:bg-white/[0.05]">
+      <div className="flex items-start gap-4">
+        <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl text-lg ${bg} ${color}`}>
+          <span aria-hidden="true">{marker}</span>
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>
-        {action && (
-          <button
-            type="button"
-            onClick={onAction}
-            className="mt-2 text-xs bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 px-2 py-1 rounded text-gray-700 dark:text-white transition-colors"
-          >
-            {action}
-          </button>
-        )}
+        <div className="flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-400">
+                  {category}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">{time}</span>
+              </div>
+              <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{title}</p>
+            </div>
+          </div>
+          <p className="mt-1.5 text-xs leading-5 text-gray-500 dark:text-gray-400">{description}</p>
+          {action ? (
+            <button
+              type="button"
+              onClick={onAction}
+              className="mt-3 rounded-full bg-gray-100 px-3 py-1.5 text-xs text-gray-700 transition-colors hover:bg-gray-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+            >
+              {action}
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
 };
 
-function getRelativeTime(value?: string | null) {
-  if (!value) return 'Just now';
-  const timestamp = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) return 'Just now';
-
-  const diffMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
-  if (diffMinutes < 1) return 'Just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-
-  const diffHours = Math.round(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-
-  const diffDays = Math.round(diffHours / 24);
-  return `${diffDays}d ago`;
-}
-
-// Alert Item
 const AlertItem: React.FC<{
   type?: string;
   title?: string;
@@ -587,11 +718,12 @@ const AlertItem: React.FC<{
   message?: string;
   count?: number;
   link?: string;
-}> = ({ type, title, description, message, count, link }) => {
+  actionLabel?: string;
+}> = ({ type, title, description, message, count, link, actionLabel }) => {
   const styles = {
-    error: { bg: 'bg-red-500/10', border: 'border-red-500/20', icon: <AlertCircle className="w-4 h-4" />, color: 'text-red-500' },
-    warning: { bg: 'bg-orange-500/10', border: 'border-orange-500/20', icon: <Camera className="w-4 h-4" />, color: 'text-orange-500' },
-    info: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: <CreditCard className="w-4 h-4" />, color: 'text-blue-500' },
+    error: { bg: 'bg-red-500/10', border: 'border-red-500/20', icon: '⚠️', color: 'text-red-500' },
+    warning: { bg: 'bg-orange-500/10', border: 'border-orange-500/20', icon: '📸', color: 'text-orange-500' },
+    info: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: '💳', color: 'text-blue-500' },
   };
 
   const normalizedType = (() => {
@@ -599,31 +731,47 @@ const AlertItem: React.FC<{
     if (rawType.includes('ERROR') || rawType.includes('FAILED')) return 'error';
     if (rawType.includes('INFO') || rawType.includes('PAYMENT')) return 'info';
     return 'warning';
-  })();
+  })() as keyof typeof styles;
+
   const { bg, border, icon, color } = styles[normalizedType];
   const derivedTitle = title?.trim() || message?.trim() || 'Action required';
-  const derivedDescription = description?.trim() || (count
-    ? `${count} ${count === 1 ? 'item needs' : 'items need'} attention.`
-    : 'Review this item from your studio dashboard.');
+  const derivedDescription = description?.trim() || (
+    count
+      ? `${count} ${count === 1 ? 'item needs' : 'items need'} attention.`
+      : 'Review this item from your studio dashboard.'
+  );
 
-  return (
-    <div className={`${bg} border ${border} rounded-lg p-3 flex gap-3 items-start`}>
-      <span className={`${color} mt-0.5`}>{icon}</span>
+  const content = (
+    <div className={`${bg} ${border} flex items-start gap-3 rounded-lg border p-3 transition-colors ${link ? 'hover:border-purple-300/40' : ''}`}>
+      <span className={`${color} mt-0.5`} aria-hidden="true">{icon}</span>
       <div>
-        <p className="text-sm text-gray-900 dark:text-white font-medium">{derivedTitle}</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{derivedDescription}</p>
+        <p className="text-sm font-medium text-gray-900 dark:text-white">{derivedTitle}</p>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{derivedDescription}</p>
         {link ? (
-          <Link to={link} className="mt-2 inline-flex text-xs font-medium text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300">
-            Open
-          </Link>
+          <span className="mt-2 inline-flex text-xs font-medium text-purple-600 dark:text-purple-400">
+            {actionLabel || 'Open'}
+          </span>
         ) : null}
       </div>
     </div>
   );
+
+  if (!link) {
+    return content;
+  }
+
+  return (
+    <Link to={link} className="block">
+      {content}
+    </Link>
+  );
 };
 
-// Health Bar
-const HealthBar: React.FC<{ label: string; value: number; color: 'green' | 'yellow' | 'blue' }> = ({ label, value, color }) => {
+const HealthBar: React.FC<{
+  label: string;
+  value: number;
+  color: 'green' | 'yellow' | 'blue';
+}> = ({ label, value, color }) => {
   const colors = {
     green: 'bg-green-500 text-green-500',
     yellow: 'bg-yellow-500 text-yellow-500',
@@ -633,11 +781,11 @@ const HealthBar: React.FC<{ label: string; value: number; color: 'green' | 'yell
 
   return (
     <div>
-      <div className="flex justify-between text-xs mb-1">
+      <div className="mb-1 flex justify-between text-xs">
         <span className="text-gray-500 dark:text-gray-400">{label}</span>
         <span className={textColor}>{value}%</span>
       </div>
-      <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-1.5">
+      <div className="h-1.5 w-full rounded-full bg-gray-200 dark:bg-white/10">
         <div className={`${bgColor} h-1.5 rounded-full`} style={{ width: `${value}%` }} />
       </div>
     </div>

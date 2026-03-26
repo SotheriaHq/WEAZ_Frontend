@@ -118,6 +118,7 @@ export interface OrderItem {
   name: string;
   productName?: string | null;
   thumbnail?: string | null;
+  image?: string | null;
   price: number;
   unitPrice?: number;
   quantity: number;
@@ -147,6 +148,7 @@ export interface Order {
   paymentReference?: string | null;
   paidAt?: string | null;
   deliveredAt?: string | null;
+  buyerConfirmedDeliveryAt?: string | null;
   createdAt: string;
   updatedAt: string;
   orderItems?: OrderItem[];
@@ -391,6 +393,14 @@ export const getMyOrders = async (page = 1, limit = 20): Promise<{ items: Order[
 
 export const getMyOrder = async (orderId: string): Promise<Order> => {
   const res = await apiClient.get(`/store/orders/${orderId}`);
+  return extractData<Order>(res);
+};
+
+export const confirmMyOrderDelivery = async (
+  orderId: string,
+  note?: string,
+): Promise<Order> => {
+  const res = await apiClient.post(`/store/orders/${orderId}/confirm-delivery`, { note });
   return extractData<Order>(res);
 };
 

@@ -135,7 +135,7 @@ export const messagingApi = {
       },
     });
 
-    return response.data as UploadedMessageFile;
+    return unwrapApiResponse<UploadedMessageFile>(response.data);
   },
 
   async listCustomOrderMessages(orderId: string, params?: { cursorCreatedAt?: string; cursorId?: string; limit?: number }) {
