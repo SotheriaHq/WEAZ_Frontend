@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { brandApi } from '@/api/BrandApi';
 import VLoader from '@/components/loaders/VLoader';
+import Modal from '@/components/ui/Modal';
 import type { RootState } from '@/store';
 
 const STATUS_THEME: Record<string, string> = {
@@ -93,6 +94,43 @@ const getReferenceTone = (referenceType?: string | null) => {
 const formatReferenceCode = (referenceId?: string | null) =>
   referenceId ? `#${String(referenceId).slice(0, 8).toUpperCase()}` : null;
 
+const formatIncomingStageLabel = (stage?: string | null) =>
+  String(stage || 'PAYMENT')
+    .trim()
+    .toUpperCase()
+    .replaceAll('_', ' ');
+
+const buildSellerReceiptStates = (transaction: IncomingTransaction) => {
+  const stage = String(transaction.stage || 'PAYMENT').trim().toUpperCase();
+  const releaseLabel = formatIncomingStageLabel(stage);
+
+  return [
+    {
+      label: 'Buyer payment captured',
+      detail: 'The buyer completed payment for this order.',
+      complete: true,
+    },
+    {
+      label: 'Escrow recorded',
+      detail: 'Threadly recorded the funds and prepared them for the release workflow.',
+      complete: true,
+    },
+    {
+      label: releaseLabel,
+      detail:
+        stage === 'PAYMENT'
+          ? 'This credit was posted directly from the payment event.'
+          : `This credit was released when the ${releaseLabel.toLowerCase()} milestone was reached.`,
+      complete: true,
+    },
+    {
+      label: 'Brand wallet credited',
+      detail: 'This amount is now reflected in your brand finance ledger.',
+      complete: true,
+    },
+  ];
+};
+
 const FinancePage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
   const [payouts, setPayouts] = useState<any[]>([]);
@@ -100,6 +138,7 @@ const FinancePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
   const [overview, setOverview] = useState<FinanceOverview | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<IncomingTransaction | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
@@ -314,7 +353,19 @@ const FinancePage: React.FC = () => {
                 incomingTransactions.map((transaction) => {
                   const stage = String(transaction.stage || 'RELEASE').toUpperCase();
                   return (
-                    <tr key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                    <tr
+                      key={transaction.id}
+                      tabIndex={0}
+                      role="button"
+                      onClick={() => setSelectedTransaction(transaction)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedTransaction(transaction);
+                        }
+                      }}
+                      className="cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-fuchsia-400/30 dark:hover:bg-gray-800/40"
+                    >
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900 dark:text-white">
                           {transaction.title || transaction.description || 'Incoming transaction'}
@@ -440,6 +491,105 @@ const FinancePage: React.FC = () => {
           </table>
         </div>
       </section>
+
+      <Modal
+        open={Boolean(selectedTransaction)}
+        onClose={() => setSelectedTransaction(null)}
+        title="Seller receipt status"
+        size="lg"
+      >
+        {selectedTransaction ? (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-gray-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${getReferenceTone(
+                        selectedTransaction.referenceType,
+                      )}`}
+                    >
+                      {formatReferenceLabel(selectedTransaction.referenceType)}
+                    </span>
+                    {formatReferenceCode(selectedTransaction.referenceId) ? (
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+                        {formatReferenceCode(selectedTransaction.referenceId)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <h3 className="mt-3 text-xl font-bold text-gray-900 dark:text-white">
+                    {selectedTransaction.title || selectedTransaction.description || 'Incoming transaction'}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {selectedTransaction.counterparty || 'Buyer'} •{' '}
+                    {new Date(selectedTransaction.createdAt).toLocaleString()}
+                  </p>
+                </div>
+
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                    INCOMING_STAGE_THEME[String(selectedTransaction.stage || 'RELEASE').toUpperCase()] ||
+                    'bg-slate-100 text-slate-800 dark:bg-slate-500/10 dark:text-slate-200'
+                  }`}
+                >
+                  {formatIncomingStageLabel(selectedTransaction.stage)}
+                </span>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <FinanceReceiptMetric
+                  label="Gross"
+                  value={formatCurrency(
+                    Number(selectedTransaction.grossAmount ?? selectedTransaction.amount ?? 0),
+                    selectedTransaction.currency || currency,
+                  )}
+                />
+                <FinanceReceiptMetric
+                  label="Commission"
+                  value={formatCurrency(
+                    Number(selectedTransaction.commissionAmount ?? 0),
+                    selectedTransaction.currency || currency,
+                  )}
+                />
+                <FinanceReceiptMetric
+                  label="Net credited"
+                  value={`+${formatCurrency(
+                    Number(selectedTransaction.netAmount ?? selectedTransaction.amount ?? 0),
+                    selectedTransaction.currency || currency,
+                  )}`}
+                  tone="text-emerald-600 dark:text-emerald-300"
+                />
+              </div>
+            </div>
+
+            <section className="rounded-2xl border border-gray-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+              <h4 className="text-sm font-bold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                Receipt Flow
+              </h4>
+              <div className="mt-4 space-y-3">
+                {buildSellerReceiptStates(selectedTransaction).map((item, index) => (
+                  <div
+                    key={item.label}
+                    className="flex items-start gap-3 rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]"
+                  >
+                    <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {item.label}
+                      </div>
+                      <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        {item.detail}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 };
@@ -455,6 +605,19 @@ const MetricCard: React.FC<{
     </div>
     <div className="mt-3 text-2xl font-semibold">{value}</div>
     <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">{description}</div>
+  </div>
+);
+
+const FinanceReceiptMetric: React.FC<{
+  label: string;
+  value: string;
+  tone?: string;
+}> = ({ label, value, tone = 'text-gray-900 dark:text-white' }) => (
+  <div className="rounded-2xl border border-gray-200/80 bg-gray-50/80 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+      {label}
+    </div>
+    <div className={`mt-1 text-lg font-bold ${tone}`}>{value}</div>
   </div>
 );
 

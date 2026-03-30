@@ -138,17 +138,19 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   onClick,
 }) => {
   const [resolved, setResolved] = useState<string | null>(() => {
-    if (src) return src;
-    if (fileId) {
-      const cached = getCachedUrl(fileId);
-      if (cached) return cached;
-    }
-    return null;
+    // fileId-based: always resolve via cache, never use the raw ID
+    if (fileId) return getCachedUrl(fileId) ?? null;
+    // S3-like URLs may be expired signed URLs — check session cache first,
+    // never use the raw URL directly (prevents loading expired/private URLs)
+    if (src && isS3LikeUrl(src)) return getCachedUrl(src) ?? null;
+    // Non-S3 absolute URLs and raw storage keys can be used directly
+    return src ?? null;
   });
   const [hadError, setHadError] = useState(false);
   const [loaded, setLoaded] = useState(() => {
-    // If we have a value initially, assume it might be loaded (browser cache) 
-    return !!(src || (fileId && getCachedUrl(fileId)));
+    if (fileId) return !!(getCachedUrl(fileId));
+    if (src && isS3LikeUrl(src)) return !!(getCachedUrl(src));
+    return !!src;
   });
   const retryCountRef = React.useRef(0);
 

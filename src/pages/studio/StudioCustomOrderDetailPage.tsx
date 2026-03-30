@@ -9,7 +9,6 @@ import {
 } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
 import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
-import OrderMessagesPanel from '@/components/messaging/OrderMessagesPanel';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   CustomOrderBadge,
@@ -17,10 +16,8 @@ import {
   CustomOrderJsonBreakdown,
   CustomOrderKeyValueList,
   CustomOrderMediaPreview,
-  CustomOrderMetricCard,
   CustomOrderWorkspaceTabs,
   formatDateTime,
-  getRelativeDeadlineText,
 } from '@/components/custom-orders/CustomOrderUi';
 import {
   formatCustomOrderCode,
@@ -29,15 +26,13 @@ import {
   humanizeCustomOrderToken,
 } from '@/components/custom-orders/customOrderFormatting';
 
-type StudioDetailTab = 'overview' | 'measurements' | 'messages' | 'operations' | 'timeline' | 'technical';
+type StudioDetailTab = 'overview' | 'measurements' | 'operations' | 'timeline';
 
 const TABS: Array<{ id: StudioDetailTab; label: string; emoji: string; helper: string }> = [
-  { id: 'overview', label: 'Overview', emoji: '🧾', helper: 'Status and order summary' },
+  { id: 'overview', label: 'Overview', emoji: '🧾', helper: 'Status, summary and audit' },
   { id: 'measurements', label: 'Measurements', emoji: '📏', helper: 'Approved body points' },
-  { id: 'messages', label: 'Messages', emoji: '💬', helper: 'Dedicated buyer thread' },
-  { id: 'operations', label: 'Operations', emoji: '🛠️', helper: 'Delivery and exception controls' },
+  { id: 'operations', label: 'Operations', emoji: '🛠️', helper: 'Acceptance and lifecycle' },
   { id: 'timeline', label: 'Timeline', emoji: '🗓️', helper: 'Progress and order activity' },
-  { id: 'technical', label: 'Technical', emoji: '🧪', helper: 'Breakdown and audit' },
 ];
 
 const brandManagedStageOptions: Array<{
@@ -94,10 +89,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const hashToTab = (hash: string): StudioDetailTab | null => {
   const key = hash.replace('#', '').trim().toLowerCase();
   if (key === 'measurements') return 'measurements';
-  if (key === 'messages') return 'messages';
   if (key === 'operations') return 'operations';
   if (key === 'timeline') return 'timeline';
-  if (key === 'technical') return 'technical';
   if (key === 'overview') return 'overview';
   return null;
 };
@@ -214,9 +207,6 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     if (nextTab) {
       setActiveTab(nextTab);
     }
-    if (location.hash.replace('#', '').trim().toLowerCase() === 'messages') {
-      setDrawerOpen(true);
-    }
   }, [location.hash]);
 
   useEffect(() => {
@@ -268,7 +258,6 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   const canUpdateProgressStage = Boolean(
     order &&
       brandId &&
-      order.paymentStatus === 'PAID' &&
       !lockedStatuses.has(order.status),
   );
 
@@ -397,55 +386,117 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     }
   };
 
+  // Filter out non-human-readable fields from timeline payloads
+  const filterTimelinePayload = (payload: Record<string, unknown>): Record<string, unknown> => {
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const skipKeys = new Set([
+      'id', 'orderId', 'brandId', 'buyerId', 'userId', 'configurationId',
+      'configurationVersionId', 'checkoutIntentId', 'chartVersionId', 'sourceId',
+      'payoutId', 'fileId', 'mediaId', 'threadId', 'messageId', 'actorId',
+    ]);
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(payload)) {
+      if (skipKeys.has(key)) continue;
+      if (typeof value === 'string' && uuidRe.test(value.trim())) continue;
+      result[key] = value;
+    }
+    return result;
+  };
+
+  const timelineEventTone = (eventType: string): string => {
+    const type = eventType.toUpperCase();
+    if (type.includes('PAYMENT') || type.includes('PAID')) return 'border-emerald-300/70 bg-emerald-50/80 dark:border-emerald-500/20 dark:bg-emerald-500/10';
+    if (type.includes('CANCEL') || type.includes('REJECT') || type.includes('REFUND') || type.includes('DISPUTE')) return 'border-rose-300/70 bg-rose-50/80 dark:border-rose-500/20 dark:bg-rose-500/10';
+    if (type.includes('ACCEPT')) return 'border-sky-300/70 bg-sky-50/80 dark:border-sky-500/20 dark:bg-sky-500/10';
+    if (type.includes('EXTENSION')) return 'border-amber-300/70 bg-amber-50/80 dark:border-amber-500/20 dark:bg-amber-500/10';
+    if (type.includes('EXCEPTION')) return 'border-purple-300/70 bg-purple-50/80 dark:border-purple-500/20 dark:bg-purple-500/10';
+    if (type.includes('STAGE') || type.includes('PRODUCTION')) return 'border-indigo-300/70 bg-indigo-50/80 dark:border-indigo-500/20 dark:bg-indigo-500/10';
+    return 'border-black/10 bg-white/80 dark:border-white/10 dark:bg-white/[0.04]';
+  };
+
   const renderTab = () => {
     if (!order) return null;
 
     if (activeTab === 'overview') {
       return (
-        <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
-          <section className={shell}>
-            <div className="text-lg font-semibold text-slate-900 dark:text-white">Order summary</div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <CustomOrderKeyValueList
-                items={[
-                  { label: 'Current production stage', value: currentStageLabel },
-                  { label: 'Payment status', value: humanizeCustomOrderToken(order.paymentStatus) },
-                  { label: 'Custom-order status', value: humanizeCustomOrderToken(order.status) },
-                  { label: 'Brand', value: textValue(order.source.brandName, 'Brand') },
-                ]}
-              />
-              <CustomOrderKeyValueList
-                items={[
-                  {
-                    label: 'Buyer total',
-                    value: formatCurrency(
-                      order.buyerPriceSummary.grandTotal,
-                      order.buyerPriceSummary.currency ?? 'NGN',
-                    ),
-                  },
-                  { label: 'Production deadline', value: formatDateTime(order.promisedProductionAt) },
-                  { label: 'Delivery deadline', value: formatDateTime(order.promisedDeliveryAt) },
-                  { label: 'Measurements attached', value: `${measurementEntries.length}` },
-                ]}
-              />
-            </div>
-          </section>
-          <section className={shell}>
-            <div className="text-lg font-semibold text-slate-900 dark:text-white">Production status</div>
-            <div className="mt-4 rounded-[1.5rem] border border-black/10 bg-black/[0.03] p-4 dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                Current display
+        <div className="space-y-5">
+          <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
+            <section className={shell}>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">Order summary</div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <CustomOrderKeyValueList
+                  items={[
+                    { label: 'Current production stage', value: currentStageLabel },
+                    { label: 'Payment status', value: humanizeCustomOrderToken(order.paymentStatus) },
+                    { label: 'Custom-order status', value: humanizeCustomOrderToken(order.status) },
+                    { label: 'Brand', value: textValue(order.source.brandName, 'Brand') },
+                  ]}
+                />
+                <CustomOrderKeyValueList
+                  items={[
+                    {
+                      label: 'Buyer total',
+                      value: formatCurrency(
+                        order.buyerPriceSummary.grandTotal,
+                        order.buyerPriceSummary.currency ?? 'NGN',
+                      ),
+                    },
+                    { label: 'Production deadline', value: formatDateTime(order.promisedProductionAt) },
+                    { label: 'Delivery deadline', value: formatDateTime(order.promisedDeliveryAt) },
+                    { label: 'Measurements attached', value: `${measurementEntries.length}` },
+                  ]}
+                />
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <CustomOrderBadge value={order.status} />
-                <CustomOrderBadge value={order.paymentStatus} type="payment" />
-                <CustomOrderBadge value={currentStage} type="stage" />
+            </section>
+            <section className={shell}>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">Production status</div>
+              <div className="mt-4 rounded-[1.5rem] border border-black/10 bg-black/[0.03] p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  Current display
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <CustomOrderBadge value={order.status} />
+                  <CustomOrderBadge value={order.paymentStatus} type="payment" />
+                  <CustomOrderBadge value={currentStage} type="stage" />
+                </div>
+                <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                  Order placed and order received are system-managed. Brand production updates begin from fabric and piece gathering after payment is confirmed.
+                </p>
               </div>
-              <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                Order placed and order received are system-managed. Brand production updates begin from fabric and piece gathering after payment is confirmed.
-              </p>
-            </div>
-          </section>
+            </section>
+          </div>
+
+          {/* Technical breakdown merged into Overview */}
+          <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_360px]">
+            <section className={shell}>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">Price breakdown</div>
+              <div className="mt-4 space-y-4">
+                {technicalBreakdown && Object.keys(technicalBreakdown).length > 0 ? (
+                  <CustomOrderJsonBreakdown data={technicalBreakdown} />
+                ) : (
+                  <div className="text-sm text-slate-500 dark:text-slate-400">No breakdown available.</div>
+                )}
+                {chartLock ? (
+                  <CustomOrderDataTable
+                    title="Chart lock"
+                    rows={[
+                      { label: 'Computed size', value: textValue(chartLock.computedSize) },
+                      { label: 'Resolver policy', value: humanizeCustomOrderToken(chartLock.resolverPolicy) },
+                      { label: 'Display chart family', value: humanizeCustomOrderToken(chartLock.displayChartFamily) },
+                      { label: 'Pricing chart family', value: humanizeCustomOrderToken(chartLock.pricingChartFamily) },
+                      { label: 'No direct match', value: chartLock.noDirectMatch ? 'Yes' : 'No' },
+                    ].filter((row) => row.value && row.value !== '—')}
+                  />
+                ) : null}
+              </div>
+            </section>
+            <section className={shell}>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">Measurement meta</div>
+              <div className="mt-4">
+                <CustomOrderDataTable title="Attachment metadata" rows={measurementMetaRows} />
+              </div>
+            </section>
+          </div>
         </div>
       );
     }
@@ -474,9 +525,9 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                 measurementEntries.map(([key, value]) => (
                   <div
                     key={key}
-                    className="rounded-[1.4rem] border border-black/10 bg-black/[0.03] px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]"
+                    className="rounded-[1.4rem] border border-indigo-100 bg-indigo-50/60 px-4 py-3 dark:border-indigo-500/20 dark:bg-indigo-500/10"
                   >
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-500 dark:text-indigo-300">
                       {formatMeasurementLabel(key)}
                     </div>
                     <div className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
@@ -497,21 +548,6 @@ const StudioCustomOrderDetailPage: React.FC = () => {
       );
     }
 
-    if (activeTab === 'messages') {
-      return (
-        <section className={shell}>
-          <OrderMessagesPanel
-            contextType="CUSTOM_ORDER"
-            orderId={order.id}
-            actorSurface="BRAND"
-            brandId={brandId}
-            title="Brand conversation"
-            highlightMessageId={highlightMessageId}
-          />
-        </section>
-      );
-    }
-
     if (activeTab === 'operations') {
       return (
         <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
@@ -521,8 +557,8 @@ const StudioCustomOrderDetailPage: React.FC = () => {
               Delivery and settlement remain system-computed. Brand updates start from fabric and piece gathering.
             </p>
 
-            <div className="mt-5 rounded-[1.5rem] border border-black/10 bg-black/[0.03] p-4 dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+            <div className="mt-5 rounded-[1.5rem] border border-indigo-200/80 bg-indigo-50/60 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/10">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-500 dark:text-indigo-300">
                 Current production status
               </div>
               <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
@@ -542,7 +578,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                   value: option.value,
                   label: option.label,
                 }))}
-                placeholder={canUpdateProgressStage ? 'Select the next production stage' : 'Payment confirmation required before brand updates'}
+                placeholder={canUpdateProgressStage ? 'Select the next production stage' : 'Stage updates not available for this order'}
                 disabled={!canUpdateProgressStage || busy}
               />
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -550,62 +586,19 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                   ? selectedStage
                     ? brandManagedStageOptions.find((option) => option.value === selectedStage)?.helper
                     : 'Choose the next production stage. Changes save immediately.'
-                  : 'Buyer payment must be confirmed before brand production updates begin.'}
+                  : 'Stage updates are not available for this order in its current state.'}
               </p>
             </div>
           </section>
 
           <section className={shell}>
-            <div className="text-lg font-semibold text-slate-900 dark:text-white">Support controls</div>
-            <div className="mt-4 space-y-4">
-              <div className="rounded-[1.4rem] border border-black/10 p-4 dark:border-white/10">
-                <div className="text-sm font-semibold text-slate-900 dark:text-white">Request production extension</div>
-                <input
-                  value={extensionDays}
-                  onChange={(event) => setExtensionDays(event.target.value)}
-                  placeholder="Extra days"
-                  className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
-                />
-                <textarea
-                  value={extensionReason}
-                  onChange={(event) => setExtensionReason(event.target.value)}
-                  rows={3}
-                  placeholder="Why is the extension needed?"
-                  className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleCreateExtensionRequest()}
-                  disabled={busy}
-                  className="mt-3 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-slate-950"
-                >
-                  Request extension
-                </button>
-              </div>
-
-              <div className="rounded-[1.4rem] border border-black/10 p-4 dark:border-white/10">
-                <div className="text-sm font-semibold text-slate-900 dark:text-white">Exception review</div>
-                <textarea
-                  value={exceptionReason}
-                  onChange={(event) => setExceptionReason(event.target.value)}
-                  rows={3}
-                  placeholder="Why does this order need exception review?"
-                  className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
-                />
-                <input
-                  value={exceptionQuote}
-                  onChange={(event) => setExceptionQuote(event.target.value)}
-                  placeholder="Optional requested quote total"
-                  className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleExceptionReview()}
-                  disabled={busy}
-                  className="mt-3 rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white"
-                >
-                  Submit exception review
-                </button>
+            <div className="text-lg font-semibold text-slate-900 dark:text-white">Order actions</div>
+            <div className="mt-4 space-y-3">
+              <div className="rounded-[1.4rem] border border-emerald-200/70 bg-emerald-50/60 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                <div className="text-sm font-semibold text-slate-900 dark:text-white">Accept order</div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Use the production status selector on the left to advance to the next stage.
+                </p>
               </div>
             </div>
           </section>
@@ -615,94 +608,135 @@ const StudioCustomOrderDetailPage: React.FC = () => {
 
     if (activeTab === 'timeline') {
       return (
-        <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <section className={shell}>
-            <div className="text-lg font-semibold text-slate-900 dark:text-white">Stage history</div>
-            <div className="mt-4 space-y-3">
-              {order.progressEvents.length === 0 ? (
-                <div className="text-sm text-slate-500 dark:text-slate-400">No production updates yet.</div>
-              ) : (
-                order.progressEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="rounded-[1.5rem] border border-black/10 px-4 py-4 dark:border-white/10"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <CustomOrderBadge value={event.stage} type="stage" />
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
-                        {formatDateTime(event.changedAt)}
+        <div className="space-y-5">
+          <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <section className={shell}>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">Stage history</div>
+              <div className="mt-4 space-y-3">
+                {order.progressEvents.length === 0 ? (
+                  <div className="text-sm text-slate-500 dark:text-slate-400">No production updates yet.</div>
+                ) : (
+                  order.progressEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className="rounded-[1.5rem] border border-indigo-200/70 bg-indigo-50/60 px-4 py-4 dark:border-indigo-500/20 dark:bg-indigo-500/10"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <CustomOrderBadge value={event.stage} type="stage" />
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          {formatDateTime(event.changedAt)}
+                        </div>
                       </div>
+                      {event.note ? (
+                        <div className="mt-3 text-sm text-slate-600 dark:text-slate-300">{event.note}</div>
+                      ) : null}
                     </div>
-                    {event.note ? (
-                      <div className="mt-3 text-sm text-slate-600 dark:text-slate-300">{event.note}</div>
-                    ) : null}
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-          <section className={shell}>
-            <div className="text-lg font-semibold text-slate-900 dark:text-white">Order activity</div>
-            <div className="mt-4 space-y-3">
-              {order.timelineEvents.length === 0 ? (
-                <div className="text-sm text-slate-500 dark:text-slate-400">No timeline activity yet.</div>
-              ) : (
-                order.timelineEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="rounded-[1.5rem] border border-black/10 px-4 py-4 dark:border-white/10"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {humanizeCustomOrderToken(event.eventType)}
+                  ))
+                )}
+              </div>
+            </section>
+            <section className={shell}>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">Order activity</div>
+              <div className="mt-4 space-y-3">
+                {order.timelineEvents.length === 0 ? (
+                  <div className="text-sm text-slate-500 dark:text-slate-400">No timeline activity yet.</div>
+                ) : (
+                  order.timelineEvents.map((event) => {
+                    const filteredPayload = isRecord(event.payloadJson) ? filterTimelinePayload(event.payloadJson) : null;
+                    return (
+                      <div
+                        key={event.id}
+                        className={`rounded-[1.5rem] border px-4 py-4 ${timelineEventTone(event.eventType)}`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {humanizeCustomOrderToken(event.eventType)}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            {formatDateTime(event.createdAt)}
+                          </div>
+                        </div>
+                        {filteredPayload && Object.keys(filteredPayload).length > 0 ? (
+                          <div className="mt-3">
+                            <CustomOrderJsonBreakdown data={filteredPayload} />
+                          </div>
+                        ) : null}
                       </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
-                        {formatDateTime(event.createdAt)}
-                      </div>
-                    </div>
-                    {isRecord(event.payloadJson) ? (
-                      <div className="mt-3">
-                        <CustomOrderJsonBreakdown data={event.payloadJson} />
-                      </div>
-                    ) : null}
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          </div>
+
+          {/* Extension request - moved from Operations */}
+          <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <section className={shell}>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">⏳ Request production extension</div>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                Ask the buyer for more time if production needs it.
+              </p>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={extensionDays}
+                  onChange={(event) => setExtensionDays(event.target.value)}
+                  placeholder="Extra days (e.g. 3)"
+                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                />
+                <textarea
+                  value={extensionReason}
+                  onChange={(event) => setExtensionReason(event.target.value)}
+                  rows={3}
+                  placeholder="Why is the extension needed?"
+                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleCreateExtensionRequest()}
+                  disabled={busy}
+                  className="rounded-full bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  Request extension
+                </button>
+              </div>
+            </section>
+
+            {/* Exception review - moved from Operations */}
+            <section className={shell}>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">🚨 Exception review</div>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                Flag this order for admin review if something outside the normal flow needs resolution.
+              </p>
+              <div className="mt-4 space-y-3">
+                <textarea
+                  value={exceptionReason}
+                  onChange={(event) => setExceptionReason(event.target.value)}
+                  rows={3}
+                  placeholder="Why does this order need exception review?"
+                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                />
+                <input
+                  value={exceptionQuote}
+                  onChange={(event) => setExceptionQuote(event.target.value)}
+                  placeholder="Optional requested quote total"
+                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleExceptionReview()}
+                  disabled={busy}
+                  className="rounded-full border border-rose-300 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-800 disabled:opacity-60 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+                >
+                  Submit exception review
+                </button>
+              </div>
+            </section>
+          </div>
         </div>
       );
     }
 
-    return (
-      <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_360px]">
-        <section className={shell}>
-          <div className="text-lg font-semibold text-slate-900 dark:text-white">Technical breakdown</div>
-          <div className="mt-4 space-y-4">
-            {technicalBreakdown && Object.keys(technicalBreakdown).length > 0 ? (
-              <CustomOrderJsonBreakdown data={technicalBreakdown} />
-            ) : (
-              <div className="text-sm text-slate-500 dark:text-slate-400">No technical breakdown available.</div>
-            )}
-            {chartLock ? (
-              <CustomOrderDataTable
-                title="Chart lock"
-                rows={Object.entries(chartLock).map(([key, value]) => ({
-                  label: humanizeCustomOrderToken(key),
-                  value: textValue(value),
-                }))}
-              />
-            ) : null}
-          </div>
-        </section>
-        <section className={shell}>
-          <div className="text-lg font-semibold text-slate-900 dark:text-white">Measurement attachment meta</div>
-          <div className="mt-4">
-            <CustomOrderDataTable title="Measurement attachment meta" rows={measurementMetaRows} />
-          </div>
-        </section>
-      </div>
-    );
+    return null;
   };
 
   if (loading) {
@@ -745,16 +779,21 @@ const StudioCustomOrderDetailPage: React.FC = () => {
             </div>
 
             <div className="mt-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-                {formatCustomOrderCode(order.id)}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                  {formatCustomOrderCode(order.id)}
+                </div>
+                <div className="rounded-full border border-black/10 bg-black/[0.03] px-3 py-1 text-sm font-bold text-slate-900 dark:border-white/10 dark:bg-white/[0.05] dark:text-white">
+                  {formatCurrency(
+                    order.buyerPriceSummary.grandTotal,
+                    order.buyerPriceSummary.currency ?? 'NGN',
+                  )}
+                </div>
               </div>
               <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{order.source.title}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 dark:text-slate-300">
-                Dedicated brand workspace for this order. Customer details stay visible here while measurements, messages, operations, and audit stay in the tab console below.
-              </p>
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
@@ -771,7 +810,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <section className={`${shell} !p-4`}>
                 <div className="text-sm font-semibold text-slate-900 dark:text-white">Customer details</div>
                 <div className="mt-3">
@@ -784,32 +823,6 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                   <CustomOrderKeyValueList items={deliveryRows} />
                 </div>
               </section>
-            </div>
-
-            <div className="mt-5 grid gap-3 lg:grid-cols-2">
-              <CustomOrderMetricCard
-                label="Buyer total"
-                value={formatCurrency(
-                  order.buyerPriceSummary.grandTotal,
-                  order.buyerPriceSummary.currency ?? 'NGN',
-                )}
-                helper="Locked buyer-facing total"
-              />
-              <CustomOrderMetricCard
-                label="Measurements"
-                value={`${measurementEntries.length}`}
-                helper="Buyer snapshot"
-              />
-              <CustomOrderMetricCard
-                label="Production deadline"
-                value={formatDateTime(order.promisedProductionAt)}
-                helper={getRelativeDeadlineText(order.promisedProductionAt)}
-              />
-              <CustomOrderMetricCard
-                label="Delivery deadline"
-                value={formatDateTime(order.promisedDeliveryAt)}
-                helper={getRelativeDeadlineText(order.promisedDeliveryAt)}
-              />
             </div>
           </div>
 
@@ -841,7 +854,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                   value: option.value,
                   label: option.label,
                 }))}
-                placeholder={canUpdateProgressStage ? 'Select the next production stage' : 'Buyer payment must confirm before production updates'}
+                placeholder={canUpdateProgressStage ? 'Select the next production stage' : 'Stage updates not available in current state'}
                 disabled={!canUpdateProgressStage || busy}
               />
               <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
@@ -849,7 +862,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                   ? selectedStage
                     ? brandManagedStageOptions.find((option) => option.value === selectedStage)?.helper
                     : 'Choose the next production stage. Changes save immediately.'
-                  : 'Buyer payment must complete before the brand can move into fabric, design, finishing, or delivery-ready updates.'}
+                  : 'Stage updates are not available for this order in its current state.'}
               </p>
             </div>
           </aside>

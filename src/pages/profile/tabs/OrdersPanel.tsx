@@ -19,7 +19,6 @@ import {
   CustomOrderDataTable,
   CustomOrderMediaPreview,
   CustomOrderMetricCard,
-  CustomOrderStageProgress,
   formatDateTime,
   getRelativeDeadlineText,
 } from '@/components/custom-orders/CustomOrderUi';
@@ -53,6 +52,14 @@ type OrdersPanelProps = {
 const CUSTOM_STAGE_FLOW: Array<{ value: CustomOrderProgressStage; label: string }> = [
   { value: 'ORDER_PLACED', label: 'Order placed' },
   { value: 'ORDER_RECEIVED', label: 'Order received' },
+  { value: 'FABRIC_AND_PIECE_PURCHASE_GATHERING', label: 'Fabric and piece gathering' },
+  { value: 'DESIGN_MODE', label: 'Design mode' },
+  { value: 'FINAL_TOUCHES_AND_PACKAGING', label: 'Final touches and packaging' },
+  { value: 'READY_FOR_DELIVERY', label: 'Ready for delivery' },
+];
+
+const BUYER_STAGE_FLOW: Array<{ value: CustomOrderProgressStage; label: string }> = [
+  { value: 'ORDER_PLACED', label: 'Order placed' },
   { value: 'FABRIC_AND_PIECE_PURCHASE_GATHERING', label: 'Fabric and piece gathering' },
   { value: 'DESIGN_MODE', label: 'Design mode' },
   { value: 'FINAL_TOUCHES_AND_PACKAGING', label: 'Final touches and packaging' },
@@ -159,6 +166,107 @@ const customOrderSummarySearchText = (order: CustomOrderListItem) =>
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
+
+const getBuyerFacingProgressStage = (
+  stage?: CustomOrderProgressStage | null,
+): CustomOrderProgressStage => {
+  if (!stage || stage === 'ORDER_RECEIVED') return 'ORDER_PLACED';
+  return stage;
+};
+
+const getBuyerFacingProgressLabel = (stage?: CustomOrderProgressStage | null) =>
+  CUSTOM_STAGE_FLOW.find((item) => item.value === getBuyerFacingProgressStage(stage))?.label ??
+  'Order placed';
+
+const shouldShowBuyerStatusBadge = (status?: string | null) => {
+  const normalized = normalizeStatus(status ?? undefined);
+  return new Set([
+    'COMPLETED',
+    'CLOSED',
+    'DISPUTED',
+    'DELIVERY_ISSUE_REPORTED',
+    'REFUND_IN_PROGRESS',
+    'REJECTED_BY_BRAND',
+    'CANCELLED_BY_BUYER_PRE_ACCEPTANCE',
+  ]).has(normalized);
+};
+
+const getBuyerCustomStageStepIndex = (stage?: CustomOrderProgressStage | null) =>
+  BUYER_STAGE_FLOW.findIndex((item) => item.value === getBuyerFacingProgressStage(stage));
+
+const getBuyerCustomHeadline = (stage?: CustomOrderProgressStage | null) => {
+  switch (getBuyerFacingProgressStage(stage)) {
+    case 'FABRIC_AND_PIECE_PURCHASE_GATHERING':
+      return 'The brand is gathering fabric and pattern pieces';
+    case 'DESIGN_MODE':
+      return 'Your custom order is in design mode';
+    case 'FINAL_TOUCHES_AND_PACKAGING':
+      return 'The brand is finishing and packaging your order';
+    case 'READY_FOR_DELIVERY':
+      return 'Your custom order is ready for delivery';
+    default:
+      return 'Your custom order has been placed';
+  }
+};
+
+const getBuyerCustomDescription = (stage?: CustomOrderProgressStage | null) => {
+  switch (getBuyerFacingProgressStage(stage)) {
+    case 'FABRIC_AND_PIECE_PURCHASE_GATHERING':
+      return 'The brand has moved into sourcing and preparation for your custom piece.';
+    case 'DESIGN_MODE':
+      return 'Construction and design work are now underway on this order.';
+    case 'FINAL_TOUCHES_AND_PACKAGING':
+      return 'The brand is wrapping up finishing details before dispatch.';
+    case 'READY_FOR_DELIVERY':
+      return 'The order is complete on the brand side and waiting for delivery handoff.';
+    default:
+      return 'Payment is complete and your custom order is now active in the brand workspace.';
+  }
+};
+
+const BuyerCustomStageFiller: React.FC<{
+  stage?: CustomOrderProgressStage | null;
+  brandName?: string | null;
+  compact?: boolean;
+}> = ({ stage, brandName, compact = false }) => {
+  const effectiveStage = getBuyerFacingProgressStage(stage);
+  const stepIndex = getBuyerCustomStageStepIndex(effectiveStage);
+
+  return (
+    <div
+      className={`rounded-2xl border border-sky-200/80 bg-sky-50/80 dark:border-sky-800/30 dark:bg-sky-500/10 ${
+        compact ? 'px-4 py-3' : 'px-4 py-4'
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-200">
+            Current status
+          </div>
+          <div className={`${compact ? 'mt-1 text-base' : 'mt-1 text-lg'} font-bold text-slate-900 dark:text-white`}>
+            {getBuyerFacingProgressLabel(effectiveStage)}
+          </div>
+        </div>
+        {brandName ? (
+          <div className="text-sm text-slate-600 dark:text-slate-300">{brandName}</div>
+        ) : null}
+      </div>
+      <div className="mt-4 grid grid-cols-5 gap-2">
+        {BUYER_STAGE_FLOW.map((step, index) => {
+          const active = index <= stepIndex;
+          return (
+            <span
+              key={step.value}
+              className={`h-2.5 rounded-full transition-colors ${
+                active ? 'bg-sky-500 dark:bg-sky-300' : 'bg-slate-200 dark:bg-white/10'
+              }`}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const getStandardOrderHeadline = (order: Order) => {
   if (order.buyerConfirmedDeliveryAt) return 'You have confirmed receipt of this order';
@@ -515,10 +623,11 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
   );
 };
 
-const BuyerCustomOrderDetailView: React.FC<{ orderId: string; onBack: () => void }> = ({
-  orderId,
-  onBack,
-}) => {
+const BuyerCustomOrderDetailView: React.FC<{
+  orderId: string;
+  onBack: () => void;
+  previewOrder?: CustomOrderListItem | null;
+}> = ({ orderId, onBack, previewOrder = null }) => {
   const navigate = useNavigate();
   const [order, setOrder] = useState<CustomOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -547,7 +656,72 @@ const BuyerCustomOrderDetailView: React.FC<{ orderId: string; onBack: () => void
     };
   }, [orderId]);
 
-  if (loading) {
+  const effectiveStage = getBuyerFacingProgressStage(
+    order?.currentProgressStage ?? previewOrder?.currentProgressStage,
+  );
+  const mediaUrl = order?.source.primaryMediaUrl ?? previewOrder?.sourcePrimaryMediaUrl ?? null;
+  const title = order?.source.title ?? previewOrder?.sourceTitle ?? 'Custom order';
+  const brandName = order?.source.brandName ?? previewOrder?.brand?.name ?? 'Brand';
+  const grandTotal = order
+    ? formatCurrency(
+        order.buyerPriceSummary.grandTotal,
+        order.buyerPriceSummary.currency ?? 'NGN',
+      )
+    : formatCurrency(
+        previewOrder?.buyerPriceSummary.grandTotal ?? 0,
+        previewOrder?.buyerPriceSummary.currency ?? 'NGN',
+      );
+
+  if (loading && previewOrder) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-full border border-gray-200/80 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-fuchsia-300 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:text-white"
+          >
+            Back to orders
+          </button>
+          <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Custom order</div>
+        </div>
+
+        <section className="overflow-hidden rounded-[2rem] border border-black/10 bg-white/90 shadow-[0_30px_120px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="grid gap-6 p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <CustomOrderMediaPreview src={previewOrder.sourcePrimaryMediaUrl} title={previewOrder.sourceTitle} />
+            <div className="space-y-4">
+              <BuyerCustomStageFiller
+                stage={previewOrder.currentProgressStage}
+                brandName={previewOrder.brand?.name}
+                compact
+              />
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                  {formatCustomOrderCode(previewOrder.id)}
+                </div>
+                <h2 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
+                  {previewOrder.sourceTitle}
+                </h2>
+                <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                  {getBuyerCustomHeadline(previewOrder.currentProgressStage)}. {getBuyerCustomDescription(previewOrder.currentProgressStage)}
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="h-[104px] animate-pulse rounded-2xl border border-black/10 bg-slate-100/80 dark:border-white/10 dark:bg-white/[0.05]"
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (loading && !previewOrder) {
     return <div className="rounded-3xl border border-gray-200/70 bg-white/70 p-8 text-sm text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">Loading custom order...</div>;
   }
 
@@ -590,23 +764,19 @@ const BuyerCustomOrderDetailView: React.FC<{ orderId: string; onBack: () => void
 
       <section className="overflow-hidden rounded-[2rem] border border-black/10 bg-white/90 shadow-[0_30px_120px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04]">
         <div className="grid gap-6 p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <CustomOrderMediaPreview src={order.source.primaryMediaUrl} title={order.source.title} />
+          <CustomOrderMediaPreview src={mediaUrl} title={title} />
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <CustomOrderBadge value={order.status} />
-              <CustomOrderBadge value={order.paymentStatus} type="payment" />
-              <CustomOrderBadge value={order.currentProgressStage ?? 'ORDER_PLACED'} type="stage" />
-            </div>
+            <BuyerCustomStageFiller stage={effectiveStage} brandName={brandName} />
             <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
               <div className="max-w-3xl">
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
                   {formatCustomOrderCode(order.id)}
                 </div>
                 <h2 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
-                  {order.source.title}
+                  {title}
                 </h2>
                 <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                  Review your custom-order status, delivery commitments, measurements, and support details without leaving the profile workspace.
+                  {getBuyerCustomHeadline(effectiveStage)}. {getBuyerCustomDescription(effectiveStage)}
                 </p>
               </div>
               <div className="min-w-[180px] rounded-2xl border border-black/10 bg-white/80 p-4 text-right dark:border-white/10 dark:bg-white/5">
@@ -614,10 +784,7 @@ const BuyerCustomOrderDetailView: React.FC<{ orderId: string; onBack: () => void
                   Locked total
                 </div>
                 <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
-                  {formatCurrency(
-                    order.buyerPriceSummary.grandTotal,
-                    order.buyerPriceSummary.currency ?? 'NGN',
-                  )}
+                  {grandTotal}
                 </div>
               </div>
             </div>
@@ -625,7 +792,7 @@ const BuyerCustomOrderDetailView: React.FC<{ orderId: string; onBack: () => void
             <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <CustomOrderMetricCard
                 label="Brand"
-                value={textValue(order.source.brandName, 'Brand')}
+                value={textValue(brandName, 'Brand')}
                 helper="Seller on this custom order"
               />
               <CustomOrderMetricCard
@@ -645,19 +812,6 @@ const BuyerCustomOrderDetailView: React.FC<{ orderId: string; onBack: () => void
               />
             </div>
           </div>
-        </div>
-      </section>
-
-      <section className="rounded-[28px] border border-gray-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Custom order progress</h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          The brand progress flow stays visible here from order placement through delivery readiness.
-        </p>
-        <div className="mt-4">
-          <CustomOrderStageProgress
-            stages={CUSTOM_STAGE_FLOW}
-            currentStage={order.currentProgressStage ?? 'ORDER_PLACED'}
-          />
         </div>
       </section>
 
@@ -743,6 +897,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
   const [customStatus, setCustomStatus] = useState<CustomStatusFilter>('ALL');
   const [activeView, setActiveView] = useState<OrdersView>('standard');
   const [selection, setSelection] = useState<OrdersPanelSelection | null>(null);
+  const [selectedCustomPreview, setSelectedCustomPreview] = useState<CustomOrderListItem | null>(null);
   const [standardSummaryByOrderId, setStandardSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
   const [customSummaryByOrderId, setCustomSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
 
@@ -814,8 +969,13 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
     if (!initialSelection || mode !== 'full') return;
     setActiveView(initialSelection.kind);
     setSelection(initialSelection);
+    setSelectedCustomPreview(
+      initialSelection.kind === 'custom'
+        ? customOrders.find((item) => item.id === initialSelection.id) ?? null
+        : null,
+    );
     onSelectionHandled?.();
-  }, [initialSelection, mode, onSelectionHandled]);
+  }, [customOrders, initialSelection, mode, onSelectionHandled]);
 
   const standardFilteredOrders = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -858,6 +1018,13 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
       return;
     }
 
+    if (nextSelection.kind === 'custom') {
+      setSelectedCustomPreview(
+        customOrders.find((item) => item.id === nextSelection.id) ?? null,
+      );
+    } else {
+      setSelectedCustomPreview(null);
+    }
     setSelection(nextSelection);
   };
 
@@ -865,7 +1032,14 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
     return selection.kind === 'standard' ? (
       <StandardOrderDetailView orderId={selection.id} onBack={() => setSelection(null)} />
     ) : (
-      <BuyerCustomOrderDetailView orderId={selection.id} onBack={() => setSelection(null)} />
+      <BuyerCustomOrderDetailView
+        orderId={selection.id}
+        previewOrder={selectedCustomPreview}
+        onBack={() => {
+          setSelection(null);
+          setSelectedCustomPreview(null);
+        }}
+      />
     );
   }
 
@@ -1070,8 +1244,11 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                     <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
                       {formatCustomOrderCode(order.id)}
                     </span>
-                    <CustomOrderBadge value={order.status} />
-                    <CustomOrderBadge value={order.currentProgressStage ?? 'ORDER_PLACED'} type="stage" />
+                    {shouldShowBuyerStatusBadge(order.status) ? <CustomOrderBadge value={order.status} /> : null}
+                    <CustomOrderBadge
+                      value={getBuyerFacingProgressStage(order.currentProgressStage)}
+                      type="stage"
+                    />
                   </div>
 
                   <div className="grid gap-3 lg:grid-cols-[92px_minmax(0,1fr)_auto] lg:items-start">
@@ -1099,16 +1276,15 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                       <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                         {order.brand?.name || 'Brand'} · {formatDate(order.createdAt)}
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <CustomOrderBadge value={order.paymentStatus} type="payment" />
-                        {summary?.hasUnread ? (
+                      {summary?.hasUnread ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
                           <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
                             {unreadCount > 0 ? `${unreadCount} unread` : 'New messages'}
                           </span>
-                        ) : null}
-                      </div>
+                        </div>
+                      ) : null}
                       <div className="mt-3 grid gap-1 text-sm text-gray-600 dark:text-gray-300 sm:grid-cols-2">
-                        <span>Stage: {humanizeCustomOrderToken(order.currentProgressStage ?? 'ORDER_PLACED')}</span>
+                        <span>Status: {getBuyerFacingProgressLabel(order.currentProgressStage)}</span>
                         <span>Delivery: {order.delivery?.city || order.delivery?.state || 'Not scheduled'}</span>
                       </div>
                     </div>
