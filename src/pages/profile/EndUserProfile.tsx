@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useDispatch, useSelector } from 'react-redux';
 import { SavedTab } from './tabs/SavedTab';
 import { PatchesTab } from './tabs/PatchesTab';
-import { OrdersPanel } from './tabs/OrdersPanel';
+import { OrdersPanel, type OrdersPanelSelection } from './tabs/OrdersPanel';
 import { apiClient } from '@/api/httpClient';
 import type { AppDispatch, RootState } from '@/store';
 import { setUser } from '@/features/userSlice';
@@ -19,6 +19,8 @@ import ProfileActionsBar, { type ProfileAction } from '@/components/profile/Prof
 import { buildProfileUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
 import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS } from '@/lib/sizeCharts';
+import ImageWithFallback from '@/components/ImageWithFallback';
+import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 
 interface UserProfile {
   id: string;
@@ -26,6 +28,15 @@ interface UserProfile {
   firstName: string;
   lastName: string;
   profileImage?: string;
+  profileImageId?: string | null;
+  profileImageFile?: {
+    id: string;
+    s3Url: string;
+    fileName?: string;
+    originalName?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  } | null;
   bannerImage?: string;
   address?: string;
   profileVisibility: 'UNLOCKED' | 'LOCKED';
@@ -44,6 +55,8 @@ const normalizeProfile = (raw: any): UserProfile | null => {
     firstName: source.firstName ?? '',
     lastName: source.lastName ?? '',
     profileImage: source.profileImage ?? undefined,
+    profileImageId: source.profileImageId ?? null,
+    profileImageFile: source.profileImageFile ?? null,
     bannerImage: source.bannerImage ?? undefined,
     address: source.address ?? undefined,
     location: source.location ?? source.address ?? undefined,
@@ -57,6 +70,29 @@ const formatJoinLabel = (value?: string): string | null => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   return `Joined ${new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(parsed)}`;
+};
+
+const describeAlphaFit = (value?: string | null): string | null => {
+  if (!value) return null;
+
+  const normalized = value
+    .trim()
+    .toUpperCase()
+    .replace(/^2XL$/, 'XXL')
+    .replace(/^3XL$/, 'XXXL')
+    .replace(/^4XL$/, 'XXXXL');
+  const labels: Record<string, string> = {
+    XXS: 'Extra Extra Small',
+    XS: 'Extra Small',
+    S: 'Small',
+    M: 'Medium',
+    L: 'Large',
+    XL: 'Extra Large',
+    XXL: 'Extra Extra Large',
+    XXXL: 'Extra Extra Extra Large',
+  };
+
+  return labels[normalized] ? `${labels[normalized]} (${normalized})` : normalized;
 };
 
 export const EndUserProfile: React.FC = () => {
@@ -83,12 +119,14 @@ export const EndUserProfile: React.FC = () => {
   const [chartLoading, setChartLoading] = useState(false);
   const [chartSaving, setChartSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   const isOwner = !id || currentUser?.id === id;
   const profileId = id ?? currentUser?.id;
-  const availableTabs = useMemo(() => (isOwner ? ['Saved', 'Patches'] : ['Patches']), [isOwner]);
+  const availableTabs = useMemo(() => (isOwner ? ['Saved', 'Patches', 'Orders'] : ['Patches']), [isOwner]);
   const [activeTab, setActiveTab] = useState<string>(isOwner ? 'Saved' : 'Patches');
+  const [ordersSelection, setOrdersSelection] = useState<OrdersPanelSelection | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -121,6 +159,8 @@ export const EndUserProfile: React.FC = () => {
             firstName: currentUser.firstName ?? '',
             lastName: currentUser.lastName ?? '',
             profileImage: currentUser.profileImage ?? undefined,
+            profileImageId: currentUser.profileImageId ?? null,
+            profileImageFile: currentUser.profileImageFile ?? null,
             bannerImage: currentUser.bannerImage ?? undefined,
             address: currentUser.address ?? undefined,
             location: currentUser.address ?? undefined,
@@ -210,6 +250,14 @@ export const EndUserProfile: React.FC = () => {
   useEffect(() => {
     setActiveTab((prev) => (availableTabs.includes(prev) ? prev : availableTabs[0]));
   }, [availableTabs]);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+    };
+  }, [avatarPreviewUrl]);
 
   const handleShareProfile = useCallback(async () => {
     if (!profile) return;
@@ -381,6 +429,12 @@ export const EndUserProfile: React.FC = () => {
       event.target.value = '';
       if (!file || !currentUser) return;
 
+      const nextPreviewUrl = URL.createObjectURL(file);
+      setAvatarPreviewUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return nextPreviewUrl;
+      });
+
       const formData = new FormData();
       formData.append('file', file);
 
@@ -398,6 +452,17 @@ export const EndUserProfile: React.FC = () => {
             ? {
                 ...prev,
                 profileImage: nextImage ?? undefined,
+                profileImageId: nextImageId,
+                profileImageFile: nextImage
+                  ? {
+                      id: nextImageId,
+                      s3Url: nextImage,
+                      fileName: uploaded?.fileName ?? file.name,
+                      originalName: uploaded?.originalName ?? file.name,
+                      createdAt: uploaded?.createdAt ?? new Date().toISOString(),
+                      updatedAt: uploaded?.updatedAt ?? new Date().toISOString(),
+                    }
+                  : null,
               }
             : prev,
         );
@@ -420,9 +485,17 @@ export const EndUserProfile: React.FC = () => {
           }),
         );
 
+        setAvatarPreviewUrl((current) => {
+          if (current) URL.revokeObjectURL(current);
+          return null;
+        });
         toast.success('Profile image updated.');
       } catch (err) {
         console.error('Failed to upload profile image', err);
+        setAvatarPreviewUrl((current) => {
+          if (current) URL.revokeObjectURL(current);
+          return null;
+        });
         toast.error('Unable to upload profile image right now.');
       } finally {
         setAvatarUploading(false);
@@ -442,9 +515,16 @@ export const EndUserProfile: React.FC = () => {
           ? {
               ...prev,
               profileImage: undefined,
+              profileImageId: null,
+              profileImageFile: null,
             }
           : prev,
       );
+
+      setAvatarPreviewUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
 
       dispatch(
         setUser({
@@ -470,8 +550,8 @@ export const EndUserProfile: React.FC = () => {
         <div className="max-w-screen-xl mx-auto space-y-6">
           <div className="animate-pulse">
             <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-2xl mb-6" />
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
-              <div className="w-24 h-24 bg-gray-200 dark:bg-gray-700 rounded-full" />
+            <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+              <div className="h-24 w-24 rounded-3xl bg-gray-200 dark:bg-gray-700" />
               <div className="flex-1 space-y-2">
                 <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
                 <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4" />
@@ -499,6 +579,17 @@ export const EndUserProfile: React.FC = () => {
   const profileUrl = buildProfileUrl({ id: profile.id, username: profile.username });
   const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || profile.username;
   const joinLabel = formatJoinLabel(profile.createdAt ?? (isOwner ? currentUser?.createdAt : undefined));
+  const avatar = resolveProfileImageSource({
+    profileImage: avatarPreviewUrl ?? profile.profileImage ?? (isOwner ? currentUser?.profileImage : null),
+    profileImageId: avatarPreviewUrl
+      ? null
+      : (profile.profileImageId ?? (isOwner ? currentUser?.profileImageId : null) ?? null),
+    profileImageFile: avatarPreviewUrl
+      ? null
+      : (profile.profileImageFile ?? (isOwner ? currentUser?.profileImageFile : null) ?? null),
+  });
+  const avatarFallback = getAvatarFallback(fullName, profile.username);
+  const alphaFitLabel = describeAlphaFit(computedAlphaSize);
   const tabs = availableTabs.map((tab) => ({
     key: tab,
     icon: tab === 'Saved' ? '🗂️' : '🪡',
@@ -551,43 +642,50 @@ export const EndUserProfile: React.FC = () => {
         <section className="rounded-[2rem] p-4 sm:p-6">
           <div className="flex flex-col gap-5">
             {/* Profile info row: avatar + name on left, computed size on right */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="flex min-w-0 items-center gap-4 sm:gap-5">
-                <div className="relative h-20 w-20 shrink-0 rounded-[1.5rem] bg-white/50 p-0.5 shadow-sm dark:bg-white/5 sm:h-24 sm:w-24">
-                  {profile.profileImage ? (
-                    <img
-                      src={profile.profileImage}
-                      alt={fullName}
-                      className="h-full w-full rounded-[1.3rem] object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center rounded-[1.3rem] bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 text-2xl font-bold text-gray-800 dark:text-white">
-                      {(profile.firstName?.charAt(0) || profile.username?.charAt(0) || '?').toUpperCase()}
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center sm:gap-8">
+                <div className="relative h-32 w-32 shrink-0 rounded-xl bg-white/70 p-1 shadow-sm dark:bg-white/5 sm:h-36 sm:w-36">
+                  <ImageWithFallback
+                    src={avatar.src}
+                    fileId={avatar.fileId}
+                    alt={fullName}
+                    fit="cover"
+                    rounded="xl"
+                    fallbackName={avatarFallback}
+                    containerClassName="h-full w-full"
+                    className="h-full w-full rounded-lg object-cover"
+                    maxHeightClassName="max-h-full"
+                  />
+                  {avatarUploading ? (
+                    <div className="absolute inset-1 flex items-center justify-center rounded-lg bg-black/55">
+                      <div className="rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-slate-900">
+                        Uploading image...
+                      </div>
                     </div>
-                  )}
+                  ) : null}
                   {isOwner ? (
                     <button
                       type="button"
                       onClick={handleTriggerAvatarUpload}
                       disabled={avatarUploading}
-                      className="absolute bottom-0 right-0 rounded-full bg-white/90 p-1 text-[11px] leading-none shadow-sm transition hover:scale-105 disabled:opacity-60 dark:bg-zinc-900"
+                      className="absolute bottom-2 right-2 rounded-full bg-white/95 px-3 py-2 text-sm font-semibold leading-none shadow-sm transition hover:scale-105 disabled:opacity-60 dark:bg-zinc-900"
                       title="Upload profile image"
                     >
                       ✏️
                     </button>
                   ) : (
-                    <div className="absolute bottom-0 right-0 rounded-full bg-white/90 p-1 text-[11px] leading-none dark:bg-zinc-900">
+                    <div className="absolute bottom-2 right-2 rounded-full bg-white/95 px-3 py-2 text-xs font-semibold leading-none shadow-sm dark:bg-zinc-900">
                       {profile.profileVisibility === 'LOCKED' ? '🔒' : '🌐'}
                     </div>
                   )}
                   {isOwner ? (
-                    <div className="absolute -top-2 -right-2 flex items-center gap-1">
-                      {profile.profileImage ? (
+                    <div className="absolute left-2 top-2 flex items-center gap-1">
+                      {avatar.src ? (
                         <button
                           type="button"
                           onClick={() => void handleRemoveAvatar()}
                           disabled={avatarUploading}
-                          className="rounded-lg bg-white/95 px-1.5 py-1 text-[11px] leading-none shadow-sm dark:bg-zinc-900"
+                          className="rounded-full bg-white/95 px-3 py-2 text-xs font-semibold leading-none shadow-sm dark:bg-zinc-900"
                           title="Remove profile image"
                         >
                           🗑️
@@ -597,33 +695,35 @@ export const EndUserProfile: React.FC = () => {
                   ) : null}
                 </div>
 
-                <div className="min-w-0">
+                <div className="min-w-0 max-w-3xl">
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <h1 className="truncate text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">
+                    <h1 className="truncate text-2xl font-black tracking-tight text-gray-900 dark:text-white sm:text-3xl">
                       {fullName}
                     </h1>
-                    {isOwner ? (
-                      <span className="inline-flex items-center rounded-full bg-fuchsia-500/10 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700 dark:text-fuchsia-300">
-                        Your Profile
-                      </span>
-                    ) : null}
                   </div>
-                  <p className="truncate text-sm font-medium italic text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 truncate text-sm font-medium italic text-gray-500 dark:text-gray-400 sm:text-base">
                     @{profile.username}
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
                     {profile.location ? <span>{profile.location}</span> : null}
-                    {profile.location ? (joinLabel ? <span className="h-1 w-1 rounded-full bg-gray-400/80 dark:bg-gray-500" /> : null) : null}
+                    {profile.location ? (joinLabel ? <span className="h-1.5 w-1.5 rounded-full bg-gray-400/80 dark:bg-gray-500" /> : null) : null}
                     {joinLabel ? <span>{joinLabel}</span> : null}
                   </div>
+                  {isOwner ? (
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <div className="rounded-full border border-emerald-300/60 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                        {avatarUploading ? 'Uploading your new profile image now.' : 'Profile photo updates appear here immediately.'}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
               {/* Computed size — displayed parallel to profile image on desktop */}
               {isOwner ? (
-                <div className="shrink-0 md:text-right">
+                <div className="w-full max-w-sm shrink-0 lg:max-w-xs">
                   {/* Minimal chart tabs */}
-                  <div className="mb-1.5 inline-flex flex-wrap gap-0.5 rounded-lg bg-gray-100/60 p-0.5 dark:bg-white/5">
+                  <div className="mb-3 inline-flex flex-wrap gap-1 rounded-2xl bg-gray-100/70 p-1 dark:bg-white/5">
                     {DISPLAY_CHART_OPTIONS.map((option) => {
                       const active = displayChartFamily === option.value;
                       return (
@@ -632,7 +732,7 @@ export const EndUserProfile: React.FC = () => {
                           type="button"
                           onClick={() => void handleDisplayChartChange(option.value)}
                           disabled={chartSaving}
-                          className={`rounded-md px-2 py-1 text-[10px] font-semibold transition ${
+                          className={`rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition sm:text-xs ${
                             active
                               ? 'bg-indigo-600 text-white shadow-sm'
                               : 'text-gray-500 hover:text-gray-800 hover:bg-white dark:text-gray-400 dark:hover:text-white dark:hover:bg-zinc-800'
@@ -648,21 +748,24 @@ export const EndUserProfile: React.FC = () => {
                     })}
                   </div>
                   {/* Computed size display */}
-                  <div className="rounded-xl bg-indigo-50/40 px-3 py-2 dark:bg-indigo-500/10">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500/80 dark:text-indigo-400/70">Computed size</div>
-                    <div className="text-xl font-bold text-indigo-900 dark:text-indigo-200">
+                  <div className="rounded-2xl border border-indigo-200/70 bg-indigo-50/70 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/10">
+                    <div className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-500/80 dark:text-indigo-300/80">Computed size</div>
+                    <div className="mt-1 text-2xl font-black text-indigo-950 dark:text-indigo-100 sm:text-3xl">
                       {chartLoading ? 'Loading…' : computedSize || '—'}
                     </div>
-                    {computedAlphaSize ? (
-                      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-600/80 dark:text-indigo-300/80">
-                        Alpha fit {computedAlphaSize}
+                    <div className="mt-3 rounded-xl bg-white/80 px-3 py-2.5 dark:bg-slate-950/40">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-500/70 dark:text-indigo-300/70">
+                        Alpha fit
                       </div>
-                    ) : null}
-                    <div className="text-[10px] text-indigo-700/70 dark:text-indigo-300/70">
+                      <div className="mt-0.5 text-lg font-bold text-indigo-900 dark:text-indigo-100">
+                        {alphaFitLabel ?? 'Not available yet'}
+                      </div>
+                    </div>
+                    <div className="mt-3 text-xs text-indigo-900/75 dark:text-indigo-200/80">
                       {computedGuidance || 'Computed from your live measurement profile.'}
                     </div>
                     {sizeFitProfile?.missingBaselineKeys?.length ? (
-                      <div className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">
+                      <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
                         Update: {sizeFitProfile.missingBaselineKeys
                           .map((key) => key.replace(/^WOMEN_|^MEN_|^UNISEX_/g, '').replace(/_/g, ' '))
                           .join(', ')}
@@ -678,7 +781,7 @@ export const EndUserProfile: React.FC = () => {
             ) : null}
 
             <div className="mt-2 flex items-center gap-4 overflow-x-auto scrollbar-hide px-1 sm:gap-8">
-              {tabs.map(({ key, icon }) => {
+              {tabs.map(({ key }) => {
                 const active = activeTab === key;
                 return (
                   <button
@@ -691,7 +794,9 @@ export const EndUserProfile: React.FC = () => {
                         : 'border-b-2 border-transparent text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
                     }`}
                   >
-                    <span className="leading-none">{icon}</span>
+                    <span className="leading-none">
+                      {key === 'Saved' ? '🗂️' : key === 'Orders' ? '📦' : '🪡'}
+                    </span>
                     <span className="whitespace-nowrap">{key}</span>
                   </button>
                 );
@@ -700,16 +805,33 @@ export const EndUserProfile: React.FC = () => {
           </div>
         </section>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div>
-            {activeTab === 'Saved' ? (
-              isOwner ? <SavedTab isOwner={isOwner} /> : <PatchesTab isOwner={isOwner} profileVisibility={profile.profileVisibility} />
-            ) : (
-              <PatchesTab isOwner={isOwner} profileVisibility={profile.profileVisibility} />
-            )}
+        {activeTab === 'Orders' && isOwner ? (
+          <div className="mt-6">
+            <OrdersPanel
+              mode="full"
+              initialSelection={ordersSelection}
+              onSelectionHandled={() => setOrdersSelection(null)}
+            />
           </div>
-          {isOwner ? <OrdersPanel /> : null}
-        </div>
+        ) : (
+          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <div>
+              {activeTab === 'Saved' ? (
+                isOwner ? <SavedTab isOwner={isOwner} /> : <PatchesTab isOwner={isOwner} profileVisibility={profile.profileVisibility} />
+              ) : (
+                <PatchesTab isOwner={isOwner} profileVisibility={profile.profileVisibility} />
+              )}
+            </div>
+            {isOwner ? (
+              <OrdersPanel
+                onViewAll={(selection) => {
+                  setOrdersSelection(selection ?? null);
+                  setActiveTab('Orders');
+                }}
+              />
+            ) : null}
+          </div>
+        )}
       </div>
 
       <EndUserQuickEditModal

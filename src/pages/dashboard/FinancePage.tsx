@@ -50,19 +50,48 @@ type FinanceOverview = {
   releasedBalance: number;
   reservedPayoutBalance: number;
   paidOutBalance: number;
+  incomingCredits: number;
+  totalOrders: number;
   negativeBalance: boolean;
 };
 
 type IncomingTransaction = {
   id: string;
   amount: number | string;
+  grossAmount?: number | string;
+  commissionAmount?: number | string;
+  netAmount?: number | string;
   currency: string;
   createdAt: string;
   title?: string | null;
   counterparty?: string | null;
   description?: string | null;
   stage?: string | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
 };
+
+const formatReferenceLabel = (referenceType?: string | null) => {
+  const normalized = String(referenceType || 'ORDER').trim();
+  if (!normalized) return 'Standard order';
+  if (normalized.toUpperCase() === 'CUSTOMORDER') return 'Custom order';
+  if (normalized.toUpperCase() === 'ORDER') return 'Standard order';
+  return normalized.replace(/([a-z])([A-Z])/g, '$1 $2').replaceAll('_', ' ').trim();
+};
+
+const getReferenceTone = (referenceType?: string | null) => {
+  const normalized = String(referenceType || '').trim().toUpperCase();
+  if (normalized === 'CUSTOMORDER') {
+    return 'bg-violet-100 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200';
+  }
+  if (normalized === 'ORDER') {
+    return 'bg-sky-100 text-sky-800 dark:bg-sky-500/10 dark:text-sky-200';
+  }
+  return 'bg-slate-100 text-slate-700 dark:bg-slate-500/10 dark:text-slate-200';
+};
+
+const formatReferenceCode = (referenceId?: string | null) =>
+  referenceId ? `#${String(referenceId).slice(0, 8).toUpperCase()}` : null;
 
 const FinancePage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
@@ -91,6 +120,8 @@ const FinancePage: React.FC = () => {
               releasedBalance: Number(overviewData.releasedBalance || 0),
               reservedPayoutBalance: Number(overviewData.reservedPayoutBalance || 0),
               paidOutBalance: Number(overviewData.paidOutBalance || 0),
+              incomingCredits: Number(overviewData.incomingCredits || 0),
+              totalOrders: Number(overviewData.totalOrders || 0),
               negativeBalance: Boolean(overviewData.negativeBalance),
             }
           : null,
@@ -127,6 +158,13 @@ const FinancePage: React.FC = () => {
   const currency = overview?.currency || 'NGN';
   const totalIncomingAmount = useMemo(
     () => incomingTransactions.reduce((sum, item) => sum + Number(item.amount || 0), 0),
+    [incomingTransactions],
+  );
+  const customOrderIncomingCount = useMemo(
+    () =>
+      incomingTransactions.filter(
+        (item) => String(item.referenceType || '').trim().toUpperCase() === 'CUSTOMORDER',
+      ).length,
     [incomingTransactions],
   );
 
@@ -225,18 +263,26 @@ const FinancePage: React.FC = () => {
           />
           <MetricCard
             label="Incoming Credits"
-            value={loading ? '...' : formatCurrency(totalIncomingAmount)}
-            description="Shipment and delivery releases already credited into your wallet history."
+            value={loading ? '...' : formatCurrency(overview?.incomingCredits ?? totalIncomingAmount)}
+            description={`${overview?.totalOrders ?? 0} paid order${(overview?.totalOrders ?? 0) === 1 ? '' : 's'} credited into your wallet.`}
           />
         </section>
       </div>
 
       <section className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/50">
         <div className="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
-          <h2 className="text-lg font-semibold">Incoming Transactions</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Credits released into your brand wallet after shipment, delivery, or custom-order milestones.
-          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Incoming Transactions</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Credits released into your brand wallet after shipment, delivery, or custom-order milestones.
+              </p>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 dark:bg-violet-500/10 dark:text-violet-200">
+              <span aria-hidden="true">✂️</span>
+              {customOrderIncomingCount} custom-order credit{customOrderIncomingCount === 1 ? '' : 's'}
+            </div>
+          </div>
         </div>
         <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full min-w-[620px] text-left text-sm sm:min-w-[700px] lg:min-w-[760px]">
@@ -245,20 +291,22 @@ const FinancePage: React.FC = () => {
                 <th className="px-6 py-4 font-medium">Transaction</th>
                 <th className="px-6 py-4 font-medium">Counterparty</th>
                 <th className="px-6 py-4 font-medium">Date</th>
-                <th className="px-6 py-4 font-medium">Amount</th>
+                <th className="px-6 py-4 font-medium">Gross</th>
+                <th className="px-6 py-4 font-medium">Commission</th>
+                <th className="px-6 py-4 font-medium">Net</th>
                 <th className="px-6 py-4 font-medium">Stage</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <VLoader size={32} phase="loading" showLabel={false} />
                   </td>
                 </tr>
               ) : incomingTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                     No incoming transactions recorded yet.
                   </td>
                 </tr>
@@ -270,6 +318,20 @@ const FinancePage: React.FC = () => {
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900 dark:text-white">
                           {transaction.title || transaction.description || 'Incoming transaction'}
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${getReferenceTone(
+                              transaction.referenceType,
+                            )}`}
+                          >
+                            {formatReferenceLabel(transaction.referenceType)}
+                          </span>
+                          {formatReferenceCode(transaction.referenceId) ? (
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+                              {formatReferenceCode(transaction.referenceId)}
+                            </span>
+                          ) : null}
                         </div>
                         {transaction.description && transaction.description !== transaction.title ? (
                           <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -283,8 +345,23 @@ const FinancePage: React.FC = () => {
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
                         {new Date(transaction.createdAt).toLocaleString()}
                       </td>
+                      <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                        {formatCurrency(
+                          Number(transaction.grossAmount ?? transaction.amount ?? 0),
+                          transaction.currency || currency,
+                        )}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-rose-600 dark:text-rose-300">
+                        {formatCurrency(
+                          Number(transaction.commissionAmount ?? 0),
+                          transaction.currency || currency,
+                        )}
+                      </td>
                       <td className="px-6 py-4 font-medium text-emerald-600 dark:text-emerald-300">
-                        +{formatCurrency(Number(transaction.amount || 0), transaction.currency || currency)}
+                        +{formatCurrency(
+                          Number(transaction.netAmount ?? transaction.amount ?? 0),
+                          transaction.currency || currency,
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <span

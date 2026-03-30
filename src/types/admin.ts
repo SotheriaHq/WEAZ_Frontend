@@ -386,3 +386,37 @@ export interface AdminFinanceOverview {
   recentRuns: AdminReconciliationRun[];
   recentDocuments: AdminFinancialDocument[];
 }
+
+export interface AdminLedgerEntry {
+  id: string;
+  direction: 'DEBIT' | 'CREDIT';
+  amount: string;
+  balanceAfter: string;
+  createdAt: string;
+  account: {
+    id: string;
+    code: string;
+    name: string;
+    type: 'ASSET' | 'LIABILITY' | 'REVENUE' | 'EXPENSE';
+    subType: string;
+    entityType?: string | null;
+    entityId?: string | null;
+  };
+}
+
+export interface AdminLedgerTransaction {
+  id: string;
+  type:
+    | 'PAYMENT_RECEIVED'
+    | 'ESCROW_RELEASE'
+    | 'PAYOUT_DISBURSED'
+    | 'REFUND_ISSUED'
+    | 'REVERSAL';
+  description: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  totalAmount: string;
+  currency: string;
+  createdAt: string;
+  entries: AdminLedgerEntry[];
+}

@@ -190,6 +190,19 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     : Array.isArray(order?.items)
       ? order.items
       : [];
+  const financeBreakdown = order?.financeBreakdown ?? null;
+  const buyerReceipt = order?.buyerReceipt ?? null;
+  const receiptSubtotal = financeBreakdown?.itemSubtotal ?? lineItems.reduce(
+    (sum: number, item: any) =>
+      sum +
+      (item.totalPrice != null
+        ? Number(item.totalPrice)
+        : Number(item.unitPrice || item.price || 0) * Number(item.quantity || 0)),
+    0,
+  );
+  const receiptShipping = financeBreakdown?.shippingAmount ?? Number(order?.shippingCost || 0);
+  const receiptDiscount = financeBreakdown?.discountAmount ?? Number(order?.discountAmount || 0);
+  const receiptTotal = financeBreakdown?.grossAmount ?? Number(order?.totalAmount || 0);
 
   return (
     <OverlayPortal>
@@ -294,19 +307,53 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     <div className="mt-4 space-y-3 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-slate-500 dark:text-slate-400">Subtotal</span>
-                        <span className="font-semibold">{formatCurrency(Number(order.totalAmount) - Number(order.shippingCost || 0), order.currency)}</span>
+                        <span className="font-semibold">{formatCurrency(receiptSubtotal, order.currency)}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-slate-500 dark:text-slate-400">Shipping</span>
-                        <span className="font-semibold">{formatCurrency(Number(order.shippingCost || 0), order.currency)}</span>
+                        <span className="font-semibold">{formatCurrency(receiptShipping, order.currency)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Discount</span>
+                        <span className="font-semibold">
+                          {receiptDiscount > 0
+                            ? `- ${formatCurrency(receiptDiscount, order.currency)}`
+                            : formatCurrency(receiptDiscount, order.currency)}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-base font-bold dark:border-white/10">
                         <span>Total</span>
-                        <span>{formatCurrency(Number(order.totalAmount), order.currency)}</span>
+                        <span>{formatCurrency(receiptTotal, order.currency)}</span>
                       </div>
+                      {financeBreakdown?.commissionAmount != null ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 dark:text-slate-400">Commission retained</span>
+                          <span className="font-semibold text-rose-600 dark:text-rose-300">
+                            {formatCurrency(Number(financeBreakdown.commissionAmount || 0), order.currency)}
+                          </span>
+                        </div>
+                      ) : null}
+                      {financeBreakdown?.netBrandAmount != null ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 dark:text-slate-400">Brand net</span>
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-300">
+                            {formatCurrency(Number(financeBreakdown.netBrandAmount || 0), order.currency)}
+                          </span>
+                        </div>
+                      ) : null}
                       {order.paymentMethod ? (
                         <div className="rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                           Payment method: <span className="font-semibold">{order.paymentMethod}</span>
+                        </div>
+                      ) : null}
+                      {(buyerReceipt?.documentNumber || financeBreakdown?.paymentReference) ? (
+                        <div className="rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                          {buyerReceipt?.documentNumber ? (
+                            <div>Receipt: <span className="font-semibold">{buyerReceipt.documentNumber}</span></div>
+                          ) : null}
+                          {financeBreakdown?.paymentReference ? (
+                            <div className="mt-1">Payment reference: <span className="font-semibold">{financeBreakdown.paymentReference}</span></div>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>

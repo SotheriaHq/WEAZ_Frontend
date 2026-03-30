@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import type { RootState } from '@/store';
 import { messagingApi, type InboxItem, type ThreadMessage } from '@/api/MessagingApi';
 import { customOrdersBuyerApi, customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
+import { getStoreStatus } from '@/api/StoreApi';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble';
@@ -335,7 +336,7 @@ const MessagingManagementPage: React.FC = () => {
   const [params, setParams] = useSearchParams();
   const profile = useSelector((state: RootState) => state.user.profile);
   const surface: Surface = profile?.type === 'BRAND' ? 'BRAND' : 'BUYER';
-  const brandId = surface === 'BRAND' ? profile?.id ?? null : null;
+  const [brandId, setBrandId] = useState<string | null>(null);
   const actorId = profile?.id;
   const { onNotification } = useRealtime();
 
@@ -355,6 +356,34 @@ const MessagingManagementPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<ActiveAction>(null);
   const [showContactDetails, setShowContactDetails] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadBrandScope = async () => {
+      if (surface !== 'BRAND') {
+        setBrandId(null);
+        return;
+      }
+
+      try {
+        const status = await getStoreStatus();
+        if (!cancelled) {
+          setBrandId(status.brandId);
+        }
+      } catch {
+        if (!cancelled) {
+          setBrandId(null);
+        }
+      }
+    };
+
+    void loadBrandScope();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [surface]);
 
   /* ---- Refs ---- */
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -493,6 +522,15 @@ const MessagingManagementPage: React.FC = () => {
     if (!activeConversation) return;
     const contextId = getContextId(activeConversation);
     const threadId = activeConversation.threadId;
+    const requiresBrandScope =
+      surface === 'BRAND' &&
+      activeConversation.contextType !== 'INQUIRY' &&
+      !useThreadTransport;
+
+    if (requiresBrandScope && !brandId) {
+      setMessages([]);
+      return;
+    }
 
     if (useThreadTransport && threadId) {
       const response = await messagingApi.listThreadMessages(threadId, { limit: 50 });
@@ -538,6 +576,10 @@ const MessagingManagementPage: React.FC = () => {
       return;
     }
     const contextId = getContextId(activeConversation);
+    if (surface === 'BRAND' && !brandId) {
+      setCustomOrderDetail(null);
+      return;
+    }
     try {
       const detail = surface === 'BRAND' && brandId
         ? await customOrdersBrandApi.getById(brandId, contextId)
@@ -549,6 +591,15 @@ const MessagingManagementPage: React.FC = () => {
   }, [activeConversation, brandId, getContextId, surface]);
 
   const refresh = useCallback(async () => {
+    if (
+      activeConversation &&
+      surface === 'BRAND' &&
+      activeConversation.contextType !== 'INQUIRY' &&
+      !useThreadTransport &&
+      !brandId
+    ) {
+      return;
+    }
     setMessagesLoading(true);
     try {
       await Promise.all([fetchMessages(), fetchCustomOrderDetail()]);

@@ -25,63 +25,106 @@ interface RawProductsPayload {
 
 const BASE_FILTERS = ['FOR_YOU', 'MENSWEAR', 'WOMENSWEAR', 'EVERYBODY', 'ON_SALE'] as const;
 
-const ProductRail: React.FC<{
+const ProductCarousel: React.FC<{
   title: string;
-  subtitle: string;
   products: StoreProduct[];
   onViewProduct: (product: StoreProduct) => void;
-}> = ({ title, subtitle, products, onViewProduct }) => {
+}> = ({ title, products, onViewProduct }) => {
   const railRef = useRef<HTMLDivElement | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const duplicatedProducts = useMemo(() => [...products, ...products], [products]);
 
   const scrollRail = useCallback((direction: 'left' | 'right') => {
     if (!railRef.current) return;
-    const amount = Math.round(railRef.current.clientWidth * 0.8);
+    const amount = Math.round(railRef.current.clientWidth * 0.6);
     railRef.current.scrollBy({
       left: direction === 'left' ? -amount : amount,
       behavior: 'smooth',
     });
   }, []);
 
+  useEffect(() => {
+    if (products.length === 0 || isPaused) return;
+    const rail = railRef.current;
+    if (!rail) return;
+
+    let animationFrame = 0;
+    let lastTimestamp: number | null = null;
+    const speedPxPerSecond = 22;
+
+    const animate = (timestamp: number) => {
+      if (lastTimestamp == null) {
+        lastTimestamp = timestamp;
+      } else {
+        const elapsed = timestamp - lastTimestamp;
+        lastTimestamp = timestamp;
+        rail.scrollLeft += (elapsed / 1000) * speedPxPerSecond;
+        const resetPoint = rail.scrollWidth / 2;
+        if (rail.scrollLeft >= resetPoint) {
+          rail.scrollLeft -= resetPoint;
+        }
+      }
+
+      animationFrame = window.requestAnimationFrame(animate);
+    };
+
+    animationFrame = window.requestAnimationFrame(animate);
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [isPaused, products.length]);
+
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    rail.scrollLeft = 0;
+  }, [products.length]);
+
   if (products.length === 0) return null;
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-3">
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">{subtitle}</p>
-        </div>
-        <div className="flex items-center gap-2">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsPaused((p) => !p)}
+            className="rounded-full border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/10"
+            aria-label={isPaused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
+          >
+            {isPaused ? '▶' : '⏸'}
+          </button>
           <button
             type="button"
             onClick={() => scrollRail('left')}
-            className="rounded-full border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-white/15 dark:text-gray-200 dark:hover:bg-white/10"
-            aria-label="Scroll fresh drops left"
+            className="rounded-full border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/10"
+            aria-label="Scroll left"
           >
-            ⬅️
+            ←
           </button>
           <button
             type="button"
             onClick={() => scrollRail('right')}
-            className="rounded-full border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:border-white/15 dark:text-gray-200 dark:hover:bg-white/10"
-            aria-label="Scroll fresh drops right"
+            className="rounded-full border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/10"
+            aria-label="Scroll right"
           >
-            ➡️
+            →
           </button>
         </div>
       </div>
 
       <div
         ref={railRef}
-        className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
       >
-        {products.map((product) => (
+        {duplicatedProducts.map((product, index) => (
           <motion.div
-            key={product.id}
-            className="min-w-[260px] max-w-[260px] snap-start"
-            initial={{ opacity: 0, y: 16 }}
+            key={`${product.id}-${index}`}
+            className="min-w-[200px] max-w-[200px] shrink-0"
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: 0.2 }}
           >
             <StoreProductCard product={product} onViewProduct={onViewProduct} />
           </motion.div>
@@ -317,8 +360,8 @@ const MarketPlace: React.FC = () => {
   const activeHero = heroProducts[heroIndex] ?? null;
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="space-y-10">
+    <div className="mx-auto w-full max-w-[1440px] px-4 py-4 sm:px-6 lg:px-8">
+      <div className="space-y-6">
         <section className="rounded-3xl border border-gray-200/70 bg-white/40 p-4 backdrop-blur-[2px] dark:border-white/10 dark:bg-white/[0.03] sm:p-6">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="lg:col-span-2">
@@ -424,17 +467,18 @@ const MarketPlace: React.FC = () => {
 
         {loading ? (
           <section>
-            <div className="mb-4 h-8 w-52 animate-pulse rounded-lg bg-gray-200/80 dark:bg-white/10" />
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
-              {Array.from({ length: 10 }).map((_, index) => (
-                <ProductCardSkeleton key={index} />
+            <div className="mb-3 h-7 w-40 animate-pulse rounded-lg bg-gray-200/80 dark:bg-white/10" />
+            <div className="flex gap-3 overflow-hidden">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="min-w-[200px] max-w-[200px]">
+                  <ProductCardSkeleton />
+                </div>
               ))}
             </div>
           </section>
         ) : (
-          <ProductRail
+          <ProductCarousel
             title="Fresh Drops"
-            subtitle="Recently posted by brands, sorted by newest products."
             products={freshDrops}
             onViewProduct={setSelectedProduct}
           />

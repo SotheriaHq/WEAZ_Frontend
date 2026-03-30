@@ -25,7 +25,6 @@ import { formatPrice } from '@/utils/helpers';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import ProductReviewSection from '@/components/reviews/ProductReviewSection';
 import { isRtwSizingMode, normalizeSizingMode } from '@/types/sizing';
@@ -191,7 +190,7 @@ export default function ProductDetailsPage() {
   const [showMeasurementModal, setShowMeasurementModal] = useState(false);
   const [modalMeasurementValues, setModalMeasurementValues] = useState<Record<string, string>>({});
   const [savingMeasurements, setSavingMeasurements] = useState(false);
-  const [showQr, setShowQr] = useState(false);
+  /* showQr disabled — only brand profile QR codes active */
   const [startingCustomOrder, setStartingCustomOrder] = useState(false);
   
   // Fetch product
@@ -257,11 +256,7 @@ export default function ProductDetailsPage() {
     return mediaList[selectedMediaIndex] ?? null;
   }, [colorImageUrl, mediaList, selectedColor, selectedMediaIndex]);
 
-  const canOpenQr =
-    Boolean(product) &&
-    product?.status === 'ACTIVE' &&
-    !product?.archivedAt &&
-    !product?.deletedAt;
+  /* canOpenQr disabled — only brand profile QR codes active */
 
   // Variants Logic
   const variants = useMemo(() => product?.variants || [], [product]);
@@ -1027,17 +1022,7 @@ export default function ProductDetailsPage() {
                     <span aria-hidden="true">🔗</span>
                     Share
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (canOpenQr) setShowQr(true);
-                    }}
-                    style={canOpenQr ? undefined : { display: 'none' }}
-                    className="flex-1 h-10 rounded-full border border-black/10 dark:border-white/15 text-sm text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center gap-2"
-                  >
-                    <span aria-hidden="true">🪪</span>
-                    QR Code
-                  </button>
+                  {/* Product QR button disabled — only brand profile QR codes active */}
                   {sourceCollectionId ? (
                     <button
                       type="button"
@@ -1100,17 +1085,7 @@ export default function ProductDetailsPage() {
       <div className="mx-auto w-full max-w-[1440px] px-4 pb-10 md:px-8 lg:px-12">
         <ProductReviewSection productId={product.id} />
       </div>
-      {canOpenQr ? (
-        <LazyEntityQrModal
-          open={showQr}
-          onClose={() => setShowQr(false)}
-          title="Product QR Code"
-          subtitle="Scan to open this product."
-          url={buildProductUrl({ id: product.id, slug: (product as ProductDto & { slug?: string }).slug })}
-          downloadFileName="product-qr.png"
-          logoUrl={(product.brand as { logo?: string } | undefined)?.logo || null}
-        />
-      ) : null}
+      {/* Product QR modal disabled — only brand profile QR codes active */}
     </div>
   );
 }

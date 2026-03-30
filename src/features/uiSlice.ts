@@ -4,7 +4,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 export type SidebarMode = 'RAIL' | 'DRAWER' | 'OVERLAY' | 'HIDDEN';
 
 // Breakpoint constant - single source of truth
-export const MOBILE_BREAKPOINT = 1024;
+export const MOBILE_BREAKPOINT = 768;
 
 interface UiState {
     sidebarMode: SidebarMode;

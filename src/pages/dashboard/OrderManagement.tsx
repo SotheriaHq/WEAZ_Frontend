@@ -500,31 +500,31 @@ const OrderManagement: React.FC = () => {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => (
           <article
             key={metric.label}
-            className="rounded-[24px] border border-slate-200 bg-[linear-gradient(145deg,rgba(255,255,255,0.92),rgba(255,255,255,0.72))] p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition hover:border-orange-300/60 dark:border-white/10 dark:bg-[linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] dark:shadow-none"
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
           >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{metric.label}</p>
-                <p className="mt-4 text-2xl font-black tracking-tight">{metric.value}</p>
-              </div>
-              <div className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900/5 text-xl dark:bg-white/5 ${metric.tone}`}>
-                {metric.marker}
-              </div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{metric.label}</p>
+              <span className="text-lg">{metric.marker}</span>
             </div>
-            <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-500">{metric.helper}</p>
-            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/5">
-              <div className="h-full rounded-full bg-[linear-gradient(90deg,#f97316,#ea580c)]" style={{ width: `${metric.progress}%` }} />
+            <p className="mt-3 text-2xl font-black tracking-tight">{metric.value}</p>
+            <div className="mt-3 flex items-center gap-3">
+              <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
+                <div className="h-full rounded-full bg-orange-500" style={{ width: `${metric.progress}%` }} />
+              </div>
+              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">{metric.helper}</p>
             </div>
           </article>
         ))}
       </section>
 
-      <section className="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
-        <div className="flex w-full items-center gap-2 overflow-x-auto pb-2 scrollbar-hide xl:w-auto xl:pb-0">
+      {/* Tabs + Filters */}
+      <section className="space-y-4">
+        {/* Underline tabs */}
+        <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-white/10">
           {STATUS_TABS.map((tab) => {
             const active = statusFilter === tab.value;
             return (
@@ -532,51 +532,55 @@ const OrderManagement: React.FC = () => {
                 key={tab.label}
                 type="button"
                 onClick={() => handleStatusChipClick(tab.value)}
-                className={`whitespace-nowrap rounded-full border px-4 py-2 text-xs font-bold transition ${
+                className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition ${
                   active
-                    ? 'border-orange-500 bg-orange-500 text-white'
-                    : 'border-slate-200 bg-white/80 text-slate-500 hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:border-white/20 dark:hover:text-white'
+                    ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+                    : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-white'
                 }`}
               >
                 {tab.label}
               </button>
             );
           })}
-        </div>
+        </nav>
 
-        <div className="grid w-full min-w-0 gap-3 md:grid-cols-2 2xl:w-auto 2xl:min-w-[min(100%,760px)] 2xl:grid-cols-[minmax(320px,1fr)_220px_auto]">
+        {/* Search + filter row */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <input
             type="text"
             placeholder="Search by order ID or customer name..."
-            className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white/85 px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-slate-500"
+            className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
             value={searchQuery}
             onChange={(event) => {
               setSearchQuery(event.target.value);
               setPage(1);
             }}
           />
-          <UniversalSelect
-            value={statusFilter}
-            onChange={(value) => {
-              setStatusFilter(value);
-              setPage(1);
-            }}
-            options={STATUS_SELECT_OPTIONS}
-            className="min-w-0 md:min-w-[200px]"
-            placeholder="All statuses"
-          />
-          <button
-            type="button"
-            onClick={cycleSort}
-            className="rounded-2xl border border-slate-200 bg-white/85 px-4 py-2.5 text-sm font-medium text-slate-700 outline-none transition hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:text-white 2xl:justify-self-end"
-            aria-label="Cycle order sort"
-          >
-            Sort by: {SORT_OPTIONS.find((option) => option.value === sortBy)?.label || 'Newest'}
-          </button>
+          <div className="flex gap-3">
+            <div className="min-w-[180px]">
+              <UniversalSelect
+                value={statusFilter}
+                onChange={(value) => {
+                  setStatusFilter(value);
+                  setPage(1);
+                }}
+                options={STATUS_SELECT_OPTIONS}
+                placeholder="All statuses"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={cycleSort}
+              className="whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:text-white"
+              aria-label="Cycle order sort"
+            >
+              {SORT_OPTIONS.find((option) => option.value === sortBy)?.label || 'Newest'}
+            </button>
+          </div>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(145deg,rgba(255,255,255,0.94),rgba(255,255,255,0.78))] shadow-[0_24px_60px_rgba(15,23,42,0.09)] dark:border-white/10 dark:bg-[linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] dark:shadow-none">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
         <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full min-w-[900px] border-collapse text-left sm:min-w-[980px] lg:min-w-[1080px]">
             <thead>

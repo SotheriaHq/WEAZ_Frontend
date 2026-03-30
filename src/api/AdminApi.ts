@@ -22,6 +22,7 @@ import type {
   AdminReconciliationItem,
   AdminFinancialDocument,
   AdminFinanceOverview,
+  AdminLedgerTransaction,
 } from '../types/admin';
 import type {
   AdminVerificationDetails,
@@ -373,4 +374,6 @@ export const adminFinanceApi = {
     apiClient.get<AdminFinancialDocument[]>('/admin/finance/documents', { params }),
   getDocument: (id: string) =>
     apiClient.get<AdminFinancialDocument>(`/admin/finance/documents/${id}`),
+  listBooks: (params?: Record<string, string>) =>
+    apiClient.get<AdminLedgerTransaction[]>('/admin/ledger', { params }),
 };

@@ -65,6 +65,8 @@ const StoreVerificationPage = lazy(() => import('./pages/studio/store/StoreVerif
 const VerificationWizardPage = lazy(() => import('./pages/studio/store/VerificationWizardPage'));
 const VerificationSubmittedPage = lazy(() => import('./pages/studio/store/VerificationSubmittedPage'));
 const StoreCollectionCreate = lazy(() => import('./pages/studio/store/StoreCollectionCreate'));
+const StudioCustomOrdersPage = lazy(() => import('./pages/studio/CustomOrdersPage'));
+const StudioCustomOrderDetailPage = lazy(() => import('./pages/studio/StudioCustomOrderDetailPage'));
 const MyOrders = lazy(() => import('./pages/orders/MyOrders'));
 const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
 const CustomOrdersIndexPage = lazy(() => import('./pages/custom-orders/CustomOrdersIndexPage'));
@@ -93,6 +95,10 @@ const AdminForceResetPasswordPage = lazy(() => import('./pages/admin/AdminForceR
 const AdminResetPasswordPage = lazy(() => import('./pages/admin/AdminResetPasswordPage'));
 const AdminCustomOrdersPage = lazy(() => import('./pages/admin/AdminCustomOrdersPage'));
 const AdminMessagingPage = lazy(() => import('./pages/admin/AdminMessagingPage'));
+
+// Password reset pages — lazy loaded
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 
 const AppRouteFallback: React.FC = () => (
   <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">Loading page...</div>
@@ -177,18 +183,6 @@ const RootLayout: React.FC = () => {
 const LegacyProductEditRedirect: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   return <Navigate to={id ? `/studio/store/products/${id}/edit` : '/studio/store'} replace />;
-};
-
-const LegacyStudioCustomOrdersRedirect: React.FC = () => {
-  const { orderId } = useParams<{ orderId: string }>();
-  const params = new URLSearchParams({
-    tab: 'orders',
-    orderTab: 'custom',
-  });
-  if (orderId) {
-    params.set('customOrderId', orderId);
-  }
-  return <Navigate to={`/studio?${params.toString()}`} replace />;
 };
 
 const profileChildren = [
@@ -294,7 +288,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/studio/store/custom-orders',
-        element: <Navigate to="/studio?tab=orders&orderTab=custom" replace />,
+        element: <Navigate to="/studio/custom-orders" replace />,
       },
       {
         path: '/studio/store/collections/new',
@@ -346,11 +340,27 @@ const router = createBrowserRouter([
       },
       {
         path: '/studio/custom-orders',
-        element: <LegacyStudioCustomOrdersRedirect />,
+        element: (
+          <RequireBrand>
+            <RequireStoreSetup>
+              <StudioScaffold active="orders" onSelect={() => {}}>
+                <StudioCustomOrdersPage />
+              </StudioScaffold>
+            </RequireStoreSetup>
+          </RequireBrand>
+        ),
       },
       {
         path: '/studio/custom-orders/:orderId',
-        element: <LegacyStudioCustomOrdersRedirect />,
+        element: (
+          <RequireBrand>
+            <RequireStoreSetup>
+              <StudioScaffold active="orders" onSelect={() => {}}>
+                <StudioCustomOrderDetailPage />
+              </StudioScaffold>
+            </RequireStoreSetup>
+          </RequireBrand>
+        ),
       },
       {
         path: '/studio/messages',
@@ -435,6 +445,8 @@ const router = createBrowserRouter([
         children: [
           { path: '/signup', element: <SignupPage /> },
           { path: '/login', element: <LoginPage /> },
+          { path: '/forgot-password', element: <ForgotPasswordPage /> },
+          { path: '/reset-password', element: <ResetPasswordPage /> },
           { path: '/account-reactivation', element: <AccountReactivationRequestPage /> },
         ],
       },

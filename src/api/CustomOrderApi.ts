@@ -179,15 +179,29 @@ export interface CustomOrderListItem {
   sourceType: CustomOrderSourceType;
   sourceId: string;
   sourceTitle: string;
+  sourcePrimaryMediaUrl?: string | null;
   brand: {
     name: string;
+  };
+  buyer?: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  };
+  delivery?: {
+    city?: string | null;
+    state?: string | null;
+    country?: string | null;
   };
   buyerPriceSummary: {
     grandTotal: number;
     currency: string;
   };
+  measurementCount?: number;
   currentProgressStage?: CustomOrderProgressStage | null;
+  promisedDeliveryAt?: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface CustomOrderTimelineEvent {
@@ -379,6 +393,8 @@ export interface CustomOrderDetail {
   exceptionDecision?: Record<string, unknown> | null;
   measurementSnapshot: Record<string, number>;
   measurementConfirmedAt?: string | null;
+  shippingAddress?: Record<string, unknown> | null;
+  contactInfo?: Record<string, unknown> | null;
   currentProgressStage?: CustomOrderProgressStage | null;
   acceptedAt?: string | null;
   buyerAcceptedAt?: string | null;

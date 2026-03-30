@@ -523,49 +523,49 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               <div className="space-y-3">
                 {/* Brand row */}
                 <div className="flex items-center justify-between gap-2 pr-8">
-                  <button
-                    type="button"
-                    onClick={handleOpenBrandCatalog}
-                    className="flex min-w-0 items-center gap-2.5 text-left group"
-                    title={`Open ${brandLabel} catalog`}
-                  >
-                    <div className="size-9 shrink-0 rounded-2xl overflow-hidden ring-1 ring-black/8 dark:ring-white/12">
-                      <ImageWithFallback
-                        src={avatar.src}
-                        fileId={avatar.fileId}
-                        alt={brandLabel}
-                        fit="cover"
-                        rounded="xl"
-                        fallbackName={avatarFallback}
-                        containerClassName="size-9 rounded-2xl"
-                        className="size-9 object-cover"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-[13px] font-semibold truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{brandLabel}</p>
-                        {canPatchBrand ? (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              void handleTogglePatch();
-                            }}
-                            disabled={patchBusy}
-                            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide shadow-sm transition ${
-                              isPatched
-                                ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 dark:text-emerald-300'
-                                : 'border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-700 hover:bg-fuchsia-500/25 dark:text-fuchsia-300'
-                            } ${patchBusy ? 'cursor-not-allowed opacity-60' : ''}`}
-                          >
-                            {patchBusy ? '...' : isPatched ? 'Patched' : 'Patch'}
-                          </button>
-                        ) : null}
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleOpenBrandCatalog}
+                      className="group flex min-w-0 items-center gap-2.5 text-left"
+                      title={`Open ${brandLabel} catalog`}
+                    >
+                      <div className="size-9 shrink-0 overflow-hidden rounded-2xl ring-1 ring-black/8 dark:ring-white/12">
+                        <ImageWithFallback
+                          src={avatar.src}
+                          fileId={avatar.fileId}
+                          alt={brandLabel}
+                          fit="cover"
+                          rounded="xl"
+                          fallbackName={avatarFallback}
+                          containerClassName="size-9 rounded-2xl"
+                          className="size-9 object-cover"
+                        />
                       </div>
-                      {item.username ? <p className="text-[11px] text-slate-400 dark:text-white/40 truncate">@{item.username}</p> : null}
-                    </div>
-                  </button>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-[13px] font-semibold transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{brandLabel}</p>
+                        </div>
+                        {item.username ? <p className="truncate text-[11px] text-slate-400 dark:text-white/40">@{item.username}</p> : null}
+                      </div>
+                    </button>
+                    {canPatchBrand ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleTogglePatch();
+                        }}
+                        disabled={patchBusy}
+                        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide shadow-sm transition ${
+                          isPatched
+                            ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 dark:text-emerald-300'
+                            : 'border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-700 hover:bg-fuchsia-500/25 dark:text-fuchsia-300'
+                        } ${patchBusy ? 'cursor-not-allowed opacity-60' : ''}`}
+                      >
+                        {patchBusy ? '...' : isPatched ? 'Patched' : 'Patch'}
+                      </button>
+                    ) : null}
+                  </div>
 
                 </div>
 
@@ -606,8 +606,13 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
-                    disabled={openingCustomComposer}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-indigo-700 transition disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={
+                      openingCustomComposer ||
+                      resolvingCustomConfiguration ||
+                      isOwnBrandContent ||
+                      !customConfigurationId
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
                     onClick={() => {
                       void handleOpenDesignCustomOrder();
                     }}

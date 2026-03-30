@@ -209,10 +209,10 @@ export function hasValidTarget(notification: NormalizedNotification): boolean {
 }
 
 /**
- * Gets display name for actor with fallback to "System"
+ * Gets display name for actor with fallback to Threadly for system events
  */
 export function getActorDisplayName(notification: NormalizedNotification): string {
-    if (!notification.actor) return 'System';
+    if (!notification.actor) return 'Threadly';
 
     if (notification.actor.username) {
         return notification.actor.username;
@@ -229,7 +229,7 @@ export function getActorDisplayName(notification: NormalizedNotification): strin
  * Gets actor initials for avatar fallback
  */
 export function getActorInitials(notification: NormalizedNotification): string {
-    if (!notification.actor) return 'SY';
+    if (!notification.actor) return 'TH';
 
     if (notification.actor.username) {
         return notification.actor.username.slice(0, 2).toUpperCase();

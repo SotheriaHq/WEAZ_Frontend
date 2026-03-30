@@ -319,6 +319,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
       (
         n.type === NotificationTypes.ORDER_PLACED ||
         n.type === NotificationTypes.ORDER_STATUS_UPDATED ||
+        n.type.startsWith('CUSTOM_ORDER_') ||
         n.type === NotificationTypes.COMMENT ||
         n.type === NotificationTypes.THREAD
       )
@@ -518,7 +519,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                                   @{actorDisplayName}
                                 </button>
                               ) : (
-                                <span className="font-semibold text-[color:var(--text-primary)]">System</span>
+                                <span className="font-semibold text-[color:var(--text-primary)]">Threadly</span>
                               )}
                               <span className="ml-1">{actionTextWithoutTitle}</span>
                               {contentTitle ? (

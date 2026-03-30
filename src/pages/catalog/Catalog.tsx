@@ -1277,18 +1277,13 @@ const ProfilePage: React.FC = () => {
     return <div className="max-w-screen-xl mx-auto p-6">Catalog not found.</div>;
   }
 
-  if (!user && !isVisitorView) {
+  if ((!user && !isVisitorView) || (isOwner && brandProfileLoading && collectionsLoading)) {
     return (
       <div className="w-full">
         <div className="max-w-screen-xl mx-auto p-4 space-y-6">
           <ProfileHeaderSkeleton />
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-3">
-              <div className="h-64 w-full rounded-2xl bg-gray-100 dark:bg-gray-900/40 animate-pulse" />
-            </div>
-            <div className="lg:col-span-9">
-              <CollectionsSkeleton />
-            </div>
+          <div className="mt-6">
+            <CollectionsSkeleton />
           </div>
         </div>
       </div>

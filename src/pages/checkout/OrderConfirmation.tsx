@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import Button from '@/components/ui/Button';
-import LazyOrderQrCard from '@/components/qr/LazyOrderQrCard';
+// import LazyOrderQrCard from '@/components/qr/LazyOrderQrCard'; // disabled — order QR codes off
 import {
   paymentApi,
   type PaymentAttemptStatus,
@@ -161,11 +161,7 @@ const OrderConfirmation: React.FC = () => {
         {orderIds.map((id) => (
           <div key={id} className="space-y-3 border-t border-gray-200/70 pt-4 first:border-t-0 first:pt-0 dark:border-zinc-700/60">
             <p className="font-mono text-sm text-gray-900 dark:text-white">{id}</p>
-            <LazyOrderQrCard
-              orderId={id}
-              title="Order QR Code"
-              subtitle="Scan to reopen this order while signed in."
-            />
+            {/* Order QR code disabled — only brand profile QR codes active for now */}
           </div>
         ))}
       </div>

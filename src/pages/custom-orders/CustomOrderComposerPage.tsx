@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useSelector } from 'react-redux';
@@ -13,7 +13,15 @@ import {
 } from '@/api/CustomOrderApi';
 import { createIdempotencyKey } from '@/api/idempotency';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import { formatMeasurementLabel } from '@/components/custom-orders/customOrderFormatting';
 import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS, PRICING_CHART_OPTIONS } from '@/lib/sizeCharts';
+import type { SizeFitProfile } from '@/types/sizeFit';
+import {
+  loadCustomOrderAddressBook,
+  removeCustomOrderAddress,
+  upsertCustomOrderAddress,
+  type CustomOrderSavedAddress,
+} from '@/lib/customOrderAddressBook';
 
 interface CustomOrderComposerPageProps {
   configurationIdOverride?: string | null;
@@ -22,18 +30,18 @@ interface CustomOrderComposerPageProps {
   onOrderCreated?: (orderId: string) => void;
 }
 
-const fieldLabel = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+const fieldLabel = (key: string) => formatMeasurementLabel(key);
 
 const isWeightKey = (key: string) => key.toUpperCase().includes('WEIGHT');
 const toInches = (cm: number) => cm / 2.54;
 const toCentimeters = (inch: number) => inch * 2.54;
 const round = (value: number) => Math.round(value * 100) / 100;
+const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+
 const convertDisplayToCm = (key: string, rawValue: string, unit: 'CM' | 'IN') => {
   const parsed = Number(rawValue);
   if (!Number.isFinite(parsed) || parsed <= 0) return NaN;
-  if (unit === 'IN' && !isWeightKey(key)) {
-    return round(toCentimeters(parsed));
-  }
+  if (unit === 'IN' && !isWeightKey(key)) return round(toCentimeters(parsed));
   return parsed;
 };
 
@@ -49,6 +57,22 @@ const formatCurrency = (value: number | undefined, currency = 'NGN') =>
 const inputClassName =
   'w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-400 dark:border-white/10 dark:bg-slate-950 dark:text-white';
 
+const buildMeasurementSignature = (values: Record<string, number>) =>
+  JSON.stringify(
+    Object.entries(values)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, value]) => [key, Number(value)]),
+  );
+
+const parseStoredMeasurement = (raw: unknown) => {
+  const normalized = Number(
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>).value
+      : raw,
+  );
+  return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
+};
+
 const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   configurationIdOverride,
   embedded = false,
@@ -58,6 +82,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const profile = useSelector((state: RootState) => state.user.profile);
+
   const [configuration, setConfiguration] = useState<CustomOrderConfiguration | null>(null);
   const [preview, setPreview] = useState<PricePreviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,17 +98,46 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   const [country, setCountry] = useState(profile?.brandCountry ?? 'Nigeria');
   const [rushSelected, setRushSelected] = useState(false);
   const [measurementConfirmed, setMeasurementConfirmed] = useState(false);
-  const [baselineRequiredKeys, setBaselineRequiredKeys] = useState<string[]>([]);
+  const [measurementRecencyConfirmed, setMeasurementRecencyConfirmed] = useState(false);
+  const [sizeFitProfile, setSizeFitProfile] = useState<SizeFitProfile | null>(null);
+  const [savedAddresses, setSavedAddresses] = useState<CustomOrderSavedAddress[]>([]);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [openAddressMenuId, setOpenAddressMenuId] = useState<string | null>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
   const [displayChartFamily, setDisplayChartFamily] = useState<CustomOrderChartFamily>('UK');
   const [pricingChartFamily, setPricingChartFamily] = useState<CustomOrderChartFamily>('HYBRID_UK_NIGERIA');
   const [noDirectMatchAcknowledged, setNoDirectMatchAcknowledged] = useState(false);
-  const createKeyRef = useRef(createIdempotencyKey());
 
+  const createKeyRef = useRef(createIdempotencyKey());
   const configurationId = configurationIdOverride ?? searchParams.get('configurationId');
 
   useEffect(() => {
     setCustomerName([profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim());
   }, [profile?.firstName, profile?.lastName]);
+
+  const applySavedAddress = useCallback((address: CustomOrderSavedAddress) => {
+    setCustomerName(address.customerName);
+    setContactEmail(address.contactEmail);
+    setContactPhone(address.contactPhone);
+    setStreet(address.street);
+    setCity(address.city);
+    setStateRegion(address.state);
+    setCountry(address.country);
+    setEditingAddressId(address.id);
+    setOpenAddressMenuId(null);
+    setShowAddressForm(false);
+  }, []);
+
+  useEffect(() => {
+    const stored = loadCustomOrderAddressBook(profile?.id);
+    setSavedAddresses(stored);
+    if (stored[0]) {
+      applySavedAddress(stored[0]);
+      setShowAddressForm(false);
+    } else {
+      setShowAddressForm(true);
+    }
+  }, [applySavedAddress, profile?.id]);
 
   useEffect(() => {
     let active = true;
@@ -100,54 +154,61 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
 
         try {
           const preference = await customOrdersBuyerApi.getDisplayChartPreference();
-          if (active) {
-            setDisplayChartFamily(preference.displayChartFamily);
-          }
+          if (active) setDisplayChartFamily(preference.displayChartFamily);
         } catch {
-          // Fallback to default chart for guests or unavailable preference endpoint.
+          // Keep default preference.
         }
 
         if (resolvedConfiguration?.requiredMeasurementKeys.length) {
           try {
             const sizeFit = await SizeFitApi.getMyProfile();
             if (!active) return;
-            const profileBaselineKeys = sizeFit.baselineRequiredKeys ?? [];
-            setBaselineRequiredKeys(profileBaselineKeys);
+            setSizeFitProfile(sizeFit);
             setLengthUnit(sizeFit.preferredLengthUnit ?? 'CM');
-            const effectiveRequiredKeys = Array.from(
-              new Set([...profileBaselineKeys, ...resolvedConfiguration.requiredMeasurementKeys]),
+
+            const nextValues = resolvedConfiguration.requiredMeasurementKeys.reduce<Record<string, string>>(
+              (accumulator, key) => {
+                const normalized = parseStoredMeasurement(
+                  (sizeFit.measurements as Record<string, unknown> | undefined)?.[key],
+                );
+                if (normalized == null) return accumulator;
+                accumulator[key] =
+                  (sizeFit.preferredLengthUnit ?? 'CM') === 'IN' && !isWeightKey(key)
+                    ? String(round(toInches(normalized)))
+                    : String(normalized);
+                return accumulator;
+              },
+              {},
             );
 
-            const nextValues = effectiveRequiredKeys.reduce<Record<string, string>>((accumulator, key) => {
-              const raw = (sizeFit.measurements as Record<string, any> | undefined)?.[key];
-              if (typeof raw === 'number') {
-                accumulator[key] =
-                  (sizeFit.preferredLengthUnit ?? 'CM') === 'IN' && !isWeightKey(key)
-                    ? String(round(toInches(raw)))
-                    : String(raw);
-              } else if (raw && typeof raw === 'object' && typeof raw.value === 'number') {
-                accumulator[key] =
-                  (sizeFit.preferredLengthUnit ?? 'CM') === 'IN' && !isWeightKey(key)
-                    ? String(round(toInches(raw.value)))
-                    : String(raw.value);
-              }
-              return accumulator;
-            }, {});
             setMeasurementValues(nextValues);
-            const hasAnyMissing = effectiveRequiredKeys.some((key) => {
-              const value = Number(nextValues[key]);
-              return !(Number.isFinite(value) && value > 0);
-            });
-            setMeasurementConfirmed(!hasAnyMissing);
+            setMeasurementConfirmed(
+              !resolvedConfiguration.requiredMeasurementKeys.some((key) => {
+                const value = Number(nextValues[key]);
+                return !(Number.isFinite(value) && value > 0);
+              }),
+            );
+
+            const lastUpdatedAt = sizeFit.lastUpdatedAt
+              ? new Date(sizeFit.lastUpdatedAt).getTime()
+              : NaN;
+            setMeasurementRecencyConfirmed(
+              Number.isFinite(lastUpdatedAt) && Date.now() - lastUpdatedAt <= FOURTEEN_DAYS_MS,
+            );
           } catch {
-            setBaselineRequiredKeys([]);
+            if (!active) return;
+            setSizeFitProfile(null);
+            setMeasurementRecencyConfirmed(false);
           }
         } else {
-          setBaselineRequiredKeys([]);
+          setSizeFitProfile(null);
+          setMeasurementRecencyConfirmed(false);
         }
       } catch (error: any) {
         if (!active) return;
-        toast.error(error?.response?.data?.message || 'Unable to load custom-order configuration');
+        toast.error(
+          error?.response?.data?.message || 'Unable to load custom-order configuration',
+        );
       } finally {
         if (active) setLoading(false);
       }
@@ -160,13 +221,8 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   }, [configurationId]);
 
   const requiredMeasurementKeys = useMemo(
-    () => Array.from(new Set([...(baselineRequiredKeys ?? []), ...(configuration?.requiredMeasurementKeys ?? [])])),
-    [baselineRequiredKeys, configuration?.requiredMeasurementKeys],
-  );
-
-  const additionalRequiredKeys = useMemo(
-    () => (configuration?.requiredMeasurementKeys ?? []).filter((key) => !(baselineRequiredKeys ?? []).includes(key)),
-    [baselineRequiredKeys, configuration?.requiredMeasurementKeys],
+    () => configuration?.requiredMeasurementKeys ?? [],
+    [configuration?.requiredMeasurementKeys],
   );
 
   const missingMeasurements = useMemo(
@@ -182,9 +238,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
     () =>
       requiredMeasurementKeys.filter((key) => {
         const value = convertDisplayToCm(key, measurementValues[key] ?? '', lengthUnit);
-        if (!Number.isFinite(value) || value <= 0) {
-          return false;
-        }
+        if (!Number.isFinite(value) || value <= 0) return false;
         const range = measurementGuidance(key);
         return value < range.min || value > range.max;
       }),
@@ -192,33 +246,22 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   );
 
   const shippingAddress = useMemo(
-    () => ({
-      street,
-      city,
-      state: stateRegion,
-      country,
-    }),
+    () => ({ street, city, state: stateRegion, country }),
     [city, country, stateRegion, street],
   );
 
   const contactInfo = useMemo(
-    () => ({
-      email: contactEmail,
-      phone: contactPhone,
-    }),
+    () => ({ email: contactEmail, phone: contactPhone }),
     [contactEmail, contactPhone],
   );
 
   const measurementPayload = useMemo(
-    () => {
-      return requiredMeasurementKeys.reduce<Record<string, number>>((accumulator, key) => {
+    () =>
+      requiredMeasurementKeys.reduce<Record<string, number>>((accumulator, key) => {
         const parsed = convertDisplayToCm(key, measurementValues[key] ?? '', lengthUnit);
-        if (Number.isFinite(parsed) && parsed > 0) {
-          accumulator[key] = parsed;
-        }
+        if (Number.isFinite(parsed) && parsed > 0) accumulator[key] = parsed;
         return accumulator;
-      }, {});
-    },
+      }, {}),
     [lengthUnit, measurementValues, requiredMeasurementKeys],
   );
 
@@ -231,6 +274,106 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
     () => deriveSizeRecommendation(measurementPayload, displayChartFamily),
     [displayChartFamily, measurementPayload],
   );
+
+  const currentMeasurementSignature = useMemo(
+    () => buildMeasurementSignature(measurementPayload),
+    [measurementPayload],
+  );
+
+  const savedMeasurementSignature = useMemo(() => {
+    const savedMeasurements =
+      sizeFitProfile?.measurements && typeof sizeFitProfile.measurements === 'object'
+        ? (sizeFitProfile.measurements as Record<string, unknown>)
+        : {};
+
+    const normalized = requiredMeasurementKeys.reduce<Record<string, number>>((accumulator, key) => {
+      const value = parseStoredMeasurement(savedMeasurements[key]);
+      if (value != null) accumulator[key] = value;
+      return accumulator;
+    }, {});
+
+    return buildMeasurementSignature(normalized);
+  }, [requiredMeasurementKeys, sizeFitProfile?.measurements]);
+
+  const needsMeasurementProfileSave = useMemo(
+    () =>
+      currentMeasurementSignature !== savedMeasurementSignature ||
+      (sizeFitProfile?.preferredLengthUnit ?? 'CM') !== lengthUnit,
+    [
+      currentMeasurementSignature,
+      lengthUnit,
+      savedMeasurementSignature,
+      sizeFitProfile?.preferredLengthUnit,
+    ],
+  );
+
+  const measurementsLastUpdatedAtMs = useMemo(() => {
+    if (!sizeFitProfile?.lastUpdatedAt) return null;
+    const parsed = new Date(sizeFitProfile.lastUpdatedAt).getTime();
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [sizeFitProfile?.lastUpdatedAt]);
+
+  const needsMeasurementReviewPrompt = useMemo(() => {
+    if (!Object.keys(measurementPayload).length) return false;
+    if (!measurementsLastUpdatedAtMs) return true;
+    return Date.now() - measurementsLastUpdatedAtMs > FOURTEEN_DAYS_MS;
+  }, [measurementPayload, measurementsLastUpdatedAtMs]);
+
+  useEffect(() => {
+    if (!needsMeasurementReviewPrompt) {
+      setMeasurementRecencyConfirmed(true);
+    }
+  }, [needsMeasurementReviewPrompt]);
+
+  const currentAddressDraft = useMemo(
+    () => ({
+      id: editingAddressId ?? undefined,
+      customerName: customerName.trim(),
+      contactEmail: contactEmail.trim(),
+      contactPhone: contactPhone.trim(),
+      street: street.trim(),
+      city: city.trim(),
+      state: stateRegion.trim(),
+      country: country.trim() || 'Nigeria',
+      updatedAt: new Date().toISOString(),
+    }),
+    [
+      city,
+      contactEmail,
+      contactPhone,
+      country,
+      customerName,
+      editingAddressId,
+      stateRegion,
+      street,
+    ],
+  );
+
+  const isCurrentAddressComplete = useMemo(
+    () =>
+      Boolean(
+        currentAddressDraft.customerName &&
+          currentAddressDraft.contactEmail &&
+          currentAddressDraft.contactPhone &&
+          currentAddressDraft.street &&
+          currentAddressDraft.city &&
+          currentAddressDraft.state,
+      ),
+    [currentAddressDraft],
+  );
+
+  const persistMeasurementProfile = useCallback(async () => {
+    if (!Object.keys(measurementPayload).length || !needsMeasurementProfileSave) {
+      return sizeFitProfile;
+    }
+
+    const updated = await SizeFitApi.updateProfile({
+      measurements: measurementPayload,
+      preferredLengthUnit: lengthUnit,
+    });
+    setSizeFitProfile(updated);
+    return updated;
+  }, [lengthUnit, measurementPayload, needsMeasurementProfileSave, sizeFitProfile]);
 
   const handleLengthUnitChange = (nextUnit: 'CM' | 'IN') => {
     if (nextUnit === lengthUnit) return;
@@ -260,12 +403,18 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       toast.error('Review the highlighted measurements before locking the preview.');
       return;
     }
+    if (needsMeasurementReviewPrompt && !measurementRecencyConfirmed) {
+      toast.error('Review and confirm that these measurements are current within the last 14 days.');
+      return;
+    }
     if (!measurementConfirmed) {
       toast.error('Confirm the measurement snapshot before continuing.');
       return;
     }
+
     setSubmitting(true);
     try {
+      await persistMeasurementProfile();
       const data = await customOrdersBuyerApi.previewPrice({
         configurationId: configuration.id,
         configurationVersionId: configuration.versions?.[0]?.id,
@@ -312,6 +461,10 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       toast.error('Acknowledge the no-direct-match guidance before creating this order.');
       return;
     }
+    if (needsMeasurementReviewPrompt && !measurementRecencyConfirmed) {
+      toast.error('Review and confirm that these measurements are current within the last 14 days.');
+      return;
+    }
     if (!customerName.trim() || !contactEmail.trim() || !contactPhone.trim() || !street.trim() || !city.trim() || !stateRegion.trim() || !country.trim()) {
       toast.error('Complete the delivery and contact information first.');
       return;
@@ -331,6 +484,11 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
         idempotencyKey: createKeyRef.current,
         noDirectMatchAcknowledged,
       });
+
+      const nextAddresses = upsertCustomOrderAddress(profile?.id, currentAddressDraft);
+      setSavedAddresses(nextAddresses);
+      if (nextAddresses[0]) setEditingAddressId(nextAddresses[0].id);
+
       if (embedded) {
         toast.success('Custom order created. Open your custom orders to continue payment.');
         onOrderCreated?.(order.id);
@@ -344,6 +502,82 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       setSubmitting(false);
     }
   };
+
+  const handleSaveCurrentAddress = useCallback(() => {
+    if (!isCurrentAddressComplete) {
+      toast.error('Complete the delivery details before saving this address.');
+      return;
+    }
+
+    const nextAddresses = upsertCustomOrderAddress(profile?.id, currentAddressDraft);
+    setSavedAddresses(nextAddresses);
+    if (nextAddresses[0]) setEditingAddressId(nextAddresses[0].id);
+    setOpenAddressMenuId(null);
+    setShowAddressForm(false);
+    toast.success(editingAddressId ? 'Delivery address updated.' : 'Delivery address saved.');
+  }, [
+    currentAddressDraft,
+    editingAddressId,
+    isCurrentAddressComplete,
+    profile?.id,
+  ]);
+
+  const handleStartNewAddress = useCallback(() => {
+    setShowAddressForm(true);
+    setEditingAddressId(null);
+    setOpenAddressMenuId(null);
+    setStreet('');
+    setCity('');
+    setStateRegion('');
+    setCountry('Nigeria');
+  }, []);
+
+  const handleEditSavedAddress = useCallback((address: CustomOrderSavedAddress) => {
+    setCustomerName(address.customerName);
+    setContactEmail(address.contactEmail);
+    setContactPhone(address.contactPhone);
+    setStreet(address.street);
+    setCity(address.city);
+    setStateRegion(address.state);
+    setCountry(address.country);
+    setEditingAddressId(address.id);
+    setOpenAddressMenuId(null);
+    setShowAddressForm(true);
+  }, []);
+
+  const handleCancelAddressForm = useCallback(() => {
+    setOpenAddressMenuId(null);
+    if (editingAddressId) {
+      const currentAddress = savedAddresses.find((address) => address.id === editingAddressId);
+      if (currentAddress) {
+        applySavedAddress(currentAddress);
+        return;
+      }
+    }
+    if (savedAddresses[0]) {
+      applySavedAddress(savedAddresses[0]);
+      return;
+    }
+    setShowAddressForm(true);
+  }, [applySavedAddress, editingAddressId, savedAddresses]);
+
+  const handleDeleteSavedAddress = useCallback(
+    (addressId: string) => {
+      const nextAddresses = removeCustomOrderAddress(profile?.id, addressId);
+      setSavedAddresses(nextAddresses);
+      setOpenAddressMenuId(null);
+      if (editingAddressId === addressId) {
+        setEditingAddressId(null);
+        if (nextAddresses[0]) {
+          applySavedAddress(nextAddresses[0]);
+        } else {
+          setShowAddressForm(true);
+        }
+      }
+      toast.success('Delivery address removed.');
+    },
+    [applySavedAddress, editingAddressId, profile?.id],
+  );
 
   if (loading) {
     return <div className="mx-auto max-w-5xl px-4 py-10 text-sm text-slate-500">Loading custom-order workspace...</div>;
@@ -399,177 +633,158 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
           Back
         </button>
       </div>
+      <div className="mb-6 rounded-3xl border border-emerald-200/80 bg-emerald-50/80 p-5 text-sm text-emerald-950 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+        <p className="font-semibold">Payment split notice</p>
+        <p className="mt-2">
+          Customers pay the full quoted total at checkout. Threadly retains the platform commission, and the brand receives the net settlement in milestone releases after production and delivery conditions are met.
+        </p>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
           <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
-            <div className="text-lg font-semibold text-slate-900 dark:text-white">Source summary</div>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              This request is being created from a {configuration.sourceType.toLowerCase()} with a locked custom-configuration version.
-            </p>
-            <dl className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-              <div className="flex items-start justify-between gap-4">
-                <dt>Source type</dt>
-                <dd className="font-medium text-slate-900 dark:text-white">{configuration.sourceType}</dd>
-              </div>
-              <div className="flex items-start justify-between gap-4">
-                <dt>Configuration version</dt>
-                <dd className="font-medium text-slate-900 dark:text-white">v{configuration.currentVersion}</dd>
-              </div>
-              <div className="flex items-start justify-between gap-4">
-                <dt>Fabric sourcing</dt>
-                <dd className="font-medium text-slate-900 dark:text-white">{configuration.fabricSourcingMode}</dd>
-              </div>
-            </dl>
-          </section>
-
-          <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Measurement profile</div>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              Baseline required points: {baselineRequiredKeys.length}. Additional points for this configuration: {additionalRequiredKeys.length}. Use {lengthUnit === 'IN' ? 'inches' : 'centimeters'} for length values.
+              Only the measurement points this brand requested are shown here. Any new values you confirm will be saved back to your profile so you do not need to type them again next time.
             </p>
             <div className="mt-3 grid gap-3 md:grid-cols-3">
-              <UniversalSelect
-                label="Length unit"
-                value={lengthUnit}
-                onChange={(value) => handleLengthUnitChange(value as 'CM' | 'IN')}
-                options={[
-                  { value: 'CM', label: 'Centimeters (cm)' },
-                  { value: 'IN', label: 'Inches (in)' },
-                ]}
-              />
-              <UniversalSelect
-                label="Display chart"
-                value={displayChartFamily}
-                onChange={(value) => setDisplayChartFamily(value as CustomOrderChartFamily)}
-                options={DISPLAY_CHART_OPTIONS}
-              />
-              <UniversalSelect
-                label="Pricing chart"
-                value={pricingChartFamily}
-                onChange={(value) => setPricingChartFamily(value as CustomOrderChartFamily)}
-                options={PRICING_CHART_OPTIONS}
-              />
+              <UniversalSelect label="Length unit" value={lengthUnit} onChange={(value) => handleLengthUnitChange(value as 'CM' | 'IN')} options={[{ value: 'CM', label: 'Centimeters (cm)' }, { value: 'IN', label: 'Inches (in)' }]} />
+              <UniversalSelect label="Display chart" value={displayChartFamily} onChange={(value) => setDisplayChartFamily(value as CustomOrderChartFamily)} options={DISPLAY_CHART_OPTIONS} />
+              <UniversalSelect label="Pricing chart" value={pricingChartFamily} onChange={(value) => setPricingChartFamily(value as CustomOrderChartFamily)} options={PRICING_CHART_OPTIONS} />
             </div>
             <div className="mt-4 rounded-2xl border border-indigo-300/50 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100">
               <div className="font-semibold">Live size recommendation</div>
               <p className="mt-1">
                 {liveRecommendation.computedSize
                   ? `${displayChartFamily} display resolves to ${liveRecommendation.computedSize}.`
-                  : 'Add bust/chest, waist, and hip values to compute a live size before preview.'}
+                  : 'Chart sizing is optional here. Add bust/chest, waist, and hip values if you want a live size recommendation too.'}
               </p>
               {liveRecommendation.conversionGuidance ? <p className="mt-1">{liveRecommendation.conversionGuidance}</p> : null}
             </div>
             {hasPrefilledMeasurements ? (
               <div className="mt-4 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
-                <div className="font-semibold">📏 Review saved fittings before checkout</div>
+                <div className="font-semibold">Review saved fittings before checkout</div>
+                <p className="mt-1">Saved measurements were prefilled from your profile. You must confirm or update them before price lock and payment.</p>
+              </div>
+            ) : null}
+            {needsMeasurementReviewPrompt ? (
+              <div className="mt-4 rounded-2xl border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-700/40 dark:bg-rose-500/10 dark:text-rose-100">
+                <div className="font-semibold">Review measurements before checkout</div>
                 <p className="mt-1">
-                  Saved measurements were prefilled from your profile. You must confirm or update them before price lock and payment.
+                  {measurementsLastUpdatedAtMs
+                    ? `Your saved profile was last updated on ${new Date(measurementsLastUpdatedAtMs).toLocaleDateString()}. Review or refresh these values before placing the order if that is older than 14 days.`
+                    : 'There is no recent measurement-update timestamp on your profile yet. Review these values carefully before placing the order.'}
                 </p>
               </div>
             ) : null}
-
-            {baselineRequiredKeys.length > 0 ? (
-              <div className="mt-4 rounded-2xl border border-emerald-300/50 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-600/40 dark:bg-emerald-500/10 dark:text-emerald-200">
-                <div className="font-semibold">Baseline profile (required for all custom orders)</div>
-                <p className="mt-1">
-                  These common points are always required. They are prefilled from your saved profile where available.
-                </p>
-              </div>
-            ) : null}
-
-            {additionalRequiredKeys.length > 0 ? (
-              <div className="mt-4 rounded-2xl border border-indigo-300/50 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-800 dark:border-indigo-600/40 dark:bg-indigo-500/10 dark:text-indigo-200">
-                <div className="font-semibold">Additional points requested by this brand configuration</div>
-                <p className="mt-1">
-                  These optional profile points are requested only for this custom-order flow.
-                </p>
-              </div>
-            ) : null}
-
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               {requiredMeasurementKeys.map((key) => (
                 <label key={key} className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    {fieldLabel(key)}
-                  </span>
-                  <span className="mb-2 inline-flex rounded-full bg-black/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
-                    {(baselineRequiredKeys ?? []).includes(key) ? 'Baseline required' : 'Configuration specific'}
-                  </span>
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{fieldLabel(key)}</span>
+                  <span className="mb-2 inline-flex rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-600 dark:bg-indigo-400/10 dark:text-indigo-300">Required by brand</span>
                   <span className="mb-2 block text-xs text-slate-500 dark:text-slate-400">
-                    {measurementGuidance(key).description} Expected range {lengthUnit === 'IN' && !isWeightKey(key)
-                      ? round(toInches(measurementGuidance(key).min))
-                      : measurementGuidance(key).min} to {lengthUnit === 'IN' && !isWeightKey(key)
-                      ? round(toInches(measurementGuidance(key).max))
-                      : measurementGuidance(key).max} {lengthUnit === 'IN' && !isWeightKey(key) ? 'in' : 'cm'}.
+                    {measurementGuidance(key).description} Expected range {lengthUnit === 'IN' && !isWeightKey(key) ? round(toInches(measurementGuidance(key).min)) : measurementGuidance(key).min} to {lengthUnit === 'IN' && !isWeightKey(key) ? round(toInches(measurementGuidance(key).max)) : measurementGuidance(key).max} {lengthUnit === 'IN' && !isWeightKey(key) ? 'in' : 'cm'}.
                   </span>
                   <input
                     value={measurementValues[key] ?? ''}
                     onChange={(event) => {
                       setMeasurementConfirmed(false);
+                      if (needsMeasurementReviewPrompt) setMeasurementRecencyConfirmed(false);
                       setMeasurementValues((current) => ({ ...current, [key]: event.target.value }));
                     }}
                     inputMode="decimal"
                     placeholder="0"
                     className={inputClassName}
                   />
-                  {outOfRangeMeasurements.includes(key) ? (
-                    <span className="mt-2 block text-xs font-medium text-rose-600 dark:text-rose-300">
-                      This value is outside the supported V1 range.
-                    </span>
-                  ) : null}
+                  {outOfRangeMeasurements.includes(key) ? <span className="mt-2 block text-xs font-medium text-rose-600 dark:text-rose-300">This value is outside the supported V1 range.</span> : null}
                 </label>
               ))}
             </div>
             <label className="mt-5 flex items-start gap-3 rounded-2xl border border-black/10 px-4 py-3 text-sm dark:border-white/10">
-              <input
-                type="checkbox"
-                checked={measurementConfirmed}
-                onChange={(event) => setMeasurementConfirmed(event.target.checked)}
-              />
-              <span className="text-slate-700 dark:text-slate-200">
-                I confirm these measurement values are the exact snapshot I want used for pricing, checkout, and brand production review.
-              </span>
+              <input type="checkbox" checked={measurementConfirmed} onChange={(event) => setMeasurementConfirmed(event.target.checked)} />
+              <span className="text-slate-700 dark:text-slate-200">I confirm these measurement values are the exact snapshot I want used for pricing, checkout, and brand production review.</span>
             </label>
-            {hasPrefilledMeasurements ? (
-              <div className="mt-3 rounded-2xl bg-black/[0.04] px-4 py-3 text-xs text-slate-600 dark:bg-white/[0.04] dark:text-slate-300">
-                Proceeding with saved values means the brand will only receive this confirmed measurement snapshot. Fit issues caused by stale measurements may lead to disputes rather than free remakes.
-              </div>
+            {needsMeasurementReviewPrompt ? (
+              <label className="mt-3 flex items-start gap-3 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
+                <input type="checkbox" checked={measurementRecencyConfirmed} onChange={(event) => setMeasurementRecencyConfirmed(event.target.checked)} />
+                <span>I confirm these measurements were reviewed and are still accurate within the last 14 days.</span>
+              </label>
             ) : null}
           </section>
 
           <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Delivery details</div>
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <label className="block md:col-span-2">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Customer name</span>
-                <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} className={inputClassName} />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</span>
-                <input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} className={inputClassName} />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Phone</span>
-                <input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} className={inputClassName} />
-              </label>
-              <label className="block md:col-span-2">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Street</span>
-                <input value={street} onChange={(event) => setStreet(event.target.value)} className={inputClassName} />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">City</span>
-                <input value={city} onChange={(event) => setCity(event.target.value)} className={inputClassName} />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">State</span>
-                <input value={stateRegion} onChange={(event) => setStateRegion(event.target.value)} className={inputClassName} />
-              </label>
-              <label className="block md:col-span-2">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Country</span>
-                <input value={country} onChange={(event) => setCountry(event.target.value)} className={inputClassName} />
-              </label>
+            <div className="mt-4 rounded-2xl border border-black/10 bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">Saved delivery addresses</div>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Your most recently used address is selected first. Add a new one only when you need another saved delivery profile.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={handleStartNewAddress} className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black">Add new address</button>
+                </div>
+              </div>
+              {savedAddresses.length > 0 ? (
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {savedAddresses.map((address) => {
+                    const isActive = editingAddressId === address.id;
+                    return (
+                      <div key={address.id} className={`relative rounded-2xl border p-3 ${isActive ? 'border-emerald-400 bg-emerald-50/70 dark:border-emerald-500/40 dark:bg-emerald-500/10' : 'border-black/10 bg-white dark:border-white/10 dark:bg-slate-950'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <button type="button" onClick={() => applySavedAddress(address)} className="flex-1 text-left">
+                            <div className="text-sm font-semibold text-slate-900 dark:text-white">{address.customerName}</div>
+                            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{address.street}, {address.city}, {address.state}</div>
+                            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{address.contactPhone} · {address.contactEmail}</div>
+                          </button>
+                          <div className="relative">
+                            <button type="button" onClick={() => setOpenAddressMenuId((current) => (current === address.id ? null : address.id))} className="rounded-full border border-black/10 px-2 py-1 text-xs font-semibold text-slate-600 dark:border-white/10 dark:text-slate-300" aria-label="Open address actions">...</button>
+                            {openAddressMenuId === address.id ? (
+                              <div className="absolute right-0 top-10 z-10 w-36 rounded-2xl border border-black/10 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-slate-950">
+                                <button type="button" onClick={() => applySavedAddress(address)} className="w-full rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5">Use address</button>
+                                <button type="button" onClick={() => handleEditSavedAddress(address)} className="w-full rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5">Edit</button>
+                                <button type="button" onClick={() => handleDeleteSavedAddress(address.id)} className="w-full rounded-xl px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10">Delete</button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">No saved delivery addresses yet. Add a new address to continue with delivery details.</p>}
             </div>
+            {showAddressForm ? (
+              <div className="mt-5 rounded-2xl border border-black/10 bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-white">{editingAddressId ? 'Edit saved address' : 'Add new delivery address'}</div>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Save this address for reuse or keep it as the active delivery profile for this order.</p>
+                  </div>
+                  {savedAddresses.length > 0 ? (
+                    <button type="button" onClick={handleCancelAddressForm} className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200">Cancel</button>
+                  ) : null}
+                </div>
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <label className="block md:col-span-2"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Customer name</span><input value={customerName} onChange={(event) => setCustomerName(event.target.value)} className={inputClassName} /></label>
+                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</span><input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} className={inputClassName} /></label>
+                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Phone</span><input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} className={inputClassName} /></label>
+                  <label className="block md:col-span-2"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Street</span><input value={street} onChange={(event) => setStreet(event.target.value)} className={inputClassName} /></label>
+                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">City</span><input value={city} onChange={(event) => setCity(event.target.value)} className={inputClassName} /></label>
+                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">State</span><input value={stateRegion} onChange={(event) => setStateRegion(event.target.value)} className={inputClassName} /></label>
+                  <label className="block md:col-span-2"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Country</span><input value={country} onChange={(event) => setCountry(event.target.value)} className={inputClassName} /></label>
+                </div>
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  {savedAddresses.length > 0 ? (
+                    <button type="button" onClick={handleCancelAddressForm} className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200">Use saved address only</button>
+                  ) : null}
+                  <button type="button" onClick={handleSaveCurrentAddress} className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black">{editingAddressId ? 'Update address' : 'Save address'}</button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-5 rounded-2xl border border-dashed border-black/10 bg-black/[0.02] px-4 py-5 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+                Delivery form is hidden while you use a saved address. Click <span className="font-semibold text-slate-900 dark:text-white">Add new address</span> to open the form again.
+              </div>
+            )}
           </section>
         </div>
 
@@ -577,133 +792,50 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
           <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Policy and delivery guidance</div>
             <dl className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-              <div className="flex items-start justify-between gap-4">
-                <dt>Brand</dt>
-                <dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.brand?.name ?? 'Brand'}</dd>
-              </div>
-              <div className="flex items-start justify-between gap-4">
-                <dt>Production lead</dt>
-                <dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.productionLeadDays} days</dd>
-              </div>
-              <div className="flex items-start justify-between gap-4">
-                <dt>Delivery window</dt>
-                <dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.deliveryMinDays}–{configuration.deliveryMaxDays} days</dd>
-              </div>
-              <div className="flex items-start justify-between gap-4">
-                <dt>Revision policy</dt>
-                <dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.revisionPolicy}</dd>
-              </div>
-              <div className="flex items-start justify-between gap-4">
-                <dt>Return policy</dt>
-                <dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.returnPolicy}</dd>
-              </div>
-              <div className="flex items-start justify-between gap-4">
-                <dt>Defect policy</dt>
-                <dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.defectPolicy}</dd>
-              </div>
+              <div className="flex items-start justify-between gap-4"><dt>Brand</dt><dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.brand?.name ?? 'Brand'}</dd></div>
+              <div className="flex items-start justify-between gap-4"><dt>Production lead</dt><dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.productionLeadDays} days</dd></div>
+              <div className="flex items-start justify-between gap-4"><dt>Delivery window</dt><dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.deliveryMinDays}-{configuration.deliveryMaxDays} days</dd></div>
+              <div className="flex items-start justify-between gap-4"><dt>Revision policy</dt><dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.revisionPolicy}</dd></div>
+              <div className="flex items-start justify-between gap-4"><dt>Return policy</dt><dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.returnPolicy}</dd></div>
+              <div className="flex items-start justify-between gap-4"><dt>Defect policy</dt><dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.defectPolicy}</dd></div>
             </dl>
-
-            {configuration.buyerInstructionText ? (
-              <div className="mt-5 rounded-2xl bg-black/[0.04] p-4 text-sm text-slate-600 dark:bg-white/[0.04] dark:text-slate-300">
-                <div className="mb-1 font-semibold text-slate-900 dark:text-white">Buyer instructions</div>
-                <p>{configuration.buyerInstructionText}</p>
-              </div>
-            ) : null}
-
+            {configuration.buyerInstructionText ? <div className="mt-5 rounded-2xl bg-black/[0.04] p-4 text-sm text-slate-600 dark:bg-white/[0.04] dark:text-slate-300"><div className="mb-1 font-semibold text-slate-900 dark:text-white">Buyer instructions</div><p>{configuration.buyerInstructionText}</p></div> : null}
             <label className="mt-5 flex items-center gap-3 rounded-2xl border border-black/10 px-4 py-3 text-sm dark:border-white/10">
-              <input
-                type="checkbox"
-                checked={rushSelected}
-                disabled={!configuration.rushEnabled}
-                onChange={(event) => setRushSelected(event.target.checked)}
-              />
-              <span className="text-slate-700 dark:text-slate-200">
-                Rush production {configuration.rushEnabled ? `(extra ${formatCurrency(Number(configuration.rushFee ?? 0))})` : '(not available)'}
-              </span>
+              <input type="checkbox" checked={rushSelected} disabled={!configuration.rushEnabled} onChange={(event) => setRushSelected(event.target.checked)} />
+              <span className="text-slate-700 dark:text-slate-200">Rush production {configuration.rushEnabled ? `(extra ${formatCurrency(Number(configuration.rushFee ?? 0))})` : '(not available)'}</span>
             </label>
           </section>
 
           <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Checkout preview</div>
             <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-              <div className="flex items-center justify-between">
-                <span>Base production charge</span>
-                <span className="font-medium text-slate-900 dark:text-white">{formatCurrency(Number(configuration.baseProductionCharge))}</span>
-              </div>
+              <div className="flex items-center justify-between"><span>Base production charge</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(Number(configuration.baseProductionCharge))}</span></div>
               {preview ? (
                 <>
                   {preview.buyerPriceSummary ? (
                     <>
-                      <div className="flex items-center justify-between">
-                        <span>Subtotal</span>
-                        <span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.subtotal ?? preview.buyerPriceSummary.grandTotal, preview.currency)}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Shipping</span>
-                        <span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.shippingFee ?? 0, preview.currency)}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Rush fee</span>
-                        <span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.rushFee ?? 0, preview.currency)}</span>
-                      </div>
-                      <div className="flex items-center justify-between border-t border-black/10 pt-3 text-base dark:border-white/10">
-                        <span className="font-semibold text-slate-900 dark:text-white">Grand total</span>
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-300">{formatCurrency(preview.buyerPriceSummary.grandTotal, preview.currency)}</span>
-                      </div>
+                      <div className="flex items-center justify-between"><span>Subtotal</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.subtotal ?? preview.buyerPriceSummary.grandTotal, preview.currency)}</span></div>
+                      <div className="flex items-center justify-between"><span>Shipping</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.shippingFee ?? 0, preview.currency)}</span></div>
+                      <div className="flex items-center justify-between"><span>Rush fee</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.rushFee ?? 0, preview.currency)}</span></div>
+                      <div className="flex items-center justify-between border-t border-black/10 pt-3 text-base dark:border-white/10"><span className="font-semibold text-slate-900 dark:text-white">Grand total</span><span className="font-semibold text-emerald-600 dark:text-emerald-300">{formatCurrency(preview.buyerPriceSummary.grandTotal, preview.currency)}</span></div>
                     </>
                   ) : null}
                   <div className="rounded-2xl bg-emerald-500/10 px-4 py-3 text-xs font-medium text-emerald-700 dark:text-emerald-200">
-                    {preview.quoteStatus === 'MANUAL_QUOTE_REQUIRED'
-                      ? 'Manual quote is required. Brand/admin review must decide this request before payment can begin.'
-                      : `Price lock ends ${new Date(preview.priceLockExpiresAt || '').toLocaleString()}.`}
-                    {preview.noDirectMatch ? (
-                      <div className="mt-2">
-                        No direct size label match was found. {preview.conversionGuidance ?? 'Nearest band guidance has been applied.'}
-                      </div>
-                    ) : null}
+                    {preview.quoteStatus === 'MANUAL_QUOTE_REQUIRED' ? 'Manual quote is required. Brand/admin review must decide this request before payment can begin.' : `Price lock ends ${new Date(preview.priceLockExpiresAt || '').toLocaleString()}.`}
+                    {preview.noDirectMatch ? <div className="mt-2">No direct size label match was found. {preview.conversionGuidance ?? 'Nearest band guidance has been applied.'}</div> : null}
                   </div>
                   {preview.noDirectMatch ? (
                     <label className="rounded-2xl border border-amber-300/60 bg-amber-50 px-3 py-3 text-xs text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
-                      <span className="flex items-start gap-2">
-                        <input
-                          type="checkbox"
-                          checked={noDirectMatchAcknowledged}
-                          onChange={(event) => setNoDirectMatchAcknowledged(event.target.checked)}
-                        />
-                        <span>
-                          I acknowledge this conversion used nearest-band guidance and accept the displayed chart mapping.
-                        </span>
-                      </span>
+                      <span className="flex items-start gap-2"><input type="checkbox" checked={noDirectMatchAcknowledged} onChange={(event) => setNoDirectMatchAcknowledged(event.target.checked)} /><span>I acknowledge this conversion used nearest-band guidance and accept the displayed chart mapping.</span></span>
                     </label>
                   ) : null}
                 </>
-              ) : (
-                <div className="rounded-2xl bg-black/[0.04] px-4 py-3 text-xs dark:bg-white/[0.04]">
-                  Generate a preview to lock the buyer-facing price before placing the order.
-                </div>
-              )}
+              ) : <div className="rounded-2xl bg-black/[0.04] px-4 py-3 text-xs dark:bg-white/[0.04]">Generate a preview to lock the buyer-facing price before placing the order.</div>}
             </div>
-
             <div className="mt-5 space-y-3">
-              <button
-                type="button"
-                onClick={handlePreview}
-                disabled={submitting}
-                className="w-full rounded-full border border-black/10 px-4 py-3 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white"
-              >
-                {submitting ? 'Calculating preview...' : 'Lock price preview'}
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateOrder}
-                disabled={submitting || !preview || preview.quoteStatus === 'MANUAL_QUOTE_REQUIRED'}
-                className="w-full rounded-full bg-emerald-500 px-4 py-3 text-sm font-semibold text-black disabled:opacity-60"
-              >
-                {submitting ? 'Creating custom order...' : 'Create custom order'}
-              </button>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Payment starts after the custom order is created, on the next screen.
-              </p>
+              <button type="button" onClick={handlePreview} disabled={submitting} className="w-full rounded-full border border-black/10 px-4 py-3 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white">{submitting ? 'Calculating preview...' : 'Lock price preview'}</button>
+              <button type="button" onClick={handleCreateOrder} disabled={submitting || !preview || preview.quoteStatus === 'MANUAL_QUOTE_REQUIRED'} className="w-full rounded-full bg-emerald-500 px-4 py-3 text-sm font-semibold text-black disabled:opacity-60">{submitting ? 'Creating custom order...' : 'Create custom order'}</button>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Payment starts after the custom order is created, on the next screen.</p>
             </div>
           </section>
         </div>

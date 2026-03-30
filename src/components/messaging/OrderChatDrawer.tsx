@@ -53,6 +53,10 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
 
   const fetchMessages = useCallback(async () => {
     if (!orderId) return;
+    if (actorSurface === 'BRAND' && !brandId) {
+      setMessages([]);
+      return;
+    }
     try {
       const response =
         actorSurface === 'ADMIN'
@@ -98,6 +102,11 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
 
   const fetchCustomOrderDetail = useCallback(async () => {
     if (contextType !== 'CUSTOM_ORDER') {
+      setCustomOrderDetail(null);
+      return;
+    }
+
+    if (actorSurface === 'BRAND' && !brandId) {
       setCustomOrderDetail(null);
       return;
     }

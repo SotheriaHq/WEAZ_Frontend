@@ -99,6 +99,8 @@ export function useNotificationsBootstrap() {
           targetUrl: payload.payload?.targetUrl ?? undefined,
         }),
       );
+      dispatch(fetchUnreadCount());
+      dispatch(fetchNotifications({ limit: 30 }));
       // Show toast for real-time notification
       if (payload.message) {
         toast.info(payload.message);

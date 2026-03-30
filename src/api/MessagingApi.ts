@@ -52,6 +52,10 @@ export interface MessageListResponse {
   items: ThreadMessage[];
   hasNextPage: boolean;
   endCursor: MessagingCursor | null;
+  thread?: {
+    id: string;
+    status: 'OPEN' | 'READ_ONLY' | 'ARCHIVED' | 'BLOCKED';
+  } | null;
 }
 
 export interface ThreadSummaryResponse {
@@ -121,6 +125,7 @@ const parseMessageList = (data: unknown): MessageListResponse => {
     items: Array.isArray(payload?.items) ? payload.items : [],
     hasNextPage: Boolean(payload?.hasNextPage),
     endCursor: payload?.endCursor ?? null,
+    thread: payload?.thread ?? null,
   };
 };
 

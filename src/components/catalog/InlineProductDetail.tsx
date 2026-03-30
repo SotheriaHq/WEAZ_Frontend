@@ -12,7 +12,6 @@ import { addToCart } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { CONTENT_DISPLAY_FRAME_CLASS, CONTENT_DISPLAY_MEDIA_CLASS } from '@/components/media/contentDisplayPresets';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
@@ -88,12 +87,7 @@ export default function InlineProductDetail({
   const [modalMeasurementValues, setModalMeasurementValues] = useState<Record<string, string>>({});
   const [showMeasurementModal, setShowMeasurementModal] = useState(false);
   const [savingMeasurements, setSavingMeasurements] = useState(false);
-  const [showQr, setShowQr] = useState(false);
-  const canOpenQr =
-    Boolean(product) &&
-    product?.isActive !== false &&
-    !product?.archivedAt &&
-    !product?.deletedAt;
+  /* QR disabled — only brand profile QR codes active for now */
 
   const requiredMeasurementKeys = useMemo(() => {
     const raw = product.customMeasurementKeys;
@@ -672,17 +666,7 @@ export default function InlineProductDetail({
                 </button>
               </>
             ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                if (canOpenQr) setShowQr(true);
-              }}
-              style={canOpenQr ? undefined : { display: 'none' }}
-              className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-emerald-600 hover:border-emerald-300 transition-all flex items-center justify-center"
-              aria-label="Open product QR code"
-            >
-              <span aria-hidden="true">🪪</span>
-            </button>
+            {/* QR button disabled — only brand profile QR codes active */}
           </div>
         </div>
       </div>
@@ -790,17 +774,7 @@ export default function InlineProductDetail({
         )}
       </AnimatePresence>
 
-      {canOpenQr ? (
-        <LazyEntityQrModal
-          open={showQr}
-          onClose={() => setShowQr(false)}
-          title="Product QR Code"
-          subtitle="Scan to open this product."
-          url={buildProductUrl({ id: product.id, slug: (product as StoreProduct & { slug?: string }).slug })}
-          downloadFileName="product-qr.png"
-          logoUrl={product.brand?.logo || null}
-        />
-      ) : null}
+      {/* Product QR modal disabled — only brand profile QR codes active */}
     </div>
   );
 }

@@ -222,11 +222,74 @@ const matchesAlphaRowValue = (rowValue: string, label: string) => {
   return rowNumber != null ? rowNumber === labelNumber : false;
 };
 
+const parseAlphaRange = (value: string) => {
+  const numbers = value.match(/\d+/g)?.map(Number) ?? [];
+  if (!numbers.length) return null;
+  if (numbers.length === 1) return { min: numbers[0], max: numbers[0] };
+  return { min: numbers[0], max: numbers[numbers.length - 1] };
+};
+
+const resolveAlphaSizeFromMeasurements = (
+  measurements: Record<string, unknown>,
+  measurementGender: 'MEN' | 'WOMEN',
+): string | null => {
+  const bust = pickMeasurement(measurements, ['BUST', 'WOMEN_BUST', 'WOMEN_CHEST_FULL_BUST', 'MEN_CHEST']);
+  const waist = pickMeasurement(measurements, ['WAIST', 'WOMEN_WAIST', 'MEN_WAIST']);
+  const hips = pickMeasurement(measurements, ['HIPS', 'HIP', 'WOMEN_HIP', 'MEN_HIP']);
+
+  if (bust == null || waist == null || hips == null) {
+    return null;
+  }
+
+  const rows = measurementGender === 'MEN' ? MEN_ALPHA_ROWS : WOMEN_ALPHA_ROWS;
+  const exact = rows.find((row) => {
+    const bustRange = parseAlphaRange(row.bust);
+    const waistRange = parseAlphaRange(row.waist);
+    const hipsRange = parseAlphaRange(row.hips);
+    if (!bustRange || !waistRange || !hipsRange) return false;
+    return (
+      bust >= bustRange.min &&
+      bust <= bustRange.max &&
+      waist >= waistRange.min &&
+      waist <= waistRange.max &&
+      hips >= hipsRange.min &&
+      hips <= hipsRange.max
+    );
+  });
+
+  if (exact) {
+    return exact.alpha.toUpperCase();
+  }
+
+  const nearest = rows.reduce(
+    (best, row) => {
+      const bustRange = parseAlphaRange(row.bust);
+      const waistRange = parseAlphaRange(row.waist);
+      const hipsRange = parseAlphaRange(row.hips);
+      if (!bustRange || !waistRange || !hipsRange) return best;
+
+      const midpoint =
+        (bustRange.min + bustRange.max + waistRange.min + waistRange.max + hipsRange.min + hipsRange.max) / 6;
+      const delta = Math.abs(midpoint - (bust + waist + hips) / 3);
+      if (delta < best.delta) {
+        return { delta, alpha: row.alpha.toUpperCase() };
+      }
+      return best;
+    },
+    { delta: Number.MAX_SAFE_INTEGER, alpha: null as string | null },
+  );
+
+  return nearest.alpha;
+};
+
 const resolveAlphaSize = (
   label: string | null,
   displayChartFamily: CustomOrderChartFamily,
   measurementGender: 'MEN' | 'WOMEN',
+  measurements: Record<string, unknown>,
 ): string | null => {
+  const measurementBased = resolveAlphaSizeFromMeasurements(measurements, measurementGender);
+  if (measurementBased) return measurementBased;
   if (!label) return null;
 
   const asiaMatch = label.match(/^ASIA\s+(.+)$/i);
@@ -348,7 +411,7 @@ export const deriveSizeRecommendation = (
   return {
     displayChartFamily,
     computedSize: resolved?.label ?? null,
-    alphaSize: resolveAlphaSize(resolved?.label ?? null, displayChartFamily, resolvedMeasurementGender),
+    alphaSize: resolveAlphaSize(resolved?.label ?? null, displayChartFamily, resolvedMeasurementGender, measurements),
     noDirectMatch: Boolean(resolved?.noDirectMatch),
     conversionGuidance:
       resolved?.noDirectMatch && resolved?.nearestLabel

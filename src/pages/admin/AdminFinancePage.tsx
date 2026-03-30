@@ -7,18 +7,20 @@ import type {
   AdminCommissionRule,
   AdminFinancialDocument,
   AdminFinanceOverview,
+  AdminLedgerTransaction,
   AdminReconciliationItem,
   AdminReconciliationRun,
 } from '@/types/admin';
 import { unwrapApiResponse } from '@/types/auth';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 
-const SECTION_OPTIONS = [
-  { value: 'overview', label: '📈 Overview' },
-  { value: 'rules', label: '🧮 Commission Rules' },
-  { value: 'reconciliation', label: '🧾 Reconciliation' },
-  { value: 'documents', label: '📄 Documents' },
-];
+const TABS = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'rules', label: 'Commission Rules' },
+  { key: 'reconciliation', label: 'Reconciliation' },
+  { key: 'books', label: 'Books' },
+  { key: 'documents', label: 'Documents' },
+] as const;
 
 const RECON_SCOPE_OPTIONS = [
   { value: 'PAYMENTS', label: 'Payments' },
@@ -42,35 +44,77 @@ const DOC_TYPE_OPTIONS = [
   { value: 'CREDIT_NOTE', label: 'Credit notes' },
 ];
 
+const BOOK_TYPE_OPTIONS = [
+  { value: '', label: 'All book entries' },
+  { value: 'PAYMENT_RECEIVED', label: 'Money in' },
+  { value: 'ESCROW_RELEASE', label: 'Escrow releases' },
+  { value: 'PAYOUT_DISBURSED', label: 'Money out' },
+  { value: 'REFUND_ISSUED', label: 'Refunds' },
+  { value: 'REVERSAL', label: 'Reversals' },
+];
+
 const RULE_SCOPE_OPTIONS = [
   { value: 'PLATFORM', label: 'Platform' },
   { value: 'BRAND', label: 'Brand' },
 ];
 
-const statusEmoji: Record<string, string> = {
-  MATCHED: '🟢',
-  UNMATCHED_INTERNAL: '🟠',
-  DISCREPANCY: '🔴',
-  RESOLVED: '🔵',
-  RUNNING: '🟡',
-  COMPLETED: '🟢',
-  FAILED: '🔴',
-  GENERATED: '🟢',
-  VOIDED: '⚪',
+const statusDot: Record<string, string> = {
+  MATCHED: 'bg-emerald-500',
+  UNMATCHED_INTERNAL: 'bg-amber-500',
+  DISCREPANCY: 'bg-rose-500',
+  RESOLVED: 'bg-sky-500',
+  RUNNING: 'bg-yellow-500',
+  COMPLETED: 'bg-emerald-500',
+  FAILED: 'bg-rose-500',
+  GENERATED: 'bg-emerald-500',
+  VOIDED: 'bg-slate-400',
 };
+
+const formatMoney = (value: number | undefined, currency = 'NGN') =>
+  typeof value === 'number'
+    ? new Intl.NumberFormat('en-NG', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value)
+    : '—';
+
+const formatReferenceLabel = (referenceType?: string | null) => {
+  const normalized = String(referenceType || 'GENERAL').trim();
+  if (!normalized) return 'General';
+  if (normalized.toUpperCase() === 'CUSTOMORDER') return 'Custom order';
+  if (normalized.toUpperCase() === 'ORDER') return 'Standard order';
+  return normalized.replace(/([a-z])([A-Z])/g, '$1 $2').replaceAll('_', ' ').trim();
+};
+
+const getReferenceTone = (referenceType?: string | null) => {
+  const normalized = String(referenceType || '').trim().toUpperCase();
+  if (normalized === 'CUSTOMORDER') {
+    return 'bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300';
+  }
+  if (normalized === 'ORDER') {
+    return 'bg-sky-100 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300';
+  }
+  if (normalized === 'PAYOUT') {
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300';
+  }
+  return 'bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-300';
+};
+
+const formatReferenceCode = (referenceId?: string | null) =>
+  referenceId ? `#${String(referenceId).slice(0, 8).toUpperCase()}` : 'â€”';
 
 const AdminFinancePage: React.FC = () => {
   const { hasPermission } = useAdminPermissions();
   const canWrite = hasPermission('PAYOUTS_PROCESS');
+  const canReadBooks = hasPermission('PAYOUTS_READ');
 
-  const [section, setSection] = useState('overview');
+  const [activeTab, setActiveTab] = useState<string>('overview');
   const [overview, setOverview] = useState<AdminFinanceOverview | null>(null);
   const [rules, setRules] = useState<AdminCommissionRule[]>([]);
   const [runs, setRuns] = useState<AdminReconciliationRun[]>([]);
   const [items, setItems] = useState<AdminReconciliationItem[]>([]);
+  const [books, setBooks] = useState<AdminLedgerTransaction[]>([]);
   const [documents, setDocuments] = useState<AdminFinancialDocument[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string>('');
   const [selectedItemStatus, setSelectedItemStatus] = useState('');
+  const [selectedBookType, setSelectedBookType] = useState('');
   const [selectedDocType, setSelectedDocType] = useState('');
   const [selectedDocument, setSelectedDocument] = useState<AdminFinancialDocument | null>(null);
   const [loading, setLoading] = useState(true);
@@ -123,12 +167,28 @@ const AdminFinancePage: React.FC = () => {
     }
   };
 
+  const loadBooks = async (type?: string) => {
+    if (!canReadBooks) {
+      setBooks([]);
+      return;
+    }
+
+    const response = await adminFinanceApi.listBooks(type ? { type, limit: '50' } : { limit: '50' });
+    setBooks(unwrapApiResponse<AdminLedgerTransaction[]>(response.data as any));
+  };
+
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadOverview(), loadRules(), loadRuns(), loadDocuments()])
+    Promise.all([
+      loadOverview(),
+      loadRules(),
+      loadRuns(),
+      loadDocuments(),
+      canReadBooks ? loadBooks() : Promise.resolve(),
+    ])
       .catch(() => toast.error('Failed to load finance data'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [canReadBooks]);
 
   useEffect(() => {
     if (!selectedRunId) {
@@ -145,6 +205,17 @@ const AdminFinancePage: React.FC = () => {
       toast.error('Failed to load finance documents'),
     );
   }, [selectedDocType]);
+
+  useEffect(() => {
+    if (!canReadBooks) {
+      setBooks([]);
+      return;
+    }
+
+    loadBooks(selectedBookType || undefined).catch(() =>
+      toast.error('Failed to load finance books'),
+    );
+  }, [canReadBooks, selectedBookType]);
 
   const selectedRun = useMemo(
     () => runs.find((run) => run.id === selectedRunId) ?? null,
@@ -232,207 +303,280 @@ const AdminFinancePage: React.FC = () => {
     setSelectedDocument(unwrapApiResponse<AdminFinancialDocument>(response.data as any));
   };
 
+  /* ------------------------------------------------------------------ */
+  /*  Loading skeleton                                                   */
+  /* ------------------------------------------------------------------ */
   if (loading) {
-    return <div className="text-sm text-slate-500 dark:text-slate-400">Loading finance workspace...</div>;
+    return (
+      <div className="space-y-6">
+        <AdminBreadcrumb segments={[{ label: 'Finance' }]} />
+        <div className="h-8 w-56 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800" />
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800/50" />
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="h-56 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800/50" />
+          <div className="h-56 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800/50" />
+        </div>
+      </div>
+    );
   }
+
+  /* ------------------------------------------------------------------ */
+  /*  Metric cards data                                                  */
+  /* ------------------------------------------------------------------ */
+  const metricCards = [
+    { label: 'GMV', value: formatMoney(overview?.gmv, overview?.currency), tone: 'border-emerald-500/30 bg-emerald-500/5' },
+    { label: 'Commissions', value: formatMoney(overview?.totalCommissions, overview?.currency), tone: 'border-indigo-500/30 bg-indigo-500/5' },
+    { label: 'Paid Out', value: formatMoney(overview?.totalPayouts, overview?.currency), tone: 'border-sky-500/30 bg-sky-500/5' },
+    { label: 'Refunds', value: formatMoney(overview?.totalRefunds, overview?.currency), tone: 'border-rose-500/30 bg-rose-500/5' },
+    { label: 'Active Rules', value: String(overview?.activeCommissionRules ?? 0), tone: 'border-amber-500/30 bg-amber-500/5' },
+    { label: 'Open Items', value: String(overview?.unresolvedReconciliationItems ?? 0), tone: 'border-orange-500/30 bg-orange-500/5' },
+  ];
+
+  const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white';
+  const cardCls = 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.03]';
 
   return (
     <div className="space-y-6">
       <AdminBreadcrumb segments={[{ label: 'Finance' }]} />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">🏦 Finance Workspace</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Operate commissions, reconciliation, documents, and finance reporting from one surface.
-          </p>
-        </div>
-
-        <div className="w-full lg:w-64">
-          <UniversalSelect
-            label="Section"
-            value={section}
-            onChange={setSection}
-            options={SECTION_OPTIONS}
-            placeholder="Choose section"
-          />
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Finance Workspace</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Commissions, reconciliation, documents, and finance reporting.
+        </p>
       </div>
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-6">
-        {[
-          { label: 'GMV', value: overview?.gmv, emoji: '💳', money: true },
-          { label: 'Commissions', value: overview?.totalCommissions, emoji: '🧮', money: true },
-          { label: 'Paid Out', value: overview?.totalPayouts, emoji: '💸', money: true },
-          { label: 'Refunds', value: overview?.totalRefunds, emoji: '↩️', money: true },
-          { label: 'Active Rules', value: overview?.activeCommissionRules, emoji: '📐', money: false },
-          { label: 'Open Reconciliation', value: overview?.unresolvedReconciliationItems, emoji: '🧾', money: false },
-        ].map((card) => (
-          <div key={card.label} className="rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-              {card.emoji} {card.label}
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-              {typeof card.value === 'number'
-                ? card.money
-                  ? `${overview?.currency ?? 'NGN'} ${card.value.toLocaleString()}`
-                  : card.value.toLocaleString()
-                : card.value}
-            </div>
+      {/* Metric cards */}
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-6">
+        {metricCards.map((card) => (
+          <div key={card.label} className={`rounded-2xl border p-4 ${card.tone}`}>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {card.label}
+            </p>
+            <p className="mt-2 text-xl font-bold text-slate-900 dark:text-white">{card.value}</p>
           </div>
         ))}
       </section>
 
-      {section === 'overview' && (
+      {/* Tabs */}
+      <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-white/10">
+        {TABS.map((tab) => {
+          const active = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`whitespace-nowrap border-b-2 px-5 py-3 text-sm font-semibold transition ${
+                active
+                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* ============================================================ */}
+      {/*  OVERVIEW TAB                                                 */}
+      {/* ============================================================ */}
+      {activeTab === 'overview' && (
         <section className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-3xl border border-black/10 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
-            <div className="text-sm font-semibold text-slate-900 dark:text-white">🧾 Recent reconciliation runs</div>
-            <div className="mt-4 space-y-3">
+          <div className={cardCls}>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Recent Reconciliation Runs</h3>
+            <div className="mt-4 space-y-2">
               {overview?.recentRuns?.length ? overview.recentRuns.map((run) => (
-                <div key={run.id} className="rounded-2xl border border-black/10 px-4 py-3 dark:border-white/10">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                    {statusEmoji[run.status] ?? '⚪'} {run.scope.replace(/_/g, ' ')}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {run.status} • {new Date(run.startedAt).toLocaleString()}
+                <div key={run.id} className="flex items-center gap-3 rounded-xl border border-slate-100 px-4 py-3 dark:border-white/5">
+                  <span className={`h-2 w-2 flex-shrink-0 rounded-full ${statusDot[run.status] ?? 'bg-slate-400'}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">{run.scope.replace(/_/g, ' ')}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{run.status} · {new Date(run.startedAt).toLocaleString()}</p>
                   </div>
                 </div>
-              )) : <div className="text-sm text-slate-500 dark:text-slate-400">No reconciliation runs yet.</div>}
+              )) : (
+                <p className="py-6 text-center text-sm text-slate-400">No reconciliation runs yet.</p>
+              )}
             </div>
           </div>
 
-          <div className="rounded-3xl border border-black/10 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
-            <div className="text-sm font-semibold text-slate-900 dark:text-white">📄 Recent financial documents</div>
-            <div className="mt-4 space-y-3">
-              {overview?.recentDocuments?.length ? overview.recentDocuments.map((document) => (
+          <div className={cardCls}>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Recent Financial Documents</h3>
+            <div className="mt-4 space-y-2">
+              {overview?.recentDocuments?.length ? overview.recentDocuments.map((doc) => (
                 <button
-                  key={document.id}
+                  key={doc.id}
                   type="button"
-                  onClick={() => {
-                    setSection('documents');
-                    setSelectedDocument(document);
-                  }}
-                  className="w-full rounded-2xl border border-black/10 px-4 py-3 text-left dark:border-white/10"
+                  onClick={() => { setActiveTab('documents'); setSelectedDocument(doc); }}
+                  className="flex w-full items-center gap-3 rounded-xl border border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/[0.03]"
                 >
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                    {statusEmoji[document.status] ?? '⚪'} {document.documentNumber}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {document.type.replace(/_/g, ' ')} • {new Date(document.issuedAt).toLocaleString()}
+                  <span className={`h-2 w-2 flex-shrink-0 rounded-full ${statusDot[doc.status] ?? 'bg-slate-400'}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">{doc.documentNumber}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{doc.type.replace(/_/g, ' ')} · {new Date(doc.issuedAt).toLocaleString()}</p>
                   </div>
                 </button>
-              )) : <div className="text-sm text-slate-500 dark:text-slate-400">No financial documents yet.</div>}
+              )) : (
+                <p className="py-6 text-center text-sm text-slate-400">No financial documents yet.</p>
+              )}
             </div>
           </div>
         </section>
       )}
 
-      {section === 'rules' && (
-        <section className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
-          <div className="rounded-3xl border border-black/10 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
-            <div className="text-sm font-semibold text-slate-900 dark:text-white">🧮 Active commission rules</div>
-            <div className="mt-4 space-y-3">
-              {rules.map((rule) => (
-                <div key={rule.id} className="rounded-2xl border border-black/10 px-4 py-3 dark:border-white/10">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {rule.isDefault ? '⭐' : '📐'} {rule.name}
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        {rule.scope} • {rule.currency || 'ALL'} • {rule.ratePercent}% • {rule.isActive ? 'Active' : 'Inactive'}
-                      </div>
-                    </div>
-                    {canWrite && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await adminFinanceApi.updateCommissionRule(rule.id, { isActive: !rule.isActive });
-                            toast.success('Commission rule updated');
-                            await loadRules();
-                          } catch {
-                            toast.error('Failed to update commission rule');
-                          }
-                        }}
-                        className="rounded-full border border-black/10 px-3 py-1 text-xs font-semibold dark:border-white/10 dark:text-white"
-                      >
-                        {rule.isActive ? 'Pause' : 'Activate'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+      {/* ============================================================ */}
+      {/*  COMMISSION RULES TAB                                         */}
+      {/* ============================================================ */}
+      {activeTab === 'rules' && (
+        <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+          {/* Rules list */}
+          <div className={cardCls}>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Active Commission Rules</h3>
+            <div className="mt-4 overflow-hidden rounded-xl border border-slate-100 dark:border-white/5">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 dark:bg-white/[0.03]">
+                  <tr>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Name</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Scope</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Rate</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                    {canWrite && <th className="px-4 py-3" />}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                  {rules.length === 0 ? (
+                    <tr><td colSpan={canWrite ? 5 : 4} className="px-4 py-8 text-center text-slate-400">No commission rules configured.</td></tr>
+                  ) : rules.map((rule) => (
+                    <tr key={rule.id} className="transition hover:bg-slate-50 dark:hover:bg-white/[0.02]">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {rule.isDefault && <span className="text-xs text-amber-500" title="Default">★</span>}
+                          <span className="font-medium text-slate-900 dark:text-white">{rule.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                        {rule.scope} · {rule.currency || 'ALL'}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-200">{rule.ratePercent}%</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${rule.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-400'}`}>
+                          {rule.isActive ? 'Active' : 'Paused'}
+                        </span>
+                      </td>
+                      {canWrite && (
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await adminFinanceApi.updateCommissionRule(rule.id, { isActive: !rule.isActive });
+                                toast.success('Rule updated');
+                                await loadRules();
+                              } catch {
+                                toast.error('Failed to update rule');
+                              }
+                            }}
+                            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
+                          >
+                            {rule.isActive ? 'Pause' : 'Activate'}
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-black/10 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
-            <div className="text-sm font-semibold text-slate-900 dark:text-white">➕ Create rule</div>
-            <div className="mt-4 space-y-4">
-              <input value={ruleDraft.name} onChange={(event) => setRuleDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Rule name" className="w-full rounded-2xl border border-black/10 bg-transparent px-4 py-3 text-sm dark:border-white/10 dark:text-white" />
-              <UniversalSelect label="Scope" value={ruleDraft.scope} onChange={(value) => setRuleDraft((current) => ({ ...current, scope: value }))} options={RULE_SCOPE_OPTIONS} placeholder="Choose scope" />
+          {/* Create rule form */}
+          <div className={cardCls}>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Create Rule</h3>
+            <div className="mt-4 space-y-3">
+              <input value={ruleDraft.name} onChange={(e) => setRuleDraft((c) => ({ ...c, name: e.target.value }))} placeholder="Rule name" className={inputCls} />
+              <UniversalSelect label="Scope" value={ruleDraft.scope} onChange={(v) => setRuleDraft((c) => ({ ...c, scope: v }))} options={RULE_SCOPE_OPTIONS} placeholder="Choose scope" />
               {ruleDraft.scope === 'BRAND' && (
-                <input value={ruleDraft.brandId} onChange={(event) => setRuleDraft((current) => ({ ...current, brandId: event.target.value }))} placeholder="Brand ID" className="w-full rounded-2xl border border-black/10 bg-transparent px-4 py-3 text-sm dark:border-white/10 dark:text-white" />
+                <input value={ruleDraft.brandId} onChange={(e) => setRuleDraft((c) => ({ ...c, brandId: e.target.value }))} placeholder="Brand ID" className={inputCls} />
               )}
-              <input value={ruleDraft.currency} onChange={(event) => setRuleDraft((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} placeholder="Currency" className="w-full rounded-2xl border border-black/10 bg-transparent px-4 py-3 text-sm dark:border-white/10 dark:text-white" />
-              <input value={ruleDraft.ratePercent} onChange={(event) => setRuleDraft((current) => ({ ...current, ratePercent: event.target.value }))} placeholder="Rate percent" className="w-full rounded-2xl border border-black/10 bg-transparent px-4 py-3 text-sm dark:border-white/10 dark:text-white" />
               <div className="grid grid-cols-2 gap-3">
-                <input value={ruleDraft.minFeeAmount} onChange={(event) => setRuleDraft((current) => ({ ...current, minFeeAmount: event.target.value }))} placeholder="Min fee" className="w-full rounded-2xl border border-black/10 bg-transparent px-4 py-3 text-sm dark:border-white/10 dark:text-white" />
-                <input value={ruleDraft.maxFeeAmount} onChange={(event) => setRuleDraft((current) => ({ ...current, maxFeeAmount: event.target.value }))} placeholder="Max fee" className="w-full rounded-2xl border border-black/10 bg-transparent px-4 py-3 text-sm dark:border-white/10 dark:text-white" />
+                <input value={ruleDraft.currency} onChange={(e) => setRuleDraft((c) => ({ ...c, currency: e.target.value.toUpperCase() }))} placeholder="Currency" className={inputCls} />
+                <input value={ruleDraft.ratePercent} onChange={(e) => setRuleDraft((c) => ({ ...c, ratePercent: e.target.value }))} placeholder="Rate %" className={inputCls} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <input value={ruleDraft.minFeeAmount} onChange={(e) => setRuleDraft((c) => ({ ...c, minFeeAmount: e.target.value }))} placeholder="Min fee" className={inputCls} />
+                <input value={ruleDraft.maxFeeAmount} onChange={(e) => setRuleDraft((c) => ({ ...c, maxFeeAmount: e.target.value }))} placeholder="Max fee" className={inputCls} />
               </div>
               <button
                 type="button"
-                onClick={() => setRuleDraft((current) => ({ ...current, isDefault: !current.isDefault }))}
-                className="rounded-2xl border border-black/10 px-4 py-3 text-left text-sm font-semibold dark:border-white/10 dark:text-white"
+                onClick={() => setRuleDraft((c) => ({ ...c, isDefault: !c.isDefault }))}
+                className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm font-medium transition ${ruleDraft.isDefault ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300' : 'border-slate-200 text-slate-600 dark:border-white/10 dark:text-slate-400'}`}
               >
-                {ruleDraft.isDefault ? '⭐ Default rule' : '⚪ Not default'}
+                {ruleDraft.isDefault ? '★ Default rule' : 'Not default'}
               </button>
               <button
                 type="button"
                 onClick={saveRule}
                 disabled={!canWrite}
-                className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 dark:bg-white dark:text-slate-900"
+                className="w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
               >
-                Save commission rule
+                Save Rule
               </button>
             </div>
           </div>
         </section>
       )}
 
-      {section === 'reconciliation' && (
-        <section className="grid gap-6 xl:grid-cols-[0.9fr,1.1fr]">
+      {/* ============================================================ */}
+      {/*  RECONCILIATION TAB                                           */}
+      {/* ============================================================ */}
+      {activeTab === 'reconciliation' && (
+        <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
           <div className="space-y-6">
-            <div className="rounded-3xl border border-black/10 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="text-sm font-semibold text-slate-900 dark:text-white">▶️ Run reconciliation</div>
-              <div className="mt-4 space-y-4">
-                <UniversalSelect label="Scope" value={runningScope} onChange={(value) => setRunningScope(value as 'PAYMENTS' | 'PAYOUTS' | 'LEDGER_INTEGRITY')} options={RECON_SCOPE_OPTIONS} placeholder="Choose run scope" />
+            {/* Run reconciliation */}
+            <div className={cardCls}>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Run Reconciliation</h3>
+              <div className="mt-4 flex items-end gap-3">
+                <div className="flex-1">
+                  <UniversalSelect label="Scope" value={runningScope} onChange={(v) => setRunningScope(v as any)} options={RECON_SCOPE_OPTIONS} placeholder="Scope" />
+                </div>
                 <button
                   type="button"
                   onClick={runCommand}
                   disabled={!canWrite}
-                  className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 dark:bg-white dark:text-slate-900"
+                  className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  Run {runningScope.replace(/_/g, ' ').toLowerCase()}
+                  Run
                 </button>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-black/10 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="text-sm font-semibold text-slate-900 dark:text-white">🧾 Runs</div>
-              <div className="mt-4 space-y-3">
-                {runs.map((run) => (
+            {/* Runs list */}
+            <div className={cardCls}>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Run History</h3>
+              <div className="mt-4 space-y-2">
+                {runs.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-slate-400">No runs yet.</p>
+                ) : runs.map((run) => (
                   <button
                     key={run.id}
                     type="button"
                     onClick={() => setSelectedRunId(run.id)}
-                    className={`w-full rounded-2xl border px-4 py-3 text-left ${selectedRunId === run.id ? 'border-emerald-400 bg-emerald-500/10' : 'border-black/10 dark:border-white/10'}`}
+                    className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${
+                      selectedRunId === run.id
+                        ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-500/40 dark:bg-indigo-500/10'
+                        : 'border-slate-100 hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/[0.03]'
+                    }`}
                   >
-                    <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                      {statusEmoji[run.status] ?? '⚪'} {run.scope.replace(/_/g, ' ')}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {run.status} • {(run._count?.items ?? 0)} items
+                    <span className={`h-2 w-2 flex-shrink-0 rounded-full ${statusDot[run.status] ?? 'bg-slate-400'}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">{run.scope.replace(/_/g, ' ')}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{run.status} · {(run._count?.items ?? 0)} items</p>
                     </div>
                   </button>
                 ))}
@@ -440,94 +584,241 @@ const AdminFinancePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-black/10 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          {/* Items panel */}
+          <div className={cardCls}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="text-sm font-semibold text-slate-900 dark:text-white">🔍 Reconciliation items</div>
-                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {selectedRun ? `${selectedRun.scope.replace(/_/g, ' ')} run selected` : 'Choose a run to inspect'}
-                </div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Reconciliation Items</h3>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  {selectedRun ? `${selectedRun.scope.replace(/_/g, ' ')} run · ${unresolvedItems.length} open` : 'Select a run to inspect'}
+                </p>
               </div>
-              <div className="w-full lg:w-64">
-                <UniversalSelect label="Item status" value={selectedItemStatus} onChange={setSelectedItemStatus} options={ITEM_STATUS_OPTIONS} placeholder="Filter items" />
+              <div className="w-full sm:w-52">
+                <UniversalSelect value={selectedItemStatus} onChange={setSelectedItemStatus} options={ITEM_STATUS_OPTIONS} placeholder="Filter" />
               </div>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-dashed border-black/10 px-4 py-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
-              Open items in this view: {unresolvedItems.length}
             </div>
 
             <div className="mt-4 space-y-3">
-              {items.map((item) => (
-                <div key={item.id} className="rounded-2xl border border-black/10 px-4 py-4 dark:border-white/10">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                    {statusEmoji[item.status] ?? '⚪'} {item.summary}
+              {items.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-400">No items found.</p>
+              ) : items.map((item) => (
+                <div key={item.id} className="rounded-xl border border-slate-100 px-4 py-4 dark:border-white/5">
+                  <div className="flex items-start gap-3">
+                    <span className={`mt-1 h-2 w-2 flex-shrink-0 rounded-full ${statusDot[item.status] ?? 'bg-slate-400'}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">{item.summary}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${getReferenceTone(item.referenceType)}`}>
+                          {formatReferenceLabel(item.referenceType)}
+                        </span>
+                        <span className="font-mono text-[11px]">{formatReferenceCode(item.referenceId)}</span>
+                        <span>Expected {item.expectedAmount ?? '—'}</span>
+                        <span>Actual {item.actualAmount ?? '—'}</span>
+                      </div>
+                    </div>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                      item.status === 'MATCHED' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' :
+                      item.status === 'RESOLVED' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300' :
+                      'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300'
+                    }`}>
+                      {item.status.replace(/_/g, ' ')}
+                    </span>
                   </div>
-                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {item.referenceType} • Expected {item.expectedAmount ?? '—'} • Actual {item.actualAmount ?? '—'}
-                  </div>
-                  {canWrite && item.status !== 'MATCHED' && (
-                    <div className="mt-3 flex flex-col gap-3">
-                      <input value={resolutionNote} onChange={(event) => setResolutionNote(event.target.value)} placeholder="Resolution note" className="w-full rounded-2xl border border-black/10 bg-transparent px-4 py-3 text-sm dark:border-white/10 dark:text-white" />
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => handleItemAction(item, 'claim')} className="rounded-full border border-black/10 px-3 py-2 text-xs font-semibold dark:border-white/10 dark:text-white">Claim</button>
-                        <button type="button" onClick={() => handleItemAction(item, 'release')} className="rounded-full border border-black/10 px-3 py-2 text-xs font-semibold dark:border-white/10 dark:text-white">Release</button>
-                        <button type="button" onClick={() => handleItemAction(item, 'resolve')} className="rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white dark:bg-white dark:text-slate-900">Resolve</button>
+                  {canWrite && item.status !== 'MATCHED' && item.status !== 'RESOLVED' && (
+                    <div className="mt-3 flex flex-col gap-2 pl-5">
+                      <input value={resolutionNote} onChange={(e) => setResolutionNote(e.target.value)} placeholder="Resolution note..." className={inputCls} />
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => handleItemAction(item, 'claim')} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:text-slate-300">Claim</button>
+                        <button type="button" onClick={() => handleItemAction(item, 'release')} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:text-slate-300">Release</button>
+                        <button type="button" onClick={() => handleItemAction(item, 'resolve')} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">Resolve</button>
                       </div>
                     </div>
                   )}
                 </div>
               ))}
-              {items.length === 0 && <div className="text-sm text-slate-500 dark:text-slate-400">No reconciliation items found.</div>}
             </div>
           </div>
         </section>
       )}
 
-      {section === 'documents' && (
-        <section className="grid gap-6 xl:grid-cols-[0.8fr,1.2fr]">
-          <div className="rounded-3xl border border-black/10 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
-            <div className="w-full">
-              <UniversalSelect label="Document type" value={selectedDocType} onChange={setSelectedDocType} options={DOC_TYPE_OPTIONS} placeholder="Filter documents" />
+      {/* ============================================================ */}
+      {/*  BOOKS TAB                                                    */}
+      {/* ============================================================ */}
+      {activeTab === 'books' && (
+        <section className={cardCls}>
+          {!canReadBooks ? (
+            <div className="flex h-40 items-center justify-center text-sm text-slate-400">
+              Book access requires audit-read permission.
             </div>
-            <div className="mt-4 space-y-3">
-              {documents.map((document) => (
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Books of accounts</h3>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    System-wide money in, money out, refunds, reversals, and release postings.
+                  </p>
+                </div>
+                <div className="w-full lg:w-72">
+                  <UniversalSelect
+                    label="Book type"
+                    value={selectedBookType}
+                    onChange={setSelectedBookType}
+                    options={BOOK_TYPE_OPTIONS}
+                    placeholder="Filter"
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-slate-100 dark:border-white/5">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 dark:bg-white/[0.03]">
+                    <tr>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Entry</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Reference</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Date</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Amount</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Split</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                    {books.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                          No book entries found.
+                        </td>
+                      </tr>
+                    ) : (
+                      books.map((book) => (
+                        <tr key={book.id} className="align-top transition hover:bg-slate-50 dark:hover:bg-white/[0.02]">
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-slate-900 dark:text-white">
+                              {book.type.replace(/_/g, ' ')}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                              {book.description}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${getReferenceTone(book.referenceType)}`}>
+                                {formatReferenceLabel(book.referenceType)}
+                              </span>
+                              <span className="font-mono text-[11px]">
+                                {formatReferenceCode(book.referenceId)}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+                            {new Date(book.createdAt).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">
+                            {formatMoney(Number(book.totalAmount), book.currency)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                              {book.entries.map((entry) => (
+                                <div key={entry.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2 dark:border-white/5">
+                                  <span>
+                                    {entry.direction} · {entry.account.subType}
+                                  </span>
+                                  <span className="font-semibold text-slate-700 dark:text-slate-200">
+                                    {formatMoney(Number(entry.amount), book.currency)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ============================================================ */}
+      {/*  DOCUMENTS TAB                                                */}
+      {/* ============================================================ */}
+      {activeTab === 'documents' && (
+        <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+          <div className={cardCls}>
+            <div className="mb-4">
+              <UniversalSelect label="Document type" value={selectedDocType} onChange={setSelectedDocType} options={DOC_TYPE_OPTIONS} placeholder="Filter" />
+            </div>
+            <div className="space-y-2">
+              {documents.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-400">No documents found.</p>
+              ) : documents.map((doc) => (
                 <button
-                  key={document.id}
+                  key={doc.id}
                   type="button"
-                  onClick={async () => {
-                    await refreshDocument(document.id);
-                  }}
-                  className={`w-full rounded-2xl border px-4 py-3 text-left ${selectedDocument?.id === document.id ? 'border-emerald-400 bg-emerald-500/10' : 'border-black/10 dark:border-white/10'}`}
+                  onClick={async () => { await refreshDocument(doc.id); }}
+                  className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${
+                    selectedDocument?.id === doc.id
+                      ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-500/40 dark:bg-indigo-500/10'
+                      : 'border-slate-100 hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/[0.03]'
+                  }`}
                 >
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                    {statusEmoji[document.status] ?? '⚪'} {document.documentNumber}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {document.type.replace(/_/g, ' ')} • {new Date(document.issuedAt).toLocaleString()}
+                  <span className={`h-2 w-2 flex-shrink-0 rounded-full ${statusDot[doc.status] ?? 'bg-slate-400'}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">{doc.documentNumber}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <span>{doc.type.replace(/_/g, ' ')}</span>
+                      <span>·</span>
+                      <span>{new Date(doc.issuedAt).toLocaleString()}</span>
+                      {doc.customOrderId ? (
+                        <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${getReferenceTone('CustomOrder')}`}>
+                          Custom order {formatReferenceCode(doc.customOrderId)}
+                        </span>
+                      ) : doc.orderId ? (
+                        <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${getReferenceTone('Order')}`}>
+                          Standard order {formatReferenceCode(doc.orderId)}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="rounded-3xl border border-black/10 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className={cardCls}>
             {selectedDocument ? (
               <div className="space-y-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                    📄 {selectedDocument.documentNumber}
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{selectedDocument.documentNumber}</h3>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      {selectedDocument.type.replace(/_/g, ' ')} · {selectedDocument.currency} {selectedDocument.grossAmount}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      {selectedDocument.customOrderId ? (
+                        <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${getReferenceTone('CustomOrder')}`}>
+                          Custom order {formatReferenceCode(selectedDocument.customOrderId)}
+                        </span>
+                      ) : selectedDocument.orderId ? (
+                        <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${getReferenceTone('Order')}`}>
+                          Standard order {formatReferenceCode(selectedDocument.orderId)}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {selectedDocument.type.replace(/_/g, ' ')} • {selectedDocument.currency} {selectedDocument.grossAmount}
-                  </div>
+                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${statusDot[selectedDocument.status] ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-400'}`}>
+                    {selectedDocument.status}
+                  </span>
                 </div>
-                <div className="rounded-2xl border border-black/10 bg-white px-4 py-4 text-sm text-slate-700 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200">
+                <div className="rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-700 dark:border-white/5 dark:bg-slate-950 dark:text-slate-200">
                   <div dangerouslySetInnerHTML={{ __html: selectedDocument.contentHtml ?? '<p>No rendered document body.</p>' }} />
                 </div>
               </div>
             ) : (
-              <div className="text-sm text-slate-500 dark:text-slate-400">Select a document to preview it.</div>
+              <div className="flex h-48 items-center justify-center text-sm text-slate-400">
+                Select a document to preview.
+              </div>
             )}
           </div>
         </section>

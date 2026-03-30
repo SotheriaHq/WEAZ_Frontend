@@ -18,7 +18,6 @@ import { FrostedButton } from '@/components/ui/FrostedButton';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { CollectionCartPreviewModal } from '@/components/collections/CollectionCartPreviewModal';
 import { getCollectionCartPreview, type CollectionCartPreviewResponse } from '@/api/collectionUploads';
-import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildCollectionUrl, shareOrCopyLink } from '@/utils/publicLinks';
 
 interface InlineCollectionViewerProps {
@@ -56,7 +55,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const [addingAll, setAddingAll] = useState(false);
   const [showCartPreview, setShowCartPreview] = useState(false);
   const [cartPreviewData, setCartPreviewData] = useState<CollectionCartPreviewResponse | null>(null);
-  const [showQr, setShowQr] = useState(false);
+  /* showQr disabled — only brand profile QR codes active */
 
   useEffect(() => {
     let mounted = true;
@@ -129,12 +128,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const hasActiveSale = useMemo(() => {
     return (detail?.saleMinPrice != null || detail?.saleMaxPrice != null);
   }, [detail]);
-  const canOpenQr = useMemo(() => {
-    if (!detail) return false;
-    if (detail.deletedAt) return false;
-    if (detail.status !== 'PUBLISHED') return false;
-    return true;
-  }, [detail]);
+  /* canOpenQr disabled — only brand profile QR codes active */
 
   const mediaItems: CarouselMediaItem[] = useMemo(() => {
     const medias = (detail?.medias ?? []) as Array<any>;
@@ -695,7 +689,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               isThreaded={isThreaded}
               onThread={handleThread}
               onShare={handleShare}
-              onOpenQr={canOpenQr ? () => setShowQr(true) : undefined}
+              onOpenQr={undefined}
               onAddToCart={!isOwner && productItems.length > 0 ? handleAddAllToCart : undefined}
               onAddToWishlist={handleWishlist}
               isWishlisted={isWishlisted}
@@ -756,15 +750,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
           }}
         />
       )}
-      <LazyEntityQrModal
-        open={showQr}
-        onClose={() => setShowQr(false)}
-        title="Collection QR Code"
-        subtitle="Scan to open this collection."
-        url={buildCollectionUrl(collectionId)}
-        downloadFileName={`collection-${collectionId}-qr.png`}
-        logoUrl={detail?.owner?.profileImage || null}
-      />
+      {/* Collection QR modal disabled — only brand profile QR codes active */}
       {isOwner && (
         <DiscountSaleModal
           open={showDiscountModal}

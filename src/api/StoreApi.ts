@@ -128,6 +128,66 @@ export interface OrderItem {
   existingReviewId?: string | null;
 }
 
+export interface OrderFinanceRelease {
+  stage: 'SHIPPED_RELEASE' | 'DELIVERED_RELEASE';
+  grossAmount: number;
+  commissionAmount: number;
+  netAmount: number;
+  releasedAt?: string | null;
+  eligibleAt?: string | null;
+  condition?: string | null;
+}
+
+export interface OrderFinanceBreakdown {
+  currency: string;
+  itemSubtotal: number;
+  shippingAmount: number;
+  discountAmount: number;
+  grossAmount: number;
+  paymentReference?: string | null;
+  paymentStatus?: string | null;
+  paidAt?: string | null;
+  escrowStatus?: string | null;
+  commissionRate?: number | null;
+  commissionAmount?: number | null;
+  netBrandAmount?: number | null;
+  releaseSchedule?: OrderFinanceRelease[];
+  ledgerTransactions?: Array<{
+    id: string;
+    type: string;
+    description: string;
+    totalAmount: number;
+    currency: string;
+    createdAt: string;
+    entries: Array<{
+      id: string;
+      direction: 'DEBIT' | 'CREDIT';
+      amount: number;
+      accountCode?: string | null;
+      accountName?: string | null;
+      accountType?: string | null;
+      accountSubType?: string | null;
+    }>;
+  }>;
+}
+
+export interface OrderBuyerReceipt {
+  id: string;
+  documentNumber: string;
+  type: string;
+  issuedAt: string;
+  currency: string;
+  grossAmount: number;
+  commissionAmount?: number | null;
+  netAmount?: number | null;
+  paymentAttemptId?: string | null;
+  paymentReference?: string | null;
+  settlementCurrency?: string | null;
+  settlementAmount?: number | null;
+  issuedToName?: string | null;
+  lineItems?: Array<{ label: string; amount: number }>;
+}
+
 export interface Order {
   id: string;
   brandId: string;
@@ -149,6 +209,8 @@ export interface Order {
   paidAt?: string | null;
   deliveredAt?: string | null;
   buyerConfirmedDeliveryAt?: string | null;
+  financeBreakdown?: OrderFinanceBreakdown | null;
+  buyerReceipt?: OrderBuyerReceipt | null;
   createdAt: string;
   updatedAt: string;
   orderItems?: OrderItem[];
@@ -157,6 +219,11 @@ export interface Order {
     name?: string;
     logo?: string | null;
     currency?: string;
+    contactEmail?: string | null;
+    owner?: {
+      phoneNumber?: string | null;
+      address?: string | null;
+    } | null;
   };
 }
 

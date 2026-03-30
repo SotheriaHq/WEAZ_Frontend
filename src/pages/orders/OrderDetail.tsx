@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { confirmMyOrderDelivery, getMyOrder, resolveOrderAccess, type Order } from '@/api/StoreApi';
 import { toast } from 'sonner';
-import LazyOrderQrCard from '@/components/qr/LazyOrderQrCard';
+
 import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
 import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
 import ImageWithFallback from '@/components/ImageWithFallback';
@@ -154,6 +154,17 @@ const OrderDetail: React.FC = () => {
     !order.buyerConfirmedDeliveryAt;
 
   const firstItem = order?.items?.[0] ?? null;
+  const financeBreakdown = order?.financeBreakdown ?? null;
+  const buyerReceipt = order?.buyerReceipt ?? null;
+  const receiptSubtotal =
+    financeBreakdown?.itemSubtotal ??
+    (order?.items ?? []).reduce(
+      (sum, item) => sum + Number(item.price ?? item.unitPrice ?? 0) * item.quantity,
+      0,
+    );
+  const receiptShipping = financeBreakdown?.shippingAmount ?? Number(order?.shippingCost || 0);
+  const receiptDiscount = financeBreakdown?.discountAmount ?? Number(order?.discountAmount || 0);
+  const receiptTotal = financeBreakdown?.grossAmount ?? Number(order?.totalAmount || 0);
 
   const timelineSteps = useMemo<TimelineStep[]>(() => {
     if (!order) return [];
@@ -467,20 +478,114 @@ const OrderDetail: React.FC = () => {
           ))}
         </div>
 
-        <div className="mt-4 grid gap-3 border-t border-gray-200 pt-4 text-sm dark:border-gray-800 sm:grid-cols-2 xl:grid-cols-4">
-          <InfoPill
-            label="Subtotal"
-            value={formatCurrency(Number(order.totalAmount), order.currency || 'NGN')}
-          />
-          <InfoPill
-            label="Shipping"
-            value={formatCurrency(Number(order.shippingCost || 0), order.currency || 'NGN')}
-          />
-          <InfoPill
-            label="Discount"
-            value={formatCurrency(Number(order.discountAmount || 0), order.currency || 'NGN')}
-          />
-          <InfoPill label="Payment status" value={order.paymentStatus} />
+        <div className="mt-4 space-y-4 border-t border-gray-200 pt-4 dark:border-gray-800">
+          {/* Brand receipt header */}
+          <div className="flex items-center gap-4 rounded-2xl border border-gray-200/70 bg-white px-4 py-4 dark:border-white/10 dark:bg-black/10">
+            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-white/10">
+              {order.brand?.logo ? (
+                <ImageWithFallback
+                  src={order.brand.logo}
+                  alt={order.brand.name || 'Brand'}
+                  fit="cover"
+                  rounded="none"
+                  className="h-full w-full object-cover"
+                  containerClassName="h-full w-full"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-lg">
+                  <span aria-hidden="true">🏷️</span>
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-gray-900 dark:text-white">
+                {order.brand?.name || 'Brand'}
+              </p>
+              {order.brand?.owner?.address ? (
+                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {order.brand.owner.address}
+                </p>
+              ) : null}
+              {order.brand?.contactEmail || order.brand?.owner?.phoneNumber ? (
+                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {[order.brand.contactEmail, order.brand.owner?.phoneNumber].filter(Boolean).join(' · ')}
+                </p>
+              ) : null}
+            </div>
+            <div className="ml-auto text-right text-xs text-gray-500 dark:text-gray-400">
+              <p>Order #{order.id.slice(0, 8).toUpperCase()}</p>
+              <p>{formatDateTime(order.createdAt)}</p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Receipt summary</p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Your purchase breakdown for this order.
+                </p>
+              </div>
+              <div className="text-right text-xs text-gray-500 dark:text-gray-400">
+                <div>{order.paymentStatus}</div>
+                {financeBreakdown?.paidAt ? <div>{formatDateTime(financeBreakdown.paidAt)}</div> : null}
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2 text-sm">
+              <ReceiptRow
+                label="Items subtotal"
+                value={formatCurrency(receiptSubtotal, order.currency || 'NGN')}
+              />
+              <ReceiptRow
+                label="Shipping"
+                value={formatCurrency(receiptShipping, order.currency || 'NGN')}
+              />
+              <ReceiptRow
+                label="Discount"
+                value={
+                  receiptDiscount > 0
+                    ? `- ${formatCurrency(receiptDiscount, order.currency || 'NGN')}`
+                    : formatCurrency(receiptDiscount, order.currency || 'NGN')
+                }
+              />
+              <ReceiptRow
+                label="Grand total"
+                value={formatCurrency(receiptTotal, order.currency || 'NGN')}
+                strong
+              />
+              <ReceiptRow
+                label="Payment reference"
+                value={financeBreakdown?.paymentReference || order.paymentReference || 'Not recorded'}
+              />
+            </div>
+          </div>
+
+          {buyerReceipt ? (
+            <div className="rounded-2xl border border-gray-200/70 bg-white px-4 py-4 text-sm dark:border-white/10 dark:bg-black/10">
+              <p className="font-semibold text-gray-900 dark:text-white">Receipt document</p>
+              <div className="mt-3 space-y-2">
+                <ReceiptRow label="Receipt number" value={buyerReceipt.documentNumber} />
+                <ReceiptRow
+                  label="Issued"
+                  value={formatDateTime(buyerReceipt.issuedAt) || 'Recorded'}
+                />
+                <ReceiptRow
+                  label="Amount paid"
+                  value={
+                    buyerReceipt.settlementAmount != null
+                      ? formatCurrency(
+                          buyerReceipt.settlementAmount,
+                          buyerReceipt.settlementCurrency || buyerReceipt.currency,
+                        )
+                      : 'Recorded'
+                  }
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {/* Settlement release timeline hidden from buyer — brand-only financial data */}
         </div>
 
         {order.orderItems?.length ? (
@@ -547,12 +652,7 @@ const OrderDetail: React.FC = () => {
         ) : null}
       </section>
 
-      <LazyOrderQrCard
-        orderId={order.id}
-        title="Order QR Code"
-        subtitle="Scan to reopen this order while signed in."
-        logoUrl={order.brand?.logo || null}
-      />
+      {/* QR code removed — order-level QR codes disabled; only brand profile QR codes are active */}
 
       <ReviewComposerModal
         open={Boolean(activeReviewItem)}
@@ -586,6 +686,19 @@ const InfoPill: React.FC<{ label: string; value: string; mono?: boolean }> = ({
     <p className={`mt-1 text-sm font-semibold text-gray-900 dark:text-white ${mono ? 'font-mono' : ''}`}>
       {value}
     </p>
+  </div>
+);
+
+const ReceiptRow: React.FC<{ label: string; value: string; strong?: boolean }> = ({
+  label,
+  value,
+  strong = false,
+}) => (
+  <div className="flex items-center justify-between gap-4 border-b border-dashed border-gray-200/80 pb-2 last:border-b-0 last:pb-0 dark:border-white/10">
+    <span className="text-gray-500 dark:text-gray-400">{label}</span>
+    <span className={`text-right ${strong ? 'font-bold text-gray-900 dark:text-white' : 'font-medium text-gray-900 dark:text-white'}`}>
+      {value}
+    </span>
   </div>
 );
 

@@ -73,6 +73,9 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [summaryUnread, setSummaryUnread] = useState<number>(0);
+  const [threadStatus, setThreadStatus] = useState<
+    'OPEN' | 'READ_ONLY' | 'ARCHIVED' | 'BLOCKED' | null
+  >(null);
   const [input, setInput] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -97,6 +100,11 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
 
   const listMessages = useCallback(async () => {
     if (!contextId) return;
+    if (actorSurface === 'BRAND' && contextType !== 'INQUIRY' && !useThreadTransport && !brandId) {
+      setMessages([]);
+      setThreadStatus(null);
+      return;
+    }
 
     if (useThreadTransport && threadId) {
       const response = await messagingApi.listThreadMessages(threadId, { limit: 50 });
@@ -106,6 +114,14 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
       );
 
       setMessages(sorted);
+      setThreadStatus(
+        response.thread?.status === 'OPEN' ||
+          response.thread?.status === 'READ_ONLY' ||
+          response.thread?.status === 'ARCHIVED' ||
+          response.thread?.status === 'BLOCKED'
+          ? response.thread.status
+          : null,
+      );
 
       const latestMessageId = sorted.at(-1)?.id;
       if (latestMessageId) {
@@ -136,6 +152,14 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
     );
 
     setMessages(sorted);
+    setThreadStatus(
+      response.thread?.status === 'OPEN' ||
+        response.thread?.status === 'READ_ONLY' ||
+        response.thread?.status === 'ARCHIVED' ||
+        response.thread?.status === 'BLOCKED'
+        ? response.thread.status
+        : null,
+    );
 
     if (actorSurface !== 'ADMIN') {
       const latestMessageId = sorted.at(-1)?.id;
@@ -159,6 +183,11 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
 
   const loadSummary = useCallback(async () => {
     if (!contextId) return;
+    if (actorSurface === 'BRAND' && contextType !== 'INQUIRY' && !useThreadTransport && !brandId) {
+      setSummaryUnread(0);
+      setThreadStatus(null);
+      return;
+    }
 
     if (actorSurface === 'ADMIN') {
       setSummaryUnread(0);
@@ -185,6 +214,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
           : await messagingApi.getOrderSummary(contextId, true);
 
     setSummaryUnread(Number(summary?.unreadCount ?? 0));
+    setThreadStatus(summary?.status ?? null);
   }, [actorSurface, brandId, contextId, contextType, threadId, useThreadTransport]);
 
   const refresh = useCallback(async () => {
@@ -297,11 +327,20 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
     return () => window.clearTimeout(timer);
   }, [highlightMessageId, messages]);
 
+  const effectiveReadOnly = useMemo(
+    () =>
+      readOnly ||
+      threadStatus === 'READ_ONLY' ||
+      threadStatus === 'ARCHIVED' ||
+      threadStatus === 'BLOCKED',
+    [readOnly, threadStatus],
+  );
+
   const canSend = useMemo(() => {
     const hasBody = Boolean(input.trim());
     const hasAttachments = pendingAttachments.length > 0;
-    return !readOnly && actorSurface !== 'ADMIN' && (hasBody || hasAttachments) && !sending && !uploading;
-  }, [actorSurface, input, pendingAttachments.length, readOnly, sending, uploading]);
+    return !effectiveReadOnly && actorSurface !== 'ADMIN' && (hasBody || hasAttachments) && !sending && !uploading;
+  }, [actorSurface, effectiveReadOnly, input, pendingAttachments.length, sending, uploading]);
 
   const onPickAttachments: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
     const fileList = event.target.files;
@@ -430,6 +469,12 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
         </button>
       </div>
 
+      {effectiveReadOnly ? (
+        <div className="mb-4 rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+          This message window is closed because the order has concluded. New messages are disabled for both buyer and brand.
+        </div>
+      ) : null}
+
       <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1 scrollbar-hide">
         {loading ? (
           <div className="text-sm text-slate-500 dark:text-slate-400">Loading messages...</div>
@@ -483,7 +528,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
         )}
       </div>
 
-      {readOnly || actorSurface === 'ADMIN' ? null : (
+      {effectiveReadOnly || actorSurface === 'ADMIN' ? null : (
       <div className="mt-4 space-y-3">
         <textarea
           value={input}

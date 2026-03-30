@@ -93,6 +93,12 @@ const invalidateCachedUrl = (key: string) => {
   setCache(cache);
 };
 
+const isS3LikeUrl = (value?: string | null) => {
+  if (!value) return false;
+  const lower = value.toLowerCase();
+  return lower.includes('.s3.') || lower.includes('amazonaws.com');
+};
+
 // In-flight dedup: prevents concurrent requests for the same fileId/src
 const inflight = new Map<string, Promise<string | null>>();
 
@@ -154,19 +160,12 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       // If src/fileId changed, reset error
       setHadError(false);
 
-      // If no stable fileId is available, use src optimizations.
-      // When fileId exists, we prefer resolving by fileId to avoid stale signed URLs.
-      if (!fileId && src && (src.includes('?') || !src.includes('s3'))) {
-        setResolved(src);
-        return;
-      }
-
-      // Handle raw unsigned S3 URLs (contain '.s3.' but no '?' query params)
-      if (!fileId && src && src.includes('.s3.') && !src.includes('?')) {
+      // When fileId exists, prefer resolving by fileId to avoid stale signed URLs.
+      if (!fileId && src && isS3LikeUrl(src)) {
         setLoaded(false);
         const url = await resolveSignedUrl(src, () => brandApi.getSignedS3Url(src));
         if (mounted) {
-          setResolved(url || src); // fallback to raw URL
+          setResolved(url || src);
         }
         return;
       }
@@ -178,6 +177,12 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         if (mounted) {
           setResolved(url || src);
         }
+        return;
+      }
+
+      // Non-S3 absolute URLs and querystring assets can be used directly.
+      if (!fileId && src) {
+        setResolved(src);
         return;
       }
 
@@ -233,7 +238,11 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       invalidateCachedUrl(key);
       const fetcher = fileId
         ? () => brandApi.getSignedFileUrl(fileId)
-        : () => brandApi.getSignedS3Url(src!);
+        : src && isS3LikeUrl(src)
+          ? () => brandApi.getSignedS3Url(src)
+          : src && !/^https?:\/\//i.test(src)
+            ? () => brandApi.getSignedS3KeyUrl(src)
+            : async () => src ?? null;
       resolveSignedUrl(key, fetcher).then((url) => {
         if (url) setResolved(url);
         else setHadError(true);

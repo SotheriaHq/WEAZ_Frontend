@@ -32,14 +32,14 @@ export const NotificationAvatar = React.memo<NotificationAvatarProps>(
     // Get display name for alt text and initials fallback
     const displayName = actor?.username 
       || [actor?.firstName, actor?.lastName].filter(Boolean).join(' ')
-      || 'System';
+      || 'Threadly';
     
     // Get initials for avatar fallback
     const initials = actor?.username 
       ? actor.username.slice(0, 2).toUpperCase()
       : actor?.firstName && actor?.lastName
         ? `${actor.firstName.charAt(0)}${actor.lastName.charAt(0)}`.toUpperCase()
-        : 'SY';
+        : 'TH';
 
     return (
       <div className="relative shrink-0">
@@ -50,12 +50,12 @@ export const NotificationAvatar = React.memo<NotificationAvatarProps>(
             alt={displayName}
             maxHeightClassName={sizeClass.split(' ').find((c) => c.startsWith('max-h-')) || 'max-h-9'}
             maxWidthClassName={sizeClass.split(' ').find((c) => c.startsWith('max-w-')) || 'max-w-9'}
-            className={`rounded-full border border-gray-200 dark:border-gray-700 shadow-sm transition-transform duration-150`}
-            mediaClassName="rounded-full"
+            className={`rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-transform duration-150`}
+            mediaClassName="rounded-xl"
           />
         ) : (
           <div 
-            className={`${sizeClass} rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 flex items-center justify-center font-bold text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800`}
+            className={`${sizeClass} rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 flex items-center justify-center font-bold text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800`}
             aria-label={displayName}
           >
             {initials}

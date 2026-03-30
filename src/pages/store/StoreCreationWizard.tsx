@@ -538,6 +538,9 @@ const StoreCreationWizard: React.FC = () => {
       localStorage.removeItem(LOCAL_PROGRESS_KEY);
       
       toast.success('🎉 Your store is now live!');
+      toast.info(
+        'Brand settlement note: customer payments are recorded gross, Threadly retains platform commission, and your net balance releases into payouts as each order milestone is completed.',
+      );
       navigate('/store/my');
     } catch (error) {
       console.error('Failed to publish store', error);

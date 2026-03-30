@@ -26,6 +26,17 @@ export default function StoreVerificationPage() {
   const [hasDraft, setHasDraft] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [countdownNow, setCountdownNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCountdownNow(Date.now());
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (!brandId) return;
@@ -149,6 +160,31 @@ export default function StoreVerificationPage() {
   };
 
   const infoItems = status?.infoRequestedItems ?? [];
+  const cooldownTarget = useMemo(() => {
+    if (!status) return null;
+
+    if (status.cooldownExpiresAt) {
+      const parsed = new Date(status.cooldownExpiresAt);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    if (status.cooldownRemainingDays > 0) {
+      return new Date(countdownNow + status.cooldownRemainingDays * 24 * 60 * 60 * 1000);
+    }
+
+    return null;
+  }, [countdownNow, status]);
+  const cooldownRemainingText = useMemo(() => {
+    if (!cooldownTarget) return null;
+
+    const diffMs = cooldownTarget.getTime() - countdownNow;
+    if (diffMs <= 0) return 'You can reapply now';
+
+    const totalHours = Math.floor(diffMs / (60 * 60 * 1000));
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+    return `${days} day${days === 1 ? '' : 's'}, ${hours} hour${hours === 1 ? '' : 's'} remaining`;
+  }, [cooldownTarget, countdownNow]);
 
   const handlePrimaryAction = () => {
     if (
@@ -237,11 +273,51 @@ export default function StoreVerificationPage() {
               <li key={`${reason.code}-${reason.label}`}>• {reason.label}</li>
             ))}
           </ul>
-          {status.cooldownRemainingDays > 0 ? (
-            <p className="mt-4 text-sm font-semibold text-rose-900">
-              New submissions unlock in {status.cooldownRemainingDays} day(s).
-            </p>
-          ) : null}
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            <div className="rounded-2xl border border-rose-200/80 bg-white/80 px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-500">
+                Applied on
+              </p>
+              <p className="mt-2 text-sm font-semibold text-rose-900">
+                {status.verificationSubmittedAt
+                  ? new Date(status.verificationSubmittedAt).toLocaleString()
+                  : 'Not recorded'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-rose-200/80 bg-white/80 px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-500">
+                Next reapply window
+              </p>
+              {status.cooldownRemainingDays > 0 && cooldownTarget ? (
+                <>
+                  <p className="mt-2 text-sm font-semibold text-rose-900">
+                    {cooldownTarget.toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-xs text-rose-700">
+                    {cooldownRemainingText}
+                  </p>
+                </>
+              ) : (
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-emerald-700">
+                    You can reapply now
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      navigate('/studio/verification/apply', {
+                        state: {
+                          from: `${location.pathname}${location.search}${location.hash}`,
+                        },
+                      })
+                    }
+                  >
+                    Start new attempt
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
         </section>
       ) : null}
 
@@ -324,15 +400,28 @@ export default function StoreVerificationPage() {
                     {status?.verificationAttemptNumber ?? 0}
                   </p>
                 </div>
-                <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-600">
+                <div className={`rounded-3xl border px-4 py-4 ${
+                  status?.cooldownRemainingDays
+                    ? 'border-amber-200 bg-amber-50'
+                    : 'border-emerald-200 bg-emerald-50'
+                }`}>
+                  <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${
+                    status?.cooldownRemainingDays ? 'text-amber-600' : 'text-emerald-600'
+                  }`}>
                     Cooldown
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-amber-900">
+                  <p className={`mt-2 text-sm font-semibold ${
+                    status?.cooldownRemainingDays ? 'text-amber-900' : 'text-emerald-900'
+                  }`}>
                     {status?.cooldownRemainingDays
-                      ? `${status.cooldownRemainingDays} day(s)`
+                      ? cooldownRemainingText ?? `${status.cooldownRemainingDays} day(s)`
                       : 'No lockout'}
                   </p>
+                  {status?.cooldownRemainingDays && cooldownTarget ? (
+                    <p className="mt-1 text-xs text-amber-700">
+                      Reapply on {cooldownTarget.toLocaleString()}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">

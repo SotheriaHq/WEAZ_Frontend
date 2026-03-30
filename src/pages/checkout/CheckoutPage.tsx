@@ -16,8 +16,16 @@ import { useNavigate } from 'react-router-dom';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import UniversalSelect from '@/components/forms/UniversalSelect';
 import { formatPrice } from '@/utils/helpers';
 import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
+import {
+  loadDeliveryAddressBook,
+  removeDeliveryAddress,
+  toShippingAddress,
+  upsertDeliveryAddress,
+  type SavedDeliveryAddress,
+} from '@/lib/customOrderAddressBook';
 import {
   CHECKOUT_PAYMENT_OPTIONS,
   buildContactInfo,
@@ -119,20 +127,6 @@ function normalizeSavedAddress(address: unknown): ShippingAddress | null {
   };
 }
 
-function buildSavedAddressKey(address: ShippingAddress) {
-  return [
-    address.firstName,
-    address.lastName,
-    address.street,
-    address.apartment ?? '',
-    address.city,
-    address.state,
-    address.postalCode ?? '',
-    address.country,
-    address.phone,
-  ].join('|').toLowerCase();
-}
-
 const CheckoutBackLink: React.FC<{
   label: string;
   onClick: () => void;
@@ -201,9 +195,10 @@ const CheckoutPage: React.FC = () => {
     phone: user?.phoneNumber ?? '',
   });
   const [shippingErrors, setShippingErrors] = useState<Partial<Record<keyof ShippingAddress, string>>>({});
-  const [savedAddresses, setSavedAddresses] = useState<ShippingAddress[]>([]);
+  const [savedAddresses, setSavedAddresses] = useState<SavedDeliveryAddress[]>([]);
   const [savedAddressesLoading, setSavedAddressesLoading] = useState(false);
-  const [selectedSavedAddressKey, setSelectedSavedAddressKey] = useState<string | null>(null);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [openAddressMenuId, setOpenAddressMenuId] = useState<string | null>(null);
 
   /* ── Payment state ── */
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod | 'PENDING_SELECTION'>('PENDING_SELECTION');
@@ -239,21 +234,50 @@ const CheckoutPage: React.FC = () => {
     const loadSavedAddresses = async () => {
       setSavedAddressesLoading(true);
       try {
+        const stored = loadDeliveryAddressBook(user?.id);
+        if (!active) return;
+
+        if (stored.length > 0) {
+          setSavedAddresses(stored);
+          setEditingAddressId(stored[0].id);
+          setAddress(toShippingAddress(stored[0]));
+          return;
+        }
+
         const response = await getMyOrders(1, 50);
         if (!active) return;
         const items = Array.isArray((response as any)?.items) ? (response as any).items : [];
-        const unique = new Map<string, ShippingAddress>();
+
+        const seeded: SavedDeliveryAddress[] = [];
 
         items.forEach((order: any) => {
           const normalized = normalizeSavedAddress(order?.shippingAddress);
           if (!normalized) return;
-          const key = buildSavedAddressKey(normalized);
-          if (!unique.has(key)) {
-            unique.set(key, normalized);
-          }
+
+          const customerName = `${normalized.firstName} ${normalized.lastName}`.trim();
+          const next = upsertDeliveryAddress(user?.id, {
+            customerName,
+            firstName: normalized.firstName,
+            lastName: normalized.lastName,
+            contactEmail: user?.email ?? '',
+            phone: normalized.phone,
+            street: normalized.street,
+            apartment: normalized.apartment,
+            city: normalized.city,
+            state: normalized.state,
+            postalCode: normalized.postalCode,
+            country: normalized.country,
+          });
+
+          seeded.splice(0, seeded.length, ...next);
         });
 
-        setSavedAddresses(Array.from(unique.values()));
+        const nextSavedAddresses = seeded.length > 0 ? seeded : loadDeliveryAddressBook(user?.id);
+        setSavedAddresses(nextSavedAddresses);
+        if (nextSavedAddresses[0]) {
+          setEditingAddressId(nextSavedAddresses[0].id);
+          setAddress(toShippingAddress(nextSavedAddresses[0]));
+        }
       } catch {
         if (!active) return;
         setSavedAddresses([]);
@@ -267,7 +291,7 @@ const CheckoutPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [user?.email, user?.id]);
 
   /* ── Derived ── */
   const priceNoticeByItemId = useMemo(
@@ -305,6 +329,43 @@ const CheckoutPage: React.FC = () => {
       },
     }));
   }, [user?.email, address.phone]);
+
+  const currentAddressDraft = useMemo<SavedDeliveryAddress>(
+    () => ({
+      id: editingAddressId ?? '',
+      firstName: address.firstName.trim(),
+      lastName: address.lastName.trim(),
+      customerName: `${address.firstName} ${address.lastName}`.trim(),
+      contactEmail:
+        user?.email?.trim() ||
+        paymentState.PAYSTACK.email ||
+        paymentState.FLUTTERWAVE.email ||
+        paymentState.BANK_TRANSFER.email ||
+        '',
+      phone: address.phone.trim(),
+      street: address.street.trim(),
+      apartment: String(address.apartment ?? '').trim(),
+      city: address.city.trim(),
+      state: address.state.trim(),
+      postalCode: String(address.postalCode ?? '').trim(),
+      country: address.country.trim() || 'Nigeria',
+      updatedAt: new Date().toISOString(),
+    }),
+    [address, editingAddressId, paymentState, user?.email],
+  );
+
+  const isCurrentAddressComplete = useMemo(
+    () =>
+      Boolean(
+        currentAddressDraft.firstName &&
+          currentAddressDraft.lastName &&
+          currentAddressDraft.street &&
+          currentAddressDraft.city &&
+          currentAddressDraft.state &&
+          currentAddressDraft.phone,
+      ),
+    [currentAddressDraft],
+  );
 
   /* ── Validation ── */
   const validateShipping = useCallback((): boolean => {
@@ -354,7 +415,6 @@ const CheckoutPage: React.FC = () => {
   /* ── Address field updater ── */
   const updateField = useCallback(<K extends keyof ShippingAddress>(field: K, value: ShippingAddress[K]) => {
     setAddress((prev) => ({ ...prev, [field]: value }));
-    setSelectedSavedAddressKey(null);
     setShippingErrors((prev) => {
       if (!prev[field]) return prev;
       const next = { ...prev };
@@ -363,11 +423,64 @@ const CheckoutPage: React.FC = () => {
     });
   }, []);
 
-  const applySavedAddress = useCallback((savedAddress: ShippingAddress) => {
-    setAddress(savedAddress);
-    setSelectedSavedAddressKey(buildSavedAddressKey(savedAddress));
+  const applySavedAddress = useCallback((savedAddress: SavedDeliveryAddress) => {
+    setAddress(toShippingAddress(savedAddress));
+    setEditingAddressId(savedAddress.id);
+    setOpenAddressMenuId(null);
     setShippingErrors({});
   }, []);
+
+  const handleSaveCurrentAddress = useCallback(() => {
+    if (!isCurrentAddressComplete) {
+      toast.error('Complete the delivery details before saving this address.');
+      return;
+    }
+
+    const nextAddresses = upsertDeliveryAddress(user?.id, currentAddressDraft);
+    setSavedAddresses(nextAddresses);
+    if (nextAddresses[0]) {
+      setEditingAddressId(nextAddresses[0].id);
+    }
+    setOpenAddressMenuId(null);
+    toast.success(editingAddressId ? 'Shipping address updated.' : 'Shipping address saved.');
+  }, [currentAddressDraft, editingAddressId, isCurrentAddressComplete, user?.id]);
+
+  const handleStartNewAddress = useCallback(() => {
+    setEditingAddressId(null);
+    setOpenAddressMenuId(null);
+    setAddress({
+      firstName: user?.firstName ?? address.firstName,
+      lastName: user?.lastName ?? address.lastName,
+      street: '',
+      apartment: '',
+      city: '',
+      state: '',
+      postalCode: '',
+      country: 'Nigeria',
+      phone: user?.phoneNumber ?? address.phone,
+    });
+    setShippingErrors({});
+  }, [address.firstName, address.lastName, address.phone, user?.firstName, user?.lastName, user?.phoneNumber]);
+
+  const handleDeleteSavedAddress = useCallback(
+    (addressId: string) => {
+      const nextAddresses = removeDeliveryAddress(user?.id, addressId);
+      setSavedAddresses(nextAddresses);
+      setOpenAddressMenuId(null);
+
+      if (editingAddressId === addressId) {
+        setEditingAddressId(null);
+        if (nextAddresses[0]) {
+          applySavedAddress(nextAddresses[0]);
+        } else {
+          handleStartNewAddress();
+        }
+      }
+
+      toast.success('Shipping address removed.');
+    },
+    [applySavedAddress, editingAddressId, handleStartNewAddress, user?.id],
+  );
 
   /* ── Promo code (scaffold) ── */
   const handleApplyPromo = useCallback(() => {
@@ -417,6 +530,14 @@ const CheckoutPage: React.FC = () => {
 
       const paymentSubmissionData = buildPaymentSubmissionData(activePaymentData, address);
       const contactInfo = buildContactInfo(paymentSubmissionData, address);
+      const nextAddresses = upsertDeliveryAddress(user?.id, {
+        ...currentAddressDraft,
+        contactEmail: currentAddressDraft.contactEmail || paymentSubmissionData.email || '',
+      });
+      setSavedAddresses(nextAddresses);
+      if (nextAddresses[0]) {
+        setEditingAddressId(nextAddresses[0].id);
+      }
 
       // 1. Place order via checkout endpoint
       const customerName = `${address.firstName} ${address.lastName}`.trim();
@@ -575,15 +696,24 @@ const CheckoutPage: React.FC = () => {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-900 dark:text-white">Saved shipping addresses</p>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Reuse an address from a previous order or keep filling a new one below.</p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Checkout now uses the same saved delivery address book as custom orders. Your most recent address is selected first.</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSavedAddressKey(null)}
-                    className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:border-white/20 dark:hover:text-white"
-                  >
-                    Use a new address
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveCurrentAddress}
+                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:border-white/20 dark:hover:text-white"
+                    >
+                      {editingAddressId ? 'Update address' : 'Save current address'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleStartNewAddress}
+                      className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-black"
+                    >
+                      Add new address
+                    </button>
+                  </div>
                 </div>
 
                 {savedAddressesLoading ? (
@@ -591,19 +721,22 @@ const CheckoutPage: React.FC = () => {
                 ) : savedAddresses.length > 0 ? (
                   <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     {savedAddresses.map((savedAddress) => {
-                      const addressKey = buildSavedAddressKey(savedAddress);
-                      const isSelected = selectedSavedAddressKey === addressKey;
+                      const isSelected = editingAddressId === savedAddress.id;
                       return (
-                        <button
-                          key={addressKey}
-                          type="button"
-                          onClick={() => applySavedAddress(savedAddress)}
+                        <div
+                          key={savedAddress.id}
                           className={`rounded-[24px] border p-4 text-left transition-all ${
                             isSelected
                               ? 'border-fuchsia-300 bg-[linear-gradient(135deg,rgba(245,208,254,0.28),rgba(224,231,255,0.54))] shadow-[0_12px_28px_rgba(217,70,239,0.12)] dark:border-fuchsia-400/30 dark:bg-[linear-gradient(135deg,rgba(168,85,247,0.14),rgba(59,130,246,0.08))]'
                               : 'border-white/60 bg-white/75 hover:border-fuchsia-200 dark:border-white/10 dark:bg-white/[0.03]'
                           }`}
                         >
+                          <div className="flex items-start justify-between gap-3">
+                            <button
+                              type="button"
+                              onClick={() => applySavedAddress(savedAddress)}
+                              className="flex-1 text-left"
+                            >
                           <p className="text-sm font-semibold text-slate-900 dark:text-white">
                             {savedAddress.firstName} {savedAddress.lastName}
                           </p>
@@ -613,11 +746,51 @@ const CheckoutPage: React.FC = () => {
                             {savedAddress.country} • {savedAddress.phone}
                           </p>
                         </button>
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setOpenAddressMenuId((current) => (current === savedAddress.id ? null : savedAddress.id))}
+                                className="rounded-full border border-black/10 px-2 py-1 text-xs font-semibold text-slate-600 dark:border-white/10 dark:text-slate-300"
+                                aria-label="Open shipping address actions"
+                              >
+                                ...
+                              </button>
+                              {openAddressMenuId === savedAddress.id ? (
+                                <div className="absolute right-0 top-10 z-10 w-36 rounded-2xl border border-black/10 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-slate-950">
+                                  <button
+                                    type="button"
+                                    onClick={() => applySavedAddress(savedAddress)}
+                                    className="w-full rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5"
+                                  >
+                                    Use address
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      applySavedAddress(savedAddress);
+                                      setOpenAddressMenuId(null);
+                                    }}
+                                    className="w-full rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSavedAddress(savedAddress.id)}
+                                    className="w-full rounded-xl px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">No reusable shipping addresses found yet. Your completed order addresses will appear here.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">No saved delivery addresses yet. Fill the form below and save this address for both checkout and custom orders.</p>
                 )}
               </div>
 
@@ -669,26 +842,17 @@ const CheckoutPage: React.FC = () => {
                   className="[&_input]:rounded-2xl [&_input]:border-white/60 [&_input]:bg-white/80 [&_input]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_input]:border-white/10 dark:[&_input]:bg-white/[0.03]"
                 />
                 <div className="w-full">
-                  <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                    State <span className="text-purple-500 ml-1">*</span>
-                  </label>
-                  <select
+                  <UniversalSelect
+                    label="State *"
                     value={address.state}
-                    onChange={(e) => updateField('state', e.target.value)}
-                    className={`w-full rounded-2xl border px-4 py-3 text-sm font-medium text-gray-900 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all duration-200 focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20 dark:text-white ${
-                      shippingErrors.state
-                        ? 'border-red-500 bg-white dark:border-red-500 dark:bg-white/[0.03]'
-                        : 'border-white/60 bg-white/80 dark:border-white/10 dark:bg-white/[0.03]'
-                    }`}
-                  >
-                    <option value="">Select state</option>
-                    {NIGERIAN_STATES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  {shippingErrors.state && (
-                    <p className="mt-1.5 text-xs text-red-500">{shippingErrors.state}</p>
-                  )}
+                    onChange={(value) => updateField('state', value)}
+                    placeholder="Select state"
+                    options={NIGERIAN_STATES.map((stateName) => ({
+                      value: stateName,
+                      label: stateName,
+                    }))}
+                    error={shippingErrors.state}
+                  />
                 </div>
               </div>
 
