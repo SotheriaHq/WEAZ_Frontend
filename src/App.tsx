@@ -88,6 +88,7 @@ const AdminTagsPage = lazy(() => import('./pages/admin/AdminTagsPage'));
 const AdminMeasurementsPage = lazy(() => import('./pages/admin/AdminMeasurementsPage'));
 const AdminFinancePage = lazy(() => import('./pages/admin/AdminFinancePage'));
 const AdminPayoutsPage = lazy(() => import('./pages/admin/AdminPayoutsPage'));
+const AdminOrderDetailPage = lazy(() => import('./pages/admin/AdminOrderDetailPage'));
 const AdminDisputesPage = lazy(() => import('./pages/admin/AdminDisputesPage'));
 const AdminModerationPage = lazy(() => import('./pages/admin/AdminModerationPage'));
 const AdminAuditPage = lazy(() => import('./pages/admin/AdminAuditPage'));
@@ -555,6 +556,7 @@ const router = createBrowserRouter([
           { path: 'tags', element: <RequireAdminPermission permission="TAGS_READ"><AdminTagsPage /></RequireAdminPermission> },
           { path: 'measurements', element: <RequireAdminPermission permission="MEASUREMENTS_READ"><AdminMeasurementsPage /></RequireAdminPermission> },
           { path: 'finance', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminFinancePage /></RequireAdminPermission> },
+          { path: 'orders/:orderId', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminOrderDetailPage /></RequireAdminPermission> },
           { path: 'payouts', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminPayoutsPage /></RequireAdminPermission> },
           { path: 'disputes', element: <RequireAdminPermission permission="DISPUTES_READ"><AdminDisputesPage /></RequireAdminPermission> },
           { path: 'messaging', element: <RequireAdminPermission permission="MESSAGING_READ"><AdminMessagingPage /></RequireAdminPermission> },

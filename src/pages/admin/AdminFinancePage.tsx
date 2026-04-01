@@ -421,9 +421,11 @@ const AdminFinancePage: React.FC = () => {
         navigate(`/admin/custom-orders/${referenceId}`);
         return;
       }
-      toast.error(
-        'No admin standard-order detail route exists yet. The finance record is linked, but the admin app does not currently expose a standard-order detail page.',
-      );
+      if (normalized === 'ORDER' || normalized === 'STANDARD_ORDER') {
+        navigate(`/admin/orders/${referenceId}`);
+        return;
+      }
+      toast.error('This finance record is linked, but the reference type is not routable in the admin app.');
     },
     [navigate],
   );

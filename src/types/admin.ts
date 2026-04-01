@@ -1,3 +1,5 @@
+import type { PayoutSourceBreakdown } from './payouts';
+
 export type AdminPermissionCode =
   | 'USERS_READ' | 'USERS_WRITE' | 'USERS_SUSPEND' | 'USERS_DEACTIVATE' | 'USERS_NOTIFY'
   | 'BRANDS_READ' | 'BRANDS_WRITE' | 'BRANDS_SUSPEND' | 'BRANDS_VERIFY' | 'BRANDS_STORE_OVERRIDE'
@@ -160,6 +162,120 @@ export interface AdminPayoutAccountSummary {
 export interface AdminPayoutDetail extends AdminPayout {
   events: AdminPayoutEvent[];
   payoutAccount: AdminPayoutAccountSummary | null;
+  sourceBreakdown: PayoutSourceBreakdown;
+}
+
+export interface AdminStandardOrderLineItem {
+  id: string;
+  quantity: number;
+  unitPrice: string | number;
+  totalPrice: string | number;
+  selectedSize?: string | null;
+  selectedColor?: string | null;
+  sizingMode?: string | null;
+  requiredMeasurementKeys?: string[] | null;
+  sizeFitSnapshot?: Record<string, unknown> | null;
+  thumbnailAtPurchase?: string | null;
+  nameAtPurchase?: string | null;
+}
+
+export interface AdminStandardOrderFinanceBreakdown {
+  currency: string;
+  itemSubtotal: number;
+  shippingAmount: number;
+  discountAmount: number;
+  grossAmount: number;
+  paymentReference?: string | null;
+  paymentStatus?: string | null;
+  paidAt?: string | null;
+  escrowStatus?: string | null;
+  commissionRate?: number | null;
+  commissionAmount?: number | null;
+  netBrandAmount?: number | null;
+  releaseSchedule?: Array<{
+    stage: 'SHIPPED_RELEASE' | 'DELIVERED_RELEASE' | string;
+    grossAmount: number;
+    commissionAmount: number;
+    netAmount: number;
+    releasedAt?: string | null;
+    eligibleAt?: string | null;
+    condition?: string | null;
+  }>;
+  ledgerTransactions?: Array<{
+    id: string;
+    type: string;
+    description: string;
+    totalAmount: number;
+    currency: string;
+    createdAt: string;
+    entries: Array<{
+      id: string;
+      direction: 'DEBIT' | 'CREDIT';
+      amount: number;
+      accountCode?: string | null;
+      accountName?: string | null;
+      accountType?: string | null;
+      accountSubType?: string | null;
+    }>;
+  }>;
+}
+
+export interface AdminStandardOrderBuyerReceipt {
+  id: string;
+  documentNumber: string;
+  type: string;
+  issuedAt: string;
+  currency: string;
+  grossAmount: number;
+  commissionAmount?: number | null;
+  netAmount?: number | null;
+  paymentAttemptId?: string | null;
+  paymentReference?: string | null;
+  settlementCurrency?: string | null;
+  settlementAmount?: number | null;
+  issuedToName?: string | null;
+  lineItems?: Array<{
+    label: string;
+    amount: number;
+  }>;
+}
+
+export interface AdminStandardOrderDetail {
+  id: string;
+  brandId: string;
+  buyerId?: string | null;
+  customerName: string;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  shippingAddress?: Record<string, unknown> | null;
+  formattedShippingAddress?: string | null;
+  contactInfo?: Record<string, unknown> | null;
+  totalAmount: string | number;
+  shippingCost?: string | number | null;
+  discountAmount?: string | number | null;
+  currency: string;
+  status: string;
+  paymentStatus: string;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
+  paidAt?: string | null;
+  deliveredAt?: string | null;
+  createdAt: string;
+  updatedAt?: string | null;
+  orderItems: AdminStandardOrderLineItem[];
+  financeBreakdown?: AdminStandardOrderFinanceBreakdown | null;
+  buyerReceipt?: AdminStandardOrderBuyerReceipt | null;
+  brand?: {
+    id: string;
+    name?: string | null;
+    logo?: string | null;
+    currency?: string | null;
+    contactEmail?: string | null;
+    owner?: {
+      phoneNumber?: string | null;
+      address?: string | null;
+    } | null;
+  } | null;
 }
 
 export interface AdminProduct {

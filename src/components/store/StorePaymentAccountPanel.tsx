@@ -176,11 +176,11 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
   const canResyncCurrentAccount = Boolean(hasExistingAccount && (bankCode || account?.bankCode));
 
   const sectionTitle =
-    mode === 'wizard' ? 'Payout account setup' : 'Payments & Payouts';
+    mode === 'wizard' ? 'Payout account setup' : 'Payout account';
   const sectionDescription =
     mode === 'wizard'
       ? 'Threadly collects customer payments in the main Paystack account, then handles escrow, commission, and brand balance release inside the app. Your payout account must be active before the store can launch.'
-      : 'Use this screen to set up, update, and resync the brand payout account used for Paystack subaccount and transfer-recipient readiness.';
+      : 'Use this Accounts screen to set up, update, and resync the brand payout account used for Paystack subaccount and transfer-recipient readiness.';
 
   const syncCards = useMemo(
     () => [

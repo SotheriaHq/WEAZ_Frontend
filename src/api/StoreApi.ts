@@ -1,6 +1,7 @@
 import { apiClient } from './httpClient';
 import type { AxiosResponse } from 'axios';
 import { createIdempotencyKey } from './idempotency';
+import type { PayoutSourceBreakdown } from '@/types/payouts';
 
 // Helper to extract data from axios response
 const extractData = <T>(res: AxiosResponse): T => {
@@ -673,6 +674,29 @@ export interface StorePayoutStatementResponse {
   contentHtml: string;
 }
 
+export interface StorePayoutDetailResponse {
+  id: string;
+  brandId: string;
+  amount: number;
+  currency: string;
+  status: string;
+  provider: string | null;
+  reference: string | null;
+  providerTransferStatus: string | null;
+  providerTransferReference: string | null;
+  providerTransferFailureMessage: string | null;
+  providerTransferInitiatedAt: string | null;
+  providerTransferFinalizedAt: string | null;
+  providerTransferReversedAt: string | null;
+  failureReason: string | null;
+  statusReason: string | null;
+  createdAt: string;
+  processedAt: string | null;
+  paidAt: string | null;
+  statement: StorePayoutStatementSummary | null;
+  sourceBreakdown: PayoutSourceBreakdown;
+}
+
 export interface StorePaymentAccountUpdateData {
   bankCode?: string;
   accountNumber?: string;
@@ -846,6 +870,13 @@ export const getStorePayoutStatement = async (
   return extractData<StorePayoutStatementResponse>(res);
 };
 
+export const getStorePayoutDetail = async (
+  payoutId: string,
+): Promise<StorePayoutDetailResponse> => {
+  const res = await apiClient.get(`/store/payouts/${payoutId}`);
+  return extractData<StorePayoutDetailResponse>(res);
+};
+
 export const updateStorePaymentAccount = async (
   data: StorePaymentAccountUpdateData
 ): Promise<StorePaymentAccountResponse> => {
@@ -972,6 +1003,7 @@ export default {
   listStorePaymentBanks,
   getStoreWallet,
   listStorePayouts,
+  getStorePayoutDetail,
   getStorePayoutStatement,
   openStore,
   closeStore,

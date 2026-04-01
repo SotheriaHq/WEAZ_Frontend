@@ -67,7 +67,7 @@ export const buildOrderRoute = ({
   }
 
   if (surface === 'ADMIN') {
-    return null;
+    return `/admin/orders/${encodeURIComponent(orderId)}`;
   }
 
   return `/orders/${encodeURIComponent(orderId)}`;

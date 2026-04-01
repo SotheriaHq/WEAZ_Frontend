@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import SettingsSidebar, {
@@ -172,12 +172,22 @@ const SettingsHome: React.FC = () => {
   const me = useSelector((s: RootState) => s.user.profile);
   const isBrandUser = me?.type === 'BRAND';
   const active = searchParams.get('tab') || 'account';
+  const normalizedActive =
+    isBrandUser && active === 'store-payments' ? 'billing' : active;
   const resolvedActive =
-    !isBrandUser && active.startsWith('store-') ? 'account' : active;
+    !isBrandUser && normalizedActive.startsWith('store-')
+      ? 'account'
+      : normalizedActive;
   const resolvedSection =
     resolvedActive === 'billing' && isBrandUser
       ? <StorePaymentsSettings />
       : sections[resolvedActive];
+
+  useEffect(() => {
+    if (isBrandUser && active === 'store-payments') {
+      setSearchParams({ tab: 'billing' }, { replace: true });
+    }
+  }, [active, isBrandUser, setSearchParams]);
 
   const setActive = (key: string) => {
     setSearchParams({ tab: key });

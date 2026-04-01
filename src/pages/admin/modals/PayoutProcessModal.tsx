@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import PayoutSourceBreakdown from '@/components/payouts/PayoutSourceBreakdown';
 import { adminPayoutsApi } from '@/api/AdminApi';
 import type { AdminPayout, AdminPayoutDetail } from '@/types/admin';
 import { toast } from 'sonner';
@@ -428,6 +429,11 @@ const PayoutProcessModal: React.FC<Props> = ({
               </div>
             </div>
           )}
+
+          <PayoutSourceBreakdown
+            breakdown={detail?.sourceBreakdown}
+            emptyMessage="No source rows were recorded for this payout yet."
+          />
 
           {detail?.events?.length ? (
             <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm dark:border-white/10 dark:bg-white/5">

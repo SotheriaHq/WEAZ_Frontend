@@ -8,6 +8,7 @@ import type {
   AdminDesign,
   AdminPayout,
   AdminPayoutDetail,
+  AdminStandardOrderDetail,
   AdminDispute,
   AdminAuditLog,
   AdminSlaConfig,
@@ -249,6 +250,11 @@ export const adminPayoutsApi = {
     apiClient.post<AdminPayout>(`/admin/payouts/${id}/finalize-transfer-otp`, { otp }),
   getProviderStatus: (id: string) =>
     apiClient.get<AdminPayout>(`/admin/payouts/${id}/provider-status`),
+};
+
+export const adminOrdersApi = {
+  getById: (id: string) =>
+    apiClient.get<AdminStandardOrderDetail>(`/admin/orders/${id}`),
 };
 
 // ── Disputes ──

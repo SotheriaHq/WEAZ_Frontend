@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import { brandApi } from '@/api/BrandApi';
 import { getStoreWallet, type StoreWalletResponse } from '@/api/StoreApi';
 
 const formatMoney = (amount: number, currency: string) => {
@@ -38,6 +40,7 @@ const BrandWalletPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [wallet, setWallet] = useState<StoreWalletResponse | null>(null);
+  const [requesting, setRequesting] = useState(false);
 
   const loadWallet = useCallback(async () => {
     setLoading(true);
@@ -55,6 +58,35 @@ const BrandWalletPanel: React.FC = () => {
   useEffect(() => {
     void loadWallet();
   }, [loadWallet]);
+
+  const availableForPayout = Number(wallet?.summary.availableForPayout || 0);
+  const canRequestPayout =
+    !loading &&
+    !requesting &&
+    !!wallet?.brandId &&
+    availableForPayout >= 5000;
+
+  const handleRequestPayout = useCallback(async () => {
+    if (!wallet?.brandId) {
+      toast.error('Brand wallet is not ready yet');
+      return;
+    }
+    if (availableForPayout < 5000) {
+      toast.error('Minimum payout amount is NGN 5,000');
+      return;
+    }
+
+    setRequesting(true);
+    try {
+      await brandApi.requestPayout(wallet.brandId, availableForPayout);
+      toast.success('Payout requested successfully');
+      await loadWallet();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to request payout');
+    } finally {
+      setRequesting(false);
+    }
+  }, [availableForPayout, loadWallet, wallet?.brandId]);
 
   const metrics = useMemo(() => {
     const currency = wallet?.currency || 'NGN';
@@ -96,6 +128,14 @@ const BrandWalletPanel: React.FC = () => {
             disabled={loading}
           >
             Refresh
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleRequestPayout()}
+            disabled={!canRequestPayout}
+            className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+          >
+            {requesting ? 'Requesting...' : 'Request payout'}
           </button>
           <Link
             to="/store/payouts"
@@ -151,8 +191,16 @@ const BrandWalletPanel: React.FC = () => {
                     Created: {formatDate(row.createdAt)}
                   </div>
                 </div>
-                <div className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${status.tone}`}>
-                  {status.emoji} {status.label}
+                <div className="flex items-center gap-3">
+                  <Link
+                    to={`/store/payouts?payout=${row.id}`}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    View details
+                  </Link>
+                  <div className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${status.tone}`}>
+                    {status.emoji} {status.label}
+                  </div>
                 </div>
               </div>
             );
