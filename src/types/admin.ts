@@ -83,6 +83,18 @@ export interface AdminPayout {
   brandId: string;
   amount: string;
   currency: string;
+  provider?: string | null;
+  providerRecipientCode?: string | null;
+  providerRecipientId?: string | null;
+  providerTransferCode?: string | null;
+  providerTransferId?: string | null;
+  providerTransferReference?: string | null;
+  providerTransferStatus?: string | null;
+  providerTransferFailureCode?: string | null;
+  providerTransferFailureMessage?: string | null;
+  providerTransferInitiatedAt?: string | null;
+  providerTransferFinalizedAt?: string | null;
+  providerTransferReversedAt?: string | null;
   status:
     | 'PENDING_APPROVAL'
     | 'APPROVED'
@@ -116,6 +128,38 @@ export interface AdminPayout {
     lastName: string;
     email: string;
   } | null;
+}
+
+export interface AdminPayoutEvent {
+  id: string;
+  type: string;
+  source: string;
+  providerEventType?: string | null;
+  providerEventReceivedAt?: string | null;
+  processedAt?: string | null;
+  payload?: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AdminPayoutAccountSummary {
+  id: string | null;
+  status: string;
+  provider: string;
+  bankName: string | null;
+  accountName: string | null;
+  maskedAccountNumber: string | null;
+  subaccountCode: string | null;
+  transferRecipientCode: string | null;
+  transferRecipientActive: boolean;
+  lastSyncError: string | null;
+  subaccountLastSyncAt: string | null;
+  transferRecipientLastSyncAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface AdminPayoutDetail extends AdminPayout {
+  events: AdminPayoutEvent[];
+  payoutAccount: AdminPayoutAccountSummary | null;
 }
 
 export interface AdminProduct {
@@ -383,8 +427,124 @@ export interface AdminFinanceOverview {
   totalRefunds: number;
   activeCommissionRules: number;
   unresolvedReconciliationItems: number;
+  pendingPayouts?: number;
+  activeEscrowHolds?: number;
   recentRuns: AdminReconciliationRun[];
   recentDocuments: AdminFinancialDocument[];
+}
+
+export interface AdminFinancePaymentAttempt {
+  id: string;
+  reference: string;
+  gateway: string;
+  providerMode: 'mock' | 'live' | string;
+  paymentMethod: string;
+  channel?: string | null;
+  status: string;
+  amount: number;
+  currency: string;
+  settlementAmount: number;
+  settlementCurrency: string;
+  subjectType: 'STANDARD_ORDER' | 'CUSTOM_ORDER' | string;
+  createdAt: string;
+  confirmedAt?: string | null;
+  lastVerifiedAt?: string | null;
+  buyer?: {
+    id: string;
+    name: string;
+    username?: string | null;
+  } | null;
+  brands: Array<{
+    id: string;
+    name: string | null;
+  }>;
+  orderCount: number;
+  orders: Array<{
+    id: string;
+    type: 'ORDER' | 'CUSTOM_ORDER' | string;
+    title: string;
+  }>;
+}
+
+export interface AdminFinancePaymentDetail {
+  id: string;
+  reference: string;
+  gateway: string;
+  providerMode: string;
+  paymentMethod: string;
+  channel?: string | null;
+  status: string;
+  amount: number;
+  currency: string;
+  settlementAmount: number;
+  settlementCurrency: string;
+  subjectType: string;
+  createdAt: string;
+  confirmedAt?: string | null;
+  lastVerifiedAt?: string | null;
+  requestSnapshot?: Record<string, unknown> | null;
+  responseSnapshot?: Record<string, unknown> | null;
+  nextAction?: Record<string, unknown> | null;
+  bankAccount?: Record<string, unknown> | null;
+  failureCode?: string | null;
+  failureMessage?: string | null;
+  buyer?: {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    username?: string | null;
+  } | null;
+  orders: Array<{
+    id: string;
+    customerName: string;
+    totalAmount: string;
+    currency: string;
+    brand?: { id: string; name: string | null } | null;
+  }>;
+  customOrder?: {
+    id: string;
+    title?: string | null;
+    sourceTitleSnapshot?: string | null;
+    brand?: { id: string; name: string | null } | null;
+    buyer?: {
+      id: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      username?: string | null;
+    } | null;
+  } | null;
+  events: Array<{
+    id: string;
+    type: string;
+    source: string;
+    payload?: Record<string, unknown> | null;
+    createdAt: string;
+  }>;
+}
+
+export interface AdminFinanceTransaction extends AdminLedgerTransaction {
+  brand?: { id: string; name: string | null } | null;
+  buyerName?: string | null;
+  referenceTitle?: string | null;
+}
+
+export interface AdminEscrowHold {
+  id: string;
+  holdType: 'STANDARD_ORDER' | 'CUSTOM_ORDER' | string;
+  referenceId?: string | null;
+  title: string;
+  brand?: { id: string; name: string | null } | null;
+  buyerName?: string | null;
+  currency: string;
+  grossAmount: number;
+  releasedNetAmount: number;
+  heldNetAmount: number;
+  status: string;
+  nextReleaseAt?: string | null;
+  releaseCondition?: string | null;
+  frozenReason?: string | null;
+  canManualRelease: boolean;
+  createdAt: string;
 }
 
 export interface AdminLedgerEntry {

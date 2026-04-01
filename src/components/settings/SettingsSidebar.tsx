@@ -49,6 +49,7 @@ const sidebarGroups: SidebarGroup[] = [
       { key: 'account', label: 'Account', path: '/settings?tab=account', icon: User, description: 'Profile, name, email' },
       { key: 'security', label: 'Security', path: '/settings?tab=security', icon: Lock, description: 'Password, login' },
       { key: 'notifications', label: 'Notifications', path: '/settings?tab=notifications', icon: Bell, description: 'Email & push alerts' },
+      { key: 'email-preferences', label: 'Email Preferences', path: '/settings?tab=email-preferences', icon: Bell, description: 'Scenario-level email delivery' },
       { key: 'privacy', label: 'Privacy', path: '/settings?tab=privacy', icon: ShieldCheck, description: 'Data & visibility' },
       { key: 'profile-visibility', label: 'Profile Visibility', path: '/settings?tab=profile-visibility', icon: Eye, description: 'Who can see your profile' },
       { key: 'size-fits', label: 'Size & Fittings', path: '/settings?tab=size-fits', icon: Ruler, description: 'Body measurements' },

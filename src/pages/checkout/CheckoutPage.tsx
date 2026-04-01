@@ -4,6 +4,7 @@ import type { RootState, AppDispatch } from '@/store';
 import { checkout, getMyOrders } from '@/api/StoreApi';
 import type { CheckoutPaymentMethod, PaymentData, ShippingAddress } from '@/api/StoreApi';
 import { paymentApi } from '@/api/PaymentApi';
+import { createIdempotencyKey } from '@/api/idempotency';
 import {
   fetchCart,
   clearCart,
@@ -558,6 +559,7 @@ const CheckoutPage: React.FC = () => {
         email: paymentSubmissionData.email,
         callbackUrl: `${window.location.origin}/checkout/payment-return`,
         paymentData: paymentSubmissionData,
+        idempotencyKey: createIdempotencyKey(),
       });
 
       // 3. Clear cart

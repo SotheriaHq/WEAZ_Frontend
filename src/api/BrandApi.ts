@@ -1607,6 +1607,20 @@ export const brandApi = {
     }
   },
 
+  async getHeldFunds(brandId: string, params?: { page?: number; limit?: number }) {
+    try {
+      const query = new URLSearchParams();
+      if (params?.page) query.append('page', String(params.page));
+      if (params?.limit) query.append('limit', String(params.limit));
+      const suffix = query.toString();
+      const response = await apiClient.get(`/brands/${brandId}/payouts/held-funds${suffix ? `?${suffix}` : ''}`);
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error fetching held funds:', error);
+      return null;
+    }
+  },
+
   async requestPayout(brandId: string, amount: number) {
     try {
       const response = await apiClient.post(`/brands/${brandId}/payouts/request`, { amount });

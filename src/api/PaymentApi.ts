@@ -1,5 +1,5 @@
 import { apiClient } from './httpClient';
-import type { CheckoutPaymentMethod, PaymentData, PaymentMethodType } from './StoreApi';
+import type { PaymentData, PaymentMethodType } from './StoreApi';
 
 export type PaymentAttemptStatus =
   | 'PENDING'
@@ -16,6 +16,7 @@ export interface PaymentInitRequest {
   email: string;
   callbackUrl?: string;
   paymentData?: PaymentData;
+  idempotencyKey?: string;
 }
 
 export interface PaymentNextAction {
@@ -79,9 +80,11 @@ export interface PaymentVerifyResult {
 export interface PaymentAttemptSummary {
   paymentAttemptId: string;
   reference: string;
+  subjectType: 'STANDARD_ORDER' | 'CUSTOM_ORDER';
+  customOrderId?: string;
   gateway: string;
   providerMode: 'mock' | 'live';
-  paymentMethod: CheckoutPaymentMethod;
+  paymentMethod: PaymentMethodType;
   status: PaymentAttemptStatus;
   currency: string;
   settlementCurrency: string;

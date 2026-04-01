@@ -7,6 +7,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import MessageBubble, { formatDate } from './MessageBubble';
 import ComposeArea from './ComposeArea';
+import VLoader from '@/components/loaders/VLoader';
 
 type ContextType = 'CUSTOM_ORDER' | 'STANDARD_ORDER';
 
@@ -43,7 +44,7 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
   const [actionLoading, setActionLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messageNodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const abortRef = useRef<AbortController | null>(null);
+  const loadSequenceRef = useRef(0);
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -124,15 +125,13 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
   // Load messages when opened
   useEffect(() => {
     if (!open) return;
+    const loadId = ++loadSequenceRef.current;
     setLoading(true);
     Promise.all([fetchMessages(), fetchCustomOrderDetail()]).finally(() => {
+      if (loadSequenceRef.current !== loadId) return;
       setLoading(false);
       scrollToBottom();
     });
-
-    return () => {
-      abortRef.current?.abort();
-    };
   }, [open, fetchCustomOrderDetail, fetchMessages, scrollToBottom]);
 
   // Scroll to bottom when messages change
@@ -483,7 +482,10 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 pb-6 space-y-1">
           {loading ? (
             <div className="flex items-center justify-center h-32">
-              <span className="text-sm text-gray-500 dark:text-gray-400 animate-pulse">Loading messages…</span>
+              <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                <VLoader size={24} phase="loading" showLabel={false} />
+                <span>Loading thread…</span>
+              </div>
             </div>
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-center">

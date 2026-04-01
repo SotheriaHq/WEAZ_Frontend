@@ -45,4 +45,29 @@ export class NotificationsApi {
     const response = await apiClient.patch('/notifications/settings', settings);
     return response.data?.data ?? response.data;
   }
+
+  static async getEmailSettings(): Promise<any> {
+    const response = await apiClient.get('/notifications/email-settings');
+    return response.data?.data ?? response.data;
+  }
+
+  static async updateEmailSettings(settings: any): Promise<any> {
+    const response = await apiClient.patch('/notifications/email-settings', settings);
+    return response.data?.data ?? response.data;
+  }
+
+  static async resetEmailSettings(): Promise<any> {
+    const response = await apiClient.post('/notifications/email-settings/reset-defaults');
+    return response.data?.data ?? response.data;
+  }
+
+  static async listTrustedDevices(): Promise<any> {
+    const response = await apiClient.get('/auth/security/devices');
+    return response.data?.data ?? response.data;
+  }
+
+  static async revokeTrustedDevice(deviceId: string): Promise<any> {
+    const response = await apiClient.patch(`/auth/security/devices/${deviceId}/revoke`);
+    return response.data?.data ?? response.data;
+  }
 }

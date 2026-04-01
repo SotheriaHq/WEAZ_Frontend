@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { brandApi } from '@/api/BrandApi';
+import { getStoreStatus } from '@/api/StoreApi';
 import VLoader from '@/components/loaders/VLoader';
 import Modal from '@/components/ui/Modal';
 import type { RootState } from '@/store';
@@ -53,6 +54,8 @@ type FinanceOverview = {
   paidOutBalance: number;
   incomingCredits: number;
   totalOrders: number;
+  activeEscrowHolds?: number;
+  queuedCustomAllocations?: number;
   negativeBalance: boolean;
 };
 
@@ -70,6 +73,22 @@ type IncomingTransaction = {
   stage?: string | null;
   referenceType?: string | null;
   referenceId?: string | null;
+};
+
+type HeldFundsItem = {
+  id: string;
+  holdType: string;
+  referenceId?: string | null;
+  title: string;
+  counterparty?: string | null;
+  currency: string;
+  grossAmount: number | string;
+  releasedNetAmount: number | string;
+  heldNetAmount: number | string;
+  status: string;
+  nextReleaseAt?: string | null;
+  releaseCondition?: string | null;
+  frozenReason?: string | null;
 };
 
 const formatReferenceLabel = (referenceType?: string | null) => {
@@ -133,8 +152,12 @@ const buildSellerReceiptStates = (transaction: IncomingTransaction) => {
 
 const FinancePage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
+  const requestRef = useRef(0);
+  const mountedRef = useRef(true);
+  const [brandId, setBrandId] = useState<string | null>(null);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [incomingTransactions, setIncomingTransactions] = useState<IncomingTransaction[]>([]);
+  const [heldFunds, setHeldFunds] = useState<HeldFundsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
   const [overview, setOverview] = useState<FinanceOverview | null>(null);
@@ -143,13 +166,21 @@ const FinancePage: React.FC = () => {
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
 
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
     setLoading(true);
     try {
-      const [overviewData, payoutsData, incomingData] = await Promise.all([
-        brandApi.getPayoutOverview(user.id),
-        brandApi.getPayouts(user.id),
-        brandApi.getIncomingTransactions(user.id, { page: 1, limit: 20 }),
+      const storeStatus = await getStoreStatus();
+      if (!mountedRef.current || requestRef.current !== requestId) return;
+      setBrandId(storeStatus.brandId);
+
+      const [overviewData, payoutsData, incomingData, heldFundsData] = await Promise.all([
+        brandApi.getPayoutOverview(storeStatus.brandId),
+        brandApi.getPayouts(storeStatus.brandId),
+        brandApi.getIncomingTransactions(storeStatus.brandId, { page: 1, limit: 20 }),
+        brandApi.getHeldFunds(storeStatus.brandId, { page: 1, limit: 20 }),
       ]);
+      if (!mountedRef.current || requestRef.current !== requestId) return;
 
       setOverview(
         overviewData
@@ -161,6 +192,8 @@ const FinancePage: React.FC = () => {
               paidOutBalance: Number(overviewData.paidOutBalance || 0),
               incomingCredits: Number(overviewData.incomingCredits || 0),
               totalOrders: Number(overviewData.totalOrders || 0),
+              activeEscrowHolds: Number(overviewData.activeEscrowHolds || 0),
+              queuedCustomAllocations: Number(overviewData.queuedCustomAllocations || 0),
               negativeBalance: Boolean(overviewData.negativeBalance),
             }
           : null,
@@ -181,16 +214,31 @@ const FinancePage: React.FC = () => {
             ? incomingData
             : [],
       );
+
+      setHeldFunds(
+        Array.isArray(heldFundsData?.items)
+          ? heldFundsData.items
+          : Array.isArray(heldFundsData)
+            ? heldFundsData
+            : [],
+      );
     } catch (error) {
+      if (!mountedRef.current || requestRef.current !== requestId) return;
       console.error('Failed to fetch finance data', error);
       toast.error('Failed to load finance data');
     } finally {
-      setLoading(false);
+      if (mountedRef.current && requestRef.current === requestId) {
+        setLoading(false);
+      }
     }
   }, [user?.id]);
 
   useEffect(() => {
+    mountedRef.current = true;
     void fetchData();
+    return () => {
+      mountedRef.current = false;
+    };
   }, [fetchData]);
 
   const availableBalance = overview?.availableBalance ?? 0;
@@ -213,7 +261,7 @@ const FinancePage: React.FC = () => {
   );
 
   const handleRequestPayout = async () => {
-    if (!user?.id) return;
+    if (!brandId) return;
     if (availableBalance < 5000) {
       toast.error('Minimum payout amount is ₦5,000');
       return;
@@ -221,7 +269,7 @@ const FinancePage: React.FC = () => {
 
     setRequesting(true);
     try {
-      await brandApi.requestPayout(user.id, availableBalance);
+      await brandApi.requestPayout(brandId, availableBalance);
       toast.success('Payout requested successfully');
       void fetchData();
     } catch (error: any) {
@@ -248,65 +296,160 @@ const FinancePage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_1fr]">
-        <section className="rounded-3xl bg-black px-7 py-8 text-white shadow-lg dark:bg-white dark:text-black">
-          <div className="flex items-start justify-between gap-4">
+      {/* Balance hero + metric strip */}
+      <div className="overflow-hidden rounded-2xl border border-black/10 bg-slate-950 text-white shadow-sm dark:border-white/10">
+        <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+          <div className="flex items-center gap-4">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.25em] opacity-70">
-                Available Balance
+              <div className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">
+                Available balance
               </div>
-              <div className="mt-3 text-4xl font-bold tracking-tight">
-                {loading ? '...' : formatCurrency(availableBalance)}
+              <div className="mt-1 text-2xl font-bold tracking-tight">
+                {loading ? '—' : formatCurrency(availableBalance)}
               </div>
-              <div className="mt-3 text-sm opacity-75">
-                {overview?.negativeBalance
-                  ? 'Balance is negative. New releases will offset recovery automatically.'
-                  : 'Only released funds that are not already reserved for payout are withdrawable.'}
-              </div>
+              {overview?.negativeBalance ? (
+                <div className="mt-1 text-xs text-rose-300">
+                  Negative — new releases will offset recovery automatically.
+                </div>
+              ) : null}
             </div>
-            <div className="text-4xl" aria-hidden="true">
+            <div className="text-2xl" aria-hidden="true">
               {overview?.negativeBalance ? '📉' : '💰'}
             </div>
           </div>
-
-          <div className="mt-6 flex flex-wrap gap-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleRequestPayout}
               disabled={!canRequestPayout}
-              className="rounded-full bg-white px-5 py-3 font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-black dark:text-white"
+              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-800 dark:text-white"
             >
-              {requesting ? 'Submitting...' : 'Request Payout'}
+              {requesting ? 'Submitting...' : 'Request payout'}
             </button>
-            <div className="rounded-full border border-white/20 px-4 py-3 text-white/80 dark:border-black/20 dark:text-black/75">
-              Minimum payout: ₦5,000
+            <div className="text-xs text-slate-400">Min. ₦5,000</div>
+          </div>
+        </div>
+
+        {/* Metric strip */}
+        <div className="grid grid-cols-2 border-t border-white/10 sm:grid-cols-4">
+          {[
+            { label: 'Released', value: overview?.releasedBalance ?? 0, note: 'Unlocked by milestones' },
+            { label: 'Reserved', value: overview?.reservedPayoutBalance ?? 0, note: 'In payout flow' },
+            { label: 'Paid out', value: overview?.paidOutBalance ?? 0, note: 'Settled to bank' },
+            {
+              label: 'Incoming',
+              value: overview?.incomingCredits ?? totalIncomingAmount,
+              note: `${overview?.totalOrders ?? 0} paid order${(overview?.totalOrders ?? 0) === 1 ? '' : 's'}`,
+            },
+          ].map((metric, index) => (
+            <div
+              key={metric.label}
+              className={`px-5 py-3 ${index < 3 ? 'border-b border-white/10 sm:border-b-0 sm:border-r' : ''}`}
+            >
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                {metric.label}
+              </div>
+              <div className="mt-1 text-base font-bold">
+                {loading ? '—' : formatCurrency(metric.value)}
+              </div>
+              <div className="mt-0.5 text-[11px] text-slate-500">{metric.note}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <section className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/50">
+        <div className="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Held Funds</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Escrowed funds that are still waiting on delivery confirmation, release milestones, or admin action.
+              </p>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-200">
+              <span aria-hidden="true">🔒</span>
+              {overview?.activeEscrowHolds ?? heldFunds.length} open hold{(overview?.activeEscrowHolds ?? heldFunds.length) === 1 ? '' : 's'}
             </div>
           </div>
-        </section>
-
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
-          <MetricCard
-            label="Released Earnings"
-            value={loading ? '...' : formatCurrency(overview?.releasedBalance ?? 0)}
-            description="Funds unlocked by shipment and delivery milestones."
-          />
-          <MetricCard
-            label="Reserved For Payout"
-            value={loading ? '...' : formatCurrency(overview?.reservedPayoutBalance ?? 0)}
-            description="Requests already in approval or transfer flow."
-          />
-          <MetricCard
-            label="Paid Out"
-            value={loading ? '...' : formatCurrency(overview?.paidOutBalance ?? 0)}
-            description="Completed transfers already settled to your bank account."
-          />
-          <MetricCard
-            label="Incoming Credits"
-            value={loading ? '...' : formatCurrency(overview?.incomingCredits ?? totalIncomingAmount)}
-            description={`${overview?.totalOrders ?? 0} paid order${(overview?.totalOrders ?? 0) === 1 ? '' : 's'} credited into your wallet.`}
-          />
-        </section>
-      </div>
+        </div>
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="bg-gray-50 text-gray-500 dark:bg-gray-800/50 dark:text-gray-400">
+              <tr>
+                <th className="px-6 py-4 font-medium">Reference</th>
+                <th className="px-6 py-4 font-medium">Buyer</th>
+                <th className="px-6 py-4 font-medium">Gross</th>
+                <th className="px-6 py-4 font-medium">Released</th>
+                <th className="px-6 py-4 font-medium">Still held</th>
+                <th className="px-6 py-4 font-medium">Release rule</th>
+                <th className="px-6 py-4 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center">
+                    <VLoader size={32} phase="loading" showLabel={false} />
+                  </td>
+                </tr>
+              ) : heldFunds.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    No held funds right now.
+                  </td>
+                </tr>
+              ) : (
+                heldFunds.map((hold) => (
+                  <tr key={hold.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-gray-900 dark:text-white">{hold.title}</div>
+                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {String(hold.holdType || '').replaceAll('_', ' ')} {hold.referenceId ? `• ${formatReferenceCode(hold.referenceId)}` : ''}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{hold.counterparty || 'Buyer'}</td>
+                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                      {formatCurrency(Number(hold.grossAmount || 0), hold.currency || currency)}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-sky-600 dark:text-sky-300">
+                      {formatCurrency(Number(hold.releasedNetAmount || 0), hold.currency || currency)}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-amber-700 dark:text-amber-300">
+                      {formatCurrency(Number(hold.heldNetAmount || 0), hold.currency || currency)}
+                    </td>
+                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
+                      <div>{String(hold.releaseCondition || 'MANUAL').replaceAll('_', ' ')}</div>
+                      <div className="mt-1 text-xs">
+                        {hold.nextReleaseAt ? `Next: ${new Date(hold.nextReleaseAt).toLocaleString()}` : 'Awaiting completion milestone'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                          hold.status === 'FROZEN'
+                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-500/10 dark:text-rose-200'
+                            : hold.status === 'PARTIALLY_RELEASED'
+                              ? 'bg-sky-100 text-sky-800 dark:bg-sky-500/10 dark:text-sky-200'
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200'
+                        }`}
+                      >
+                        <span aria-hidden="true">
+                          {hold.status === 'FROZEN' ? '🧊' : hold.status === 'PARTIALLY_RELEASED' ? '✂️' : '🔒'}
+                        </span>
+                        {String(hold.status || 'HELD').replaceAll('_', ' ')}
+                      </span>
+                      {hold.frozenReason ? (
+                        <div className="mt-1 text-xs text-rose-600 dark:text-rose-300">{hold.frozenReason}</div>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/50">
         <div className="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
@@ -593,20 +736,6 @@ const FinancePage: React.FC = () => {
     </div>
   );
 };
-
-const MetricCard: React.FC<{
-  label: string;
-  value: string;
-  description: string;
-}> = ({ label, value, description }) => (
-  <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900/60">
-    <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-      {label}
-    </div>
-    <div className="mt-3 text-2xl font-semibold">{value}</div>
-    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">{description}</div>
-  </div>
-);
 
 const FinanceReceiptMetric: React.FC<{
   label: string;

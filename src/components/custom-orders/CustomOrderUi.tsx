@@ -102,11 +102,11 @@ const renderBreakdownValue = (value: unknown): React.ReactNode => {
 
     if (primitiveValues) {
       return (
-        <div className="flex flex-wrap gap-2 text-left">
+        <div className="flex flex-wrap gap-1.5 text-left">
           {value.map((entry, index) => (
             <span
               key={`${index}-${String(entry)}`}
-              className="inline-flex rounded-full bg-black/[0.05] px-2.5 py-1 text-xs font-medium text-slate-700 dark:bg-white/[0.08] dark:text-slate-200"
+              className="inline-flex rounded-full border border-black/5 bg-black/[0.03] px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200"
             >
               {formatPrimitiveValue(entry)}
             </span>
@@ -192,19 +192,20 @@ export const CustomOrderMetricCard: React.FC<{ label: string; value: React.React
   value,
   helper,
 }) => (
-  <div className="h-full min-h-[104px] min-w-0 rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
-    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{label}</div>
-    <div className="mt-2 min-w-0 break-words text-lg font-semibold leading-tight text-slate-900 dark:text-white">{value}</div>
-    {helper ? <div className="mt-1 min-w-0 break-words text-xs leading-5 text-slate-500 dark:text-slate-400">{helper}</div> : null}
+  <div className="group relative flex h-full min-h-[104px] min-w-0 flex-col justify-center overflow-hidden rounded-[1.4rem] border border-black/5 bg-gradient-to-br from-white to-slate-50/50 p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md dark:border-white/[0.05] dark:from-white/[0.03] dark:to-transparent">
+    <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:animate-shimmer group-hover:opacity-100 dark:via-white/5" />
+    <div className="relative text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-[11px] sm:tracking-[0.18em] dark:text-slate-400">{label}</div>
+    <div className="relative mt-1.5 min-w-0 break-words text-lg font-bold leading-tight text-slate-900 dark:text-white">{value}</div>
+    {helper ? <div className="relative mt-1 min-w-0 break-words text-[11px] font-medium text-slate-500 dark:text-slate-400">{helper}</div> : null}
   </div>
 );
 
 export const CustomOrderKeyValueList: React.FC<{ items: Array<{ label: string; value: React.ReactNode }> }> = ({ items }) => (
-  <dl className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
+  <dl className="space-y-2 text-[13px] text-slate-600 dark:text-slate-300">
     {items.map((item) => (
-      <div key={item.label} className="flex items-start justify-between gap-4">
-        <dt className="min-w-0">{item.label}</dt>
-        <dd className="min-w-0 break-words text-right font-medium text-slate-900 dark:text-white">{item.value}</dd>
+      <div key={item.label} className="group flex items-start justify-between gap-3 rounded-xl px-2 py-1.5 transition-colors duration-200 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+        <dt className="min-w-0 font-medium opacity-80 transition-opacity group-hover:opacity-100">{item.label}</dt>
+        <dd className="min-w-0 break-words text-right font-semibold text-slate-900 dark:text-white">{item.value}</dd>
       </div>
     ))}
   </dl>
@@ -216,10 +217,10 @@ export const CustomOrderJsonBreakdown: React.FC<{ data?: Record<string, unknown>
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid items-start gap-2 md:grid-cols-2 xl:grid-cols-3">
       {Object.entries(data).map(([key, value]) => (
-        <div key={key} className="grid gap-3 rounded-2xl border border-black/10 px-4 py-3 text-sm dark:border-white/10">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{prettify(key)}</div>
+        <div key={key} className="group flex flex-col gap-1.5 rounded-xl border border-black/[0.06] bg-gradient-to-br from-white to-black/[0.01] px-3.5 py-3 text-sm shadow-sm transition-all duration-300 hover:border-indigo-500/30 hover:shadow-md dark:border-white/[0.06] dark:from-white/[0.02] dark:to-transparent dark:hover:border-indigo-400/30">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 transition-colors sm:text-[11px] sm:tracking-[0.18em] group-hover:text-indigo-600 dark:text-slate-400 dark:group-hover:text-indigo-300">{prettify(key)}</div>
           <div className="font-medium text-slate-900 dark:text-white">{renderBreakdownValue(value)}</div>
         </div>
       ))}
@@ -312,8 +313,8 @@ export const CustomOrderWorkspaceTabs: React.FC<{
   activeTab: string;
   onChange: (tabId: string) => void;
 }> = ({ tabs, activeTab, onChange }) => (
-  <div className="sticky top-20 z-10 overflow-x-auto rounded-[1.75rem] backdrop-blur">
-    <div className="inline-flex min-w-full gap-2 rounded-[1.75rem] border border-black/10 bg-white/85 p-2 dark:border-white/10 dark:bg-white/[0.05]">
+  <div className="sticky top-20 z-10 overflow-x-auto rounded-[2rem] p-1 backdrop-blur-md">
+    <div className="inline-flex min-w-full gap-2 rounded-[2rem] border border-white/40 bg-white/70 p-2 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
       {tabs.map((tab) => {
         const isActive = tab.id === activeTab;
         return (
@@ -321,17 +322,31 @@ export const CustomOrderWorkspaceTabs: React.FC<{
             key={tab.id}
             type="button"
             onClick={() => onChange(tab.id)}
-            className={`min-w-[150px] rounded-[1.2rem] px-4 py-3 text-left transition ${
+            className={`group relative min-w-[160px] rounded-[1.5rem] px-5 py-3.5 text-left transition-all duration-300 ${
               isActive
-                ? 'bg-gray-900 font-bold text-white shadow-[0_18px_50px_rgba(15,23,42,0.24)] dark:bg-white dark:text-slate-950'
-                : 'text-slate-600 hover:bg-black/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.06]'
+                ? 'text-white'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
             }`}
           >
-            <div className="text-sm font-semibold">
-              <span className="mr-2" aria-hidden="true">{tab.emoji}</span>
+            {isActive && (
+              <div className="absolute inset-0 rounded-[1.5rem] bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 shadow-[0_8px_16px_rgba(99,102,241,0.3)] transition-all dark:from-indigo-400 dark:via-purple-400 dark:to-indigo-500 dark:shadow-[0_8px_16px_rgba(99,102,241,0.2)]" />
+            )}
+            {isActive && (
+              <div className="pointer-events-none absolute inset-0 -translate-x-full rounded-[1.5rem] bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 transition-opacity duration-1000 group-hover:animate-shimmer group-hover:opacity-100" />
+            )}
+            {!isActive && (
+              <div className="absolute inset-0 rounded-[1.5rem] bg-black/[0.02] opacity-0 transition-opacity duration-200 group-hover:opacity-100 dark:bg-white/[0.04]" />
+            )}
+            
+            <div className="relative z-10 flex items-center text-sm font-bold">
+              <span className="mr-2 text-lg transition-transform duration-300 group-hover:scale-110" aria-hidden="true">{tab.emoji}</span>
               {tab.label}
             </div>
-            {tab.helper ? <div className={`mt-1 text-xs ${isActive ? 'text-white/80 dark:text-slate-700' : 'text-slate-500 dark:text-slate-400'}`}>{tab.helper}</div> : null}
+            {tab.helper ? (
+              <div className={`relative z-10 mt-1 text-xs font-medium transition-colors duration-300 ${isActive ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>
+                {tab.helper}
+              </div>
+            ) : null}
           </button>
         );
       })}
@@ -345,21 +360,24 @@ export const CustomOrderMediaPreview: React.FC<{ src?: string | null; title: str
   emoji = '🧵',
   className,
 }) => (
-  <div className={`overflow-hidden rounded-[1.75rem] border border-black/10 dark:border-white/10 ${className ?? ''}`}>
+  <div className={`group relative overflow-hidden rounded-[2rem] border border-white/40 bg-gradient-to-b from-black/[0.02] to-black/[0.05] shadow-sm dark:border-white/10 dark:from-white/[0.02] dark:to-white/[0.05] ${className ?? ''}`}>
     {src ? (
-      <ImageWithFallback
-        src={src}
-        alt={title}
-        fallbackName={title}
-        fit="contain"
-        rounded="none"
-        containerClassName="w-full overflow-hidden"
-        className="h-auto w-full max-h-[36rem]"
-        maxHeightClassName="max-h-[36rem]"
-      />
+      <>
+        <ImageWithFallback
+          src={src}
+          alt={title}
+          fallbackName={title}
+          fit="contain"
+          rounded="none"
+          containerClassName="w-full overflow-hidden"
+          className="h-auto w-full max-h-[36rem] transition-transform duration-700 group-hover:scale-[1.02]"
+          maxHeightClassName="max-h-[36rem]"
+        />
+        <div className="pointer-events-none absolute inset-0 rounded-[2rem] ring-1 ring-inset ring-black/10 dark:ring-white/10" />
+      </>
     ) : (
-      <div className="flex min-h-[260px] items-center justify-center bg-slate-950 text-7xl text-white">
-        <span aria-hidden="true">{emoji}</span>
+      <div className="flex min-h-[260px] items-center justify-center bg-slate-900 text-7xl text-white transition-colors duration-500 group-hover:bg-slate-800 dark:bg-slate-950">
+        <span aria-hidden="true" className="transition-transform duration-500 group-hover:scale-110">{emoji}</span>
       </div>
     )}
   </div>

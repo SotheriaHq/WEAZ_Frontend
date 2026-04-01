@@ -33,21 +33,9 @@ export interface PaymentFormState {
 export const CHECKOUT_PAYMENT_OPTIONS: PaymentOptionMeta[] = [
   {
     value: 'PAYSTACK',
-    label: 'Pay with Card (Paystack)',
+    label: 'Pay with Paystack',
     emoji: '💳',
-    description: 'Hosted card checkout with issuer verification handled on Paystack.',
-  },
-  {
-    value: 'FLUTTERWAVE',
-    label: 'Pay with Flutterwave',
-    emoji: '🦋',
-    description: 'Choose card, transfer, bank account, USSD, or mobile money within Flutterwave.',
-  },
-  {
-    value: 'BANK_TRANSFER',
-    label: 'Direct Bank Transfer',
-    emoji: '🏦',
-    description: 'Generate a dedicated transfer account and complete payment from your banking app.',
+    description: 'Choose hosted card checkout or Paystack bank transfer for v1.',
   },
 ];
 
@@ -134,12 +122,6 @@ export function createInitialPaymentState(email: string, phone: string): Payment
       billingSameAsShipping: true,
       billingAddress: { ...EMPTY_BILLING_ADDRESS },
       consentAccepted: false,
-      mockCard: {
-        cardNumber: '',
-        cardholderName: '',
-        expiry: '',
-        cvv: '',
-      },
     },
     FLUTTERWAVE: {
       method: 'FLUTTERWAVE',
@@ -237,25 +219,8 @@ export function validatePaymentData(
 
   if (paymentMethod === 'PAYSTACK') {
     const paystackData = paymentData as PaystackPaymentData;
-    const cardNumber = paystackData.mockCard?.cardNumber.replace(/\s+/g, '') ?? '';
-    const cardholderName = paystackData.mockCard?.cardholderName.trim() ?? '';
-    const expiry = paystackData.mockCard?.expiry.trim() ?? '';
-    const cvv = paystackData.mockCard?.cvv.trim() ?? '';
-
-    if (cardNumber.length < 16) {
-      errors['mockCard.cardNumber'] = 'Enter a 16-digit card number to simulate the Paystack step';
-    }
-
-    if (!cardholderName) {
-      errors['mockCard.cardholderName'] = 'Cardholder name is required';
-    }
-
-    if (!/^\d{2}\/\d{2}$/.test(expiry)) {
-      errors['mockCard.expiry'] = 'Use MM/YY format';
-    }
-
-    if (!/^\d{3,4}$/.test(cvv)) {
-      errors['mockCard.cvv'] = 'Enter a valid CVV';
+    if (!['CARD', 'BANK_TRANSFER'].includes(paystackData.channel)) {
+      errors.channel = 'Select a Paystack payment channel';
     }
   }
 
@@ -348,11 +313,11 @@ export function getPaymentSummaryLines(
   const lines = [paymentData.email, paymentData.phone];
 
   if (paymentMethod === 'PAYSTACK') {
-    lines.push('Hosted card checkout via Paystack');
     const paystackData = paymentData as PaystackPaymentData;
-    const lastFour = paystackData.mockCard?.cardNumber.replace(/\s+/g, '').slice(-4);
-    if (lastFour) {
-      lines.push(`Demo card ending in ${lastFour}`);
+    lines.push('Hosted card checkout via Paystack');
+    if (paystackData.channel === 'BANK_TRANSFER') {
+      lines[lines.length - 1] = 'Hosted bank transfer checkout via Paystack';
+      lines.push('Paystack will show the account details after redirect');
     }
   }
 

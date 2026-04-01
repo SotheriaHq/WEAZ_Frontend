@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import type {
   CheckoutPaymentMethod,
   DirectBankTransferPaymentData,
@@ -8,9 +8,8 @@ import type {
   ShippingAddress,
 } from '@/api/StoreApi';
 import Input from '@/components/ui/Input';
-import VLoader from '@/components/loaders/VLoader';
-import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
+import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   FLUTTERWAVE_CHANNEL_OPTIONS,
   FLUTTERWAVE_USSD_BANKS,
@@ -32,17 +31,9 @@ interface PaymentDetailsSectionProps {
 
 const inputClassName = '[&_input]:rounded-2xl [&_input]:border-white/60 [&_input]:bg-white/80 [&_input]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_input]:border-white/10 dark:[&_input]:bg-white/[0.03]';
 const textareaClassName = '[&_textarea]:rounded-2xl [&_textarea]:border-white/60 [&_textarea]:bg-white/80 [&_textarea]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_textarea]:border-white/10 dark:[&_textarea]:bg-white/[0.03]';
-const selectClassName = '[&_.DropdownTrigger]:rounded-2xl [&_.DropdownTrigger]:border-white/60 [&_.DropdownTrigger]:bg-white/80 [&_.DropdownTrigger]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_.DropdownTrigger]:border-white/10 dark:[&_.DropdownTrigger]:bg-white/[0.03]';
+const selectClassName = '[&>div>button]:rounded-2xl [&>div>button]:border-white/60 [&>div>button]:bg-white/80 [&>div>button]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&>div>button]:border-white/10 dark:[&>div>button]:bg-white/[0.03]';
 
 const infoCardClassName = 'rounded-[24px] border border-slate-200/80 bg-white/70 p-4 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300';
-
-const formatDemoCardNumber = (value: string) => value.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
-const formatDemoExpiry = (value: string) => {
-  const digits = value.replace(/\D/g, '').slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-};
-const formatDemoCvv = (value: string) => value.replace(/\D/g, '').slice(0, 4);
 
 const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   paymentMethod,
@@ -52,8 +43,6 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   onChange,
   compact = false,
 }) => {
-  const [cardValidationPhase, setCardValidationPhase] = useState<'idle' | 'starting' | 'loading' | 'complete'>('idle');
-
   const updateField = (field: string, value: string | boolean) => {
     onChange((current) => ({ ...current, [field]: value } as PaymentData));
   };
@@ -67,38 +56,6 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
       },
     } as PaymentData));
   };
-
-  useEffect(() => {
-    if (paymentMethod !== 'PAYSTACK') {
-      setCardValidationPhase('idle');
-      return;
-    }
-
-    const paystackData = paymentData as PaystackPaymentData;
-    const cardNumber = paystackData.mockCard?.cardNumber.replace(/\s+/g, '') ?? '';
-    const cardholderName = paystackData.mockCard?.cardholderName.trim() ?? '';
-    const expiry = paystackData.mockCard?.expiry.trim() ?? '';
-    const cvv = paystackData.mockCard?.cvv.trim() ?? '';
-    const isComplete =
-      cardNumber.length >= 16 &&
-      cardholderName.length > 0 &&
-      /^\d{2}\/\d{2}$/.test(expiry) &&
-      /^\d{3,4}$/.test(cvv);
-
-    if (!isComplete) {
-      setCardValidationPhase('idle');
-      return;
-    }
-
-    setCardValidationPhase('starting');
-    const startTimer = window.setTimeout(() => setCardValidationPhase('loading'), 180);
-    const finishTimer = window.setTimeout(() => setCardValidationPhase('complete'), 1300);
-
-    return () => {
-      window.clearTimeout(startTimer);
-      window.clearTimeout(finishTimer);
-    };
-  }, [paymentData, paymentMethod]);
 
   const renderBillingAddress = () => {
     if (paymentData.billingSameAsShipping) {
@@ -169,16 +126,11 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
 
         {flutterwaveData.channel === 'BANK_ACCOUNT' && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Select label="Bank" value={flutterwaveData.bankAccount?.bankCode ?? ''} onChange={(e) => {
-              const selected = NIGERIAN_BANK_OPTIONS.find((option) => option.value === e.target.value);
-              updateNestedField('bankAccount', 'bankCode', e.target.value);
+            <UniversalSelect label="Bank" value={flutterwaveData.bankAccount?.bankCode ?? ''} onChange={(value) => {
+              const selected = NIGERIAN_BANK_OPTIONS.find((option) => option.value === value);
+              updateNestedField('bankAccount', 'bankCode', value);
               updateNestedField('bankAccount', 'bankName', selected?.label ?? '');
-            }} error={errors['bankAccount.bankCode']} className={selectClassName}>
-              <option value="">Select bank</option>
-              {NIGERIAN_BANK_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </Select>
+            }} error={errors['bankAccount.bankCode']} className={selectClassName} placeholder="Select bank" options={NIGERIAN_BANK_OPTIONS} />
             <Input label="Account number" value={flutterwaveData.bankAccount?.accountNumber ?? ''} onChange={(e) => updateNestedField('bankAccount', 'accountNumber', e.target.value)} error={errors['bankAccount.accountNumber']} className={inputClassName} />
             <div className="sm:col-span-2">
               <Input label="Account name" value={flutterwaveData.bankAccount?.accountName ?? ''} onChange={(e) => updateNestedField('bankAccount', 'accountName', e.target.value)} helperText="If you already know the account name, add it now. Production account resolution can replace this later." error={errors['bankAccount.accountName']} className={inputClassName} />
@@ -188,16 +140,11 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
 
         {flutterwaveData.channel === 'USSD' && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Select label="USSD bank" value={flutterwaveData.ussd?.bankCode ?? ''} onChange={(e) => {
-              const selected = FLUTTERWAVE_USSD_BANKS.find((option) => option.value === e.target.value);
-              updateNestedField('ussd', 'bankCode', e.target.value);
+            <UniversalSelect label="USSD bank" value={flutterwaveData.ussd?.bankCode ?? ''} onChange={(value) => {
+              const selected = FLUTTERWAVE_USSD_BANKS.find((option) => option.value === value);
+              updateNestedField('ussd', 'bankCode', value);
               updateNestedField('ussd', 'bankName', selected?.label ?? '');
-            }} error={errors['ussd.bankCode']} className={selectClassName}>
-              <option value="">Select bank</option>
-              {FLUTTERWAVE_USSD_BANKS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </Select>
+            }} error={errors['ussd.bankCode']} className={selectClassName} placeholder="Select bank" options={FLUTTERWAVE_USSD_BANKS} />
             <div className={infoCardClassName}>
               <p className="font-semibold text-slate-900 dark:text-white">USSD payment flow</p>
               <p className="mt-1">Threadly will generate the dial string after order creation. The customer completes authorization on their phone using their bank PIN.</p>
@@ -207,26 +154,17 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
 
         {flutterwaveData.channel === 'MOBILE_MONEY' && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Select label="Country" value={flutterwaveData.mobileMoney?.countryCode ?? 'GH'} onChange={(e) => {
-              const countryCode = e.target.value as 'GH' | 'KE';
+            <UniversalSelect label="Country" value={flutterwaveData.mobileMoney?.countryCode ?? 'GH'} onChange={(value) => {
+              const countryCode = value as 'GH' | 'KE';
               updateNestedField('mobileMoney', 'countryCode', countryCode);
               updateNestedField('mobileMoney', 'networkId', '');
               updateNestedField('mobileMoney', 'networkName', '');
-            }} className={selectClassName}>
-              {MOBILE_MONEY_COUNTRY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </Select>
-            <Select label="Mobile money network" value={flutterwaveData.mobileMoney?.networkId ?? ''} onChange={(e) => {
-              const selected = networks.find((option) => option.value === e.target.value);
-              updateNestedField('mobileMoney', 'networkId', e.target.value);
+            }} className={selectClassName} options={MOBILE_MONEY_COUNTRY_OPTIONS} />
+            <UniversalSelect label="Mobile money network" value={flutterwaveData.mobileMoney?.networkId ?? ''} onChange={(value) => {
+              const selected = networks.find((option) => option.value === value);
+              updateNestedField('mobileMoney', 'networkId', value);
               updateNestedField('mobileMoney', 'networkName', selected?.label ?? '');
-            }} error={errors['mobileMoney.networkId']} className={selectClassName}>
-              <option value="">Select network</option>
-              {networks.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </Select>
+            }} error={errors['mobileMoney.networkId']} className={selectClassName} placeholder="Select network" options={networks} />
             <div className="sm:col-span-2">
               <Input label="Wallet phone number" value={flutterwaveData.mobileMoney?.phone ?? ''} onChange={(e) => updateNestedField('mobileMoney', 'phone', e.target.value)} error={errors['mobileMoney.phone']} helperText="Use the number registered for the selected mobile money wallet." className={inputClassName} />
             </div>
@@ -264,37 +202,37 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
 
     return (
       <div className="space-y-4">
+        <UniversalSelect
+          label="Paystack channel"
+          value={paystackData.channel}
+          onChange={(value) => updateField('channel', value)}
+          options={[
+            {
+              value: 'CARD',
+              label: 'Card checkout',
+              description: 'Paystack collects card and issuer verification on the hosted payment page.',
+            },
+            {
+              value: 'BANK_TRANSFER',
+              label: 'Bank transfer',
+              description: 'Paystack shows the transfer account details on the hosted checkout page.',
+            },
+          ]}
+          error={errors.channel}
+          className={selectClassName}
+        />
         <div className={infoCardClassName}>
-          <p className="font-semibold text-slate-900 dark:text-white">Inline demo card step</p>
-          <p className="mt-1">This is a Threadly-only simulation so you can rehearse the card step before redirect. Real card capture, OTP, and verification still happen on Paystack.</p>
+          <p className="font-semibold text-slate-900 dark:text-white">
+            {paystackData.channel === 'BANK_TRANSFER'
+              ? 'Hosted transfer instructions'
+              : 'Hosted secure checkout'}
+          </p>
+          <p className="mt-1">
+            {paystackData.channel === 'BANK_TRANSFER'
+              ? 'Threadly will redirect you to Paystack, where the exact bank-transfer instructions and reference will be displayed.'
+              : 'Threadly does not collect card PAN, CVV, OTP, or 3DS data in this form. Paystack handles those steps on the hosted payment page.'}
+          </p>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input label="Card number" value={paystackData.mockCard?.cardNumber ?? ''} placeholder="4242 4242 4242 4242" onChange={(e) => updateNestedField('mockCard', 'cardNumber', formatDemoCardNumber(e.target.value))} error={errors['mockCard.cardNumber']} className={inputClassName} helperText="Demo validation only. This value is not sent to the backend." />
-          <Input label="Cardholder name" value={paystackData.mockCard?.cardholderName ?? ''} placeholder="ABEL FIRSTMAN" onChange={(e) => updateNestedField('mockCard', 'cardholderName', e.target.value.toUpperCase())} error={errors['mockCard.cardholderName']} className={inputClassName} />
-          <Input label="Expiry date" value={paystackData.mockCard?.expiry ?? ''} placeholder="MM/YY" onChange={(e) => updateNestedField('mockCard', 'expiry', formatDemoExpiry(e.target.value))} error={errors['mockCard.expiry']} className={inputClassName} />
-          <Input label="CVV" value={paystackData.mockCard?.cvv ?? ''} placeholder="123" onChange={(e) => updateNestedField('mockCard', 'cvv', formatDemoCvv(e.target.value))} error={errors['mockCard.cvv']} className={inputClassName} />
-        </div>
-        {cardValidationPhase !== 'idle' ? (
-          <div className="rounded-[24px] border border-slate-200/80 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-            <div className="flex items-center gap-3">
-              {cardValidationPhase === 'complete' ? (
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/12 text-lg">✅</div>
-              ) : (
-                <VLoader size={44} phase={cardValidationPhase} showLabel={false} className="shrink-0" />
-              )}
-              <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                  {cardValidationPhase === 'complete' ? 'Card fields look ready' : 'Checking card fields'}
-                </p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {cardValidationPhase === 'complete'
-                    ? 'Threadly has finished the dummy card check. Paystack will still run the real secure verification.'
-                    : 'Running a dummy safety check on the card number, expiry, and CVV before redirect.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : null}
       </div>
     );
   };

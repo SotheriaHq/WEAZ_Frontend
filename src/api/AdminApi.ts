@@ -7,6 +7,7 @@ import type {
   AdminCollection,
   AdminDesign,
   AdminPayout,
+  AdminPayoutDetail,
   AdminDispute,
   AdminAuditLog,
   AdminSlaConfig,
@@ -23,6 +24,10 @@ import type {
   AdminFinancialDocument,
   AdminFinanceOverview,
   AdminLedgerTransaction,
+  AdminFinancePaymentAttempt,
+  AdminFinancePaymentDetail,
+  AdminFinanceTransaction,
+  AdminEscrowHold,
 } from '../types/admin';
 import type {
   AdminVerificationDetails,
@@ -231,11 +236,19 @@ export const adminTagsApi = {
 export const adminPayoutsApi = {
   list: (params?: Record<string, string>) =>
     apiClient.get<AdminPayout[] | Paginated<AdminPayout>>('/admin/payouts', { params }),
+  getById: (id: string) =>
+    apiClient.get<AdminPayoutDetail>(`/admin/payouts/${id}`),
   updateStatus: (id: string, status: string, reason?: string) =>
     apiClient.patch(`/admin/payouts/${id}/status`, { status, reason }),
   claim: (id: string) => apiClient.post<AdminPayout>(`/admin/payouts/${id}/claim`),
   release: (id: string, reason?: string) =>
     apiClient.post<AdminPayout>(`/admin/payouts/${id}/release`, { reason }),
+  initiateTransfer: (id: string) =>
+    apiClient.post<AdminPayout>(`/admin/payouts/${id}/initiate-transfer`),
+  finalizeTransferOtp: (id: string, otp: string) =>
+    apiClient.post<AdminPayout>(`/admin/payouts/${id}/finalize-transfer-otp`, { otp }),
+  getProviderStatus: (id: string) =>
+    apiClient.get<AdminPayout>(`/admin/payouts/${id}/provider-status`),
 };
 
 // ── Disputes ──
@@ -374,6 +387,22 @@ export const adminFinanceApi = {
     apiClient.get<AdminFinancialDocument[]>('/admin/finance/documents', { params }),
   getDocument: (id: string) =>
     apiClient.get<AdminFinancialDocument>(`/admin/finance/documents/${id}`),
+  listPayments: (params?: Record<string, string>) =>
+    apiClient.get<{ items: AdminFinancePaymentAttempt[]; total: number }>('/admin/finance/payments', { params }),
+  getPayment: (reference: string) =>
+    apiClient.get<AdminFinancePaymentDetail>(`/admin/finance/payments/${reference}`),
+  listTransactions: (params?: Record<string, string>) =>
+    apiClient.get<{ items: AdminFinanceTransaction[]; total: number }>('/admin/finance/transactions', { params }),
+  listEscrowHolds: (params?: Record<string, string>) =>
+    apiClient.get<{ items: AdminEscrowHold[]; total: number }>('/admin/finance/escrow-holds', { params }),
+  releaseEscrowHold: (
+    id: string,
+    data: { holdType: 'STANDARD_ORDER' | 'CUSTOM_ORDER'; note?: string },
+  ) => apiClient.post(`/admin/finance/escrow-holds/${id}/release`, data),
+  freezeEscrowHold: (id: string, reason: string) =>
+    apiClient.post(`/admin/finance/escrow-holds/${id}/freeze`, { reason }),
+  unfreezeEscrowHold: (id: string) =>
+    apiClient.post(`/admin/finance/escrow-holds/${id}/unfreeze`),
   listBooks: (params?: Record<string, string>) =>
     apiClient.get<AdminLedgerTransaction[]>('/admin/ledger', { params }),
 };

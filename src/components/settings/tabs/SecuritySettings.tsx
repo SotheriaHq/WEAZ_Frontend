@@ -4,6 +4,17 @@ import type { RootState } from '@/store';
 import Modal from '@/components/ui/Modal';
 import { Lock, Mail, Building2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { NotificationsApi } from '@/api/NotificationsApi';
+
+type TrustedDevice = {
+  id: string;
+  deviceLabel: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  lastUserAgent: string | null;
+  isTrusted: boolean;
+  revokedAt: string | null;
+};
 
 const SecuritySettings: React.FC = () => {
   const { profile } = useSelector((state: RootState) => state.user);
@@ -19,6 +30,24 @@ const SecuritySettings: React.FC = () => {
 
   // Verification Password (for modal)
   const [verifyPassword, setVerifyPassword] = React.useState('');
+  const [devices, setDevices] = React.useState<TrustedDevice[]>([]);
+  const [loadingDevices, setLoadingDevices] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadDevices = async () => {
+      try {
+        const result = await NotificationsApi.listTrustedDevices();
+        setDevices(Array.isArray(result) ? (result as TrustedDevice[]) : []);
+      } catch (error) {
+        console.error('Failed to load trusted devices', error);
+        toast.error('Failed to load recognized devices');
+      } finally {
+        setLoadingDevices(false);
+      }
+    };
+
+    void loadDevices();
+  }, []);
 
   if (!profile) return null;
 
@@ -57,6 +86,27 @@ const SecuritySettings: React.FC = () => {
       setConfirmPassword('');
     } catch {
       toast.error("Incorrect password or update failed");
+    }
+  };
+
+  const handleRevokeDevice = async (deviceId: string) => {
+    try {
+      const result = await NotificationsApi.revokeTrustedDevice(deviceId);
+      if (result?.success) {
+        setDevices((prev) =>
+          prev.map((device) =>
+            device.id === deviceId
+              ? { ...device, revokedAt: new Date().toISOString(), isTrusted: false }
+              : device,
+          ),
+        );
+        toast.success('Device access revoked');
+      } else {
+        toast.error('Unable to revoke device');
+      }
+    } catch (error) {
+      console.error('Failed to revoke device', error);
+      toast.error('Failed to revoke device');
     }
   };
 
@@ -150,6 +200,50 @@ const SecuritySettings: React.FC = () => {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Recognized Devices */}
+      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-4">
+        <div className="flex items-center space-x-2">
+          <ShieldCheck className="w-5 h-5 text-primary" />
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Recognized Devices</h2>
+        </div>
+
+        {loadingDevices ? (
+          <p className="text-sm text-gray-500">Loading devices...</p>
+        ) : devices.length === 0 ? (
+          <p className="text-sm text-gray-500">No recognized devices found.</p>
+        ) : (
+          <div className="space-y-3">
+            {devices.map((device) => {
+              const revoked = !!device.revokedAt;
+              const userAgent = device.lastUserAgent || 'Unknown device';
+              return (
+                <div
+                  key={device.id}
+                  className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-lg border border-gray-200 dark:border-white/10 p-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {device.deviceLabel || userAgent.slice(0, 80)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Last seen: {new Date(device.lastSeenAt).toLocaleString()} {revoked ? '• Revoked' : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={revoked}
+                    onClick={() => void handleRevokeDevice(device.id)}
+                    className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Verification Modal */}

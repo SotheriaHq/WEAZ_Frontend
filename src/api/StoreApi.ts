@@ -270,13 +270,7 @@ export interface PaymentContactDetails {
 
 export interface PaystackPaymentData extends PaymentContactDetails {
   method: 'PAYSTACK';
-  channel: 'CARD';
-  mockCard?: {
-    cardNumber: string;
-    cardholderName: string;
-    expiry: string;
-    cvv: string;
-  };
+  channel: 'CARD' | 'BANK_TRANSFER';
 }
 
 export interface FlutterwavePaymentData extends PaymentContactDetails {
@@ -569,6 +563,65 @@ export interface StoreStatusResponse {
     socialWebsite?: string | null;
     responseTimeSla?: string | null;
   };
+  paymentAccount?: StorePaymentAccountSummary | null;
+}
+
+export interface StorePaymentAccountSummary {
+  id: string | null;
+  provider: string;
+  status: 'PENDING_SETUP' | 'PENDING_SYNC' | 'ACTIVE' | 'SYNC_ERROR' | string;
+  isReady: boolean;
+  businessName: string | null;
+  primaryContactName: string | null;
+  primaryContactEmail: string | null;
+  primaryContactPhone: string | null;
+  bankCode: string | null;
+  bankName: string | null;
+  accountName: string | null;
+  maskedAccountNumber: string | null;
+  subaccountCode: string | null;
+  subaccountId: string | null;
+  subaccountActive: boolean;
+  subaccountVerified: boolean;
+  transferRecipientCode: string | null;
+  transferRecipientId: string | null;
+  transferRecipientActive: boolean;
+  lastSyncError: string | null;
+  accountResolvedAt: string | null;
+  subaccountLastSyncAt: string | null;
+  transferRecipientLastSyncAt: string | null;
+  lastProviderSyncAt: string | null;
+  lastSuccessfulSyncAt: string | null;
+  paystackBankId: string | null;
+  updatedAt: string | null;
+}
+
+export interface StorePaymentAccountResponse {
+  brandId: string;
+  provider: 'PAYSTACK' | string;
+  isRequiredForStoreOpen: boolean;
+  suggestedDefaults: {
+    businessName: string;
+    primaryContactName: string | null;
+    primaryContactEmail: string | null;
+    primaryContactPhone: string | null;
+  };
+  account: StorePaymentAccountSummary;
+}
+
+export interface StorePaymentBankOption {
+  id: number;
+  code: string;
+  name: string;
+  currency: string;
+}
+
+export interface StorePaymentAccountUpdateData {
+  bankCode?: string;
+  accountNumber?: string;
+  primaryContactName?: string;
+  primaryContactEmail?: string;
+  primaryContactPhone?: string;
 }
 
 export interface StoreProfileUpdateData {
@@ -624,6 +677,7 @@ export interface StoreGeneralSettingsResponse {
   storeNameLastChangedAt: string | null;
   storeNameNextAllowedAt: string | null;
   responseTimeSla?: string;
+  paymentAccount?: StorePaymentAccountSummary | null;
 }
 
 export interface StorePoliciesResponse {
@@ -696,6 +750,23 @@ export const updateStoreProfile = async (data: StoreProfileUpdateData): Promise<
 export const getStorePolicies = async (): Promise<StorePoliciesResponse> => {
   const res = await apiClient.get('/store/policies');
   return extractData<StorePoliciesResponse>(res);
+};
+
+export const getStorePaymentAccount = async (): Promise<StorePaymentAccountResponse> => {
+  const res = await apiClient.get('/store/payment-account');
+  return extractData<StorePaymentAccountResponse>(res);
+};
+
+export const listStorePaymentBanks = async (): Promise<StorePaymentBankOption[]> => {
+  const res = await apiClient.get('/store/payment-account/banks');
+  return extractData<StorePaymentBankOption[]>(res);
+};
+
+export const updateStorePaymentAccount = async (
+  data: StorePaymentAccountUpdateData
+): Promise<StorePaymentAccountResponse> => {
+  const res = await apiClient.patch('/store/payment-account', data);
+  return extractData<StorePaymentAccountResponse>(res);
 };
 
 export const updateStorePolicies = async (
@@ -811,12 +882,15 @@ export default {
   getBrandStoreInfo,
   getStoreWizardPrefill,
   getStoreGeneralSettings,
+  getStorePaymentAccount,
   updateStoreName,
   getStoreStatus,
+  listStorePaymentBanks,
   openStore,
   closeStore,
   updateStoreProfile,
   getStorePolicies,
+  updateStorePaymentAccount,
   updateStorePolicies,
   getProductPriceChangePreview,
   resolveOrderAccess,

@@ -1,17 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import {
-  ArrowLeft,
-  Check,
-  CheckCheck,
-  ChevronDown,
-  Rocket,
-  Link,
-  Instagram,
-  Globe,
-  Edit3,
-} from 'lucide-react';
 import type { StoreWizardData } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import type { StorePaymentAccountSummary } from '@/api/StoreApi';
+import StorePaymentAccountPanel from '@/components/store/StorePaymentAccountPanel';
 
 // Step type for navigation
 type WizardStep = 'basic-info' | 'social' | 'policies' | 'review';
@@ -70,7 +61,8 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
   onGoToStep,
   isSaving = false,
 }) => {
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [expandedSection, setExpandedSection] = useState<string | null>('payments');
+  const [paymentAccount, setPaymentAccount] = useState<StorePaymentAccountSummary | null>(null);
 
   // Check if all requirements are met (minimal requirements)
   const descriptionComplete = data.description.trim().length > 0;
@@ -83,7 +75,8 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
   const socialComplete = Boolean(data.instagram || data.tiktok || data.twitter || data.website);
   // Policies are optional - just need to have passed through the step
   const policiesComplete = true; // Always true - policies page visited
-  const allRequirementsMet = basicComplete; // Only basic info is truly required
+  const paymentAccountComplete = paymentAccount?.isReady === true;
+  const allRequirementsMet = basicComplete && paymentAccountComplete;
 
   const toggleSection = useCallback((section: string) => {
     setExpandedSection((prev) => (prev === section ? null : section));
@@ -118,13 +111,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                     : 'bg-orange-500/10 border-orange-500/20'
                 }`}
               >
-                <Check
-                  className={
-                    allRequirementsMet
-                      ? 'w-4 h-4 text-green-500'
-                      : 'w-4 h-4 text-orange-500'
-                  }
-                />
+                <span aria-hidden="true">{allRequirementsMet ? '✅' : '⚠️'}</span>
                 <span
                   className={`text-sm font-medium ${
                     allRequirementsMet
@@ -201,21 +188,13 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                     </div>
                     <div className="flex items-center gap-3 mt-4">
                       {data.instagram && (
-                        <span className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer">
-                          <Instagram className="w-5 h-5" />
-                        </span>
+                        <span className="text-xl" aria-hidden="true">📸</span>
                       )}
                       {data.twitter && (
-                        <span className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer">
-                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                          </svg>
-                        </span>
+                        <span className="text-xl" aria-hidden="true">✖️</span>
                       )}
                       {data.website && (
-                        <span className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer">
-                          <Globe className="w-5 h-5" />
-                        </span>
+                        <span className="text-xl" aria-hidden="true">🌐</span>
                       )}
                     </div>
                   </div>
@@ -336,6 +315,21 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                   />
                 </div>
               </SectionCard>
+
+              <SectionCard
+                title="Payments & Payouts"
+                subtitle="Required before your store can go live"
+                isComplete={paymentAccountComplete}
+                isExpanded={expandedSection === 'payments'}
+                onToggle={() => toggleSection('payments')}
+              >
+                <div className="mt-4">
+                  <StorePaymentAccountPanel
+                    mode="wizard"
+                    onStatusChange={setPaymentAccount}
+                  />
+                </div>
+              </SectionCard>
             </div>
           </div>
 
@@ -348,7 +342,9 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                     ? 'bg-green-500/10 border-green-500/20' 
                     : 'bg-orange-500/10 border-orange-500/20'
                 }`}>
-                  <CheckCheck className={`w-6 h-6 ${allRequirementsMet ? 'text-green-500' : 'text-orange-500'}`} />
+                <span className="text-2xl" aria-hidden="true">
+                  {allRequirementsMet ? '✅' : '⚠️'}
+                </span>
                 </div>
                 <div>
                   <h3 className="text-gray-900 dark:text-white font-bold">
@@ -364,6 +360,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                 <ReadinessItem label="Basic info complete" checked={basicComplete} />
                 <ReadinessItem label="Policies set" checked={policiesComplete} />
                 <ReadinessItem label="Social links (optional)" checked={socialComplete} />
+                <ReadinessItem label="Payout account ready" checked={paymentAccountComplete} />
               </div>
 
               <div className="border-t border-gray-200 dark:border-gray-800 pt-6 space-y-4">
@@ -402,7 +399,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                       : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
                   }`}
                 >
-                  <Rocket className="w-4 h-4" />
+                  <span aria-hidden="true">🚀</span>
                   {isSaving ? 'Publishing...' : 'Publish Store'}
                 </button>
                 <p className="text-xs text-gray-500 dark:text-gray-400 text-center px-2">
@@ -410,7 +407,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                 </p>
 
                 <button className="w-full py-3 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-white font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-[#1e1e1e] transition-colors flex items-center justify-center gap-2">
-                  <Link className="w-4 h-4" />
+                  <span aria-hidden="true">🔗</span>
                   Get Preview Link
                 </button>
               </div>
@@ -424,7 +421,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
             onClick={onBack}
             className="px-6 py-3 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-white font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-[#1e1e1e] transition-colors flex items-center gap-2"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <span aria-hidden="true">⬅️</span>
             Back
           </button>
         </div>
@@ -467,9 +464,9 @@ const SectionCard: React.FC<SectionCardProps> = ({
               : 'bg-orange-500/10 border border-orange-500/20'
           }`}
         >
-          <Check
-            className={isComplete ? 'w-5 h-5 text-green-500' : 'w-5 h-5 text-orange-500'}
-          />
+          <span className="text-lg" aria-hidden="true">
+            {isComplete ? '✅' : '⚠️'}
+          </span>
         </div>
         <div>
           <h3 className="text-gray-900 dark:text-white font-semibold">{title}</h3>
@@ -482,16 +479,19 @@ const SectionCard: React.FC<SectionCardProps> = ({
             onClick={onEdit}
             className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 text-sm font-medium flex items-center gap-1"
           >
-            <Edit3 className="w-3.5 h-3.5" />
+            <span aria-hidden="true">✏️</span>
             Edit
           </button>
         )}
         <button onClick={onToggle}>
-          <ChevronDown
-            className={`w-5 h-5 text-gray-400 transition-transform ${
+          <span
+            className={`inline-block text-sm text-gray-400 transition-transform ${
               isExpanded ? 'rotate-180' : ''
             }`}
-          />
+            aria-hidden="true"
+          >
+            🔽
+          </span>
         </button>
       </div>
     </div>
@@ -516,17 +516,9 @@ const SocialItem: React.FC<{ platform: string; username: string }> = ({
 }) => (
   <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-[#1a1a1a] rounded-lg">
     <div className="flex items-center gap-3">
-      {platform === 'Instagram' && <Instagram className="w-4 h-4 text-pink-500" />}
-      {platform === 'Twitter' && (
-        <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-        </svg>
-      )}
-      {platform === 'TikTok' && (
-        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
-        </svg>
-      )}
+      {platform === 'Instagram' && <span aria-hidden="true">📸</span>}
+      {platform === 'Twitter' && <span aria-hidden="true">✖️</span>}
+      {platform === 'TikTok' && <span aria-hidden="true">🎵</span>}
       <span className="text-gray-900 dark:text-white">@{username}</span>
     </div>
     <span className="text-xs text-green-500">Connected</span>
@@ -538,9 +530,7 @@ const ReadinessItem: React.FC<{ label: string; checked: boolean }> = ({
   checked,
 }) => (
   <div className="flex items-center gap-3">
-    <Check
-      className={checked ? 'w-4 h-4 text-green-500' : 'w-4 h-4 text-gray-400'}
-    />
+    <span aria-hidden="true">{checked ? '✅' : '⬜'}</span>
     <span
       className={checked ? 'text-sm text-gray-700 dark:text-gray-300' : 'text-sm text-gray-500'}
     >

@@ -4,6 +4,7 @@ import { messagingApi, type ThreadMessage } from '@/api/MessagingApi';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
+import VLoader from '@/components/loaders/VLoader';
 
 type ContextType = 'CUSTOM_ORDER' | 'STANDARD_ORDER' | 'INQUIRY';
 type ActorSurface = 'BUYER' | 'BRAND' | 'ADMIN';
@@ -81,6 +82,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
   const [uploading, setUploading] = useState(false);
   const attachmentsRef = useRef<PendingAttachment[]>([]);
   const messageNodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const refreshSequenceRef = useRef(0);
   const contextId = useMemo(() => orderId || threadId || '', [orderId, threadId]);
   const useThreadTransport = actorSurface === 'BRAND' && Boolean(threadId);
 
@@ -218,6 +220,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
   }, [actorSurface, brandId, contextId, contextType, threadId, useThreadTransport]);
 
   const refresh = useCallback(async () => {
+    const refreshId = ++refreshSequenceRef.current;
     setLoading(true);
     try {
       await Promise.all([listMessages(), loadSummary()]);
@@ -233,6 +236,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
       });
       toast.error(error?.response?.data?.message || 'Unable to load order messages');
     } finally {
+      if (refreshSequenceRef.current !== refreshId) return;
       setLoading(false);
     }
   }, [listMessages, loadSummary]);
@@ -477,7 +481,10 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
 
       <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1 scrollbar-hide">
         {loading ? (
-          <div className="text-sm text-slate-500 dark:text-slate-400">Loading messages...</div>
+          <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+            <VLoader size={24} phase="loading" showLabel={false} />
+            <span>Loading thread…</span>
+          </div>
         ) : messages.length === 0 ? (
           <div className="text-sm text-slate-500 dark:text-slate-400">No messages yet for this order.</div>
         ) : (

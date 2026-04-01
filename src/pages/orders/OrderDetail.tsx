@@ -269,8 +269,9 @@ const OrderDetail: React.FC = () => {
         <span className="font-medium text-gray-900 dark:text-white">#{order.id.slice(0, 8)}</span>
       </div>
 
-      <section className="overflow-hidden rounded-[28px] border border-gray-200/80 bg-white/70 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
-        <div className="grid gap-6 p-6 md:grid-cols-[180px_minmax(0,1fr)]">
+      <section className="relative overflow-hidden rounded-[2.5rem] border border-white/40 bg-white/50 p-2 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-black/20">
+        <div className="relative overflow-hidden rounded-[2rem] bg-white/60 p-6 shadow-sm ring-1 ring-inset ring-black/5 dark:bg-white/[0.02] dark:ring-white/10">
+          <div className="grid gap-6 md:grid-cols-[180px_minmax(0,1fr)]">
           <div className="overflow-hidden rounded-3xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/[0.04]">
             {firstItem?.thumbnail ? (
               <ImageWithFallback
@@ -380,11 +381,12 @@ const OrderDetail: React.FC = () => {
                 </div>
               </div>
             ) : null}
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-gray-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
+      <section className="relative rounded-[2rem] border border-white/40 bg-white/60 p-5 lg:p-6 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/20">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Order progress</h2>
@@ -397,10 +399,10 @@ const OrderDetail: React.FC = () => {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {timelineSteps.map((step) => {
             const stateTone = step.complete
-              ? 'border-emerald-300/70 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-500/10'
+              ? 'border-emerald-200/50 bg-gradient-to-br from-emerald-50 to-emerald-100/30 shadow-sm dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent'
               : step.current
-                ? 'border-blue-300/70 bg-blue-50/70 dark:border-blue-500/20 dark:bg-blue-500/10'
-                : 'border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/[0.03]';
+                ? 'scale-[1.02] border-indigo-300/60 bg-gradient-to-br from-indigo-50 to-purple-50/50 shadow-md ring-1 ring-inset ring-indigo-500/10 dark:border-indigo-500/30 dark:from-indigo-500/10 dark:to-purple-500/5 dark:ring-indigo-400/20'
+                : 'border-black/5 bg-white/40 opacity-70 dark:border-white/10 dark:bg-white/[0.03]';
 
             const marker = step.complete ? '✅' : step.current ? '🟣' : '⚪';
 
@@ -424,7 +426,7 @@ const OrderDetail: React.FC = () => {
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-gray-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
+      <section className="relative rounded-[2rem] border border-white/40 bg-white/60 p-5 lg:p-6 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/20">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Order items</h2>

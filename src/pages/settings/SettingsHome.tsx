@@ -1,7 +1,6 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { ChevronRight, Construction } from 'lucide-react';
 import SettingsSidebar, {
   getGroupForKey,
   getItemForKey,
@@ -11,8 +10,10 @@ import PatchesSettings from '@/components/settings/tabs/PatchesSettings';
 import SubscriptionsSettings from '@/components/settings/tabs/SubscriptionsSettings';
 import AccountSettings from '@/components/settings/tabs/AccountSettings';
 import NotificationSettings from '@/components/settings/tabs/NotificationSettings';
+import EmailPreferencesSettings from '@/components/settings/tabs/EmailPreferencesSettings';
 import StoreGeneralSettings from '@/components/settings/tabs/StoreGeneralSettings';
 import StorePoliciesSettings from '@/components/settings/tabs/StorePoliciesSettings';
+import StorePaymentsSettings from '@/components/settings/tabs/StorePaymentsSettings';
 import ProfileVisibilitySettings from '@/components/settings/tabs/ProfileVisibilitySettings';
 import SizeFitSettings from '@/components/settings/tabs/SizeFitSettings';
 import HiddenContentSettings from './HiddenContentSettings';
@@ -31,8 +32,8 @@ const ComingSoon: React.FC<{ title: string; description: string }> = ({
       <p className="text-gray-500 dark:text-gray-400">{description}</p>
     </div>
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="p-4 rounded-full bg-gray-100 dark:bg-white/5 mb-4">
-        <Construction className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+      <div className="p-4 rounded-full bg-gray-100 dark:bg-white/5 mb-4 text-3xl" aria-hidden="true">
+        🚧
       </div>
       <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-1">
         Coming Soon
@@ -88,6 +89,7 @@ const sections: Record<string, React.ReactNode> = {
   account: <AccountSettings />,
   security: <SecuritySettings />,
   notifications: <NotificationSettings />,
+  'email-preferences': <EmailPreferencesSettings />,
   privacy: (
     <ComingSoon
       title="Privacy"
@@ -117,12 +119,7 @@ const sections: Record<string, React.ReactNode> = {
     />
   ),
   'store-policies': <StorePoliciesSettings />,
-  'store-payments': (
-    <ComingSoon
-      title="Payments & Payouts"
-      description="Set up payout methods, view payout history, and configure payment preferences."
-    />
-  ),
+  'store-payments': <StorePaymentsSettings />,
   'store-team': (
     <ComingSoon
       title="Team Members"
@@ -151,7 +148,7 @@ const Breadcrumbs: React.FC<{ activeKey: string; onNavigate: (key: string) => vo
       </button>
       {group && (
         <>
-          <ChevronRight className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />
+          <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">›</span>
           <span className="text-gray-400 dark:text-gray-500">
             {group.label}
           </span>
@@ -159,7 +156,7 @@ const Breadcrumbs: React.FC<{ activeKey: string; onNavigate: (key: string) => vo
       )}
       {item && (
         <>
-          <ChevronRight className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />
+          <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">›</span>
           <span className="text-gray-900 dark:text-white font-medium">
             {item.label}
           </span>

@@ -71,7 +71,7 @@ const stageDisplayOrder: CustomOrderProgressStage[] = [
   'READY_FOR_DELIVERY',
 ];
 
-const shell = 'rounded-[1.75rem] border border-black/10 bg-white/85 p-5 dark:border-white/10 dark:bg-white/[0.04]';
+const shell = 'relative rounded-[2rem] border border-white/40 bg-white/60 p-5 lg:p-6 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/20';
 
 const formatCurrency = (value: number | undefined, currency = 'NGN') =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(Number(value ?? 0));
@@ -114,35 +114,69 @@ const lockedStatuses = new Set<CustomOrderStatus>([
   'COMPLETED',
 ]);
 
-const getStageTone = (_stage: CustomOrderProgressStage, _currentStage: CustomOrderProgressStage) => '';
+const getStageTone = (stage: CustomOrderProgressStage, currentStage: CustomOrderProgressStage) => {
+  const stageIndex = stageDisplayOrder.indexOf(stage);
+  const currentIndex = stageDisplayOrder.indexOf(currentStage);
+
+  if (stageIndex < currentIndex) {
+    return {
+      dot: 'border-emerald-500 bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]',
+      label: 'text-emerald-700 dark:text-emerald-200',
+      helper: 'text-emerald-600/90 dark:text-emerald-200/80',
+      marker: 'Complete',
+    };
+  }
+
+  if (stageIndex === currentIndex) {
+    return {
+      dot: 'border-sky-500 bg-sky-500 shadow-[0_0_0_5px_rgba(14,165,233,0.16)]',
+      label: 'text-sky-700 dark:text-sky-200',
+      helper: 'text-sky-600/90 dark:text-sky-200/80',
+      marker: 'Current',
+    };
+  }
+
+  return {
+    dot: 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-950',
+    label: 'text-slate-500 dark:text-slate-300',
+    helper: 'text-slate-400 dark:text-slate-500',
+    marker: 'Next',
+  };
+};
 
 const StageStatusStrip: React.FC<{ currentStage: CustomOrderProgressStage }> = ({ currentStage }) => (
-  <div className="space-y-3">
-    <div className="flex flex-wrap gap-2">
-      {stageDisplayOrder.map((stage) => (
-        <div
-          key={stage}
-          className={`min-w-[132px] rounded-2xl border px-3 py-2 ${getStageTone(stage, currentStage)}`}
-        >
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em]">
-            {stage === currentStage ? 'Current' : 'Stage'}
-          </div>
-          <div className="mt-1 text-sm font-semibold">{humanizeCustomOrderToken(stage)}</div>
-        </div>
-      ))}
-    </div>
-    <div className="rounded-2xl border border-black/10 bg-black/[0.03] px-4 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
-      <span className="font-semibold text-slate-900 dark:text-white">
-        {humanizeCustomOrderToken(currentStage)}
-      </span>{' '}
-      • {stageHelperMap[currentStage]}
+  <div className="overflow-x-auto">
+    <div className="relative min-w-[560px] px-1">
+      <div className="absolute left-4 right-4 top-3 h-[2px] rounded-full bg-slate-200 dark:bg-slate-700" />
+      <div
+        className="absolute left-4 top-3 h-[2px] rounded-full bg-sky-500 transition-[width] duration-300"
+        style={{
+          width: `calc(${(stageDisplayOrder.indexOf(currentStage) / (stageDisplayOrder.length - 1)) * 100}% - 8px)`,
+        }}
+      />
+      <div className="relative grid grid-cols-6 gap-1">
+        {stageDisplayOrder.map((stage) => {
+          const tone = getStageTone(stage, currentStage);
+          return (
+            <div key={stage} className="min-w-0">
+              <div className="flex items-center justify-center">
+                <div className={`h-6 w-6 rounded-full border-2 transition-all duration-300 ${tone.dot}`} />
+              </div>
+              <div className="mt-2 text-center">
+                <div className={`text-[10px] font-bold uppercase tracking-[0.12em] ${tone.helper}`}>
+                  {tone.marker}
+                </div>
+                <div className={`mt-0.5 text-[11px] font-semibold leading-4 ${tone.label}`}>
+                  {humanizeCustomOrderToken(stage)}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   </div>
 );
-
-void stageDisplayOrder;
-void getStageTone;
-void StageStatusStrip;
 
 const StudioCustomOrderDetailPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -420,15 +454,15 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     if (activeTab === 'overview') {
       return (
         <div className="space-y-5">
-          <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
+          <div className="grid items-start gap-5 min-[1080px]:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
             <section className={shell}>
               <div className="text-lg font-semibold text-slate-900 dark:text-white">Order summary</div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <CustomOrderKeyValueList
                   items={[
                     { label: 'Current production stage', value: currentStageLabel },
-                    { label: 'Payment status', value: humanizeCustomOrderToken(order.paymentStatus) },
-                    { label: 'Custom-order status', value: humanizeCustomOrderToken(order.status) },
+                    { label: 'Order intake', value: 'System-managed after buyer payment' },
+                    { label: 'Brand updates begin', value: 'Fabric and piece gathering' },
                     { label: 'Brand', value: textValue(order.source.brandName, 'Brand') },
                   ]}
                 />
@@ -455,8 +489,6 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                   Current display
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <CustomOrderBadge value={order.status} />
-                  <CustomOrderBadge value={order.paymentStatus} type="payment" />
                   <CustomOrderBadge value={currentStage} type="stage" />
                 </div>
                 <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
@@ -467,7 +499,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
           </div>
 
           {/* Technical breakdown merged into Overview */}
-          <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid items-start gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_360px]">
             <section className={shell}>
               <div className="text-lg font-semibold text-slate-900 dark:text-white">Price breakdown</div>
               <div className="mt-4 space-y-4">
@@ -503,7 +535,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
 
     if (activeTab === 'measurements') {
       return (
-        <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid items-start gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_360px]">
           <section className={shell}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -550,7 +582,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
 
     if (activeTab === 'operations') {
       return (
-        <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
+        <div className="grid items-start gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
           <section className={shell}>
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Production management</div>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -569,36 +601,66 @@ const StudioCustomOrderDetailPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="mt-5">
-              <UniversalSelect
-                label="Update stage"
-                value={selectedStage}
-                onChange={(value) => void handleStageChange(value)}
-                options={brandManagedStageOptions.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-                placeholder={canUpdateProgressStage ? 'Select the next production stage' : 'Stage updates not available for this order'}
-                disabled={!canUpdateProgressStage || busy}
-              />
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                {canUpdateProgressStage
-                  ? selectedStage
-                    ? brandManagedStageOptions.find((option) => option.value === selectedStage)?.helper
-                    : 'Choose the next production stage. Changes save immediately.'
-                  : 'Stage updates are not available for this order in its current state.'}
-              </p>
-            </div>
           </section>
 
-          <section className={shell}>
-            <div className="text-lg font-semibold text-slate-900 dark:text-white">Order actions</div>
-            <div className="mt-4 space-y-3">
-              <div className="rounded-[1.4rem] border border-emerald-200/70 bg-emerald-50/60 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
-                <div className="text-sm font-semibold text-slate-900 dark:text-white">Accept order</div>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Use the production status selector on the left to advance to the next stage.
-                </p>
+          <section className={`${shell} space-y-5`}>
+            <div>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">⏳ Request extension</div>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Ask the buyer for more production time.
+              </p>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={extensionDays}
+                  onChange={(event) => setExtensionDays(event.target.value)}
+                  placeholder="Extra days (e.g. 3)"
+                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                />
+                <textarea
+                  value={extensionReason}
+                  onChange={(event) => setExtensionReason(event.target.value)}
+                  rows={2}
+                  placeholder="Why is the extension needed?"
+                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleCreateExtensionRequest()}
+                  disabled={busy}
+                  className="rounded-full bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  Request extension
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-black/[0.06] pt-5 dark:border-white/[0.06]">
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">🚨 Exception review</div>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Flag for admin review if something needs resolution.
+              </p>
+              <div className="mt-4 space-y-3">
+                <textarea
+                  value={exceptionReason}
+                  onChange={(event) => setExceptionReason(event.target.value)}
+                  rows={2}
+                  placeholder="Why does this order need exception review?"
+                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                />
+                <input
+                  value={exceptionQuote}
+                  onChange={(event) => setExceptionQuote(event.target.value)}
+                  placeholder="Optional requested quote total"
+                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleExceptionReview()}
+                  disabled={busy}
+                  className="rounded-full border border-rose-300 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-800 disabled:opacity-60 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+                >
+                  Submit exception review
+                </button>
               </div>
             </div>
           </section>
@@ -609,7 +671,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     if (activeTab === 'timeline') {
       return (
         <div className="space-y-5">
-          <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="grid items-start gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <section className={shell}>
               <div className="text-lg font-semibold text-slate-900 dark:text-white">Stage history</div>
               <div className="mt-4 space-y-3">
@@ -669,69 +731,6 @@ const StudioCustomOrderDetailPage: React.FC = () => {
             </section>
           </div>
 
-          {/* Extension request - moved from Operations */}
-          <div className="grid gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <section className={shell}>
-              <div className="text-lg font-semibold text-slate-900 dark:text-white">⏳ Request production extension</div>
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Ask the buyer for more time if production needs it.
-              </p>
-              <div className="mt-4 space-y-3">
-                <input
-                  value={extensionDays}
-                  onChange={(event) => setExtensionDays(event.target.value)}
-                  placeholder="Extra days (e.g. 3)"
-                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
-                />
-                <textarea
-                  value={extensionReason}
-                  onChange={(event) => setExtensionReason(event.target.value)}
-                  rows={3}
-                  placeholder="Why is the extension needed?"
-                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleCreateExtensionRequest()}
-                  disabled={busy}
-                  className="rounded-full bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  Request extension
-                </button>
-              </div>
-            </section>
-
-            {/* Exception review - moved from Operations */}
-            <section className={shell}>
-              <div className="text-lg font-semibold text-slate-900 dark:text-white">🚨 Exception review</div>
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Flag this order for admin review if something outside the normal flow needs resolution.
-              </p>
-              <div className="mt-4 space-y-3">
-                <textarea
-                  value={exceptionReason}
-                  onChange={(event) => setExceptionReason(event.target.value)}
-                  rows={3}
-                  placeholder="Why does this order need exception review?"
-                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
-                />
-                <input
-                  value={exceptionQuote}
-                  onChange={(event) => setExceptionQuote(event.target.value)}
-                  placeholder="Optional requested quote total"
-                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleExceptionReview()}
-                  disabled={busy}
-                  className="rounded-full border border-rose-300 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-800 disabled:opacity-60 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
-                >
-                  Submit exception review
-                </button>
-              </div>
-            </section>
-          </div>
         </div>
       );
     }
@@ -765,16 +764,23 @@ const StudioCustomOrderDetailPage: React.FC = () => {
         <span className="font-medium">{formatCustomOrderCode(order.id)}</span>
       </div>
 
-      <section className="rounded-[2rem] border border-black/10 bg-white/90 p-5 shadow-[0_30px_120px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04]">
-        <div className="grid gap-5 min-[1180px]:grid-cols-[220px_minmax(0,1fr)_300px] min-[1180px]:items-start">
+      <section className="relative mt-5 rounded-[2.5rem] border border-white/40 bg-white/50 p-2 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-black/20">
+        <div className="relative rounded-[2rem] bg-white/60 p-5 shadow-sm ring-1 ring-inset ring-black/5 dark:bg-white/[0.02] dark:ring-white/10">
+          {/* Stage progress filler — full width, top of order */}
+          <div className="mb-5 rounded-2xl border border-sky-200/70 bg-gradient-to-r from-sky-50/90 via-indigo-50/60 to-sky-50/90 px-5 py-4 dark:border-sky-500/20 dark:from-sky-500/10 dark:via-indigo-500/5 dark:to-sky-500/10">
+            <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.24em] text-sky-600 dark:text-sky-400">
+              Production progress
+            </div>
+            <StageStatusStrip currentStage={currentStage} />
+          </div>
+
+          <div className="grid gap-5 min-[1180px]:grid-cols-[220px_minmax(0,1fr)_300px] min-[1180px]:items-start">
           <div className="min-w-0">
             <CustomOrderMediaPreview src={order.source.primaryMediaUrl} title={order.source.title} />
           </div>
 
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <CustomOrderBadge value={order.status} />
-              <CustomOrderBadge value={order.paymentStatus} type="payment" />
               <CustomOrderBadge value={currentStage} type="stage" />
             </div>
 
@@ -790,21 +796,21 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                   )}
                 </div>
               </div>
-              <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{order.source.title}</h1>
+              <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{order.source.title}</h1>
             </div>
 
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
-                className="rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-slate-800 dark:border-white/10 dark:text-white"
+                className="rounded-full border border-black/10 bg-white/80 px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition-all hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
               >
-                Open messages
+                Open conversation
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/studio/custom-orders')}
-                className="rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white dark:bg-white dark:text-slate-950"
+                className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(15,23,42,0.15)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(15,23,42,0.2)] dark:bg-white dark:text-slate-950 dark:shadow-[0_4px_12px_rgba(255,255,255,0.1)]"
               >
                 Back to queue
               </button>
@@ -832,19 +838,6 @@ const StudioCustomOrderDetailPage: React.FC = () => {
               System sets order placed and order received automatically. Brand updates begin from fabric and piece gathering.
             </p>
 
-            <div className="mt-4 rounded-[1.4rem] border border-black/10 bg-black/[0.03] p-4 dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                Current production status
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <CustomOrderBadge value={currentStage} type="stage" />
-                <CustomOrderBadge value={order.status} />
-              </div>
-              <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                {stageHelperMap[currentStage]}
-              </p>
-            </div>
-
             <div className="mt-5">
               <UniversalSelect
                 label="Production status"
@@ -866,6 +859,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
               </p>
             </div>
           </aside>
+          </div>
         </div>
       </section>
 

@@ -10,6 +10,7 @@ import {
   type CustomOrderIssueType,
   type CustomOrderPaymentVerificationResult,
 } from '@/api/CustomOrderApi';
+import type { CheckoutPaymentMethod, PaymentData, ShippingAddress } from '@/api/StoreApi';
 import {
   CustomOrderBadge,
   CustomOrderJsonBreakdown,
@@ -22,6 +23,14 @@ import {
 } from '@/components/custom-orders/CustomOrderUi';
 import { formatCustomOrderCode, formatMeasurementLabel, formatMeasurementValue, humanizeCustomOrderToken } from '@/components/custom-orders/customOrderFormatting';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
+import {
+  CHECKOUT_PAYMENT_OPTIONS,
+  buildPaymentSubmissionData,
+  createInitialPaymentState,
+  type PaymentFormErrors,
+  validatePaymentData,
+} from '@/pages/checkout/paymentFlow';
 import { useConfirm } from '@/components/ui/useConfirm';
 
 const formatCurrency = (value: number | undefined, currency = 'NGN') =>
@@ -50,7 +59,7 @@ const hashToTab = (hash: string): BuyerDetailTab | null => {
   return null;
 };
 
-const shell = 'rounded-[1.8rem] border border-black/10 bg-white/85 p-6 dark:border-white/10 dark:bg-white/[0.04]';
+const shell = 'relative rounded-[2rem] border border-white/40 bg-white/60 p-5 lg:p-6 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/20';
 
 const CustomOrderDetailPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -62,6 +71,12 @@ const CustomOrderDetailPage: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<BuyerDetailTab>('overview');
   const [paymentVerification, setPaymentVerification] = useState<CustomOrderPaymentVerificationResult | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>('PAYSTACK');
+  const [paymentState, setPaymentState] = useState(() =>
+    createInitialPaymentState(profile?.email ?? '', profile?.phoneNumber ?? ''),
+  );
+  const [paymentErrors, setPaymentErrors] = useState<PaymentFormErrors>({});
+  const [paymentGateway, setPaymentGateway] = useState<string>('PAYSTACK');
   const [cancelReason, setCancelReason] = useState('');
   const [issueType, setIssueType] = useState<CustomOrderIssueType>('OTHER');
   const [issueDescription, setIssueDescription] = useState('');
@@ -70,9 +85,11 @@ const CustomOrderDetailPage: React.FC = () => {
   const [counterDays, setCounterDays] = useState('');
   const { confirm, ConfirmDialog } = useConfirm();
 
-  const loadOrder = async () => {
+  const loadOrder = async (options?: { silent?: boolean }) => {
     if (!orderId) return;
-    setLoading(true);
+    if (!options?.silent) {
+      setLoading(true);
+    }
     try {
       const data = await customOrdersBuyerApi.getById(orderId);
       setOrder(data);
@@ -81,11 +98,36 @@ const CustomOrderDetailPage: React.FC = () => {
       toast.error(error?.response?.data?.message || 'Unable to load custom order');
       navigate('/custom-orders');
     } finally {
-      setLoading(false);
+      if (!options?.silent) {
+        setLoading(false);
+      }
     }
   };
 
-  useEffect(() => { void loadOrder(); }, [orderId]);
+  useEffect(() => {
+    let active = true;
+    const run = async () => {
+      if (!orderId) return;
+      setLoading(true);
+      try {
+        const data = await customOrdersBuyerApi.getById(orderId);
+        if (!active) return;
+        setOrder(data);
+        if (data.paymentStatus === 'PAID') setPaymentVerification(null);
+      } catch (error: any) {
+        if (!active) return;
+        toast.error(error?.response?.data?.message || 'Unable to load custom order');
+        navigate('/custom-orders');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      active = false;
+    };
+  }, [navigate, orderId]);
   useEffect(() => { const nextTab = hashToTab(location.hash); if (nextTab) setActiveTab(nextTab); }, [location.hash]);
 
   const latestOpenExtension = useMemo(() => order?.extensionRequests.find((entry) => entry.buyerResponseStatus === 'OPEN') ?? null, [order?.extensionRequests]);
@@ -97,6 +139,58 @@ const CustomOrderDetailPage: React.FC = () => {
   const measurementEntries = Object.entries(order?.measurementSnapshot ?? {});
   const contactInfo = ((order?.contactInfo ?? null) as Record<string, unknown> | null) ?? {};
   const shippingAddress = ((order?.shippingAddress ?? null) as Record<string, unknown> | null) ?? {};
+  const paymentShippingAddress = useMemo<ShippingAddress>(
+    () => ({
+      firstName: String(contactInfo.customerName || profile?.firstName || '').split(' ')[0] || profile?.firstName || 'Buyer',
+      lastName:
+        String(contactInfo.customerName || profile?.lastName || '')
+          .split(' ')
+          .slice(1)
+          .join(' ') || profile?.lastName || 'Customer',
+      street: String(shippingAddress.street ?? ''),
+      apartment: String(shippingAddress.apartment ?? ''),
+      city: String(shippingAddress.city ?? ''),
+      state: String(shippingAddress.state ?? ''),
+      postalCode: String(shippingAddress.postalCode ?? ''),
+      country: String(shippingAddress.country ?? 'Nigeria'),
+      phone: String(contactInfo.phone ?? profile?.phoneNumber ?? ''),
+    }),
+    [
+      contactInfo.customerName,
+      contactInfo.phone,
+      profile?.firstName,
+      profile?.lastName,
+      profile?.phoneNumber,
+      shippingAddress.apartment,
+      shippingAddress.city,
+      shippingAddress.country,
+      shippingAddress.postalCode,
+      shippingAddress.state,
+      shippingAddress.street,
+    ],
+  );
+  const activePaymentData = paymentState[paymentMethod];
+
+  useEffect(() => {
+    setPaymentState((prev) => ({
+      PAYSTACK: {
+        ...prev.PAYSTACK,
+        email: prev.PAYSTACK.email || String(contactInfo.email ?? profile?.email ?? ''),
+        phone: prev.PAYSTACK.phone || paymentShippingAddress.phone,
+      },
+      FLUTTERWAVE: {
+        ...prev.FLUTTERWAVE,
+        email: prev.FLUTTERWAVE.email || String(contactInfo.email ?? profile?.email ?? ''),
+        phone: prev.FLUTTERWAVE.phone || paymentShippingAddress.phone,
+      },
+      BANK_TRANSFER: {
+        ...prev.BANK_TRANSFER,
+        email: prev.BANK_TRANSFER.email || String(contactInfo.email ?? profile?.email ?? ''),
+        phone: prev.BANK_TRANSFER.phone || paymentShippingAddress.phone,
+        senderPhone: prev.BANK_TRANSFER.senderPhone || paymentShippingAddress.phone,
+      },
+    }));
+  }, [contactInfo.email, paymentShippingAddress.phone, profile?.email]);
 
   const wrapMutation = async (work: () => Promise<unknown>, successMessage: string) => {
     setBusy(true);
@@ -111,18 +205,47 @@ const CustomOrderDetailPage: React.FC = () => {
     }
   };
 
+  const updateSelectedPaymentData = (updater: (current: PaymentData) => PaymentData) => {
+    setPaymentState((prev) => ({
+      ...prev,
+      [paymentMethod]: updater(prev[paymentMethod]),
+    }));
+    setPaymentErrors({});
+  };
+
   const handlePayNow = async () => {
-    if (!orderId || !profile?.email) return toast.error('Missing payment email for this account.');
+    if (!orderId) return;
+    const validationErrors = validatePaymentData(
+      paymentMethod,
+      activePaymentData,
+      paymentShippingAddress,
+    );
+    setPaymentErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) {
+      toast.error('Complete the payment details for the selected method');
+      return;
+    }
+
+    const paymentSubmissionData = buildPaymentSubmissionData(
+      activePaymentData,
+      paymentShippingAddress,
+    );
     setBusy(true);
     try {
-      const init = await customOrdersBuyerApi.initializePayment(orderId, { paymentMethod: 'PAYSTACK', email: profile.email });
+      const init = await customOrdersBuyerApi.initializePayment(orderId, {
+        paymentMethod,
+        email: paymentSubmissionData.email,
+        callbackUrl: `${window.location.origin}/checkout/payment-return`,
+        paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
+      });
+      setPaymentGateway(init.gateway);
       setPaymentVerification(null);
       if (init.authorizationUrl) {
         window.location.href = init.authorizationUrl;
         return;
       }
       toast.success('Payment initialized. Verify once the provider returns you here.');
-      await loadOrder();
+      await loadOrder({ silent: true });
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to initialize payment');
     } finally {
@@ -134,12 +257,15 @@ const CustomOrderDetailPage: React.FC = () => {
     if (!orderId || !order?.paymentReference) return toast.error('No payment reference is attached to this custom order yet.');
     setBusy(true);
     try {
-      const verificationResult = await customOrdersBuyerApi.verifyPayment(orderId, { reference: order.paymentReference, gateway: 'PAYSTACK' });
+      const verificationResult = await customOrdersBuyerApi.verifyPayment(orderId, {
+        reference: order.paymentReference,
+        gateway: paymentGateway || paymentMethod,
+      });
       setPaymentVerification(verificationResult);
       if (verificationResult.success) toast.success('Payment verification completed.');
       else if (verificationResult.awaitingProviderConfirmation) toast.info(verificationResult.recoveryMessage || 'Payment is still awaiting provider confirmation.');
       else toast.error(verificationResult.failureMessage || 'Payment is still pending or needs another attempt.');
-      await loadOrder();
+      await loadOrder({ silent: true });
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to verify payment');
     } finally {
@@ -176,7 +302,7 @@ const CustomOrderDetailPage: React.FC = () => {
   const renderTab = () => {
     if (activeTab === 'overview') {
       return (
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid items-start gap-6 xl:grid-cols-2">
           <section className={shell}>
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Order summary</div>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -196,7 +322,7 @@ const CustomOrderDetailPage: React.FC = () => {
           </section>
           <section className={shell}>
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Delivery and contact</div>
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
               <CustomOrderKeyValueList items={[
                 { label: 'Customer', value: textValue(contactInfo.customerName) },
                 { label: 'Email', value: textValue(contactInfo.email) },
@@ -225,7 +351,7 @@ const CustomOrderDetailPage: React.FC = () => {
             </div>
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Confirmed {formatDateTime(order.measurementConfirmedAt)}</div>
           </div>
-          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-5 grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
             {measurementEntries.length === 0 ? <div className="text-sm text-slate-500 dark:text-slate-400">No measurement points were saved.</div> : measurementEntries.map(([key, value]) => (
               <div key={key} className="rounded-[1.5rem] border border-black/10 bg-black/[0.03] px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{formatMeasurementLabel(key)}</div>
@@ -240,7 +366,7 @@ const CustomOrderDetailPage: React.FC = () => {
 
     if (activeTab === 'timeline') {
       return (
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid items-start gap-6 xl:grid-cols-2">
           <section className={shell}>
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Stage history</div>
             <div className="mt-4 space-y-3">{order.progressEvents.length === 0 ? <div className="text-sm text-slate-500 dark:text-slate-400">No stage history yet.</div> : order.progressEvents.map((event) => (
@@ -265,7 +391,7 @@ const CustomOrderDetailPage: React.FC = () => {
 
     if (activeTab === 'support') {
       return (
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid items-start gap-6 xl:grid-cols-2">
           <section className={shell}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-lg font-semibold text-slate-900 dark:text-white">Conversation and extension</div>
@@ -306,18 +432,19 @@ const CustomOrderDetailPage: React.FC = () => {
         <span className="font-medium">{formatCustomOrderCode(order.id)}</span>
       </div>
 
-      <section className="mt-5 overflow-hidden rounded-[2rem] border border-black/10 bg-white/90 shadow-[0_30px_120px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04]">
-        <div className="grid gap-6 p-6 xl:grid-cols-[360px_1fr]">
+      <section className="relative mt-5 overflow-hidden rounded-[2.5rem] border border-white/40 bg-white/50 p-2 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-black/20">
+        <div className="relative overflow-hidden rounded-[2rem] bg-white/60 p-6 shadow-sm ring-1 ring-inset ring-black/5 dark:bg-white/[0.02] dark:ring-white/10">
+          <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
           <CustomOrderMediaPreview src={order.source.primaryMediaUrl} title={order.source.title} />
           <div>
             <div className="flex flex-wrap items-center gap-2"><CustomOrderBadge value={order.status} /><CustomOrderBadge value={order.paymentStatus} type="payment" /><CustomOrderBadge value={order.currentProgressStage ?? 'ORDER_PLACED'} type="stage" /></div>
             <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
               <div className="max-w-3xl">
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">{formatCustomOrderCode(order.id)}</div>
-                <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{order.source.title}</h1>
+                <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{order.source.title}</h1>
                 <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">Dedicated buyer workspace for this custom order. Review payment, measurements, delivery commitments, and support actions without moving through multiple pages.</p>
               </div>
-              <div className="flex flex-wrap gap-3"><button type="button" onClick={() => navigate(`/messages?customOrderId=${encodeURIComponent(order.id)}`)} className="rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-slate-800 dark:border-white/10 dark:text-white">Open conversation</button><button type="button" onClick={() => navigate('/custom-orders')} className="rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white dark:bg-white dark:text-slate-950">Back to queue</button></div>
+              <div className="flex flex-wrap gap-3"><button type="button" onClick={() => navigate(`/messages?customOrderId=${encodeURIComponent(order.id)}`)} className="rounded-full border border-black/10 bg-white/80 px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-all hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10">Open conversation</button><button type="button" onClick={() => navigate('/custom-orders')} className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(15,23,42,0.15)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(15,23,42,0.2)] dark:bg-white dark:text-slate-950 dark:shadow-[0_4px_12px_rgba(255,255,255,0.1)]">Back to queue</button></div>
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <CustomOrderMetricCard label="Locked total" value={formatCurrency(order.buyerPriceSummary.grandTotal, order.buyerPriceSummary.currency ?? 'NGN')} helper="Buyer-facing amount" />
@@ -325,11 +452,76 @@ const CustomOrderDetailPage: React.FC = () => {
               <CustomOrderMetricCard label="Delivery deadline" value={formatDateTime(order.promisedDeliveryAt)} helper={getRelativeDeadlineText(order.promisedDeliveryAt)} />
               <CustomOrderMetricCard label="Measurements" value={`${measurementEntries.length}`} helper={formatDateTime(order.measurementConfirmedAt)} />
             </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {order.paymentStatus !== 'PAID' ? <section className="mt-6 rounded-[1.8rem] border border-amber-300/70 bg-amber-50/90 p-5 text-sm text-amber-950 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100"><div className="font-semibold">💳 Payment must complete before brand acceptance</div><p className="mt-2">{paymentNeedsProviderConfirmation ? paymentVerification?.recoveryMessage || 'Your payment attempt is waiting for provider confirmation.' : 'Initialize checkout, then verify the payment when you return from the provider.'}</p><div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={handlePayNow} disabled={busy} className="rounded-full bg-amber-400 px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-60">{busy ? 'Opening payment...' : 'Pay now'}</button><button type="button" onClick={handleVerifyPayment} disabled={busy || !order.paymentReference} className="rounded-full border border-amber-400/60 px-4 py-2.5 text-sm font-semibold text-amber-900 disabled:opacity-60 dark:text-amber-100">Verify payment</button></div>{order.paymentReference ? <div className="mt-2 text-xs">Reference: {order.paymentReference}</div> : null}</section> : null}
+      {order.paymentStatus !== 'PAID' ? (
+        <section className="mt-6 rounded-[1.8rem] border border-amber-300/70 bg-amber-50/90 p-5 text-sm text-amber-950 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+          <div className="font-semibold">💳 Payment must complete before brand acceptance</div>
+          <p className="mt-2">
+            {paymentNeedsProviderConfirmation
+              ? paymentVerification?.recoveryMessage || 'Your payment attempt is waiting for provider confirmation.'
+              : 'Choose the gateway and channel you want to use, then continue to the hosted payment flow.'}
+          </p>
+          <div className="mt-5 grid gap-3 lg:grid-cols-3">
+            {CHECKOUT_PAYMENT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  setPaymentMethod(option.value);
+                  setPaymentGateway(option.value);
+                  setPaymentErrors({});
+                }}
+                className={`rounded-[1.4rem] border px-4 py-4 text-left transition ${
+                  paymentMethod === option.value
+                    ? 'border-amber-500 bg-white/90 shadow-sm dark:bg-white/10'
+                    : 'border-amber-200/80 bg-white/55 dark:border-amber-500/20 dark:bg-black/10'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">{option.emoji}</span>
+                  <div>
+                    <div className="font-semibold text-slate-900 dark:text-white">{option.label}</div>
+                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">{option.description}</div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="mt-5">
+            <PaymentDetailsSection
+              paymentMethod={paymentMethod}
+              paymentData={activePaymentData}
+              shippingAddress={paymentShippingAddress}
+              errors={paymentErrors}
+              onChange={updateSelectedPaymentData}
+              compact
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={handlePayNow}
+              disabled={busy}
+              className="rounded-full bg-amber-400 px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
+            >
+              {busy ? 'Opening payment...' : 'Pay now'}
+            </button>
+            <button
+              type="button"
+              onClick={handleVerifyPayment}
+              disabled={busy || !order.paymentReference}
+              className="rounded-full border border-amber-400/60 px-4 py-2.5 text-sm font-semibold text-amber-900 disabled:opacity-60 dark:text-amber-100"
+            >
+              Verify payment
+            </button>
+          </div>
+          {order.paymentReference ? <div className="mt-2 text-xs">Reference: {order.paymentReference}</div> : null}
+        </section>
+      ) : null}
 
       <div className="mt-6"><CustomOrderWorkspaceTabs tabs={TABS} activeTab={activeTab} onChange={(nextTab) => setActiveTab(nextTab as BuyerDetailTab)} /></div>
       <div className="mt-6">{renderTab()}</div>

@@ -9,7 +9,7 @@ import {
   type PaymentAttemptSummary,
   type PaymentNextAction,
 } from '@/api/PaymentApi';
-import type { CheckoutPaymentMethod, PaymentData } from '@/api/StoreApi';
+import type { CheckoutPaymentMethod, PaymentData, PaymentMethodType } from '@/api/StoreApi';
 import { formatPrice } from '@/utils/helpers';
 import { getPaymentSummaryLines } from '@/pages/checkout/paymentFlow';
 
@@ -72,6 +72,12 @@ function getStatusEmoji(status: PaymentAttemptStatus, nextAction?: PaymentNextAc
   return '💳';
 }
 
+function isCheckoutPaymentMethod(
+  value: PaymentMethodType | undefined,
+): value is CheckoutPaymentMethod {
+  return value === 'PAYSTACK' || value === 'FLUTTERWAVE' || value === 'BANK_TRANSFER';
+}
+
 const OrderConfirmation: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -84,22 +90,31 @@ const OrderConfirmation: React.FC = () => {
   const reference = searchParams.get('reference')?.trim() || locationState?.reference || '';
 
   useEffect(() => {
+    let active = true;
+
     const loadAttempt = async () => {
       if (!reference) return;
       setLoading(true);
       try {
         const result = await paymentApi.getAttempt(reference);
+        if (!active) return;
         setAttempt(result);
       } catch (error: any) {
+        if (!active) return;
         toast.error(error?.response?.data?.message || 'Unable to load payment confirmation');
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
 
     if (reference) {
       void loadAttempt();
     }
+    return () => {
+      active = false;
+    };
   }, [reference]);
 
   const orderIds = locationState?.orderIds ?? attempt?.orderIds ?? [];
@@ -112,7 +127,7 @@ const OrderConfirmation: React.FC = () => {
   const status = attempt?.status ?? (nextAction?.type ? 'PENDING' : 'PAID');
 
   const paymentSummaryLines = useMemo(() => {
-    if (!paymentMethod || !paymentData) return [];
+    if (!paymentMethod || !paymentData || !isCheckoutPaymentMethod(paymentMethod)) return [];
     return getPaymentSummaryLines(paymentMethod, paymentData);
   }, [paymentData, paymentMethod]);
 
@@ -156,9 +171,12 @@ const OrderConfirmation: React.FC = () => {
 
       <div className="mb-6 space-y-4 rounded-xl border border-gray-200/70 bg-gray-50 p-4 text-left dark:border-zinc-700/60 dark:bg-zinc-800/50">
         <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400">
-          Order {orderIds.length > 1 ? 'IDs' : 'ID'}
+          {attempt?.subjectType === 'CUSTOM_ORDER' ? 'Custom order' : `Order ${orderIds.length > 1 ? 'IDs' : 'ID'}`}
         </p>
-        {orderIds.map((id) => (
+        {(attempt?.subjectType === 'CUSTOM_ORDER' && attempt.customOrderId
+          ? [attempt.customOrderId]
+          : orderIds
+        ).map((id) => (
           <div key={id} className="space-y-3 border-t border-gray-200/70 pt-4 first:border-t-0 first:pt-0 dark:border-zinc-700/60">
             <p className="font-mono text-sm text-gray-900 dark:text-white">{id}</p>
             {/* Order QR code disabled — only brand profile QR codes active for now */}
@@ -288,8 +306,15 @@ const OrderConfirmation: React.FC = () => {
             {nextAction?.ctaLabel || 'Continue Payment'}
           </Button>
         )}
-        <Button onClick={() => navigate('/orders')} size="lg">
-          View My Orders
+        <Button
+          onClick={() =>
+            attempt?.subjectType === 'CUSTOM_ORDER' && attempt.customOrderId
+              ? navigate(`/custom-orders/${attempt.customOrderId}`)
+              : navigate('/orders')
+          }
+          size="lg"
+        >
+          {attempt?.subjectType === 'CUSTOM_ORDER' ? 'Open Custom Order' : 'View My Orders'}
         </Button>
         <Button variant="secondary" onClick={() => navigate('/')} size="lg">
           Continue Shopping

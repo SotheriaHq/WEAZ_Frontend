@@ -104,9 +104,10 @@ const AdminPayoutsPage: React.FC = () => {
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Brand</th>
                 <th className="px-3 py-3">Amount</th>
+                <th className="px-3 py-3">Transfer</th>
                 <th className="px-3 py-3">Owner</th>
                 <th className="px-3 py-3">Date</th>
-                {canProcess && <th className="px-3 py-3">Actions</th>}
+                <th className="px-3 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -125,26 +126,27 @@ const AdminPayoutsPage: React.FC = () => {
                     {payout.amount} {payout.currency}
                   </td>
                   <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400">
+                    {payout.providerTransferStatus || 'Not started'}
+                  </td>
+                  <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400">
                     {formatOwner(payout)}
                   </td>
                   <td className="px-3 py-2.5 text-gray-500">
                     {new Date(payout.createdAt).toLocaleDateString()}
                   </td>
-                  {canProcess && (
-                    <td className="px-3 py-2.5">
-                      <button
-                        onClick={() => setSelectedPayout(payout)}
-                        className="text-primary hover:underline text-xs"
-                      >
-                        Manage
-                      </button>
-                    </td>
-                  )}
+                  <td className="px-3 py-2.5">
+                    <button
+                      onClick={() => setSelectedPayout(payout)}
+                      className="text-primary hover:underline text-xs"
+                    >
+                      {canProcess ? 'Manage' : 'View'}
+                    </button>
+                  </td>
                 </tr>
               ))}
               {payouts.length === 0 && (
                 <tr>
-                  <td colSpan={canProcess ? 6 : 5} className="py-8 text-center text-gray-500">
+                  <td colSpan={7} className="py-8 text-center text-gray-500">
                     No payouts found
                   </td>
                 </tr>
@@ -165,8 +167,8 @@ const AdminPayoutsPage: React.FC = () => {
         payout={selectedPayout}
         open={!!selectedPayout}
         onClose={() => setSelectedPayout(null)}
-        onUpdated={() => {
-          setSelectedPayout(null);
+        onUpdated={(updatedPayout) => {
+          setSelectedPayout(updatedPayout ?? null);
           reset();
         }}
       />

@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
 import { messagingApi, type ThreadSummaryByContextItem } from '@/api/MessagingApi';
+import { getStoreStatus } from '@/api/StoreApi';
 import OrderDetailsModal from '@/components/dashboard/OrderDetailsModal';
 import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
 import ImageWithFallback from '@/components/ImageWithFallback';
@@ -239,7 +238,6 @@ const downloadCsv = (orders: OrderRecord[]) => {
 };
 
 const OrderManagement: React.FC = () => {
-  const user = useSelector((state: RootState) => state.user.profile);
   const { onNotification } = useRealtime();
   const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState<OrderRecord[]>([]);
@@ -256,17 +254,41 @@ const OrderManagement: React.FC = () => {
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
   const [selectedOrder, setSelectedOrder] = useState<{ id: string } | null>(null);
   const [chatOrder, setChatOrder] = useState<{ id: string; customerName?: string } | null>(null);
+  const [brandId, setBrandId] = useState<string | null>(null);
 
   const preselectedOrderId = searchParams.get('orderId');
   const preselectedMessageId = searchParams.get('messageId');
   const shouldOpenChat = searchParams.get('openChat') === '1';
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadBrandScope = async () => {
+      try {
+        const status = await getStoreStatus();
+        if (!cancelled) {
+          setBrandId(status.brandId ?? null);
+        }
+      } catch {
+        if (!cancelled) {
+          setBrandId(null);
+        }
+      }
+    };
+
+    void loadBrandScope();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const fetchOrders = useCallback(async () => {
-    if (!user?.id) return;
+    if (!brandId) return;
 
     setLoading(true);
     try {
-      const data = await brandApi.getOrders(user.id, {
+      const data = await brandApi.getOrders(brandId, {
         page,
         limit: 10,
         status: statusFilter,
@@ -282,7 +304,7 @@ const OrderManagement: React.FC = () => {
         const orderIds = nextOrders.map((order: OrderRecord) => order.id).filter(Boolean);
         if (orderIds.length > 0) {
           try {
-            const summaries = await messagingApi.getBulkOrderSummariesForBrand(user.id, orderIds, true);
+            const summaries = await messagingApi.getBulkOrderSummariesForBrand(brandId, orderIds, true);
             setSummaryByOrderId(
               (summaries.items || []).reduce<Record<string, ThreadSummaryByContextItem['summary']>>((acc, item) => {
                 acc[item.contextId] = item.summary;
@@ -311,7 +333,7 @@ const OrderManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, searchQuery, statusFilter, user?.id]);
+  }, [brandId, page, searchQuery, statusFilter]);
 
   useEffect(() => {
     const debounce = window.setTimeout(() => {
@@ -375,12 +397,12 @@ const OrderManagement: React.FC = () => {
         type === 'MESSAGE_THREAD_REOPENED' ||
         type === 'MESSAGE_MODERATED';
 
-      if (!isMessageEvent || !user?.id) return;
+      if (!isMessageEvent || !brandId) return;
       const payloadOrderId = String(payload?.payload?.orderId ?? '');
       if (!payloadOrderId) return;
 
       void messagingApi
-        .getOrderSummaryForBrand(user.id, payloadOrderId, true)
+        .getOrderSummaryForBrand(brandId, payloadOrderId, true)
         .then((summaryItem) => {
           setSummaryByOrderId((prev) => ({ ...prev, [payloadOrderId]: summaryItem }));
         })
@@ -388,7 +410,7 @@ const OrderManagement: React.FC = () => {
     });
 
     return unsubscribe;
-  }, [onNotification, user?.id]);
+  }, [brandId, onNotification]);
 
   const sortedOrders = useMemo(() => {
     const next = [...orders];
@@ -806,17 +828,17 @@ const OrderManagement: React.FC = () => {
         </div>
       </section>
 
-      {selectedOrder && user?.id ? (
+      {selectedOrder && brandId ? (
         <OrderDetailsModal
           isOpen={Boolean(selectedOrder)}
           onClose={handleCloseOrderDetails}
           orderId={selectedOrder.id}
-          brandId={user.id}
+          brandId={brandId}
           onStatusUpdate={fetchOrders}
         />
       ) : null}
 
-      {chatOrder && user?.id ? (
+      {chatOrder && brandId ? (
         <OrderChatDrawer
           open={Boolean(chatOrder)}
           onClose={() => {
@@ -831,7 +853,7 @@ const OrderManagement: React.FC = () => {
           orderId={chatOrder.id}
           contextType="STANDARD_ORDER"
           actorSurface="BRAND"
-          brandId={user.id}
+          brandId={brandId}
           customerName={chatOrder.customerName}
           highlightMessageId={preselectedMessageId}
         />

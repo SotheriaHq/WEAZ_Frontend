@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import Button from '@/components/ui/Button';
 import { paymentApi, type PaymentAttemptSummary, type PaymentAttemptStatus, type PaymentVerifyResult } from '@/api/PaymentApi';
+import { customOrdersBuyerApi } from '@/api/CustomOrderApi';
 
 type ViewState = 'verifying' | 'resolved' | 'missing';
 
@@ -76,45 +77,108 @@ const PaymentReturnPage: React.FC = () => {
   const statusHint = searchParams.get('status')?.trim() || undefined;
 
   useEffect(() => {
+    let active = true;
+
     const run = async () => {
-      if (!reference || !gateway) {
+      if (!reference) {
         setViewState('missing');
         return;
       }
 
       setViewState('verifying');
       try {
-        const result = await paymentApi.verifyWithStatus(reference, gateway, statusHint);
-        setVerifyResult(result);
         const summary = await paymentApi.getAttempt(reference);
+        if (!active) return;
         setAttempt(summary);
+
+        const resolvedGateway = gateway || summary.gateway;
+        let result: PaymentVerifyResult | null = null;
+
+        if (summary.subjectType === 'CUSTOM_ORDER' && summary.customOrderId) {
+          const customResult = await customOrdersBuyerApi.verifyPayment(summary.customOrderId, {
+            reference,
+            gateway: resolvedGateway,
+            statusHint,
+          });
+          result = {
+            success: customResult.success,
+            status: customResult.status as PaymentAttemptStatus,
+            paymentAttemptId: customResult.paymentAttemptId,
+            reference: customResult.reference,
+            amount: customResult.amount,
+            currency: customResult.currency,
+            settlementCurrency: customResult.currency,
+            settlementAmount: customResult.amount,
+            paidAt: customResult.paidAt,
+            channel: customResult.channel,
+            failureMessage: customResult.failureMessage,
+            gatewayResponse: customResult.recoveryMessage,
+            orderIds: customResult.customOrderId ? [customResult.customOrderId] : [],
+          };
+        } else {
+          result = await paymentApi.verifyWithStatus(reference, resolvedGateway, statusHint);
+        }
+
+        if (!active) return;
+        setVerifyResult(result);
+        const refreshedSummary = await paymentApi.getAttempt(reference);
+        if (!active) return;
+        setAttempt(refreshedSummary);
         setViewState('resolved');
 
-        if (result.status === 'PAID') {
+        if (result?.status === 'PAID') {
           navigate(`/checkout/confirmation?reference=${encodeURIComponent(reference)}`, {
             replace: true,
           });
         }
       } catch (error: any) {
+        if (!active) return;
         toast.error(error?.response?.data?.message || 'Unable to verify the payment attempt');
         try {
           const summary = await paymentApi.getAttempt(reference);
+          if (!active) return;
           setAttempt(summary);
           setViewState('resolved');
         } catch {
+          if (!active) return;
           setViewState('missing');
         }
       }
     };
 
     void run();
+    return () => {
+      active = false;
+    };
   }, [gateway, navigate, reference, statusHint]);
 
   const handleVerifyAgain = async () => {
-    if (!reference || !gateway) return;
+    const resolvedGateway = gateway || attempt?.gateway;
+    if (!reference || !resolvedGateway) return;
     setSubmitting(true);
     try {
-      const result = await paymentApi.verifyWithStatus(reference, gateway, statusHint);
+      const result =
+        attempt?.subjectType === 'CUSTOM_ORDER' && attempt.customOrderId
+          ? await customOrdersBuyerApi.verifyPayment(attempt.customOrderId, {
+              reference,
+              gateway: resolvedGateway,
+              statusHint,
+            }).then((customResult) => ({
+              success: customResult.success,
+              status: customResult.status as PaymentAttemptStatus,
+              paymentAttemptId: customResult.paymentAttemptId,
+              reference: customResult.reference,
+              amount: customResult.amount,
+              currency: customResult.currency,
+              settlementCurrency: customResult.currency,
+              settlementAmount: customResult.amount,
+              paidAt: customResult.paidAt,
+              channel: customResult.channel,
+              failureMessage: customResult.failureMessage,
+              gatewayResponse: customResult.recoveryMessage,
+              orderIds: customResult.customOrderId ? [customResult.customOrderId] : [],
+            }))
+          : await paymentApi.verifyWithStatus(reference, resolvedGateway, statusHint);
       setVerifyResult(result);
       const summary = await paymentApi.getAttempt(reference);
       setAttempt(summary);
@@ -168,6 +232,9 @@ const PaymentReturnPage: React.FC = () => {
         <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400">Payment attempt</p>
         <p className="text-sm text-gray-700 dark:text-zinc-300">Reference: {reference}</p>
         <p className="text-sm text-gray-700 dark:text-zinc-300">Gateway: {attempt?.gateway || gateway}</p>
+        <p className="text-sm text-gray-700 dark:text-zinc-300">
+          Subject: {attempt?.subjectType === 'CUSTOM_ORDER' ? 'Custom order' : 'Standard order'}
+        </p>
         <p className="text-sm text-gray-700 dark:text-zinc-300">Status: {resolvedStatus}</p>
         {verifyResult?.failureMessage && (
           <p className="text-sm text-rose-600 dark:text-rose-300">{verifyResult.failureMessage}</p>
@@ -184,7 +251,16 @@ const PaymentReturnPage: React.FC = () => {
             Verify again
           </Button>
         )}
-        <Button variant="secondary" onClick={() => navigate('/orders')}>Open my orders</Button>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            attempt?.subjectType === 'CUSTOM_ORDER' && attempt.customOrderId
+              ? navigate(`/custom-orders/${attempt.customOrderId}`)
+              : navigate('/orders')
+          }
+        >
+          {attempt?.subjectType === 'CUSTOM_ORDER' ? 'Open custom order' : 'Open my orders'}
+        </Button>
         <Button variant="ghost" onClick={() => navigate('/checkout')}>Return to checkout</Button>
       </div>
     </div>

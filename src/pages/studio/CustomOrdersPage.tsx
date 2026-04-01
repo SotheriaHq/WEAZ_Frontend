@@ -11,7 +11,6 @@ import { messagingApi, type ThreadSummaryResponse } from '@/api/MessagingApi';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   CustomOrderBadge,
-  CustomOrderMetricCard,
   formatDateTime,
 } from '@/components/custom-orders/CustomOrderUi';
 import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
@@ -277,38 +276,47 @@ const CustomOrdersPage: React.FC = () => {
         <span className="font-medium">Custom orders</span>
       </div>
 
-      <section className="rounded-[2rem] border border-black/10 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-6 text-white shadow-[0_30px_120px_rgba(15,23,42,0.28)]">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="max-w-3xl">
-            <div className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-200">Studio Custom Orders</div>
-            <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Handle the queue here. Manage each order on its own page.</h1>
-            <p className="mt-3 text-sm text-slate-200 sm:text-base">
-              This view is now the dedicated studio custom-order tab. Cards show the important buyer, payment, and deadline context before you open the full management workspace.
-            </p>
+      <section className="rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-5 py-4 text-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">Studio</div>
+            <h1 className="mt-0.5 text-xl font-bold">Custom orders</h1>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => navigate('/studio/messages')}
-              className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white"
+              className="rounded-full border border-white/20 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
             >
               Open studio messages
             </button>
             <button
               type="button"
               onClick={() => navigate('/studio?tab=orders')}
-              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950"
+              className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-950"
             >
               Standard orders
             </button>
           </div>
         </div>
 
-        <div className="mt-6 grid gap-3 md:grid-cols-4">
-          <CustomOrderMetricCard label="Orders in view" value={metrics.total} helper="Current filtered queue" />
-          <CustomOrderMetricCard label="Awaiting payment" value={metrics.awaitingMoney} helper="Not ready for production" />
-          <CustomOrderMetricCard label="Active pipeline" value={metrics.active} helper="Live production or delivery" />
-          <CustomOrderMetricCard label="Needs attention" value={metrics.issues} helper="Disputes or delivery issues" />
+        <div className="mt-4 flex flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 rounded-xl bg-white/10 px-3.5 py-2">
+            <span className="text-lg font-bold">{metrics.total}</span>
+            <span className="text-xs text-slate-300">in view</span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-xl bg-amber-500/20 px-3.5 py-2">
+            <span className="text-lg font-bold text-amber-200">{metrics.awaitingMoney}</span>
+            <span className="text-xs text-amber-300/80">awaiting payment</span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-xl bg-emerald-500/20 px-3.5 py-2">
+            <span className="text-lg font-bold text-emerald-200">{metrics.active}</span>
+            <span className="text-xs text-emerald-300/80">active pipeline</span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-xl bg-rose-500/20 px-3.5 py-2">
+            <span className="text-lg font-bold text-rose-200">{metrics.issues}</span>
+            <span className="text-xs text-rose-300/80">needs attention</span>
+          </div>
         </div>
       </section>
 
