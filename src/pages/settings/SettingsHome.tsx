@@ -101,8 +101,8 @@ const sections: Record<string, React.ReactNode> = {
   'hidden-content': <HiddenContentSettings />,
   billing: (
     <ComingSoon
-      title="Billing & Payments"
-      description="View invoices, manage payment methods, and track spending."
+      title="Accounts"
+      description="Manage account-level billing and payment preferences."
     />
   ),
 
@@ -174,6 +174,10 @@ const SettingsHome: React.FC = () => {
   const active = searchParams.get('tab') || 'account';
   const resolvedActive =
     !isBrandUser && active.startsWith('store-') ? 'account' : active;
+  const resolvedSection =
+    resolvedActive === 'billing' && isBrandUser
+      ? <StorePaymentsSettings />
+      : sections[resolvedActive];
 
   const setActive = (key: string) => {
     setSearchParams({ tab: key });
@@ -186,7 +190,7 @@ const SettingsHome: React.FC = () => {
       <div className="min-h-screen pb-10 px-4 md:pl-[248px] pt-6">
         <div className="max-w-4xl mx-auto">
           <Breadcrumbs activeKey={resolvedActive} onNavigate={setActive} />
-          {sections[resolvedActive] ?? (
+          {resolvedSection ?? (
             <ComingSoon
               title="Not Found"
               description="This settings section doesn't exist or has been moved."

@@ -67,6 +67,7 @@ const VerificationSubmittedPage = lazy(() => import('./pages/studio/store/Verifi
 const StoreCollectionCreate = lazy(() => import('./pages/studio/store/StoreCollectionCreate'));
 const StudioCustomOrdersPage = lazy(() => import('./pages/studio/CustomOrdersPage'));
 const StudioCustomOrderDetailPage = lazy(() => import('./pages/studio/StudioCustomOrderDetailPage'));
+const BrandPayoutsPage = lazy(() => import('./pages/store/BrandPayoutsPage'));
 const MyOrders = lazy(() => import('./pages/orders/MyOrders'));
 const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
 const CustomOrdersIndexPage = lazy(() => import('./pages/custom-orders/CustomOrdersIndexPage'));
@@ -458,6 +459,16 @@ const router = createBrowserRouter([
           { path: '/checkout/confirmation', element: <Layout><OrderConfirmation /></Layout> },
           { path: '/orders', element: <Layout><MyOrders /></Layout> },
           { path: '/messages', element: <Layout><MessagingManagementPage /></Layout> },
+          {
+            path: '/store/payouts',
+            element: (
+              <RequireBrand>
+                <Layout>
+                  <BrandPayoutsPage />
+                </Layout>
+              </RequireBrand>
+            ),
+          },
           { path: '/custom-orders', element: <Layout><CustomOrdersIndexPage /></Layout> },
           { path: '/custom-orders/new', element: <Layout><CustomOrderComposerPage /></Layout> },
           { path: '/custom-orders/:orderId', element: <Layout><CustomOrderDetailPage /></Layout> },

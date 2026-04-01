@@ -616,6 +616,63 @@ export interface StorePaymentBankOption {
   currency: string;
 }
 
+export interface StorePayoutStatementSummary {
+  id: string;
+  documentNumber: string;
+  issuedAt: string;
+  downloadPath: string;
+}
+
+export interface StoreWalletPayoutItem {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  providerTransferStatus: string | null;
+  createdAt: string;
+  processedAt: string | null;
+  paidAt: string | null;
+  statement: StorePayoutStatementSummary | null;
+}
+
+export interface StoreWalletResponse {
+  brandId: string;
+  currency: string;
+  summary: {
+    availableForPayout: number;
+    heldInEscrow: number;
+    totalEarnings: number;
+    totalPaidOut: number;
+    pendingPayoutTotal: number;
+    pendingPayoutCount: number;
+  };
+  recentPayouts: StoreWalletPayoutItem[];
+}
+
+export interface StorePayoutListResponse {
+  items: Array<
+    StoreWalletPayoutItem & {
+      providerTransferFailureMessage?: string | null;
+      providerTransferReference?: string | null;
+    }
+  >;
+  total: number;
+  page: number;
+  totalPages: number;
+  hasNextPage: boolean;
+}
+
+export interface StorePayoutStatementResponse {
+  id: string;
+  payoutId: string;
+  documentNumber: string;
+  issuedAt: string;
+  currency: string;
+  grossAmount: number;
+  netAmount: number;
+  contentHtml: string;
+}
+
 export interface StorePaymentAccountUpdateData {
   bankCode?: string;
   accountNumber?: string;
@@ -762,6 +819,33 @@ export const listStorePaymentBanks = async (): Promise<StorePaymentBankOption[]>
   return extractData<StorePaymentBankOption[]>(res);
 };
 
+export const getStoreWallet = async (): Promise<StoreWalletResponse> => {
+  const res = await apiClient.get('/store/wallet');
+  return extractData<StoreWalletResponse>(res);
+};
+
+export const listStorePayouts = async (params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+}): Promise<StorePayoutListResponse> => {
+  const res = await apiClient.get('/store/payouts', {
+    params: {
+      page: params?.page,
+      limit: params?.limit,
+      status: params?.status,
+    },
+  });
+  return extractData<StorePayoutListResponse>(res);
+};
+
+export const getStorePayoutStatement = async (
+  payoutId: string,
+): Promise<StorePayoutStatementResponse> => {
+  const res = await apiClient.get(`/store/payouts/${payoutId}/statement`);
+  return extractData<StorePayoutStatementResponse>(res);
+};
+
 export const updateStorePaymentAccount = async (
   data: StorePaymentAccountUpdateData
 ): Promise<StorePaymentAccountResponse> => {
@@ -886,6 +970,9 @@ export default {
   updateStoreName,
   getStoreStatus,
   listStorePaymentBanks,
+  getStoreWallet,
+  listStorePayouts,
+  getStorePayoutStatement,
   openStore,
   closeStore,
   updateStoreProfile,

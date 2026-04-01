@@ -23,7 +23,6 @@ import {
   X,
 } from 'lucide-react';
 import type { RootState } from '@/store';
-
 interface SidebarItem {
   key: string;
   label: string;
@@ -54,7 +53,7 @@ const sidebarGroups: SidebarGroup[] = [
       { key: 'profile-visibility', label: 'Profile Visibility', path: '/settings?tab=profile-visibility', icon: Eye, description: 'Who can see your profile' },
       { key: 'size-fits', label: 'Size & Fittings', path: '/settings?tab=size-fits', icon: Ruler, description: 'Body measurements' },
       { key: 'hidden-content', label: 'Hidden Content', path: '/settings?tab=hidden-content', icon: EyeOff, description: 'Manage hidden items' },
-      { key: 'billing', label: 'Billing & Payments', path: '/settings?tab=billing', icon: CreditCard, description: 'Invoices & methods' },
+      { key: 'billing', label: 'Accounts', path: '/settings?tab=billing', icon: CreditCard, description: 'Billing and payout account access' },
     ],
   },
   {
