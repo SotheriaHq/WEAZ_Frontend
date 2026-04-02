@@ -12,6 +12,12 @@ import { setUser } from '../features/userSlice';
 import { addLocalNotification } from '../features/notificationsSlice';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { apiClient, persistAccessToken, dropStoredAccessToken } from '../api/httpClient';
+import { AuthApi } from '@/api/AuthApi';
+import {
+  PASSWORD_POLICY_MIN_LENGTH,
+  getPasswordLength,
+  getPasswordPolicyErrorMessage,
+} from '@/lib/passwordPolicy';
 import Modal from '@/components/ui/Modal';
 import VLoader from '@/components/loaders/VLoader';
 import '../styles/auth.css';
@@ -264,8 +270,8 @@ const LoginPage = () => {
       toast.error('All password reset fields are required.');
       return;
     }
-    if (forceResetNewPassword.length < 8) {
-      toast.error('New password must be at least 8 characters.');
+    if (getPasswordLength(forceResetNewPassword) < PASSWORD_POLICY_MIN_LENGTH) {
+      toast.error(getPasswordPolicyErrorMessage('New password'));
       return;
     }
     if (forceResetNewPassword !== forceResetConfirmPassword) {
@@ -275,7 +281,7 @@ const LoginPage = () => {
 
     setIsSubmittingForceReset(true);
     try {
-      await apiClient.post('/auth/admin/reset-password/first-login', {
+      await AuthApi.completeAdminFirstLoginReset({
         email: forceResetEmail,
         currentPassword: forceResetCurrentPassword,
         newPassword: forceResetNewPassword,
@@ -501,7 +507,10 @@ const LoginPage = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center ml-1">
                     <label className="text-xs font-medium text-gray-300 uppercase tracking-wider">Password</label>
-                    <Link to="/forgot-password" className="text-xs text-[#D4AF37] hover:text-white transition-colors">
+                    <Link
+                      to="/forgot-password"
+                      className="text-xs text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)] transition-colors"
+                    >
                       Forgot password?
                     </Link>
                   </div>

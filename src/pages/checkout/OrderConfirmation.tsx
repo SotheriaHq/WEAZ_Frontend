@@ -9,9 +9,13 @@ import {
   type PaymentAttemptSummary,
   type PaymentNextAction,
 } from '@/api/PaymentApi';
-import type { CheckoutPaymentMethod, PaymentData, PaymentMethodType } from '@/api/StoreApi';
+import type { CheckoutPaymentMethod, PaymentData } from '@/api/StoreApi';
 import { formatPrice } from '@/utils/helpers';
 import { getPaymentSummaryLines } from '@/pages/checkout/paymentFlow';
+import {
+  getCheckoutStatusCopy,
+  isCheckoutPaymentMethod,
+} from '@/pages/checkout/checkoutStatusCopy';
 
 interface ConfirmationState {
   orderIds: string[];
@@ -39,43 +43,6 @@ interface ConfirmationState {
     shippingCity: string;
     shippingState: string;
   };
-}
-
-function getStatusHeadline(status: PaymentAttemptStatus, nextAction?: PaymentNextAction): string {
-  if (status === 'PAID') return 'Payment confirmed';
-  if (status === 'FAILED') return 'Payment failed';
-  if (status === 'CANCELLED') return 'Payment cancelled';
-  if (status === 'EXPIRED') return 'Payment expired';
-  if (nextAction?.title) return nextAction.title;
-  if (status === 'PROCESSING') return 'Payment still processing';
-  if (status === 'REQUIRES_ACTION') return 'Continue your payment';
-  return 'Complete your payment';
-}
-
-function getStatusDescription(status: PaymentAttemptStatus, nextAction?: PaymentNextAction): string {
-  if (status === 'PAID') return 'Threadly has confirmed this payment attempt and your order is now in the post-payment flow.';
-  if (status === 'FAILED') return 'This payment attempt ended in a failed state. You can retry later from your order.';
-  if (status === 'CANCELLED') return 'This payment attempt was cancelled before completion.';
-  if (status === 'EXPIRED') return 'This payment window expired before the order was paid.';
-  return nextAction?.description || 'Use the details below to complete or resume this payment flow.';
-}
-
-function getStatusEmoji(status: PaymentAttemptStatus, nextAction?: PaymentNextAction): string {
-  if (status === 'PAID') return '✅';
-  if (status === 'FAILED') return '⚠️';
-  if (status === 'CANCELLED') return '🛑';
-  if (status === 'EXPIRED') return '⏰';
-  if (nextAction?.type === 'BANK_TRANSFER_INSTRUCTIONS') return '🏦';
-  if (nextAction?.type === 'USSD_INSTRUCTIONS') return '📲';
-  if (nextAction?.type === 'MOBILE_MONEY_APPROVAL') return '📱';
-  if (nextAction?.type === 'BANK_ACCOUNT_AUTH') return '🏛️';
-  return '💳';
-}
-
-function isCheckoutPaymentMethod(
-  value: PaymentMethodType | undefined,
-): value is CheckoutPaymentMethod {
-  return value === 'PAYSTACK' || value === 'FLUTTERWAVE' || value === 'BANK_TRANSFER';
 }
 
 const OrderConfirmation: React.FC = () => {
@@ -125,6 +92,7 @@ const OrderConfirmation: React.FC = () => {
   const authorizationUrl = locationState?.authorizationUrl ?? attempt?.authorizationUrl;
   const summary = locationState?.summary ?? attempt?.summary;
   const status = attempt?.status ?? (nextAction?.type ? 'PENDING' : 'PAID');
+  const statusCopy = getCheckoutStatusCopy('confirmation', status, nextAction);
 
   const paymentSummaryLines = useMemo(() => {
     if (!paymentMethod || !paymentData || !isCheckoutPaymentMethod(paymentMethod)) return [];
@@ -161,12 +129,12 @@ const OrderConfirmation: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-      <div className="mb-6 text-6xl">{getStatusEmoji(status, nextAction)}</div>
+      <div className="mb-6 text-6xl">{statusCopy.emoji}</div>
       <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
-        {getStatusHeadline(status, nextAction)}
+        {statusCopy.headline}
       </h1>
       <p className="mb-6 text-gray-500 dark:text-zinc-400">
-        {getStatusDescription(status, nextAction)}
+        {statusCopy.description}
       </p>
 
       <div className="mb-6 space-y-4 rounded-xl border border-gray-200/70 bg-gray-50 p-4 text-left dark:border-zinc-700/60 dark:bg-zinc-800/50">

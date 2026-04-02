@@ -1,6 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { apiClient } from '@/api/httpClient';
+import { AuthApi } from '@/api/AuthApi';
+import {
+  PASSWORD_POLICY_HINT,
+  PASSWORD_POLICY_MIN_LENGTH,
+  getPasswordLength,
+  getPasswordPolicyErrorMessage,
+} from '@/lib/passwordPolicy';
 import '../styles/auth.css';
 
 const ResetPasswordPage: React.FC = () => {
@@ -15,30 +21,33 @@ const ResetPasswordPage: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const passwordValid = useMemo(() => newPassword.length >= 8, [newPassword]);
+  const passwordLength = useMemo(() => getPasswordLength(newPassword), [newPassword]);
+  const passwordValid = useMemo(
+    () => passwordLength >= PASSWORD_POLICY_MIN_LENGTH,
+    [passwordLength],
+  );
   const passwordsMatch = useMemo(
     () => newPassword === confirmPassword && confirmPassword.length > 0,
     [newPassword, confirmPassword],
   );
 
   const passwordStrength = useMemo(() => {
-    if (newPassword.length === 0) return null;
+    if (passwordLength === 0) return null;
     let score = 0;
-    if (newPassword.length >= 8) score++;
-    if (/[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword)) score++;
-    if (/\d/.test(newPassword)) score++;
-    if (/[^A-Za-z0-9]/.test(newPassword)) score++;
+    if (passwordLength >= PASSWORD_POLICY_MIN_LENGTH) score++;
+    if (passwordLength >= 20) score++;
+    if (passwordLength >= 24) score++;
     if (score <= 1) return 'weak';
     if (score <= 2) return 'medium';
     return 'strong';
-  }, [newPassword]);
+  }, [passwordLength]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
 
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
+    if (passwordLength < PASSWORD_POLICY_MIN_LENGTH) {
+      setError(getPasswordPolicyErrorMessage());
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -50,11 +59,12 @@ const ResetPasswordPage: React.FC = () => {
     setError(null);
 
     try {
-      await apiClient.post('/auth/password-reset/confirm', {
+      await AuthApi.confirmPasswordReset({
         token,
         newPassword,
       });
       setSuccess(true);
+      window.history.replaceState({}, document.title, '/reset-password');
     } catch (err: any) {
       const message =
         err?.response?.data?.message || 'Failed to reset password. The link may be expired or invalid.';
@@ -181,7 +191,7 @@ const ResetPasswordPage: React.FC = () => {
                         }}
                         placeholder="Enter new password"
                         required
-                        minLength={8}
+                        minLength={PASSWORD_POLICY_MIN_LENGTH}
                         className="auth-input w-full rounded-xl py-3.5 px-4 pr-16 text-sm"
                         autoFocus
                       />
@@ -214,7 +224,7 @@ const ResetPasswordPage: React.FC = () => {
 
                     {/* Requirements Hint */}
                     <p className="text-xs text-gray-500 ml-1">
-                      Minimum 8 characters. Mix uppercase, lowercase, numbers, and symbols for a stronger password.
+                      {PASSWORD_POLICY_HINT}
                     </p>
                   </div>
 
@@ -233,7 +243,7 @@ const ResetPasswordPage: React.FC = () => {
                         }}
                         placeholder="Confirm new password"
                         required
-                        minLength={8}
+                        minLength={PASSWORD_POLICY_MIN_LENGTH}
                         className={`auth-input w-full rounded-xl py-3.5 px-4 pr-16 text-sm ${
                           confirmPassword.length > 0
                             ? passwordsMatch

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { checkout, getMyOrders } from '@/api/StoreApi';
-import type { CheckoutPaymentMethod, PaymentData, ShippingAddress } from '@/api/StoreApi';
+import type { PaystackPaymentData, ShippingAddress } from '@/api/StoreApi';
 import { paymentApi } from '@/api/PaymentApi';
 import { createIdempotencyKey } from '@/api/idempotency';
 import {
@@ -35,6 +35,7 @@ import {
   getPaymentSummaryLines,
   getReviewCtaLabel,
   type PaymentFormErrors,
+  type PaymentFormState,
   validatePaymentData,
 } from '@/pages/checkout/paymentFlow';
 
@@ -57,6 +58,7 @@ const SHIPPING_RATES: Record<string, number> = {
 const DEFAULT_SHIPPING = 4000;
 
 type Step = 'shipping' | 'payment' | 'review';
+type CheckoutPaymentSelection = keyof PaymentFormState | 'PENDING_SELECTION';
 const STEPS: Step[] = ['shipping', 'payment', 'review'];
 const STEP_LABELS: Record<Step, string> = {
   shipping: 'Shipping',
@@ -179,6 +181,8 @@ const CheckoutPage: React.FC = () => {
   const removedItemNotices = useSelector(selectCartRemovedItemNotices);
   const user = useSelector((s: RootState) => s.user.profile);
   const submittingRef = useRef(false);
+  const checkoutIdempotencyKeyRef = useRef<string | null>(null);
+  const paymentInitIdempotencyKeyRef = useRef<string | null>(null);
 
   /* ── Step state ── */
   const [step, setStep] = useState<Step>('shipping');
@@ -202,7 +206,7 @@ const CheckoutPage: React.FC = () => {
   const [openAddressMenuId, setOpenAddressMenuId] = useState<string | null>(null);
 
   /* ── Payment state ── */
-  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod | 'PENDING_SELECTION'>('PENDING_SELECTION');
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentSelection>('PENDING_SELECTION');
   const [paymentState, setPaymentState] = useState(() =>
     createInitialPaymentState(user?.email ?? '', user?.phoneNumber ?? ''),
   );
@@ -317,19 +321,13 @@ const CheckoutPage: React.FC = () => {
         email: prev.PAYSTACK.email || user?.email || '',
         phone: prev.PAYSTACK.phone || address.phone,
       },
-      FLUTTERWAVE: {
-        ...prev.FLUTTERWAVE,
-        email: prev.FLUTTERWAVE.email || user?.email || '',
-        phone: prev.FLUTTERWAVE.phone || address.phone,
-      },
-      BANK_TRANSFER: {
-        ...prev.BANK_TRANSFER,
-        email: prev.BANK_TRANSFER.email || user?.email || '',
-        phone: prev.BANK_TRANSFER.phone || address.phone,
-        senderPhone: prev.BANK_TRANSFER.senderPhone || address.phone,
-      },
     }));
   }, [user?.email, address.phone]);
+
+  useEffect(() => {
+    checkoutIdempotencyKeyRef.current = null;
+    paymentInitIdempotencyKeyRef.current = null;
+  }, [activePaymentData, address, cart.items, paymentMethod, promoApplied, promoCode]);
 
   const currentAddressDraft = useMemo<SavedDeliveryAddress>(
     () => ({
@@ -340,8 +338,6 @@ const CheckoutPage: React.FC = () => {
       contactEmail:
         user?.email?.trim() ||
         paymentState.PAYSTACK.email ||
-        paymentState.FLUTTERWAVE.email ||
-        paymentState.BANK_TRANSFER.email ||
         '',
       phone: address.phone.trim(),
       street: address.street.trim(),
@@ -491,16 +487,17 @@ const CheckoutPage: React.FC = () => {
     toast.success('Promo code applied — 10% discount');
   }, [promoCode]);
 
-  const updateSelectedPaymentData = useCallback((updater: (current: PaymentData) => PaymentData) => {
-    if (paymentMethod === 'PENDING_SELECTION') return;
+  const updateSelectedPaymentData = useCallback((updater: (current: PaystackPaymentData) => PaystackPaymentData) => {
+    const selectedPaymentMethod = paymentMethod;
+    if (selectedPaymentMethod === 'PENDING_SELECTION') return;
     setPaymentState((prev) => ({
       ...prev,
-      [paymentMethod]: updater(prev[paymentMethod]),
+      [selectedPaymentMethod]: updater(prev[selectedPaymentMethod]),
     }));
     setPaymentErrors({});
   }, [paymentMethod]);
 
-  const handleSelectPaymentMethod = useCallback((method: CheckoutPaymentMethod) => {
+  const handleSelectPaymentMethod = useCallback((method: keyof PaymentFormState) => {
     setPaymentMethod(method);
     setPaymentErrors({});
   }, []);
@@ -531,6 +528,12 @@ const CheckoutPage: React.FC = () => {
 
       const paymentSubmissionData = buildPaymentSubmissionData(activePaymentData, address);
       const contactInfo = buildContactInfo(paymentSubmissionData, address);
+      const checkoutIdempotencyKey =
+        checkoutIdempotencyKeyRef.current ?? createIdempotencyKey();
+      checkoutIdempotencyKeyRef.current = checkoutIdempotencyKey;
+      const paymentInitIdempotencyKey =
+        paymentInitIdempotencyKeyRef.current ?? createIdempotencyKey();
+      paymentInitIdempotencyKeyRef.current = paymentInitIdempotencyKey;
       const nextAddresses = upsertDeliveryAddress(user?.id, {
         ...currentAddressDraft,
         contactEmail: currentAddressDraft.contactEmail || paymentSubmissionData.email || '',
@@ -548,6 +551,8 @@ const CheckoutPage: React.FC = () => {
         contactInfo,
         paymentMethod,
         promoCode: promoApplied ? promoCode : undefined,
+      }, {
+        idempotencyKey: checkoutIdempotencyKey,
       });
 
       const orderIds = result.orders.map((o) => o.id);
@@ -559,7 +564,7 @@ const CheckoutPage: React.FC = () => {
         email: paymentSubmissionData.email,
         callbackUrl: `${window.location.origin}/checkout/payment-return`,
         paymentData: paymentSubmissionData,
-        idempotencyKey: createIdempotencyKey(),
+        idempotencyKey: paymentInitIdempotencyKey,
       });
 
       // 3. Clear cart
@@ -939,7 +944,6 @@ const CheckoutPage: React.FC = () => {
                       {isSelected && (
                         <div className="border-t border-fuchsia-200/70 px-4 pb-4 pt-1 dark:border-white/10 sm:px-5 sm:pb-5">
                           <PaymentDetailsSection
-                            paymentMethod={opt.value}
                             paymentData={optionPaymentData}
                             shippingAddress={address}
                             errors={paymentErrors}

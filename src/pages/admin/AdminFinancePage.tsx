@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import UniversalSelect from '@/components/forms/UniversalSelect';
@@ -176,6 +176,7 @@ const toneFor = (value: string | null | undefined, kind: keyof typeof THEMES) =>
 
 const AdminFinancePage: React.FC = () => {
   const navigate = useNavigate();
+  const { reference: routePaymentReference } = useParams<{ reference?: string }>();
   const { hasPermission } = useAdminPermissions();
   const canProcess = hasPermission('PAYOUTS_PROCESS');
   const mountedRef = useRef(true);
@@ -445,13 +446,46 @@ const AdminFinancePage: React.FC = () => {
     setPaymentDetailLoading(true);
     try {
       const response = await adminFinanceApi.getPayment(reference);
-      setPaymentDetail(unwrapApiResponse<AdminFinancePaymentDetail>(response.data as any));
+      const detail = unwrapApiResponse<AdminFinancePaymentDetail>(response.data as any);
+      setPaymentDetail(detail);
+      return detail;
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to load payment detail');
+      return null;
     } finally {
       setPaymentDetailLoading(false);
     }
   }, []);
+
+  const closePaymentDetail = useCallback(() => {
+    setPaymentDetail(null);
+    setPaymentDetailLoading(false);
+    if (routePaymentReference) {
+      navigate('/admin/finance', { replace: true });
+    }
+  }, [navigate, routePaymentReference]);
+
+  useEffect(() => {
+    if (!routePaymentReference) {
+      setPaymentDetail(null);
+      setPaymentDetailLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const run = async () => {
+      const nextDetail = await openPaymentDetail(routePaymentReference);
+      if (!nextDetail && !cancelled) {
+        navigate('/admin/finance', { replace: true });
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate, openPaymentDetail, routePaymentReference]);
 
   const openDocumentDetail = useCallback(async (id: string) => {
     setSelectedDocument(null);
@@ -796,7 +830,7 @@ const AdminFinancePage: React.FC = () => {
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{prettify(attempt.gateway)} • {attempt.providerMode}</td>
                         <td className="px-4 py-3"><Badge tone={toneFor(attempt.status, 'payment')} label={prettify(attempt.status)} /></td>
                         <td className="px-4 py-3">
-                          <button type="button" onClick={() => void openPaymentDetail(attempt.reference)} className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]">
+                          <button type="button" onClick={() => navigate(`/admin/finance/payments/${encodeURIComponent(attempt.reference)}`)} className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]">
                             Inspect
                           </button>
                         </td>
@@ -1109,7 +1143,7 @@ const AdminFinancePage: React.FC = () => {
         </div>
       </section>
 
-      <Modal open={paymentDetailLoading || Boolean(paymentDetail)} onClose={() => { setPaymentDetail(null); setPaymentDetailLoading(false); }} title="Payment Detail" size="xl">
+      <Modal open={paymentDetailLoading || Boolean(paymentDetail)} onClose={closePaymentDetail} title="Payment Detail" size="xl">
         {paymentDetailLoading ? <LoaderBlock /> : paymentDetail ? (
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-3">

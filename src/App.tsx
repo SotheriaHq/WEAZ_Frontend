@@ -470,6 +470,16 @@ const router = createBrowserRouter([
               </RequireBrand>
             ),
           },
+          {
+            path: '/store/payouts/:payoutId',
+            element: (
+              <RequireBrand>
+                <Layout>
+                  <BrandPayoutsPage />
+                </Layout>
+              </RequireBrand>
+            ),
+          },
           { path: '/custom-orders', element: <Layout><CustomOrdersIndexPage /></Layout> },
           { path: '/custom-orders/new', element: <Layout><CustomOrderComposerPage /></Layout> },
           { path: '/custom-orders/:orderId', element: <Layout><CustomOrderDetailPage /></Layout> },
@@ -556,6 +566,7 @@ const router = createBrowserRouter([
           { path: 'tags', element: <RequireAdminPermission permission="TAGS_READ"><AdminTagsPage /></RequireAdminPermission> },
           { path: 'measurements', element: <RequireAdminPermission permission="MEASUREMENTS_READ"><AdminMeasurementsPage /></RequireAdminPermission> },
           { path: 'finance', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminFinancePage /></RequireAdminPermission> },
+          { path: 'finance/payments/:reference', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminFinancePage /></RequireAdminPermission> },
           { path: 'orders/:orderId', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminOrderDetailPage /></RequireAdminPermission> },
           { path: 'payouts', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminPayoutsPage /></RequireAdminPermission> },
           { path: 'disputes', element: <RequireAdminPermission permission="DISPUTES_READ"><AdminDisputesPage /></RequireAdminPermission> },

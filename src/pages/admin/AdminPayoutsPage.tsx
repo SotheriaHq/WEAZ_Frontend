@@ -1,23 +1,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import { getPayoutStatusMeta } from '@/components/payouts/payoutStatus';
 import { adminPayoutsApi } from '@/api/AdminApi';
 import type { AdminPayout } from '@/types/admin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { unwrapApiResponse } from '@/types/auth';
 import PayoutProcessModal from './modals/PayoutProcessModal';
-
-const STATUS_EMOJI: Record<string, string> = {
-  PENDING_APPROVAL: '🟡',
-  APPROVED: '🟦',
-  PROCESSING: '🔵',
-  PAID: '🟢',
-  FAILED: '🔴',
-  REJECTED: '⛔',
-  ON_HOLD: '⏸️',
-  RECONCILIATION_REVIEW: '🧾',
-};
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -117,7 +107,10 @@ const AdminPayoutsPage: React.FC = () => {
                   className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900/50"
                 >
                   <td className="px-3 py-2.5">
-                    {STATUS_EMOJI[payout.status] ?? '⚪'} {payout.status}
+                    {(() => {
+                      const status = getPayoutStatusMeta(payout.status);
+                      return `${status.emoji} ${status.label}`;
+                    })()}
                   </td>
                   <td className="px-3 py-2.5 font-medium">
                     {payout.brand?.name ?? payout.brandId}

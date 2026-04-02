@@ -438,9 +438,13 @@ export const clearCart = async (): Promise<void> => {
 
 // ============= Checkout & Orders =============
 
-export const checkout = async (payload: CheckoutPayload): Promise<{ orders: Order[] }> => {
+export const checkout = async (
+  payload: CheckoutPayload,
+  options?: { idempotencyKey?: string },
+): Promise<{ orders: Order[] }> => {
+  const idempotencyKey = options?.idempotencyKey ?? createIdempotencyKey();
   const res = await apiClient.post('/store/checkout', payload, {
-    headers: { 'Idempotency-Key': createIdempotencyKey() },
+    headers: { 'Idempotency-Key': idempotencyKey },
   });
   return extractData<{ orders: Order[] }>(res);
 };
@@ -878,9 +882,13 @@ export const getStorePayoutDetail = async (
 };
 
 export const updateStorePaymentAccount = async (
-  data: StorePaymentAccountUpdateData
+  data: StorePaymentAccountUpdateData,
+  options?: { idempotencyKey?: string },
 ): Promise<StorePaymentAccountResponse> => {
-  const res = await apiClient.patch('/store/payment-account', data);
+  const idempotencyKey = options?.idempotencyKey ?? createIdempotencyKey();
+  const res = await apiClient.patch('/store/payment-account', data, {
+    headers: { 'Idempotency-Key': idempotencyKey },
+  });
   return extractData<StorePaymentAccountResponse>(res);
 };
 

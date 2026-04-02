@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -10,7 +10,7 @@ import {
   type CustomOrderIssueType,
   type CustomOrderPaymentVerificationResult,
 } from '@/api/CustomOrderApi';
-import type { CheckoutPaymentMethod, PaymentData, ShippingAddress } from '@/api/StoreApi';
+import type { PaystackPaymentData, ShippingAddress } from '@/api/StoreApi';
 import {
   CustomOrderBadge,
   CustomOrderJsonBreakdown,
@@ -29,9 +29,11 @@ import {
   buildPaymentSubmissionData,
   createInitialPaymentState,
   type PaymentFormErrors,
+  type PaymentFormState,
   validatePaymentData,
 } from '@/pages/checkout/paymentFlow';
 import { useConfirm } from '@/components/ui/useConfirm';
+import { createIdempotencyKey } from '@/api/idempotency';
 
 const formatCurrency = (value: number | undefined, currency = 'NGN') =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(Number(value ?? 0));
@@ -71,7 +73,7 @@ const CustomOrderDetailPage: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<BuyerDetailTab>('overview');
   const [paymentVerification, setPaymentVerification] = useState<CustomOrderPaymentVerificationResult | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>('PAYSTACK');
+  const [paymentMethod, setPaymentMethod] = useState<keyof PaymentFormState>('PAYSTACK');
   const [paymentState, setPaymentState] = useState(() =>
     createInitialPaymentState(profile?.email ?? '', profile?.phoneNumber ?? ''),
   );
@@ -84,6 +86,7 @@ const CustomOrderDetailPage: React.FC = () => {
   const [extensionResponse, setExtensionResponse] = useState<CustomOrderExtensionResponseStatus>('ACCEPTED');
   const [counterDays, setCounterDays] = useState('');
   const { confirm, ConfirmDialog } = useConfirm();
+  const paymentInitIdempotencyKeyRef = useRef<string | null>(null);
 
   const loadOrder = async (options?: { silent?: boolean }) => {
     if (!orderId) return;
@@ -178,19 +181,12 @@ const CustomOrderDetailPage: React.FC = () => {
         email: prev.PAYSTACK.email || String(contactInfo.email ?? profile?.email ?? ''),
         phone: prev.PAYSTACK.phone || paymentShippingAddress.phone,
       },
-      FLUTTERWAVE: {
-        ...prev.FLUTTERWAVE,
-        email: prev.FLUTTERWAVE.email || String(contactInfo.email ?? profile?.email ?? ''),
-        phone: prev.FLUTTERWAVE.phone || paymentShippingAddress.phone,
-      },
-      BANK_TRANSFER: {
-        ...prev.BANK_TRANSFER,
-        email: prev.BANK_TRANSFER.email || String(contactInfo.email ?? profile?.email ?? ''),
-        phone: prev.BANK_TRANSFER.phone || paymentShippingAddress.phone,
-        senderPhone: prev.BANK_TRANSFER.senderPhone || paymentShippingAddress.phone,
-      },
     }));
   }, [contactInfo.email, paymentShippingAddress.phone, profile?.email]);
+
+  useEffect(() => {
+    paymentInitIdempotencyKeyRef.current = null;
+  }, [activePaymentData, orderId, paymentMethod, paymentShippingAddress]);
 
   const wrapMutation = async (work: () => Promise<unknown>, successMessage: string) => {
     setBusy(true);
@@ -205,7 +201,7 @@ const CustomOrderDetailPage: React.FC = () => {
     }
   };
 
-  const updateSelectedPaymentData = (updater: (current: PaymentData) => PaymentData) => {
+  const updateSelectedPaymentData = (updater: (current: PaystackPaymentData) => PaystackPaymentData) => {
     setPaymentState((prev) => ({
       ...prev,
       [paymentMethod]: updater(prev[paymentMethod]),
@@ -230,6 +226,9 @@ const CustomOrderDetailPage: React.FC = () => {
       activePaymentData,
       paymentShippingAddress,
     );
+    const paymentInitIdempotencyKey =
+      paymentInitIdempotencyKeyRef.current ?? createIdempotencyKey();
+    paymentInitIdempotencyKeyRef.current = paymentInitIdempotencyKey;
     setBusy(true);
     try {
       const init = await customOrdersBuyerApi.initializePayment(orderId, {
@@ -237,6 +236,7 @@ const CustomOrderDetailPage: React.FC = () => {
         email: paymentSubmissionData.email,
         callbackUrl: `${window.location.origin}/checkout/payment-return`,
         paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
+        idempotencyKey: paymentInitIdempotencyKey,
       });
       setPaymentGateway(init.gateway);
       setPaymentVerification(null);
@@ -493,7 +493,6 @@ const CustomOrderDetailPage: React.FC = () => {
           </div>
           <div className="mt-5">
             <PaymentDetailsSection
-              paymentMethod={paymentMethod}
               paymentData={activePaymentData}
               shippingAddress={paymentShippingAddress}
               errors={paymentErrors}

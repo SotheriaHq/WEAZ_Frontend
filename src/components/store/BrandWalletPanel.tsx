@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { brandApi } from '@/api/BrandApi';
 import { getStoreWallet, type StoreWalletResponse } from '@/api/StoreApi';
+import { getPayoutStatusMeta } from '@/components/payouts/payoutStatus';
 
 const formatMoney = (amount: number, currency: string) => {
   return new Intl.NumberFormat('en-NG', {
@@ -17,20 +18,6 @@ const formatDate = (value?: string | null) => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '—';
   return parsed.toLocaleString();
-};
-
-const payoutStatusMeta = (status?: string | null) => {
-  const normalized = String(status || '').toUpperCase();
-  if (normalized === 'PAID') {
-    return { emoji: '✅', label: 'Paid', tone: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/30' };
-  }
-  if (normalized === 'PROCESSING' || normalized === 'APPROVED') {
-    return { emoji: '🟡', label: 'Processing', tone: 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30' };
-  }
-  if (normalized === 'FAILED' || normalized === 'REJECTED') {
-    return { emoji: '⛔', label: 'Failed', tone: 'text-rose-700 bg-rose-50 border-rose-200 dark:text-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30' };
-  }
-  return { emoji: '🧾', label: normalized || 'Unknown', tone: 'text-gray-700 bg-gray-50 border-gray-200 dark:text-gray-200 dark:bg-white/5 dark:border-white/10' };
 };
 
 const cardClassName =
@@ -177,7 +164,7 @@ const BrandWalletPanel: React.FC = () => {
           ) : null}
 
           {(wallet?.recentPayouts || []).map((row) => {
-            const status = payoutStatusMeta(row.status);
+            const status = getPayoutStatusMeta(row.status);
             return (
               <div
                 key={row.id}
@@ -193,7 +180,7 @@ const BrandWalletPanel: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-3">
                   <Link
-                    to={`/store/payouts?payout=${row.id}`}
+                    to={`/store/payouts/${row.id}`}
                     className="text-xs font-semibold text-primary hover:underline"
                   >
                     View details

@@ -814,10 +814,17 @@ export const customOrdersBuyerApi = {
     idempotencyKey?: string;
     noDirectMatchAcknowledged?: boolean;
   }) {
-    const response = await apiClient.post('/custom-orders', {
-      ...payload,
-      idempotencyKey: payload.idempotencyKey ?? createIdempotencyKey(),
-    });
+    const idempotencyKey = payload.idempotencyKey ?? createIdempotencyKey();
+    const response = await apiClient.post(
+      '/custom-orders',
+      {
+        ...payload,
+        idempotencyKey,
+      },
+      {
+        headers: { 'Idempotency-Key': idempotencyKey },
+      },
+    );
     return unwrapApiResponse<CustomOrderDetail>(response.data);
   },
 
@@ -831,10 +838,17 @@ export const customOrdersBuyerApi = {
       idempotencyKey?: string;
     },
   ) {
-    const response = await apiClient.post(`/custom-orders/${orderId}/payment/initialize`, {
-      ...payload,
-      idempotencyKey: payload.idempotencyKey ?? createIdempotencyKey(),
-    });
+    const idempotencyKey = payload.idempotencyKey ?? createIdempotencyKey();
+    const response = await apiClient.post(
+      `/custom-orders/${orderId}/payment/initialize`,
+      {
+        ...payload,
+        idempotencyKey,
+      },
+      {
+        headers: { 'Idempotency-Key': idempotencyKey },
+      },
+    );
     return unwrapApiResponse<CustomOrderPaymentInitResult>(response.data);
   },
 

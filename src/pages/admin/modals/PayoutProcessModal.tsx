@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import PayoutSourceBreakdown from '@/components/payouts/PayoutSourceBreakdown';
+import { getPayoutStatusMeta } from '@/components/payouts/payoutStatus';
 import { adminPayoutsApi } from '@/api/AdminApi';
 import type { AdminPayout, AdminPayoutDetail } from '@/types/admin';
 import { toast } from 'sonner';
@@ -15,15 +16,11 @@ interface Props {
   onUpdated: (payout?: AdminPayout | null) => void;
 }
 
-const STATUS_EMOJI: Record<string, string> = {
-  PENDING_APPROVAL: '🟡',
-  APPROVED: '🔵',
-  PROCESSING: '🟣',
-  PAID: '🟢',
-  FAILED: '🔴',
-  REJECTED: '⛔',
-  ON_HOLD: '⏸️',
-  RECONCILIATION_REVIEW: '🧾',
+const PAYOUT_ACCOUNT_STATUS_COPY: Record<string, { emoji: string; label: string }> = {
+  ACTIVE: { emoji: '✅', label: 'Ready for payouts' },
+  PENDING_SYNC: { emoji: '⏳', label: 'Sync in progress' },
+  SYNC_ERROR: { emoji: '⚠️', label: 'Sync needs attention' },
+  PENDING_SETUP: { emoji: '🧾', label: 'Payout account required' },
 };
 
 const TRANSITIONS: Record<string, string[]> = {
@@ -251,6 +248,10 @@ const PayoutProcessModal: React.FC<Props> = ({
     activePayout.statusReason ||
     null;
   const payoutAccount = detail?.payoutAccount ?? null;
+  const payoutStatus = getPayoutStatusMeta(activePayout.status);
+  const payoutAccountStatus = PAYOUT_ACCOUNT_STATUS_COPY[
+    String(payoutAccount?.status ?? 'PENDING_SETUP').toUpperCase()
+  ] ?? PAYOUT_ACCOUNT_STATUS_COPY.PENDING_SETUP;
 
   return (
     <>
@@ -272,7 +273,7 @@ const PayoutProcessModal: React.FC<Props> = ({
             <div>
               <span className="text-gray-500 dark:text-gray-400">Status</span>
               <p className="font-medium text-gray-900 dark:text-white">
-                {STATUS_EMOJI[activePayout.status] ?? '⚪'} {activePayout.status}
+                {payoutStatus.emoji} {payoutStatus.label}
               </p>
             </div>
             <div>
@@ -312,7 +313,7 @@ const PayoutProcessModal: React.FC<Props> = ({
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">Readiness</span>
                   <p className="text-gray-800 dark:text-gray-200">
-                    {STATUS_EMOJI[payoutAccount.status] ?? '🧾'} {payoutAccount.status}
+                    {payoutAccountStatus.emoji} {payoutAccountStatus.label}
                   </p>
                 </div>
                 <div>
@@ -481,7 +482,8 @@ const PayoutProcessModal: React.FC<Props> = ({
                       message: 'You will become the active owner of this payout.',
                     })
                   }
-                  className="rounded-lg bg-blue-100 px-3 py-1.5 text-xs text-blue-800 transition hover:bg-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
+                  disabled={loading}
+                  className="rounded-lg bg-blue-100 px-3 py-1.5 text-xs text-blue-800 transition hover:bg-blue-200 disabled:opacity-60 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
                 >
                   Claim
                 </button>
@@ -493,7 +495,8 @@ const PayoutProcessModal: React.FC<Props> = ({
                       message: 'The payout will become available for another admin to claim.',
                     })
                   }
-                  className="rounded-lg bg-gray-200 px-3 py-1.5 text-xs text-gray-800 transition hover:bg-gray-300 dark:bg-white/10 dark:text-gray-200 dark:hover:bg-white/15"
+                  disabled={loading}
+                  className="rounded-lg bg-gray-200 px-3 py-1.5 text-xs text-gray-800 transition hover:bg-gray-300 disabled:opacity-60 dark:bg-white/10 dark:text-gray-200 dark:hover:bg-white/15"
                 >
                   Release
                 </button>
@@ -517,7 +520,8 @@ const PayoutProcessModal: React.FC<Props> = ({
                           'This will send the payout to the brand transfer recipient saved in the active payout account.',
                       })
                     }
-                    className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs text-emerald-800 transition hover:bg-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
+                    disabled={loading}
+                    className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
                   >
                     🚀 Initiate transfer
                   </button>
@@ -575,9 +579,10 @@ const PayoutProcessModal: React.FC<Props> = ({
                   <button
                     key={status}
                     onClick={() => handleStatusChange(status)}
-                    className="rounded-lg bg-white px-3 py-1.5 text-xs text-gray-800 transition hover:bg-gray-100 dark:bg-white/10 dark:text-gray-100 dark:hover:bg-white/15"
+                    disabled={loading}
+                    className="rounded-lg bg-white px-3 py-1.5 text-xs text-gray-800 transition hover:bg-gray-100 disabled:opacity-60 dark:bg-white/10 dark:text-gray-100 dark:hover:bg-white/15"
                   >
-                    {STATUS_EMOJI[status] ?? '⚪'} Mark as {status}
+                    {getPayoutStatusMeta(status).emoji} Mark as {status}
                   </button>
                 ))}
               </div>

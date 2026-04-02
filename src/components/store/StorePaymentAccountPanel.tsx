@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   getStorePaymentAccount,
@@ -71,6 +72,32 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
   const [primaryContactName, setPrimaryContactName] = useState('');
   const [primaryContactEmail, setPrimaryContactEmail] = useState('');
   const [primaryContactPhone, setPrimaryContactPhone] = useState('');
+  const [bankChangeConfirmOpen, setBankChangeConfirmOpen] = useState(false);
+
+  const applyLoadedPanelData = (
+    nextAccount: StorePaymentAccountResponse,
+    nextBanks: StorePaymentBankOption[],
+  ) => {
+    setAccountResponse(nextAccount);
+    setBanks(nextBanks);
+    setBankCode(nextAccount.account?.bankCode ?? '');
+    setPrimaryContactName(
+      nextAccount.account?.primaryContactName ??
+        nextAccount.suggestedDefaults.primaryContactName ??
+        '',
+    );
+    setPrimaryContactEmail(
+      nextAccount.account?.primaryContactEmail ??
+        nextAccount.suggestedDefaults.primaryContactEmail ??
+        '',
+    );
+    setPrimaryContactPhone(
+      nextAccount.account?.primaryContactPhone ??
+        nextAccount.suggestedDefaults.primaryContactPhone ??
+        '',
+    );
+    onStatusChange?.(nextAccount.account ?? null);
+  };
 
   const loadPanel = async (silent = false) => {
     if (!silent) {
@@ -81,25 +108,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
         getStorePaymentAccount(),
         listStorePaymentBanks(),
       ]);
-      setAccountResponse(nextAccount);
-      setBanks(nextBanks);
-      setBankCode(nextAccount.account?.bankCode ?? '');
-      setPrimaryContactName(
-        nextAccount.account?.primaryContactName ??
-          nextAccount.suggestedDefaults.primaryContactName ??
-          '',
-      );
-      setPrimaryContactEmail(
-        nextAccount.account?.primaryContactEmail ??
-          nextAccount.suggestedDefaults.primaryContactEmail ??
-          '',
-      );
-      setPrimaryContactPhone(
-        nextAccount.account?.primaryContactPhone ??
-          nextAccount.suggestedDefaults.primaryContactPhone ??
-          '',
-      );
-      onStatusChange?.(nextAccount.account ?? null);
+      applyLoadedPanelData(nextAccount, nextBanks);
     } catch (error: any) {
       toast.error(
         error?.response?.data?.message ||
@@ -123,25 +132,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
           listStorePaymentBanks(),
         ]);
         if (cancelled) return;
-        setAccountResponse(nextAccount);
-        setBanks(nextBanks);
-        setBankCode(nextAccount.account?.bankCode ?? '');
-        setPrimaryContactName(
-          nextAccount.account?.primaryContactName ??
-            nextAccount.suggestedDefaults.primaryContactName ??
-            '',
-        );
-        setPrimaryContactEmail(
-          nextAccount.account?.primaryContactEmail ??
-            nextAccount.suggestedDefaults.primaryContactEmail ??
-            '',
-        );
-        setPrimaryContactPhone(
-          nextAccount.account?.primaryContactPhone ??
-            nextAccount.suggestedDefaults.primaryContactPhone ??
-            '',
-        );
-        onStatusChange?.(nextAccount.account ?? null);
+        applyLoadedPanelData(nextAccount, nextBanks);
       } catch (error: any) {
         if (cancelled) return;
         toast.error(
@@ -174,6 +165,14 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
   const accountNumberProvided = accountNumber.trim().length > 0;
   const bankDetailsDirty = bankChanged || accountNumberProvided;
   const canResyncCurrentAccount = Boolean(hasExistingAccount && (bankCode || account?.bankCode));
+  const primarySyncConfig = {
+    useExistingAccountNumber:
+      hasExistingAccount && !bankChanged && !accountNumberProvided,
+    successMessage: bankDetailsDirty
+      ? 'Paystack payout account updated'
+      : 'Paystack payout account synced',
+  };
+  const nextAccountSummary = selectedBank?.name || bankCode || 'selected bank';
 
   const sectionTitle =
     mode === 'wizard' ? 'Payout account setup' : 'Payout account';
@@ -246,6 +245,25 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handlePrimarySave = async () => {
+    if (bankChanged && !accountNumberProvided) {
+      toast.error('Enter the new account number for the selected bank');
+      return;
+    }
+
+    if (hasExistingAccount && bankDetailsDirty) {
+      setBankChangeConfirmOpen(true);
+      return;
+    }
+
+    await executeSync(primarySyncConfig);
+  };
+
+  const confirmPrimarySave = async () => {
+    setBankChangeConfirmOpen(false);
+    await executeSync(primarySyncConfig);
   };
 
   return (
@@ -495,15 +513,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          onClick={() =>
-            executeSync({
-              useExistingAccountNumber:
-                hasExistingAccount && !bankChanged && !accountNumberProvided,
-              successMessage: bankDetailsDirty
-                ? 'Paystack payout account updated'
-                : 'Paystack payout account synced',
-            })
-          }
+          onClick={() => void handlePrimarySave()}
           disabled={loading || saving}
           className="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -535,6 +545,17 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
           Refresh status
         </button>
       </div>
+
+      <ConfirmDialog
+        open={bankChangeConfirmOpen}
+        title="Confirm payout account change"
+        message={`Changing the payout bank or account number will resync ${nextAccountSummary} with Paystack and update the recipient used for future payouts. Continue with this change?`}
+        confirmText="Save and sync"
+        cancelText="Go back"
+        isLoading={saving}
+        onConfirm={() => void confirmPrimarySave()}
+        onCancel={() => setBankChangeConfirmOpen(false)}
+      />
     </div>
   );
 };

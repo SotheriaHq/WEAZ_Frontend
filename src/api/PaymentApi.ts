@@ -1,4 +1,5 @@
 import { apiClient } from './httpClient';
+import { createIdempotencyKey } from './idempotency';
 import type { PaymentData, PaymentMethodType } from './StoreApi';
 
 export type PaymentAttemptStatus =
@@ -121,7 +122,12 @@ function extract<T>(res: any): T {
 
 export const paymentApi = {
   async initialize(req: PaymentInitRequest): Promise<PaymentInitResult> {
-    const res = await apiClient.post('/payment/initialize', req);
+    const idempotencyKey = req.idempotencyKey ?? createIdempotencyKey();
+    const res = await apiClient.post(
+      '/payment/initialize',
+      { ...req, idempotencyKey },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
     return extract<PaymentInitResult>(res);
   },
 

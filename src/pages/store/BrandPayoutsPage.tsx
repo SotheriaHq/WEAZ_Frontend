@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import Modal from '@/components/ui/Modal';
 import PayoutSourceBreakdown from '@/components/payouts/PayoutSourceBreakdown';
+import { getPayoutStatusMeta } from '@/components/payouts/payoutStatus';
 import {
   getStorePayoutDetail,
   getStorePayoutStatement,
@@ -27,43 +28,6 @@ const formatDate = (value?: string | null) => {
   return parsed.toLocaleString();
 };
 
-const payoutStatusMeta = (status?: string | null) => {
-  const normalized = String(status || '').toUpperCase();
-  if (normalized === 'PAID') {
-    return {
-      emoji: '✅',
-      label: 'Paid',
-      tone: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/30',
-    };
-  }
-  if (normalized === 'PROCESSING' || normalized === 'APPROVED') {
-    return {
-      emoji: '🟡',
-      label: 'Processing',
-      tone: 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30',
-    };
-  }
-  if (normalized === 'FAILED' || normalized === 'REJECTED') {
-    return {
-      emoji: '⛔',
-      label: 'Failed',
-      tone: 'text-rose-700 bg-rose-50 border-rose-200 dark:text-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30',
-    };
-  }
-  if (normalized === 'PENDING_APPROVAL') {
-    return {
-      emoji: '🕒',
-      label: 'Pending approval',
-      tone: 'text-sky-700 bg-sky-50 border-sky-200 dark:text-sky-200 dark:bg-sky-500/10 dark:border-sky-500/30',
-    };
-  }
-  return {
-    emoji: '🧾',
-    label: normalized || 'Unknown',
-    tone: 'text-gray-700 bg-gray-50 border-gray-200 dark:text-gray-200 dark:bg-white/5 dark:border-white/10',
-  };
-};
-
 const STATUS_OPTIONS = [
   { value: '', label: 'All payouts' },
   { value: 'PENDING_APPROVAL', label: 'Pending approval' },
@@ -77,6 +41,8 @@ const STATUS_OPTIONS = [
 ];
 
 const BrandPayoutsPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { payoutId: routePayoutId } = useParams<{ payoutId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<StorePayoutListResponse | null>(null);
@@ -86,7 +52,7 @@ const BrandPayoutsPage: React.FC = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detail, setDetail] = useState<StorePayoutDetailResponse | null>(null);
 
-  const selectedPayoutId = searchParams.get('payout');
+  const selectedPayoutId = routePayoutId || searchParams.get('payout');
 
   const load = useCallback(
     async (nextPage: number) => {
@@ -138,18 +104,23 @@ const BrandPayoutsPage: React.FC = () => {
     void loadDetail(selectedPayoutId);
   }, [loadDetail, selectedPayoutId]);
 
-  const updatePayoutQuery = useCallback(
-    (payoutId?: string | null) => {
-      const next = new URLSearchParams(searchParams);
-      if (payoutId) {
-        next.set('payout', payoutId);
-      } else {
-        next.delete('payout');
-      }
-      setSearchParams(next, { replace: true });
+  const openPayoutDetail = useCallback(
+    (payoutId: string) => {
+      navigate(`/store/payouts/${encodeURIComponent(payoutId)}`);
     },
-    [searchParams, setSearchParams],
+    [navigate],
   );
+
+  const closePayoutDetail = useCallback(() => {
+    if (routePayoutId) {
+      navigate('/store/payouts', { replace: true });
+      return;
+    }
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('payout');
+    setSearchParams(next, { replace: true });
+  }, [navigate, routePayoutId, searchParams, setSearchParams]);
 
   const downloadStatement = async (payoutId: string) => {
     setDownloadingId(payoutId);
@@ -182,7 +153,7 @@ const BrandPayoutsPage: React.FC = () => {
     detail?.statusReason ||
     null;
 
-  const activeStatus = payoutStatusMeta(detail?.status);
+  const activeStatus = getPayoutStatusMeta(detail?.status);
 
   return (
     <div className="min-h-screen px-4 py-6">
@@ -266,7 +237,7 @@ const BrandPayoutsPage: React.FC = () => {
                   </tr>
                 ) : data?.items?.length ? (
                   data.items.map((item) => {
-                    const status = payoutStatusMeta(item.status);
+                    const status = getPayoutStatusMeta(item.status);
                     return (
                       <tr key={item.id}>
                         <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
@@ -321,7 +292,7 @@ const BrandPayoutsPage: React.FC = () => {
                         <td className="px-4 py-3">
                           <button
                             type="button"
-                            onClick={() => updatePayoutQuery(item.id)}
+                            onClick={() => openPayoutDetail(item.id)}
                             className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
                           >
                             View
@@ -372,7 +343,7 @@ const BrandPayoutsPage: React.FC = () => {
 
       <Modal
         open={Boolean(selectedPayoutId)}
-        onClose={() => updatePayoutQuery(null)}
+        onClose={closePayoutDetail}
         title="Payout detail"
         size="lg"
       >

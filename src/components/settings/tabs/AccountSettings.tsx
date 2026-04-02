@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import type { RootState } from '@/store';
 import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 
 const AccountSettings: React.FC = () => {
   const { profile } = useSelector((state: RootState) => state.user);
+  const navigate = useNavigate();
   const [displayChartFamily, setDisplayChartFamily] = useState<CustomOrderChartFamily>('UK');
-
-  if (!profile) return null;
 
   useEffect(() => {
     let active = true;
@@ -27,6 +27,8 @@ const AccountSettings: React.FC = () => {
     };
   }, []);
 
+  if (!profile) return null;
+
   const handleDisplayChartChange = (value: string) => {
     const next = value as CustomOrderChartFamily;
     setDisplayChartFamily(next);
@@ -34,6 +36,10 @@ const AccountSettings: React.FC = () => {
       displayChartFamily: next,
       updatedAtMs: Date.now(),
     });
+  };
+
+  const handleOpenSecurity = () => {
+    navigate('/settings?tab=security');
   };
 
   return (
@@ -62,10 +68,14 @@ const AccountSettings: React.FC = () => {
         <div className="space-y-4">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">Password</h3>
           <div className="space-y-4">
-            <button className="w-full flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors text-left">
+            <button
+              type="button"
+              onClick={handleOpenSecurity}
+              className="w-full flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors text-left"
+            >
               <div>
                 <p className="text-sm font-medium text-gray-900 dark:text-white">Change Password</p>
-                <p className="text-sm text-gray-500">Update your password to keep your account secure</p>
+                <p className="text-sm text-gray-500">Open Security tab to update your password</p>
               </div>
               <span className="text-gray-400">→</span>
             </button>

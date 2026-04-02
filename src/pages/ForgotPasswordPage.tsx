@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiClient } from '@/api/httpClient';
+import { isAxiosError } from 'axios';
+import { AuthApi } from '@/api/AuthApi';
 import '../styles/auth.css';
 
 const ForgotPasswordPage: React.FC = () => {
@@ -18,11 +19,14 @@ const ForgotPasswordPage: React.FC = () => {
     setError(null);
 
     try {
-      await apiClient.post('/auth/password-reset/request', { email: trimmed });
+      await AuthApi.requestPasswordReset(trimmed);
       setSubmitted(true);
-    } catch (err: any) {
-      // Always show success to prevent email enumeration
-      setSubmitted(true);
+    } catch (err: unknown) {
+      if (isAxiosError(err) && !err.response) {
+        setError('Unable to reach the server. Please check your connection and try again.');
+      } else {
+        setError('Unable to send reset link right now. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -136,7 +140,7 @@ const ForgotPasswordPage: React.FC = () => {
                     setEmail('');
                     setError(null);
                   }}
-                  className="text-sm text-[#D4AF37] hover:text-white transition-colors font-medium"
+                  className="text-sm text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)] transition-colors font-medium"
                 >
                   Try another email
                 </button>
@@ -147,7 +151,7 @@ const ForgotPasswordPage: React.FC = () => {
             <div className="mt-8 text-center">
               <Link
                 to="/login"
-                className="text-sm text-gray-400 hover:text-[#D4AF37] transition-colors"
+                className="text-sm text-gray-400 hover:text-[var(--brand-primary)] transition-colors"
               >
                 ← Back to Sign In
               </Link>
