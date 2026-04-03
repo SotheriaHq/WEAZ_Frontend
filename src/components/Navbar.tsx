@@ -102,6 +102,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   }, [dispatch, user]);
 
   useEffect(() => {
+    if (!user) {
+      setShowProfileMenu(false);
+      setShowLanguageDropdown(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
         profileMenuRef.current &&
@@ -415,19 +422,19 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
             </FrostedButton>
           ) : null}
 
-          <div className="relative">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.preventDefault();
-                setShowNotifications(false);
-                setShowLanguageDropdown(false);
-                setShowProfileMenu((prev) => !prev);
-              }}
-              className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl transition-all duration-200 hover:ring-2 hover:ring-primary/20"
-              aria-label="Profile menu"
-            >
-              {user ? (
+          {user ? (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  setShowNotifications(false);
+                  setShowLanguageDropdown(false);
+                  setShowProfileMenu((prev) => !prev);
+                }}
+                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl transition-all duration-200 hover:ring-2 hover:ring-primary/20"
+                aria-label="Profile menu"
+              >
                 <ImageWithFallback
                   src={user.profileImage ?? user.profileImageFile?.s3Url ?? null}
                   fileId={user.profileImageId ?? user.profileImageFile?.id ?? null}
@@ -438,14 +445,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                   containerClassName="h-full w-full"
                   rounded="xl"
                 />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center rounded-xl bg-gray-200 text-sm dark:bg-gray-700">
-                  <span aria-hidden="true">👤</span>
-                </div>
-              )}
-            </button>
-            <ProfileMenu />
-          </div>
+              </button>
+              <ProfileMenu />
+            </div>
+          ) : null}
         </div>
       </div>
     </nav>
