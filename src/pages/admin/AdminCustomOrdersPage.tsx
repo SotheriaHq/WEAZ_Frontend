@@ -272,7 +272,7 @@ const AdminCustomOrdersPage: React.FC = () => {
       <div>
         <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600 dark:text-emerald-300">Admin</div>
         <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">Custom orders</h1>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Monitor risk, intervene on stale orders, review disputes, and moderate fabric-rule bases.</p>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Monitor risk, intervene on stale orders, and review disputes.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-5">
@@ -818,6 +818,7 @@ const AdminCustomOrdersPage: React.FC = () => {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
+        {false ? (
         <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
           <div className="text-lg font-semibold text-slate-900 dark:text-white">Fabric-rule basis moderation</div>
           <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
@@ -834,9 +835,9 @@ const AdminCustomOrdersPage: React.FC = () => {
                 <div className="text-sm text-slate-500 dark:text-slate-400">Select a basis to review.</div>
               ) : (
                 <div className="space-y-3">
-                  <div className="font-semibold text-slate-900 dark:text-white">{selectedBasis.label}</div>
+                  <div className="font-semibold text-slate-900 dark:text-white">{selectedBasis!.label}</div>
                   <div className="rounded-2xl bg-black/[0.03] px-4 py-3 text-sm text-slate-600 dark:bg-white/[0.03] dark:text-slate-300">
-                    Keys: {selectedBasis.measurementKeys.join(', ')}
+                    Keys: {selectedBasis!.measurementKeys.join(', ')}
                   </div>
                   <UniversalSelect
                     value={basisStatus}
@@ -857,7 +858,7 @@ const AdminCustomOrdersPage: React.FC = () => {
                         description: `This will mark the basis as ${basisStatus.replace(/_/g, ' ').toLowerCase()} and update its moderation notes for future configuration authoring.`,
                         confirmLabel: 'Save decision',
                         tone: basisStatus === 'REJECTED' ? 'danger' : 'default',
-                        execute: () => runAction(() => customOrdersAdminApi.reviewFabricRuleBasis(selectedBasis.id, { status: basisStatus, moderationNotes: basisNotes || undefined }), 'Fabric-rule basis reviewed'),
+                        execute: () => runAction(() => customOrdersAdminApi.reviewFabricRuleBasis(selectedBasis!.id, { status: basisStatus, moderationNotes: basisNotes || undefined }), 'Fabric-rule basis reviewed'),
                       })
                     }
                     className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-black"
@@ -869,6 +870,7 @@ const AdminCustomOrdersPage: React.FC = () => {
             </div>
           </div>
         </section>
+        ) : null}
 
         <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
           <div className="text-lg font-semibold text-slate-900 dark:text-white">Refund review queue</div>

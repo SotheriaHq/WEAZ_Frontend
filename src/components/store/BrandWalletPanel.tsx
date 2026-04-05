@@ -47,11 +47,25 @@ const BrandWalletPanel: React.FC = () => {
   }, [loadWallet]);
 
   const availableForPayout = Number(wallet?.summary.availableForPayout || 0);
+  const paymentAccount = wallet?.paymentAccount ?? null;
+  const payoutAccountReady =
+    String(paymentAccount?.status || '').trim().toUpperCase() === 'ACTIVE' &&
+    Boolean(paymentAccount?.transferRecipientCode) &&
+    Boolean(paymentAccount?.transferRecipientActive);
   const canRequestPayout =
     !loading &&
     !requesting &&
     !!wallet?.brandId &&
-    availableForPayout >= 5000;
+    availableForPayout >= 5000 &&
+    payoutAccountReady;
+
+  const payoutUnavailableReason = !wallet?.brandId
+    ? 'Brand wallet is not ready yet.'
+    : availableForPayout < 5000
+      ? 'Minimum payout amount is NGN 5,000.'
+      : !payoutAccountReady
+        ? 'Complete payout account setup and wait for ACTIVE + recipient sync before requesting payout.'
+        : null;
 
   const handleRequestPayout = useCallback(async () => {
     if (!wallet?.brandId) {
@@ -60,6 +74,12 @@ const BrandWalletPanel: React.FC = () => {
     }
     if (availableForPayout < 5000) {
       toast.error('Minimum payout amount is NGN 5,000');
+      return;
+    }
+    if (!payoutAccountReady) {
+      toast.error(
+        'Payout account is not ready yet. Complete account sync and ensure transfer recipient is active.',
+      );
       return;
     }
 
@@ -73,7 +93,7 @@ const BrandWalletPanel: React.FC = () => {
     } finally {
       setRequesting(false);
     }
-  }, [availableForPayout, loadWallet, wallet?.brandId]);
+  }, [availableForPayout, loadWallet, payoutAccountReady, wallet?.brandId]);
 
   const metrics = useMemo(() => {
     const currency = wallet?.currency || 'NGN';
@@ -107,29 +127,34 @@ const BrandWalletPanel: React.FC = () => {
             Track available balance, escrow holds, and recent payout outcomes.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void loadWallet()}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
-            disabled={loading}
-          >
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleRequestPayout()}
-            disabled={!canRequestPayout}
-            className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
-          >
-            {requesting ? 'Requesting...' : 'Request payout'}
-          </button>
-          <Link
-            to="/store/payouts"
-            className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-primary/90"
-          >
-            View payout history
-          </Link>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void loadWallet()}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
+              disabled={loading}
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleRequestPayout()}
+              disabled={!canRequestPayout}
+              className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+            >
+              {requesting ? 'Requesting...' : 'Request payout'}
+            </button>
+            <Link
+              to="/store/payouts"
+              className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-primary/90"
+            >
+              View payout history
+            </Link>
+          </div>
+          {!canRequestPayout && payoutUnavailableReason ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400">{payoutUnavailableReason}</p>
+          ) : null}
         </div>
       </div>
 

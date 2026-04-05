@@ -27,6 +27,7 @@ import { NotificationTypes, getActionText } from '@/types/notificationTypes';
 import { NotificationIcon } from '@/components/notifications/NotificationIcon';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { COMPANY_NAME } from '@/lib/brand';
 
 interface Props { 
   open: boolean; 
@@ -519,7 +520,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                                   @{actorDisplayName}
                                 </button>
                               ) : (
-                                <span className="font-semibold text-[color:var(--text-primary)]">Threadly</span>
+                                <span className="font-semibold text-[color:var(--text-primary)]">{COMPANY_NAME}</span>
                               )}
                               <span className="ml-1">{actionTextWithoutTitle}</span>
                               {contentTitle ? (

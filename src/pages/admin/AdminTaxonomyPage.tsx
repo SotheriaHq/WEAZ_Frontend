@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
@@ -10,6 +10,8 @@ import { customOrdersAdminApi, type CustomFabricRuleBasis } from '@/api/CustomOr
 import { unwrapApiResponse } from '@/types/auth';
 import type { AdminCategory } from '@/types/admin';
 import type { MeasurementPoint, MeasurementPointCategory } from '@/types/sizing';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
 
 type TabKey = 'taxonomy' | 'measurements' | 'custom-order-configurations';
 
@@ -97,15 +99,19 @@ const AdminTaxonomyPage: React.FC = () => {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  /** True when rendered via /admin/measurements — only show the measurements tab */
+  const isMeasurementsRoute = location.pathname.includes('/admin/measurements');
+
   const initialTab = useMemo<TabKey>(() => {
     const fromQuery = searchParams.get('tab');
+    if (isMeasurementsRoute) return 'measurements';
     if (fromQuery === 'measurements') return 'measurements';
-    if (fromQuery === 'custom-order-configurations') return 'custom-order-configurations';
-    if (location.pathname.includes('/admin/measurements')) return 'measurements';
     return 'taxonomy';
-  }, [location.pathname, searchParams]);
+  }, [isMeasurementsRoute, searchParams]);
 
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+  const notifications = useSelector((state: RootState) => state.notifications.items);
+  const lastMeasurementNotificationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -278,6 +284,21 @@ const AdminTaxonomyPage: React.FC = () => {
       void fetchTaxonomy();
     }
   }, [activeTab, fetchTaxonomy]);
+
+  useEffect(() => {
+    if (activeTab !== 'measurements') return;
+
+    const latestMeasurementNotification = notifications.find((notification) => {
+      const payload = notification.payload as Record<string, unknown> | undefined;
+      return notification.type === 'ADMIN_ACTION' && payload?.action === 'MEASUREMENT_FREEFORM_SUBMITTED';
+    });
+
+    if (!latestMeasurementNotification) return;
+    if (lastMeasurementNotificationIdRef.current === latestMeasurementNotification.id) return;
+
+    lastMeasurementNotificationIdRef.current = latestMeasurementNotification.id;
+    void Promise.all([fetchMeasurementQueue(), fetchMeasurementPoints()]);
+  }, [activeTab, fetchMeasurementPoints, fetchMeasurementQueue, notifications]);
 
   const resetGlobalYardBasisForm = useCallback(() => {
     setGlobalYardBasisLabel('');
@@ -521,6 +542,24 @@ const AdminTaxonomyPage: React.FC = () => {
     [],
   );
 
+  void [
+    UniversalSelect,
+    globalYardBasisLabel,
+    configurationMeasurementKeys,
+    configurationMeasurementGender,
+    editingGlobalYardBasisId,
+    globalYardBasisSaving,
+    globalYardBasisLoading,
+    fetchGlobalYardBases,
+    resetGlobalYardBasisForm,
+    saveGlobalYardBasis,
+    startEditingGlobalYardBasis,
+    deleteGlobalYardBasis,
+    availableMeasurementKeyOptions,
+    sortedGlobalYardBases,
+    configurationGenderOptions,
+  ];
+
   const executeConfirm = async () => {
     if (!confirmAction) return;
     setConfirmLoading(true);
@@ -728,47 +767,43 @@ const AdminTaxonomyPage: React.FC = () => {
       <section className="rounded-3xl border border-white/70 bg-gradient-to-br from-white/90 via-[#f7f9ff] to-[#eef3ff] p-6 shadow-lg shadow-slate-500/10 dark:border-white/10 dark:from-white/10 dark:via-[#101422] dark:to-[#1a2033]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Global Configuration</h1>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+              {isMeasurementsRoute ? 'Measurement Points' : 'Taxonomy Configuration'}
+            </h1>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Manage taxonomy, measurements, and custom-order configurations in one workspace.
+              {isMeasurementsRoute
+                ? 'Define the global measurement points brands and buyers use across sizing, custom orders, and size charts.'
+                : 'Manage product categories, sub-categories, and taxonomy used across the platform.'}
             </p>
           </div>
 
-          <div className="inline-flex rounded-full border border-white/70 bg-white/80 p-1 shadow-sm dark:border-white/10 dark:bg-white/5">
-            <button
-              type="button"
-              onClick={() => setActiveTab('taxonomy')}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                activeTab === 'taxonomy'
-                  ? 'bg-white text-indigo-700 shadow dark:bg-white/15 dark:text-indigo-200'
-                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white'
-              }`}
-            >
-              Taxonomy Tree
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('measurements')}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                activeTab === 'measurements'
-                  ? 'bg-white text-indigo-700 shadow dark:bg-white/15 dark:text-indigo-200'
-                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white'
-              }`}
-            >
-              Measurement Points
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('custom-order-configurations')}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                activeTab === 'custom-order-configurations'
-                  ? 'bg-white text-indigo-700 shadow dark:bg-white/15 dark:text-indigo-200'
-                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white'
-              }`}
-            >
-              Custom-Order Config
-            </button>
-          </div>
+          {/* Only show tab switcher on the taxonomy route — measurements route is focused */}
+          {!isMeasurementsRoute && (
+            <div className="inline-flex rounded-full border border-white/70 bg-white/80 p-1 shadow-sm dark:border-white/10 dark:bg-white/5">
+              <button
+                type="button"
+                onClick={() => setActiveTab('taxonomy')}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  activeTab === 'taxonomy'
+                    ? 'bg-white text-indigo-700 shadow dark:bg-white/15 dark:text-indigo-200'
+                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white'
+                }`}
+              >
+                Taxonomy Tree
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('measurements')}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  activeTab === 'measurements'
+                    ? 'bg-white text-indigo-700 shadow dark:bg-white/15 dark:text-indigo-200'
+                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white'
+                }`}
+              >
+                Measurement Points
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1306,176 +1341,7 @@ const AdminTaxonomyPage: React.FC = () => {
             )}
           </div>
         </section>
-      ) : (
-        <section className="space-y-5">
-          <div className="rounded-2xl border border-indigo-200/60 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-400/30 dark:bg-indigo-500/10 dark:text-indigo-100">
-            <div className="font-semibold">Global fabric-yard options</div>
-            <p className="mt-1 text-xs">
-              Create reusable yard options globally. Brands can pick any option when configuring custom orders for products or designs.
-            </p>
-          </div>
-
-          <div className="grid gap-3 lg:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Option label <span className="text-rose-500">*</span></span>
-              <input
-                value={globalYardBasisLabel}
-                onChange={(event) => setGlobalYardBasisLabel(event.target.value)}
-                placeholder="e.g. Standard Men Shirt, Women Gown Premium"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
-              />
-            </label>
-
-            <UniversalSelect
-              label="Measurement gender"
-              value={configurationMeasurementGender}
-              onChange={(value) => setConfigurationMeasurementGender(value as 'MEN' | 'WOMEN' | 'UNISEX')}
-              options={configurationGenderOptions}
-              placeholder="Select gender"
-              className="block"
-            />
-
-            <div className="block lg:col-span-2">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Measurement points</span>
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-black/20">
-                <div className="mb-2 flex flex-wrap gap-2">
-                  {configurationMeasurementKeys.map((key) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setConfigurationMeasurementKeys((prev) => prev.filter((entry) => entry !== key))}
-                      className="rounded-full border border-indigo-300 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-400/40 dark:bg-indigo-500/10 dark:text-indigo-100"
-                    >
-                      {formatMeasurementKeyLabel(key)} x
-                    </button>
-                  ))}
-                  {configurationMeasurementKeys.length === 0 && (
-                    <span className="text-xs text-slate-500 dark:text-slate-400">No points selected yet.</span>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {availableMeasurementKeyOptions.map((option) => {
-                    const selected = configurationMeasurementKeys.includes(option.key);
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => {
-                          setConfigurationMeasurementKeys((prev) => {
-                            if (prev.includes(option.key)) {
-                              return prev.filter((entry) => entry !== option.key);
-                            }
-                            return [...prev, option.key];
-                          });
-                        }}
-                        className={`rounded-full border px-3 py-1 text-xs font-medium transition ${selected
-                          ? 'border-emerald-400 bg-emerald-50 text-emerald-700 dark:border-emerald-400/50 dark:bg-emerald-500/10 dark:text-emerald-100'
-                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-200'}`}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Choose only the points this configuration needs. You can add or remove them anytime.
-              </p>
-            </div>
-
-            <div className="lg:col-span-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void saveGlobalYardBasis()}
-                  disabled={globalYardBasisSaving}
-                  className="inline-flex items-center rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {globalYardBasisSaving
-                    ? 'Saving...'
-                    : editingGlobalYardBasisId
-                      ? 'Update Global Yard Option'
-                      : 'Create Global Yard Option'}
-                </button>
-                {editingGlobalYardBasisId ? (
-                  <button
-                    type="button"
-                    onClick={resetGlobalYardBasisForm}
-                    className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
-                  >
-                    Cancel edit
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-600 dark:text-slate-300">
-                Existing global yard options
-              </h3>
-              {globalYardBasisLoading ? (
-                <span className="text-xs text-slate-500 dark:text-slate-400">Loading...</span>
-              ) : (
-                <span className="text-xs text-slate-500 dark:text-slate-400">{sortedGlobalYardBases.length} option(s)</span>
-              )}
-            </div>
-
-            {sortedGlobalYardBases.length === 0 && !globalYardBasisLoading ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
-                No global options created yet. Create one above to make it available platform-wide.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                {sortedGlobalYardBases.map((basis) => (
-                  <article
-                    key={basis.id}
-                    className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-md shadow-slate-400/10 dark:border-white/10 dark:bg-white/[0.04]"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <h4 className="font-bold text-slate-900 dark:text-white">{basis.label}</h4>
-                      <span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200">
-                        Global
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {basis.measurementKeys.length} measurement point(s)
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {basis.measurementKeys.map((key) => (
-                        <span
-                          key={`${basis.id}:${key}`}
-                          className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
-                        >
-                          {formatMeasurementKeyLabel(key)}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEditingGlobalYardBasis(basis)}
-                        className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteGlobalYardBasis(basis)}
-                        className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-200"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        </section>
-      )}
+      ) : null}
 
       <Modal
         open={showCategoryCreate || Boolean(editingCategory)}

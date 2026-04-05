@@ -8,6 +8,11 @@ import { toast } from 'sonner';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import type { SizingMode } from '@/types/sizing';
+import {
+  getProductStockState,
+  isCustomOrderOnlyProduct,
+  isStrictlyOutOfStockProduct,
+} from '@/lib/productAvailability';
 
 export interface StoreProduct {
   id: string;
@@ -28,6 +33,9 @@ export interface StoreProduct {
   sizingMode?: SizingMode;
   customMeasurementKeys?: string[];
   customAvailable?: boolean;
+  customOrderEnabled?: boolean;
+  isCustomOrderOnly?: boolean;
+  canBagWhenOutOfStock?: boolean;
   sizeAvailability: { size: string; inStock: boolean; quantity: number }[];
   colors: string[];
   variants?: Array<{
@@ -88,7 +96,11 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
   const redHeartEmoji = String.fromCodePoint(0x2764, 0xfe0f);
   const whiteHeartEmoji = String.fromCodePoint(0x1f90d);
-  const isCustomAvailable = product.customAvailable === true;
+  const isCustomAvailable =
+    product.customAvailable === true || product.customOrderEnabled === true;
+  const isCustomOrderOnly = isCustomOrderOnlyProduct(product);
+  const isStrictlyOutOfStock = isStrictlyOutOfStockProduct(product);
+  const stockState = getProductStockState(product);
   const ownerStatus = (() => {
     if (!isOwnerView) return null;
     if (product.deletedAt) {
@@ -159,7 +171,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       return;
     }
 
-    if (product.isOutOfStock) {
+    if (isStrictlyOutOfStock) {
       toast.error('This product is out of stock');
       return;
     }
@@ -288,7 +300,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             -{product.discountPercent}%
           </span>
         )}
-        {product.isLowStock && !product.isOutOfStock && (
+        {product.isLowStock && !isCustomOrderOnly && !product.isOutOfStock && (
           <span
             className="group/badge relative text-base leading-none drop-shadow-md cursor-default"
             title="Low Stock"
@@ -299,14 +311,20 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             </span>
           </span>
         )}
-        {isOwnerView && !product.isOutOfStock && (
+        {isOwnerView && stockState !== 'OUT_OF_STOCK' && (
           <span
             className="group/badge relative text-base leading-none drop-shadow-md cursor-default"
-            title={`${product.totalStock} in stock`}
+            title={
+              isCustomOrderOnly
+                ? 'Out of stock, but still baggable as a custom order'
+                : `${product.totalStock} in stock`
+            }
           >
-            📦
+            {isCustomOrderOnly ? '✂️' : '📦'}
             <span className="absolute left-full ml-1.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-semibold text-white bg-gray-900/90 backdrop-blur-sm whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none">
-              {product.totalStock} in stock
+              {isCustomOrderOnly
+                ? 'Custom order only'
+                : `${product.totalStock} in stock`}
             </span>
           </span>
         )}
@@ -377,10 +395,18 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       )}
 
       {/* Out of Stock Overlay */}
-      {product.isOutOfStock && (
+      {isStrictlyOutOfStock && (
         <div className="absolute inset-0 z-20 bg-white/60 dark:bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
           <span className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold rounded-full shadow-xl">
             Sold Out
+          </span>
+        </div>
+      )}
+
+      {isCustomOrderOnly && (
+        <div className="absolute inset-x-0 top-4 z-20 flex justify-center px-4">
+          <span className="rounded-full bg-violet-600/90 px-3 py-1 text-xs font-semibold text-white shadow-xl backdrop-blur-sm">
+            ✂️ Custom order only
           </span>
         </div>
       )}
@@ -442,18 +468,20 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               <button
                 type="button"
                 onClick={handleQuickAddToCart}
-                disabled={cartLoading || product.isOutOfStock || isOwnProduct}
+                disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
                 title={
                   isOwnProduct
                     ? 'Brands cannot bag their own products'
-                    : product.isOutOfStock
+                    : isStrictlyOutOfStock
                       ? 'Item is out of stock'
+                      : isCustomOrderOnly
+                        ? 'Bag as a custom order'
                       : 'Bag it'
                 }
                 className={`
                   h-8 w-8 rounded-lg flex items-center justify-center
                   transition-all duration-200
-                  ${product.isOutOfStock || isOwnProduct
+                  ${isStrictlyOutOfStock || isOwnProduct
                     ? 'text-white/30 cursor-not-allowed'
                     : 'text-white/80 hover:bg-white/15 hover:text-white active:scale-95'
                   }

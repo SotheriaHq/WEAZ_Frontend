@@ -24,7 +24,12 @@ import {
 } from '@/api/StoreApi';
 
 import type { StoreWizardData } from '@/types/storeWizard';
-import { markStoreOpenPending } from '@/utils/storeSetup';
+import {
+  clearStoreProgressLocally,
+  markStoreOpenPending,
+  readStoreProgressLocally,
+  saveStoreProgressLocally,
+} from '@/utils/storeSetup';
 
 // Initial empty state for the wizard
 const initialData: StoreWizardData = {
@@ -52,7 +57,7 @@ const initialData: StoreWizardData = {
   freeShippingThreshold: null,
   shippingMethod: 'standard',
   shippingRates: [],
-  orderProcessingMode: 'manual-review',
+  orderProcessingMode: 'auto-confirm',
   orderCancellationWindow: '24h',
   allowOrderNotes: true,
   returnsAccepted: true,
@@ -98,8 +103,6 @@ const STEP_ORDER: WizardStep[] = [
 ];
 
 type WizardSaveState = 'idle' | 'saving' | 'saved' | 'error';
-
-const LOCAL_PROGRESS_KEY = 'store-progress';
 
 const MAX_STORE_DESCRIPTION_LEN = 500;
 const MAX_STORE_TAGLINE_LEN = 100;
@@ -169,12 +172,13 @@ const StoreCreationWizard: React.FC = () => {
         ...wizardData,
         step: stepToNumber(currentStep),
         savedAt: Date.now(),
+        ownerUserId: user?.id ?? null,
       };
-      localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(localData));
+      saveStoreProgressLocally(localData, user?.id);
     } catch (error) {
       console.error('Failed to save to localStorage', error);
     }
-  }, [wizardData, currentStep]);
+  }, [wizardData, currentStep, user?.id]);
 
   // Save to localStorage immediately when data or step changes
   useEffect(() => {
@@ -283,13 +287,9 @@ const StoreCreationWizard: React.FC = () => {
       setIsLoadingDraft(true);
       
       // Load local draft first
-      const localDraftRaw = localStorage.getItem(LOCAL_PROGRESS_KEY) ?? localStorage.getItem('store-draft');
-      let localDraft: Record<string, unknown> | null = null;
-      try {
-        localDraft = localDraftRaw ? JSON.parse(localDraftRaw) : null;
-      } catch {
-        localDraft = null;
-      }
+      const localDraft = readStoreProgressLocally<Record<string, unknown>>(
+        user?.id,
+      );
 
       // Start with initial data, then layer local draft on top
       let nextData: StoreWizardData = localDraft 
@@ -532,10 +532,10 @@ const StoreCreationWizard: React.FC = () => {
       
       // Call openStore API to mark setup as complete
       await openStore();
-      markStoreOpenPending();
+      markStoreOpenPending(user?.id);
       
       // Clear the localStorage draft since setup is complete
-      localStorage.removeItem(LOCAL_PROGRESS_KEY);
+      clearStoreProgressLocally(user?.id);
       
       toast.success('🎉 Your store is now live!');
       toast.info(
@@ -558,7 +558,7 @@ const StoreCreationWizard: React.FC = () => {
       }
       setSaveState('error');
     }
-  }, [persistProgress, navigate]);
+  }, [persistProgress, navigate, user?.id]);
 
   // --- RENDER ---
   return (

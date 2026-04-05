@@ -62,6 +62,14 @@ function buildStoreProductPayload(data: Partial<ProductCreateDto>) {
     payload.trackInventory = data.trackInventory;
   if (data.allowBackorders !== undefined)
     payload.allowBackorders = data.allowBackorders;
+  if (data.standardCheckoutEnabled !== undefined)
+    payload.standardCheckoutEnabled = data.standardCheckoutEnabled;
+  const nextCustomOrderEnabled =
+    data.customOrderEnabled !== undefined
+      ? data.customOrderEnabled
+      : data.customAvailable;
+  if (nextCustomOrderEnabled !== undefined)
+    payload.customOrderEnabled = nextCustomOrderEnabled;
   if (data.isPhysicalProduct !== undefined)
     payload.isPhysicalProduct = data.isPhysicalProduct;
   if (data.customsRegion !== undefined)
@@ -80,11 +88,6 @@ function buildStoreProductPayload(data: Partial<ProductCreateDto>) {
   if (Array.isArray(data.customMeasurementKeys)) {
     payload.customMeasurementKeys = data.customMeasurementKeys;
   }
-  if (data.fitPreference !== undefined)
-    payload.fitPreference = data.fitPreference;
-  if (data.targetAgeGroup !== undefined)
-    payload.targetAgeGroup = data.targetAgeGroup;
-
   // Variants mapping (store schema uses arrays + sizeStock map)
   if (Array.isArray(data.variants) && data.variants.length > 0) {
     payload.variants = data.variants.map((v) => ({
@@ -191,8 +194,6 @@ export interface ProductCreateDto {
   customAvailable?: boolean;
   customOrderEnabled?: boolean;
   standardCheckoutEnabled?: boolean;
-  fitPreference?: "SLIM" | "REGULAR" | "LOOSE" | "OVERSIZED";
-  targetAgeGroup?: "ADULT" | "CHILD";
 }
 
 export interface ProductDto {
@@ -253,8 +254,11 @@ export interface ProductDto {
   customAvailable?: boolean;
   customOrderEnabled?: boolean;
   standardCheckoutEnabled?: boolean;
-  fitPreference?: "SLIM" | "REGULAR" | "LOOSE" | "OVERSIZED";
-  targetAgeGroup?: "ADULT" | "CHILD";
+  customOrderOutOfStockTriggeredAt?: string | null;
+  customOrderOutOfStockReminderSentAt?: string | null;
+  customOrderOutOfStockDiscontinueAt?: string | null;
+  isCustomOrderOnly?: boolean;
+  canBagWhenOutOfStock?: boolean;
   isPhysicalProduct?: boolean;
   customsRegion?: string;
   isFeatured?: boolean;

@@ -205,6 +205,21 @@ export default function VerificationWizardPage() {
   }, [user]);
 
   useEffect(() => {
+    const savedPhoneNumber = String(user?.phoneNumber ?? '').trim();
+    if (!savedPhoneNumber) {
+      return;
+    }
+
+    setForm((current) => {
+      if (current.ownerPhoneNumber?.trim()) {
+        return current;
+      }
+
+      return mergeDraftIntoForm(current, { ownerPhoneNumber: savedPhoneNumber });
+    });
+  }, [user?.phoneNumber]);
+
+  useEffect(() => {
     let cancelled = false;
     const syncPreviewUrls = async () => {
       const uploads = DOCUMENT_UPLOADS.map((item) => {
@@ -345,10 +360,12 @@ export default function VerificationWizardPage() {
 
   const validateStep = (index: number) => {
     if (index === 0) {
+      const resolvedPhoneNumber =
+        form.ownerPhoneNumber?.trim() || String(user?.phoneNumber ?? '').trim();
       if (!form.ownerLegalFirstName?.trim() || !form.ownerLegalLastName?.trim()) {
         throw new Error('Enter the legal first and last name');
       }
-      if (!form.ownerDateOfBirth || !form.ownerPhoneNumber?.trim()) {
+      if (!form.ownerDateOfBirth || !resolvedPhoneNumber) {
         throw new Error('Date of birth and phone number are required');
       }
       if (!form.ownerNin?.trim()) {
@@ -417,6 +434,8 @@ export default function VerificationWizardPage() {
 
     try {
       validateStep(4);
+      const resolvedPhoneNumber =
+        form.ownerPhoneNumber?.trim() || String(user?.phoneNumber ?? '').trim();
       setSubmitting(true);
       // Submit endpoint accepts only verification fields; strip draft-only metadata like `currentStep`.
       const payload: Record<string, unknown> = {
@@ -424,7 +443,7 @@ export default function VerificationWizardPage() {
         ownerLegalLastName: form.ownerLegalLastName,
         ownerDateOfBirth: form.ownerDateOfBirth,
         ownerGender: form.ownerGender,
-        ownerPhoneNumber: form.ownerPhoneNumber,
+        ownerPhoneNumber: resolvedPhoneNumber,
         ownerNin: form.ownerNin,
         cacNumber: form.cacNumber,
         businessAddress: form.businessAddress,
@@ -616,8 +635,14 @@ export default function VerificationWizardPage() {
               </Select>
               <Input
                 label="Phone number"
+                required
                 value={form.ownerPhoneNumber ?? ''}
-                onChange={(event) => setField('ownerPhoneNumber', event.target.value)}
+                readOnly
+                helperText={
+                  form.ownerPhoneNumber?.trim()
+                    ? 'Loaded from your saved profile and locked for verification.'
+                    : 'No phone number is on file. Add it in Settings before continuing.'
+                }
               />
               <Input
                 label="NIN"

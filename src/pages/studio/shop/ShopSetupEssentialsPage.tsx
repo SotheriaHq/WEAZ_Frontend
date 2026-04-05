@@ -1,12 +1,15 @@
 import React, { useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import StudioScaffold from '@/components/studio/StudioScaffold';
 import StoreEssentials from '@/pages/store/StoreEssentials';
 import { getStoreStatus } from '@/api/StoreApi';
 import { useNavigate } from 'react-router-dom';
+import type { RootState } from '@/store';
 import { clearStoreOpenPending, isStoreOpenPending, sleep } from '@/utils/storeSetup';
 
 const ShopSetupEssentialsPage: React.FC = () => {
   const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.user.profile);
 
   useEffect(() => {
     let mounted = true;
@@ -16,7 +19,7 @@ const ShopSetupEssentialsPage: React.FC = () => {
         const status = await getStoreStatus();
         if (!mounted) return false;
         if (status?.isStoreOpen) {
-          clearStoreOpenPending();
+          clearStoreOpenPending(user?.id);
           navigate('/studio/store', { replace: true });
           return true;
         }
@@ -28,7 +31,7 @@ const ShopSetupEssentialsPage: React.FC = () => {
 
     const run = async () => {
       const redirected = await checkStatus();
-      if (redirected || !isStoreOpenPending()) return;
+      if (redirected || !isStoreOpenPending(user?.id)) return;
 
       for (let attempt = 0; attempt < 6; attempt += 1) {
         await sleep(700);
@@ -41,7 +44,7 @@ const ShopSetupEssentialsPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [navigate]);
+  }, [navigate, user?.id]);
 
   return (
     <StudioScaffold active="store" onSelect={() => {}}>

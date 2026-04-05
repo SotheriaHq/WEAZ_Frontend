@@ -20,6 +20,7 @@ import {
 } from '@/utils/profileImage';
 import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildStorefrontUrl } from '@/utils/publicLinks';
+import type { VerificationStatusResponse } from '@/types/verification';
 
 export default function StoreManagement() {
   const navigate = useNavigate();
@@ -28,6 +29,7 @@ export default function StoreManagement() {
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<StoreStatusResponse | null>(null);
+  const [verification, setVerification] = useState<VerificationStatusResponse | null>(null);
   const [overview, setOverview] = useState<any>(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [analytics, setAnalytics] = useState<any>(null);
@@ -104,24 +106,63 @@ export default function StoreManagement() {
   const routeSearchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const returnTo = routeSearchParams.get('returnTo');
   const returnLabel = routeSearchParams.get('returnLabel') || 'Back';
-  const verificationMarker = user?.verificationBadgeVisible
+  const verificationStatus = verification?.verificationStatus ?? user?.verificationStatus ?? 'NOT_SUBMITTED';
+  const verificationBadgeVisible = verification?.badgeState.verificationBadgeVisible ?? user?.verificationBadgeVisible ?? false;
+  const verificationInProgress =
+    verificationStatus === 'PENDING' ||
+    verificationStatus === 'IN_REVIEW' ||
+    verificationStatus === 'ADDITIONAL_INFO_REQUESTED';
+  const verificationMarker = verificationBadgeVisible
     ? '✅'
-    : user?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED'
-      ? '🛠️'
-      : user?.verificationStatus === 'PENDING' ||
-          user?.verificationStatus === 'IN_REVIEW'
-        ? '⏳'
-        : user?.verificationStatus === 'REJECTED'
-          ? '⚠️'
+    : verificationInProgress
+      ? '⏳'
+      : verificationStatus === 'REJECTED'
+        ? '⚠️'
+        : verificationStatus === 'CANCELLED'
+          ? '🛑'
           : '🪪';
-  const verificationLabel = user?.verificationBadgeVisible
+  const verificationLabel = verificationBadgeVisible
     ? 'Seller verified'
-    : user?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED'
-      ? 'Reviewer requested updates'
-      : user?.verificationStatus === 'PENDING' ||
-          user?.verificationStatus === 'IN_REVIEW'
-        ? 'Verification in progress'
-        : 'Open verification workspace';
+    : verificationInProgress
+      ? 'Verification in progress'
+      : verificationStatus === 'REJECTED'
+        ? 'Verification needs attention'
+        : verificationStatus === 'CANCELLED'
+          ? 'Verification cancelled'
+          : 'Open verification workspace';
+  const showVerificationPrompt =
+    verificationStatus === 'NOT_SUBMITTED' ||
+    verificationStatus === 'REJECTED' ||
+    verificationStatus === 'CANCELLED';
+  const verificationPrompt = useMemo(() => {
+    if (verificationStatus === 'REJECTED') {
+      return {
+        eyebrow: 'Verification review',
+        title: 'Your previous verification attempt needs changes.',
+        description:
+          'Open the verification workspace to review the feedback and submit a corrected attempt.',
+        primaryLabel: 'Review feedback',
+      };
+    }
+
+    if (verificationStatus === 'CANCELLED') {
+      return {
+        eyebrow: 'Verification paused',
+        title: 'Your verification request was cancelled.',
+        description:
+          'You can start a fresh attempt from the verification workspace whenever you are ready.',
+        primaryLabel: 'Restart verification',
+      };
+    }
+
+    return {
+      eyebrow: 'Verify your brand',
+      title: 'Your store is ready. Finish brand verification to start making sales.',
+      description:
+        'Complete verification to strengthen trust, unlock a better buyer experience, and make your store feel fully open for business.',
+      primaryLabel: 'Open verification',
+    };
+  }, [verificationStatus]);
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('en-NG', {
@@ -141,9 +182,12 @@ export default function StoreManagement() {
     const run = async () => {
       try {
         setLoading(true);
+        const verificationRequest = user?.id
+          ? brandApi.getVerificationStatus(user.id, { force: true }).catch(() => null)
+          : Promise.resolve<VerificationStatusResponse | null>(null);
         let s = await getStoreStatus();
 
-        if (!s?.isStoreOpen && isStoreOpenPending()) {
+        if (!s?.isStoreOpen && isStoreOpenPending(user?.id)) {
           for (let attempt = 0; attempt < 5; attempt += 1) {
             await sleep(500);
             try {
@@ -162,11 +206,11 @@ export default function StoreManagement() {
         setStatus(s);
 
         if (s?.isStoreOpen) {
-          clearStoreOpenPending();
+          clearStoreOpenPending(user?.id);
         }
 
         if (s?.profile == null) {
-          if (isStoreOpenPending()) {
+          if (isStoreOpenPending(user?.id)) {
             return;
           }
           navigate('/studio/store/setup', { replace: true });
@@ -174,16 +218,21 @@ export default function StoreManagement() {
         }
 
         if (!s?.isStoreOpen) {
-          if (isStoreOpenPending()) {
+          if (isStoreOpenPending(user?.id)) {
             return;
           }
 
-          navigate(resolveStoreSetupDestination(), { replace: true });
+          navigate(resolveStoreSetupDestination(user?.id), { replace: true });
         }
+
+        const verificationData = await verificationRequest;
+        if (!mounted) return;
+
+        setVerification(verificationData);
       } catch (e) {
         const code = (e as any)?.response?.status;
         if (code === 404) {
-          if (isStoreOpenPending()) {
+          if (isStoreOpenPending(user?.id)) {
             return;
           }
           navigate('/studio/store/setup', { replace: true });
@@ -199,7 +248,7 @@ export default function StoreManagement() {
     return () => {
       mounted = false;
     };
-  }, [navigate]);
+  }, [navigate, user?.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -290,7 +339,7 @@ export default function StoreManagement() {
   }
 
   if (!status.isStoreOpen) {
-    if (isStoreOpenPending()) {
+    if (isStoreOpenPending(user?.id)) {
       return (
         <div className="rounded-2xl border border-gray-200 bg-white/70 p-6 dark:border-white/10 dark:bg-white/5">
           <div className="font-semibold text-gray-900 dark:text-white">
@@ -439,6 +488,43 @@ export default function StoreManagement() {
           </div>
         </div>
       </div>
+
+      {showVerificationPrompt ? (
+        <section className="rounded-3xl border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-indigo-50 p-5 shadow-sm dark:border-sky-500/20 dark:from-sky-500/10 dark:via-white/5 dark:to-indigo-500/10">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700 dark:text-sky-200">
+                {verificationPrompt.eyebrow}
+              </div>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900 dark:text-white">
+                {verificationPrompt.title}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {verificationPrompt.description}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/studio/verification')}
+                className="inline-flex items-center rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+              >
+                {verificationPrompt.primaryLabel}
+              </button>
+              {verificationStatus === 'NOT_SUBMITTED' ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/settings?tab=notifications')}
+                  className="inline-flex items-center rounded-full border border-sky-200 bg-white/80 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-white dark:border-sky-500/20 dark:bg-white/5 dark:text-sky-200"
+                >
+                  Manage reminders
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <StoreProductsPanel
         layoutMode={layoutMode}

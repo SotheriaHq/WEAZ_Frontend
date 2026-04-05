@@ -101,6 +101,7 @@ const AdminMessagingPage = lazy(() => import('./pages/admin/AdminMessagingPage')
 // Password reset pages — lazy loaded
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const EmailVerifyPage = lazy(() => import('./pages/EmailVerify'));
 
 const AppRouteFallback: React.FC = () => (
   <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">Loading page...</div>
@@ -388,7 +389,9 @@ const router = createBrowserRouter([
         path: '/studio/store/setup',
         element: (
           <RequireBrand>
-            <ShopSetupWizardPage />
+            <RequireStoreSetup>
+              <ShopSetupWizardPage />
+            </RequireStoreSetup>
           </RequireBrand>
         ),
       },
@@ -396,7 +399,9 @@ const router = createBrowserRouter([
         path: '/studio/store/essentials',
         element: (
           <RequireBrand>
-            <ShopSetupEssentialsPage />
+            <RequireStoreSetup>
+              <ShopSetupEssentialsPage />
+            </RequireStoreSetup>
           </RequireBrand>
         ),
       },
@@ -441,6 +446,10 @@ const router = createBrowserRouter([
       {
         path: '/brand/:slug',
         element: <Layout><StorefrontAliasRedirect /></Layout>,
+      },
+      {
+        path: '/verify-email',
+        element: <EmailVerifyPage />,
       },
       {
         element: <GuestRoute />,

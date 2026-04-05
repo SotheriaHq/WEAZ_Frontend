@@ -59,6 +59,7 @@ import {
   updatePublishTask,
   removePublishTask,
 } from '@/utils/publishTracker';
+import { TourOverlay, type TourStep } from '@/components/ui/TourOverlay';
 // ============================================================================
 
 type CategoryTypeOption = { id: string; name: string };
@@ -145,6 +146,24 @@ const CreateDesignInner: React.FC = () => {
   );
 
   // UI state
+  const [isTourActive, setIsTourActive] = useState(false);
+
+  // Auto-start the tour the first time a user opens the create-design page.
+  // Persisted in localStorage so it never shows again after the first visit.
+  useEffect(() => {
+    if (isEditMode) return;
+    if (localStorage.getItem('threadly_tour_design_create')) return;
+    const timer = window.setTimeout(() => setIsTourActive(true), 800);
+    return () => clearTimeout(timer);
+    // isEditMode is stable for the lifetime of this page instance
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleTourClose = useCallback(() => {
+    setIsTourActive(false);
+    localStorage.setItem('threadly_tour_design_create', '1');
+  }, []);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [coverIndex, setCoverIndex] = useState(0);
@@ -1092,6 +1111,47 @@ const CreateDesignInner: React.FC = () => {
     isMadeToOrder,
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const tourSteps = useMemo<TourStep[]>(
+    () => [
+      {
+        targetId: 'design-media-section',
+        title: 'Upload your design images',
+        description:
+          'Add front, left, right, and back-view images. The starred image becomes the cover shown in the catalog.',
+        emoji: '🖼️',
+      },
+      {
+        targetId: 'design-details-section',
+        title: 'Design title & story',
+        description:
+          'Give your design a compelling title and describe the inspiration behind it. These appear in the public catalog.',
+        emoji: '📝',
+        onEnter: () => setExpandedSections((prev) => ({ ...prev, details: true })),
+        enterDelay: 350,
+      },
+      {
+        targetId: 'design-pricing-section',
+        title: 'Set a price range',
+        description:
+          'Add an indicative min–max price so buyers understand what to expect. This is not a checkout price.',
+        emoji: '💰',
+        onEnter: () => setExpandedSections((prev) => ({ ...prev, pricing: true })),
+        enterDelay: 350,
+      },
+      {
+        targetId: 'design-targeting-section',
+        title: 'Targeting & visibility',
+        description:
+          "Choose who sees this design — men, women, or everyone. Set it public or keep it private until it's ready.",
+        emoji: '🎯',
+        onEnter: () => setExpandedSections((prev) => ({ ...prev, targeting: true })),
+        enterDelay: 350,
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="min-h-screen bg-transparent text-[var(--text-primary)] transition-colors duration-300">
       {/* CreateStoreModal removed as per request */}
@@ -1212,7 +1272,7 @@ const CreateDesignInner: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-6 items-start mb-8">
           {/* Media Section */}
-          <section className="h-full min-w-0">
+          <section id="design-media-section" className="h-full min-w-0">
             {files.length === 0 ? (
               <div className="space-y-3">
                 <MediaUploadZone
@@ -1365,6 +1425,7 @@ const CreateDesignInner: React.FC = () => {
           {/* Design Details */}
           <div className="h-full">
             <FormSection
+              id="design-details-section"
               title="Design Details"
               icon="📝"
               isOpen={expandedSections.details}
@@ -1578,6 +1639,7 @@ const CreateDesignInner: React.FC = () => {
         <div className="space-y-4">
           {/* Pricing & Availability */}
           <FormSection
+            id="design-pricing-section"
             title="Pricing & Availability"
             icon="💰"
             isOpen={expandedSections.pricing}
@@ -1691,6 +1753,7 @@ const CreateDesignInner: React.FC = () => {
 
           {/* Targeting & Visibility */}
           <FormSection
+            id="design-targeting-section"
             title="Targeting & Visibility"
             icon="🎯"
             isOpen={expandedSections.targeting}
@@ -2166,6 +2229,13 @@ const CreateDesignInner: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Spotlight tour — shown automatically on first visit (create mode) */}
+      <TourOverlay
+        steps={tourSteps}
+        isActive={isTourActive}
+        onClose={handleTourClose}
+      />
     </div>
   );
 };
@@ -2184,8 +2254,10 @@ const FormSection: React.FC<{
   onToggle: () => void;
   children: React.ReactNode;
   className?: string;
-}> = ({ title, icon, isOpen, onToggle, children, className }) => (
+  id?: string;
+}> = ({ title, icon, isOpen, onToggle, children, className, id }) => (
   <div
+    id={id}
     className={`rounded-2xl glass-panel border border-gray-200 dark:border-white/10 overflow-hidden bg-white/80 dark:bg-gray-900/60 backdrop-blur ${className ?? ""}`}
   >
     <button

@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { getStoreStatus, type StoreStatusResponse } from '@/api/StoreApi';
+import type { RootState } from '@/store';
 import {
   clearStoreOpenPending,
+  isBrandProfileComplete,
   isStoreOpenPending,
+  resolveBrandProfileSetupDestination,
   resolveStoreSetupDestination,
   sleep,
 } from '@/utils/storeSetup';
@@ -11,6 +15,8 @@ import {
 const STATUS_RETRY_ATTEMPTS = 5;
 const STATUS_RETRY_DELAY_MS = 600;
 const STORE_STATUS_CACHE_TTL_MS = 5 * 60 * 1000;
+const EMAIL_VERIFICATION_RETURN_PATH_KEY =
+  'threadly.emailVerification.returnPath';
 
 type StoreStatusCache = {
   status: StoreStatusResponse | null;
@@ -24,19 +30,30 @@ let storeStatusCache: StoreStatusCache = {
   checkedAt: 0,
 };
 
-let inFlightStoreStatusCheck: Promise<StoreStatusCache> | null = null;
+let storeStatusCacheUserId: string | null = null;
 
-const isCacheFresh = () =>
+let inFlightStoreStatusCheck: Promise<StoreStatusCache> | null = null;
+let inFlightStoreStatusCheckUserId: string | null = null;
+
+const normalizeCacheUserId = (userId?: string | null): string | null => {
+  const candidate = String(userId ?? '').trim();
+  return candidate.length > 0 ? candidate : null;
+};
+
+const isCacheFresh = (userId?: string | null) =>
+  storeStatusCacheUserId === normalizeCacheUserId(userId) &&
   storeStatusCache.checkedAt > 0 &&
   Date.now() - storeStatusCache.checkedAt < STORE_STATUS_CACHE_TTL_MS;
 
-const canServeFromCache = () =>
-  isCacheFresh() &&
+const canServeFromCache = (userId?: string | null) =>
+  isCacheFresh(userId) &&
   !storeStatusCache.hadError &&
   Boolean(storeStatusCache.status?.isStoreOpen);
 
-const fetchStoreStatusWithRetry = async (): Promise<StoreStatusCache> => {
-  const shouldRetryForPendingOpen = isStoreOpenPending();
+const fetchStoreStatusWithRetry = async (
+  userId?: string | null,
+): Promise<StoreStatusCache> => {
+  const shouldRetryForPendingOpen = isStoreOpenPending(userId);
   const maxAttempts = shouldRetryForPendingOpen ? STATUS_RETRY_ATTEMPTS : 1;
   let nextStatus: StoreStatusResponse | null = null;
   let sawError = false;
@@ -47,7 +64,7 @@ const fetchStoreStatusWithRetry = async (): Promise<StoreStatusCache> => {
         nextStatus = await getStoreStatus();
         sawError = false;
         if (nextStatus?.isStoreOpen) {
-          clearStoreOpenPending();
+          clearStoreOpenPending(userId);
           break;
         }
       } catch {
@@ -69,16 +86,25 @@ const fetchStoreStatusWithRetry = async (): Promise<StoreStatusCache> => {
   };
 
   storeStatusCache = nextCache;
+  storeStatusCacheUserId = normalizeCacheUserId(userId);
   return nextCache;
 };
 
-const getCachedOrFetchStoreStatus = async (): Promise<StoreStatusCache> => {
-  if (inFlightStoreStatusCheck) {
+const getCachedOrFetchStoreStatus = async (
+  userId?: string | null,
+): Promise<StoreStatusCache> => {
+  const normalizedUserId = normalizeCacheUserId(userId);
+  if (
+    inFlightStoreStatusCheck &&
+    inFlightStoreStatusCheckUserId === normalizedUserId
+  ) {
     return inFlightStoreStatusCheck;
   }
 
-  inFlightStoreStatusCheck = fetchStoreStatusWithRetry().finally(() => {
+  inFlightStoreStatusCheckUserId = normalizedUserId;
+  inFlightStoreStatusCheck = fetchStoreStatusWithRetry(userId).finally(() => {
     inFlightStoreStatusCheck = null;
+    inFlightStoreStatusCheckUserId = null;
   });
 
   return inFlightStoreStatusCheck;
@@ -86,9 +112,14 @@ const getCachedOrFetchStoreStatus = async (): Promise<StoreStatusCache> => {
 
 const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
-  const [status, setStatus] = useState<StoreStatusResponse | null>(storeStatusCache.status);
-  const [loading, setLoading] = useState(() => !canServeFromCache());
-  const [hadError, setHadError] = useState(storeStatusCache.hadError);
+  const user = useSelector((state: RootState) => state.user.profile);
+  const [status, setStatus] = useState<StoreStatusResponse | null>(() =>
+    isCacheFresh(user?.id) ? storeStatusCache.status : null,
+  );
+  const [loading, setLoading] = useState(() => !canServeFromCache(user?.id));
+  const [hadError, setHadError] = useState(() =>
+    isCacheFresh(user?.id) ? storeStatusCache.hadError : false,
+  );
 
   const isSetupRoute = useMemo(() => {
     return (
@@ -97,28 +128,58 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     );
   }, [location.pathname]);
 
+  const verificationPromptDestination = useMemo(() => {
+    const nextPath = `${location.pathname}${location.search}`;
+    const params = new URLSearchParams();
+    params.set('verifyEmailPrompt', 'store-setup');
+    params.set('next', nextPath);
+    return `/profile?${params.toString()}`;
+  }, [location.pathname, location.search]);
+
+  const brandProfileSetupDestination = useMemo(() => {
+    const nextPath = `${location.pathname}${location.search}`;
+    return resolveBrandProfileSetupDestination(nextPath);
+  }, [location.pathname, location.search]);
+
+  const effectiveEmailVerified =
+    status?.isEmailVerified ?? user?.isEmailVerified ?? true;
+  const effectiveProfileComplete =
+    status?.isProfileComplete ?? isBrandProfileComplete(user);
+  const requiresEmailVerification =
+    user?.type === 'BRAND' && effectiveEmailVerified === false;
+  const requiresProfileCompletion =
+    user?.type === 'BRAND' && effectiveProfileComplete === false;
+
   useEffect(() => {
-    if (isSetupRoute) {
-      setLoading(false);
+    if (!requiresEmailVerification) {
       return;
     }
 
+    try {
+      const nextPath = `${location.pathname}${location.search}`;
+      window.sessionStorage.setItem(EMAIL_VERIFICATION_RETURN_PATH_KEY, nextPath);
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [requiresEmailVerification, location.pathname, location.search]);
+
+  useEffect(() => {
     let mounted = true;
 
-    if (storeStatusCache.checkedAt > 0) {
+    if (isCacheFresh(user?.id)) {
       setStatus(storeStatusCache.status);
       setHadError(storeStatusCache.hadError);
       setLoading(false);
     }
 
-    if (canServeFromCache()) {
+    if (canServeFromCache(user?.id)) {
       return () => {
         mounted = false;
       };
     }
 
     const shouldBlockWithLoader =
-      storeStatusCache.checkedAt === 0 ||
+      !isCacheFresh(user?.id) ||
       !storeStatusCache.status?.isStoreOpen ||
       storeStatusCache.hadError;
     if (shouldBlockWithLoader) {
@@ -127,7 +188,7 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     }
 
     const run = async () => {
-      const nextCache = await getCachedOrFetchStoreStatus();
+      const nextCache = await getCachedOrFetchStoreStatus(user?.id);
       if (!mounted) return;
       setStatus(nextCache.status);
       setHadError(nextCache.hadError);
@@ -140,7 +201,15 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     return () => {
       mounted = false;
     };
-  }, [isSetupRoute]);
+  }, [isSetupRoute, user?.id]);
+
+  if (requiresEmailVerification) {
+    return <Navigate to={verificationPromptDestination} replace />;
+  }
+
+  if (requiresProfileCompletion) {
+    return <Navigate to={brandProfileSetupDestination} replace />;
+  }
 
   if (isSetupRoute) {
     return <>{children}</>;
@@ -155,15 +224,15 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
   }
 
   if (status?.isStoreOpen) {
-    clearStoreOpenPending();
+    clearStoreOpenPending(user?.id);
     return <>{children}</>;
   }
 
-  if (isStoreOpenPending()) {
+  if (isStoreOpenPending(user?.id)) {
     return <>{children}</>;
   }
 
-  const destination = resolveStoreSetupDestination();
+  const destination = resolveStoreSetupDestination(user?.id);
   if (hadError || !status) {
     return <Navigate to={destination} replace />;
   }

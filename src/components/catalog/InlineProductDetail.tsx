@@ -15,6 +15,10 @@ import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { CONTENT_DISPLAY_FRAME_CLASS, CONTENT_DISPLAY_MEDIA_CLASS } from '@/components/media/contentDisplayPresets';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
+import {
+  isCustomOrderOnlyProduct,
+  isStrictlyOutOfStockProduct,
+} from '@/lib/productAvailability';
 
 interface InlineProductDetailProps {
   product: StoreProduct;
@@ -97,8 +101,8 @@ export default function InlineProductDetail({
 
   const requiresMeasurements = useMemo(() => {
     if (requiredMeasurementKeys.length === 0) return false;
-    return product.customAvailable === true;
-  }, [product.customAvailable, requiredMeasurementKeys]);
+    return product.customAvailable === true || product.customOrderEnabled === true;
+  }, [product.customAvailable, product.customOrderEnabled, requiredMeasurementKeys]);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
   const isWishlisted = wishlistedIds.has(product.id);
 
@@ -208,6 +212,9 @@ export default function InlineProductDetail({
   const variants = Array.isArray(product.variants) ? product.variants : [];
   const hasVariants = variants.length > 0;
   const inStockVariants = variants.filter((variant) => Number(variant.stock || 0) > 0);
+  const isCustomOrderOnly = isCustomOrderOnlyProduct(product);
+  const isStrictlyOutOfStock = isStrictlyOutOfStockProduct(product);
+  const selectableVariants = isCustomOrderOnly ? variants : inStockVariants;
   const compareAtPrice = (product as any).compareAtPrice as number | undefined;
   const isOutOfStock = !product.totalStock || product.totalStock <= 0;
   const ownerCandidates = [
@@ -225,13 +232,14 @@ export default function InlineProductDetail({
     .map((value) => (typeof value === 'string' ? value.trim() : ''))
     .filter(Boolean);
   const isOwnProduct = viewerCandidates.some((viewerId) => ownerCandidates.includes(viewerId));
-  const isCustomOrderProduct = product.customAvailable === true;
+  const isCustomOrderProduct =
+    product.customAvailable === true || product.customOrderEnabled === true;
 
   const availableSizes = useMemo(() => {
     if (!hasVariants) return sizes;
     const matches = selectedColor
-      ? inStockVariants.filter((variant) => (variant.color || null) === selectedColor)
-      : inStockVariants;
+      ? selectableVariants.filter((variant) => (variant.color || null) === selectedColor)
+      : selectableVariants;
     return Array.from(
       new Set(
         matches
@@ -239,13 +247,13 @@ export default function InlineProductDetail({
           .filter((size): size is string => typeof size === 'string' && size.length > 0),
       ),
     );
-  }, [hasVariants, inStockVariants, selectedColor, sizes]);
+  }, [hasVariants, selectableVariants, selectedColor, sizes]);
 
   const availableColors = useMemo(() => {
     if (!hasVariants) return colors;
     const matches = selectedSize
-      ? inStockVariants.filter((variant) => (variant.size || null) === selectedSize)
-      : inStockVariants;
+      ? selectableVariants.filter((variant) => (variant.size || null) === selectedSize)
+      : selectableVariants;
     return Array.from(
       new Set(
         matches
@@ -253,7 +261,7 @@ export default function InlineProductDetail({
           .filter((color): color is string => typeof color === 'string' && color.length > 0),
       ),
     );
-  }, [colors, hasVariants, inStockVariants, selectedSize]);
+  }, [colors, hasVariants, selectableVariants, selectedSize]);
 
   useEffect(() => {
     if (!selectedSize) return;
@@ -272,10 +280,10 @@ export default function InlineProductDetail({
   const selectedVariant = useMemo(() => {
     if (!hasVariants) return null;
     if (!selectedSize || !selectedColor) return null;
-    return inStockVariants.find(
+    return selectableVariants.find(
       (variant) => (variant.size || null) === selectedSize && (variant.color || null) === selectedColor,
     ) ?? null;
-  }, [hasVariants, inStockVariants, selectedColor, selectedSize]);
+  }, [hasVariants, selectableVariants, selectedColor, selectedSize]);
 
   const normalizeMeasurements = (values: Record<string, string>) => {
     return requiredMeasurementKeys.reduce((acc, key) => {
@@ -301,7 +309,7 @@ export default function InlineProductDetail({
       toast.info('Please sign in to bag items.');
       return;
     }
-    if (isOutOfStock) {
+    if (isStrictlyOutOfStock) {
       toast.error('This product is out of stock.');
       return;
     }
@@ -619,11 +627,21 @@ export default function InlineProductDetail({
           {/* Stock Info */}
           <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${!isOutOfStock ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  isCustomOrderOnly
+                    ? 'bg-violet-500'
+                    : !isOutOfStock
+                      ? 'bg-green-500'
+                      : 'bg-red-500'
+                }`}
+              />
               <span className="text-gray-600 dark:text-gray-400">
-                {!isOutOfStock 
-                  ? `${product.totalStock} in stock` 
-                  : 'Out of stock'}
+                {isCustomOrderOnly
+                  ? 'Custom order only'
+                  : !isOutOfStock
+                    ? `${product.totalStock} in stock`
+                    : 'Out of stock'}
               </span>
             </div>
           </div>
@@ -634,11 +652,11 @@ export default function InlineProductDetail({
               <button
                 type="button"
                 onClick={handleAddToBag}
-                disabled={isOutOfStock}
+                disabled={isStrictlyOutOfStock}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:scale-100"
               >
                 <span aria-hidden="true">🛍️</span>
-                Bag it
+                {isCustomOrderOnly ? 'Bag as custom order' : 'Bag it'}
               </button>
             ) : (
               <div className="flex-1 flex items-center justify-center px-6 py-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm font-medium text-gray-600 dark:text-gray-300">

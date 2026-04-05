@@ -228,7 +228,7 @@ const StoreMediaReviewStep: React.FC<StoreMediaReviewStepProps> = ({
           {mediaItems.map((item) => (
             <div
               key={item.id}
-              className={`bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border rounded-xl overflow-hidden group hover:border-gray-300 dark:hover:border-white/20 transition-all duration-300 ${
+              className={`bg-white border border-gray-200 shadow-sm rounded-2xl overflow-hidden group hover:border-gray-300 dark:border-white/10 dark:bg-[#1a1a1a] dark:hover:border-white/20 transition-all duration-300 ${
                 item.status === 'failed'
                   ? 'border-red-500/30'
                   : item.status === 'warning'
@@ -237,7 +237,7 @@ const StoreMediaReviewStep: React.FC<StoreMediaReviewStepProps> = ({
               }`}
             >
               {/* Image */}
-              <div className="relative w-full aspect-[4/3]">
+              <div className="relative w-full aspect-[4/3] bg-black/[0.02] dark:bg-white/[0.02]">
                 <MediaRenderer
                   kind="image"
                   src={item.url}

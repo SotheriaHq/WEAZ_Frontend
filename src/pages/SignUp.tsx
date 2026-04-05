@@ -14,6 +14,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { apiClient, persistAccessToken, dropStoredAccessToken } from '../api/httpClient';
 import '../styles/auth.css';
 import VLoader from '@/components/loaders/VLoader';
+import BrandWordmark from '@/components/brand/BrandWordmark';
+import { COMPANY_NAME } from '@/lib/brand';
 
 const CONFETTI_STORAGE_KEY = 'threadly-signup-confetti';
 
@@ -125,10 +127,11 @@ const LoadingScreen = () => (
   <div className="fixed inset-0 bg-[var(--surface-primary)] text-[var(--text-primary)] dark:bg-[var(--surface-primary)] flex items-center justify-center z-50">
     <div className="text-center">
       <div className="flex items-center justify-center gap-3 mb-6">
-        <div className="w-12 h-12 rounded-full bg-brand-gold flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.5)]">
-          <span className="text-2xl font-bold tracking-tight text-[var(--surface-primary)]">T</span>
-        </div>
-        <span className="text-3xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white">Threadly</span>
+        <BrandWordmark
+          logoSize={48}
+          logoClassName="drop-shadow-[0_0_20px_rgba(212,175,55,0.45)]"
+          textClassName="text-3xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white"
+        />
       </div>
       <div className="flex space-x-2 justify-center mb-4">
         <div className="w-3 h-3 bg-[var(--brand-primary-strong)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
@@ -216,17 +219,22 @@ const SignUpPage = () => {
 
       dispatch(setUser(user));
       dispatch(addLocalNotification({ message: 'Account created successfully!' }));
-      toast.success('Welcome to Threadly!');
+      toast.success(`Welcome to ${COMPANY_NAME}!`);
 
       await celebrateSignupOnce(user.id);
+
+      const nextRoute =
+        user.type === 'BRAND'
+          ? '/profile?modal=brand-setup&modalOrigin=prompt'
+          : '/profile';
 
       if (user.type === 'BRAND') {
         // Ensure the post-signup prompt shows even if previously dismissed.
         localStorage.removeItem('threadly.brandProfileSetup.dismissedUntil');
-        navigate('/profile?modal=brand-setup&modalOrigin=prompt', { replace: true });
-      } else {
-        navigate('/profile', { replace: true });
       }
+
+      navigate(nextRoute, { replace: true });
+
       setIsRedirecting(true);
       reset();
     } catch (error: unknown) {
@@ -306,12 +314,11 @@ const SignUpPage = () => {
           {/* Logo */}
           <div className="relative z-10">
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-2xl shadow-[0_0_15px_rgba(212,175,55,0.4)]">
-                T
-              </div>
-              <span className="text-2xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors">
-                Threadly
-              </span>
+              <BrandWordmark
+                logoSize={40}
+                logoClassName="drop-shadow-[0_0_14px_rgba(212,175,55,0.35)]"
+                textClassName="text-2xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+              />
             </Link>
           </div>
 
@@ -371,10 +378,11 @@ const SignUpPage = () => {
         <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12 relative z-10">
           {/* Mobile Logo */}
           <Link to="/" className="lg:hidden absolute top-8 left-8 flex items-center gap-3 group">
-            <div className="w-8 h-8 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-lg shadow-[0_0_12px_rgba(212,175,55,0.4)] group-hover:shadow-[0_0_20px_rgba(212,175,55,0.6)] transition-shadow">
-              T
-            </div>
-            <span className="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors">Threadly</span>
+            <BrandWordmark
+              logoSize={32}
+              logoClassName="drop-shadow-[0_0_12px_rgba(212,175,55,0.45)] group-hover:drop-shadow-[0_0_18px_rgba(212,175,55,0.6)] transition-[filter]"
+              textClassName="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+            />
           </Link>
 
           <div className="w-full max-w-md mt-16 lg:mt-0">
@@ -382,7 +390,7 @@ const SignUpPage = () => {
             <div className="auth-glass-panel rounded-2xl p-8 sm:p-10 w-full">
               <div className="text-center mb-8">
                 <h1 className="text-4xl font-extrabold tracking-tight text-white mb-3" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>Create Account</h1>
-                <p className="text-gray-300 text-base font-medium">Start your fashion journey with Threadly.</p>
+                <p className="text-gray-300 text-base font-medium">Start your fashion journey with {COMPANY_NAME}.</p>
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">

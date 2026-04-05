@@ -6,10 +6,13 @@ import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { closeSidebar } from '@/features/uiSlice';
 import { useLocation, Outlet } from 'react-router-dom';
+import { useNotificationsBootstrap } from '@/hooks/useNotifications';
 
 const AdminScaffold: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
+
+  useNotificationsBootstrap();
 
   useEffect(() => {
     dispatch(closeSidebar());

@@ -4,33 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../store';
 import { closeSidebar, toggleSidebar, MOBILE_BREAKPOINT } from '../features/uiSlice';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
-
-const ThreadlyLogo = () => (
-  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="threadly-gradient-sidebar" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-        <stop stopColor="var(--brand-primary)" />
-        <stop offset="0.5" stopColor="var(--brand-accent)" />
-        <stop offset="1" stopColor="var(--brand-primary-strong)" />
-      </linearGradient>
-    </defs>
-    <path
-      d="M8 20C8 16.5 13 16.5 13 13C13 9.5 8 9.5 8 13"
-      stroke="url(#threadly-gradient-sidebar)"
-      strokeWidth="3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M24 12C24 15.5 19 15.5 19 19C19 22.5 24 22.5 24 19"
-      stroke="url(#threadly-gradient-sidebar)"
-      strokeWidth="3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <circle cx="16" cy="16" r="2.5" fill="url(#threadly-gradient-sidebar)" />
-  </svg>
-);
+import BrandWordmark from '@/components/brand/BrandWordmark';
 
 interface SidebarLinkProps {
   emoji: string;
@@ -127,7 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
 
   const handleLinkClick = (path: string) => {
     navigate(path);
-    if (showOverlay) dispatch(closeSidebar());
+    if (isSidebarOpen) dispatch(closeSidebar());
   };
 
   // Brands without complete store setup should not see Studio or Messages
@@ -224,107 +198,120 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
     );
   }
 
-  return (
-    <>
-      {showOverlay && (
-        <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-          onClick={() => dispatch(closeSidebar())}
-          aria-hidden
-        />
-      )}
+  const renderSidebarContent = (isRailMode: boolean) => (
+    <div className={`flex-1 overflow-y-auto scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${isRailMode ? 'px-1' : 'px-3'} py-2`}>
+      <div className="space-y-1 mb-3">
+        {mainLinks.map((link) => (
+          <SidebarLink
+            key={link.path}
+            emoji={link.emoji}
+            label={link.label}
+            active={link.active}
+            onClick={() => handleLinkClick(link.path)}
+            isRail={isRailMode}
+          />
+        ))}
+      </div>
 
-      <div
-        className={`${positionClass} ${widthClass} ${showOverlay ? 'threadly-chrome-surface rounded-r-lg shadow-xl' : 'bg-transparent shadow-none'} flex flex-col overflow-hidden transition-all duration-300 ease-out ${slideClasses}`}
-      >
-        {showOverlay && (
-          <div className="h-16 shrink-0 border-b border-gray-200/50 px-4 sm:px-5 dark:border-white/10 flex items-center justify-start">
-            <button
-              onClick={() => dispatch(toggleSidebar())}
-              className="inline-flex h-9 w-9 items-center justify-center mr-1 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"
-            >
-              <span className="text-xl">🍔</span>
-            </button>
-            <div className="flex items-center cursor-pointer" onClick={() => handleLinkClick('/')}>
-              <ThreadlyLogo />
-              <span className="ml-1.5 text-lg font-bold text-gray-900 dark:text-white tracking-tight">
-                Threadly
-              </span>
-            </div>
+      {!isRailMode && (
+        <>
+          <div className="border-t border-gray-200/50 dark:border-white/10 my-3 mx-2" />
+
+          <div className="px-3 mb-2">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center">
+              You <span className="ml-1 text-xs">{'>'}</span>
+            </h3>
           </div>
-        )}
-
-        <div className={`flex-1 overflow-y-auto scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${isRail ? 'px-1' : 'px-3'} py-2`}>
           <div className="space-y-1 mb-3">
-            {mainLinks.map((link) => (
+            {youLinks.map((link) => (
               <SidebarLink
                 key={link.path}
                 emoji={link.emoji}
                 label={link.label}
                 active={link.active}
                 onClick={() => handleLinkClick(link.path)}
-                isRail={isRail}
+                isRail={isRailMode}
               />
             ))}
           </div>
 
-          {!isRail && (
-            <>
-              <div className="border-t border-gray-200/50 dark:border-white/10 my-3 mx-2" />
+          <div className="border-t border-gray-200/50 dark:border-white/10 my-3 mx-2" />
 
-              <div className="px-3 mb-2">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center">
-                  You <span className="ml-1 text-xs">{'>'}</span>
-                </h3>
-              </div>
-              <div className="space-y-1 mb-3">
-                {youLinks.map((link) => (
-                  <SidebarLink
-                    key={link.path}
-                    emoji={link.emoji}
-                    label={link.label}
-                    active={link.active}
-                    onClick={() => handleLinkClick(link.path)}
-                    isRail={isRail}
-                  />
-                ))}
-              </div>
+          <div className="px-3 mb-2">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Explore</h3>
+          </div>
+          <div className="space-y-1 mb-3">
+            {exploreLinks.map((link) => (
+              <SidebarLink
+                key={link.path}
+                emoji={link.emoji}
+                label={link.label}
+                active={link.active}
+                onClick={() => handleLinkClick(link.path)}
+                isRail={isRailMode}
+              />
+            ))}
+          </div>
 
-              <div className="border-t border-gray-200/50 dark:border-white/10 my-3 mx-2" />
+          <div className="border-t border-gray-200/50 dark:border-white/10 my-3 mx-2" />
 
-              <div className="px-3 mb-2">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Explore</h3>
-              </div>
-              <div className="space-y-1 mb-3">
-                {exploreLinks.map((link) => (
-                  <SidebarLink
-                    key={link.path}
-                    emoji={link.emoji}
-                    label={link.label}
-                    active={link.active}
-                    onClick={() => handleLinkClick(link.path)}
-                    isRail={isRail}
-                  />
-                ))}
-              </div>
-
-              <div className="border-t border-gray-200/50 dark:border-white/10 my-3 mx-2" />
-
-              {user && (
-                <div className="space-y-1 mb-3">
-                  <SidebarLink
-                    emoji="⚙️"
-                    label="Settings"
-                    active={location.pathname.startsWith('/settings')}
-                    onClick={() => handleLinkClick('/settings')}
-                    isRail={isRail}
-                  />
-                </div>
-              )}
-            </>
+          {user && (
+            <div className="space-y-1 mb-3">
+              <SidebarLink
+                emoji="⚙️"
+                label="Settings"
+                active={location.pathname.startsWith('/settings')}
+                onClick={() => handleLinkClick('/settings')}
+                isRail={isRailMode}
+              />
+            </div>
           )}
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ease-out ${
+          isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => dispatch(closeSidebar())}
+        aria-hidden
+      />
+
+      {/* OVERLAY SIDEBAR (Always rendered but translated when closed) */}
+      <div
+        className={`fixed left-0 top-0 h-full z-50 shadow-xl w-[240px] threadly-chrome-surface rounded-r-lg flex flex-col overflow-hidden transform transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${
+          isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'
+        }`}
+      >
+        <div className="h-16 shrink-0 border-b border-gray-200/50 px-4 sm:px-5 dark:border-white/10 flex items-center justify-start">
+          <button
+            onClick={() => dispatch(toggleSidebar())}
+            className="inline-flex h-9 w-9 items-center justify-center mr-1 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"
+          >
+            <span className="text-xl">🍔</span>
+          </button>
+          <div className="flex items-center cursor-pointer" onClick={() => handleLinkClick('/')}>
+            <BrandWordmark
+              logoSize={32}
+              textClassName="text-lg font-bold text-gray-900 dark:text-white tracking-tight"
+            />
+          </div>
         </div>
+
+        {renderSidebarContent(false)}
       </div>
+
+      {/* RAIL SIDEBAR */}
+      {!overlayOnly && !isMobile && (
+        <div className="fixed left-0 top-[var(--app-header-height)] h-[calc(100vh-var(--app-header-height))] z-30 w-[76px] bg-transparent flex flex-col overflow-hidden">
+          {renderSidebarContent(true)}
+        </div>
+      )}
     </>
   );
 };

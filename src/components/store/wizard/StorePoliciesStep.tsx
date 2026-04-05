@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { StoreWizardData } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import UniversalSelect from '@/components/forms/UniversalSelect';
 
 interface StorePoliciesStepProps {
   data: StoreWizardData;
@@ -51,11 +52,6 @@ const SHIPPING_METHODS = [
   { value: 'standard', label: 'Standard Shipping' },
   { value: 'express', label: 'Express Shipping' },
   { value: 'free-threshold', label: 'Free over threshold' },
-];
-
-const ORDER_PROCESSING_MODES = [
-  { value: 'manual-review', label: 'Manual review before confirmation' },
-  { value: 'auto-confirm', label: 'Auto-confirm paid ready-to-wear orders' },
 ];
 
 const ORDER_CANCELLATION_WINDOWS = [
@@ -153,7 +149,7 @@ const RECOMMENDED_DEFAULTS: Partial<StoreWizardData> = {
   processingTime: '3-5',
   shippingMethods: ['standard', 'express'],
   freeShippingThreshold: 50000,
-  orderProcessingMode: 'manual-review',
+  orderProcessingMode: 'auto-confirm',
   orderCancellationWindow: '24h',
   allowOrderNotes: true,
   returnsAccepted: true,
@@ -267,6 +263,12 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
     (chart) => chart.id === data.sizeChartPresetKey
   );
 
+  useEffect(() => {
+    if (data.orderProcessingMode !== 'auto-confirm') {
+      onChange({ orderProcessingMode: 'auto-confirm' });
+    }
+  }, [data.orderProcessingMode, onChange]);
+
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
       {/* Main Content - Centered Card */}
@@ -377,23 +379,13 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
 
                   {/* Processing Time */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Processing Time
-                    </label>
-                    <select
+                    <UniversalSelect
+                      label="Processing Time"
                       value={data.processingTime}
-                      onChange={(e) =>
-                        onChange({ processingTime: e.target.value })
-                      }
-                      className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
-                    >
-                      <option value="">Select processing time</option>
-                      {PROCESSING_TIMES.map((time) => (
-                        <option key={time.value} value={time.value}>
-                          {time.label}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => onChange({ processingTime: value })}
+                      options={PROCESSING_TIMES}
+                      placeholder="Select processing time"
+                    />
                   </div>
 
                   {/* Shipping Methods */}
@@ -483,24 +475,13 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                     <>
                       {/* Return Window */}
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Return Window
-                        </label>
-                        <select
+                        <UniversalSelect
+                          label="Return Window"
                           value={data.returnWindow}
-                          onChange={(e) =>
-                            onChange({ returnWindow: e.target.value })
-                          }
-                          className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
-                        >
-                          {RETURN_WINDOWS.filter((w) => w.value !== 'none').map(
-                            (window) => (
-                              <option key={window.value} value={window.value}>
-                                {window.label}
-                              </option>
-                            )
-                          )}
-                        </select>
+                          onChange={(value) => onChange({ returnWindow: value })}
+                          options={RETURN_WINDOWS.filter((window) => window.value !== 'none')}
+                          placeholder="Select return window"
+                        />
                       </div>
 
                       {/* Return Conditions */}
@@ -537,22 +518,13 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
 
                       {/* Refund Method */}
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Refund Method
-                        </label>
-                        <select
+                        <UniversalSelect
+                          label="Refund Method"
                           value={data.refundMethod}
-                          onChange={(e) =>
-                            onChange({ refundMethod: e.target.value })
-                          }
-                          className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
-                        >
-                          {REFUND_METHODS.map((method) => (
-                            <option key={method.value} value={method.value}>
-                              {method.label}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(value) => onChange({ refundMethod: value })}
+                          options={REFUND_METHODS}
+                          placeholder="Select refund method"
+                        />
                       </div>
                     </>
                   ) : (
@@ -579,34 +551,27 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Standard Order Processing
                     </label>
-                    <select
-                      value={data.orderProcessingMode}
-                      onChange={(e) => onChange({ orderProcessingMode: e.target.value as StoreWizardData['orderProcessingMode'] })}
-                      className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
-                    >
-                      {ORDER_PROCESSING_MODES.map((mode) => (
-                        <option key={mode.value} value={mode.value}>
-                          {mode.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-100">
+                      <div className="font-semibold">System managed</div>
+                      <div className="mt-1">
+                        Standard orders are auto-confirmed by system policy. Super-admin category-based controls can be introduced centrally.
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Buyer Cancellation Window
-                    </label>
-                    <select
+                    <UniversalSelect
+                      label="Buyer Cancellation Window"
                       value={data.orderCancellationWindow}
-                      onChange={(e) => onChange({ orderCancellationWindow: e.target.value as StoreWizardData['orderCancellationWindow'] })}
-                      className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
-                    >
-                      {ORDER_CANCELLATION_WINDOWS.map((window) => (
-                        <option key={window.value} value={window.value}>
-                          {window.label}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) =>
+                        onChange({
+                          orderCancellationWindow:
+                            value as StoreWizardData['orderCancellationWindow'],
+                        })
+                      }
+                      options={ORDER_CANCELLATION_WINDOWS}
+                      placeholder="Select cancellation window"
+                    />
                   </div>
 
                   <label className="flex items-start gap-3 p-3 rounded-lg bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -648,41 +613,33 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                   {data.customOrdersEnabled ? (
                     <>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Consultation Mode
-                        </label>
-                        <select
+                        <UniversalSelect
+                          label="Consultation Mode"
                           value={data.customOrderConsultationMode}
-                          onChange={(e) =>
+                          onChange={(value) =>
                             onChange({
-                              customOrderConsultationMode: e.target.value as StoreWizardData['customOrderConsultationMode'],
+                              customOrderConsultationMode:
+                                value as StoreWizardData['customOrderConsultationMode'],
                             })
                           }
-                          className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
-                        >
-                          {CUSTOM_ORDER_CONSULTATION_MODES.map((mode) => (
-                            <option key={mode.value} value={mode.value}>
-                              {mode.label}
-                            </option>
-                          ))}
-                        </select>
+                          options={CUSTOM_ORDER_CONSULTATION_MODES}
+                          placeholder="Select consultation mode"
+                        />
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Typical Custom-Order Lead Time
-                        </label>
-                        <select
+                        <UniversalSelect
+                          label="Typical Custom-Order Lead Time"
                           value={data.customOrderLeadTime}
-                          onChange={(e) => onChange({ customOrderLeadTime: e.target.value as StoreWizardData['customOrderLeadTime'] })}
-                          className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
-                        >
-                          {CUSTOM_ORDER_LEAD_TIMES.map((leadTime) => (
-                            <option key={leadTime.value} value={leadTime.value}>
-                              {leadTime.label}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(value) =>
+                            onChange({
+                              customOrderLeadTime:
+                                value as StoreWizardData['customOrderLeadTime'],
+                            })
+                          }
+                          options={CUSTOM_ORDER_LEAD_TIMES}
+                          placeholder="Select lead time"
+                        />
                       </div>
 
                       <label className="flex items-start gap-3 p-3 rounded-lg bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -725,7 +682,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                   </button>
 
                   {expandedSections.sizeChart && (
-                  <div className="grid md:grid-cols-2 gap-4 mt-4">
+                  <div className="grid gap-4 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)] mt-4 items-start">
                     {/* Preset cards */}
                     <div className="space-y-3">
                       {SIZE_CHARTS.map((chart, index) => {
@@ -801,7 +758,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                     </div>
 
                     {/* Preview */}
-                    <div className="rounded-xl border border-dashed border-gray-300 dark:border-white/10 bg-white dark:bg-black/10 p-4 h-full">
+                    <div className="rounded-xl border border-dashed border-gray-300 dark:border-white/10 bg-white dark:bg-black/10 p-5 h-full min-h-[280px]">
                       {data.sizeChartUrl ? (
                         <div className="relative">
                           <div className="text-xs text-gray-500 mb-2 flex items-center gap-2">
@@ -835,23 +792,23 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                               <span className="text-gray-600 dark:text-gray-400">Preview</span>
                             </div>
                           </div>
-                          <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
-                            <table className="min-w-full text-xs text-left text-gray-700 dark:text-gray-200">
+                          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/10">
+                            <table className="min-w-[560px] w-full text-xs text-left text-gray-700 dark:text-gray-200">
                               <thead className="bg-gray-100 dark:bg-white/5 text-[11px] uppercase tracking-wide text-gray-600 dark:text-gray-400">
                                 <tr>
-                                  <th className="px-3 py-2">Size</th>
-                                  <th className="px-3 py-2">Bust</th>
-                                  <th className="px-3 py-2">Waist</th>
-                                  <th className="px-3 py-2">Hip</th>
+                                  <th className="px-4 py-3">Size</th>
+                                  <th className="px-4 py-3">Bust</th>
+                                  <th className="px-4 py-3">Waist</th>
+                                  <th className="px-4 py-3">Hip</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {selectedPreset.rows.map((row) => (
                                   <tr key={row.size} className="odd:bg-white even:bg-gray-50 dark:odd:bg-black/30 dark:even:bg-black/20">
-                                    <td className="px-3 py-2 font-medium">{row.size}</td>
-                                    <td className="px-3 py-2">{row.bust}</td>
-                                    <td className="px-3 py-2">{row.waist}</td>
-                                    <td className="px-3 py-2">{row.hip}</td>
+                                    <td className="px-4 py-3 font-medium">{row.size}</td>
+                                    <td className="px-4 py-3">{row.bust}</td>
+                                    <td className="px-4 py-3">{row.waist}</td>
+                                    <td className="px-4 py-3">{row.hip}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -882,22 +839,13 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
 
                   {/* Response Time SLA */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Response Time Commitment
-                    </label>
-                    <select
+                    <UniversalSelect
+                      label="Response Time Commitment"
                       value={data.responseTimeSla}
-                      onChange={(e) =>
-                        onChange({ responseTimeSla: e.target.value })
-                      }
-                      className="select-threadly w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
-                    >
-                      {RESPONSE_SLAS.map((sla) => (
-                        <option key={sla.value} value={sla.value}>
-                          {sla.label}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => onChange({ responseTimeSla: value })}
+                      options={RESPONSE_SLAS}
+                      placeholder="Select response commitment"
+                    />
                     {/* Preview badge */}
                     <div className="p-3 rounded-lg bg-purple-600/5 border border-purple-500/20">
                       <div className="flex items-center gap-2 text-sm">
@@ -917,18 +865,38 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
 
                   {/* Contact Email */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Contact Email
-                    </label>
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Contact Email
+                      </label>
+                      {isSettingsMode ? (
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                          Editable in settings
+                        </span>
+                      ) : (
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+                          System filled
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="email"
                       value={data.contactEmail}
-                      onChange={(e) =>
-                        onChange({ contactEmail: e.target.value })
-                      }
-                      placeholder="support@yourbrand.com"
-                      className="w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
+                      onChange={isSettingsMode ? (e) => onChange({ contactEmail: e.target.value }) : undefined}
+                      readOnly={!isSettingsMode}
+                      aria-readonly={!isSettingsMode}
+                      placeholder={isSettingsMode ? 'support@yourbrand.com' : 'Pulled from your verified profile email'}
+                      className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none ${
+                        isSettingsMode
+                          ? 'border-gray-300 bg-white text-gray-900 focus:border-purple-500 dark:border-white/10 dark:bg-black/30 dark:text-white'
+                          : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-500 dark:border-white/10 dark:bg-black/20 dark:text-gray-400'
+                      }`}
                     />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {isSettingsMode
+                        ? 'Used for customer support replies and store contact details.'
+                        : 'This email is pulled from your profile and locked during setup. Update it from Settings if it changes.'}
+                    </p>
                   </div>
                 </div>
               </div>

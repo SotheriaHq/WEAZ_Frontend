@@ -5,7 +5,7 @@ import AdminTaxonomyPage from './AdminTaxonomyPage';
 const AdminMeasurementsPage: React.FC = () => {
   return (
     <>
-      <AdminBreadcrumb segments={[{ label: 'Measurements' }]} />
+      <AdminBreadcrumb segments={[{ label: 'Measurement Points' }]} />
       <AdminTaxonomyPage />
     </>
   );

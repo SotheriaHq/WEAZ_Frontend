@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 
 export interface UniversalSelectOption {
@@ -17,7 +17,19 @@ interface UniversalSelectProps {
   disabled?: boolean;
   className?: string;
   error?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
+  optionCompact?: boolean;
+  optionAllowWrap?: boolean;
 }
+
+const normalizeSearchText = (value: string): string =>
+  String(value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const UniversalSelect: React.FC<UniversalSelectProps> = ({
   label,
@@ -28,11 +40,32 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   disabled = false,
   className = '',
   error,
+  searchable = false,
+  searchPlaceholder = 'Search options...',
+  emptyMessage = 'No matching options',
+  optionCompact = false,
+  optionAllowWrap = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
+
+  const filteredOptions = useMemo(() => {
+    if (!searchable) return options;
+    const query = normalizeSearchText(searchTerm);
+    if (!query) return options;
+
+    const queryTokens = query.split(' ');
+
+    return options.filter((option) => {
+      const haystack = normalizeSearchText(
+        `${option.label} ${option.description ?? ''} ${option.value}`,
+      );
+      return queryTokens.every((token) => haystack.includes(token));
+    });
+  }, [options, searchable, searchTerm]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -44,6 +77,12 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen && searchTerm) {
+      setSearchTerm('');
+    }
+  }, [isOpen, searchTerm]);
 
   const handleSelect = (optionValue: string) => {
     if (disabled) return;
@@ -96,33 +135,56 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
 
         {isOpen && (
           <div className="absolute z-50 mt-2 max-h-60 w-full overflow-auto rounded-xl bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-white/10 shadow-xl ring-1 ring-black ring-opacity-5 focus:outline-none animate-in fade-in zoom-in-95 duration-100 scrollbar-hide">
+            {searchable && (
+              <div className="sticky top-0 z-10 border-b border-gray-100 bg-white px-2 py-2 dark:border-white/10 dark:bg-[#0a0a0a]">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-purple-400 dark:border-white/10 dark:bg-black/40 dark:text-white dark:focus:border-purple-400"
+                />
+              </div>
+            )}
             <div className="p-1">
-              {options.map((option) => {
+              {filteredOptions.map((option) => {
                 const isSelected = option.value === value;
                 return (
                   <div
                     key={option.value}
                     onClick={() => handleSelect(option.value)}
                     className={`
-                      relative cursor-pointer select-none rounded-lg py-2.5 pl-3 pr-9 transition-colors
+                      relative cursor-pointer select-none rounded-lg ${optionCompact ? 'py-2 pl-2.5 pr-8' : 'py-2.5 pl-3 pr-9'} transition-colors
                       ${isSelected 
                         ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-900 dark:text-purple-100' 
                         : 'text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-white/5'
                       }
                     `}
                   >
-                    <div className="flex items-center">
+                    <div className={`flex ${optionAllowWrap ? 'items-start' : 'items-center'}`}>
                       {option.icon && (
-                        <span className={`mr-3 flex-shrink-0 ${isSelected ? 'text-purple-500' : 'text-gray-400'}`}>
+                        <span className={`mr-3 mt-0.5 flex-shrink-0 ${isSelected ? 'text-purple-500' : 'text-gray-400'}`}>
                           {option.icon}
                         </span>
                       )}
-                      <div className="flex flex-col">
-                        <span className={`block truncate ${isSelected ? 'font-semibold' : 'font-normal'}`}>
+                      <div className="flex min-w-0 flex-col">
+                        <span
+                          className={`block ${
+                            optionAllowWrap
+                              ? 'text-sm leading-5 whitespace-normal break-words'
+                              : 'truncate'
+                          } ${isSelected ? 'font-semibold' : 'font-normal'}`}
+                        >
                           {option.label}
                         </span>
                         {option.description && (
-                          <span className={`block truncate text-xs ${isSelected ? 'text-purple-700 dark:text-purple-300' : 'text-gray-500 dark:text-gray-400'}`}>
+                          <span
+                            className={`block ${
+                              optionAllowWrap
+                                ? 'text-[11px] leading-4 whitespace-normal break-words'
+                                : 'truncate text-xs'
+                            } ${isSelected ? 'text-purple-700 dark:text-purple-300' : 'text-gray-500 dark:text-gray-400'}`}
+                          >
                             {option.description}
                           </span>
                         )}
@@ -137,6 +199,11 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                   </div>
                 );
               })}
+              {filteredOptions.length === 0 && (
+                <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
+                  {emptyMessage}
+                </div>
+              )}
             </div>
           </div>
         )}

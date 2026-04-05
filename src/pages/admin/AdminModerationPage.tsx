@@ -1,10 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { adminModerationApi, adminReviewsApi } from '@/api/AdminApi';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { toast } from 'sonner';
 import { unwrapApiResponse } from '@/types/auth';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
 
 type ModerationTab = 'queue' | 'reviews' | 'reports';
 type ReviewModerationAction = 'KEEP' | 'HIDE' | 'RESTORE' | 'DELETE';
@@ -74,6 +76,8 @@ const REVIEW_ACTION_LABELS: Record<ReviewModerationAction, string> = {
 
 const AdminModerationPage: React.FC = () => {
   const { hasPermission } = useAdminPermissions();
+  const notifications = useSelector((state: RootState) => state.notifications.items);
+  const lastMeasurementNotificationIdRef = useRef<string | null>(null);
   const [activeTab, setActiveTab] = useState<ModerationTab>('queue');
   const [reviewStatusFilter, setReviewStatusFilter] = useState('');
   const [genericQueue, setGenericQueue] = useState<GenericQueueItem[]>([]);
@@ -97,7 +101,37 @@ const AdminModerationPage: React.FC = () => {
     if (Array.isArray(data)) {
       return data as GenericQueueItem[];
     }
-    return ((data as { items?: GenericQueueItem[] })?.items ?? []) as GenericQueueItem[];
+
+    const items = ((data as { items?: GenericQueueItem[] })?.items ?? []) as GenericQueueItem[];
+    if (items.length > 0) {
+      return items;
+    }
+
+    const freeformPoints = Array.isArray((data as { freeformPoints?: any[] })?.freeformPoints)
+      ? (data as { freeformPoints: any[] }).freeformPoints
+      : [];
+    const sizeCharts = Array.isArray((data as { sizeCharts?: any[] })?.sizeCharts)
+      ? (data as { sizeCharts: any[] }).sizeCharts
+      : [];
+
+    return [
+      ...freeformPoints.map((point) => ({
+        id: point.id,
+        type: 'Measurement Point',
+        name: point.label ?? point.key ?? point.id,
+        createdAt: point.createdAt,
+      })),
+      ...sizeCharts.map((chart) => ({
+        id: chart.id,
+        type: 'Size Chart',
+        name: chart.notes?.trim() || `Version ${chart.version}`,
+        createdAt: chart.createdAt,
+      })),
+    ].sort((left, right) => {
+      const leftTime = left.createdAt ? new Date(left.createdAt).getTime() : 0;
+      const rightTime = right.createdAt ? new Date(right.createdAt).getTime() : 0;
+      return rightTime - leftTime;
+    });
   }, []);
 
   const fetchReviewQueue = useCallback(async () => {
@@ -137,6 +171,22 @@ const AdminModerationPage: React.FC = () => {
   useEffect(() => {
     void loadActiveTab();
   }, [loadActiveTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'queue') return;
+
+    const latestMeasurementNotification = notifications.find((notification) => {
+      const payload = notification.payload as Record<string, unknown> | undefined;
+      return notification.type === 'ADMIN_ACTION' && payload?.action === 'MEASUREMENT_FREEFORM_SUBMITTED';
+    });
+
+    if (!latestMeasurementNotification) return;
+    if (lastMeasurementNotificationIdRef.current === latestMeasurementNotification.id) return;
+
+    lastMeasurementNotificationIdRef.current = latestMeasurementNotification.id;
+
+    void loadActiveTab();
+  }, [activeTab, loadActiveTab, notifications]);
 
   const metrics = useMemo(
     () => ({

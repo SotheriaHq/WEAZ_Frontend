@@ -33,7 +33,7 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
       <Sidebar overlayOnly />
       <StudioSidebar active={active} onSelect={onSelect} />
 
-      <div className="min-h-screen px-3 pb-28 pt-20 sm:px-4 lg:pb-10 lg:pl-[236px]">
+      <div className="min-h-screen px-3 pb-28 pt-20 sm:px-4 xl:pb-10 xl:pl-[236px]">
         <div className="mx-auto max-w-6xl min-w-0">{children}</div>
       </div>
     </div>

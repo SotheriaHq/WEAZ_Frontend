@@ -27,6 +27,7 @@ interface NotificationSettingsData {
   brand: {
     patchRequests: boolean;
     contributions: boolean;
+    verificationPrompts: boolean;
   };
   orders: {
     placed: boolean;
@@ -148,6 +149,7 @@ const NotificationSettings: React.FC = () => {
       items: [
         { id: 'patchRequests', label: 'Brand Patch Requests', description: 'When another brand wants to connect with you' },
         { id: 'contributions', label: 'Contribution Requests', description: 'When a patched brand invites you to contribute' },
+        { id: 'verificationPrompts', label: 'Store Verification Prompts', description: 'After store setup, show a success reminder that prompts brand verification' },
       ],
     },
     {

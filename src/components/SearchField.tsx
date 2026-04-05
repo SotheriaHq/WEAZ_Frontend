@@ -17,6 +17,7 @@ interface SearchFieldProps {
   inputRef?: React.RefObject<HTMLInputElement | null>;
   filterItems?: Array<{ label: string; value: string }>;
   onFilterSelect?: (value: string) => void;
+  submitOnEnter?: boolean;
   ariaControls?: string;
   ariaActiveDescendant?: string;
   ariaAutocomplete?: 'list' | 'none';
@@ -40,6 +41,7 @@ const SearchField: React.FC<SearchFieldProps> = ({
   inputRef,
   filterItems,
   onFilterSelect,
+  submitOnEnter = true,
   ariaControls,
   ariaActiveDescendant,
   ariaAutocomplete = 'none',
@@ -124,7 +126,11 @@ const SearchField: React.FC<SearchFieldProps> = ({
           onBlur={() => setIsFocused(false)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
-              onSubmit?.(inputValue);
+              if (submitOnEnter) {
+                onSubmit?.(inputValue);
+              } else {
+                event.preventDefault();
+              }
             }
             onKeyDown?.(event);
           }}

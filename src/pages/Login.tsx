@@ -20,6 +20,7 @@ import {
 } from '@/lib/passwordPolicy';
 import Modal from '@/components/ui/Modal';
 import VLoader from '@/components/loaders/VLoader';
+import BrandWordmark from '@/components/brand/BrandWordmark';
 import '../styles/auth.css';
 
 const loginSchema = z.object({
@@ -44,10 +45,11 @@ const LoadingScreen = () => (
   <div className="fixed inset-0 bg-brand-dark flex items-center justify-center z-50">
     <div className="text-center">
       <div className="flex items-center justify-center gap-3 mb-6">
-        <div className="w-12 h-12 rounded-full bg-brand-gold flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.5)]">
-          <span className="font-serif text-2xl font-bold text-[#0a0a0a]">T</span>
-        </div>
-        <span className="text-3xl font-serif font-bold text-white">Threadly</span>
+        <BrandWordmark
+          logoSize={48}
+          logoClassName="drop-shadow-[0_0_20px_rgba(212,175,55,0.45)]"
+          textClassName="text-3xl font-serif font-bold text-white"
+        />
       </div>
       <div className="flex space-x-2 justify-center mb-4">
         <div className="w-3 h-3 bg-[#6B21A8] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
@@ -423,12 +425,11 @@ const LoginPage = () => {
           {/* Logo */}
           <div className="relative z-10">
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-2xl shadow-[0_0_15px_rgba(212,175,55,0.4)]">
-                T
-              </div>
-              <span className="text-2xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors">
-                Threadly
-              </span>
+              <BrandWordmark
+                logoSize={40}
+                logoClassName="drop-shadow-[0_0_14px_rgba(212,175,55,0.35)]"
+                textClassName="text-2xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+              />
             </Link>
           </div>
 
@@ -453,10 +454,11 @@ const LoginPage = () => {
         <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12 relative z-10">
           {/* Mobile Logo */}
           <Link to="/" className="lg:hidden absolute top-8 left-8 flex items-center gap-3 group">
-            <div className="w-8 h-8 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-lg shadow-[0_0_12px_rgba(212,175,55,0.4)] group-hover:shadow-[0_0_20px_rgba(212,175,55,0.6)] transition-shadow">
-              T
-            </div>
-            <span className="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors">Threadly</span>
+            <BrandWordmark
+              logoSize={32}
+              logoClassName="drop-shadow-[0_0_12px_rgba(212,175,55,0.45)] group-hover:drop-shadow-[0_0_18px_rgba(212,175,55,0.6)] transition-[filter]"
+              textClassName="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+            />
           </Link>
 
           <div className="w-full max-w-md mt-16 lg:mt-0">

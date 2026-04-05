@@ -552,6 +552,9 @@ export interface BrandStoreInfo {
 export interface StoreStatusResponse {
   brandId: string;
   isStoreOpen: boolean;
+  isEmailVerified?: boolean;
+  isProfileComplete?: boolean;
+  profileMissingFields?: string[];
   isSetupComplete: boolean;
   missingFields: string[];
   profile: {
@@ -643,6 +646,7 @@ export interface StoreWalletPayoutItem {
 export interface StoreWalletResponse {
   brandId: string;
   currency: string;
+  paymentAccount?: StorePaymentAccountSummary | null;
   summary: {
     availableForPayout: number;
     heldInEscrow: number;
@@ -707,6 +711,22 @@ export interface StorePaymentAccountUpdateData {
   primaryContactName?: string;
   primaryContactEmail?: string;
   primaryContactPhone?: string;
+}
+
+export interface StorePaymentAccountVerificationData {
+  bankCode: string;
+  accountNumber: string;
+}
+
+export interface StorePaymentAccountVerificationResponse {
+  bankCode: string;
+  bankName: string;
+  paystackBankId: number | null;
+  accountNumber: string;
+  maskedAccountNumber: string | null;
+  accountName: string | null;
+  message: string;
+  verifiedAt: string;
 }
 
 export interface StoreProfileUpdateData {
@@ -892,6 +912,13 @@ export const updateStorePaymentAccount = async (
   return extractData<StorePaymentAccountResponse>(res);
 };
 
+export const verifyStorePaymentAccount = async (
+  data: StorePaymentAccountVerificationData,
+): Promise<StorePaymentAccountVerificationResponse> => {
+  const res = await apiClient.post('/store/payment-account/verify', data);
+  return extractData<StorePaymentAccountVerificationResponse>(res);
+};
+
 export const updateStorePolicies = async (
   data: StorePoliciesUpdateData
 ): Promise<StorePoliciesResponse> => {
@@ -1009,6 +1036,7 @@ export default {
   updateStoreName,
   getStoreStatus,
   listStorePaymentBanks,
+  verifyStorePaymentAccount,
   getStoreWallet,
   listStorePayouts,
   getStorePayoutDetail,

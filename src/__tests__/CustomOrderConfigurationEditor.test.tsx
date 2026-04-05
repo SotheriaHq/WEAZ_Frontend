@@ -1,7 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { createRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import CustomOrderConfigurationEditor from '@/components/custom-orders/CustomOrderConfigurationEditor';
+import CustomOrderConfigurationEditor, {
+  type CustomOrderConfigurationEditorHandle,
+} from '@/components/custom-orders/CustomOrderConfigurationEditor';
 
 const getStoreStatus = vi.fn();
 const listFabricRuleBases = vi.fn();
@@ -12,6 +15,16 @@ const createConfiguration = vi.fn();
 const updateConfiguration = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
+
+const defaultFabricRuleBasis = {
+  id: 'basis-1',
+  label: 'Dress block',
+  measurementKeys: ['bust', 'waist'],
+  status: 'BRAND_ONLY',
+  gender: 'WOMEN',
+  createdAt: '2026-03-12T00:00:00.000Z',
+  updatedAt: '2026-03-12T00:00:00.000Z',
+};
 
 vi.mock('@/api/StoreApi', () => ({
   getStoreStatus: (...args: unknown[]) => getStoreStatus(...args),
@@ -48,18 +61,9 @@ describe('CustomOrderConfigurationEditor', () => {
         tags: [],
       },
     });
-    listFabricRuleBases.mockResolvedValue([]);
+    listFabricRuleBases.mockResolvedValue([defaultFabricRuleBasis]);
     getActiveForProduct.mockResolvedValue(null);
     getActiveForDesign.mockResolvedValue(null);
-    createFabricRuleBasis.mockResolvedValue({
-      id: 'basis-1',
-      label: 'Dress block',
-      measurementKeys: ['bust', 'waist'],
-      status: 'BRAND_ONLY',
-      gender: 'WOMEN',
-      createdAt: '2026-03-12T00:00:00.000Z',
-      updatedAt: '2026-03-12T00:00:00.000Z',
-    });
     createConfiguration.mockResolvedValue({
       id: 'configuration-1',
       brandId: 'brand-1',
@@ -105,16 +109,18 @@ describe('CustomOrderConfigurationEditor', () => {
   it('shows the save-first state when the source has not been persisted yet', () => {
     render(<CustomOrderConfigurationEditor sourceType="PRODUCT" measurementKeys={['bust', 'waist']} />);
 
-    expect(screen.getByText('Save this product first. The custom-order configuration attaches to a persisted source id.')).toBeInTheDocument();
+    expect(screen.getByText('Save this item first so the custom-order settings can attach to it.')).toBeInTheDocument();
     expect(getStoreStatus).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Create configuration' })).not.toBeInTheDocument();
   });
 
-  it('creates a basis and saves a new custom-order configuration for a persisted source', async () => {
+  it('saves a new custom-order configuration for a persisted source', async () => {
     const user = userEvent.setup();
+    const editorRef = createRef<CustomOrderConfigurationEditorHandle>();
 
     render(
       <CustomOrderConfigurationEditor
+        ref={editorRef}
         sourceType="PRODUCT"
         sourceId="product-1"
         measurementKeys={['bust', 'waist']}
@@ -128,39 +134,70 @@ describe('CustomOrderConfigurationEditor', () => {
       expect(getActiveForProduct).toHaveBeenCalledWith('product-1');
     });
 
-    await user.type(screen.getByPlaceholderText('New basis label'), 'Dress block');
-    await user.click(screen.getByRole('button', { name: 'Create basis' }));
+    await user.type(screen.getByRole('textbox', { name: /buyer instructions/i }), 'Bring your final measurements.');
+    await user.type(screen.getByPlaceholderText('120000'), '120000');
+    await user.type(screen.getByPlaceholderText('10000'), '10000');
 
     await waitFor(() => {
-      expect(createFabricRuleBasis).toHaveBeenCalledWith({
-        label: 'Dress block',
-        measurementKeys: ['bust', 'waist'],
-        gender: 'WOMEN',
-      });
+      expect(editorRef.current).not.toBeNull();
+    });
+
+    await act(async () => {
+      const saved = await editorRef.current!.saveConfiguration();
+      expect(saved).toBe(true);
+    });
+
+    expect(createConfiguration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: 'PRODUCT',
+        sourceId: 'product-1',
+        buyerInstructionText: 'Bring your final measurements.',
+        requiredMeasurementKeys: ['bust', 'waist'],
+        fabricRuleBasisId: 'basis-1',
+        baseProductionCharge: '120000',
+        fabricCostPerYard: '10000',
+      }),
+    );
+
+    expect(screen.getByText('Configuration v1')).toBeInTheDocument();
+    expect(toastSuccess).toHaveBeenCalledWith('Custom-order configuration created.');
+  });
+
+  it('requires rush fee and rush lead days before saving when rush is enabled', async () => {
+    const user = userEvent.setup();
+    const editorRef = createRef<CustomOrderConfigurationEditorHandle>();
+
+    render(
+      <CustomOrderConfigurationEditor
+        ref={editorRef}
+        sourceType="PRODUCT"
+        sourceId="product-1"
+        measurementKeys={['bust', 'waist']}
+        measurementGender="WOMEN"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(getStoreStatus).toHaveBeenCalled();
+      expect(listFabricRuleBases).toHaveBeenCalledWith({ includeBrandOnly: true });
+      expect(getActiveForProduct).toHaveBeenCalledWith('product-1');
     });
 
     await user.type(screen.getByRole('textbox', { name: /buyer instructions/i }), 'Bring your final measurements.');
     await user.type(screen.getByPlaceholderText('120000'), '120000');
     await user.type(screen.getByPlaceholderText('10000'), '10000');
-    await user.click(screen.getByRole('button', { name: 'Create configuration' }));
+    await user.click(screen.getByRole('checkbox', { name: /rush ordering enabled/i }));
 
     await waitFor(() => {
-      expect(createConfiguration).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sourceType: 'PRODUCT',
-          sourceId: 'product-1',
-          buyerInstructionText: 'Bring your final measurements.',
-          requiredMeasurementKeys: ['bust', 'waist'],
-          fabricRuleBasisId: 'basis-1',
-          baseProductionCharge: '120000',
-          fabricCostPerYard: '10000',
-        }),
-      );
+      expect(editorRef.current).not.toBeNull();
     });
 
-    expect(toastSuccess).toHaveBeenCalledWith('Fabric-rule basis created.');
-    expect(toastSuccess).toHaveBeenCalledWith('Custom-order configuration created.');
-    expect(screen.getByText('Configuration v1')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Update configuration' })).toBeInTheDocument();
+    await act(async () => {
+      const saved = await editorRef.current!.saveConfiguration();
+      expect(saved).toBe(false);
+    });
+
+    expect(toastError).toHaveBeenCalledWith('Complete required fields: Rush fee, Rush production lead days');
+    expect(createConfiguration).not.toHaveBeenCalled();
   });
 });

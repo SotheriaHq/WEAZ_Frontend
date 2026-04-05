@@ -7,6 +7,8 @@ import {
   getPasswordLength,
   getPasswordPolicyErrorMessage,
 } from '@/lib/passwordPolicy';
+import BrandWordmark from '@/components/brand/BrandWordmark';
+import { COMPANY_NAME } from '@/lib/brand';
 import '../styles/auth.css';
 
 const ResetPasswordPage: React.FC = () => {
@@ -90,12 +92,11 @@ const ResetPasswordPage: React.FC = () => {
 
         <div className="flex flex-col min-h-screen items-center justify-center px-6 relative z-10">
           <Link to="/" className="absolute top-8 left-8 flex items-center gap-3 group">
-            <div className="w-8 h-8 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-lg shadow-[0_0_12px_rgba(212,175,55,0.4)]">
-              T
-            </div>
-            <span className="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors">
-              Threadly
-            </span>
+            <BrandWordmark
+              logoSize={32}
+              logoClassName="drop-shadow-[0_0_12px_rgba(212,175,55,0.45)]"
+              textClassName="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+            />
           </Link>
 
           <div className="w-full max-w-md">
@@ -148,12 +149,11 @@ const ResetPasswordPage: React.FC = () => {
       <div className="flex flex-col min-h-screen items-center justify-center px-6 relative z-10">
         {/* Logo */}
         <Link to="/" className="absolute top-8 left-8 flex items-center gap-3 group">
-          <div className="w-8 h-8 rounded-full bg-[var(--brand-accent)] flex items-center justify-center text-[var(--surface-primary)] font-serif font-bold text-lg shadow-[0_0_12px_rgba(212,175,55,0.4)] group-hover:shadow-[0_0_20px_rgba(212,175,55,0.6)] transition-shadow">
-            T
-          </div>
-          <span className="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors">
-            Threadly
-          </span>
+          <BrandWordmark
+            logoSize={32}
+            logoClassName="drop-shadow-[0_0_12px_rgba(212,175,55,0.45)] group-hover:drop-shadow-[0_0_18px_rgba(212,175,55,0.6)] transition-[filter]"
+            textClassName="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+          />
         </Link>
 
         <div className="w-full max-w-md">
@@ -301,7 +301,7 @@ const ResetPasswordPage: React.FC = () => {
                   Password reset successfully!
                 </h2>
                 <p className="text-sm text-gray-400 leading-relaxed mb-8">
-                  Your password has been updated. You can now sign in with your new password.
+                  Your password has been updated. You can now sign in to {COMPANY_NAME} with your new password.
                 </p>
                 <Link
                   to="/login"

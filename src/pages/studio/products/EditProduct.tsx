@@ -34,7 +34,9 @@ import {
 import { brandApi, type CategoryTypeOption } from "@/api/BrandApi";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
-import Select from "@/components/ui/Select";
+import UniversalSelect, {
+  type UniversalSelectOption,
+} from "@/components/forms/UniversalSelect";
 import Tag from "@/components/ui/Tag";
 import InfoTooltip from "@/components/ui/InfoTooltip";
 import { useConfirm } from "@/components/ui/useConfirm";
@@ -60,6 +62,7 @@ import {
   type CollectionPriceImpact,
 } from "@/api/StoreApi";
 import { emitProductStudioSync } from "@/utils/productStudioEvents";
+import { TourOverlay, type TourStep } from "@/components/ui/TourOverlay";
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -111,6 +114,41 @@ function buildVariantSku(
   const tail = tokens.length ? tokens.join("-") : `V${index + 1}`;
   return `${toSkuToken(baseSku)}-${tail}`;
 }
+
+const PRODUCT_VARIANT_SIZE_OPTIONS = [
+  "XXS",
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "XXL",
+  "XXXL",
+  "XXXXL",
+] as const;
+
+const PRODUCT_VARIANT_SIZE_ALIAS_MAP: Record<string, string> = {
+  XSM: "XS",
+  "2XL": "XXL",
+  "3XL": "XXXL",
+  "4XL": "XXXXL",
+};
+
+const PRODUCT_VARIANT_SIZE_LABELS = PRODUCT_VARIANT_SIZE_OPTIONS.join(", ");
+
+const normalizeProductVariantSize = (
+  value: string | null | undefined,
+): string | null => {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return null;
+  const compact = normalized.toUpperCase().replace(/[\s-]+/g, "");
+  const aliased = PRODUCT_VARIANT_SIZE_ALIAS_MAP[compact] ?? compact;
+  return PRODUCT_VARIANT_SIZE_OPTIONS.includes(
+    aliased as (typeof PRODUCT_VARIANT_SIZE_OPTIONS)[number],
+  )
+    ? aliased
+    : null;
+};
 
 type ShippingRegionOption = {
   code: string;
@@ -267,8 +305,7 @@ interface FormState {
   sizingMode: SizingMode;
   rtwSizeSystem: string;
   customMeasurementKeys: string[];
-  fitPreference: "SLIM" | "REGULAR" | "LOOSE" | "OVERSIZED" | "";
-  targetAgeGroup: "ADULT" | "CHILD";
+  customOrderEnabled: boolean;
 }
 
 const defaultFormState: FormState = {
@@ -302,9 +339,11 @@ const defaultFormState: FormState = {
   sizingMode: "NONE",
   rtwSizeSystem: "ALPHA",
   customMeasurementKeys: [],
-  fitPreference: "",
-  targetAgeGroup: "ADULT",
+  customOrderEnabled: false,
 };
+
+const STANDALONE_COLLECTION_VALUE = "__standalone__";
+
 
 // =====================
 // Currency Formatting
@@ -396,6 +435,23 @@ const EditProduct: React.FC = () => {
     fulfillment: true,
     additional: true,
   });
+  const [isTourActive, setIsTourActive] = useState(false);
+
+  // Auto-start the tour the first time a user opens the create-product page.
+  // Persisted in localStorage so it never shows again after the first visit.
+  useEffect(() => {
+    if (isEditMode) return;
+    if (localStorage.getItem('threadly_tour_product_create')) return;
+    const timer = window.setTimeout(() => setIsTourActive(true), 800);
+    return () => clearTimeout(timer);
+    // isEditMode is stable for the lifetime of this page instance
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleTourClose = useCallback(() => {
+    setIsTourActive(false);
+    localStorage.setItem('threadly_tour_product_create', '1');
+  }, []);
   const { confirm, ConfirmDialog: ConfirmModal } = useConfirm();
 
   // Taxonomy state (standalone category/sub-category/filters)
@@ -440,7 +496,7 @@ const EditProduct: React.FC = () => {
   const [pendingSaveDraft, setPendingSaveDraft] = useState(false);
   // Custom order: on new product, hidden by default. On edit, shown if a
   // configuration already exists (resolved via the editor's own load logic).
-  const [showCustomOrderForm, setShowCustomOrderForm] = useState(isEditMode);
+  const [showCustomOrderForm, setShowCustomOrderForm] = useState(false);
   const [pendingStatusOverride, setPendingStatusOverride] = useState<
     FormState["status"] | null
   >(null);
@@ -823,12 +879,12 @@ const EditProduct: React.FC = () => {
           customMeasurementKeys: Array.isArray(product.customMeasurementKeys)
             ? product.customMeasurementKeys
             : [],
-          fitPreference:
-            (product.fitPreference as FormState["fitPreference"]) || "",
-          targetAgeGroup:
-            (product.targetAgeGroup as FormState["targetAgeGroup"]) ||
-            "ADULT",
+          customOrderEnabled:
+            product.customOrderEnabled ?? product.customAvailable ?? false,
         });
+        setShowCustomOrderForm(
+          product.customOrderEnabled ?? product.customAvailable ?? false,
+        );
 
         setFilterSelection(normalizeFilterSelectionFromProduct(product));
 
@@ -911,6 +967,48 @@ const EditProduct: React.FC = () => {
       (categoryType) => categoryType.categoryId === form.taxonomyCategoryId,
     );
   }, [categoryTypes, form.taxonomyCategoryId, taxonomyCategories]);
+
+  const collectionSelectOptions = useMemo<UniversalSelectOption[]>(
+    () => [
+      {
+        value: STANDALONE_COLLECTION_VALUE,
+        label: 'No collection (standalone)',
+        description: 'Keep this product separate from a Store Collection.',
+      },
+      ...categories.map((category) => ({
+        value: category.id,
+        label: category.name,
+      })),
+    ],
+    [categories],
+  );
+
+  const taxonomyCategorySelectOptions = useMemo<UniversalSelectOption[]>(
+    () =>
+      taxonomyCategories.map((category) => ({
+        value: category.id,
+        label: category.name,
+        description:
+          category.types.length > 0
+            ? `${category.types.length} ${category.types.length === 1 ? 'sub-category' : 'sub-categories'}`
+            : 'No sub-categories yet',
+      })),
+    [taxonomyCategories],
+  );
+
+  const subCategorySelectOptions = useMemo<UniversalSelectOption[]>(
+    () => {
+      const scopedTypes = form.taxonomyCategoryId
+        ? selectedTaxonomyCategoryTypes
+        : availableCategoryTypes;
+
+      return scopedTypes.map((categoryType) => ({
+        value: categoryType.id,
+        label: categoryType.name,
+      }));
+    },
+    [availableCategoryTypes, form.taxonomyCategoryId, selectedTaxonomyCategoryTypes],
+  );
 
   useEffect(() => {
     if (!isCollectionFlow || !collectionContextId || categoriesLoading) return;
@@ -1071,11 +1169,21 @@ const EditProduct: React.FC = () => {
 
   const addMultipleSizesForColor = useCallback(
     (color: string, sizesStr: string) => {
-      const sizes = sizesStr
+      const rawSizes = sizesStr
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-      if (sizes.length === 0) return;
+      if (rawSizes.length === 0) return;
+      const unsupportedSizes = rawSizes.filter(
+        (size) => normalizeProductVariantSize(size) === null,
+      );
+      if (unsupportedSizes.length > 0) {
+        toast.error(`Use supported sizes only: ${PRODUCT_VARIANT_SIZE_LABELS}`);
+        return;
+      }
+      const sizes = rawSizes
+        .map((size) => normalizeProductVariantSize(size))
+        .filter((size): size is string => Boolean(size));
       const existing = form.variants.filter(
         (v) => (v.color ?? "").trim().toLowerCase() === color.trim().toLowerCase(),
       );
@@ -1196,6 +1304,40 @@ const EditProduct: React.FC = () => {
     [],
   );
 
+  const tourSteps = useMemo<TourStep[]>(
+    () => [
+      {
+        targetId: 'product-media-section',
+        title: 'Upload product media',
+        description:
+          'Add front, left, right, and back-view photos. Clear multi-angle images build buyer trust and reduce return requests.',
+        emoji: '🖼️',
+      },
+      {
+        targetId: 'product-category-section',
+        title: 'Category & sub-category',
+        description:
+          'Choose the main category, then the specific sub-category. This controls where the product appears in search and browse filters.',
+        emoji: '🏷️',
+      },
+      {
+        targetId: 'product-pricing-section',
+        title: 'Pricing & publish status',
+        description:
+          'Set the selling price, an optional compare-at price, and decide whether to publish now or keep as a draft.',
+        emoji: '💳',
+        onEnter: () =>
+          setCollapsedSections((prev) =>
+            prev.pricing ? { ...prev, pricing: false } : prev,
+          ),
+        enterDelay: 350,
+      },
+    ],
+    // setCollapsedSections is a stable useState setter — no dependency needed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   const notifyProductStudioSync = useCallback(
     (reason: string, syncedProductId?: string) => {
       emitProductStudioSync({
@@ -1240,6 +1382,40 @@ const EditProduct: React.FC = () => {
         mediaUrls.length > 0 ||
         pendingMediaFiles.length > 0,
       );
+      const invalidVariantSizes = Array.from(
+        new Set(
+          form.variants
+            .map((variant) => String(variant.size ?? "").trim())
+            .filter(
+              (size) =>
+                size.length > 0 && normalizeProductVariantSize(size) === null,
+            ),
+        ),
+      );
+      const hasMissingVariantSize = form.variants.some(
+        (variant) => String(variant.size ?? "").trim().length === 0,
+      );
+
+      if (form.variants.length === 0) {
+        toast.error(
+          "Add at least one size variant before saving this product.",
+        );
+        return;
+      }
+      if (hasMissingVariantSize) {
+        toast.error(`Each variant needs a supported size: ${PRODUCT_VARIANT_SIZE_LABELS}`);
+        return;
+      }
+      if (variantTotalStock <= 0) {
+        toast.error(
+          "Add stock to at least one size variant before saving this product.",
+        );
+        return;
+      }
+      if (invalidVariantSizes.length > 0) {
+        toast.error(`Supported sizes: ${PRODUCT_VARIANT_SIZE_LABELS}`);
+        return;
+      }
 
       if (!shouldValidatePublish) {
         if (!hasDraftContent) {
@@ -1293,10 +1469,6 @@ const EditProduct: React.FC = () => {
           form.compareAtPrice >= form.price
         ) {
           toast.error("Sale price must be less than the price");
-          return;
-        }
-        if (form.variants.length === 0) {
-          toast.error("At least one variant (color/size) is required so customers can add this product to their bag.");
           return;
         }
         if (hasDuplicateVariants) {
@@ -1387,6 +1559,23 @@ const EditProduct: React.FC = () => {
           // Collection flow should not block on store policy updates.
           persistPolicy: !isCollectionContext,
         });
+        const normalizedVariants =
+          form.variants.length > 0
+            ? form.variants.map((v, idx) => ({
+                ...v,
+                size: normalizeProductVariantSize(v.size) || undefined,
+                color: v.color?.trim() || undefined,
+                sku:
+                  (
+                    v.sku?.trim() || buildVariantSku(ensuredSku, v, idx)
+                  ).trim() || undefined,
+                price:
+                  typeof v.price === "number" && v.price > 0
+                    ? v.price
+                    : undefined,
+                stock: Number.isFinite(v.stock) ? v.stock : 0,
+              }))
+            : undefined;
 
         const payload: ProductCreateDto = {
           title: effectiveDraft
@@ -1424,6 +1613,7 @@ const EditProduct: React.FC = () => {
           status: finalStatus,
           isPhysicalProduct: form.isPhysicalProduct,
           customsRegion: resolvedCustomsRegion,
+          customOrderEnabled: form.customOrderEnabled,
           mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
           sizingMode: normalizeSizingMode(form.sizingMode),
           rtwSizeSystem:
@@ -1434,25 +1624,7 @@ const EditProduct: React.FC = () => {
             isCustomSizingMode(form.sizingMode)
               ? form.customMeasurementKeys
               : [],
-          fitPreference: form.fitPreference || undefined,
-          targetAgeGroup: form.targetAgeGroup,
-          variants:
-            form.variants.length > 0
-              ? form.variants.map((v, idx) => ({
-                  ...v,
-                  size: v.size?.trim() || undefined,
-                  color: v.color?.trim() || undefined,
-                  sku:
-                    (
-                      v.sku?.trim() || buildVariantSku(ensuredSku, v, idx)
-                    ).trim() || undefined,
-                  price:
-                    typeof v.price === "number" && v.price > 0
-                      ? v.price
-                      : undefined,
-                  stock: Number.isFinite(v.stock) ? v.stock : 0,
-                }))
-              : undefined,
+          variants: normalizedVariants,
         };
 
         if (isEditMode && productId) {
@@ -1619,6 +1791,23 @@ const EditProduct: React.FC = () => {
       const resolvedCustomsRegion = await syncShippingRegions({
         persistPolicy: !isCollectionContext,
       });
+      const normalizedVariants =
+        form.variants.length > 0
+          ? form.variants.map((v, idx) => ({
+              ...v,
+              size: normalizeProductVariantSize(v.size) || undefined,
+              color: v.color?.trim() || undefined,
+              sku:
+                (
+                  v.sku?.trim() || buildVariantSku(ensuredSku, v, idx)
+                ).trim() || undefined,
+              price:
+                typeof v.price === "number" && v.price > 0
+                  ? v.price
+                  : undefined,
+              stock: Number.isFinite(v.stock) ? v.stock : 0,
+            }))
+          : undefined;
 
       const payload: ProductCreateDto = {
         title: effectiveDraft
@@ -1652,6 +1841,7 @@ const EditProduct: React.FC = () => {
         status: statusToPersist,
         isPhysicalProduct: form.isPhysicalProduct,
         customsRegion: resolvedCustomsRegion,
+        customOrderEnabled: form.customOrderEnabled,
         mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
         sizingMode: normalizeSizingMode(form.sizingMode),
         rtwSizeSystem:
@@ -1662,25 +1852,7 @@ const EditProduct: React.FC = () => {
           isCustomSizingMode(form.sizingMode)
             ? form.customMeasurementKeys
             : [],
-        fitPreference: form.fitPreference || undefined,
-        targetAgeGroup: form.targetAgeGroup,
-        variants:
-          form.variants.length > 0
-            ? form.variants.map((v, idx) => ({
-                ...v,
-                size: v.size?.trim() || undefined,
-                color: v.color?.trim() || undefined,
-                sku:
-                  (
-                    v.sku?.trim() || buildVariantSku(ensuredSku, v, idx)
-                  ).trim() || undefined,
-                price:
-                  typeof v.price === "number" && v.price > 0
-                    ? v.price
-                    : undefined,
-                stock: Number.isFinite(v.stock) ? v.stock : 0,
-              }))
-            : undefined,
+        variants: normalizedVariants,
       };
 
       await productApi.updateProduct(productId!, payload);
@@ -2222,7 +2394,10 @@ const EditProduct: React.FC = () => {
           {/* LEFT COLUMN: Media (42% approx -> 5 cols) */}
           <div className="lg:col-span-5 space-y-6">
             {/* Media Gallery */}
-            <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-5">
+            <div
+              id="product-media-section"
+              className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-5 scroll-mt-24"
+            >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-white">
                   Media
@@ -2361,17 +2536,53 @@ const EditProduct: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                /* Empty state - Add first image */
                 <button
                   type="button"
                   onClick={() => mediaFileInputRef.current?.click()}
-                  className="aspect-[4/5] rounded-xl border-2 border-dashed border-gray-300 dark:border-white/20 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:border-purple-400/60 hover:bg-purple-50 dark:hover:bg-white/5 transition-all"
+                  className="group aspect-[4/5] w-full rounded-2xl border border-dashed border-slate-300/80 dark:border-white/15 bg-gradient-to-br from-white via-sky-50/80 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900 p-5 text-left shadow-[0_20px_50px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:border-sky-400/70 hover:shadow-[0_24px_70px_rgba(56,189,248,0.18)] dark:hover:shadow-[0_24px_70px_rgba(56,189,248,0.12)]"
                 >
-                  <Plus className="w-8 h-8 mb-2" />
-                  <span className="text-sm font-medium">Add images</span>
-                  <span className="text-xs text-gray-400 mt-1">
-                    Minimum 4, up to 6 images
-                  </span>
+                  <div className="flex h-full flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-sky-700 dark:text-sky-200">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500/10 text-xl group-hover:bg-sky-500/15 transition-colors">
+                          ✦
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold">Add your first product images</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Clear photos help buyers trust the listing.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 space-y-2">
+                        {[
+                          'Front, left, right, and back views',
+                          'One cover image so the product stands out',
+                          'Up to 6 images total',
+                        ].map((item) => (
+                          <div key={item} className="flex items-start gap-2 rounded-xl bg-white/70 dark:bg-white/5 px-3 py-2 text-sm text-slate-700 dark:text-slate-200">
+                            <span className="mt-0.5 text-sky-600">•</span>
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-900/5 dark:bg-white/5 px-3 py-2">
+                      <div>
+                        <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                          Tap to upload
+                        </p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Start with images, then add a video if needed.
+                        </p>
+                      </div>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500 text-white shadow-sm">
+                        <Plus className="h-4 w-4" />
+                      </span>
+                    </div>
+                  </div>
                 </button>
               )}
 
@@ -2451,114 +2662,115 @@ const EditProduct: React.FC = () => {
 
                   <div className="h-[360px] overflow-y-auto scrollbar-threadly-strong pr-1 sm:pr-2">
                     <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                        <div className="md:col-span-6">
-                          <label className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
-                            Collection (optional)
-                            <InfoTooltip text="Link this product to a Store Collection for grouped merchandising. Products can also exist standalone." />
-                          </label>
-                          <Select
-                            value={form.categoryId}
-                            onChange={(e) =>
-                              handleCollectionChange(e.target.value)
-                            }
-                            disabled={categoriesLoading || isCollectionFlow}
-                          >
-                            <option value="">No collection (standalone)</option>
-                            {categories.map((cat) => (
-                              <option key={cat.id} value={cat.id}>
-                                {cat.name}
-                              </option>
-                            ))}
-                          </Select>
-                        </div>
-
-                        <div className="md:col-span-6">
-                          <label className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
-                            Category
-                            <InfoTooltip text="The primary taxonomy category for this product (e.g., Women's Wear, Men's Wear). Helps with discovery and filtering." />
-                          </label>
-                          <Select
-                            value={form.taxonomyCategoryId}
-                            onChange={(e) => {
-                              updateForm("taxonomyCategoryId", e.target.value);
-                              updateForm("categoryTypeId", "");
-                            }}
-                            disabled={categoriesLoading}
-                          >
-                            <option value="">Select category</option>
-                            {taxonomyCategories.map((cat) => (
-                              <option key={cat.id} value={cat.id}>
-                                {cat.name}
-                              </option>
-                            ))}
-                          </Select>
-                        </div>
-
-                        <div className="md:col-span-6">
-                          <label className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
-                            Sub-Category
-                            <InfoTooltip text="A more specific type within the selected category (e.g., Evening Wear, Casual Tops)." />
-                          </label>
-                          <Select
-                            value={form.categoryTypeId}
-                            onChange={(e) =>
-                              updateForm("categoryTypeId", e.target.value)
-                            }
-                            disabled={
-                              !form.taxonomyCategoryId &&
-                              availableCategoryTypes.length === 0
-                            }
-                          >
-                            {(() => {
-                              const scoped = form.taxonomyCategoryId
-                                ? selectedTaxonomyCategoryTypes
-                                : availableCategoryTypes;
-                              if (scoped.length === 0) {
-                                return (
-                                  <option value="">
-                                    No sub-categories available
-                                  </option>
-                                );
+                      <div className="space-y-3" id="product-category-section">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                          <div className="md:col-span-6">
+                            <UniversalSelect
+                              label="Category"
+                              value={form.taxonomyCategoryId}
+                              onChange={(value) =>
+                                updateForm("taxonomyCategoryId", value)
                               }
-                              return [
-                                <option key="subcategory-placeholder" value="">
-                                  Select sub-category
-                                </option>,
-                                ...scoped.map((ct) => (
-                                  <option key={ct.id} value={ct.id}>
-                                    {ct.name}
-                                  </option>
-                                )),
-                              ];
-                            })()}
-                          </Select>
+                              options={taxonomyCategorySelectOptions}
+                              placeholder={
+                                categoriesLoading
+                                  ? 'Loading categories...'
+                                  : 'Select category'
+                              }
+                              disabled={
+                                categoriesLoading ||
+                                taxonomyCategorySelectOptions.length === 0
+                              }
+                              searchable
+                              emptyMessage="No categories available"
+                              optionAllowWrap
+                            />
+                          </div>
+
+                          <div className="md:col-span-6">
+                            <UniversalSelect
+                              label="Sub-Category"
+                              value={form.categoryTypeId}
+                              onChange={(value) =>
+                                updateForm("categoryTypeId", value)
+                              }
+                              options={subCategorySelectOptions}
+                              placeholder={
+                                form.taxonomyCategoryId ||
+                                availableCategoryTypes.length > 0
+                                  ? 'Select sub-category'
+                                  : 'Select a category first'
+                              }
+                              disabled={
+                                (!form.taxonomyCategoryId &&
+                                  availableCategoryTypes.length === 0 &&
+                                  subCategorySelectOptions.length === 0) ||
+                                categoriesLoading
+                              }
+                              searchable
+                              emptyMessage={
+                                form.taxonomyCategoryId ||
+                                availableCategoryTypes.length > 0
+                                  ? 'No sub-categories available'
+                                  : 'Select a category first'
+                              }
+                              optionAllowWrap
+                            />
+                          </div>
                         </div>
 
-                        <div className="md:col-span-6 flex items-start justify-between gap-3 rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2.5">
-                          <p className="text-[11px] text-gray-500">
-                            {categoriesLoading
-                              ? "Loading collections…"
-                              : categories.length
-                                ? "Choose a collection or keep this product standalone."
-                                : "No collections yet. This product can stay standalone."}
-                          </p>
-                          {!categoriesLoading && categories.length === 0 ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const suffix = productId
-                                  ? `?productId=${encodeURIComponent(productId)}`
-                                  : "";
-                                navigate(
-                                  `/studio/store/collections/new${suffix}`,
-                                );
-                              }}
-                              className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 transition-colors whitespace-nowrap"
-                            >
-                              Create collection
-                            </button>
-                          ) : null}
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                          <div className="md:col-span-8">
+                            <UniversalSelect
+                              label="Collection (optional)"
+                              value={
+                                form.categoryId || STANDALONE_COLLECTION_VALUE
+                              }
+                              onChange={(value) =>
+                                handleCollectionChange(
+                                  value === STANDALONE_COLLECTION_VALUE
+                                    ? ''
+                                    : value,
+                                )
+                              }
+                              options={collectionSelectOptions}
+                              placeholder={
+                                categoriesLoading
+                                  ? 'Loading collections...'
+                                  : 'No collection (standalone)'
+                              }
+                              disabled={categoriesLoading || isCollectionFlow}
+                              searchable
+                              emptyMessage="No collections available"
+                              optionAllowWrap
+                            />
+                          </div>
+
+                          <div className="md:col-span-4 flex items-start justify-between gap-3 rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2.5">
+                            <p className="text-[11px] text-gray-500">
+                              {categoriesLoading
+                                ? 'Loading collections…'
+                                : categories.length
+                                  ? 'Collections are optional. Use one only if this product belongs in a store collection.'
+                                  : 'No collections yet. This product can stay standalone.'}
+                            </p>
+                            {!categoriesLoading && categories.length === 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const suffix = productId
+                                    ? `?productId=${encodeURIComponent(productId)}`
+                                    : '';
+                                  navigate(
+                                    `/studio/store/collections/new${suffix}`,
+                                  );
+                                }}
+                                className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 transition-colors whitespace-nowrap"
+                              >
+                                Create collection
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
 
@@ -2678,7 +2890,10 @@ const EditProduct: React.FC = () => {
               </div>
               <div className="h-[460px] md:h-[520px] overflow-y-auto scrollbar-threadly-strong p-4 space-y-4">
                 {/* Pricing */}
-                <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
+                <div
+                  id="product-pricing-section"
+                  className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4 scroll-mt-24"
+                >
                   <div className="flex items-center justify-between gap-4">
                     <button
                       type="button"
@@ -2890,7 +3105,7 @@ const EditProduct: React.FC = () => {
                                   </span>
                                   <input
                                     type="text"
-                                    placeholder="e.g. S, M, L, XL, 6XL"
+                                    placeholder="e.g. XXS, XS, S, M, L, XL"
                                     className="flex-1 text-xs bg-transparent border-none outline-none text-gray-700 dark:text-gray-300 placeholder:text-gray-400"
                                     onKeyDown={(e) => {
                                       if (e.key === "Enter") {
@@ -3002,17 +3217,15 @@ const EditProduct: React.FC = () => {
                         })}
 
                         <datalist id="threadly-size-options">
+                          <option value="XXS" />
                           <option value="XS" />
                           <option value="S" />
                           <option value="M" />
                           <option value="L" />
                           <option value="XL" />
                           <option value="XXL" />
-                          <option value="3XL" />
-                          <option value="4XL" />
-                          <option value="5XL" />
-                          <option value="6XL" />
-                          <option value="One Size" />
+                          <option value="XXXL" />
+                          <option value="XXXXL" />
                         </datalist>
 
                         <div className="px-3 py-2 text-[11px] text-gray-500 dark:text-gray-400 flex items-center justify-between">
@@ -3040,14 +3253,6 @@ const EditProduct: React.FC = () => {
                   onCustomMeasurementKeysChange={(keys) =>
                     updateForm("customMeasurementKeys", keys)
                   }
-                  fitPreference={form.fitPreference}
-                  onFitPreferenceChange={(value) =>
-                    updateForm("fitPreference", value)
-                  }
-                  targetAgeGroup={form.targetAgeGroup}
-                  onTargetAgeGroupChange={(value) =>
-                    updateForm("targetAgeGroup", value)
-                  }
                 />
 
                 {/* Custom order toggle — keeps form hidden until brand opts in */}
@@ -3058,23 +3263,27 @@ const EditProduct: React.FC = () => {
                         Custom Order
                       </h2>
                       <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        Allow buyers to request this product with their own measurements.
+                        Allow buyers to request this product with their own measurements. Custom order does not replace the required stocked size variants.
                       </p>
                     </div>
                     <button
                       type="button"
                       role="switch"
-                      aria-checked={showCustomOrderForm}
-                      onClick={() => setShowCustomOrderForm((v) => !v)}
+                      aria-checked={form.customOrderEnabled}
+                      onClick={() => {
+                        const nextValue = !form.customOrderEnabled;
+                        updateForm("customOrderEnabled", nextValue);
+                        setShowCustomOrderForm(nextValue);
+                      }}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-                        showCustomOrderForm
+                        form.customOrderEnabled
                           ? 'bg-purple-600'
                           : 'bg-gray-200 dark:bg-gray-700'
                       }`}
                     >
                       <span
                         className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                          showCustomOrderForm ? 'translate-x-6' : 'translate-x-1'
+                          form.customOrderEnabled ? 'translate-x-6' : 'translate-x-1'
                         }`}
                       />
                     </button>
@@ -3491,6 +3700,13 @@ const EditProduct: React.FC = () => {
           isLoading={saving}
         />
       )}
+
+      {/* Spotlight tour — shown automatically on first visit (create mode) */}
+      <TourOverlay
+        steps={tourSteps}
+        isActive={isTourActive}
+        onClose={handleTourClose}
+      />
 
       {/* Discard Changes Modal - Premium styled */}
       <DiscardChangesModal

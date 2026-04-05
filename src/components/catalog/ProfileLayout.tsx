@@ -1,4 +1,5 @@
 import React, { lazy } from 'react';
+import { isAxiosError } from 'axios';
 import { Sidebar } from '../SideBar';
 import { Navbar } from '../Navbar';
 import ProfileHeaderSkeleton from '../profile/ProfileHeaderSkeleton';
@@ -7,10 +8,21 @@ import { EndUserProfile } from '../../pages/profile/EndUserProfile';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '@/context/AuthContext';
 import { closeSidebar, selectIsMobile, setSidebarMode } from '@/features/uiSlice';
+import { setUser } from '@/features/userSlice';
 import type { AppDispatch, RootState } from '@/store';
-import { useLocation, Navigate, Outlet, useParams } from 'react-router-dom';
+import {
+  useLocation,
+  Navigate,
+  Outlet,
+  useParams,
+  useSearchParams,
+  useNavigate,
+} from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/api/httpClient';
+import { unwrapApiResponse } from '@/types/auth';
+import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
+import { toast } from 'sonner';
 
 const Profile = lazy(() => import('../../pages/catalog/Catalog'));
 
@@ -23,18 +35,34 @@ const computeSidebarMode = (pathname: string, isMobile: boolean) => {
   return 'RAIL' as const;
 };
 
+const sanitizeNextPath = (path: string): string | null => {
+  if (!path) return null;
+  if (!path.startsWith('/') || path.startsWith('//')) return null;
+  return path;
+};
+
 export const ProfileLayout: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const { loading } = useAuth();
   const user = useSelector((state: RootState) => state.user.profile);
   const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
   const isMobile = useSelector(selectIsMobile);
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { id: routeBrandId } = useParams<{ id?: string }>();
 
   const isVisitorRoute = Boolean(routeBrandId);
   const [visitorType, setVisitorType] = useState<'BRAND' | 'REGULAR' | null>(null);
   const [visitorLoading, setVisitorLoading] = useState(false);
+  const [isRefreshingVerification, setIsRefreshingVerification] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
+
+  const verificationPromptContext = searchParams.get('verifyEmailPrompt') ?? '';
+  const verificationNextPath = useMemo(
+    () => sanitizeNextPath(searchParams.get('next')?.trim() ?? ''),
+    [searchParams],
+  );
 
   const computedSidebarMode = useMemo(
     () => computeSidebarMode(location.pathname, isMobile),
@@ -87,6 +115,108 @@ export const ProfileLayout: React.FC = () => {
 
   const isRail = computedSidebarMode === 'RAIL';
   const mainMarginLeft = isRail ? '72px' : '0px';
+  const showEmailVerificationPrompt = useMemo(() => {
+    if (isVisitorRoute) return false;
+    if (!user) return false;
+    if (user.isEmailVerified) return false;
+    return location.pathname === '/profile';
+  }, [isVisitorRoute, user, location.pathname]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const emailVerifiedFlag = searchParams.get('emailVerified');
+    const emailVerifiedMessage =
+      searchParams.get('emailVerifiedMessage')?.trim() ||
+      'Your email is verified successfully.';
+
+    let shouldCleanQuery = false;
+
+    if (emailVerifiedFlag === '1') {
+      toast.success(emailVerifiedMessage);
+      shouldCleanQuery = true;
+    }
+
+    if (verificationPromptContext === 'store-setup' && !user.isEmailVerified) {
+      toast.info(
+        'Verify your email before starting store setup. Check your inbox and click the verification link.',
+      );
+      shouldCleanQuery = true;
+    }
+
+    if (!shouldCleanQuery) return;
+
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('emailVerified');
+      next.delete('emailVerifiedMessage');
+      next.delete('verifyEmailPrompt');
+      return next;
+    }, { replace: true });
+  }, [searchParams, setSearchParams, user, verificationPromptContext]);
+
+  const refreshEmailVerificationStatus = async () => {
+    if (!user || isRefreshingVerification) return;
+
+    setIsRefreshingVerification(true);
+    try {
+      const response = await apiClient.get('/auth/profile');
+      const profilePayload = unwrapApiResponse<AuthProfileResponse | AuthUserDto>(response.data);
+      const refreshedUser =
+        'user' in profilePayload
+          ? (profilePayload as AuthProfileResponse).user
+          : (profilePayload as AuthUserDto);
+
+      if (!refreshedUser || !refreshedUser.id) {
+        toast.error('Unable to refresh your verification status right now.');
+        return;
+      }
+
+      dispatch(setUser(refreshedUser));
+
+      if (refreshedUser.isEmailVerified) {
+        toast.success('Your email is now verified.');
+        if (verificationNextPath) {
+          navigate(verificationNextPath, { replace: true });
+        }
+      } else {
+        toast.info('Email verification is still pending. Please click the link in your inbox.');
+      }
+    } catch {
+      toast.error('Unable to refresh your verification status right now.');
+    } finally {
+      setIsRefreshingVerification(false);
+    }
+  };
+
+  const resendVerificationEmail = async () => {
+    if (!user || isResendingVerification) return;
+
+    setIsResendingVerification(true);
+    try {
+      const response = await apiClient.post('/auth/verify-email/resend');
+      const payload =
+        (response.data?.data as { message?: string } | undefined) ??
+        (response.data as { message?: string } | undefined);
+
+      toast.success(
+        payload?.message ||
+          'Verification email sent. Please check your inbox and spam folder.',
+      );
+    } catch (error: unknown) {
+      let message =
+        'Unable to resend verification email right now. Please try again shortly.';
+      if (isAxiosError(error)) {
+        const data = error.response?.data as
+          | { message?: string; data?: { message?: string } }
+          | undefined;
+        message = data?.message || data?.data?.message || message;
+      }
+      toast.error(message);
+    } finally {
+      setIsResendingVerification(false);
+    }
+  };
 
   if (!isVisitorRoute) {
     if (loading && !user) {
@@ -158,6 +288,52 @@ export const ProfileLayout: React.FC = () => {
           className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
           style={{ marginLeft: mainMarginLeft }}
         >
+          {showEmailVerificationPrompt ? (
+            <div className="px-4 sm:px-6 pt-4">
+              <div className="rounded-2xl border border-purple-300/60 bg-purple-50/70 dark:bg-purple-500/10 dark:border-purple-400/30 px-4 sm:px-5 py-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-purple-800 dark:text-purple-200">
+                      {verificationPromptContext === 'store-setup'
+                        ? 'Verify your email before store setup'
+                        : 'Verify your email to secure your account'}
+                    </p>
+                    <p className="text-xs sm:text-sm text-purple-700/90 dark:text-purple-100/80 mt-1">
+                      {verificationPromptContext === 'store-setup'
+                        ? <>
+                            Store setup is locked until email verification is complete. We sent a verification link to <span className="font-semibold">{user?.email}</span>. Click it, then return here.
+                          </>
+                        : <>
+                            We sent a verification link to <span className="font-semibold">{user?.email}</span>. Click it, then come back and confirm below.
+                          </>}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={resendVerificationEmail}
+                      disabled={isResendingVerification}
+                      className="inline-flex items-center justify-center rounded-xl border border-purple-500/40 bg-white/80 dark:bg-transparent px-4 py-2 text-sm font-semibold text-purple-800 dark:text-purple-200 hover:bg-purple-100/70 dark:hover:bg-purple-500/20 disabled:opacity-70 disabled:cursor-not-allowed transition"
+                    >
+                      {isResendingVerification ? 'Resending...' : 'Resend Email'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={refreshEmailVerificationStatus}
+                      disabled={isRefreshingVerification}
+                      className="inline-flex items-center justify-center rounded-xl bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-strong)] disabled:opacity-70 disabled:cursor-not-allowed transition"
+                    >
+                      {isRefreshingVerification
+                        ? 'Checking...'
+                        : verificationNextPath
+                          ? 'I Have Verified - Continue'
+                          : 'I Have Verified'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="px-0 sm:px-2">
             {location.pathname === '/profile' ? (
               user?.type === 'BRAND' ? <Profile /> : <EndUserProfile />

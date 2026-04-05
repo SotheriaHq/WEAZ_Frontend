@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
 import type { RootState } from '@/store';
@@ -15,15 +15,27 @@ function clearModalSearchParams(searchParams: URLSearchParams): URLSearchParams 
   const next = new URLSearchParams(searchParams);
   next.delete('modal');
   next.delete('modalOrigin');
+  next.delete('next');
   return next;
+}
+
+function sanitizeNextPath(path: string): string | null {
+  if (!path) return null;
+  if (!path.startsWith('/') || path.startsWith('//')) return null;
+  return path;
 }
 
 export const GlobalModalRouter: React.FC = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
   const [searchParams, setSearchParams] = useSearchParams();
   const modal = searchParams.get('modal');
   const modalOrigin = searchParams.get('modalOrigin');
+  const nextPath = useMemo(
+    () => sanitizeNextPath(searchParams.get('next')?.trim() ?? ''),
+    [searchParams],
+  );
 
   const isBrandSetupOpen = modal === 'brand-setup';
   const showSkip = modalOrigin === 'prompt';
@@ -80,6 +92,10 @@ export const GlobalModalRouter: React.FC = () => {
         onSaved={async (updatedUser) => {
           dispatch(setUser(updatedUser));
           localStorage.removeItem(BRAND_SETUP_DISMISS_KEY);
+          if (nextPath) {
+            navigate(nextPath, { replace: true });
+            return;
+          }
           closeModal();
         }}
       />

@@ -821,10 +821,34 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     if (!payload.returnPolicy) missingRequiredFields.push('Return policy');
     if (!payload.defectPolicy) missingRequiredFields.push('Defect policy');
     if (payload.requiredMeasurementKeys.length === 0) missingRequiredFields.push('Required measurement keys');
+    if (form.rushEnabled) {
+      if (!form.rushFee.trim()) missingRequiredFields.push('Rush fee');
+      if (!form.rushProductionLeadDays.trim()) missingRequiredFields.push('Rush production lead days');
+    }
 
     if (missingRequiredFields.length > 0) {
       toast.error(`Complete required fields: ${missingRequiredFields.join(', ')}`);
       return false;
+    }
+
+    if (form.rushEnabled) {
+      const rushFeeValue = Number(form.rushFee);
+      if (!Number.isFinite(rushFeeValue) || rushFeeValue <= 0) {
+        toast.error('Rush fee must be a positive number.');
+        return false;
+      }
+
+      const rushProductionLeadDaysValue = Number(form.rushProductionLeadDays);
+      const productionLeadDaysValue = Number(form.productionLeadDays);
+      if (!Number.isFinite(rushProductionLeadDaysValue) || rushProductionLeadDaysValue < 5) {
+        toast.error('Rush production lead days must be at least 5.');
+        return false;
+      }
+
+      if (Number.isFinite(productionLeadDaysValue) && rushProductionLeadDaysValue >= productionLeadDaysValue) {
+        toast.error('Rush production lead time must be shorter than standard production lead time.');
+        return false;
+      }
     }
 
     setSaving(true);
@@ -870,7 +894,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     <section className="rounded-xl border border-black/10 bg-white/80 p-3 dark:border-white/10 dark:bg-white/5">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <p className="text-xs text-slate-600 dark:text-slate-300">
-          Configure the production charge, yard rules, and customer-facing policies.
+          Configure the production charge and customer-facing policies.
         </p>
         <div className="rounded-full border border-black/10 px-2.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200">
           {configuration ? `Configuration v${configuration.currentVersion}` : 'No config yet'}
@@ -879,7 +903,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
 
       {!sourceId ? (
         <div className="mt-5 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-4 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
-          {`Save this ${sourceType.toLowerCase()} first. The custom-order configuration attaches to a persisted source id.`}
+          Save this item first so the custom-order settings can attach to it.
         </div>
       ) : null}
 
@@ -922,8 +946,8 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         </label>
         <label className="block">
           <span className={requiredFieldLabelClassName}>
-            Fabric / yard <span className="text-rose-500">*</span>
-            <span className={infoBadgeClassName} title="Cost of fabric per yard used by the yard-rule engine.">i</span>
+            Material cost per yard <span className="text-rose-500">*</span>
+            <span className={infoBadgeClassName} title="Estimated material cost used when pricing custom orders.">i</span>
           </span>
           <input value={form.fabricCostPerYard} onChange={(event) => updateForm('fabricCostPerYard', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="10000" />
         </label>
@@ -1084,27 +1108,24 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             Add key
           </button>
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-          <UniversalSelect
-            value={form.fabricRuleBasisId}
-            onChange={(value) => updateForm('fabricRuleBasisId', String(value))}
-            options={basisOptions}
-            placeholder="Select a fabric-rule basis"
-            disabled={disabled}
-            className="w-full"
-          />
-          <button type="button" onClick={handleCreateBasis} disabled={disabled || saving} className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white">
-            Create basis
-          </button>
-        </div>
-        {bases.length === 0 ? (
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            No basis options yet. Create one after selecting the measurement keys this outfit requires.
-          </p>
+        {false ? (
+          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+            <UniversalSelect
+              value={form.fabricRuleBasisId}
+              onChange={(value) => updateForm('fabricRuleBasisId', String(value))}
+              options={basisOptions}
+              placeholder="Select a fabric-rule basis"
+              disabled={disabled}
+              className="w-full"
+            />
+            <button type="button" onClick={handleCreateBasis} disabled={disabled || saving} className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white">
+              Create basis
+            </button>
+          </div>
         ) : null}
-        <input value={basisLabel} onChange={(event) => setBasisLabel(event.target.value)} disabled={disabled} placeholder="New basis label" className={`${fieldClassName} mt-3`} />
       </div>
 
+      {false ? (
       <details className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10" open>
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
           Brand yard setup <span className="text-rose-500">*</span>
@@ -1193,6 +1214,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           </button>
         </div>
       </details>
+      ) : null}
 
       <details className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10">
         <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900 dark:text-white">Policies, Rush, and Internal Notes</summary>
@@ -1211,9 +1233,40 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         />
         {form.rushEnabled ? (
           <>
-            <input value={form.rushFee} onChange={(event) => updateForm('rushFee', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="Rush fee" />
-            <input value={form.rushProductionLeadDays} onChange={(event) => updateForm('rushProductionLeadDays', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="Rush production lead days" />
+            <label className="space-y-2">
+              <span className={requiredFieldLabelClassName}>
+                Rush fee <span className="text-rose-500">*</span>
+                <span className={infoBadgeClassName} title="Extra amount charged when the buyer selects rush production.">i</span>
+              </span>
+              <input
+                value={form.rushFee}
+                onChange={(event) => updateForm('rushFee', event.target.value)}
+                disabled={disabled}
+                className={fieldClassName}
+                placeholder="Rush fee"
+                inputMode="decimal"
+              />
+            </label>
+            <label className="space-y-2">
+              <span className={requiredFieldLabelClassName}>
+                Rush production lead days <span className="text-rose-500">*</span>
+                <span className={infoBadgeClassName} title="Must be shorter than the standard lead time and at least 5 days.">i</span>
+              </span>
+              <input
+                value={form.rushProductionLeadDays}
+                onChange={(event) => updateForm('rushProductionLeadDays', event.target.value)}
+                disabled={disabled}
+                className={fieldClassName}
+                placeholder="Rush production lead days"
+                inputMode="numeric"
+              />
+            </label>
           </>
+        ) : null}
+        {form.rushEnabled ? (
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 sm:col-span-2 xl:col-span-3">
+            Required when rush ordering is enabled.
+          </p>
         ) : null}
       </div>
 
@@ -1234,6 +1287,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             }}
             disabled={disabled}
             options={revisionPolicyOptions}
+            optionAllowWrap
             className="w-full"
           />
           <textarea value={form.revisionPolicy} onChange={(event) => updateForm('revisionPolicy', event.target.value)} disabled={disabled} rows={2} className={fieldClassName} placeholder="Revision policy details" />
@@ -1254,6 +1308,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             }}
             disabled={disabled}
             options={returnPolicyOptions}
+            optionAllowWrap
             className="w-full"
           />
           <textarea value={form.returnPolicy} onChange={(event) => updateForm('returnPolicy', event.target.value)} disabled={disabled} rows={2} className={fieldClassName} placeholder="Return policy details" />
@@ -1274,6 +1329,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             }}
             disabled={disabled}
             options={defectPolicyOptions}
+            optionAllowWrap
             className="w-full"
           />
           <textarea value={form.defectPolicy} onChange={(event) => updateForm('defectPolicy', event.target.value)} disabled={disabled} rows={2} className={fieldClassName} placeholder="Defect policy details" />

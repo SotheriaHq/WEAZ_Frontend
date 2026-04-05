@@ -5,11 +5,10 @@ import { ArrowRight, Sparkles, Store, CheckCircle2, Circle } from 'lucide-react'
 import type { RootState } from '@/store';
 import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
 import Input from '@/components/ui/Input';
+import { saveStoreProgressLocally } from '@/utils/storeSetup';
 
 const MAX_CATEGORIES = 3;
 const MAX_DESCRIPTION = 500;
-const LOCAL_PROGRESS_KEY = 'store-progress';
-
 const normalizeToken = (value: string): string => value.trim().toLowerCase();
 
 const normalizeCategorySelection = (
@@ -184,7 +183,7 @@ const StoreEssentials: React.FC = () => {
       };
 
       try {
-        localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(localProgress));
+        saveStoreProgressLocally(localProgress, user?.id);
       } catch {
         // ignore storage errors; onboarding can still continue
       }
@@ -198,7 +197,7 @@ const StoreEssentials: React.FC = () => {
 
       navigate('/studio/store/setup', { replace: true });
     },
-    [description, navigate, selected, tagline]
+    [description, navigate, selected, tagline, user?.id]
   );
 
   const selectedLabels = useMemo(() => {

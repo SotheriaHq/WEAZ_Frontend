@@ -76,11 +76,12 @@ const MediaPreview: React.FC<MediaPreviewProps> = ({ items, onDeleteItem, onAddM
 
   return (
     <div className="w-full">
-      <div className="mb-4 rounded-lg overflow-hidden relative flex items-center justify-center">
+      <div className="mb-4 rounded-2xl border border-gray-200/70 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
         <MediaRenderer
           kind={isVideo ? 'video' : 'image'}
           src={selected.url}
           alt={selected.file?.name || 'Preview'}
+          className="w-full"
         />
       </div>
 
@@ -93,7 +94,7 @@ const MediaPreview: React.FC<MediaPreviewProps> = ({ items, onDeleteItem, onAddM
           return (
             <div
               key={(pf.id ?? pf.url) + idx}
-              className={`relative h-28 w-28 flex-shrink-0 rounded-md overflow-hidden border bg-gray-100 dark:bg-gray-800 ${
+              className={`relative h-28 w-28 flex-shrink-0 rounded-xl overflow-hidden border bg-white shadow-sm dark:bg-white/[0.03] ${
                 selectedIndex === idx
                   ? 'ring-2 ring-purple-500 dark:ring-purple-400 border-transparent'
                   : 'border-gray-200 dark:border-gray-700'
@@ -111,6 +112,7 @@ const MediaPreview: React.FC<MediaPreviewProps> = ({ items, onDeleteItem, onAddM
                   muted
                   maxHeightClassName="max-h-28"
                   maxWidthClassName="max-w-28"
+                  className="w-full h-full"
                 />
               </div>
               

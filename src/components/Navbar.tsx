@@ -34,25 +34,12 @@ import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
 import { generateUserUid } from '@/utils/userUid';
+import BrandWordmark from '@/components/brand/BrandWordmark';
+import { COMPANY_NAME } from '@/lib/brand';
 
 interface NavbarProps {
   minimal?: boolean;
 }
-
-const ThreadlyLogo = () => (
-  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="threadly-gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-        <stop stopColor="var(--brand-primary)" />
-        <stop offset="0.5" stopColor="var(--brand-accent)" />
-        <stop offset="1" stopColor="var(--brand-primary-strong)" />
-      </linearGradient>
-    </defs>
-    <path d="M8 20C8 16.5 13 16.5 13 13C13 9.5 8 9.5 8 13" stroke="url(#threadly-gradient)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M24 12C24 15.5 19 15.5 19 19C19 22.5 24 22.5 24 19" stroke="url(#threadly-gradient)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-    <circle cx="16" cy="16" r="2.5" fill="url(#threadly-gradient)" />
-  </svg>
-);
 
 export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -318,10 +305,11 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                 navigate('/');
               }}
             >
-              <ThreadlyLogo />
-              <span className="ml-1.5 max-w-[200px] truncate text-lg font-bold tracking-tight text-gray-900 dark:text-white" title="Threadly">
-                Threadly
-              </span>
+              <BrandWordmark
+                logoSize={32}
+                textClassName="max-w-[200px] truncate text-lg font-bold tracking-tight text-gray-900 dark:text-white"
+              />
+              <span className="sr-only">{COMPANY_NAME}</span>
             </div>
           )}
         </div>

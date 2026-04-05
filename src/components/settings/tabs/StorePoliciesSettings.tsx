@@ -27,7 +27,7 @@ const initialPolicyData: StoreWizardData = {
   freeShippingThreshold: null,
   shippingMethod: 'standard',
   shippingRates: [],
-  orderProcessingMode: 'manual-review',
+  orderProcessingMode: 'auto-confirm',
   orderCancellationWindow: '24h',
   allowOrderNotes: true,
   returnsAccepted: true,

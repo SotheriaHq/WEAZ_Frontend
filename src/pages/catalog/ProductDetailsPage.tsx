@@ -30,6 +30,10 @@ import ProductReviewSection from '@/components/reviews/ProductReviewSection';
 import { isRtwSizingMode, normalizeSizingMode } from '@/types/sizing';
 import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
+import {
+  isCustomOrderOnlyProduct,
+  isStrictlyOutOfStockProduct,
+} from '@/lib/productAvailability';
 
 const findMappedColorValue = (
   map: Record<string, string> | undefined,
@@ -291,7 +295,9 @@ export default function ProductDetailsPage() {
   }, [product?.customMeasurementKeys]);
 
   const requiresRtwSelection = isRtwSizingMode(sizingMode) && availableSizes.length > 0;
-  const isCustomAvailable = product?.customAvailable === true;
+  const isCustomAvailable =
+    product?.customAvailable === true || product?.customOrderEnabled === true;
+  const isCustomOrderOnly = isCustomOrderOnlyProduct(product);
   const requiresMeasurements =
     isCustomAvailable && requiredMeasurementKeys.length > 0;
 
@@ -513,7 +519,14 @@ export default function ProductDetailsPage() {
     }
   };
   
-  const isOutOfStock = variants.length > 0 ? (currentVariant?.stock === 0) : false;
+  const isOutOfStock = (() => {
+    if (!product) return false;
+    if (isCustomOrderOnly) return false;
+    if (variants.length > 0) {
+      return Number(currentVariant?.stock ?? 0) <= 0;
+    }
+    return isStrictlyOutOfStockProduct(product);
+  })();
   const isStudioStoreView = location.pathname.startsWith('/studio/store');
   const ownerCandidates = [
     product.brandId,
@@ -856,8 +869,12 @@ export default function ProductDetailsPage() {
                     <div>Views</div>
                   </div>
                   <div className="rounded-xl bg-black/5 dark:bg-white/5 px-3 py-2 text-center text-slate-600 dark:text-slate-300">
-                    <div className="font-semibold">{currentVariant?.stock ?? product.totalStock ?? product.stock ?? 0}</div>
-                    <div>Stock</div>
+                    <div className="font-semibold">
+                      {isCustomOrderOnly
+                        ? 'Custom'
+                        : currentVariant?.stock ?? product.totalStock ?? product.stock ?? 0}
+                    </div>
+                    <div>{isCustomOrderOnly ? 'Mode' : 'Stock'}</div>
                   </div>
                 </div>
 
@@ -990,7 +1007,11 @@ export default function ProductDetailsPage() {
                       }`}
                     >
                       <ShoppingBag size={18} />
-                      {isOutOfStock ? 'Sold Out' : '🛍️ Bag it'}
+                      {isOutOfStock
+                        ? 'Sold Out'
+                        : isCustomOrderOnly
+                          ? '🛍️ Bag as custom order'
+                          : '🛍️ Bag it'}
                     </button>
                     <button
                       onClick={handleWishlist}

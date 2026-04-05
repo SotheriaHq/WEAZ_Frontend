@@ -30,6 +30,10 @@ import StoreEmptyState, { type EmptyStateType } from '@/components/designs/Store
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
 import { PRODUCT_STUDIO_SYNC_EVENT } from '@/utils/productStudioEvents';
+import {
+  getProductStockState,
+  isCustomOrderOnlyProduct,
+} from '@/lib/productAvailability';
 
 type StudioStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'DELETED';
 type OutletView = 'products' | 'collections';
@@ -80,6 +84,10 @@ interface BackendProduct {
   totalStock: number;
   isActive: boolean;
   isFeatured?: boolean;
+  customAvailable?: boolean;
+  customOrderEnabled?: boolean;
+  isCustomOrderOnly?: boolean;
+  canBagWhenOutOfStock?: boolean;
   thumbnail?: string | null;
   images?: string[];
   media?: Array<{ id: string; url: string; type: string; isPrimary?: boolean }>;
@@ -387,6 +395,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
   const showDraftCollectionsInProductArea =
     !loading && filterStatus === 'draft' && filteredProducts.length === 0 && draftCollections.length > 0;
+  const primaryProductActionLabel = products.length === 0 ? 'Create Product' : 'Add Product';
 
   const visibleCollections = useMemo(
     () => collections.filter((collection) => !isSystemStoreCollection(collection)),
@@ -1289,7 +1298,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         sizes: data.sizes || [],
         sizingMode: data.sizingMode,
         customMeasurementKeys: data.customMeasurementKeys || [],
-        customAvailable: data.customAvailable ?? false,
+        customAvailable:
+          data.customAvailable ?? data.customOrderEnabled ?? false,
+        customOrderEnabled:
+          data.customOrderEnabled ?? data.customAvailable ?? false,
+        isCustomOrderOnly: data.isCustomOrderOnly ?? false,
+        canBagWhenOutOfStock: data.canBagWhenOutOfStock ?? false,
         sizeAvailability: data.sizeAvailability || [],
         colors: data.colors || [],
         variants: data.variants || [],
@@ -1827,11 +1841,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => navigate('/studio/store/products/new')}
-                className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3 py-2.5 text-base font-semibold text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:-translate-y-0.5 active:scale-95 transition-all duration-200"
-                aria-label="Add product"
-                title="Add product"
+                className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-500/40 active:scale-95"
+                aria-label={primaryProductActionLabel}
+                title={primaryProductActionLabel}
               >
-                ➕
+                <span aria-hidden="true">➕</span>
+                <span>{primaryProductActionLabel}</span>
               </button>
               <button
                 type="button"
@@ -2791,27 +2806,33 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       
                       {/* Stock info row */}
                       <div className="flex items-center justify-between mt-0.5">
-                        <span 
+                        <span
                           className={`text-[10px] font-medium cursor-help ${
-                            (product.totalStock ?? 0) === 0 
-                              ? 'text-rose-300' 
-                              : (product.totalStock ?? 0) <= 5 
-                                ? 'text-amber-300' 
-                                : 'text-emerald-300'
+                            getProductStockState(product) === 'CUSTOM_ORDER_ONLY'
+                              ? 'text-violet-300'
+                              : getProductStockState(product) === 'OUT_OF_STOCK'
+                                ? 'text-rose-300'
+                                : getProductStockState(product) === 'LOW_STOCK'
+                                  ? 'text-amber-300'
+                                  : 'text-emerald-300'
                           }`}
                           title={
-                            (product.totalStock ?? 0) === 0 
-                              ? 'This product is out of stock and cannot be purchased' 
-                              : (product.totalStock ?? 0) <= 5 
-                                ? 'Low stock warning: Consider restocking soon' 
-                                : 'Stock is healthy'
+                            isCustomOrderOnlyProduct(product)
+                              ? 'Out of stock, but customers can still bag it while you restock.'
+                              : (product.totalStock ?? 0) === 0
+                                ? 'This product is out of stock and cannot be purchased'
+                                : (product.totalStock ?? 0) <= 5
+                                  ? 'Low stock warning: Consider restocking soon'
+                                  : 'Stock is healthy'
                           }
                         >
-                          {(product.totalStock ?? 0) === 0 
-                            ? '🔴 Out of stock' 
-                            : (product.totalStock ?? 0) <= 5 
-                              ? `🟡 ${product.totalStock} in stock` 
-                              : `🟢 ${product.totalStock} in stock`}
+                          {isCustomOrderOnlyProduct(product)
+                            ? '✂️ Custom order only'
+                            : (product.totalStock ?? 0) === 0
+                              ? '🔴 Out of stock'
+                              : (product.totalStock ?? 0) <= 5
+                                ? `🟡 ${product.totalStock} in stock`
+                                : `🟢 ${product.totalStock} in stock`}
                         </span>
                         
                         {/* Creation time */}

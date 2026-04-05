@@ -120,11 +120,11 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.2 }}
                 className={`
-                  relative w-full rounded-xl overflow-hidden
-                  border-2 transition-all duration-200 group
+                    relative w-full rounded-xl overflow-hidden
+                    border border-gray-200 bg-white shadow-sm transition-all duration-200 group dark:border-white/10 dark:bg-white/[0.03]
                   ${isSelected 
                     ? 'thumbnail-selected border-transparent scale-105' 
-                    : 'border-white/10 hover:border-purple-500/50'
+                      : 'hover:border-purple-500/50'
                   }
                   ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
                 `}
@@ -137,7 +137,7 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
                   kind={isVideo ? 'video' : 'image'}
                   src={pf.url}
                   alt={pf.file?.name || `Thumbnail ${idx + 1}`}
-                  className="w-full h-24 flex items-center justify-center bg-black/5 dark:bg-white/5"
+                  className="w-full h-24 flex items-center justify-center bg-white/70 dark:bg-white/[0.03]"
                   maxHeightClassName="max-h-full"
                   maxWidthClassName="max-w-full"
                   controls={false}

@@ -4,8 +4,6 @@ import Select from '@/components/ui/Select';
 import { MeasurementPointsApi } from '@/api/MeasurementPointsApi';
 import { useMeasurementPoints } from '@/hooks/useMeasurementPoints';
 import type {
-  AgeGroup,
-  FitPreference,
   MeasurementPoint,
   MeasurementPointCategory,
   SizingMode,
@@ -19,10 +17,6 @@ interface SizingConfiguratorProps {
   onRtwSizeSystemChange: (value: string) => void;
   customMeasurementKeys: string[];
   onCustomMeasurementKeysChange: (keys: string[]) => void;
-  fitPreference?: FitPreference | '';
-  onFitPreferenceChange: (value: FitPreference | '') => void;
-  targetAgeGroup: AgeGroup;
-  onTargetAgeGroupChange: (value: AgeGroup) => void;
   measurementGender?: 'MEN' | 'WOMEN' | 'UNISEX';
   disabled?: boolean;
 }
@@ -44,10 +38,6 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
   onRtwSizeSystemChange,
   customMeasurementKeys,
   onCustomMeasurementKeysChange,
-  fitPreference,
-  onFitPreferenceChange,
-  targetAgeGroup,
-  onTargetAgeGroupChange,
   measurementGender,
   disabled = false,
 }) => {
@@ -360,38 +350,6 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
-            Fit Preference
-          </label>
-          <Select
-            value={fitPreference || ''}
-            onChange={(event) => onFitPreferenceChange(event.target.value as FitPreference | '')}
-            disabled={disabled}
-          >
-            <option value="">Not set</option>
-            <option value="SLIM">Slim</option>
-            <option value="REGULAR">Regular</option>
-            <option value="LOOSE">Loose</option>
-            <option value="OVERSIZED">Oversized</option>
-          </Select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
-            Target Age Group
-          </label>
-          <Select
-            value={targetAgeGroup}
-            onChange={(event) => onTargetAgeGroupChange(event.target.value as AgeGroup)}
-            disabled={disabled}
-          >
-            <option value="ADULT">Adult</option>
-            <option value="CHILD">Child</option>
-          </Select>
-        </div>
-      </div>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'sonner';
@@ -25,110 +25,81 @@ interface RawProductsPayload {
 
 const BASE_FILTERS = ['FOR_YOU', 'MENSWEAR', 'WOMENSWEAR', 'EVERYBODY', 'ON_SALE'] as const;
 
+// Speed in pixels per second for the marquee
+const MARQUEE_PX_PER_S = 40;
+// Width per card (min-w-[400px]) + gap-3 (12px)
+const CARD_WIDTH = 412;
+
 const ProductCarousel: React.FC<{
   title: string;
   products: StoreProduct[];
   onViewProduct: (product: StoreProduct) => void;
 }> = ({ title, products, onViewProduct }) => {
-  const railRef = useRef<HTMLDivElement | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+
+  // Duplicate so the seamless loop works.
+  // The CSS animation translates by -50% of the track's own (max-content) width,
+  // which equals exactly the width of one copy → loops without a visible seam.
   const duplicatedProducts = useMemo(() => [...products, ...products], [products]);
 
-  const scrollRail = useCallback((direction: 'left' | 'right') => {
-    if (!railRef.current) return;
-    const amount = Math.round(railRef.current.clientWidth * 0.6);
-    railRef.current.scrollBy({
-      left: direction === 'left' ? -amount : amount,
-      behavior: 'smooth',
-    });
-  }, []);
-
-  useEffect(() => {
-    if (products.length === 0 || isPaused) return;
-    const rail = railRef.current;
-    if (!rail) return;
-
-    let animationFrame = 0;
-    let lastTimestamp: number | null = null;
-    const speedPxPerSecond = 22;
-
-    const animate = (timestamp: number) => {
-      if (lastTimestamp == null) {
-        lastTimestamp = timestamp;
-      } else {
-        const elapsed = timestamp - lastTimestamp;
-        lastTimestamp = timestamp;
-        rail.scrollLeft += (elapsed / 1000) * speedPxPerSecond;
-        const resetPoint = rail.scrollWidth / 2;
-        if (rail.scrollLeft >= resetPoint) {
-          rail.scrollLeft -= resetPoint;
-        }
-      }
-
-      animationFrame = window.requestAnimationFrame(animate);
-    };
-
-    animationFrame = window.requestAnimationFrame(animate);
-    return () => window.cancelAnimationFrame(animationFrame);
-  }, [isPaused, products.length]);
-
-  useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-    rail.scrollLeft = 0;
-  }, [products.length]);
+  // Duration: time to scroll one full copy width
+  const durationS = useMemo(
+    () => Math.round((products.length * CARD_WIDTH) / MARQUEE_PX_PER_S),
+    [products.length],
+  );
 
   if (products.length === 0) return null;
 
   return (
     <section className="space-y-3">
+      {/* keyframes injected once per carousel render */}
+      <style>{`
+        @keyframes threadly-marquee {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
+        }
+      `}</style>
+
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setIsPaused((p) => !p)}
-            className="rounded-full border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/10"
-            aria-label={isPaused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
-          >
-            {isPaused ? '▶' : '⏸'}
-          </button>
-          <button
-            type="button"
-            onClick={() => scrollRail('left')}
-            className="rounded-full border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/10"
-            aria-label="Scroll left"
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            onClick={() => scrollRail('right')}
-            className="rounded-full border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/10"
-            aria-label="Scroll right"
-          >
-            →
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setIsPaused((p) => !p)}
+          className="rounded-full border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/10"
+          aria-label={isPaused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
+        >
+          {isPaused ? '▶' : '⏸'}
+        </button>
       </div>
 
+      {/*
+        Outer: overflow-hidden clips the second copy until it scrolls into view.
+        Inner: width:max-content ensures translateX(-50%) equals exactly one copy's width.
+      */}
       <div
-        ref={railRef}
-        className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="overflow-hidden"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
+        onTouchStart={() => setIsPaused(true)}
+        onTouchEnd={() => setIsPaused(false)}
       >
-        {duplicatedProducts.map((product, index) => (
-          <motion.div
-            key={`${product.id}-${index}`}
-            className="min-w-[200px] max-w-[200px] shrink-0"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <StoreProductCard product={product} onViewProduct={onViewProduct} />
-          </motion.div>
-        ))}
+        <div
+          className="flex gap-3"
+          style={{
+            width: 'max-content',
+            animation: `threadly-marquee ${durationS}s linear infinite`,
+            animationPlayState: isPaused ? 'paused' : 'running',
+          }}
+        >
+          {duplicatedProducts.map((product, index) => (
+            <div
+              key={`${product.id}-${index}`}
+              className="min-w-[400px] max-w-[400px] shrink-0"
+            >
+              <StoreProductCard product={product} onViewProduct={onViewProduct} />
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -211,7 +182,12 @@ const normalizeProduct = (raw: any): StoreProduct | null => {
     customMeasurementKeys: Array.isArray(raw?.customMeasurementKeys)
       ? raw.customMeasurementKeys.map((k: any) => String(k))
       : [],
-    customAvailable: Boolean(raw?.customAvailable),
+    customAvailable: Boolean(raw?.customAvailable ?? raw?.customOrderEnabled),
+    customOrderEnabled: Boolean(
+      raw?.customOrderEnabled ?? raw?.customAvailable,
+    ),
+    isCustomOrderOnly: Boolean(raw?.isCustomOrderOnly),
+    canBagWhenOutOfStock: Boolean(raw?.canBagWhenOutOfStock),
     sizeAvailability,
     colors: Array.isArray(raw?.colors) ? raw.colors.map((c: any) => String(c)) : [],
     variants,
@@ -487,20 +463,23 @@ const MarketPlace: React.FC = () => {
 
 
         <section className="space-y-5">
-          <div className="sticky top-16 z-20 rounded-2xl border border-gray-200/70 bg-white/55 p-4 backdrop-blur-[4px] dark:border-white/10 dark:bg-[#0f0b13]/55">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h2 className="text-2xl font-black text-gray-900 dark:text-white">Explore the Market</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Tap any product to preview, wishlist, or add to bag. Use global search for product, brand, design, and tag discovery.</p>
+          <div className="sticky top-16 z-20 rounded-2xl border border-gray-200/70 bg-white/55 px-3 py-3 backdrop-blur-[4px] sm:p-4 dark:border-white/10 dark:bg-[#0f0b13]/55">
+            {/* Heading + search row — on small screens header is compact, search hidden */}
+            <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-lg font-black text-gray-900 dark:text-white sm:text-2xl">Explore the Market</h2>
+                <p className="hidden text-sm text-gray-600 dark:text-gray-400 sm:block">
+                  Tap any product to preview, wishlist, or add to bag. Use global search for product, brand, design, and tag discovery.
+                </p>
               </div>
-              <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[520px] lg:flex-row">
+              <div className="hidden w-full flex-col gap-3 sm:flex lg:w-auto lg:min-w-[520px] lg:flex-row">
                 <SearchBarWithSuggestions
                   placeholder="Search products, brands, styles, or tags..."
                   className="w-full"
                 />
               </div>
             </div>
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 sm:gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {availableFilters.map((filter) => {
                 const active = selectedFilter === filter;
                 return (
@@ -508,7 +487,7 @@ const MarketPlace: React.FC = () => {
                     key={filter}
                     type="button"
                     onClick={() => setSelectedFilter(filter)}
-                    className={`whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition sm:px-4 sm:py-2 sm:text-sm ${
                       active
                         ? 'border-purple-500 bg-purple-600 text-white'
                         : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-white/15 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10'
@@ -524,6 +503,13 @@ const MarketPlace: React.FC = () => {
                 );
               })}
             </div>
+            {/* Search visible only on small screens — below the filter chips */}
+            <div className="mt-2 sm:hidden">
+              <SearchBarWithSuggestions
+                placeholder="Search products, brands..."
+                className="w-full"
+              />
+            </div>
           </div>
 
           {error ? (
@@ -533,7 +519,7 @@ const MarketPlace: React.FC = () => {
           ) : null}
 
           {loading ? (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 12 }).map((_, index) => (
                 <ProductCardSkeleton key={index} />
               ))}
@@ -555,7 +541,7 @@ const MarketPlace: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {visibleProducts.map((product) => (
                   <motion.div
                     key={product.id}

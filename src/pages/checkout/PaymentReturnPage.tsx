@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import Button from '@/components/ui/Button';
@@ -8,6 +8,9 @@ import { getCheckoutStatusCopy } from '@/pages/checkout/checkoutStatusCopy';
 
 type ViewState = 'verifying' | 'resolved' | 'missing';
 
+const AUTO_VERIFY_INTERVAL_MS = 10000;
+const AUTO_VERIFY_MAX_ATTEMPTS = 6;
+
 const PaymentReturnPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -15,10 +18,45 @@ const PaymentReturnPage: React.FC = () => {
   const [verifyResult, setVerifyResult] = useState<PaymentVerifyResult | null>(null);
   const [attempt, setAttempt] = useState<PaymentAttemptSummary | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [autoVerifyAttempts, setAutoVerifyAttempts] = useState(0);
+  const [autoVerifying, setAutoVerifying] = useState(false);
 
   const reference = searchParams.get('reference')?.trim() || '';
   const gateway = searchParams.get('gateway')?.trim() || '';
   const statusHint = searchParams.get('status')?.trim() || undefined;
+
+  const verifyAttempt = useCallback(async (
+    summary: PaymentAttemptSummary,
+    resolvedGateway: string,
+    includeStatusHint: boolean,
+  ): Promise<PaymentVerifyResult> => {
+    const hint = includeStatusHint ? statusHint : undefined;
+
+    if (summary.subjectType === 'CUSTOM_ORDER' && summary.customOrderId) {
+      const customResult = await customOrdersBuyerApi.verifyPayment(summary.customOrderId, {
+        reference,
+        gateway: resolvedGateway,
+        statusHint: hint,
+      });
+      return {
+        success: customResult.success,
+        status: customResult.status as PaymentAttemptStatus,
+        paymentAttemptId: customResult.paymentAttemptId,
+        reference: customResult.reference,
+        amount: customResult.amount,
+        currency: customResult.currency,
+        settlementCurrency: customResult.currency,
+        settlementAmount: customResult.amount,
+        paidAt: customResult.paidAt,
+        channel: customResult.channel,
+        failureMessage: customResult.failureMessage,
+        gatewayResponse: customResult.recoveryMessage,
+        orderIds: customResult.customOrderId ? [customResult.customOrderId] : [],
+      };
+    }
+
+    return paymentApi.verifyWithStatus(reference, resolvedGateway, hint);
+  }, [reference, statusHint]);
 
   useEffect(() => {
     let active = true;
@@ -29,6 +67,8 @@ const PaymentReturnPage: React.FC = () => {
         return;
       }
 
+      setAutoVerifyAttempts(0);
+      setAutoVerifying(false);
       setViewState('verifying');
       try {
         const summary = await paymentApi.getAttempt(reference);
@@ -36,32 +76,7 @@ const PaymentReturnPage: React.FC = () => {
         setAttempt(summary);
 
         const resolvedGateway = gateway || summary.gateway;
-        let result: PaymentVerifyResult | null = null;
-
-        if (summary.subjectType === 'CUSTOM_ORDER' && summary.customOrderId) {
-          const customResult = await customOrdersBuyerApi.verifyPayment(summary.customOrderId, {
-            reference,
-            gateway: resolvedGateway,
-            statusHint,
-          });
-          result = {
-            success: customResult.success,
-            status: customResult.status as PaymentAttemptStatus,
-            paymentAttemptId: customResult.paymentAttemptId,
-            reference: customResult.reference,
-            amount: customResult.amount,
-            currency: customResult.currency,
-            settlementCurrency: customResult.currency,
-            settlementAmount: customResult.amount,
-            paidAt: customResult.paidAt,
-            channel: customResult.channel,
-            failureMessage: customResult.failureMessage,
-            gatewayResponse: customResult.recoveryMessage,
-            orderIds: customResult.customOrderId ? [customResult.customOrderId] : [],
-          };
-        } else {
-          result = await paymentApi.verifyWithStatus(reference, resolvedGateway, statusHint);
-        }
+        const result = await verifyAttempt(summary, resolvedGateway, true);
 
         if (!active) return;
         setVerifyResult(result);
@@ -94,47 +109,67 @@ const PaymentReturnPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [gateway, navigate, reference, statusHint]);
+  }, [gateway, navigate, reference, verifyAttempt]);
 
-  const handleVerifyAgain = async () => {
+  const handleVerifyAgain = useCallback(async (options?: { auto?: boolean }) => {
     const resolvedGateway = gateway || attempt?.gateway;
     if (!reference || !resolvedGateway) return;
-    setSubmitting(true);
+
+    if (options?.auto) {
+      setAutoVerifying(true);
+    } else {
+      setSubmitting(true);
+    }
+
     try {
-      const result =
-        attempt?.subjectType === 'CUSTOM_ORDER' && attempt.customOrderId
-          ? await customOrdersBuyerApi.verifyPayment(attempt.customOrderId, {
-              reference,
-              gateway: resolvedGateway,
-              statusHint,
-            }).then((customResult) => ({
-              success: customResult.success,
-              status: customResult.status as PaymentAttemptStatus,
-              paymentAttemptId: customResult.paymentAttemptId,
-              reference: customResult.reference,
-              amount: customResult.amount,
-              currency: customResult.currency,
-              settlementCurrency: customResult.currency,
-              settlementAmount: customResult.amount,
-              paidAt: customResult.paidAt,
-              channel: customResult.channel,
-              failureMessage: customResult.failureMessage,
-              gatewayResponse: customResult.recoveryMessage,
-              orderIds: customResult.customOrderId ? [customResult.customOrderId] : [],
-            }))
-          : await paymentApi.verifyWithStatus(reference, resolvedGateway, statusHint);
+      const currentAttempt = attempt ?? await paymentApi.getAttempt(reference);
+      if (!attempt) {
+        setAttempt(currentAttempt);
+      }
+
+      const result = await verifyAttempt(currentAttempt, resolvedGateway, false);
       setVerifyResult(result);
       const summary = await paymentApi.getAttempt(reference);
       setAttempt(summary);
+
+      if (options?.auto) {
+        setAutoVerifyAttempts((current) => current + 1);
+      }
+
       if (result.status === 'PAID') {
         navigate(`/checkout/confirmation?reference=${encodeURIComponent(reference)}`);
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Verification failed');
+      if (!options?.auto) {
+        toast.error(error?.response?.data?.message || 'Verification failed');
+      }
     } finally {
-      setSubmitting(false);
+      if (options?.auto) {
+        setAutoVerifying(false);
+      } else {
+        setSubmitting(false);
+      }
     }
-  };
+  }, [attempt, gateway, navigate, reference, verifyAttempt]);
+
+  const resolvedStatus = verifyResult?.status ?? attempt?.status ?? 'PENDING';
+
+  useEffect(() => {
+    if (viewState !== 'resolved' || resolvedStatus !== 'PROCESSING') {
+      return;
+    }
+    if (autoVerifyAttempts >= AUTO_VERIFY_MAX_ATTEMPTS || autoVerifying || submitting) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void handleVerifyAgain({ auto: true });
+    }, AUTO_VERIFY_INTERVAL_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [autoVerifyAttempts, autoVerifying, handleVerifyAgain, resolvedStatus, submitting, viewState]);
 
   if (viewState === 'missing') {
     return (
@@ -164,7 +199,6 @@ const PaymentReturnPage: React.FC = () => {
     );
   }
 
-  const resolvedStatus = verifyResult?.status ?? attempt?.status ?? 'PENDING';
   const statusCopy = getCheckoutStatusCopy('return', resolvedStatus);
 
   return (
@@ -186,13 +220,24 @@ const PaymentReturnPage: React.FC = () => {
         )}
       </div>
 
+      {resolvedStatus === 'PROCESSING' && (
+        <div className="mb-8 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-left text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          <p>
+            Threadly will keep checking automatically every 10 seconds (attempt {Math.min(autoVerifyAttempts + 1, AUTO_VERIFY_MAX_ATTEMPTS)} of {AUTO_VERIFY_MAX_ATTEMPTS}).
+          </p>
+          <p className="mt-1">
+            If it still shows processing, you can leave this page and check your order later while provider confirmation continues in the background.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col justify-center gap-3 sm:flex-row">
         {resolvedStatus === 'PAID' ? (
           <Button onClick={() => navigate(`/checkout/confirmation?reference=${encodeURIComponent(reference)}`)}>
             Open confirmation
           </Button>
         ) : (
-          <Button onClick={handleVerifyAgain} loading={submitting}>
+          <Button onClick={() => void handleVerifyAgain()} loading={submitting || autoVerifying}>
             Verify again
           </Button>
         )}

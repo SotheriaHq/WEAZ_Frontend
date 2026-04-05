@@ -111,8 +111,8 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
   }, [enableGlobalShortcut]);
 
   const entries = useMemo(
-    () => flattenSuggestionEntries(suggestions, localRecent),
-    [localRecent, suggestions],
+    () => flattenSuggestionEntries(suggestions, localRecent, value),
+    [localRecent, suggestions, value],
   );
 
   useEffect(() => {
@@ -141,7 +141,7 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
   };
 
   const handleSelect = (entry: SearchSuggestionEntry) => {
-    if (entry.kind === 'recent' || entry.kind === 'trending') {
+    if (entry.kind === 'search' || entry.kind === 'recent' || entry.kind === 'trending') {
       setValue(entry.query || entry.label);
       runSearch(entry.query || entry.label);
       return;
@@ -189,6 +189,7 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
         ariaControls={dropdownId}
         ariaActiveDescendant={activeDescendantId}
         collapsible={collapsible}
+        submitOnEnter={false}
         className="!max-w-none"
         onKeyDown={(event) => {
           if (!open || entries.length === 0) {
@@ -201,9 +202,6 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
           } else if (event.key === 'ArrowUp') {
             event.preventDefault();
             setActiveIndex((current) => (current <= 0 ? entries.length - 1 : current - 1));
-          } else if (event.key === 'Enter' && activeIndex >= 0) {
-            event.preventDefault();
-            handleSelect(entries[activeIndex]);
           } else if (event.key === 'Escape') {
             setOpen(false);
             setActiveIndex(-1);
@@ -215,6 +213,7 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
         dropdownId={dropdownId}
         suggestions={suggestions}
         localRecent={localRecent}
+        query={value}
         activeIndex={activeIndex}
         open={open}
         isLoading={isLoading}

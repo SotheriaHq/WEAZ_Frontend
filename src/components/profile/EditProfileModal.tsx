@@ -58,6 +58,12 @@ const profileSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 const MAX_TAGS = 5;
+const BUSINESS_TYPE_OPTIONS = [
+  { value: 'Retailer', label: 'Retailer' },
+  { value: 'Designer', label: 'Designer' },
+  { value: 'Wholesaler', label: 'Wholesaler' },
+  { value: 'Boutique', label: 'Boutique' },
+];
 
 const getFirstErrorMessage = (errors: unknown): string | null => {
   if (!errors) return null;
@@ -576,6 +582,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           }}
                           options={countryOptions}
                           placeholder={loadingLocations ? "Loading..." : "Select Country"}
+                          searchable
+                          searchPlaceholder="Search countries..."
+                          emptyMessage="No matching country found"
                           disabled={loadingLocations}
                           className="w-full"
                       />
@@ -605,21 +614,25 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2 z-10">
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Business Type</label>
-                  <div className="relative">
-                    <select className="select-threadly w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white cursor-pointer focus:ring-2 focus:ring-purple-500 focus:border-transparent" {...register('businessType')}>
-                      <option value="" className="bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300">Select Type</option>
-                      <option value="Retailer" className="bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300">Retailer</option>
-                      <option value="Designer" className="bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300">Designer</option>
-                      <option value="Wholesaler" className="bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300">Wholesaler</option>
-                      <option value="Boutique" className="bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300">Boutique</option>
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </div>
+                  <UniversalSelect
+                    label="Business Type"
+                    value={watch('businessType') || ''}
+                    onChange={(value) =>
+                      setValue('businessType', value, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                    options={BUSINESS_TYPE_OPTIONS}
+                    placeholder="Select Type"
+                    disabled={isSubmitting}
+                    className="w-full"
+                  />
+                  {errors.businessType && (
+                    <p className="text-xs text-red-500 font-medium">
+                      {errors.businessType.message}
+                    </p>
+                  )}
                 </div>
                 
                 <div className="space-y-2">

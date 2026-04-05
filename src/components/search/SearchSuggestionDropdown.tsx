@@ -1,11 +1,12 @@
 import React from 'react';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import { buildSearchHref } from '@/lib/searchRouting';
 import type { SearchItem, SearchSuggestionResponse } from '@/types/search';
 
 export interface SearchSuggestionEntry {
   id: string;
   label: string;
-  kind: 'recent' | 'trending' | 'item' | 'tag';
+  kind: 'search' | 'recent' | 'trending' | 'item' | 'tag';
   href: string;
   section: string;
   query?: string;
@@ -15,6 +16,7 @@ export interface SearchSuggestionEntry {
 interface SearchSuggestionDropdownProps {
   suggestions: SearchSuggestionResponse | null;
   localRecent: string[];
+  query: string;
   activeIndex: number;
   open: boolean;
   isLoading: boolean;
@@ -28,9 +30,22 @@ const sectionTitleClass = 'px-3 py-2 text-[11px] font-semibold uppercase trackin
 function buildEntries(
   suggestions: SearchSuggestionResponse | null,
   localRecent: string[],
+  query: string,
 ): SearchSuggestionEntry[] {
   const entries: SearchSuggestionEntry[] = [];
   const seenRecent = new Set<string>();
+  const trimmedQuery = query.trim();
+
+  if (trimmedQuery) {
+    entries.push({
+      id: `search:${trimmedQuery}`,
+      label: `Search for "${trimmedQuery}"`,
+      kind: 'search',
+      href: buildSearchHref(trimmedQuery),
+      section: 'Search',
+      query: trimmedQuery,
+    });
+  }
 
   for (const recent of suggestions?.recent ?? []) {
     seenRecent.add(recent.query);
@@ -91,13 +106,15 @@ function buildEntries(
 export function flattenSuggestionEntries(
   suggestions: SearchSuggestionResponse | null,
   localRecent: string[],
+  query: string,
 ) {
-  return buildEntries(suggestions, localRecent);
+  return buildEntries(suggestions, localRecent, query);
 }
 
 const SearchSuggestionDropdown: React.FC<SearchSuggestionDropdownProps> = ({
   suggestions,
   localRecent,
+  query,
   activeIndex,
   open,
   isLoading,
@@ -109,7 +126,7 @@ const SearchSuggestionDropdown: React.FC<SearchSuggestionDropdownProps> = ({
     return null;
   }
 
-  const entries = buildEntries(suggestions, localRecent);
+  const entries = buildEntries(suggestions, localRecent, query);
   let activeSection = '';
 
   return (
@@ -124,7 +141,7 @@ const SearchSuggestionDropdown: React.FC<SearchSuggestionDropdownProps> = ({
         ) : isLoading && entries.length === 0 ? (
           <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">Searching...</div>
         ) : !isLoading && entries.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">No suggestions yet.</div>
+          <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">No suggestions yet. Keep typing or choose a result when it appears.</div>
         ) : null}
 
         {entries.map((entry, index) => {
@@ -160,7 +177,15 @@ const SearchSuggestionDropdown: React.FC<SearchSuggestionDropdownProps> = ({
                   />
                 ) : (
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-lg dark:bg-white/8">
-                    {entry.kind === 'recent' ? '🕘' : entry.kind === 'trending' ? '🔥' : entry.kind === 'tag' ? '🏷️' : '🔎'}
+                    {entry.kind === 'search'
+                      ? '🔎'
+                      : entry.kind === 'recent'
+                        ? '🕘'
+                        : entry.kind === 'trending'
+                          ? '🔥'
+                          : entry.kind === 'tag'
+                            ? '🏷️'
+                            : '🔎'}
                   </div>
                 )}
 
