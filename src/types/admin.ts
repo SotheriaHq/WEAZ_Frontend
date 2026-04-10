@@ -382,6 +382,157 @@ export interface AdminCategory {
 export interface AdminTagItem {
   name: string;
   usageCount: number;
+  displayName?: string;
+  isBanned?: boolean;
+  aliasOfTagName?: string | null;
+  lifecycleStage?: 'LIVE' | 'REJECTED' | 'ALIAS' | 'DORMANT';
+  createdAt?: string;
+  lastUsedAt?: string | null;
+  updatedAt?: string;
+}
+
+export interface AdminIdentitySnapshot {
+  id: string;
+  username: string | null;
+  brandFullName: string | null;
+  profileImage: string | null;
+}
+
+export interface AdminTagLifecycleEvent {
+  id: string;
+  type: string;
+  at: string;
+  summary: string;
+}
+
+export interface AdminTagLifecycleActor {
+  userId: string;
+  username: string | null;
+  brandFullName: string | null;
+  profileImage: string | null;
+  usageCount: number;
+  latestTaggedAt: string | null;
+}
+
+export interface AdminTagLifecycleEntityUsage {
+  entityType: string;
+  entityId: string;
+  usageCount: number;
+  latestTaggedAt: string | null;
+  label: string;
+}
+
+export interface AdminTagLifecycleDetails {
+  name: string;
+  displayName: string | null;
+  usageCount: number;
+  isBanned: boolean;
+  lifecycleStage: 'LIVE' | 'REJECTED' | 'ALIAS' | 'DORMANT';
+  lastUsedAt: string | null;
+  aliasOf: {
+    name: string;
+    displayName: string | null;
+  } | null;
+  aliases: Array<{
+    name: string;
+    displayName: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  resolvedTag: {
+    id: string;
+    name: string;
+    displayName: string | null;
+  };
+  entityCounts: Record<string, number>;
+  usage: {
+    distinctUsersCount: number;
+    users: AdminTagLifecycleActor[];
+    entities: AdminTagLifecycleEntityUsage[];
+  };
+  timeline: AdminTagLifecycleEvent[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminMeasurementPointRow {
+  id: string;
+  key: string;
+  label: string;
+  description: string | null;
+  category: string;
+  gender: string | null;
+  source: string;
+  status: string;
+  brandId: string | null;
+  brand: {
+    id: string;
+    name: string;
+    ownerId: string;
+    owner: AdminIdentitySnapshot;
+  } | null;
+  minValueCm: number | null;
+  maxValueCm: number | null;
+  minValueChildCm?: number | null;
+  maxValueChildCm?: number | null;
+  sortOrder: number;
+  isActive: boolean;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  reviewedBy: AdminIdentitySnapshot | null;
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminMeasurementLifecycleEvent {
+  id: string;
+  type: string;
+  at: string;
+  summary: string;
+}
+
+export interface AdminMeasurementLifecycleUserUsage {
+  userId: string;
+  username: string | null;
+  brandFullName: string | null;
+  profileImage: string | null;
+  usageCount: number;
+  latestUsedAt: string | null;
+}
+
+export interface AdminMeasurementPointLifecycleDetails {
+  point: AdminMeasurementPointRow;
+  usage: {
+    collectionUsageCountById: number;
+    collectionUsageCountByKey: number;
+    productUsageCountById: number;
+    productUsageCountByKey: number;
+    distinctUsersCount: number;
+    users: AdminMeasurementLifecycleUserUsage[];
+  };
+  references: {
+    collections: Array<{
+      id: string;
+      title: string | null;
+      ownerId: string;
+      status: string;
+      visibility: string;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    products: Array<{
+      id: string;
+      name: string;
+      isActive: boolean;
+      brandId: string;
+      brandName: string;
+      ownerId: string;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
+  timeline: AdminMeasurementLifecycleEvent[];
 }
 
 export interface AdminDispute {

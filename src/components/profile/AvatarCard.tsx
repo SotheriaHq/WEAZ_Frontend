@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import DefaultAvatar from '../DefaultAvatar';
-import { FiFeather } from 'react-icons/fi';
 import VLoader from '../loaders/VLoader';
-import MediaRenderer from '../media/MediaRenderer';
+import ImageWithFallback from '../ImageWithFallback';
 
 interface AvatarCardProps {
   src?: string | null;
@@ -35,15 +34,7 @@ const AvatarCard: React.FC<AvatarCardProps> = ({
   onClick,
   fallbackInitials,
 }) => {
-  const [errored, setErrored] = useState(false);
-  const [isImageLoading, setIsImageLoading] = useState<boolean>(Boolean(src));
-  const showImage = Boolean(src) && !errored;
   const clickable = typeof onClick === 'function';
-
-  useEffect(() => {
-    setErrored(false);
-    setIsImageLoading(Boolean(src));
-  }, [src]);
 
   const handleKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (event) => {
     if (!clickable) return;
@@ -55,30 +46,31 @@ const AvatarCard: React.FC<AvatarCardProps> = ({
 
   return (
     <div
-      className={`relative rounded-lg ${sizeMap[size]} ${className} ${clickable ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-00' : ''}`}
+      className={`relative overflow-hidden rounded-xl ${sizeMap[size]} ${className} ${clickable ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-00' : ''}`}
       onClick={onClick}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}
       onKeyDown={handleKeyDown}
     >
-      {showImage ? (
-        <MediaRenderer
-          kind="image"
-          src={src as string}
+      {src ? (
+        /* ImageWithFallback handles signed URL resolution for private S3 objects,
+           shimmer while loading, and DefaultAvatar on error — all in one. */
+        <ImageWithFallback
+          src={src}
           alt={alt}
+          fit="cover"
+          containerClassName="w-full h-full"
+          rounded="xl"
+          fallbackName={fallbackInitials ?? name ?? undefined}
           maxHeightClassName={sizeMap[size].split(' ').find((c) => c.startsWith('max-h-')) || 'max-h-28'}
-          maxWidthClassName={sizeMap[size].split(' ').find((c) => c.startsWith('max-w-')) || 'max-w-28'}
-          onLoad={() => setIsImageLoading(false)}
-          onError={() => {
-            setErrored(true);
-            setIsImageLoading(false);
-          }}
         />
       ) : (
         <DefaultAvatar name={fallbackInitials ?? name ?? alt ?? 'User'} className="w-full h-full" />
       )}
 
-      {(loading || isImageLoading) && (
+      {/* Only show the spinner for explicit external operations (e.g. upload in progress),
+          not for the image load itself — ImageWithFallback handles that with its shimmer. */}
+      {loading && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 backdrop-blur-sm">
           <VLoader size={44} />
         </div>
@@ -95,7 +87,7 @@ const AvatarCard: React.FC<AvatarCardProps> = ({
           disabled={loading}
           type="button"
         >
-          <FiFeather className="h-5 w-5" />
+          <span aria-hidden="true" className="text-base leading-none">📷</span>
         </button>
       )}
     </div>

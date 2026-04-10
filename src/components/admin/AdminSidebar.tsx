@@ -21,7 +21,6 @@ const navItems: NavItem[] = [
   { key: 'brands', label: 'Brands', path: '/admin/brands', emoji: '🏷️', permission: 'BRANDS_READ' },
   { key: 'verification', label: 'Verification', path: '/admin/verification', emoji: '🪪', permission: 'BRANDS_VERIFY' },
   { key: 'content', label: 'Content Management', path: '/admin/content', emoji: '🧰' },
-  { key: 'measurements', label: 'Measurement Points', path: '/admin/measurements', emoji: '📐', permission: 'MEASUREMENTS_READ' },
   { key: 'configurations', label: 'Configurations', path: '/admin/taxonomy', emoji: '🧬', permission: 'TAXONOMY_READ' },
   { key: 'tags', label: 'Tags', path: '/admin/tags', emoji: '🏷️', permission: 'TAGS_READ' },
   { key: 'finance', label: 'Finance', path: '/admin/finance', emoji: '🏦', permission: 'PAYOUTS_READ' },
@@ -46,10 +45,11 @@ const AdminSidebar: React.FC = () => {
   });
 
   const getIsActive = (item: NavItem) => {
+    const path = item.path.split('?')[0];
     if (item.path === '/admin') {
       return location.pathname === '/admin';
     }
-    return location.pathname.startsWith(item.path);
+    return location.pathname.startsWith(path);
   };
 
   const handleNavigate = (path: string) => {

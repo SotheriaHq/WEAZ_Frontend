@@ -253,14 +253,28 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     return () => clearTimeout(timer);
   }, [hadError, fileId, src]);
 
-  const showFallback = hadError || !resolved;
+  // Only treat as "resolving" when there is actually a source to resolve.
+  // Without this guard, a null src causes the shimmer to show forever because
+  // resolved stays null even after the useEffect completes with no URL.
+  const hasSource = !!(fileId || src);
+  const isResolving = hasSource && !hadError && !resolved;
+  // Shimmer should stay visible until the image is fully loaded, not just until the URL resolves.
+  // Without this, there is a white flash between "URL resolved" and "image onLoad" because the
+  // <img> is opacity-0 with no background behind it during that window.
+  const showShimmer = isResolving || (hasSource && !hadError && !loaded);
+  const showFallback = hadError;
   const wrapperClassName = cn(roundClass(rounded), containerClassName);
 
   return (
-    <div className={wrapperClassName} onClick={onClick}>
-      {showFallback ? (
+    <div className={cn('relative', wrapperClassName)} onClick={onClick}>
+      {showShimmer && (
+        /* Shimmer skeleton — visible until the signed URL is fetched AND image is fully loaded */
+        <div className={cn('absolute inset-0 animate-pulse bg-gray-200 dark:bg-gray-700', roundClass(rounded))} aria-hidden="true" />
+      )}
+      {showFallback && (
         <DefaultAvatar name={fallbackName ?? alt} className={cn('w-full h-full', roundClass(rounded), className)} />
-      ) : (
+      )}
+      {!isResolving && !showFallback && (
         <MediaRenderer
           kind="image"
           src={resolved ?? ''}
@@ -268,6 +282,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           fit={fit}
           onError={() => setHadError(true)}
           onLoad={() => setLoaded(true)}
+          loading="eager"
           className="w-full h-full"
           mediaClassName={`transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${className ?? ''}`}
           maxHeightClassName={maxHeightClassName ?? 'max-h-[70vh]'}

@@ -122,6 +122,50 @@ export const ProfileLayout: React.FC = () => {
     return location.pathname === '/profile';
   }, [isVisitorRoute, user, location.pathname]);
 
+  const verificationPromptDetails = useMemo(() => {
+    const emailAddress = user?.email?.trim() || 'your email address';
+
+    if (verificationPromptContext === 'design-create') {
+      return {
+        title: 'Verify your email before creating designs',
+        description: (
+          <>
+            Design creation is locked until email verification is complete. We sent a verification link to <span className="font-semibold">{emailAddress}</span>. Click it, then return here.
+          </>
+        ),
+        toastMessage:
+          'Verify your email before creating designs. Check your inbox and click the verification link, then come back here.',
+        actionLabel: verificationNextPath ? 'I Have Verified - Continue' : 'I Have Verified',
+      };
+    }
+
+    if (verificationPromptContext === 'store-setup') {
+      return {
+        title: 'Verify your email before store setup',
+        description: (
+          <>
+            Store setup is locked until email verification is complete. We sent a verification link to <span className="font-semibold">{emailAddress}</span>. Click it, then return here.
+          </>
+        ),
+        toastMessage:
+          'Verify your email before starting store setup. Check your inbox for the verification link.',
+        actionLabel: verificationNextPath ? 'I Have Verified - Continue' : 'I Have Verified',
+      };
+    }
+
+    return {
+      title: 'Verify your email to secure your account',
+      description: (
+        <>
+          We sent a verification link to <span className="font-semibold">{emailAddress}</span>. Click it, then come back and confirm below.
+        </>
+      ),
+      toastMessage:
+        'Verify your email before continuing. Check your inbox and click the verification link, or use the resend button on your profile if you have not received it.',
+      actionLabel: verificationNextPath ? 'I Have Verified - Continue' : 'I Have Verified',
+    };
+  }, [verificationNextPath, user?.email, verificationPromptContext]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -137,10 +181,8 @@ export const ProfileLayout: React.FC = () => {
       shouldCleanQuery = true;
     }
 
-    if (verificationPromptContext === 'store-setup' && !user.isEmailVerified) {
-      toast.info(
-        'Verify your email before starting store setup. Check your inbox and click the verification link.',
-      );
+    if (!user.isEmailVerified && verificationPromptContext) {
+      toast.info(verificationPromptDetails.toastMessage);
       shouldCleanQuery = true;
     }
 
@@ -153,7 +195,7 @@ export const ProfileLayout: React.FC = () => {
       next.delete('verifyEmailPrompt');
       return next;
     }, { replace: true });
-  }, [searchParams, setSearchParams, user, verificationPromptContext]);
+  }, [searchParams, setSearchParams, user, verificationPromptContext, verificationPromptDetails.toastMessage]);
 
   const refreshEmailVerificationStatus = async () => {
     if (!user || isRefreshingVerification) return;
@@ -294,18 +336,10 @@ export const ProfileLayout: React.FC = () => {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-purple-800 dark:text-purple-200">
-                      {verificationPromptContext === 'store-setup'
-                        ? 'Verify your email before store setup'
-                        : 'Verify your email to secure your account'}
+                      {verificationPromptDetails.title}
                     </p>
                     <p className="text-xs sm:text-sm text-purple-700/90 dark:text-purple-100/80 mt-1">
-                      {verificationPromptContext === 'store-setup'
-                        ? <>
-                            Store setup is locked until email verification is complete. We sent a verification link to <span className="font-semibold">{user?.email}</span>. Click it, then return here.
-                          </>
-                        : <>
-                            We sent a verification link to <span className="font-semibold">{user?.email}</span>. Click it, then come back and confirm below.
-                          </>}
+                      {verificationPromptDetails.description}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -325,9 +359,7 @@ export const ProfileLayout: React.FC = () => {
                     >
                       {isRefreshingVerification
                         ? 'Checking...'
-                        : verificationNextPath
-                          ? 'I Have Verified - Continue'
-                          : 'I Have Verified'}
+                        : verificationPromptDetails.actionLabel}
                     </button>
                   </div>
                 </div>

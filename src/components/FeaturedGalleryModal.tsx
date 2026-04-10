@@ -106,7 +106,7 @@ const FeaturedGalleryModal: React.FC<FeaturedGalleryModalProps> = ({ open, onClo
                             src={images[0]}
                             alt={item.entityName}
                             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            loading="lazy"
+                            loading="eager"
                           />
                         </div>
                         {images.slice(1, 3).map((url, i) => (
@@ -115,7 +115,7 @@ const FeaturedGalleryModal: React.FC<FeaturedGalleryModalProps> = ({ open, onClo
                               src={url}
                               alt={`${item.entityName} ${i + 2}`}
                               className="h-full w-full object-cover"
-                              loading="lazy"
+                              loading="eager"
                             />
                           </div>
                         ))}
@@ -127,7 +127,7 @@ const FeaturedGalleryModal: React.FC<FeaturedGalleryModalProps> = ({ open, onClo
                             src={images[0]}
                             alt={item.entityName}
                             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            loading="lazy"
+                            loading="eager"
                           />
                         ) : (
                           <div className="flex h-full items-center justify-center bg-amber-50 text-3xl dark:bg-amber-500/10">⭐</div>

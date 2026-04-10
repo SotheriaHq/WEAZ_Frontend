@@ -102,6 +102,9 @@ export interface InboxItem {
   mutedUntil?: string | null;
   archivedAt?: string | null;
   targetUrl?: string;
+  /** Canonical order-detail page URL for the "View Order" action. Distinct from
+   *  targetUrl which is optimised for notification deep-links. */
+  orderDetailUrl?: string | null;
 }
 
 export interface InboxResponse {
@@ -117,6 +120,7 @@ export interface ResolvedThreadRoute {
   customOrderId?: string | null;
   inquiryType?: string;
   targetUrl: string;
+  orderDetailUrl?: string | null;
 }
 
 const parseMessageList = (data: unknown): MessageListResponse => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { confirmMyOrderDelivery, getMyOrder, resolveOrderAccess, type Order } from '@/api/StoreApi';
 import { toast } from 'sonner';
 
@@ -108,12 +108,25 @@ type TimelineStep = {
 
 const OrderDetail: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { flags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeReviewItem, setActiveReviewItem] = useState<any | null>(null);
   const [confirmingDelivery, setConfirmingDelivery] = useState(false);
+
+  useEffect(() => {
+    const paymentFailureReason =
+      (location.state as { paymentFailureReason?: string } | null)
+        ?.paymentFailureReason;
+    if (!paymentFailureReason) {
+      return;
+    }
+
+    toast.error(paymentFailureReason);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     let active = true;

@@ -1,9 +1,9 @@
-import React, { useState, useCallback } from 'react';
-import { ShoppingBag, Eye, ImageOff } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
+import { brandApi } from '@/api/BrandApi';
 import { toast } from 'sonner';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import MediaRenderer from '@/components/media/MediaRenderer';
@@ -70,6 +70,8 @@ interface StoreProductCardProps {
   onViewProduct?: (product: StoreProduct) => void;
   isWishlisted?: boolean;
   className?: string;
+  enableHoverGallery?: boolean;
+  onPreviewNavigationActiveChange?: (active: boolean) => void;
   /** Owner mode shows edit/manage controls instead of purchase controls */
   isOwnerView?: boolean;
   onEdit?: (product: StoreProduct) => void;
@@ -79,6 +81,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   product,
   onViewProduct,
   className = '',
+  enableHoverGallery = false,
+  onPreviewNavigationActiveChange,
   isOwnerView = false,
   onEdit,
 }) => {
@@ -93,6 +97,9 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const [showCustomLabel, setShowCustomLabel] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [failedGalleryUrls, setFailedGalleryUrls] = useState<string[]>([]);
+  const [resolvedGalleryImages, setResolvedGalleryImages] = useState<string[]>([]);
   const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
   const redHeartEmoji = String.fromCodePoint(0x2764, 0xfe0f);
   const whiteHeartEmoji = String.fromCodePoint(0x1f90d);
@@ -176,8 +183,19 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       return;
     }
 
-    // Products with selectable options must go through detail selection first.
-    if (product.sizes.length > 0 || product.colors.length > 0) {
+    const requiresMeasuredBagFlow =
+      product.sizingMode === 'RTW_PLUS_FITTINGS' &&
+      Array.isArray(product.customMeasurementKeys) &&
+      product.customMeasurementKeys.length > 0;
+
+    // Products with selectable options, hybrid fittings, or custom-order
+    // availability need the detail surface so the buyer chooses the right path.
+    if (
+      product.sizes.length > 0 ||
+      product.colors.length > 0 ||
+      requiresMeasuredBagFlow ||
+      isCustomAvailable
+    ) {
       onViewProduct?.(product);
       return;
     }
@@ -220,7 +238,178 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const { url: primarySignedUrl } = useSignedFileUrl(primaryFileId, primaryImage);
   const { url: secondarySignedUrl } = useSignedFileUrl(secondaryFileId, secondaryImage);
 
-  const displayImage = isHovered && secondarySignedUrl ? secondarySignedUrl : primarySignedUrl;
+  const gallerySources = useMemo(() => {
+    const seen = new Set<string>();
+    const sources: Array<{ fileId?: string; url?: string | null }> = [];
+    const appendSource = (source: { fileId?: string; url?: string | null }) => {
+      const key = source.fileId || source.url || null;
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      sources.push(source);
+    };
+
+    appendSource({ fileId: primaryFileId, url: primaryImage });
+    appendSource({ fileId: secondaryFileId, url: secondaryImage });
+
+    product.media?.forEach((item) => {
+      appendSource({
+        fileId:
+          typeof item.id === 'string' && !item.id.startsWith('http')
+            ? item.id
+            : undefined,
+        url: item.url,
+      });
+    });
+
+    product.mediaIds?.forEach((mediaId) => {
+      if (typeof mediaId === 'string' && mediaId.trim().length > 0) {
+        appendSource({ fileId: mediaId });
+      }
+    });
+
+    product.images.forEach((imageUrl) => {
+      appendSource({ url: imageUrl });
+    });
+
+    return sources;
+  }, [primaryFileId, primaryImage, product.images, product.media, product.mediaIds, secondaryFileId, secondaryImage]);
+
+  useEffect(() => {
+    let active = true;
+
+    const resolveGalleryImages = async () => {
+      if (gallerySources.length === 0) {
+        setResolvedGalleryImages([]);
+        return;
+      }
+
+      const resolved = await Promise.all(
+        gallerySources.map(async (source) => {
+          if (source.fileId) {
+            try {
+              const signed = await brandApi.getSignedFileUrl(source.fileId);
+              if (signed) {
+                return signed;
+              }
+            } catch {
+            }
+          }
+
+          if (
+            source.url &&
+            source.url.includes('.s3.') &&
+            !source.url.includes('?')
+          ) {
+            try {
+              const signed = await brandApi.getSignedS3Url(source.url);
+              if (signed) {
+                return signed;
+              }
+            } catch {
+            }
+          }
+
+          return source.url ?? null;
+        }),
+      );
+
+      if (!active) {
+        return;
+      }
+
+      setResolvedGalleryImages(
+        resolved.reduce<string[]>((acc, candidate) => {
+          if (!candidate || acc.includes(candidate)) {
+            return acc;
+          }
+          acc.push(candidate);
+          return acc;
+        }, []),
+      );
+    };
+
+    void resolveGalleryImages();
+
+    return () => {
+      active = false;
+    };
+  }, [gallerySources]);
+
+  const galleryImages = useMemo(() => {
+    const candidates = [
+      primarySignedUrl,
+      secondarySignedUrl,
+      ...resolvedGalleryImages,
+      primaryImage,
+      secondaryImage,
+      ...product.images,
+    ];
+
+    return candidates.reduce<string[]>((acc, candidate) => {
+      if (!candidate || acc.includes(candidate)) {
+        return acc;
+      }
+
+      acc.push(candidate);
+      return acc;
+    }, []).filter((candidate) => !failedGalleryUrls.includes(candidate));
+  }, [failedGalleryUrls, primaryImage, primarySignedUrl, product.images, resolvedGalleryImages, secondaryImage, secondarySignedUrl]);
+
+  const hoverGalleryEnabled = enableHoverGallery && galleryImages.length > 1;
+  const safePreviewIndex = galleryImages.length > 0
+    ? Math.min(previewIndex, galleryImages.length - 1)
+    : 0;
+  const primaryDisplayImage = primarySignedUrl && !failedGalleryUrls.includes(primarySignedUrl)
+    ? primarySignedUrl
+    : primaryImage && !failedGalleryUrls.includes(primaryImage)
+      ? primaryImage
+      : null;
+  const secondaryDisplayImage = secondarySignedUrl && !failedGalleryUrls.includes(secondarySignedUrl)
+    ? secondarySignedUrl
+    : secondaryImage && !failedGalleryUrls.includes(secondaryImage)
+      ? secondaryImage
+      : null;
+  const displayImage = hoverGalleryEnabled
+    ? galleryImages[safePreviewIndex] ?? galleryImages[0] ?? primaryDisplayImage
+    : isHovered && secondaryDisplayImage
+      ? secondaryDisplayImage
+      : primaryDisplayImage;
+  const hasDisplayImage = Boolean(displayImage);
+
+  useEffect(() => {
+    if (!isHovered || !hoverGalleryEnabled) {
+      setPreviewIndex(0);
+      onPreviewNavigationActiveChange?.(false);
+    }
+  }, [hoverGalleryEnabled, isHovered, onPreviewNavigationActiveChange]);
+
+  useEffect(() => {
+    setImgLoaded(false);
+    setImgError(false);
+  }, [displayImage]);
+
+  useEffect(() => {
+    setFailedGalleryUrls([]);
+  }, [product.id]);
+
+  const movePreview = useCallback((direction: -1 | 1) => {
+    if (!hoverGalleryEnabled) {
+      return;
+    }
+
+    setPreviewIndex((current) => {
+      const next = current + direction;
+      if (next < 0) {
+        return galleryImages.length - 1;
+      }
+      if (next >= galleryImages.length) {
+        return 0;
+      }
+      return next;
+    });
+  }, [galleryImages.length, hoverGalleryEnabled]);
 
   // Calculate available sizes
   // const availableSizes = product.sizeAvailability.filter((s) => s.inStock);
@@ -241,22 +430,25 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       `}
       onClick={handleCardClick}
       onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        onPreviewNavigationActiveChange?.(false);
+      }}
     >
       {/* Full-bleed Image */}
       <div className="absolute inset-0 bg-gray-100 dark:bg-zinc-800/50">
         {/* Skeleton loader */}
-        {!imgLoaded && !imgError && (
+        {hasDisplayImage && !imgLoaded && !imgError && (
           <div className="absolute inset-0 animate-pulse">
             <div className="h-full w-full bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-zinc-800 dark:via-zinc-700 dark:to-zinc-800" />
           </div>
         )}
 
         {/* Product Image */}
-        {!imgError && displayImage ? (
+        {!imgError && hasDisplayImage ? (
           <MediaRenderer
             kind="image"
-            src={displayImage}
+            src={displayImage ?? ''}
             alt={product.name}
             fit="cover"
             className={`
@@ -270,17 +462,62 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             maxWidthClassName="max-w-full"
             onLoad={() => setImgLoaded(true)}
             onError={() => {
+              if (hoverGalleryEnabled && displayImage && galleryImages.length > 1) {
+                setFailedGalleryUrls((prev) => (prev.includes(displayImage) ? prev : [...prev, displayImage]));
+                setImgLoaded(true);
+                return;
+              }
               setImgError(true);
               setImgLoaded(true);
             }}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-zinc-800">
-            <ImageOff className="h-10 w-10 text-gray-300 dark:text-zinc-600 mb-1.5" strokeWidth={1.5} />
+            <span className="mb-1.5 text-3xl">🖼️</span>
             <span className="text-xs text-gray-400 dark:text-zinc-500">No image</span>
           </div>
         )}
       </div>
+
+      {hoverGalleryEnabled && isHovered ? (
+        <div
+          className="absolute inset-x-3 top-1/2 z-20 flex -translate-y-1/2 items-center justify-between"
+          onMouseEnter={() => onPreviewNavigationActiveChange?.(true)}
+          onMouseLeave={() => onPreviewNavigationActiveChange?.(false)}
+        >
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              movePreview(-1);
+            }}
+            onFocus={() => onPreviewNavigationActiveChange?.(true)}
+            onBlur={() => onPreviewNavigationActiveChange?.(false)}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-black/55 text-lg text-white shadow-lg backdrop-blur-sm transition hover:bg-black/70"
+            aria-label="Show previous preview"
+          >
+            ←
+          </button>
+          <div className="rounded-full border border-white/20 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+            {safePreviewIndex + 1}/{galleryImages.length}
+          </div>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              movePreview(1);
+            }}
+            onFocus={() => onPreviewNavigationActiveChange?.(true)}
+            onBlur={() => onPreviewNavigationActiveChange?.(false)}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-black/55 text-lg text-white shadow-lg backdrop-blur-sm transition hover:bg-black/70"
+            aria-label="Show next preview"
+          >
+            →
+          </button>
+        </div>
+      ) : null}
 
       {/* Status Indicators - Top Left — minimal emoji with hover tooltip */}
       <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 z-10">
@@ -488,14 +725,16 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                   ${cartLoading ? 'opacity-70 cursor-wait' : ''}
                 `}
               >
-                <ShoppingBag size={15} />
+                <span role="img" aria-hidden="true" className="text-sm leading-none">
+                  🛍️
+                </span>
               </button>
             )}
 
             {isOwnerView && (
               <div className="flex items-center gap-2 text-[10px] text-white/50">
                 <span className="inline-flex items-center gap-0.5">
-                  <Eye size={10} />
+                  <span role="img" aria-hidden="true">👁️</span>
                   {product.viewsCount}
                 </span>
               </div>

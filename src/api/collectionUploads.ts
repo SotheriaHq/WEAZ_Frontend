@@ -269,6 +269,7 @@ export async function initializeCollectionUploads(
     rtwSizeType?: 'PREDEFINED' | 'FREEFORM' | 'MIXED';
     customGender?: 'MEN' | 'WOMEN' | 'UNISEX';
     customMeasurementKeys?: string[];
+    customOrderEnabled?: boolean;
     fitPreference?: 'SLIM' | 'REGULAR' | 'LOOSE' | 'OVERSIZED';
     targetAgeGroup?: 'ADULT' | 'CHILD';
   },
@@ -308,6 +309,7 @@ export async function finalizeCollectionUploads(
       rtwSizeType?: 'PREDEFINED' | 'FREEFORM' | 'MIXED';
       customGender?: 'MEN' | 'WOMEN' | 'UNISEX';
       customMeasurementKeys?: string[];
+      customOrderEnabled?: boolean;
       fitPreference?: 'SLIM' | 'REGULAR' | 'LOOSE' | 'OVERSIZED';
       targetAgeGroup?: 'ADULT' | 'CHILD';
     };

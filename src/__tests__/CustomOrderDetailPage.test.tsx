@@ -10,13 +10,17 @@ const cancelOrder = vi.fn();
 const initializePayment = vi.fn();
 const verifyPayment = vi.fn();
 const respondToExtension = vi.fn();
+const confirmPrompt = vi.fn();
 
 vi.mock('react-redux', () => ({
   useSelector: (selector: (state: unknown) => unknown) =>
     selector({
       user: {
         profile: {
+          firstName: 'Ada',
+          lastName: 'Okafor',
           email: 'buyer@example.com',
+          phoneNumber: '08000000000',
         },
       },
     }),
@@ -39,10 +43,18 @@ vi.mock('@/components/messaging/OrderMessagesPanel', () => ({
   default: () => null,
 }));
 
+vi.mock('@/components/ui/useConfirm', () => ({
+  useConfirm: () => ({
+    confirm: confirmPrompt,
+    ConfirmDialog: null,
+  }),
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),
     success: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -55,7 +67,7 @@ const orderFixture = {
   promisedProductionAt: '2026-03-18T10:00:00.000Z',
   promisedDispatchAt: '2026-03-20T10:00:00.000Z',
   promisedDeliveryAt: '2026-03-22T10:00:00.000Z',
-  buyerAcceptanceWindowEndsAt: '2026-03-25T10:00:00.000Z',
+  buyerAcceptanceWindowEndsAt: '2099-03-25T10:00:00.000Z',
   measurementConfirmedAt: '2026-03-12T10:00:00.000Z',
   source: {
     title: 'Structured Occasion Dress',
@@ -116,6 +128,7 @@ describe('CustomOrderDetailPage', () => {
     initializePayment.mockResolvedValue({ authorizationUrl: null });
     verifyPayment.mockResolvedValue(orderFixture);
     respondToExtension.mockResolvedValue(orderFixture);
+    confirmPrompt.mockResolvedValue(true);
   });
 
   it('renders the buyer tracking sections for a custom order', async () => {
@@ -131,10 +144,10 @@ describe('CustomOrderDetailPage', () => {
       expect(screen.getByText('Structured Occasion Dress')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Order overview')).toBeInTheDocument();
-    expect(screen.getByText('Production stage history')).toBeInTheDocument();
-    expect(screen.getByText('Extension requests')).toBeInTheDocument();
-    expect(screen.getByText('Buyer actions')).toBeInTheDocument();
+    expect(screen.getByText('Customer and delivery details')).toBeInTheDocument();
+    expect(screen.getAllByText('Measurements').length).toBeGreaterThan(0);
+    expect(screen.getByText('Timeline')).toBeInTheDocument();
+    expect(screen.getByText('Support and actions')).toBeInTheDocument();
   });
 
   it('confirms before reporting an issue', async () => {
@@ -147,17 +160,26 @@ describe('CustomOrderDetailPage', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Buyer actions')).toBeInTheDocument();
+      expect(screen.getByText('Support and actions')).toBeInTheDocument();
     });
 
     fireEvent.change(screen.getByPlaceholderText('Describe the issue'), {
       target: { value: 'The delivered fit does not match the confirmed bust measurement.' },
     });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Report issue' })).toBeEnabled();
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Report issue' }));
 
-    expect(await screen.findByText('Report a delivery issue?')).toBeInTheDocument();
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Report issue' }).at(-1)!);
+    await waitFor(() => {
+      expect(confirmPrompt).toHaveBeenCalledWith({
+        title: 'Report a delivery issue?',
+        message: 'This opens a support and dispute review path for the order.',
+        confirmText: 'Report issue',
+        cancelText: 'Go back',
+        isDestructive: true,
+      });
+    });
 
     await waitFor(() => {
       expect(reportIssue).toHaveBeenCalledWith('order-12345678', {
@@ -171,7 +193,7 @@ describe('CustomOrderDetailPage', () => {
     getById.mockResolvedValue({
       ...orderFixture,
       buyerAcceptanceWindowEndsAt: '2026-03-01T10:00:00.000Z',
-      status: 'COMPLETED',
+      status: 'DELIVERED_PENDING_BUYER_CONFIRMATION',
     });
 
     render(
@@ -183,7 +205,7 @@ describe('CustomOrderDetailPage', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Buyer actions')).toBeInTheDocument();
+      expect(screen.getByText('Support and actions')).toBeInTheDocument();
     });
 
     expect(screen.getByText('Delivery issues can only be reported while the buyer acceptance window is still open.')).toBeInTheDocument();

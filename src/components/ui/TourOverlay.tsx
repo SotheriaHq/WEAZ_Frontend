@@ -113,8 +113,8 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
   const [isLocating, setIsLocating] = useState(true);
 
-  const measureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const measureTimerRef = useRef<number | ReturnType<typeof setTimeout> | null>(null);
+  const scrollTimerRef = useRef<number | ReturnType<typeof setTimeout> | null>(null);
   const rafRef = useRef<number | null>(null);
 
   const currentStep = steps[stepIndex] ?? null;
@@ -173,8 +173,8 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
     if (!isActive || !currentStep) return;
     measureTarget(currentStep);
     return () => {
-      if (measureTimerRef.current) clearTimeout(measureTimerRef.current);
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+      if (measureTimerRef.current) window.clearTimeout(measureTimerRef.current);
+      if (scrollTimerRef.current) window.clearTimeout(scrollTimerRef.current);
     };
     // stepIndex as dep drives re-run on step change; measureTarget is stable
     // eslint-disable-next-line react-hooks/exhaustive-deps

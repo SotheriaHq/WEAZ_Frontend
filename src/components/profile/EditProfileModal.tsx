@@ -597,6 +597,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           }}
                           options={stateOptions}
                           placeholder={loadingLocations ? "Loading..." : "State/Province"}
+                          searchable
+                          searchPlaceholder="Search states or provinces..."
+                          emptyMessage="No matching state or province found"
                           disabled={!selectedCountry || stateOptions.length === 0 || loadingLocations}
                           className="w-full"
                       />
@@ -606,6 +609,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           onChange={(val) => setValue('brandCity', val)}
                           options={cityOptions}
                           placeholder={loadingLocations ? "Loading..." : "City"}
+                          searchable
+                          searchPlaceholder="Search cities..."
+                          emptyMessage="No matching city found"
                           disabled={!selectedState || cityOptions.length === 0 || loadingLocations}
                           className="w-full"
                       />
@@ -625,6 +631,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     }
                     options={BUSINESS_TYPE_OPTIONS}
                     placeholder="Select Type"
+                    searchable
+                    searchPlaceholder="Search business types..."
+                    emptyMessage="No matching business type found"
                     disabled={isSubmitting}
                     className="w-full"
                   />

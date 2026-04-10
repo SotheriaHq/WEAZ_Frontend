@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { getStoreStatus } from '@/api/StoreApi';
 import { useMeasurementPoints } from '@/hooks/useMeasurementPoints';
@@ -16,14 +16,17 @@ import {
 interface CustomOrderConfigurationEditorProps {
   sourceType: CustomOrderSourceType;
   sourceId?: string;
+  sourceTitle?: string;
   measurementKeys: string[];
   measurementGender?: 'MEN' | 'WOMEN' | 'UNISEX';
   defaultBaseCharge?: string | number | null;
   disabled?: boolean;
+  onRequiredMeasurementKeysChange?: (keys: string[]) => void;
 }
 
 export interface CustomOrderConfigurationEditorHandle {
   saveConfiguration: (options?: { silentSuccess?: boolean }) => Promise<boolean>;
+  buildConfigurationDraft: () => Omit<CustomOrderConfigurationUpsertInput, 'sourceId'> | null;
 }
 
 type ConfigurationFormState = {
@@ -99,6 +102,11 @@ type SizeExtraYardFormState = {
   extraYards: string;
 };
 
+type FieldErrors = {
+  rushFee?: string;
+  rushProductionLeadDays?: string;
+};
+
 const createRuleId = () =>
   `rule_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -126,6 +134,15 @@ const normalizeMeasurementDisplayLabel = (rawLabel: string) =>
 
 const normalizeMeasurementLabel = (value: string) =>
   value.trim().toLowerCase().replace(/[\s_]+/g, ' ');
+
+const normalizeMeasurementKeyList = (keys: string[]) =>
+  Array.from(
+    new Set(
+      keys
+        .map((key) => String(key ?? '').trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  );
 
 const parsePolicySelection = (value: string, options: string[]) =>
   options.includes(value) ? value : POLICY_CUSTOM;
@@ -245,9 +262,9 @@ const normalizeRulePayload = (
   });
 };
 
-const createDefaultForm = (keys: string[]): ConfigurationFormState => ({
+const createDefaultForm = (): ConfigurationFormState => ({
   buyerInstructionText: '',
-  requiredMeasurementKeys: keys,
+  requiredMeasurementKeys: [],
   fabricRuleBasisId: '',
   baseProductionCharge: '',
   fabricCostPerYard: '',
@@ -310,26 +327,28 @@ const mapConfigurationToForm = (configuration: CustomOrderConfiguration): Config
 const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditorHandle, CustomOrderConfigurationEditorProps>(({ 
   sourceType,
   sourceId,
+  sourceTitle,
   measurementKeys,
   measurementGender,
   defaultBaseCharge,
   disabled = false,
+  onRequiredMeasurementKeysChange,
 }, ref) => {
   const [brandId, setBrandId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [configuration, setConfiguration] = useState<CustomOrderConfiguration | null>(null);
   const [bases, setBases] = useState<CustomFabricRuleBasis[]>([]);
-  const [form, setForm] = useState<ConfigurationFormState>(() => createDefaultForm(measurementKeys));
+  const [form, setForm] = useState<ConfigurationFormState>(() => createDefaultForm());
   const [basisLabel, setBasisLabel] = useState('');
   const [revisionPolicyPreset, setRevisionPolicyPreset] = useState<string>(() =>
-    parsePolicySelection(createDefaultForm(measurementKeys).revisionPolicy, REVISION_POLICY_OPTIONS),
+    parsePolicySelection(createDefaultForm().revisionPolicy, REVISION_POLICY_OPTIONS),
   );
   const [returnPolicyPreset, setReturnPolicyPreset] = useState<string>(() =>
-    parsePolicySelection(createDefaultForm(measurementKeys).returnPolicy, RETURN_POLICY_OPTIONS),
+    parsePolicySelection(createDefaultForm().returnPolicy, RETURN_POLICY_OPTIONS),
   );
   const [defectPolicyPreset, setDefectPolicyPreset] = useState<string>(() =>
-    parsePolicySelection(createDefaultForm(measurementKeys).defectPolicy, DEFECT_POLICY_OPTIONS),
+    parsePolicySelection(createDefaultForm().defectPolicy, DEFECT_POLICY_OPTIONS),
   );
   const [ruleRows, setRuleRows] = useState<RuleFormState[]>(() => createDefaultRules());
   const [averageBaseYards, setAverageBaseYards] = useState('');
@@ -337,10 +356,15 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     { sizeLabel: 'XL', extraYards: '1.5' },
     { sizeLabel: 'XXL', extraYards: '2' },
   ]);
+  const [showFabricRules, setShowFabricRules] = useState(false);
   const [manualMeasurementKeyInput, setManualMeasurementKeyInput] = useState('');
   const [hasEditedBaseCharge, setHasEditedBaseCharge] = useState(false);
   const [showAllSelectedKeys, setShowAllSelectedKeys] = useState(false);
   const [showAllPoolKeys, setShowAllPoolKeys] = useState(false);
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const containerRef = useRef<HTMLElement | null>(null);
+  const seededMeasurementKeysSignatureRef = useRef<string>('');
 
   const normalizedDefaultBaseCharge = useMemo(() => {
     if (defaultBaseCharge == null) {
@@ -358,14 +382,38 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     [measurementGender],
   );
   const { points: measurementPoints } = useMeasurementPoints(measurementFilter);
+  const normalizedMeasurementKeys = useMemo(
+    () => normalizeMeasurementKeyList(measurementKeys),
+    [measurementKeys],
+  );
+  const looksLikeRegistryWideSeed = useMemo(() => {
+    const registryKeys = normalizeMeasurementKeyList(
+      measurementPoints.map((point) => point.key),
+    );
+    const LEGACY_REGISTRY_WIDTH_THRESHOLD = 8;
 
-  useEffect(() => {
-    setForm((current) => ({
-      ...current,
-      requiredMeasurementKeys:
-        current.requiredMeasurementKeys.length > 0 ? current.requiredMeasurementKeys : measurementKeys,
-    }));
-  }, [measurementKeys]);
+    return (
+      registryKeys.length >= LEGACY_REGISTRY_WIDTH_THRESHOLD &&
+      registryKeys.every((key) => normalizedMeasurementKeys.includes(key))
+    );
+  }, [measurementPoints, normalizedMeasurementKeys]);
+
+  const clearFieldErrors = useCallback((keys: Array<keyof FieldErrors>) => {
+    setFieldErrors((current) => {
+      let changed = false;
+      const next: FieldErrors = { ...current };
+
+      for (const key of keys) {
+        if (next[key] == null) {
+          continue;
+        }
+        delete next[key];
+        changed = true;
+      }
+
+      return changed ? next : current;
+    });
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -376,10 +424,17 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         setBrandId(null);
         setConfiguration(null);
         setHasEditedBaseCharge(false);
+        setShowFabricRules(false);
+        setFieldErrors({});
         setBases([]);
-        const nextForm = createDefaultForm(measurementKeys);
+        const nextForm = createDefaultForm();
         setForm(nextForm);
         setRuleRows(buildRulesFromJson(nextForm.rulesJson));
+        setAverageBaseYards('');
+        setSizeExtraRows([
+          { sizeLabel: 'XL', extraYards: '1.5' },
+          { sizeLabel: 'XXL', extraYards: '2' },
+        ]);
         setLoading(false);
         return;
       }
@@ -389,6 +444,9 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         const status = await getStoreStatus();
         const basisPromise = customOrderConfigurationsApi.listFabricRuleBases({ includeBrandOnly: true });
         const existingConfigurationPromise = (async () => {
+          if (!sourceId) {
+            return null;
+          }
           try {
             if (sourceType === 'PRODUCT') {
               return await customOrderConfigurationsApi.getActiveForProduct(sourceId);
@@ -409,9 +467,11 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         setBases(basisList);
         setBrandId(status.brandId ?? existingConfiguration?.brandId ?? null);
         setConfiguration(existingConfiguration);
+        setFieldErrors({});
 
         if (existingConfiguration) {
           setHasEditedBaseCharge(false);
+          setShowFabricRules(true);
           const nextForm = mapConfigurationToForm(existingConfiguration);
           setForm(nextForm);
           setRuleRows(buildRulesFromJson(nextForm.rulesJson));
@@ -435,14 +495,16 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           setReturnPolicyPreset(parsePolicySelection(nextForm.returnPolicy, RETURN_POLICY_OPTIONS));
           setDefectPolicyPreset(parsePolicySelection(nextForm.defectPolicy, DEFECT_POLICY_OPTIONS));
         } else {
-          setForm((current) => ({
-            ...current,
-            requiredMeasurementKeys:
-              current.requiredMeasurementKeys.length > 0
-                ? current.requiredMeasurementKeys
-                : measurementKeys,
-            fabricRuleBasisId: current.fabricRuleBasisId || basisList[0]?.id || '',
-          }));
+          setHasEditedBaseCharge(false);
+          setShowFabricRules(false);
+          setFieldErrors({});
+          setAverageBaseYards('');
+          setSizeExtraRows([
+            { sizeLabel: 'XL', extraYards: '1.5' },
+            { sizeLabel: 'XXL', extraYards: '2' },
+          ]);
+          setForm(createDefaultForm());
+          setRuleRows((current) => (current.length > 0 ? current : createDefaultRules()));
         }
       } catch (error: any) {
         if (!active) return;
@@ -456,7 +518,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     return () => {
       active = false;
     };
-  }, [sourceId, sourceType]);
+  }, [measurementKeys, sourceId, sourceType]);
 
   useEffect(() => {
     if (configuration || hasEditedBaseCharge) {
@@ -483,7 +545,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   }, [configuration, hasEditedBaseCharge, normalizedDefaultBaseCharge]);
 
   useEffect(() => {
-    if (configuration || !sourceId) {
+    if (configuration || !sourceId || !showFabricRules) {
       return;
     }
     if (form.fabricRuleBasisId || bases.length === 0) {
@@ -494,7 +556,34 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       ...current,
       fabricRuleBasisId: current.fabricRuleBasisId || bases[0].id,
     }));
-  }, [bases, configuration, form.fabricRuleBasisId, sourceId]);
+  }, [bases, configuration, form.fabricRuleBasisId, showFabricRules, sourceId]);
+
+  useEffect(() => {
+    if (
+      configuration ||
+      form.requiredMeasurementKeys.length > 0 ||
+      normalizedMeasurementKeys.length === 0 ||
+      looksLikeRegistryWideSeed
+    ) {
+      return;
+    }
+
+    const nextSignature = normalizedMeasurementKeys.join('|');
+    if (!nextSignature || seededMeasurementKeysSignatureRef.current === nextSignature) {
+      return;
+    }
+
+    seededMeasurementKeysSignatureRef.current = nextSignature;
+    setForm((current) =>
+      current.requiredMeasurementKeys.length > 0
+        ? current
+        : { ...current, requiredMeasurementKeys: normalizedMeasurementKeys },
+    );
+  }, [configuration, form.requiredMeasurementKeys.length, looksLikeRegistryWideSeed, normalizedMeasurementKeys]);
+
+  useEffect(() => {
+    seededMeasurementKeysSignatureRef.current = '';
+  }, [configuration?.id, sourceId]);
 
   const measurementPointLabelMap = useMemo(() => {
     const entries = measurementPoints.map((point) => [
@@ -503,6 +592,14 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     ] as const);
     return new Map(entries);
   }, [measurementPoints]);
+
+  const measurementPointByKey = useMemo(
+    () =>
+      new Map(
+        measurementPoints.map((point) => [String(point.key ?? '').trim().toUpperCase(), point] as const),
+      ),
+    [measurementPoints],
+  );
 
   const availableMeasurementKeys = useMemo(() => {
     const keys: string[] = [];
@@ -542,6 +639,15 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       ),
     [availableMeasurementKeys, form.requiredMeasurementKeys],
   );
+
+  const normalizedSelectedMeasurementKeys = useMemo(
+    () => normalizeMeasurementKeyList(form.requiredMeasurementKeys),
+    [form.requiredMeasurementKeys],
+  );
+
+  useEffect(() => {
+    onRequiredMeasurementKeysChange?.(normalizedSelectedMeasurementKeys);
+  }, [normalizedSelectedMeasurementKeys, onRequiredMeasurementKeysChange]);
 
   const selectableMeasurementKeys = useMemo(
     () =>
@@ -725,6 +831,14 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   };
 
   const updateForm = <K extends keyof ConfigurationFormState>(key: K, value: ConfigurationFormState[K]) => {
+    setValidationMessage(null);
+    if (key === 'rushFee') {
+      clearFieldErrors(['rushFee']);
+    } else if (key === 'rushProductionLeadDays') {
+      clearFieldErrors(['rushProductionLeadDays']);
+    } else if (key === 'rushEnabled') {
+      clearFieldErrors(['rushFee', 'rushProductionLeadDays']);
+    }
     setForm((current) => ({ ...current, [key]: value }));
   };
 
@@ -745,7 +859,9 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       const created = await customOrderConfigurationsApi.createFabricRuleBasis(payload);
       setBases((current) => [created, ...current]);
       setBasisLabel('');
+      setValidationMessage(null);
       setForm((current) => ({ ...current, fabricRuleBasisId: created.id }));
+      setShowFabricRules(true);
       toast.success('Fabric-rule basis created.');
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to create fabric-rule basis');
@@ -754,36 +870,58 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     }
   };
 
-  const handleSaveConfiguration = useCallback(async (options?: { silentSuccess?: boolean }) => {
-    if (!sourceId) {
-      toast.error('Save the product or design first, then configure its custom-order configuration.');
-      return false;
-    }
+  const buildConfigurationDraft = useCallback(() => {
+    const failDraftValidation = (
+      message: string,
+      errors?: FieldErrors,
+      options?: { showBanner?: boolean },
+    ) => {
+      setValidationMessage(options?.showBanner === false ? null : message);
+      setFieldErrors(errors ?? {});
+      if (typeof containerRef.current?.scrollIntoView === 'function') {
+        containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      toast.error(message);
+      return null;
+    };
+
     if (!brandId) {
-      toast.error('Brand context is unavailable for this store session.');
-      return false;
+      return failDraftValidation('Brand context is unavailable for this store session.');
     }
 
     let rules: CustomOrderConfigurationUpsertInput['rules'];
     try {
       rules = normalizeRulePayload(ruleRows);
     } catch (error: any) {
-      toast.error(error?.message || 'Fabric yard rules are invalid.');
-      return false;
+      return failDraftValidation(error?.message || 'Fabric yard rules are invalid.');
     }
 
-    const payload: CustomOrderConfigurationUpsertInput = {
+    const requiredFreeformPointIds = Array.from(
+      new Set(
+        form.requiredMeasurementKeys
+          .map((key) => measurementPointByKey.get(String(key ?? '').trim().toUpperCase()))
+          .filter(
+            (point): point is NonNullable<typeof point> =>
+              Boolean(point?.id && point.source === 'BRAND_FREEFORM'),
+          )
+          .map((point) => point.id),
+      ),
+    );
+
+    const payload: Omit<CustomOrderConfigurationUpsertInput, 'sourceId'> = {
       sourceType,
-      sourceId,
       buyerInstructionText: form.buyerInstructionText.trim() || undefined,
       requiredMeasurementKeys: form.requiredMeasurementKeys,
-      requiredFreeformPointIds: [],
+      requiredFreeformPointIds,
       fabricRuleBasisId: form.fabricRuleBasisId,
       baseProductionCharge: form.baseProductionCharge.trim(),
       fabricCostPerYard: form.fabricCostPerYard.trim(),
       rushEnabled: form.rushEnabled,
       rushFee: form.rushEnabled ? form.rushFee.trim() || undefined : undefined,
-      rushProductionLeadDays: form.rushEnabled && form.rushProductionLeadDays ? Number(form.rushProductionLeadDays) : undefined,
+      rushProductionLeadDays:
+        form.rushEnabled && form.rushProductionLeadDays
+          ? Number(form.rushProductionLeadDays)
+          : undefined,
       productionLeadDays: Number(form.productionLeadDays),
       deliveryMinDays: Number(form.deliveryMinDays),
       deliveryMaxDays: Number(form.deliveryMaxDays),
@@ -793,60 +931,148 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       defectPolicy: form.defectPolicy.trim(),
       fabricSourcingMode: form.fabricSourcingMode,
       notes: form.notes.trim() || undefined,
-      averageBaseYards: averageBaseYards.trim() ? Number(averageBaseYards) : undefined,
+      averageBaseYards: averageBaseYards.trim()
+        ? Number(averageBaseYards)
+        : undefined,
       sizeExtraYards: sizeExtraRows
         .map((row) => ({
           sizeLabel: row.sizeLabel.trim(),
           extraYards: Number(row.extraYards),
         }))
-        .filter((row) => row.sizeLabel.length > 0 && Number.isFinite(row.extraYards)) as CustomOrderConfigurationSizeExtraYard[],
+        .filter(
+          (row) =>
+            row.sizeLabel.length > 0 && Number.isFinite(row.extraYards),
+        ) as CustomOrderConfigurationSizeExtraYard[],
       rules,
     };
 
-    if (payload.averageBaseYards != null && (!Number.isFinite(payload.averageBaseYards) || payload.averageBaseYards <= 0)) {
-      toast.error('Average base yards must be greater than zero.');
-      return false;
+    if (
+      payload.averageBaseYards != null &&
+      (!Number.isFinite(payload.averageBaseYards) ||
+        payload.averageBaseYards <= 0)
+    ) {
+      return failDraftValidation('Average base yards must be greater than zero.');
     }
 
-    if ((payload.sizeExtraYards ?? []).some((row) => !Number.isFinite(row.extraYards) || row.extraYards < 0)) {
-      toast.error('Each size extra-yard value must be zero or greater.');
-      return false;
+    if (
+      (payload.sizeExtraYards ?? []).some(
+        (row) => !Number.isFinite(row.extraYards) || row.extraYards < 0,
+      )
+    ) {
+      return failDraftValidation('Each size extra-yard value must be zero or greater.');
     }
 
     const missingRequiredFields: string[] = [];
-    if (!payload.baseProductionCharge) missingRequiredFields.push('Base production charge');
-    if (!payload.fabricCostPerYard) missingRequiredFields.push('Fabric cost per yard');
-    if (!payload.fabricRuleBasisId) missingRequiredFields.push('Fabric-rule basis');
+    if (!payload.baseProductionCharge)
+      missingRequiredFields.push('Base production charge');
+    if (!payload.fabricCostPerYard)
+      missingRequiredFields.push('Fabric cost per yard');
+    if (showFabricRules && !payload.fabricRuleBasisId)
+      missingRequiredFields.push('Fabric-rule basis');
     if (!payload.revisionPolicy) missingRequiredFields.push('Revision policy');
     if (!payload.returnPolicy) missingRequiredFields.push('Return policy');
     if (!payload.defectPolicy) missingRequiredFields.push('Defect policy');
-    if (payload.requiredMeasurementKeys.length === 0) missingRequiredFields.push('Required measurement keys');
+    if (payload.requiredMeasurementKeys.length === 0)
+      missingRequiredFields.push('Required measurement keys');
     if (form.rushEnabled) {
       if (!form.rushFee.trim()) missingRequiredFields.push('Rush fee');
-      if (!form.rushProductionLeadDays.trim()) missingRequiredFields.push('Rush production lead days');
+      if (!form.rushProductionLeadDays.trim())
+        missingRequiredFields.push('Rush production lead days');
     }
 
     if (missingRequiredFields.length > 0) {
-      toast.error(`Complete required fields: ${missingRequiredFields.join(', ')}`);
-      return false;
+      const rushErrors: FieldErrors = {};
+      if (form.rushEnabled && !form.rushFee.trim()) {
+        rushErrors.rushFee = 'Rush fee is required.';
+      }
+      if (form.rushEnabled && !form.rushProductionLeadDays.trim()) {
+        rushErrors.rushProductionLeadDays = 'Rush production lead days are required.';
+      }
+
+      return failDraftValidation(
+        `Complete required fields: ${missingRequiredFields.join(', ')}`,
+        rushErrors,
+      );
     }
 
     if (form.rushEnabled) {
       const rushFeeValue = Number(form.rushFee);
       if (!Number.isFinite(rushFeeValue) || rushFeeValue <= 0) {
-        toast.error('Rush fee must be a positive number.');
-        return false;
+        return failDraftValidation('Rush fee must be a positive number.', {
+          rushFee: 'Rush fee must be a positive number.',
+        }, { showBanner: false });
       }
 
       const rushProductionLeadDaysValue = Number(form.rushProductionLeadDays);
       const productionLeadDaysValue = Number(form.productionLeadDays);
-      if (!Number.isFinite(rushProductionLeadDaysValue) || rushProductionLeadDaysValue < 5) {
-        toast.error('Rush production lead days must be at least 5.');
-        return false;
+      if (
+        !Number.isFinite(rushProductionLeadDaysValue) ||
+        rushProductionLeadDaysValue < 5
+      ) {
+        return failDraftValidation('Rush production lead days must be at least 5.', {
+          rushProductionLeadDays: 'Rush production lead days must be at least 5.',
+        }, { showBanner: false });
       }
 
-      if (Number.isFinite(productionLeadDaysValue) && rushProductionLeadDaysValue >= productionLeadDaysValue) {
-        toast.error('Rush production lead time must be shorter than standard production lead time.');
+      if (
+        Number.isFinite(productionLeadDaysValue) &&
+        rushProductionLeadDaysValue >= productionLeadDaysValue
+      ) {
+        return failDraftValidation(
+          'Rush production lead time must be shorter than standard production lead time.',
+          {
+            rushProductionLeadDays:
+              'Rush production lead time must be shorter than standard production lead time.',
+          },
+          { showBanner: false },
+        );
+      }
+    }
+
+    setValidationMessage(null);
+    setFieldErrors({});
+    return payload;
+  }, [
+    averageBaseYards,
+    brandId,
+    measurementPointByKey,
+    form,
+    showFabricRules,
+    ruleRows,
+    sizeExtraRows,
+    sourceType,
+  ]);
+
+  const handleSaveConfiguration = useCallback(async (options?: { silentSuccess?: boolean }) => {
+    if (!sourceId) {
+      toast.error('Save the product or design first, then configure its custom-order configuration.');
+      return false;
+    }
+    const draft = buildConfigurationDraft();
+    if (!draft) {
+      return false;
+    }
+
+    let payload: CustomOrderConfigurationUpsertInput = {
+      ...draft,
+      sourceId,
+    };
+
+    if (!payload.fabricRuleBasisId) {
+      try {
+        const hiddenBasis = await customOrderConfigurationsApi.createFabricRuleBasis({
+          label: `${String(sourceTitle ?? '').trim() || (sourceType === 'PRODUCT' ? 'Product' : 'Design')} fabric rules`,
+          measurementKeys: draft.requiredMeasurementKeys,
+          gender: measurementGender,
+        });
+        setBases((current) => [hiddenBasis, ...current]);
+        setForm((current) => ({ ...current, fabricRuleBasisId: hiddenBasis.id }));
+        payload = {
+          ...payload,
+          fabricRuleBasisId: hiddenBasis.id,
+        };
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Unable to prepare fabric-rule basis');
         return false;
       }
     }
@@ -874,24 +1100,26 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       setSaving(false);
     }
   }, [
-    averageBaseYards,
-    brandId,
+    buildConfigurationDraft,
+    bases,
     configuration,
-    form,
     measurementGender,
-    ruleRows,
-    sizeExtraRows,
-    sourceId,
+    sourceTitle,
     sourceType,
+    sourceId,
   ]);
 
   useImperativeHandle(ref, () => ({
     saveConfiguration: (options?: { silentSuccess?: boolean }) =>
       handleSaveConfiguration(options),
-  }), [handleSaveConfiguration]);
+    buildConfigurationDraft: () => buildConfigurationDraft(),
+  }), [buildConfigurationDraft, handleSaveConfiguration]);
 
   return (
-    <section className="rounded-xl border border-black/10 bg-white/80 p-3 dark:border-white/10 dark:bg-white/5">
+    <section
+      ref={containerRef}
+      className="rounded-xl border border-black/10 bg-white/80 p-3 dark:border-white/10 dark:bg-white/5"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <p className="text-xs text-slate-600 dark:text-slate-300">
           Configure the production charge and customer-facing policies.
@@ -900,6 +1128,12 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           {configuration ? `Configuration v${configuration.currentVersion}` : 'No config yet'}
         </div>
       </div>
+
+      {validationMessage ? (
+        <div className="mb-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-200">
+          ⚠️ {validationMessage}
+        </div>
+      ) : null}
 
       {!sourceId ? (
         <div className="mt-5 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-4 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
@@ -1108,19 +1342,63 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             Add key
           </button>
         </div>
-        {false ? (
-          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-            <UniversalSelect
-              value={form.fabricRuleBasisId}
-              onChange={(value) => updateForm('fabricRuleBasisId', String(value))}
-              options={basisOptions}
-              placeholder="Select a fabric-rule basis"
-              disabled={disabled}
-              className="w-full"
-            />
-            <button type="button" onClick={handleCreateBasis} disabled={disabled || saving} className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white">
-              Create basis
-            </button>
+
+        <div className="mt-4 rounded-xl border border-black/10 p-3 dark:border-white/10">
+          <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg px-3 py-2 transition-colors ${showFabricRules ? 'bg-purple-50/70 dark:bg-purple-500/10' : 'bg-slate-50 dark:bg-white/5'}`}>
+            <div>
+              <p className="text-sm font-semibold text-slate-800 dark:text-white">Add fabric rules</p>
+              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                Reveal the fabric-rule basis and yard-rule builder only when you need measurement-based pricing.
+              </p>
+            </div>
+            <div className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 ${showFabricRules ? 'bg-purple-600' : 'bg-slate-300 dark:bg-white/20'}`}>
+              <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${showFabricRules ? 'translate-x-5' : 'translate-x-0'}`} />
+              <input
+                type="checkbox"
+                className="sr-only"
+                aria-label="Add fabric rules"
+                checked={showFabricRules}
+                onChange={(event) => setShowFabricRules(event.target.checked)}
+                disabled={disabled}
+              />
+            </div>
+          </label>
+        </div>
+
+        {showFabricRules ? (
+          <div className="mt-4 space-y-2">
+            <div className="grid gap-3">
+              <UniversalSelect
+                value={form.fabricRuleBasisId}
+                onChange={(value) => updateForm('fabricRuleBasisId', String(value))}
+                options={basisOptions}
+                placeholder="Select a fabric-rule basis"
+                disabled={disabled}
+                className="w-full"
+              />
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <input
+                  value={basisLabel}
+                  onChange={(event) => setBasisLabel(event.target.value)}
+                  disabled={disabled || saving}
+                  className={fieldClassName}
+                  placeholder="New fabric-rule basis label (e.g. Ankara Kaftan Base)"
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateBasis}
+                  disabled={disabled || saving}
+                  className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white"
+                >
+                  Create basis
+                </button>
+              </div>
+            </div>
+            {!bases.length ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                No fabric-rule basis exists yet. Create one after selecting the measurement keys this source requires.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -1216,243 +1494,317 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       </details>
       ) : null}
 
-      <details className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10">
-        <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900 dark:text-white">Policies, Rush, and Internal Notes</summary>
+      <details className="mt-4 overflow-hidden rounded-2xl border border-black/10 dark:border-white/10">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors">
+          <span>Policies, Rush &amp; Notes</span>
+          <span className="text-xs font-normal text-slate-400">click to expand</span>
+        </summary>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        <label className="flex items-center gap-3 rounded-2xl border border-black/10 px-4 py-3 text-sm dark:border-white/10">
-          <input type="checkbox" checked={form.rushEnabled} onChange={(event) => updateForm('rushEnabled', event.target.checked)} disabled={disabled} />
-          <span className="text-slate-700 dark:text-slate-200">Rush ordering enabled</span>
-        </label>
-        <UniversalSelect
-          value={form.fabricSourcingMode}
-          onChange={(value) => updateForm('fabricSourcingMode', value as ConfigurationFormState['fabricSourcingMode'])}
-          options={sourcingModeOptions}
-          disabled={disabled}
-          className="w-full"
-        />
-        {form.rushEnabled ? (
-          <>
-            <label className="space-y-2">
-              <span className={requiredFieldLabelClassName}>
-                Rush fee <span className="text-rose-500">*</span>
-                <span className={infoBadgeClassName} title="Extra amount charged when the buyer selects rush production.">i</span>
-              </span>
-              <input
-                value={form.rushFee}
-                onChange={(event) => updateForm('rushFee', event.target.value)}
-                disabled={disabled}
-                className={fieldClassName}
-                placeholder="Rush fee"
-                inputMode="decimal"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className={requiredFieldLabelClassName}>
-                Rush production lead days <span className="text-rose-500">*</span>
-                <span className={infoBadgeClassName} title="Must be shorter than the standard lead time and at least 5 days.">i</span>
-              </span>
-              <input
-                value={form.rushProductionLeadDays}
-                onChange={(event) => updateForm('rushProductionLeadDays', event.target.value)}
-                disabled={disabled}
-                className={fieldClassName}
-                placeholder="Rush production lead days"
-                inputMode="numeric"
-              />
-            </label>
-          </>
-        ) : null}
-        {form.rushEnabled ? (
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 sm:col-span-2 xl:col-span-3">
-            Required when rush ordering is enabled.
-          </p>
-        ) : null}
-      </div>
+        <div className="space-y-5 border-t border-black/10 p-4 dark:border-white/10">
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        <div className="space-y-2">
-          <span className={requiredFieldLabelClassName}>
-            Revision policy <span className="text-rose-500">*</span>
-            <span className={infoBadgeClassName} title="How many revisions the buyer gets and under what timeline.">i</span>
-          </span>
-          <UniversalSelect
-            value={revisionPolicyPreset}
-            onChange={(value) => {
-              const nextValue = String(value);
-              setRevisionPolicyPreset(nextValue);
-              if (nextValue !== POLICY_CUSTOM) {
-                updateForm('revisionPolicy', nextValue);
-              }
-            }}
-            disabled={disabled}
-            options={revisionPolicyOptions}
-            optionAllowWrap
-            className="w-full"
-          />
-          <textarea value={form.revisionPolicy} onChange={(event) => updateForm('revisionPolicy', event.target.value)} disabled={disabled} rows={2} className={fieldClassName} placeholder="Revision policy details" />
+          {/* ── Row 1: Rush toggle + Fabric sourcing ── */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {/* Rush toggle card */}
+            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl px-4 py-3 transition-colors ${form.rushEnabled ? 'bg-emerald-50/80 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800' : 'bg-slate-50 border border-black/10 dark:bg-white/5 dark:border-white/10'}`}>
+              <div>
+                <p className="text-sm font-semibold text-slate-800 dark:text-white">⚡ Rush ordering</p>
+                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Allow buyers to request rush production</p>
+              </div>
+              <div className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 ${form.rushEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-white/20'}`}>
+                <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${form.rushEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  aria-label="Rush ordering enabled"
+                  checked={form.rushEnabled}
+                  onChange={(event) => updateForm('rushEnabled', event.target.checked)}
+                  disabled={disabled}
+                />
+              </div>
+            </label>
+
+            {/* Fabric sourcing */}
+            <div className="space-y-1.5">
+              <span className={requiredFieldLabelClassName}>
+                Fabric sourcing
+                <span className={infoBadgeClassName} title="Who supplies the fabric for the custom order.">i</span>
+              </span>
+              <UniversalSelect
+                value={form.fabricSourcingMode}
+                onChange={(value) => updateForm('fabricSourcingMode', value as ConfigurationFormState['fabricSourcingMode'])}
+                options={sourcingModeOptions}
+                disabled={disabled}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          {/* ── Row 2: Rush fields (conditional) ── */}
+          {form.rushEnabled ? (
+            <div className="grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-800 dark:bg-emerald-950/20 sm:grid-cols-2">
+              <label className="space-y-1.5">
+                <span className={requiredFieldLabelClassName}>
+                  Rush fee <span className="text-rose-500">*</span>
+                  <span className={infoBadgeClassName} title="Extra amount charged when the buyer selects rush production.">i</span>
+                </span>
+                <input
+                  value={form.rushFee}
+                  onChange={(event) => updateForm('rushFee', event.target.value)}
+                  disabled={disabled}
+                  aria-invalid={Boolean(fieldErrors.rushFee)}
+                  className={`${fieldClassName} ${fieldErrors.rushFee ? 'border-rose-400 focus:border-rose-500 dark:border-rose-500/50' : ''}`}
+                  placeholder="e.g. 5000"
+                  inputMode="decimal"
+                />
+                {fieldErrors.rushFee ? (
+                  <p className="text-[11px] font-medium text-rose-600 dark:text-rose-300">
+                    {fieldErrors.rushFee}
+                  </p>
+                ) : null}
+              </label>
+              <label className="space-y-1.5">
+                <span className={requiredFieldLabelClassName}>
+                  Rush lead days <span className="text-rose-500">*</span>
+                  <span className={infoBadgeClassName} title="Must be shorter than the standard lead time and at least 5 days.">i</span>
+                </span>
+                <input
+                  value={form.rushProductionLeadDays}
+                  onChange={(event) => updateForm('rushProductionLeadDays', event.target.value)}
+                  disabled={disabled}
+                  aria-invalid={Boolean(fieldErrors.rushProductionLeadDays)}
+                  className={`${fieldClassName} ${fieldErrors.rushProductionLeadDays ? 'border-rose-400 focus:border-rose-500 dark:border-rose-500/50' : ''}`}
+                  placeholder="e.g. 5"
+                  inputMode="numeric"
+                />
+                {fieldErrors.rushProductionLeadDays ? (
+                  <p className="text-[11px] font-medium text-rose-600 dark:text-rose-300">
+                    {fieldErrors.rushProductionLeadDays}
+                  </p>
+                ) : null}
+              </label>
+            </div>
+          ) : null}
+
+          {/* ── Row 3: Policy cards ── */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            {/* Revision policy */}
+            <div className="space-y-1.5 rounded-xl border border-black/10 p-3 dark:border-white/10">
+              <span className={requiredFieldLabelClassName}>
+                Revision <span className="text-rose-500">*</span>
+                <span className={infoBadgeClassName} title="How many revisions the buyer gets and under what timeline.">i</span>
+              </span>
+              <UniversalSelect
+                value={revisionPolicyPreset}
+                onChange={(value) => {
+                  const nextValue = String(value);
+                  setRevisionPolicyPreset(nextValue);
+                  if (nextValue !== POLICY_CUSTOM) updateForm('revisionPolicy', nextValue);
+                }}
+                disabled={disabled}
+                options={revisionPolicyOptions}
+                optionAllowWrap
+                className="w-full"
+              />
+              <textarea
+                value={form.revisionPolicy}
+                onChange={(event) => updateForm('revisionPolicy', event.target.value)}
+                disabled={disabled}
+                rows={2}
+                className={fieldClassName}
+                placeholder="Revision policy details"
+              />
+            </div>
+
+            {/* Return policy */}
+            <div className="space-y-1.5 rounded-xl border border-black/10 p-3 dark:border-white/10">
+              <span className={requiredFieldLabelClassName}>
+                Returns <span className="text-rose-500">*</span>
+                <span className={infoBadgeClassName} title="Return/refund expectations for custom orders.">i</span>
+              </span>
+              <UniversalSelect
+                value={returnPolicyPreset}
+                onChange={(value) => {
+                  const nextValue = String(value);
+                  setReturnPolicyPreset(nextValue);
+                  if (nextValue !== POLICY_CUSTOM) updateForm('returnPolicy', nextValue);
+                }}
+                disabled={disabled}
+                options={returnPolicyOptions}
+                optionAllowWrap
+                className="w-full"
+              />
+              <textarea
+                value={form.returnPolicy}
+                onChange={(event) => updateForm('returnPolicy', event.target.value)}
+                disabled={disabled}
+                rows={2}
+                className={fieldClassName}
+                placeholder="Return policy details"
+              />
+            </div>
+
+            {/* Defect policy */}
+            <div className="space-y-1.5 rounded-xl border border-black/10 p-3 dark:border-white/10">
+              <span className={requiredFieldLabelClassName}>
+                Defects <span className="text-rose-500">*</span>
+                <span className={infoBadgeClassName} title="How defect reports are handled (repair/remake/refund flow).">i</span>
+              </span>
+              <UniversalSelect
+                value={defectPolicyPreset}
+                onChange={(value) => {
+                  const nextValue = String(value);
+                  setDefectPolicyPreset(nextValue);
+                  if (nextValue !== POLICY_CUSTOM) updateForm('defectPolicy', nextValue);
+                }}
+                disabled={disabled}
+                options={defectPolicyOptions}
+                optionAllowWrap
+                className="w-full"
+              />
+              <textarea
+                value={form.defectPolicy}
+                onChange={(event) => updateForm('defectPolicy', event.target.value)}
+                disabled={disabled}
+                rows={2}
+                className={fieldClassName}
+                placeholder="Defect policy details"
+              />
+            </div>
+          </div>
+
+          {/* ── Internal notes ── */}
+          <div className="space-y-1.5">
+            <span className={requiredFieldLabelClassName}>Internal notes (private)</span>
+            <textarea
+              value={form.notes}
+              onChange={(event) => updateForm('notes', event.target.value)}
+              disabled={disabled}
+              rows={2}
+              className={fieldClassName}
+              placeholder="Notes visible only to you — order context, reminders, etc."
+            />
+          </div>
+
         </div>
-        <div className="space-y-2">
-          <span className={requiredFieldLabelClassName}>
-            Return policy <span className="text-rose-500">*</span>
-            <span className={infoBadgeClassName} title="Return/refund expectations for custom orders.">i</span>
-          </span>
-          <UniversalSelect
-            value={returnPolicyPreset}
-            onChange={(value) => {
-              const nextValue = String(value);
-              setReturnPolicyPreset(nextValue);
-              if (nextValue !== POLICY_CUSTOM) {
-                updateForm('returnPolicy', nextValue);
-              }
-            }}
-            disabled={disabled}
-            options={returnPolicyOptions}
-            optionAllowWrap
-            className="w-full"
-          />
-          <textarea value={form.returnPolicy} onChange={(event) => updateForm('returnPolicy', event.target.value)} disabled={disabled} rows={2} className={fieldClassName} placeholder="Return policy details" />
-        </div>
-        <div className="space-y-2">
-          <span className={requiredFieldLabelClassName}>
-            Defect policy <span className="text-rose-500">*</span>
-            <span className={infoBadgeClassName} title="How defect reports are handled (repair/remake/refund flow).">i</span>
-          </span>
-          <UniversalSelect
-            value={defectPolicyPreset}
-            onChange={(value) => {
-              const nextValue = String(value);
-              setDefectPolicyPreset(nextValue);
-              if (nextValue !== POLICY_CUSTOM) {
-                updateForm('defectPolicy', nextValue);
-              }
-            }}
-            disabled={disabled}
-            options={defectPolicyOptions}
-            optionAllowWrap
-            className="w-full"
-          />
-          <textarea value={form.defectPolicy} onChange={(event) => updateForm('defectPolicy', event.target.value)} disabled={disabled} rows={2} className={fieldClassName} placeholder="Defect policy details" />
-        </div>
-        <textarea value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} disabled={disabled} rows={2} className={fieldClassName} placeholder="Internal notes" />
-      </div>
       </details>
 
-      <details className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10">
-        <summary className="mb-2 flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-          Fabric yard rules builder <span className="text-rose-500">*</span>
-          <span className={infoBadgeClassName} title="Each rule maps buyer measurements to required fabric yards. Fallback is used when no condition rule matches.">i</span>
-        </summary>
-        <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-          Example: Waist 1-3 and Height 4-5 can output 1 yard. Configure rules below instead of editing raw JSON.
-        </p>
+      {showFabricRules ? (
+        <details className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10">
+          <summary className="mb-2 flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+            Fabric yard rules builder <span className="text-rose-500">*</span>
+            <span className={infoBadgeClassName} title="Each rule maps buyer measurements to required fabric yards. Fallback is used when no condition rule matches.">i</span>
+          </summary>
+          <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+            Example: Waist 1-3 and Height 4-5 can output 1 yard. Configure rules below instead of editing raw JSON.
+          </p>
 
-        <div className="space-y-3">
-          {ruleRows.map((rule, ruleIndex) => (
-            <div key={rule.id} className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-slate-900 dark:text-white">Rule {ruleIndex + 1}</div>
-                <button
-                  type="button"
-                  onClick={() => removeRuleRow(rule.id)}
-                  disabled={disabled}
-                  className="rounded-full border border-black/10 px-3 py-1 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200"
-                >
-                  Remove rule
-                </button>
-              </div>
-
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Output yards</span>
-                  <input
-                    value={rule.outputYards}
-                    onChange={(event) => updateRuleRow(rule.id, { outputYards: event.target.value })}
-                    disabled={disabled}
-                    className={fieldClassName}
-                    placeholder="4"
-                  />
-                </label>
-
-                <label className="flex items-center gap-3 rounded-2xl border border-black/10 px-4 py-3 text-sm dark:border-white/10">
-                  <input
-                    type="checkbox"
-                    checked={rule.isFallback}
-                    onChange={(event) => updateRuleRow(rule.id, { isFallback: event.target.checked })}
-                    disabled={disabled}
-                  />
-                  <span className="text-slate-700 dark:text-slate-200">Fallback rule</span>
-                </label>
-              </div>
-
-              {!rule.isFallback ? (
-                <div className="mt-3 rounded-xl border border-black/10 p-3 dark:border-white/10">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Conditions</div>
-                  {rule.conditions.length === 0 ? (
-                    <div className="text-xs text-slate-500 dark:text-slate-400">No conditions yet. Add one below.</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {rule.conditions.map((condition, conditionIndex) => (
-                        <div key={`${rule.id}_${conditionIndex}`} className="grid gap-2 md:grid-cols-[1.4fr_1fr_1fr_auto]">
-                          <UniversalSelect
-                            value={condition.key}
-                            onChange={(value) => updateRuleCondition(rule.id, conditionIndex, { key: String(value) })}
-                            disabled={disabled}
-                            options={form.requiredMeasurementKeys.map((key) => ({ value: key, label: getMeasurementLabel(key) }))}
-                            className="w-full"
-                          />
-                          <input
-                            value={condition.min}
-                            onChange={(event) => updateRuleCondition(rule.id, conditionIndex, { min: event.target.value })}
-                            disabled={disabled}
-                            className={fieldClassName}
-                            placeholder="Min"
-                          />
-                          <input
-                            value={condition.max}
-                            onChange={(event) => updateRuleCondition(rule.id, conditionIndex, { max: event.target.value })}
-                            disabled={disabled}
-                            className={fieldClassName}
-                            placeholder="Max"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeRuleCondition(rule.id, conditionIndex)}
-                            disabled={disabled}
-                            className="rounded-full border border-black/10 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
+          <div className="space-y-3">
+            {ruleRows.map((rule, ruleIndex) => (
+              <div key={rule.id} className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">Rule {ruleIndex + 1}</div>
                   <button
                     type="button"
-                    onClick={() => addRuleCondition(rule.id)}
+                    onClick={() => removeRuleRow(rule.id)}
                     disabled={disabled}
-                    className="mt-3 rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200"
+                    className="rounded-full border border-black/10 px-3 py-1 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200"
                   >
-                    Add condition
+                    Remove rule
                   </button>
                 </div>
-              ) : (
-                <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">Fallback rule must have no conditions and is used when no other rule matches.</div>
-              )}
-            </div>
-          ))}
 
-          <button
-            type="button"
-            onClick={addRuleRow}
-            disabled={disabled}
-            className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white"
-          >
-            Add yard rule
-          </button>
-        </div>
-      </details>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Output yards</span>
+                    <input
+                      value={rule.outputYards}
+                      onChange={(event) => updateRuleRow(rule.id, { outputYards: event.target.value })}
+                      disabled={disabled}
+                      className={fieldClassName}
+                      placeholder="4"
+                    />
+                  </label>
+
+                  <label className="flex items-center gap-3 rounded-2xl border border-black/10 px-4 py-3 text-sm dark:border-white/10">
+                    <input
+                      type="checkbox"
+                      checked={rule.isFallback}
+                      onChange={(event) => updateRuleRow(rule.id, { isFallback: event.target.checked })}
+                      disabled={disabled}
+                    />
+                    <span className="text-slate-700 dark:text-slate-200">Fallback rule</span>
+                  </label>
+                </div>
+
+                {!rule.isFallback ? (
+                  <div className="mt-3 rounded-xl border border-black/10 p-3 dark:border-white/10">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Conditions</div>
+                    {rule.conditions.length === 0 ? (
+                      <div className="text-xs text-slate-500 dark:text-slate-400">No conditions yet. Add one below.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {rule.conditions.map((condition, conditionIndex) => (
+                          <div key={`${rule.id}_${conditionIndex}`} className="grid gap-2 md:grid-cols-[1.4fr_1fr_1fr_auto]">
+                            <UniversalSelect
+                              value={condition.key}
+                              onChange={(value) => updateRuleCondition(rule.id, conditionIndex, { key: String(value) })}
+                              disabled={disabled}
+                              options={form.requiredMeasurementKeys.map((key) => ({ value: key, label: getMeasurementLabel(key) }))}
+                              className="w-full"
+                            />
+                            <input
+                              value={condition.min}
+                              onChange={(event) => updateRuleCondition(rule.id, conditionIndex, { min: event.target.value })}
+                              disabled={disabled}
+                              className={fieldClassName}
+                              placeholder="Min"
+                            />
+                            <input
+                              value={condition.max}
+                              onChange={(event) => updateRuleCondition(rule.id, conditionIndex, { max: event.target.value })}
+                              disabled={disabled}
+                              className={fieldClassName}
+                              placeholder="Max"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeRuleCondition(rule.id, conditionIndex)}
+                              disabled={disabled}
+                              className="rounded-full border border-black/10 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => addRuleCondition(rule.id)}
+                      disabled={disabled}
+                      className="mt-3 rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200"
+                    >
+                      Add condition
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">Fallback rule must have no conditions and is used when no other rule matches.</div>
+                )}
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={addRuleRow}
+              disabled={disabled}
+              className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white"
+            >
+              Add yard rule
+            </button>
+          </div>
+        </details>
+      ) : null}
 
       <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
         Custom-order configuration is saved automatically when you publish updates.

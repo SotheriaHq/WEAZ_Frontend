@@ -62,6 +62,33 @@ const brandManagedStageOptions: Array<{
   },
 ];
 
+const lifecycleStatusOptions: Array<{
+  value: CustomOrderStatus;
+  label: string;
+  helper: string;
+}> = [
+  {
+    value: 'READY_FOR_DISPATCH',
+    label: 'Ready for dispatch',
+    helper: 'Use this when the order is packed and ready to leave the studio.',
+  },
+  {
+    value: 'IN_TRANSIT',
+    label: 'In transit',
+    helper: 'Use this after the order has been handed to delivery or is actively moving.',
+  },
+  {
+    value: 'DELIVERED_PENDING_BUYER_CONFIRMATION',
+    label: 'Delivered awaiting buyer confirmation',
+    helper: 'Use this only after the buyer has received the order.',
+  },
+  {
+    value: 'CLOSED',
+    label: 'Closed',
+    helper: 'Use this only after the order has already completed and should be archived.',
+  },
+];
+
 const stageDisplayOrder: CustomOrderProgressStage[] = [
   'ORDER_PLACED',
   'ORDER_RECEIVED',
@@ -190,6 +217,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<StudioDetailTab>('overview');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedStage, setSelectedStage] = useState('');
+  const [selectedLifecycleStatus, setSelectedLifecycleStatus] = useState('');
   const [extensionDays, setExtensionDays] = useState('2');
   const [extensionReason, setExtensionReason] = useState('');
   const [exceptionReason, setExceptionReason] = useState('');
@@ -251,6 +279,40 @@ const StudioCustomOrderDetailPage: React.FC = () => {
       setSelectedStage('');
     }
   }, [order?.currentProgressStage]);
+
+  const availableLifecycleOptions = useMemo(() => {
+    if (!order) return [];
+
+    switch (order.status) {
+      case 'ACCEPTED':
+      case 'IN_PRODUCTION':
+        return lifecycleStatusOptions.filter((option) => option.value === 'READY_FOR_DISPATCH');
+      case 'READY_FOR_DISPATCH':
+        return lifecycleStatusOptions.filter((option) =>
+          option.value === 'IN_TRANSIT' || option.value === 'DELIVERED_PENDING_BUYER_CONFIRMATION',
+        );
+      case 'IN_TRANSIT':
+        return lifecycleStatusOptions.filter((option) => option.value === 'DELIVERED_PENDING_BUYER_CONFIRMATION');
+      case 'COMPLETED':
+        return lifecycleStatusOptions.filter((option) => option.value === 'CLOSED');
+      default:
+        return [];
+    }
+  }, [order]);
+
+  useEffect(() => {
+    if (!order) {
+      setSelectedLifecycleStatus('');
+      return;
+    }
+
+    if (availableLifecycleOptions.some((option) => option.value === order.status)) {
+      setSelectedLifecycleStatus(order.status);
+      return;
+    }
+
+    setSelectedLifecycleStatus('');
+  }, [availableLifecycleOptions, order]);
 
   const contactInfo = useMemo(
     () => (isRecord(order?.contactInfo) ? order.contactInfo : {}),
@@ -362,6 +424,29 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     } catch (error: any) {
       setSelectedStage(order.currentProgressStage ?? '');
       toast.error(error?.response?.data?.message || 'Unable to update production stage.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleLifecycleStatusChange = async (value: string) => {
+    if (!brandId || !order || !value) return;
+    const nextStatus = value as CustomOrderStatus;
+    setSelectedLifecycleStatus(nextStatus);
+    setBusy(true);
+    try {
+      const updated = await customOrdersBrandApi.updateLifecycleStatus(brandId, order.id, {
+        status: nextStatus,
+      });
+      setOrder(updated);
+      toast.success(`Lifecycle updated to ${humanizeCustomOrderToken(nextStatus)}.`);
+    } catch (error: any) {
+      setSelectedLifecycleStatus(
+        availableLifecycleOptions.some((option) => option.value === order.status)
+          ? order.status
+          : '',
+      );
+      toast.error(error?.response?.data?.message || 'Unable to update lifecycle status.');
     } finally {
       setBusy(false);
     }
@@ -601,6 +686,18 @@ const StudioCustomOrderDetailPage: React.FC = () => {
               </p>
             </div>
 
+            <div className="mt-4 rounded-[1.5rem] border border-sky-200/80 bg-sky-50/60 p-4 dark:border-sky-500/20 dark:bg-sky-500/10">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-500 dark:text-sky-300">
+                Current lifecycle status
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <CustomOrderBadge value={order.status} />
+              </div>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                Use lifecycle updates for dispatch, transit, delivered, and final close states after production work has moved forward.
+              </p>
+            </div>
+
           </section>
 
           <section className={`${shell} space-y-5`}>
@@ -637,7 +734,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
             <div className="border-t border-black/[0.06] pt-5 dark:border-white/[0.06]">
               <div className="text-lg font-semibold text-slate-900 dark:text-white">🚨 Exception review</div>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Flag for admin review if something needs resolution.
+                Escalate unusual production, delivery, pricing, or buyer-handling blockers to admin review.
               </p>
               <div className="mt-4 space-y-3">
                 <textarea
@@ -856,6 +953,31 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                     ? brandManagedStageOptions.find((option) => option.value === selectedStage)?.helper
                     : 'Choose the next production stage. Changes save immediately.'
                   : 'Stage updates are not available for this order in its current state.'}
+              </p>
+            </div>
+
+            <div className="mt-5">
+              <UniversalSelect
+                label="Lifecycle status"
+                value={selectedLifecycleStatus}
+                onChange={(value) => void handleLifecycleStatusChange(value)}
+                options={availableLifecycleOptions.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                placeholder={
+                  availableLifecycleOptions.length > 0
+                    ? 'Select the next lifecycle update'
+                    : 'Lifecycle updates not available in current state'
+                }
+                disabled={availableLifecycleOptions.length === 0 || busy}
+              />
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                {availableLifecycleOptions.length > 0
+                  ? selectedLifecycleStatus
+                    ? availableLifecycleOptions.find((option) => option.value === selectedLifecycleStatus)?.helper
+                    : 'Choose the next dispatch or delivery lifecycle update. Changes save immediately.'
+                  : 'Lifecycle updates unlock only when the order has moved into dispatch, transit, delivered, or completed states.'}
               </p>
             </div>
           </aside>

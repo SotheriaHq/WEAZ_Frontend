@@ -19,6 +19,9 @@ import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { CollectionCartPreviewModal } from '@/components/collections/CollectionCartPreviewModal';
 import { getCollectionCartPreview, type CollectionCartPreviewResponse } from '@/api/collectionUploads';
 import { buildCollectionUrl, shareOrCopyLink } from '@/utils/publicLinks';
+import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
+import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
 
 interface InlineCollectionViewerProps {
   collectionId: string;
@@ -55,6 +58,9 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const [addingAll, setAddingAll] = useState(false);
   const [showCartPreview, setShowCartPreview] = useState(false);
   const [cartPreviewData, setCartPreviewData] = useState<CollectionCartPreviewResponse | null>(null);
+  const [customComposerOpen, setCustomComposerOpen] = useState(false);
+  const [customConfigurationId, setCustomConfigurationId] = useState<string | null>(null);
+  const [openingCustomComposer, setOpeningCustomComposer] = useState(false);
   /* showQr disabled — only brand profile QR codes active */
 
   useEffect(() => {
@@ -217,6 +223,9 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
 
   const totalItems = useMemo(() => mediaCount + productItems.length, [mediaCount, productItems.length]);
   const showProductSection = productItems.length > 0 || mediaItems.length === 0;
+  const designSupportsCustomBag = Boolean(
+    detail?.customOrderEnabled === true || detail?.customAvailable === true,
+  );
 
   // active media id no longer needed for unified comments
 
@@ -332,6 +341,44 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       toast.success('Bagged!');
     } catch (e: any) {
       toast.error(e?.message || 'Failed to bag item');
+    }
+  };
+
+  const handleOpenDesignCustomOrder = async () => {
+    if (isOwner) {
+      toast.info('Brands cannot place custom orders on their own designs.');
+      return;
+    }
+    if (!isAuth) {
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    if (openingCustomComposer) {
+      return;
+    }
+
+    setOpeningCustomComposer(true);
+    try {
+      const activeConfiguration =
+        (customConfigurationId
+          ? { id: customConfigurationId }
+          : await customOrderConfigurationsApi.getActiveForDesign(collectionId)) ?? null;
+      const resolvedConfigurationId = activeConfiguration?.id ?? null;
+
+      if (!resolvedConfigurationId) {
+        toast.error(
+          'This design is not configured for custom orders yet. Complete the custom-order setup on the design first.',
+        );
+        return;
+      }
+
+      setCustomConfigurationId(resolvedConfigurationId);
+      setCustomComposerOpen(true);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to bag this design.');
+    } finally {
+      setOpeningCustomComposer(false);
     }
   };
 
@@ -621,7 +668,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                       >
                         <div className="aspect-square bg-gray-100 dark:bg-zinc-800/50 flex items-center justify-center">
                           {image ? (
-                            <img src={image} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                            <img src={image} alt={product.name} className="w-full h-full object-cover" loading="eager" />
                           ) : (
                             <span className="text-xs text-gray-400">No image</span>
                           )}
@@ -716,6 +763,25 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
             />
           </div>
 
+          {!isOwner && designSupportsCustomBag ? (
+            <div className="glass-panel rounded-2xl border border-white/20 bg-white/70 p-4 backdrop-blur-md dark:bg-white/5">
+              <button
+                type="button"
+                onClick={() => {
+                  void handleOpenDesignCustomOrder();
+                }}
+                disabled={openingCustomComposer}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition hover:from-purple-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span aria-hidden="true">👜</span>
+                {openingCustomComposer ? 'Loading...' : 'Bag this design'}
+              </button>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                Place a custom order for this design directly from the brand catalog.
+              </p>
+            </div>
+          ) : null}
+
           {/* Comments Section - Unified & Frosted Glassmorphism */}
           <div className="glass-panel rounded-2xl p-3 border border-white/20 bg-white/60 dark:bg-white/5 backdrop-blur-xl lg:h-[420px] overflow-hidden flex flex-col shadow-lg">
             <div className="flex items-center gap-2 pb-3 border-b border-gray-200/50 dark:border-gray-700/50">
@@ -793,6 +859,35 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
           isLoading={addingAll}
         />
       )}
+      {customComposerOpen && customConfigurationId ? (
+        <OverlayPortal>
+          <div
+            className="fixed inset-0 z-layer-modal flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                setCustomComposerOpen(false);
+              }
+            }}
+          >
+            <div className="relative h-[92vh] w-[98vw] max-w-[1280px] overflow-y-auto rounded-3xl border border-white/20 bg-white/90 p-4 text-slate-900 shadow-2xl dark:bg-[#0d0b12] dark:text-white">
+              <button
+                type="button"
+                aria-label="Close custom order composer"
+                onClick={() => setCustomComposerOpen(false)}
+                className="sticky top-2 float-right z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/80 text-slate-700 shadow-sm hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+              >
+                <span aria-hidden="true" className="text-base">×</span>
+              </button>
+              <CustomOrderComposerPage
+                embedded
+                configurationIdOverride={customConfigurationId}
+                onClose={() => setCustomComposerOpen(false)}
+                onOrderCreated={() => setCustomComposerOpen(false)}
+              />
+            </div>
+          </div>
+        </OverlayPortal>
+      ) : null}
     </div>
   );
 };

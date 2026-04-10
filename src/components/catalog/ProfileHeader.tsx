@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Tag from '@/components/ui/Tag';
 import { getTagColor } from '@/utils/tagColors';
 import AvatarCard from '../profile/AvatarCard';
 import VLoader from '../loaders/VLoader';
-import MediaRenderer from '../media/MediaRenderer';
+import ImageWithFallback from '../ImageWithFallback';
 
 interface ProfileHeaderProps {
   profile: {
@@ -57,20 +57,13 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   onShareProfile,
 }) => {
   const location = useLocation();
-  const [bannerFailed, setBannerFailed] = useState(false);
-  const hasBannerImage = showBanner && Boolean(profile.bannerImage) && !bannerFailed;
+  const hasBannerImage = showBanner && Boolean(profile.bannerImage);
   const bannerLabel =
     (profile.username ? `@${profile.username}` : `${profile.firstName} ${profile.lastName}` || '').trim() || 'Your Profile';
 
-  const [isBannerImageLoading, setIsBannerImageLoading] = useState<boolean>(hasBannerImage);
-
-  useEffect(() => {
-    setBannerFailed(false);
-    setIsBannerImageLoading(showBanner && Boolean(profile.bannerImage));
-  }, [profile.bannerImage, showBanner]);
-
-  const showBannerLoader =
-    showBanner && (bannerLoading || (Boolean(profile.bannerImage) && !bannerFailed && isBannerImageLoading));
+  // Only show the external spinner for explicit upload operations — ImageWithFallback
+  // handles the image-load shimmer internally (including signed URL resolution for S3).
+  const showBannerLoader = showBanner && bannerLoading;
 
   const tags: string[] = Array.isArray(profile.tags)
     ? profile.tags
@@ -89,20 +82,15 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       {showBanner ? (
         <div className="relative rounded-3xl">
           {hasBannerImage ? (
-            <MediaRenderer
-              kind="image"
-              src={profile.bannerImage ?? ''}
+            /* ImageWithFallback resolves signed S3 URLs, shows a shimmer while loading,
+               and degrades gracefully on error — no manual error/loading state needed. */
+            <ImageWithFallback
+              src={profile.bannerImage}
               alt={`${profile.firstName} ${profile.lastName} banner`}
               fit="cover"
-              className="w-full h-64 rounded-3xl overflow-hidden"
+              containerClassName="w-full h-64 rounded-3xl overflow-hidden"
+              rounded="none"
               maxHeightClassName="max-h-64"
-              maxWidthClassName="max-w-full"
-              mediaClassName="w-full h-full object-cover"
-              onLoad={() => setIsBannerImageLoading(false)}
-              onError={() => {
-                setBannerFailed(true);
-                setIsBannerImageLoading(false);
-              }}
             />
           ) : (
             <div className="h-64 rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex items-center justify-center p-6">
@@ -181,7 +169,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         <div className="relative z-20 flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
           <div className="flex-shrink-0">
             <div
-              className={`rounded-xl border-4 shadow-2xl transition-colors duration-300 ${
+              className={`rounded-xl border-2 shadow-lg transition-colors duration-300 ${
                 !showBanner
                   ? 'border-transparent shadow-none ring-0'
                   : avatarHighlight

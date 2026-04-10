@@ -4,6 +4,7 @@ import type { MeasurementPoint, MeasurementPointCategory } from '@/types/sizing'
 import { getWithTTL, setWithTTL } from '@/utils/sizing';
 
 const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour fallback cache
+const MEASUREMENT_POINTS_UPDATED_EVENT = 'threadly:measurement-points-updated';
 
 export function useMeasurementPoints(filter?: {
   gender?: 'MEN' | 'WOMEN' | 'UNISEX';
@@ -12,6 +13,7 @@ export function useMeasurementPoints(filter?: {
   const [points, setPoints] = useState<MeasurementPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const cacheKey = useMemo(
     () => `measurement_points:${filter?.gender ?? 'ALL'}:${filter?.category ?? 'ALL'}`,
@@ -49,7 +51,22 @@ export function useMeasurementPoints(filter?: {
     return () => {
       active = false;
     };
-  }, [cacheKey, filter?.gender, filter?.category]);
+  }, [cacheKey, filter?.gender, filter?.category, refreshTick]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const handleMeasurementPointRefresh = () => {
+      setRefreshTick((current) => current + 1);
+    };
+
+    window.addEventListener(MEASUREMENT_POINTS_UPDATED_EVENT, handleMeasurementPointRefresh);
+    return () => {
+      window.removeEventListener(MEASUREMENT_POINTS_UPDATED_EVENT, handleMeasurementPointRefresh);
+    };
+  }, []);
 
   return { points, isLoading, error };
 }

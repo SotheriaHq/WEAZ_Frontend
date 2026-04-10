@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import Select from '@/components/ui/Select';
 import { MeasurementPointsApi } from '@/api/MeasurementPointsApi';
@@ -53,15 +53,27 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
   const [isSubmittingFreeform, setIsSubmittingFreeform] = useState(false);
   const [addedPoints, setAddedPoints] = useState<MeasurementPoint[]>([]);
   const [showAllPoints, setShowAllPoints] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>(customMeasurementKeys);
 
   const INITIAL_DISPLAY_COUNT = 12;
 
+  useEffect(() => {
+    setSelectedKeys(customMeasurementKeys);
+  }, [customMeasurementKeys]);
+
+  const syncSelectedKeys = (nextKeys: string[]) => {
+    setSelectedKeys(nextKeys);
+    onCustomMeasurementKeysChange(nextKeys);
+  };
+
   const toggleMeasurementKey = (key: string) => {
-    if (customMeasurementKeys.includes(key)) {
-      onCustomMeasurementKeysChange(customMeasurementKeys.filter((existing) => existing !== key));
-      return;
-    }
-    onCustomMeasurementKeysChange([...customMeasurementKeys, key]);
+    setSelectedKeys((current) => {
+      const next = current.includes(key)
+        ? current.filter((existing) => existing !== key)
+        : [...current, key];
+      onCustomMeasurementKeysChange(next);
+      return next;
+    });
   };
 
   const mergedPoints = useMemo(() => {
@@ -85,7 +97,7 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
   /** Points the user has already selected */
   const selectedPoints = useMemo(() => {
     const pointsByKey = new Map(mergedPoints.map((point) => [point.key, point]));
-    return customMeasurementKeys.map((key) => {
+    return selectedKeys.map((key) => {
       const existing = pointsByKey.get(key);
       if (existing) return existing;
 
@@ -112,12 +124,12 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
         isActive: true,
       } as MeasurementPoint;
     });
-  }, [mergedPoints, customMeasurementKeys, measurementGender]);
+  }, [mergedPoints, selectedKeys, measurementGender]);
 
   /** Points the user has NOT yet selected — shown as available chips */
   const unselectedPoints = useMemo(
-    () => mergedPoints.filter((p) => !customMeasurementKeys.includes(p.key)),
-    [mergedPoints, customMeasurementKeys],
+    () => mergedPoints.filter((p) => !selectedKeys.includes(p.key)),
+    [mergedPoints, selectedKeys],
   );
 
   const handleAddFreeformPoint = async () => {
@@ -135,8 +147,8 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
     );
     if (existing) {
       // Auto-select the existing point instead of showing an error
-      if (!customMeasurementKeys.includes(existing.key)) {
-        onCustomMeasurementKeysChange([...customMeasurementKeys, existing.key]);
+      if (!selectedKeys.includes(existing.key)) {
+        syncSelectedKeys([...selectedKeys, existing.key]);
         toast.info(`"${existing.label}" already exists — selected it for you`);
       } else {
         toast.info(`"${existing.label}" is already selected`);
@@ -159,8 +171,8 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
         return [...prev, response.point];
       });
 
-      if (!customMeasurementKeys.includes(response.point.key)) {
-        onCustomMeasurementKeysChange([...customMeasurementKeys, response.point.key]);
+      if (!selectedKeys.includes(response.point.key)) {
+        syncSelectedKeys([...selectedKeys, response.point.key]);
       }
 
       setFreeformLabel('');

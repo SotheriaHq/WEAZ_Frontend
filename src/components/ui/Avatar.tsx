@@ -57,6 +57,7 @@ const Avatar: React.FC<AvatarProps> = ({
           kind="image"
           src={src}
           alt={alt}
+          loading="eager"
           maxHeightClassName={sizeClasses[size].split(' ').find((c) => c.startsWith('max-h-')) || 'max-h-10'}
           maxWidthClassName={sizeClasses[size].split(' ').find((c) => c.startsWith('max-w-')) || 'max-w-10'}
           className="rounded-full"

@@ -294,7 +294,7 @@ const AdminCustomOrdersPage: React.FC = () => {
                 { value: '', label: 'All statuses' },
                 { value: 'DISPUTED', label: 'Disputed' },
                 { value: 'REFUND_IN_PROGRESS', label: 'Refund in progress' },
-                { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pending acceptance' },
+                { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pre-production hold' },
                 { value: 'IN_PRODUCTION', label: 'In production' },
               ]}
               className="min-w-[220px]"

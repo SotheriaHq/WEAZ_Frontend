@@ -48,19 +48,19 @@ const Button: React.FC<ButtonProps> = ({
   const inferredLoading = /\b(saving|loading|submitting|uploading|signing)\b/i.test(inferredText);
   const showLoader = loading || Boolean(disabled && inferredLoading);
 
-  const baseClasses = 'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+  const baseClasses = 'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-0 focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed';
 
   const variantClasses = {
     // Black fill — confident, editorial, fashion-native. Default for all actions.
-    primary:   'bg-[#0d0d0d] hover:bg-[#1a1a1a] text-white focus:ring-gray-700 dark:bg-white dark:hover:bg-gray-100 dark:text-[#0d0d0d] dark:focus:ring-gray-300',
+    primary:   'bg-[#0d0d0d] hover:bg-[#1a1a1a] text-white dark:bg-white dark:hover:bg-gray-100 dark:text-[#0d0d0d]',
     // Purple fill — reserved for brand-owned CTAs (follow, shop, subscribe).
-    brand:     'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-strong)] text-white focus:ring-purple-500',
+    brand:     'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-strong)] text-white',
     // Outline — transparent with border. Supporting action alongside primary.
-    secondary: 'bg-transparent border border-[#0d0d0d] text-[#0d0d0d] hover:bg-[#0d0d0d]/5 focus:ring-gray-400 dark:border-white dark:text-white dark:hover:bg-white/10',
+    secondary: 'bg-transparent border border-[#0d0d0d] text-[#0d0d0d] hover:bg-[#0d0d0d]/5 dark:border-white dark:text-white dark:hover:bg-white/10',
     // Ghost — no border. Low-emphasis actions in dense UI.
-    ghost:     'bg-transparent hover:bg-gray-100 text-[var(--text-secondary)] hover:text-[var(--text-primary)] dark:hover:bg-white/8 dark:text-gray-400 dark:hover:text-white focus:ring-gray-400',
-    link:      'bg-transparent hover:underline text-[var(--text-primary)] focus:ring-transparent underline-offset-2',
-    danger:    'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500',
+    ghost:     'bg-transparent hover:bg-gray-100 text-[var(--text-secondary)] hover:text-[var(--text-primary)] dark:hover:bg-white/8 dark:text-gray-400 dark:hover:text-white',
+    link:      'bg-transparent hover:underline text-[var(--text-primary)] underline-offset-2',
+    danger:    'bg-red-600 hover:bg-red-700 text-white',
   };
 
   const sizeClasses = {

@@ -25,7 +25,7 @@ const formatCurrency = (value: number | undefined, currency = 'NGN') =>
 const statusFilterOptions = [
   { value: '', label: 'All statuses' },
   { value: 'PENDING_PAYMENT', label: 'Pending payment' },
-  { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pending brand acceptance' },
+  { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pre-production hold' },
   { value: 'IN_PRODUCTION', label: 'In production' },
   { value: 'DELIVERED_PENDING_BUYER_CONFIRMATION', label: 'Awaiting your confirmation' },
   { value: 'DISPUTED', label: 'Disputed' },

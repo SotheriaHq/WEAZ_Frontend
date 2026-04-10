@@ -42,7 +42,10 @@ import InfoTooltip from "@/components/ui/InfoTooltip";
 import { useConfirm } from "@/components/ui/useConfirm";
 import { DiscardChangesModal } from "@/components/studio/store/modals";
 import { isCustomSizingMode, isRtwSizingMode, normalizeSizingMode, type SizingMode } from '@/types/sizing';
-import CustomOrderConfigurationEditor from '@/components/custom-orders/CustomOrderConfigurationEditor';
+import CustomOrderConfigurationEditor, {
+  type CustomOrderConfigurationEditorHandle,
+} from '@/components/custom-orders/CustomOrderConfigurationEditor';
+import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 import {
   normalizePrimary,
   reorderItems,
@@ -133,6 +136,8 @@ const PRODUCT_VARIANT_SIZE_ALIAS_MAP: Record<string, string> = {
   "3XL": "XXXL",
   "4XL": "XXXXL",
 };
+
+const MIN_PUBLISH_VARIANT_COUNT = 5;
 
 const PRODUCT_VARIANT_SIZE_LABELS = PRODUCT_VARIANT_SIZE_OPTIONS.join(", ");
 
@@ -497,6 +502,8 @@ const EditProduct: React.FC = () => {
   // Custom order: on new product, hidden by default. On edit, shown if a
   // configuration already exists (resolved via the editor's own load logic).
   const [showCustomOrderForm, setShowCustomOrderForm] = useState(false);
+  const customOrderEditorRef =
+    useRef<CustomOrderConfigurationEditorHandle | null>(null);
   const [pendingStatusOverride, setPendingStatusOverride] = useState<
     FormState["status"] | null
   >(null);
@@ -1402,6 +1409,15 @@ const EditProduct: React.FC = () => {
         );
         return;
       }
+      if (
+        shouldValidatePublish &&
+        form.variants.length < MIN_PUBLISH_VARIANT_COUNT
+      ) {
+        toast.error(
+          `Add at least ${MIN_PUBLISH_VARIANT_COUNT} size variants before publishing this product.`,
+        );
+        return;
+      }
       if (hasMissingVariantSize) {
         toast.error(`Each variant needs a supported size: ${PRODUCT_VARIANT_SIZE_LABELS}`);
         return;
@@ -1546,6 +1562,14 @@ const EditProduct: React.FC = () => {
       const payloadCategoryId = form.taxonomyCategoryId || undefined;
       const finalStatus =
         normalizedForcedStatus ?? (effectiveDraft ? "DRAFT" : form.status);
+      const pendingCustomOrderDraft =
+        form.customOrderEnabled
+          ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
+          : null;
+
+      if (form.customOrderEnabled && !pendingCustomOrderDraft) {
+        return;
+      }
 
       setSaving(true);
       try {
@@ -1629,6 +1653,16 @@ const EditProduct: React.FC = () => {
 
         if (isEditMode && productId) {
           await productApi.updateProduct(productId, payload);
+          if (form.customOrderEnabled) {
+            const saved = await customOrderEditorRef.current?.saveConfiguration({
+              silentSuccess: true,
+            });
+            if (!saved) {
+              throw new Error(
+                "Custom-order setup could not be saved. The product update was kept, but custom-order availability was not finalized.",
+              );
+            }
+          }
           notifyProductStudioSync("product-updated", productId);
           toast.success(
             isCollectionContext
@@ -1647,6 +1681,23 @@ const EditProduct: React.FC = () => {
               ? { ...payload, status: "DRAFT" }
               : payload,
           );
+
+          if (pendingCustomOrderDraft) {
+            try {
+              await customOrderConfigurationsApi.create({
+                ...pendingCustomOrderDraft,
+                sourceId: created.id,
+              });
+            } catch (customOrderError: any) {
+              await productApi.updateProduct(created.id, {
+                customOrderEnabled: false,
+              });
+              throw new Error(
+                customOrderError?.response?.data?.message ||
+                  "Custom-order setup could not be saved for the new product. The product was kept, but custom-order availability was turned back off.",
+              );
+            }
+          }
 
           // Build media upload list (needed for both flow paths)
           let pendingUploads: Array<{ file: File; isPrimary: boolean }> = [];
@@ -1764,6 +1815,15 @@ const EditProduct: React.FC = () => {
   );
 
   const handlePriceChangeConfirm = useCallback(async () => {
+    const pendingCustomOrderDraft =
+      form.customOrderEnabled
+        ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
+        : null;
+
+    if (form.customOrderEnabled && !pendingCustomOrderDraft) {
+      return;
+    }
+
     setShowPricePreview(false);
     // Continue with save
     setSaving(true);
@@ -1855,9 +1915,41 @@ const EditProduct: React.FC = () => {
         variants: normalizedVariants,
       };
 
-      await productApi.updateProduct(productId!, payload);
+      if (productId) {
+        await productApi.updateProduct(productId, payload);
+        if (form.customOrderEnabled) {
+          const saved = await customOrderEditorRef.current?.saveConfiguration({
+            silentSuccess: true,
+          });
+          if (!saved) {
+            throw new Error(
+              "Custom-order setup could not be saved. The product update was kept, but custom-order availability was not finalized.",
+            );
+          }
+        }
+      } else {
+        const created = await productApi.createProduct(payload);
+        if (pendingCustomOrderDraft) {
+          try {
+            await customOrderConfigurationsApi.create({
+              ...pendingCustomOrderDraft,
+              sourceId: created.id,
+            });
+          } catch (customOrderError: any) {
+            await productApi.updateProduct(created.id, {
+              customOrderEnabled: false,
+            });
+            throw new Error(
+              customOrderError?.response?.data?.message ||
+                "Custom-order setup could not be saved for the new product. The product was kept, but custom-order availability was turned back off.",
+            );
+          }
+        }
+      }
       notifyProductStudioSync("product-updated", productId || undefined);
-      toast.success("Product updated successfully");
+      toast.success(
+        productId ? "Product updated successfully" : "Product created successfully",
+      );
       setOriginalPrice(form.price); // Update tracked price
       setHasChanges(false);
       if (returnTo && isCollectionContext) {
@@ -2309,8 +2401,8 @@ const EditProduct: React.FC = () => {
   return (
     <div className="flex flex-col min-h-full bg-transparent text-gray-900 dark:text-[#e5e5e5] font-sans">
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto p-6">
-        <div className="mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-4 sm:px-6 sm:py-6">
+        <div className="mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:mb-6">
           <div className="flex flex-col gap-1">
             <div className="flex items-center text-xs text-gray-600 dark:text-gray-400 gap-2">
               {isCollectionContext ? (
@@ -2390,13 +2482,13 @@ const EditProduct: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* LEFT COLUMN: Media (42% approx -> 5 cols) */}
           <div className="lg:col-span-5 space-y-6">
             {/* Media Gallery */}
             <div
               id="product-media-section"
-              className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-5 scroll-mt-24"
+              className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4 sm:p-5 scroll-mt-24"
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-white">
@@ -2611,7 +2703,7 @@ const EditProduct: React.FC = () => {
             </div>
 
             {/* Video Section */}
-            <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-5">
+            <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4 sm:p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-white">
                   Product Video
@@ -2634,7 +2726,7 @@ const EditProduct: React.FC = () => {
           {/* RIGHT COLUMN: Details (58% approx -> 7 cols) */}
           <div className="lg:col-span-7 space-y-6">
             {/* Basic Info */}
-            <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
+            <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4 sm:p-5">
               <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-6">
                 Basic Information
               </h2>
@@ -2660,7 +2752,7 @@ const EditProduct: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="h-[360px] overflow-y-auto scrollbar-threadly-strong pr-1 sm:pr-2">
+                  <div className="lg:h-[360px] lg:overflow-y-auto scrollbar-threadly-strong lg:pr-1">
                     <div className="space-y-4">
                       <div className="space-y-3" id="product-category-section">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -2684,6 +2776,7 @@ const EditProduct: React.FC = () => {
                               searchable
                               emptyMessage="No categories available"
                               optionAllowWrap
+                              selectedAllowWrap
                             />
                           </div>
 
@@ -2715,6 +2808,7 @@ const EditProduct: React.FC = () => {
                                   : 'Select a category first'
                               }
                               optionAllowWrap
+                              selectedAllowWrap
                             />
                           </div>
                         </div>
@@ -2743,6 +2837,7 @@ const EditProduct: React.FC = () => {
                               searchable
                               emptyMessage="No collections available"
                               optionAllowWrap
+                              selectedAllowWrap
                             />
                           </div>
 
@@ -2888,7 +2983,7 @@ const EditProduct: React.FC = () => {
                   Scroll inside panel
                 </span>
               </div>
-              <div className="h-[460px] md:h-[520px] overflow-y-auto scrollbar-threadly-strong p-4 space-y-4">
+              <div className="space-y-4 p-4 lg:h-[520px] lg:overflow-y-auto scrollbar-threadly-strong lg:pr-1">
                 {/* Pricing */}
                 <div
                   id="product-pricing-section"
@@ -2995,31 +3090,47 @@ const EditProduct: React.FC = () => {
                 {/* Variants */}
                 <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl overflow-hidden">
                   <div
-                    className={`p-4 flex items-center justify-between ${collapsedSections.variants ? "" : "border-b border-gray-200 dark:border-white/5"}`}
+                    className={`p-4 ${collapsedSections.variants ? "" : "border-b border-gray-200 dark:border-white/5"}`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => toggleSection("variants")}
-                      className="flex items-center gap-2 text-left"
-                    >
-                      <h2 className="text-base font-medium text-gray-900 dark:text-white">
-                        Variants
-                      </h2>
-                      {collapsedSections.variants ? (
-                        <ChevronDown className="h-4 w-4 text-gray-500" />
-                      ) : (
-                        <ChevronUp className="h-4 w-4 text-gray-500" />
-                      )}
-                    </button>
-                    {!collapsedSections.variants && (
+                    <div className="flex items-center justify-between gap-3">
                       <button
                         type="button"
-                        onClick={addVariant}
-                        className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition"
+                        onClick={() => toggleSection("variants")}
+                        className="flex items-center gap-2 text-left"
                       >
-                        + Add Color Group
+                        <h2 className="text-base font-medium text-gray-900 dark:text-white">
+                          Variants
+                        </h2>
+                        {collapsedSections.variants ? (
+                          <ChevronDown className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <ChevronUp className="h-4 w-4 text-gray-500" />
+                        )}
                       </button>
-                    )}
+                      {!collapsedSections.variants && (
+                        <button
+                          type="button"
+                          onClick={addVariant}
+                          className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition"
+                        >
+                          + Add Color Group
+                        </button>
+                      )}
+                    </div>
+                    <p
+                      className={`mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                        form.variants.length >= MIN_PUBLISH_VARIANT_COUNT
+                          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-100'
+                          : 'border-amber-500/20 bg-amber-500/10 text-amber-100'
+                      }`}
+                    >
+                      <span aria-hidden="true">
+                        {form.variants.length >= MIN_PUBLISH_VARIANT_COUNT ? '✅' : '⚠️'}
+                      </span>
+                      {form.variants.length >= MIN_PUBLISH_VARIANT_COUNT
+                        ? `Publish ready: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants.`
+                        : `Publish requires at least ${MIN_PUBLISH_VARIANT_COUNT} size variants (${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} added).`}
+                    </p>
                   </div>
 
                   {!collapsedSections.variants && hasDuplicateVariants && (
@@ -3292,8 +3403,10 @@ const EditProduct: React.FC = () => {
                   {showCustomOrderForm && (
                     <div className="mt-4">
                       <CustomOrderConfigurationEditor
+                        ref={customOrderEditorRef}
                         sourceType="PRODUCT"
                         sourceId={isEditMode ? productId : undefined}
+                        sourceTitle={form.title}
                         measurementKeys={form.customMeasurementKeys}
                         defaultBaseCharge={form.price > 0 ? form.price : null}
                         disabled={saving}

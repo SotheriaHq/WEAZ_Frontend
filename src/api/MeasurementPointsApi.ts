@@ -2,6 +2,7 @@ import type { MeasurementPoint, MeasurementPointCategory } from '@/types/sizing'
 import { apiClient } from './httpClient';
 
 const unwrap = <T>(raw: any): T => (raw?.data ?? raw) as T;
+const MEASUREMENT_POINTS_UPDATED_EVENT = 'threadly:measurement-points-updated';
 
 const normalizeMeasurementDisplayLabel = (rawLabel: string) =>
   String(rawLabel ?? '')
@@ -47,6 +48,10 @@ export const MeasurementPointsApi = {
       point: MeasurementPoint;
       fuzzyMatches: Array<{ id: string; key: string; label: string; similarity: number }>;
     }>(response.data);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(MEASUREMENT_POINTS_UPDATED_EVENT));
+    }
 
     return {
       ...data,

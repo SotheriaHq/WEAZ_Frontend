@@ -91,7 +91,7 @@ export const buildCollectionUrl = (collectionId: string): string => {
 };
 
 export const buildOrderUrl = (orderId: string): string => {
-  return toAbsoluteUrl(`/orders/access/${encodeURIComponent(orderId)}`);
+  return toAbsoluteUrl(`/orders/${encodeURIComponent(orderId)}`);
 };
 
 export const buildPublicUrl = (target: PublicUrlTarget): string => {

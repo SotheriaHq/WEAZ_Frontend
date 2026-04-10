@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Share2, X } from 'lucide-react';
 import VLoader from '@/components/loaders/VLoader';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import type { SizeFitSharePolicy, SizeFitSharesPayload } from '@/types/sizeFit';
+import type { SizeFitShareDto, SizeFitSharePolicy, SizeFitSharesPayload } from '@/types/sizeFit';
 
 interface EndUserSizeFitQuickShareModalProps {
   open: boolean;
@@ -10,7 +9,7 @@ interface EndUserSizeFitQuickShareModalProps {
   sharePolicy: SizeFitSharePolicy;
   shares: SizeFitSharesPayload | null;
   onClose: () => void;
-  onShare: (payload: { targetUserId: string; canReshare?: boolean; note?: string }) => Promise<void>;
+  onShare: (payload: SizeFitShareDto) => Promise<void>;
   onRespond: (shareId: string, decision: 'APPROVE' | 'REJECT' | 'REVOKE') => Promise<void>;
 }
 
@@ -49,7 +48,7 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
   const handleShare = async () => {
     if (!shareTarget.trim()) return;
     await onShare({
-      targetUserId: shareTarget.trim(),
+      targetUserIdentifier: shareTarget.trim(),
       canReshare,
       note: shareNote.trim() || undefined,
     });
@@ -75,14 +74,14 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
             className="absolute top-4 right-4 z-20 inline-flex items-center justify-center h-9 w-9 rounded-xl neu-modal-inset focus-visible:ring-2 focus-visible:ring-indigo-400"
             aria-label="Close"
           >
-            <X className="h-4 w-4 text-[color:var(--neu-text-muted)]" aria-hidden="true" />
+            <span aria-hidden="true" className="text-[color:var(--neu-text-muted)]">❌</span>
           </button>
 
           <div className="p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0 pr-10">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 text-white grid place-items-center">
-                  <Share2 className="h-4 w-4" aria-hidden="true" />
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 text-white grid place-items-center text-base" aria-hidden="true">
+                  📤
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold text-[color:var(--neu-text)]">Quick Share</h2>
@@ -112,7 +111,7 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
                   value={shareTarget}
                   onChange={(event) => setShareTarget(event.target.value)}
                   className="rounded-lg neu-modal-inset px-3 py-2 text-sm text-[color:var(--neu-text)]"
-                  placeholder="Target user id"
+                  placeholder="Username or email"
                 />
                 <input
                   value={shareNote}

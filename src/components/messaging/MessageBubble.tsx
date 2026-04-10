@@ -177,7 +177,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
                           src={att.file.s3Url}
                           alt={att.file.originalName || 'Attachment'}
                           className="w-full h-auto rounded-lg"
-                          loading="lazy"
+                          loading="eager"
                         />
                       </a>
                     ) : (

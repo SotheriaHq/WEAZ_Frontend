@@ -19,13 +19,13 @@ const AdminScaffold: React.FC = () => {
   }, [dispatch, location.pathname]);
 
   return (
-    <div className="min-h-screen threadly-shell-bg pb-20 md:pb-0">
+    <div className="min-h-screen overflow-x-hidden threadly-shell-bg pb-20 md:pb-0">
       <Navbar minimal={false} />
       <Sidebar overlayOnly />
       <AdminSidebar />
 
-      <div className="min-h-screen pb-10 px-4 md:pl-[220px] pt-20">
-        <div className="max-w-6xl mx-auto">
+      <div className="min-h-screen min-w-0 overflow-x-hidden px-4 pb-10 pt-20 md:pl-[220px]">
+        <div className="mx-auto w-full min-w-0 max-w-6xl">
           <Outlet />
         </div>
       </div>

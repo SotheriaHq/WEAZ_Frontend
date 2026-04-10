@@ -14,6 +14,7 @@
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",
     "@hookform/resolvers": "^5.1.1",
+    "@paystack/inline-js": "^2.22.8",
     "@reduxjs/toolkit": "^2.8.2",
     "@rollup/rollup-win32-x64-msvc": "^4.45.1",
     "@types/qrcode.react": "^1.0.5",

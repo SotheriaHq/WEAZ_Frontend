@@ -66,6 +66,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
     (theme === 'system' &&
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const themeActionEmoji = resolvedIsDark ? '🌞' : '🌙';
+  const themeMenuLabel = resolvedIsDark ? 'Light theme' : 'Dark theme';
 
   React.useEffect(() => {
     if (isAuthenticated) {
@@ -172,7 +174,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           {user ? (
             <>
               <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3">
                   <ImageWithFallback
                     src={user.profileImage ?? user.profileImageFile?.s3Url ?? null}
                     fileId={user.profileImageId ?? user.profileImageFile?.id ?? null}
@@ -183,9 +185,11 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                     containerClassName="h-10 w-10"
                     rounded="xl"
                   />
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">{user.firstName} {user.lastName}</p>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{user.email}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {user.firstName} {user.lastName}
+                    </p>
+                    <p className="break-words text-sm font-medium text-gray-600 dark:text-gray-300">{user.email}</p>
                     <p className="mt-0.5 text-[11px] font-semibold tracking-wide text-gray-700 dark:text-gray-200">UID: {userUid}</p>
                   </div>
                 </div>
@@ -196,70 +200,65 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                   <MenuButton icon="🧵" label="Dashboard" onClick={() => { navigate('/studio'); setShowProfileMenu(false); }} />
                 ) : null}
                 <MenuButton icon="👤" label={translate('profile')} onClick={() => { navigate(profileHomeRoute); setShowProfileMenu(false); }} />
+                <MenuButton icon={themeActionEmoji} label={themeMenuLabel} onClick={handleThemeToggle} />
                 <MenuButton icon="⚙️" label={translate('settings')} onClick={() => { navigate('/settings'); setShowProfileMenu(false); }} />
+              </div>
+
+              <div className="border-t border-gray-200 py-2 dark:border-gray-700">
+                <button
+                  onClick={() => {
+                    setShowNotifications(false);
+                    setShowLanguageDropdown((prev) => !prev);
+                  }}
+                  className="flex w-full items-center justify-between px-4 py-2 text-left text-gray-700 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  <div className="flex items-center gap-3">
+                    <span aria-hidden="true">🌍</span>
+                    <span>{translate('language')}</span>
+                  </div>
+                  <span aria-hidden="true" className={`transition-transform duration-200 ${showLanguageDropdown ? 'rotate-180' : ''}`}>⌄</span>
+                </button>
+                {showLanguageDropdown ? (
+                  <div className="space-y-1 py-1 pl-8">
+                    <button onClick={() => setLanguage('en')} className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">English</button>
+                    <button onClick={() => setLanguage('zh')} className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">中文</button>
+                    <button onClick={() => setLanguage('ar')} className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">العربية</button>
+                    <button onClick={() => setLanguage('hi')} className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">हिन्दी</button>
+                  </div>
+                ) : null}
+                <MenuButton icon="📍" label={translate('location')} onClick={handleLocationShare} />
+                <MenuButton icon="🆘" label="Help" onClick={() => { navigate(helpRoute); setShowProfileMenu(false); }} />
               </div>
 
               <div className="border-t border-gray-200 py-2 dark:border-gray-700">
                 <MenuButton icon="📦" label="My Orders" onClick={() => { navigate(ordersRoute); setShowProfileMenu(false); }} />
                 <MenuButton icon="🤍" label="Saved" onClick={() => { navigate(savedRoute); setShowProfileMenu(false); }} />
               </div>
+
+              <div className="border-t border-gray-200 py-2 dark:border-gray-700">
+                <MenuButton
+                  icon="↩️"
+                  label={translate('signOut')}
+                  danger
+                  onClick={async () => {
+                    try {
+                      await apiClient.post('/auth/logout');
+                    } catch (error) {
+                      void error;
+                    }
+                    dispatch(addLocalNotification({ message: 'Signed out successfully.' }));
+                    dropStoredAccessToken();
+                    localStorage.removeItem(env.userStorageKey);
+                    dispatch(clearUser());
+                    dispatch(resetCartState());
+                    dispatch(resetWishlistState());
+                    dispatch(resetUnreadCount());
+                    setShowProfileMenu(false);
+                    navigate('/', { replace: true });
+                  }}
+                />
+              </div>
             </>
-          ) : (
-            <div className="border-b border-gray-200 py-2 dark:border-gray-700">
-              <MenuButton icon="⚙️" label={translate('settings')} onClick={() => { navigate('/settings'); setShowProfileMenu(false); }} />
-            </div>
-          )}
-
-          <div className="border-t border-gray-200 py-2 dark:border-gray-700">
-            <button
-              onClick={() => {
-                setShowNotifications(false);
-                setShowLanguageDropdown((prev) => !prev);
-              }}
-              className="flex w-full items-center justify-between px-4 py-2 text-left text-gray-700 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-            >
-              <div className="flex items-center gap-3">
-                <span aria-hidden="true">🌍</span>
-                <span>{translate('language')}</span>
-              </div>
-              <span aria-hidden="true" className={`transition-transform duration-200 ${showLanguageDropdown ? 'rotate-180' : ''}`}>⌄</span>
-            </button>
-            {showLanguageDropdown ? (
-              <div className="space-y-1 py-1 pl-8">
-                <button onClick={() => setLanguage('en')} className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">English</button>
-                <button onClick={() => setLanguage('zh')} className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">中文</button>
-                <button onClick={() => setLanguage('ar')} className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">العربية</button>
-                <button onClick={() => setLanguage('hi')} className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">हिन्दी</button>
-              </div>
-            ) : null}
-            <MenuButton icon="📍" label={translate('location')} onClick={handleLocationShare} />
-            <MenuButton icon="🆘" label="Help" onClick={() => { navigate(helpRoute); setShowProfileMenu(false); }} />
-          </div>
-
-          {user ? (
-            <div className="border-t border-gray-200 py-2 dark:border-gray-700">
-              <MenuButton
-                icon="↩️"
-                label={translate('signOut')}
-                danger
-                onClick={async () => {
-                  try {
-                    await apiClient.post('/auth/logout');
-                  } catch (error) {
-                    void error;
-                  }
-                  dispatch(addLocalNotification({ message: 'Signed out successfully.' }));
-                  dropStoredAccessToken();
-                  localStorage.removeItem(env.userStorageKey);
-                  dispatch(clearUser());
-                  dispatch(resetCartState());
-                  dispatch(resetWishlistState());
-                  dispatch(resetUnreadCount());
-                  setShowProfileMenu(false);
-                  navigate('/', { replace: true });
-                }}
-              />
-            </div>
           ) : null}
         </div>
       </div>
@@ -336,16 +335,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
               <span aria-hidden="true" className="text-lg text-gray-700 dark:text-gray-200">🔎</span>
             </button>
           ) : null}
-
-          <button
-            type="button"
-            onClick={handleThemeToggle}
-            className="rounded-full p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
-            aria-label={resolvedIsDark ? 'Switch to light theme' : 'Switch to dark theme'}
-            title={resolvedIsDark ? 'Switch to light theme' : 'Switch to dark theme'}
-          >
-            <span aria-hidden="true" className="text-lg">{resolvedIsDark ? '🌞' : '🌙'}</span>
-          </button>
 
           {user ? (
             <button

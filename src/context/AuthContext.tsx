@@ -5,7 +5,7 @@ import { unwrapApiResponse } from '../types/auth';
 import type { AuthUserDto, AuthProfileResponse, AuthTokensResponse } from '../types/auth';
 import { useDispatch } from 'react-redux';
 import { env } from '../config/env';
-import { setUser, clearUser } from '../features/userSlice';
+import { setUser, setUserFromStorage, clearUser } from '../features/userSlice';
 import {
   apiClient,
   dropStoredAccessToken,
@@ -113,6 +113,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       window.addEventListener('auth:expired', onAuthExpired);
     }
 
+    const onUserStorage = (event: StorageEvent) => {
+      if (event.storageArea !== localStorage) return;
+      if (event.key !== env.userStorageKey) return;
+
+      if (!event.newValue) {
+        dispatch(clearUser());
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(event.newValue) as AuthUserDto;
+        if (parsed?.id) {
+          dispatch(setUserFromStorage(parsed));
+        } else {
+          dispatch(clearUser());
+        }
+      } catch {
+        dispatch(clearUser());
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', onUserStorage);
+    }
+
     const initialize = async () => {
       try {
         await fetchUserProfile();
@@ -131,6 +156,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       isMounted = false;
       if (typeof window !== 'undefined') {
         window.removeEventListener('auth:expired', onAuthExpired);
+        window.removeEventListener('storage', onUserStorage);
       }
     };
   }, [dispatch, fetchUserProfile, handleProfileError]);

@@ -10,7 +10,7 @@ export interface CheckoutStatusCopy {
 }
 
 const HEADLINES: Record<string, string> = {
-  PAID: 'Payment confirmed',
+  PAID: 'Your order is placed successfully',
   FAILED: 'Payment failed',
   CANCELLED: 'Payment cancelled',
   EXPIRED: 'Payment expired',
@@ -20,7 +20,7 @@ const HEADLINES: Record<string, string> = {
 };
 
 const RETURN_DESCRIPTIONS: Record<string, string> = {
-  PAID: 'Threadly has confirmed the payment attempt. You can move into the final confirmation screen.',
+  PAID: 'Thank you for shopping. Threadly has confirmed your payment and finalized the order.',
   FAILED: 'The payment attempt ended in a failed state. You can retry from your order or switch methods.',
   CANCELLED: 'The payment attempt was cancelled before completion.',
   EXPIRED: 'The payment window expired before the payment was completed.',
@@ -30,7 +30,7 @@ const RETURN_DESCRIPTIONS: Record<string, string> = {
 };
 
 const CONFIRMATION_DESCRIPTIONS: Record<string, string> = {
-  PAID: 'Threadly has confirmed this payment attempt and your order is now in the post-payment flow.',
+  PAID: 'Your order is placed successfully, Thank you for shopping.',
   FAILED: 'This payment attempt ended in a failed state. You can retry later from your order.',
   CANCELLED: 'This payment attempt was cancelled before completion.',
   EXPIRED: 'This payment window expired before the order was paid.',

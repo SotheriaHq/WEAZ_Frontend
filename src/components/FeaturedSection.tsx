@@ -127,7 +127,7 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({
                     src={thumbnailUrl(spotlight)!}
                     alt={spotlight.entityName}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    loading="lazy"
+                    loading="eager"
                   />
                 ) : (
                   <div className="flex h-full min-h-[192px] items-center justify-center bg-amber-100/50 text-3xl dark:bg-amber-500/10">⭐</div>
@@ -226,7 +226,7 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({
                   src={thumbnailUrl(item)!}
                   alt={item.entityName}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  loading="lazy"
+                  loading="eager"
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-3xl">⭐</div>

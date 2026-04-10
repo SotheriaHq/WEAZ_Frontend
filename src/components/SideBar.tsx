@@ -81,23 +81,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
   const isAdminConsoleUser = user?.role === 'SuperAdmin' || user?.role === 'Admin';
   const storeSetupComplete = useStoreSetupStatus();
 
-  const showOverlay = isSidebarOpen;
-  const isRail = !showOverlay;
-
   if (overlayOnly && !isSidebarOpen) {
     return null;
   }
-
-  const widthClass = isRail ? 'w-[76px]' : 'w-[240px]';
-  const positionClass = isRail
-    ? 'fixed left-0 top-[var(--app-header-height)] h-[calc(100vh-var(--app-header-height))] z-50'
-    : 'fixed left-0 top-0 h-full z-50 shadow-xl';
-
-  const slideClasses = showOverlay
-    ? `transform transition-transform duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${
-        isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'
-      }`
-    : '';
 
   const handleLinkClick = (path: string) => {
     navigate(path);

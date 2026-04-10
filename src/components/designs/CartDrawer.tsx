@@ -50,7 +50,7 @@ const CartItemThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt })
       src={url || src}
       alt={alt}
       className="w-full h-full object-cover rounded-lg"
-      loading="lazy"
+      loading="eager"
     />
   );
 };

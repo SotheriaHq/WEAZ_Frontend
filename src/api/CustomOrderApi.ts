@@ -442,6 +442,32 @@ export interface PricePreviewResponse {
   conversionGuidance?: string | null;
 }
 
+export interface CustomOrderCheckoutSubmission {
+  status: 'READY_FOR_PAYMENT' | 'ALREADY_PLACED';
+  checkoutIntentId: string;
+  customOrderId?: string;
+  priceLockExpiresAt?: string;
+  checkoutSessionId?: string;
+  resumeUrl?: string;
+}
+
+export interface CustomOrderCheckoutSession {
+  id: string;
+  status: string;
+  checkoutIntentId: string;
+  customOrderId?: string | null;
+  submittedAt: string;
+  paymentInitiatedAt?: string | null;
+  paidConfirmedAt?: string | null;
+  abandonedAt?: string | null;
+  lastAttemptReference?: string | null;
+  lastAttemptStatus?: string | null;
+  attemptsCount: number;
+  resumeUrl?: string | null;
+  resumePath?: string | null;
+  uiState?: Record<string, unknown> | null;
+}
+
 export interface DisplayChartPreference {
   displayChartFamily: CustomOrderChartFamily;
   updatedAtMs: number;
@@ -467,6 +493,7 @@ export interface CustomOrderPaymentInitResult {
   gateway: string;
   status: string;
   channel?: string;
+  providerAccessCode?: string;
   callbackUrl?: string;
   authorizationUrl?: string;
   bankAccount?: Record<string, unknown>;
@@ -483,10 +510,27 @@ export interface CustomOrderPaymentVerificationResult {
   paidAt?: string;
   channel?: string;
   failureMessage?: string;
-  customOrderId: string;
+  customOrderId?: string;
   awaitingProviderConfirmation?: boolean;
   recoveryAction?: string;
   recoveryMessage?: string;
+}
+
+export interface CustomOrderPaymentAttempt {
+  id: string;
+  reference: string;
+  status: string;
+  provider: string;
+  paymentMethod: string;
+  channel?: string | null;
+  amount: number;
+  currency: string;
+  failureCode?: string | null;
+  failureMessage?: string | null;
+  createdAt: string;
+  confirmedAt?: string | null;
+  finalizedAt?: string | null;
+  lastVerifiedAt?: string | null;
 }
 
 export interface PaginatedCustomOrders<T> {
@@ -825,7 +869,36 @@ export const customOrdersBuyerApi = {
         headers: { 'Idempotency-Key': idempotencyKey },
       },
     );
-    return unwrapApiResponse<CustomOrderDetail>(response.data);
+    return unwrapApiResponse<CustomOrderCheckoutSubmission>(response.data);
+  },
+
+  async getCheckoutSessionByToken(token: string) {
+    const response = await apiClient.get(`/custom-orders/checkout-sessions/resume/${token}`);
+    return unwrapApiResponse<CustomOrderCheckoutSession>(response.data);
+  },
+
+  async initializePaymentForCheckoutIntent(
+    checkoutIntentId: string,
+    payload: {
+      paymentMethod: 'PAYSTACK' | 'FLUTTERWAVE' | 'BANK_TRANSFER';
+      email: string;
+      callbackUrl?: string;
+      paymentData?: Record<string, unknown>;
+      idempotencyKey?: string;
+    },
+  ) {
+    const idempotencyKey = payload.idempotencyKey ?? createIdempotencyKey();
+    const response = await apiClient.post(
+      `/custom-orders/checkout/${checkoutIntentId}/payment/initialize`,
+      {
+        ...payload,
+        idempotencyKey,
+      },
+      {
+        headers: { 'Idempotency-Key': idempotencyKey },
+      },
+    );
+    return unwrapApiResponse<CustomOrderPaymentInitResult>(response.data);
   },
 
   async initializePayment(
@@ -862,6 +935,16 @@ export const customOrdersBuyerApi = {
     return unwrapApiResponse<CustomOrderPaymentVerificationResult>(response.data);
   },
 
+  async verifyPaymentByReference(payload: {
+    reference: string;
+    gateway: string;
+    otp?: string;
+    statusHint?: string;
+  }) {
+    const response = await apiClient.post('/custom-orders/payment/verify', payload);
+    return unwrapApiResponse<CustomOrderPaymentVerificationResult>(response.data);
+  },
+
   async list(params?: { page?: number; limit?: number; status?: CustomOrderStatus; stage?: CustomOrderProgressStage; q?: string }) {
     const response = await apiClient.get('/custom-orders', withParams(params));
     return unwrapApiResponse<PaginatedCustomOrders<CustomOrderListItem>>(response.data);
@@ -870,6 +953,11 @@ export const customOrdersBuyerApi = {
   async getById(orderId: string) {
     const response = await apiClient.get(`/custom-orders/${orderId}`);
     return unwrapApiResponse<CustomOrderDetail>(response.data);
+  },
+
+  async listPaymentAttempts(orderId: string) {
+    const response = await apiClient.get(`/custom-orders/${orderId}/payment-attempts`);
+    return unwrapApiResponse<CustomOrderPaymentAttempt[]>(response.data);
   },
 
   async cancel(orderId: string, reason: string) {

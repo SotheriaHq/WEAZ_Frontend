@@ -22,6 +22,7 @@ interface UniversalSelectProps {
   emptyMessage?: string;
   optionCompact?: boolean;
   optionAllowWrap?: boolean;
+  selectedAllowWrap?: boolean;
 }
 
 const normalizeSearchText = (value: string): string =>
@@ -45,6 +46,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   emptyMessage = 'No matching options',
   optionCompact = false,
   optionAllowWrap = false,
+  selectedAllowWrap = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -91,7 +93,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   };
 
   return (
-    <div className={`relative space-y-1.5 ${className}`} ref={containerRef}>
+    <div className={`relative space-y-2 ${className}`} ref={containerRef}>
       {label && (
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           {label}
@@ -104,25 +106,23 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           onClick={() => !disabled && setIsOpen(!isOpen)}
           disabled={disabled}
           className={`
-            relative w-full cursor-pointer rounded-xl border text-left shadow-sm transition-all duration-200
-            flex items-center justify-between px-4 py-3
-            ${disabled ? 'cursor-not-allowed opacity-60 bg-gray-100 dark:bg-gray-800' : 'bg-white/60 dark:bg-black/40 backdrop-blur-md hover:bg-white/80 dark:hover:bg-white/5'}
+            relative w-full cursor-pointer rounded-2xl border text-left shadow-sm transition-all duration-200
+            flex items-center justify-between px-4 py-3.5 ${selectedAllowWrap ? 'items-start' : 'items-center'}
+            ${disabled ? 'cursor-not-allowed opacity-60 bg-gray-100 dark:bg-gray-800' : 'bg-white/75 dark:bg-white/5 backdrop-blur-xl hover:bg-white dark:hover:bg-white/10'}
             ${error 
-              ? 'border-red-500 focus:ring-red-500' 
-              : isOpen 
-                ? 'border-purple-500 ring-2 ring-purple-500/20' 
-                : 'border-gray-200 dark:border-white/10 hover:border-purple-400 dark:hover:border-purple-500/50'
+              ? 'border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.10)]' 
+              : 'border-gray-200/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
             }
           `}
         >
-          <span className={`block truncate ${!selectedOption ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+          <span className={`flex min-w-0 flex-1 ${selectedAllowWrap ? 'items-start' : 'items-center'} ${!selectedOption ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
             {selectedOption ? (
-              <span className="flex items-center gap-2">
+              <span className={`flex min-w-0 gap-2 ${selectedAllowWrap ? 'items-start' : 'items-center'}`}>
                 {selectedOption.icon && <span className="flex-shrink-0 text-gray-500 dark:text-gray-400">{selectedOption.icon}</span>}
-                <span>{selectedOption.label}</span>
+                <span className={selectedAllowWrap ? 'whitespace-normal break-words text-sm leading-5' : 'truncate'}>{selectedOption.label}</span>
               </span>
             ) : (
-              placeholder
+              <span className={selectedAllowWrap ? 'whitespace-normal break-words text-sm leading-5' : 'truncate'}>{placeholder}</span>
             )}
           </span>
           <span className="pointer-events-none flex items-center pr-2">
@@ -134,27 +134,29 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
         </button>
 
         {isOpen && (
-          <div className="absolute z-50 mt-2 max-h-60 w-full overflow-auto rounded-xl bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-white/10 shadow-xl ring-1 ring-black ring-opacity-5 focus:outline-none animate-in fade-in zoom-in-95 duration-100 scrollbar-hide">
+          <div className="absolute z-50 mt-2 max-h-60 w-full overflow-auto rounded-2xl glass-menu p-1 animate-slideDown focus:outline-none scrollbar-hide">
             {searchable && (
-              <div className="sticky top-0 z-10 border-b border-gray-100 bg-white px-2 py-2 dark:border-white/10 dark:bg-[#0a0a0a]">
+              <div className="sticky top-0 z-10 border-b border-white/10 bg-white/80 px-2 py-2 backdrop-blur-xl dark:border-white/10 dark:bg-black/20">
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder={searchPlaceholder}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-purple-400 dark:border-white/10 dark:bg-black/40 dark:text-white dark:focus:border-purple-400"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="w-full rounded-xl border border-gray-200/80 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-transparent focus:ring-0 dark:border-white/10 dark:bg-black/40 dark:text-white"
                 />
               </div>
             )}
-            <div className="p-1">
+            <div className="space-y-1 p-1">
               {filteredOptions.map((option) => {
                 const isSelected = option.value === value;
                 return (
                   <div
                     key={option.value}
                     onClick={() => handleSelect(option.value)}
-                    className={`
-                      relative cursor-pointer select-none rounded-lg ${optionCompact ? 'py-2 pl-2.5 pr-8' : 'py-2.5 pl-3 pr-9'} transition-colors
+                      className={`
+                      relative cursor-pointer select-none rounded-xl ${optionCompact ? 'py-2 pl-2.5 pr-8' : 'py-2.5 pl-3 pr-9'} transition-colors
                       ${isSelected 
                         ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-900 dark:text-purple-100' 
                         : 'text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-white/5'

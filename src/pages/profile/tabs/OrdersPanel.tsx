@@ -1,16 +1,23 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   confirmMyOrderDelivery,
   getMyOrder,
   getMyOrders,
   type Order,
+  type PaystackPaymentData,
+  type ShippingAddress,
 } from '@/api/StoreApi';
 import {
   customOrdersBuyerApi,
   type CustomOrderDetail,
+  type CustomOrderExtensionResponseStatus,
+  type CustomOrderIssueType,
   type CustomOrderListItem,
+  type CustomOrderPaymentAttempt,
+  type CustomOrderPaymentVerificationResult,
   type CustomOrderProgressStage,
 } from '@/api/CustomOrderApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
@@ -22,6 +29,7 @@ import {
   formatDateTime,
   getRelativeDeadlineText,
 } from '@/components/custom-orders/CustomOrderUi';
+import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   formatCustomOrderCode,
   formatMeasurementLabel,
@@ -29,6 +37,22 @@ import {
   humanizeCustomOrderToken,
 } from '@/components/custom-orders/customOrderFormatting';
 import { messagingApi, type ThreadSummaryResponse } from '@/api/MessagingApi';
+import type { RootState } from '@/store';
+import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
+import {
+  CHECKOUT_PAYMENT_OPTIONS,
+  buildPaymentSubmissionData,
+  createInitialPaymentState,
+  type PaymentFormErrors,
+  type PaymentFormState,
+  validatePaymentData,
+} from '@/pages/checkout/paymentFlow';
+import { useConfirm } from '@/components/ui/useConfirm';
+import { createIdempotencyKey } from '@/api/idempotency';
+import {
+  cancelActivePaystackInline,
+  openPaystackInline,
+} from '@/lib/paystackInline';
 
 const STANDARD_STATUS_OPTIONS = ['ALL', 'PENDING', 'PROCESSING', 'SHIPPED'] as const;
 const CUSTOM_STATUS_OPTIONS = ['ALL', 'PENDING', 'ACTIVE', 'COMPLETED', 'ISSUES'] as const;
@@ -47,6 +71,25 @@ type OrdersPanelProps = {
   onViewAll?: (selection?: OrdersPanelSelection) => void;
   initialSelection?: OrdersPanelSelection | null;
   onSelectionHandled?: () => void;
+};
+
+const paymentAttemptEmoji = (status: string) => {
+  switch (status) {
+    case 'PAID':
+      return '✅';
+    case 'FAILED':
+      return '❌';
+    case 'CANCELLED':
+      return '🚫';
+    case 'EXPIRED':
+      return '⌛';
+    case 'REQUIRES_ACTION':
+      return '🧭';
+    case 'PROCESSING':
+      return '⏳';
+    default:
+      return '⏳';
+  }
 };
 
 const CUSTOM_STAGE_FLOW: Array<{ value: CustomOrderProgressStage; label: string }> = [
@@ -228,9 +271,13 @@ const BuyerCustomStageFiller: React.FC<{
   stage?: CustomOrderProgressStage | null;
   brandName?: string | null;
   compact?: boolean;
-}> = ({ stage, brandName, compact = false }) => {
+  statusLabel?: string | null;
+  progressIndex?: number | null;
+}> = ({ stage, brandName, compact = false, statusLabel = null, progressIndex = null }) => {
   const effectiveStage = getBuyerFacingProgressStage(stage);
-  const stepIndex = getBuyerCustomStageStepIndex(effectiveStage);
+  const stepIndex =
+    typeof progressIndex === 'number' ? progressIndex : getBuyerCustomStageStepIndex(effectiveStage);
+  const resolvedLabel = statusLabel ?? getBuyerFacingProgressLabel(effectiveStage);
 
   return (
     <div
@@ -244,16 +291,16 @@ const BuyerCustomStageFiller: React.FC<{
             Current status
           </div>
           <div className={`${compact ? 'mt-1 text-base' : 'mt-1 text-lg'} font-bold text-slate-900 dark:text-white`}>
-            {getBuyerFacingProgressLabel(effectiveStage)}
+            {resolvedLabel}
           </div>
         </div>
         {brandName ? (
           <div className="text-sm text-slate-600 dark:text-slate-300">{brandName}</div>
         ) : null}
       </div>
-      <div className="mt-4 grid grid-cols-5 gap-2">
-        {BUYER_STAGE_FLOW.map((step, index) => {
-          const active = index <= stepIndex;
+        <div className="mt-4 grid grid-cols-5 gap-2">
+          {BUYER_STAGE_FLOW.map((step, index) => {
+            const active = index <= stepIndex;
           return (
             <span
               key={step.value}
@@ -387,6 +434,10 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
     };
   }, [orderId]);
 
+  useEffect(() => {
+    void refreshPaymentAttempts();
+  }, [refreshPaymentAttempts]);
+
   const handleConfirmDelivery = async () => {
     if (!order) return;
     setConfirmingDelivery(true);
@@ -434,6 +485,7 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
 
   return (
     <div className="space-y-6">
+      {ConfirmDialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
@@ -623,14 +675,77 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
   );
 };
 
-const BuyerCustomOrderDetailView: React.FC<{
+export const BuyerCustomOrderDetailView: React.FC<{
   orderId: string;
   onBack: () => void;
   previewOrder?: CustomOrderListItem | null;
 }> = ({ orderId, onBack, previewOrder = null }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const profile = useSelector((state: RootState) => state.user.profile);
   const [order, setOrder] = useState<CustomOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [paymentVerification, setPaymentVerification] =
+    useState<CustomOrderPaymentVerificationResult | null>(null);
+  const [paymentMethod, setPaymentMethod] =
+    useState<keyof PaymentFormState>('PAYSTACK');
+  const [paymentState, setPaymentState] = useState(() =>
+    createInitialPaymentState(profile?.email ?? '', profile?.phoneNumber ?? ''),
+  );
+  const [paymentErrors, setPaymentErrors] = useState<PaymentFormErrors>({});
+  const [paymentGateway, setPaymentGateway] = useState<string>('PAYSTACK');
+  const [paymentAttempts, setPaymentAttempts] = useState<CustomOrderPaymentAttempt[]>([]);
+  const [paymentAttemptsLoading, setPaymentAttemptsLoading] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [issueType, setIssueType] = useState<CustomOrderIssueType>('OTHER');
+  const [issueDescription, setIssueDescription] = useState('');
+  const [deliveryNote, setDeliveryNote] = useState('');
+  const [extensionResponse, setExtensionResponse] =
+    useState<CustomOrderExtensionResponseStatus>('ACCEPTED');
+  const [counterDays, setCounterDays] = useState('');
+  const { confirm, ConfirmDialog } = useConfirm();
+  const paymentInitIdempotencyKeyRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
+  const refreshPaymentAttempts = useCallback(async () => {
+    if (!orderId) return;
+    setPaymentAttemptsLoading(true);
+    try {
+      const attempts = await customOrdersBuyerApi.listPaymentAttempts(orderId);
+      if (mountedRef.current) {
+        setPaymentAttempts(attempts);
+      }
+    } catch {
+      if (mountedRef.current) {
+        setPaymentAttempts([]);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setPaymentAttemptsLoading(false);
+      }
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const paymentFailureReason =
+      (location.state as { paymentFailureReason?: string } | null)
+        ?.paymentFailureReason;
+    if (paymentFailureReason) {
+      toast.error(paymentFailureReason);
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    return () => {
+      void cancelActivePaystackInline();
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -641,9 +756,13 @@ const BuyerCustomOrderDetailView: React.FC<{
         const data = await customOrdersBuyerApi.getById(orderId);
         if (!mounted) return;
         setOrder(data);
-      } catch (error) {
+        if (data.paymentStatus === 'PAID') {
+          setPaymentVerification(null);
+        }
+      } catch (error: any) {
         if (!mounted) return;
         setOrder(null);
+        toast.error(error?.response?.data?.message || 'Unable to load custom order');
       } finally {
         if (mounted) setLoading(false);
       }
@@ -656,12 +775,311 @@ const BuyerCustomOrderDetailView: React.FC<{
     };
   }, [orderId]);
 
+  const latestOpenExtension = useMemo(
+    () =>
+      order?.extensionRequests.find(
+        (entry) => entry.buyerResponseStatus === 'OPEN',
+      ) ?? null,
+    [order?.extensionRequests],
+  );
+  const activeDispute = useMemo(
+    () =>
+      order?.disputes.find(
+        (entry) => entry.status !== 'CLOSED' && entry.status !== 'RESOLVED',
+      ) ??
+      order?.disputes[0] ??
+      null,
+    [order?.disputes],
+  );
+  const acceptanceWindowOpen = useMemo(
+    () =>
+      order?.buyerAcceptanceWindowEndsAt
+        ? new Date(order.buyerAcceptanceWindowEndsAt).getTime() >= Date.now()
+        : false,
+    [order?.buyerAcceptanceWindowEndsAt],
+  );
+  const canCancel =
+    order?.status === 'DRAFT' || order?.status === 'PENDING_PAYMENT';
+  const canConfirmDelivery =
+    order?.status === 'DELIVERED_PENDING_BUYER_CONFIRMATION';
+  const canReportIssue =
+    order?.status === 'DELIVERED_PENDING_BUYER_CONFIRMATION' &&
+    acceptanceWindowOpen;
+  const contactInfo =
+    ((order?.contactInfo ?? null) as Record<string, unknown> | null) ?? {};
+  const shippingAddress =
+    ((order?.shippingAddress ?? null) as Record<string, unknown> | null) ?? {};
+  const paymentShippingAddress = useMemo<ShippingAddress>(
+    () => ({
+      firstName:
+        String(contactInfo.customerName || profile?.firstName || '').split(' ')[0] ||
+        profile?.firstName ||
+        'Buyer',
+      lastName:
+        String(contactInfo.customerName || profile?.lastName || '')
+          .split(' ')
+          .slice(1)
+          .join(' ') ||
+        profile?.lastName ||
+        'Customer',
+      street: String(shippingAddress.street ?? ''),
+      apartment: String(shippingAddress.apartment ?? ''),
+      city: String(shippingAddress.city ?? ''),
+      state: String(shippingAddress.state ?? ''),
+      postalCode: String(shippingAddress.postalCode ?? ''),
+      country: String(shippingAddress.country ?? 'Nigeria'),
+      phone: String(contactInfo.phone ?? profile?.phoneNumber ?? ''),
+    }),
+    [
+      contactInfo.customerName,
+      contactInfo.phone,
+      profile?.firstName,
+      profile?.lastName,
+      profile?.phoneNumber,
+      shippingAddress.apartment,
+      shippingAddress.city,
+      shippingAddress.country,
+      shippingAddress.postalCode,
+      shippingAddress.state,
+      shippingAddress.street,
+    ],
+  );
+  const activePaymentData = paymentState[paymentMethod];
+
+  useEffect(() => {
+    setPaymentState((prev) => ({
+      PAYSTACK: {
+        ...prev.PAYSTACK,
+        email:
+          prev.PAYSTACK.email ||
+          String(contactInfo.email ?? profile?.email ?? ''),
+        phone: prev.PAYSTACK.phone || paymentShippingAddress.phone,
+      },
+    }));
+  }, [contactInfo.email, paymentShippingAddress.phone, profile?.email]);
+
+  useEffect(() => {
+    paymentInitIdempotencyKeyRef.current = null;
+  }, [activePaymentData, orderId, paymentMethod, paymentShippingAddress]);
+
+  const wrapMutation = async (
+    work: () => Promise<unknown>,
+    successMessage: string,
+  ) => {
+    setBusy(true);
+    try {
+      await work();
+      toast.success(successMessage);
+      const refreshed = await customOrdersBuyerApi.getById(orderId);
+      setOrder(refreshed);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to update custom order');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateSelectedPaymentData = (
+    updater: (current: PaystackPaymentData) => PaystackPaymentData,
+  ) => {
+    setPaymentState((prev) => ({
+      ...prev,
+      [paymentMethod]: updater(prev[paymentMethod]),
+    }));
+    setPaymentErrors({});
+  };
+
+  const handlePayNow = async () => {
+    // Guard against double-submit before setBusy(true) is reached.
+    if (busy) return;
+    if (!orderId) return;
+    const validationErrors = validatePaymentData(
+      paymentMethod,
+      activePaymentData,
+      paymentShippingAddress,
+    );
+    setPaymentErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) {
+      toast.error('Complete the payment details for the selected method');
+      return;
+    }
+
+    const paymentSubmissionData = buildPaymentSubmissionData(
+      activePaymentData,
+      paymentShippingAddress,
+    );
+    const paymentInitIdempotencyKey =
+      paymentInitIdempotencyKeyRef.current ?? createIdempotencyKey();
+    paymentInitIdempotencyKeyRef.current = paymentInitIdempotencyKey;
+    setBusy(true);
+    try {
+      const init = await customOrdersBuyerApi.initializePayment(orderId, {
+        paymentMethod,
+        email: paymentSubmissionData.email,
+        callbackUrl: `${window.location.origin}/checkout/payment-return`,
+        paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
+        idempotencyKey: paymentInitIdempotencyKey,
+      });
+      setPaymentGateway(init.gateway);
+      setPaymentVerification(null);
+      if (init.providerAccessCode) {
+        await openPaystackInline(init.providerAccessCode, {
+          onSuccess: (response) => {
+            navigate(
+              `/checkout/payment-return?reference=${encodeURIComponent(response.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
+            );
+          },
+          onCancel: () => {
+            paymentInitIdempotencyKeyRef.current = null;
+            toast.error('Payment was cancelled before the order could be placed.');
+          },
+          onError: (inlineError) => {
+            paymentInitIdempotencyKeyRef.current = null;
+            toast.error(inlineError.message || 'Unable to open the payment window.');
+          },
+        });
+        return;
+      }
+      if (init.authorizationUrl) {
+        const fallbackUrl = new URL(init.authorizationUrl, window.location.origin);
+        if (fallbackUrl.origin === window.location.origin) {
+          window.location.assign(fallbackUrl.toString());
+          return;
+        }
+
+        throw new Error(
+          'Payment provider did not return an inline payment session for this attempt.',
+        );
+      }
+      if (init.reference) {
+        navigate(
+          `/checkout/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
+        );
+        return;
+      }
+      const refreshed = await customOrdersBuyerApi.getById(orderId);
+      setOrder(refreshed);
+      await refreshPaymentAttempts();
+    } catch (error: any) {
+      paymentInitIdempotencyKeyRef.current = null;
+      toast.error(error?.response?.data?.message || 'Unable to initialize payment');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleVerifyPayment = async () => {
+    if (!orderId || !order?.paymentReference) {
+      toast.error('No payment reference is attached to this custom order yet.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const verificationResult = await customOrdersBuyerApi.verifyPayment(
+        orderId,
+        {
+          reference: order.paymentReference,
+          gateway: paymentGateway || paymentMethod,
+        },
+      );
+      setPaymentVerification(verificationResult);
+      if (verificationResult.success) {
+        toast.success('Payment verification completed.');
+      } else if (verificationResult.awaitingProviderConfirmation) {
+        toast.info(
+          verificationResult.recoveryMessage ||
+            'Payment is still awaiting provider confirmation.',
+        );
+      } else {
+        toast.error(
+          verificationResult.failureMessage ||
+            'Payment is still pending or needs another attempt.',
+        );
+      }
+      const refreshed = await customOrdersBuyerApi.getById(orderId);
+      setOrder(refreshed);
+      await refreshPaymentAttempts();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to verify payment');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleConfirmDelivery = async () => {
+    if (!canConfirmDelivery || !order) return;
+    const approved = await confirm({
+      title: 'Confirm delivery?',
+      message:
+        'Use this only after you have received the order and checked that it matches the agreed custom-order brief.',
+      confirmText: 'Confirm delivery',
+      cancelText: 'Keep reviewing',
+    });
+    if (!approved) return;
+    await wrapMutation(
+      () => customOrdersBuyerApi.confirmDelivery(order.id, deliveryNote.trim() || undefined),
+      'Delivery confirmed',
+    );
+  };
+
+  const handleReportIssue = async () => {
+    if (!canReportIssue || issueDescription.trim().length < 10 || !order) return;
+    const approved = await confirm({
+      title: 'Report a delivery issue?',
+      message: 'This opens a support and dispute review path for the order.',
+      confirmText: 'Report issue',
+      cancelText: 'Go back',
+      isDestructive: true,
+    });
+    if (!approved) return;
+    await wrapMutation(
+      () =>
+        customOrdersBuyerApi.reportIssue(order.id, {
+          issueType,
+          description: issueDescription.trim(),
+        }),
+      'Issue reported',
+    );
+  };
+
+  const handleCancelOrder = async () => {
+    if (!canCancel || cancelReason.trim().length < 3 || !order) return;
+    const approved = await confirm({
+      title: 'Cancel this custom order?',
+      message: 'Use this before payment confirmation only.',
+      confirmText: 'Cancel order',
+      cancelText: 'Keep order',
+      isDestructive: true,
+    });
+    if (!approved) return;
+    await wrapMutation(
+      () => customOrdersBuyerApi.cancel(order.id, cancelReason.trim()),
+      'Custom order cancelled',
+    );
+  };
+
+  const handleRespondToExtension = async () => {
+    if (!latestOpenExtension || !order) return;
+    const counterValue =
+      extensionResponse === 'COUNTERED' ? Number(counterDays) : undefined;
+    await wrapMutation(
+      () =>
+        customOrdersBuyerApi.respondToExtension(order.id, latestOpenExtension.id, {
+          response: extensionResponse,
+          counterDays: counterValue,
+        }),
+      'Extension response saved',
+    );
+  };
+
   const effectiveStage = getBuyerFacingProgressStage(
     order?.currentProgressStage ?? previewOrder?.currentProgressStage,
   );
   const mediaUrl = order?.source.primaryMediaUrl ?? previewOrder?.sourcePrimaryMediaUrl ?? null;
   const title = order?.source.title ?? previewOrder?.sourceTitle ?? 'Custom order';
   const brandName = order?.source.brandName ?? previewOrder?.brand?.name ?? 'Brand';
+  const paymentStatusValue = order?.paymentStatus ?? previewOrder?.paymentStatus ?? null;
+  const paymentPending = paymentStatusValue !== null && paymentStatusValue !== 'PAID';
   const grandTotal = order
     ? formatCurrency(
         order.buyerPriceSummary.grandTotal,
@@ -671,6 +1089,19 @@ const BuyerCustomOrderDetailView: React.FC<{
         previewOrder?.buyerPriceSummary.grandTotal ?? 0,
         previewOrder?.buyerPriceSummary.currency ?? 'NGN',
       );
+  const paymentNeedsProviderConfirmation =
+    paymentVerification?.awaitingProviderConfirmation === true;
+  const paymentStatusLabel = paymentNeedsProviderConfirmation
+    ? 'Payment awaiting confirmation'
+    : paymentStatusValue === 'FAILED'
+      ? 'Payment failed'
+      : 'Awaiting payment';
+  const headline = paymentPending ? paymentStatusLabel : getBuyerCustomHeadline(effectiveStage);
+  const description = paymentPending
+    ? paymentStatusValue === 'FAILED'
+      ? 'Your payment did not complete. Please retry to place this custom order.'
+      : 'Complete payment to place this custom order and notify the brand.'
+    : getBuyerCustomDescription(effectiveStage);
 
   if (loading && previewOrder) {
     return (
@@ -694,6 +1125,8 @@ const BuyerCustomOrderDetailView: React.FC<{
                 stage={previewOrder.currentProgressStage}
                 brandName={previewOrder.brand?.name}
                 compact
+                statusLabel={paymentPending ? paymentStatusLabel : null}
+                progressIndex={paymentPending ? -1 : null}
               />
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
@@ -702,9 +1135,9 @@ const BuyerCustomOrderDetailView: React.FC<{
                 <h2 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
                   {previewOrder.sourceTitle}
                 </h2>
-                <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                  {getBuyerCustomHeadline(previewOrder.currentProgressStage)}. {getBuyerCustomDescription(previewOrder.currentProgressStage)}
-                </p>
+                  <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                    {headline}. {description}
+                  </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, index) => (
@@ -737,8 +1170,6 @@ const BuyerCustomOrderDetailView: React.FC<{
     label: formatMeasurementLabel(key),
     value: formatMeasurementValue(value),
   }));
-  const shippingAddress = ((order.shippingAddress ?? null) as Record<string, unknown> | null) ?? {};
-  const contactInfo = ((order.contactInfo ?? null) as Record<string, unknown> | null) ?? {};
 
   return (
     <div className="space-y-6">
@@ -766,7 +1197,12 @@ const BuyerCustomOrderDetailView: React.FC<{
         <div className="grid gap-6 p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           <CustomOrderMediaPreview src={mediaUrl} title={title} />
           <div>
-            <BuyerCustomStageFiller stage={effectiveStage} brandName={brandName} />
+            <BuyerCustomStageFiller
+              stage={effectiveStage}
+              brandName={brandName}
+              statusLabel={paymentPending ? paymentStatusLabel : null}
+              progressIndex={paymentPending ? -1 : null}
+            />
             <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
               <div className="max-w-3xl">
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
@@ -775,9 +1211,9 @@ const BuyerCustomOrderDetailView: React.FC<{
                 <h2 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
                   {title}
                 </h2>
-                <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                  {getBuyerCustomHeadline(effectiveStage)}. {getBuyerCustomDescription(effectiveStage)}
-                </p>
+                  <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                    {headline}. {description}
+                  </p>
               </div>
               <div className="min-w-[180px] rounded-2xl border border-black/10 bg-white/80 p-4 text-right dark:border-white/10 dark:bg-white/5">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
@@ -812,6 +1248,139 @@ const BuyerCustomOrderDetailView: React.FC<{
               />
             </div>
           </div>
+        </div>
+      </section>
+
+      {order.paymentStatus !== 'PAID' ? (
+        <section className="rounded-[28px] border border-amber-200/80 bg-amber-50/80 p-6 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+          <div className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+            Payment must complete before production intake is locked
+          </div>
+          <p className="mt-2 text-sm text-amber-900/80 dark:text-amber-200/90">
+            {paymentNeedsProviderConfirmation
+              ? paymentVerification?.recoveryMessage ||
+                'Your payment attempt is waiting for provider confirmation.'
+              : 'Choose the gateway and channel you want to use, then complete payment in the secure window.'}
+          </p>
+          {paymentVerification?.failureMessage && !paymentNeedsProviderConfirmation ? (
+            <div className="mt-2 text-xs text-rose-700 dark:text-rose-200">
+              {paymentVerification.failureMessage}
+            </div>
+          ) : null}
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            {CHECKOUT_PAYMENT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  setPaymentMethod(option.value);
+                  setPaymentGateway(option.value);
+                  setPaymentErrors({});
+                }}
+                className={`rounded-[1.4rem] border px-4 py-4 text-left transition ${
+                  paymentMethod === option.value
+                    ? 'border-amber-500 bg-white/90 shadow-sm dark:bg-white/10'
+                    : 'border-amber-200/80 bg-white/55 dark:border-amber-500/20 dark:bg-black/10'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">{option.emoji}</span>
+                  <div>
+                    <div className="font-semibold text-slate-900 dark:text-white">
+                      {option.label}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+                      {option.description}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="mt-5">
+            <PaymentDetailsSection
+              paymentData={activePaymentData}
+              shippingAddress={paymentShippingAddress}
+              errors={paymentErrors}
+              onChange={updateSelectedPaymentData}
+              compact
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={handlePayNow}
+              disabled={busy}
+              className="rounded-full bg-amber-400 px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
+            >
+              {busy ? 'Opening payment...' : 'Pay now'}
+            </button>
+            <button
+              type="button"
+              onClick={handleVerifyPayment}
+              disabled={busy || !order.paymentReference}
+              className="rounded-full border border-amber-400/60 px-4 py-2.5 text-sm font-semibold text-amber-900 disabled:opacity-60 dark:text-amber-100"
+            >
+              Verify payment
+            </button>
+          </div>
+          {order.paymentReference ? (
+            <div className="mt-2 text-xs text-amber-900/80 dark:text-amber-200/80">
+              Reference: {order.paymentReference}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      <section className="rounded-[28px] border border-gray-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Payment attempts</h3>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {paymentAttemptsLoading ? 'Loading attempts...' : `${paymentAttempts.length} attempt(s)`}
+          </div>
+        </div>
+        <div className="mt-4 max-h-72 overflow-y-auto rounded-2xl border border-gray-200/70 bg-white/70 dark:border-white/10 dark:bg-white/[0.02]">
+          {paymentAttemptsLoading ? (
+            <div className="p-4 text-sm text-gray-500 dark:text-gray-400">Loading payment attempts...</div>
+          ) : paymentAttempts.length === 0 ? (
+            <div className="p-4 text-sm text-gray-500 dark:text-gray-400">No payment attempts yet.</div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-white/90 text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:bg-slate-900/90 dark:text-gray-400">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold">Status</th>
+                  <th className="px-3 py-2 text-left font-semibold">Reference</th>
+                  <th className="px-3 py-2 text-left font-semibold">Gateway</th>
+                  <th className="px-3 py-2 text-left font-semibold">Created</th>
+                  <th className="px-3 py-2 text-left font-semibold">Confirmed</th>
+                  <th className="px-3 py-2 text-left font-semibold">Reason</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                {paymentAttempts.map((attempt) => (
+                  <tr key={attempt.id} className="text-gray-700 dark:text-gray-300">
+                    <td className="px-3 py-2">
+                      <span className="mr-1">{paymentAttemptEmoji(attempt.status)}</span>
+                      {attempt.status}
+                    </td>
+                    <td className="px-3 py-2 font-mono">
+                      <span className="block max-w-[140px] truncate" title={attempt.reference}>
+                        {attempt.reference}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">{attempt.provider}</td>
+                    <td className="px-3 py-2">{formatDateTime(attempt.createdAt)}</td>
+                    <td className="px-3 py-2">
+                      {attempt.confirmedAt ? formatDateTime(attempt.confirmedAt) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-rose-600 dark:text-rose-300">
+                      {attempt.failureMessage || attempt.failureCode || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </section>
 
@@ -875,6 +1444,164 @@ const BuyerCustomOrderDetailView: React.FC<{
               ))}
             </>
           )}
+        </div>
+      </section>
+
+      <section className="rounded-[28px] border border-gray-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Support and actions</h3>
+        <div className="mt-4 grid gap-6 xl:grid-cols-2">
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">Conversation and extension</div>
+              <button
+                type="button"
+                onClick={() => navigate(`/messages?customOrderId=${encodeURIComponent(order.id)}`)}
+                className="rounded-full border border-gray-200/80 bg-white/80 px-3 py-2 text-xs font-semibold text-gray-700 transition hover:border-fuchsia-300 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:text-white"
+              >
+                Open conversation
+              </button>
+            </div>
+            <div className="mt-4 space-y-3">
+              {order.extensionRequests.length === 0 ? (
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  No extension requests have been raised on this order.
+                </div>
+              ) : (
+                order.extensionRequests.map((request) => (
+                  <div
+                    key={request.id}
+                    className="rounded-2xl border border-gray-200/80 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {humanizeCustomOrderToken(request.targetType)} +{request.requestedExtraDays} day(s)
+                      </div>
+                      <CustomOrderBadge value={request.buyerResponseStatus} type="payment" />
+                    </div>
+                    <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">{request.reason}</div>
+                  </div>
+                ))
+              )}
+            </div>
+            {latestOpenExtension ? (
+              <div className="mt-4 space-y-3 rounded-2xl border border-gray-200/80 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                <UniversalSelect
+                  value={extensionResponse}
+                  onChange={(value) =>
+                    setExtensionResponse(value as CustomOrderExtensionResponseStatus)
+                  }
+                  options={[
+                    { value: 'ACCEPTED', label: 'Accept' },
+                    { value: 'COUNTERED', label: 'Counter' },
+                    { value: 'REJECTED', label: 'Reject' },
+                  ]}
+                />
+                {extensionResponse === 'COUNTERED' ? (
+                  <input
+                    value={counterDays}
+                    onChange={(event) => setCounterDays(event.target.value)}
+                    placeholder="Counter days"
+                    className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={handleRespondToExtension}
+                  className="rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-slate-950"
+                >
+                  Send response
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-gray-900 dark:text-white">Issues and buyer actions</div>
+            {activeDispute ? (
+              <div className="mt-4 rounded-2xl border border-rose-300/60 bg-rose-50 px-4 py-4 text-sm text-rose-900 dark:border-rose-700/40 dark:bg-rose-500/10 dark:text-rose-100">
+                <div className="font-semibold">Active dispute</div>
+                <div className="mt-1">Status: {humanizeCustomOrderToken(activeDispute.status)}</div>
+              </div>
+            ) : (
+              <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">No active dispute on this order.</div>
+            )}
+            <div className="mt-4 grid gap-4">
+              <div className="rounded-2xl border border-gray-200/80 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">Confirm delivery</div>
+                <textarea
+                  value={deliveryNote}
+                  onChange={(event) => setDeliveryNote(event.target.value)}
+                  rows={3}
+                  className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                  placeholder="Optional confirmation note"
+                />
+                <button
+                  type="button"
+                  disabled={busy || !canConfirmDelivery}
+                  onClick={handleConfirmDelivery}
+                  className="mt-3 rounded-full bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
+                >
+                  Confirm delivery
+                </button>
+              </div>
+              <div className="rounded-2xl border border-gray-200/80 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">Report issue</div>
+                <div className="mt-3">
+                  <UniversalSelect
+                    value={issueType}
+                    onChange={(value) => setIssueType(value as CustomOrderIssueType)}
+                    options={[
+                      { value: 'MEASUREMENT_NON_COMPLIANCE', label: 'Measurement non-compliance' },
+                      { value: 'MATERIAL_DEFECT', label: 'Material defect' },
+                      { value: 'UNFINISHED_WORK', label: 'Unfinished work' },
+                      { value: 'NON_DELIVERY', label: 'Non-delivery' },
+                      { value: 'UNREASONABLE_DELAY', label: 'Unreasonable delay' },
+                      { value: 'WRONG_ITEM', label: 'Wrong item' },
+                      { value: 'OTHER', label: 'Other' },
+                    ]}
+                  />
+                </div>
+                <textarea
+                  value={issueDescription}
+                  onChange={(event) => setIssueDescription(event.target.value)}
+                  rows={4}
+                  className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                  placeholder="Describe the issue"
+                />
+                <button
+                  type="button"
+                  disabled={busy || !canReportIssue || issueDescription.trim().length < 10}
+                  onClick={handleReportIssue}
+                  className="mt-3 rounded-full bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  Report issue
+                </button>
+                {!acceptanceWindowOpen && order.status === 'DELIVERED_PENDING_BUYER_CONFIRMATION' ? (
+                  <div className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                    Delivery issues can only be reported while the buyer acceptance window is still open.
+                  </div>
+                ) : null}
+              </div>
+              <div className="rounded-2xl border border-gray-200/80 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">Cancel before payment confirmation</div>
+                <textarea
+                  value={cancelReason}
+                  onChange={(event) => setCancelReason(event.target.value)}
+                  rows={3}
+                  className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                  placeholder="Explain the cancellation reason"
+                />
+                <button
+                  type="button"
+                  disabled={busy || !canCancel || cancelReason.trim().length < 3}
+                  onClick={handleCancelOrder}
+                  className="mt-3 rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white"
+                >
+                  Cancel custom order
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -1046,24 +1773,29 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
   return (
     <div className={mode === 'full' ? 'space-y-4' : 'space-y-4 lg:sticky lg:top-24 lg:self-start'}>
       <section className="glass-panel rounded-3xl border border-gray-200/70 bg-white/70 p-4 backdrop-blur-md dark:border-white/10 dark:bg-white/5 sm:p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h3 className="text-base font-bold text-gray-900 dark:text-white">
-            {mode === 'full' ? 'All Orders' : 'Recent Orders'}
-          </h3>
-          <button
-            type="button"
-            onClick={() => {
-              if (mode === 'full') return;
-              if (onViewAll) {
-                onViewAll();
-                return;
-              }
-              navigate('/orders');
-            }}
-            className="text-xs font-bold uppercase tracking-wide text-fuchsia-600 transition hover:text-gray-900 dark:text-fuchsia-300 dark:hover:text-white"
-          >
-            {mode === 'full' ? `${activeCount} item${activeCount === 1 ? '' : 's'}` : 'View All'}
-          </button>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          {mode === 'full' ? (
+            <span className="text-xs font-bold uppercase tracking-widest text-fuchsia-600 dark:text-fuchsia-400">
+              {activeCount} item{activeCount === 1 ? '' : 's'}
+            </span>
+          ) : (
+            <>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white">Recent Orders</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onViewAll) {
+                    onViewAll();
+                    return;
+                  }
+                  navigate('/orders');
+                }}
+                className="text-xs font-bold uppercase tracking-wide text-fuchsia-600 transition hover:text-gray-900 dark:text-fuchsia-300 dark:hover:text-white"
+              >
+                View All
+              </button>
+            </>
+          )}
         </div>
 
         <div className="mb-4 inline-flex rounded-2xl border border-gray-200/80 bg-white/80 p-1 dark:border-white/10 dark:bg-white/5">
@@ -1263,8 +1995,8 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                           rounded="none"
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[11px] font-semibold text-gray-500 dark:text-gray-400">
-                          No image
+                        <div className="flex h-full w-full items-center justify-center text-2xl opacity-30">
+                          🧵
                         </div>
                       )}
                     </div>
@@ -1284,7 +2016,6 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                         </div>
                       ) : null}
                       <div className="mt-3 grid gap-1 text-sm text-gray-600 dark:text-gray-300 sm:grid-cols-2">
-                        <span>Status: {getBuyerFacingProgressLabel(order.currentProgressStage)}</span>
                         <span>Delivery: {order.delivery?.city || order.delivery?.state || 'Not scheduled'}</span>
                       </div>
                     </div>

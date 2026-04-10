@@ -17,13 +17,28 @@ export const formatCustomOrderCode = (value: string | null | undefined) => {
   return `#CO-${normalized.slice(0, 8).toUpperCase()}`;
 };
 
-export const humanizeCustomOrderToken = (value: string | null | undefined) =>
-  String(value ?? '')
-    .trim()
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .toLowerCase()
-    .replace(/\b\w/g, (character) => character.toUpperCase());
+const customOrderLabelOverrides: Record<string, string> = {
+  PENDING_BRAND_ACCEPTANCE: 'Pre-production Hold',
+  BRAND_ACCEPTED: 'Order Intake Locked',
+  MEASUREMENTS_UPDATED_PRE_ACCEPTANCE: 'Measurements Updated Before Production',
+  MEASUREMENTS_UPDATED_PRE_PRODUCTION: 'Measurements Updated Before Production',
+};
+
+export const humanizeCustomOrderToken = (value: string | null | undefined) => {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  return (
+    customOrderLabelOverrides[normalized] ||
+    normalized
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (character) => character.toUpperCase())
+  );
+};
 
 export const formatMeasurementValue = (value: number | string | null | undefined, unit = 'cm') => {
   if (value === null || value === undefined || value === '') {

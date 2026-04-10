@@ -1,17 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { adminModerationApi, adminTaxonomyApi } from '@/api/AdminApi';
-import { MeasurementPointsApi } from '@/api/MeasurementPointsApi';
 import { customOrdersAdminApi, type CustomFabricRuleBasis } from '@/api/CustomOrderApi';
 import { unwrapApiResponse } from '@/types/auth';
-import type { AdminCategory } from '@/types/admin';
+import type {
+  AdminCategory,
+  AdminMeasurementPointLifecycleDetails,
+  AdminMeasurementPointRow,
+} from '@/types/admin';
 import type { MeasurementPoint, MeasurementPointCategory } from '@/types/sizing';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
+import useDebounce from '@/hooks/useDebounce';
 
 type TabKey = 'taxonomy' | 'measurements' | 'custom-order-configurations';
 
@@ -33,6 +37,11 @@ type ModerationQueueResponse = {
 type MeasurementSortMode = 'CATEGORY_ORDER' | 'ALPHA' | 'RANGE_ASC' | 'RANGE_DESC';
 type MeasurementViewMode = 'cards' | 'list';
 type MeasurementUnitMode = 'CM' | 'IN';
+type MeasurementLifecycleSortMode = 'recent' | 'oldest' | 'updated' | 'label';
+type MeasurementLifecycleActiveMode = 'all' | 'active' | 'inactive';
+type MeasurementLifecycleStatusMode = 'all' | 'brand_only' | 'approved_global' | 'rejected';
+type MeasurementLifecycleSourceMode = 'all' | 'brand_freeform' | 'system';
+type MeasurementLifecycleAction = 'approve' | 'reject' | 'activate' | 'deactivate';
 
 const CATEGORY_ORDER: MeasurementPointCategory[] = [
   'UPPER_BODY',
@@ -95,21 +104,41 @@ const formatMeasurementKeyLabel = (rawKey: string) => {
     .join(' ');
 };
 
-const AdminTaxonomyPage: React.FC = () => {
-  const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+const formatDate = (value?: string | null) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
 
-  /** True when rendered via /admin/measurements — only show the measurements tab */
-  const isMeasurementsRoute = location.pathname.includes('/admin/measurements');
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const AdminTaxonomyPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const initialTab = useMemo<TabKey>(() => {
     const fromQuery = searchParams.get('tab');
-    if (isMeasurementsRoute) return 'measurements';
     if (fromQuery === 'measurements') return 'measurements';
     return 'taxonomy';
-  }, [isMeasurementsRoute, searchParams]);
+  }, [searchParams]);
 
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+  const isMeasurementsRoute = activeTab === 'measurements';
   const notifications = useSelector((state: RootState) => state.notifications.items);
   const lastMeasurementNotificationIdRef = useRef<string | null>(null);
 
@@ -178,9 +207,25 @@ const AdminTaxonomyPage: React.FC = () => {
 
   const [allMeasurementPoints, setAllMeasurementPoints] = useState<MeasurementPoint[]>([]);
   const [measurementPointsLoading, setMeasurementPointsLoading] = useState(true);
+  const [measurementLifecycleSearch, setMeasurementLifecycleSearch] = useState('');
+  const [measurementLifecycleSortMode, setMeasurementLifecycleSortMode] = useState<MeasurementLifecycleSortMode>('recent');
+  const [measurementLifecycleStatusMode, setMeasurementLifecycleStatusMode] = useState<MeasurementLifecycleStatusMode>('brand_only');
+  const [measurementLifecycleSourceMode, setMeasurementLifecycleSourceMode] = useState<MeasurementLifecycleSourceMode>('brand_freeform');
+  const [measurementLifecycleCategoryMode, setMeasurementLifecycleCategoryMode] = useState<string>('all');
+  const [measurementLifecycleActiveMode, setMeasurementLifecycleActiveMode] = useState<MeasurementLifecycleActiveMode>('all');
+  const [measurementLifecycleRows, setMeasurementLifecycleRows] = useState<AdminMeasurementPointRow[]>([]);
+  const [measurementLifecycleLoading, setMeasurementLifecycleLoading] = useState(true);
+  const [measurementLifecycleError, setMeasurementLifecycleError] = useState<string | null>(null);
+  const [selectedMeasurementPoint, setSelectedMeasurementPoint] = useState<AdminMeasurementPointRow | null>(null);
+  const [selectedMeasurementLifecycle, setSelectedMeasurementLifecycle] =
+    useState<AdminMeasurementPointLifecycleDetails | null>(null);
+  const [measurementLifecycleModalLoading, setMeasurementLifecycleModalLoading] = useState(false);
+  const [measurementLifecycleActionLoading, setMeasurementLifecycleActionLoading] = useState(false);
+  const [measurementLifecycleRejectReason, setMeasurementLifecycleRejectReason] = useState('');
 
   const [rejectReasonByPointId, setRejectReasonByPointId] = useState<Record<string, string>>({});
   const [reviewingIds, setReviewingIds] = useState<Record<string, boolean>>({});
+  const debouncedMeasurementLifecycleSearch = useDebounce(measurementLifecycleSearch, 300);
 
   const resetCategoryForm = useCallback(() => {
     setCategoryFormName('');
@@ -246,7 +291,51 @@ const AdminTaxonomyPage: React.FC = () => {
   const fetchMeasurementPoints = useCallback(async () => {
     setMeasurementPointsLoading(true);
     try {
-      const points = await MeasurementPointsApi.getAll();
+      const points: MeasurementPoint[] = [];
+      let cursor: string | undefined;
+
+      while (true) {
+        const response = await adminModerationApi.listMeasurementPoints({
+          limit: 100,
+          sort: 'label',
+          ...(cursor ? { cursor } : {}),
+        });
+        const payload = unwrapApiResponse<
+          { items?: AdminMeasurementPointRow[]; nextCursor?: string | null } | AdminMeasurementPointRow[]
+        >(response.data as any);
+        const rows = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.items)
+            ? payload.items
+            : [];
+
+        points.push(
+          ...rows.map((row) => ({
+            id: row.id,
+            key: row.key,
+            label: normalizeMeasurementLabel(row.label),
+            description: row.description,
+            category: row.category as MeasurementPointCategory,
+            gender: (row.gender as MeasurementPoint['gender']) ?? null,
+            source: row.source as MeasurementPoint['source'],
+            status: row.status as MeasurementPoint['status'],
+            brandId: row.brandId,
+            minValueCm: row.minValueCm,
+            maxValueCm: row.maxValueCm,
+            minValueChildCm: row.minValueChildCm ?? null,
+            maxValueChildCm: row.maxValueChildCm ?? null,
+            sortOrder: row.sortOrder,
+            isActive: row.isActive,
+          })),
+        );
+
+        const nextCursor = Array.isArray(payload) ? null : payload?.nextCursor ?? null;
+        if (!nextCursor || rows.length === 0) {
+          break;
+        }
+        cursor = nextCursor;
+      }
+
       setAllMeasurementPoints(points);
     } catch {
       setAllMeasurementPoints([]);
@@ -254,6 +343,157 @@ const AdminTaxonomyPage: React.FC = () => {
       setMeasurementPointsLoading(false);
     }
   }, []);
+
+  const fetchMeasurementLifecycleRows = useCallback(async () => {
+    setMeasurementLifecycleLoading(true);
+    setMeasurementLifecycleError(null);
+    try {
+      const params: Record<string, string | number> = {
+        limit: 80,
+        sort: measurementLifecycleSortMode,
+      };
+
+      const search = debouncedMeasurementLifecycleSearch.trim();
+      if (search) {
+        params.search = search;
+      }
+
+      if (measurementLifecycleStatusMode !== 'all') {
+        params.status = measurementLifecycleStatusMode.toUpperCase();
+      }
+
+      if (measurementLifecycleSourceMode !== 'all') {
+        params.source = measurementLifecycleSourceMode.toUpperCase();
+      }
+
+      if (measurementLifecycleCategoryMode !== 'all') {
+        params.category = measurementLifecycleCategoryMode;
+      }
+
+      if (measurementLifecycleActiveMode !== 'all') {
+        params.isActive = measurementLifecycleActiveMode;
+      }
+
+      const response = await adminModerationApi.listMeasurementPoints(params);
+      const payload = unwrapApiResponse<
+        { items?: AdminMeasurementPointRow[] } | AdminMeasurementPointRow[]
+      >(response.data as any);
+      const rows = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.items)
+          ? payload.items
+          : [];
+
+      setMeasurementLifecycleRows(rows);
+    } catch (error: any) {
+      setMeasurementLifecycleRows([]);
+      setMeasurementLifecycleError(
+        error?.response?.data?.message ||
+          'Failed to load measurement lifecycle records',
+      );
+    } finally {
+      setMeasurementLifecycleLoading(false);
+    }
+  }, [
+    debouncedMeasurementLifecycleSearch,
+    measurementLifecycleActiveMode,
+    measurementLifecycleCategoryMode,
+    measurementLifecycleSortMode,
+    measurementLifecycleSourceMode,
+    measurementLifecycleStatusMode,
+  ]);
+
+  const openMeasurementLifecycle = useCallback(
+    async (row: AdminMeasurementPointRow) => {
+      setSelectedMeasurementPoint(row);
+      setSelectedMeasurementLifecycle(null);
+      setMeasurementLifecycleRejectReason(row.rejectionReason ?? '');
+      setMeasurementLifecycleModalLoading(true);
+      try {
+        const response = await adminModerationApi.getMeasurementPointLifecycle(row.id);
+        const payload =
+          unwrapApiResponse<AdminMeasurementPointLifecycleDetails>(
+            response.data as any,
+          );
+        setSelectedMeasurementLifecycle(payload);
+        setSelectedMeasurementPoint(payload.point);
+        setMeasurementLifecycleRejectReason(payload.point.rejectionReason ?? '');
+      } catch (error: any) {
+        setSelectedMeasurementPoint(null);
+        setSelectedMeasurementLifecycle(null);
+        toast.error(
+          error?.response?.data?.message ||
+            'Failed to load measurement lifecycle details',
+        );
+      } finally {
+        setMeasurementLifecycleModalLoading(false);
+      }
+    },
+    [],
+  );
+
+  const applyMeasurementLifecycleAction = useCallback(
+    async (action: MeasurementLifecycleAction) => {
+      if (!selectedMeasurementPoint) return;
+
+      const reason = measurementLifecycleRejectReason.trim();
+      if (action === 'reject' && !reason) {
+        toast.error('Provide a rejection reason before rejecting this point.');
+        return;
+      }
+
+      setMeasurementLifecycleActionLoading(true);
+      try {
+        await adminModerationApi.updateMeasurementPointLifecycle(
+          selectedMeasurementPoint.id,
+          {
+            action,
+            reason: action === 'reject' ? reason : undefined,
+          },
+        );
+
+        const successMessageByAction: Record<MeasurementLifecycleAction, string> = {
+          approve: 'Measurement point approved globally.',
+          reject: 'Measurement point rejected with feedback.',
+          activate: 'Measurement point activated.',
+          deactivate: 'Measurement point deactivated.',
+        };
+        toast.success(successMessageByAction[action]);
+
+        await Promise.all([
+          fetchMeasurementQueue(),
+          fetchMeasurementPoints(),
+          fetchMeasurementLifecycleRows(),
+        ]);
+
+        const lifecycleResponse =
+          await adminModerationApi.getMeasurementPointLifecycle(selectedMeasurementPoint.id);
+        const lifecyclePayload =
+          unwrapApiResponse<AdminMeasurementPointLifecycleDetails>(
+            lifecycleResponse.data as any,
+          );
+        setSelectedMeasurementLifecycle(lifecyclePayload);
+        setSelectedMeasurementPoint(lifecyclePayload.point);
+        setMeasurementLifecycleRejectReason(
+          lifecyclePayload.point.rejectionReason ?? '',
+        );
+      } catch (error: any) {
+        toast.error(
+          error?.response?.data?.message ||
+            'Failed to update measurement point lifecycle',
+        );
+      } finally {
+        setMeasurementLifecycleActionLoading(false);
+      }
+    },
+    [
+      fetchMeasurementLifecycleRows,
+      fetchMeasurementPoints,
+      fetchMeasurementQueue,
+      measurementLifecycleRejectReason,
+      selectedMeasurementPoint,
+    ],
+  );
 
   const fetchGlobalYardBases = useCallback(async () => {
     setGlobalYardBasisLoading(true);
@@ -270,14 +510,24 @@ const AdminTaxonomyPage: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'measurements') {
-      void Promise.all([fetchMeasurementQueue(), fetchMeasurementPoints()]);
+      void Promise.all([
+        fetchMeasurementQueue(),
+        fetchMeasurementPoints(),
+        fetchMeasurementLifecycleRows(),
+      ]);
       return;
     }
 
     if (activeTab === 'custom-order-configurations') {
       void Promise.all([fetchMeasurementPoints(), fetchGlobalYardBases()]);
     }
-  }, [activeTab, fetchGlobalYardBases, fetchMeasurementPoints, fetchMeasurementQueue]);
+  }, [
+    activeTab,
+    fetchGlobalYardBases,
+    fetchMeasurementLifecycleRows,
+    fetchMeasurementPoints,
+    fetchMeasurementQueue,
+  ]);
 
   useEffect(() => {
     if (activeTab === 'taxonomy') {
@@ -297,8 +547,18 @@ const AdminTaxonomyPage: React.FC = () => {
     if (lastMeasurementNotificationIdRef.current === latestMeasurementNotification.id) return;
 
     lastMeasurementNotificationIdRef.current = latestMeasurementNotification.id;
-    void Promise.all([fetchMeasurementQueue(), fetchMeasurementPoints()]);
-  }, [activeTab, fetchMeasurementPoints, fetchMeasurementQueue, notifications]);
+    void Promise.all([
+      fetchMeasurementQueue(),
+      fetchMeasurementPoints(),
+      fetchMeasurementLifecycleRows(),
+    ]);
+  }, [
+    activeTab,
+    fetchMeasurementLifecycleRows,
+    fetchMeasurementPoints,
+    fetchMeasurementQueue,
+    notifications,
+  ]);
 
   const resetGlobalYardBasisForm = useCallback(() => {
     setGlobalYardBasisLabel('');
@@ -542,8 +802,74 @@ const AdminTaxonomyPage: React.FC = () => {
     [],
   );
 
+  const measurementSortOptions = useMemo(
+    () => [
+      { value: 'CATEGORY_ORDER', label: 'Sort: Category order' },
+      { value: 'ALPHA', label: 'Sort: A-Z' },
+      { value: 'RANGE_ASC', label: 'Sort: Min range low-high' },
+      { value: 'RANGE_DESC', label: 'Sort: Min range high-low' },
+    ],
+    [],
+  );
+
+  const converterUnitOptions = useMemo(
+    () => [
+      { value: 'IN', label: 'From inches' },
+      { value: 'CM', label: 'From centimeters' },
+    ],
+    [],
+  );
+
+  const measurementLifecycleSortOptions = useMemo(
+    () => [
+      { value: 'recent', label: 'Lifecycle sort: Recently created' },
+      { value: 'oldest', label: 'Lifecycle sort: Oldest created' },
+      { value: 'updated', label: 'Lifecycle sort: Recently updated' },
+      { value: 'label', label: 'Lifecycle sort: Label A-Z' },
+    ],
+    [],
+  );
+
+  const measurementLifecycleStatusOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Status: All' },
+      { value: 'brand_only', label: 'Status: Brand-only pending' },
+      { value: 'approved_global', label: 'Status: Approved global' },
+      { value: 'rejected', label: 'Status: Rejected' },
+    ],
+    [],
+  );
+
+  const measurementLifecycleSourceOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Source: All' },
+      { value: 'brand_freeform', label: 'Source: Brand freeform' },
+      { value: 'system', label: 'Source: System seeded' },
+    ],
+    [],
+  );
+
+  const measurementLifecycleCategoryOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Category: All' },
+      ...CATEGORY_ORDER.map((category) => ({
+        value: category,
+        label: `Category: ${formatCategory(category)}`,
+      })),
+    ],
+    [],
+  );
+
+  const measurementLifecycleActiveOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Visibility: All' },
+      { value: 'active', label: 'Visibility: Active' },
+      { value: 'inactive', label: 'Visibility: Inactive' },
+    ],
+    [],
+  );
+
   void [
-    UniversalSelect,
     globalYardBasisLabel,
     configurationMeasurementKeys,
     configurationMeasurementGender,
@@ -558,6 +884,15 @@ const AdminTaxonomyPage: React.FC = () => {
     availableMeasurementKeyOptions,
     sortedGlobalYardBases,
     configurationGenderOptions,
+    measurementSortOptions,
+    converterUnitOptions,
+    measurementLifecycleSortOptions,
+    measurementLifecycleStatusOptions,
+    measurementLifecycleSourceOptions,
+    measurementLifecycleCategoryOptions,
+    measurementLifecycleActiveOptions,
+    openMeasurementLifecycle,
+    applyMeasurementLifecycleAction,
   ];
 
   const executeConfirm = async () => {
@@ -763,7 +1098,7 @@ const AdminTaxonomyPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <section className="rounded-3xl border border-white/70 bg-gradient-to-br from-white/90 via-[#f7f9ff] to-[#eef3ff] p-6 shadow-lg shadow-slate-500/10 dark:border-white/10 dark:from-white/10 dark:via-[#101422] dark:to-[#1a2033]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -778,7 +1113,7 @@ const AdminTaxonomyPage: React.FC = () => {
           </div>
 
           {/* Only show tab switcher on the taxonomy route — measurements route is focused */}
-          {!isMeasurementsRoute && (
+          {activeTab !== 'custom-order-configurations' && (
             <div className="inline-flex rounded-full border border-white/70 bg-white/80 p-1 shadow-sm dark:border-white/10 dark:bg-white/5">
               <button
                 type="button"
@@ -977,27 +1312,22 @@ const AdminTaxonomyPage: React.FC = () => {
             </ul>
           </div>
 
-          <div className="grid w-full grid-cols-1 gap-2 lg:grid-cols-[minmax(240px,1fr)_180px_180px_auto_auto]">
+          <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-[minmax(0,1fr)_180px_180px_auto_auto]">
             <input
               value={measurementSearch}
               onChange={(event) => setMeasurementSearch(event.target.value)}
               placeholder="Search measurement points..."
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white md:col-span-2 2xl:col-span-1"
             />
             <div className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 dark:border-white/10 dark:bg-black/20 dark:text-slate-200">
               🌍 Universal points
             </div>
-            <select
+            <UniversalSelect
               value={measurementSortMode}
-              onChange={(event) => setMeasurementSortMode(event.target.value as MeasurementSortMode)}
-              className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
-            >
-              <option value="CATEGORY_ORDER">Sort: Category order</option>
-              <option value="ALPHA">Sort: A-Z</option>
-              <option value="RANGE_ASC">Sort: Min range low-high</option>
-              <option value="RANGE_DESC">Sort: Min range high-low</option>
-            </select>
-            <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-black/20">
+              onChange={(value) => setMeasurementSortMode(value as MeasurementSortMode)}
+              options={measurementSortOptions}
+            />
+            <div className="inline-flex w-full rounded-2xl border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-black/20 2xl:w-auto">
               <button
                 type="button"
                 onClick={() => setMeasurementViewMode('cards')}
@@ -1024,7 +1354,11 @@ const AdminTaxonomyPage: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                void Promise.all([fetchMeasurementQueue(), fetchMeasurementPoints()]);
+                void Promise.all([
+                  fetchMeasurementQueue(),
+                  fetchMeasurementPoints(),
+                  fetchMeasurementLifecycleRows(),
+                ]);
               }}
               className="rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
             >
@@ -1032,7 +1366,7 @@ const AdminTaxonomyPage: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-4 md:grid-cols-[200px_1fr] dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="grid min-w-0 grid-cols-1 gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-4 md:grid-cols-[200px_minmax(0,1fr)] dark:border-white/10 dark:bg-white/[0.04]">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Library Unit</div>
               <div className="mt-2 inline-flex rounded-xl border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-black/20">
@@ -1061,24 +1395,21 @@ const AdminTaxonomyPage: React.FC = () => {
               </div>
             </div>
 
-            <div>
+            <div className="min-w-0">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Conversion Calculator</div>
-              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[120px_140px_auto]">
+              <div className="mt-2 grid min-w-0 grid-cols-1 gap-2 xl:grid-cols-[120px_180px_minmax(0,1fr)]">
                 <input
                   value={converterInput}
                   onChange={(event) => setConverterInput(event.target.value)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
                   placeholder="10"
                 />
-                <select
+                <UniversalSelect
                   value={converterFromUnit}
-                  onChange={(event) => setConverterFromUnit(event.target.value as MeasurementUnitMode)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
-                >
-                  <option value="IN">From inches</option>
-                  <option value="CM">From centimeters</option>
-                </select>
-                <div className="rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-700 dark:border-white/20 dark:text-slate-200">
+                  onChange={(value) => setConverterFromUnit(value as MeasurementUnitMode)}
+                  options={converterUnitOptions}
+                />
+                <div className="min-w-0 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-700 dark:border-white/20 dark:text-slate-200">
                   {(() => {
                     const parsed = Number(converterInput);
                     if (!Number.isFinite(parsed)) return 'Enter a valid number';
@@ -1249,6 +1580,197 @@ const AdminTaxonomyPage: React.FC = () => {
               )}
             </div>
           </div>
+
+          <section className="space-y-3 rounded-3xl border border-white/70 bg-white/80 p-4 shadow-lg shadow-slate-400/10 dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  Measurement Lifecycle Management
+                </h2>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+                  Manage brand-submitted measurement points with full lifecycle actions and usage context.
+                </p>
+              </div>
+              <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                {measurementLifecycleRows.length} points
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_190px_190px_190px_170px_220px_auto]">
+              <input
+                value={measurementLifecycleSearch}
+                onChange={(event) => setMeasurementLifecycleSearch(event.target.value)}
+                placeholder="Search lifecycle points..."
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white md:col-span-2 xl:col-span-1"
+              />
+              <UniversalSelect
+                value={measurementLifecycleStatusMode}
+                onChange={(value) =>
+                  setMeasurementLifecycleStatusMode(
+                    value as MeasurementLifecycleStatusMode,
+                  )
+                }
+                options={measurementLifecycleStatusOptions}
+              />
+              <UniversalSelect
+                value={measurementLifecycleSourceMode}
+                onChange={(value) =>
+                  setMeasurementLifecycleSourceMode(
+                    value as MeasurementLifecycleSourceMode,
+                  )
+                }
+                options={measurementLifecycleSourceOptions}
+              />
+              <UniversalSelect
+                value={measurementLifecycleCategoryMode}
+                onChange={(value) => setMeasurementLifecycleCategoryMode(String(value))}
+                options={measurementLifecycleCategoryOptions}
+              />
+              <UniversalSelect
+                value={measurementLifecycleActiveMode}
+                onChange={(value) =>
+                  setMeasurementLifecycleActiveMode(
+                    value as MeasurementLifecycleActiveMode,
+                  )
+                }
+                options={measurementLifecycleActiveOptions}
+              />
+              <UniversalSelect
+                value={measurementLifecycleSortMode}
+                onChange={(value) =>
+                  setMeasurementLifecycleSortMode(value as MeasurementLifecycleSortMode)
+                }
+                options={measurementLifecycleSortOptions}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  void fetchMeasurementLifecycleRows();
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-black/20 dark:text-slate-200"
+              >
+                Refresh lifecycle
+              </button>
+            </div>
+
+            {measurementLifecycleError ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+                {measurementLifecycleError}
+              </div>
+            ) : null}
+
+            {measurementLifecycleLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="h-16 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/10"
+                  />
+                ))}
+              </div>
+            ) : measurementLifecycleRows.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-300">
+                No measurement points match these lifecycle filters.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white/70 dark:border-white/10 dark:bg-white/[0.03]">
+                <table className="w-full min-w-[1020px] text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200/70 text-left uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-slate-400">
+                      <th className="px-3 py-2">Point</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Source</th>
+                      <th className="px-3 py-2">Created By</th>
+                      <th className="px-3 py-2">Created</th>
+                      <th className="px-3 py-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {measurementLifecycleRows.map((row) => {
+                      const submittedBy =
+                        row.brand?.owner?.brandFullName ||
+                        row.brand?.owner?.username ||
+                        row.brand?.name ||
+                        'System';
+                      const statusBadgeClass =
+                        row.status === 'APPROVED_GLOBAL'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
+                          : row.status === 'REJECTED'
+                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200';
+
+                      return (
+                        <tr
+                          key={row.id}
+                          className="border-b border-slate-100/80 align-top dark:border-white/5"
+                        >
+                          <td className="px-3 py-2.5">
+                            <div className="font-semibold text-slate-900 dark:text-white">
+                              {normalizeMeasurementLabel(row.label)}
+                            </div>
+                            <div className="mt-0.5 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                              {normalizeMeasurementKey(row.key)}
+                            </div>
+                            <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                              {formatCategory(row.category)} · {formatGender(row.gender)}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex flex-col items-start gap-1">
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${statusBadgeClass}`}
+                              >
+                                {row.status}
+                              </span>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                  row.isActive
+                                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200'
+                                    : 'bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-300'
+                                }`}
+                              >
+                                {row.isActive ? 'Active' : 'Inactive'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">
+                            {row.source === 'BRAND_FREEFORM'
+                              ? 'Brand freeform'
+                              : 'System seeded'}
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-700 dark:text-slate-200">
+                            <div className="font-semibold">{submittedBy}</div>
+                            {row.brand?.name ? (
+                              <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                Brand: {row.brand.name}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">
+                            <div>{formatDate(row.createdAt)}</div>
+                            <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                              Updated {formatDate(row.updatedAt)}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void openMeasurementLifecycle(row);
+                              }}
+                              className="rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200"
+                            >
+                              Open lifecycle
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
 
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">Measurement Library</h2>
@@ -1570,6 +2092,301 @@ const AdminTaxonomyPage: React.FC = () => {
             </div>
           </div>
         ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(selectedMeasurementPoint)}
+        onClose={() => {
+          setSelectedMeasurementPoint(null);
+          setSelectedMeasurementLifecycle(null);
+          setMeasurementLifecycleRejectReason('');
+          setMeasurementLifecycleModalLoading(false);
+          setMeasurementLifecycleActionLoading(false);
+        }}
+        title={
+          selectedMeasurementPoint
+            ? `Measurement Lifecycle • ${normalizeMeasurementLabel(selectedMeasurementPoint.label)}`
+            : 'Measurement Lifecycle'
+        }
+        size="lg"
+        backdropStyle="light"
+      >
+        {measurementLifecycleModalLoading || !selectedMeasurementLifecycle ? (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-16 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/10"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200/80 bg-white/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200">
+                  {normalizeMeasurementKey(selectedMeasurementLifecycle.point.key)}
+                </span>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                    selectedMeasurementLifecycle.point.status === 'APPROVED_GLOBAL'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
+                      : selectedMeasurementLifecycle.point.status === 'REJECTED'
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'
+                        : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
+                  }`}
+                >
+                  {selectedMeasurementLifecycle.point.status}
+                </span>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                    selectedMeasurementLifecycle.point.isActive
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
+                      : 'bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-300'
+                  }`}
+                >
+                  {selectedMeasurementLifecycle.point.isActive ? 'Active' : 'Inactive'}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                  {selectedMeasurementLifecycle.point.source === 'BRAND_FREEFORM'
+                    ? 'Brand freeform'
+                    : 'System seeded'}
+                </span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600 dark:text-slate-300 md:grid-cols-2">
+                <div>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">Created:</span>{' '}
+                  {formatDateTime(selectedMeasurementLifecycle.point.createdAt)}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">Updated:</span>{' '}
+                  {formatDateTime(selectedMeasurementLifecycle.point.updatedAt)}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">Submitted:</span>{' '}
+                  {formatDateTime(selectedMeasurementLifecycle.point.submittedAt)}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">Reviewed:</span>{' '}
+                  {formatDateTime(selectedMeasurementLifecycle.point.reviewedAt)}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-slate-500 dark:text-slate-400">Users</div>
+                <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                  {selectedMeasurementLifecycle.usage.distinctUsersCount}
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-slate-500 dark:text-slate-400">Collections (ID)</div>
+                <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                  {selectedMeasurementLifecycle.usage.collectionUsageCountById}
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-slate-500 dark:text-slate-400">Collections (Key)</div>
+                <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                  {selectedMeasurementLifecycle.usage.collectionUsageCountByKey}
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-slate-500 dark:text-slate-400">Products (ID)</div>
+                <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                  {selectedMeasurementLifecycle.usage.productUsageCountById}
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-slate-500 dark:text-slate-400">Products (Key)</div>
+                <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                  {selectedMeasurementLifecycle.usage.productUsageCountByKey}
+                </div>
+              </div>
+            </div>
+
+            {selectedMeasurementLifecycle.point.rejectionReason ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+                <span className="font-semibold">Latest rejection reason:</span>{' '}
+                {selectedMeasurementLifecycle.point.rejectionReason}
+              </div>
+            ) : null}
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                Rejection feedback
+              </label>
+              <textarea
+                value={measurementLifecycleRejectReason}
+                onChange={(event) =>
+                  setMeasurementLifecycleRejectReason(event.target.value)
+                }
+                rows={2}
+                placeholder="Required when rejecting this measurement point"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
+              />
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  void applyMeasurementLifecycleAction('approve');
+                }}
+                disabled={measurementLifecycleActionLoading}
+                className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-500/20 dark:text-emerald-200"
+              >
+                Approve Global
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void applyMeasurementLifecycleAction('reject');
+                }}
+                disabled={measurementLifecycleActionLoading}
+                className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-200 disabled:opacity-60 dark:bg-rose-500/20 dark:text-rose-200"
+              >
+                Reject
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void applyMeasurementLifecycleAction(
+                    selectedMeasurementLifecycle.point.isActive
+                      ? 'deactivate'
+                      : 'activate',
+                  );
+                }}
+                disabled={measurementLifecycleActionLoading}
+                className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300 disabled:opacity-60 dark:bg-white/10 dark:text-slate-200"
+              >
+                {selectedMeasurementLifecycle.point.isActive
+                  ? 'Deactivate'
+                  : 'Activate'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Used by whom
+                </div>
+                <div className="mt-2 max-h-52 space-y-1 overflow-y-auto pr-1">
+                  {selectedMeasurementLifecycle.usage.users.length === 0 ? (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      No usage actors yet.
+                    </div>
+                  ) : (
+                    selectedMeasurementLifecycle.usage.users
+                      .slice(0, 25)
+                      .map((actor) => (
+                        <div
+                          key={actor.userId}
+                          className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-xs dark:border-white/10 dark:bg-black/20"
+                        >
+                          <div className="font-semibold text-slate-800 dark:text-slate-100">
+                            {actor.brandFullName || actor.username || actor.userId}
+                          </div>
+                          <div className="mt-0.5 text-slate-500 dark:text-slate-400">
+                            Usage {actor.usageCount} · Last used {formatDate(actor.latestUsedAt)}
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Lifecycle timeline
+                </div>
+                <div className="mt-2 max-h-52 space-y-1 overflow-y-auto pr-1">
+                  {selectedMeasurementLifecycle.timeline.length === 0 ? (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      No lifecycle events.
+                    </div>
+                  ) : (
+                    selectedMeasurementLifecycle.timeline.map((event) => (
+                      <div
+                        key={event.id}
+                        className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-xs dark:border-white/10 dark:bg-black/20"
+                      >
+                        <div className="font-semibold text-slate-800 dark:text-slate-100">
+                          {event.summary}
+                        </div>
+                        <div className="mt-0.5 text-slate-500 dark:text-slate-400">
+                          {formatDateTime(event.at)} · {event.type}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Collection references
+                </div>
+                <div className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-1">
+                  {selectedMeasurementLifecycle.references.collections.length === 0 ? (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      No collections reference this point.
+                    </div>
+                  ) : (
+                    selectedMeasurementLifecycle.references.collections
+                      .slice(0, 30)
+                      .map((collection) => (
+                        <div
+                          key={collection.id}
+                          className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-xs dark:border-white/10 dark:bg-black/20"
+                        >
+                          <div className="font-semibold text-slate-800 dark:text-slate-100">
+                            {collection.title || collection.id}
+                          </div>
+                          <div className="mt-0.5 text-slate-500 dark:text-slate-400">
+                            {collection.status} · {collection.visibility} · Updated {formatDate(collection.updatedAt)}
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Product references
+                </div>
+                <div className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-1">
+                  {selectedMeasurementLifecycle.references.products.length === 0 ? (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      No products reference this point.
+                    </div>
+                  ) : (
+                    selectedMeasurementLifecycle.references.products
+                      .slice(0, 30)
+                      .map((product) => (
+                        <div
+                          key={product.id}
+                          className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-xs dark:border-white/10 dark:bg-black/20"
+                        >
+                          <div className="font-semibold text-slate-800 dark:text-slate-100">
+                            {product.name}
+                          </div>
+                          <div className="mt-0.5 text-slate-500 dark:text-slate-400">
+                            {product.isActive ? 'Active' : 'Inactive'} · {product.brandName} · Updated {formatDate(product.updatedAt)}
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
 
       <ConfirmDialog

@@ -2,6 +2,7 @@ import React from 'react';
 import type { CommentV2Dto } from '@/types/comments';
 import { Link2, Reply, Trash2 } from 'lucide-react';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import type { RootState } from '@/store';
 import { CommentsApi } from '@/api/CommentsApi';
 import { toast } from 'sonner';
@@ -22,6 +23,7 @@ type Props = {
 
 const CommentItem: React.FC<Props> = ({ comment, onThread, onReply, onDelete, currentUserId, contentOwnerId, enableReplyComposer = false, onCreateReply }) => {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const navigate = useNavigate();
   const [threaded, setThreaded] = React.useState(Boolean(comment.isThreadedByMe));
   const [threadCount, setThreadCount] = React.useState(comment.threadCount ?? 0);
 
@@ -71,6 +73,22 @@ const CommentItem: React.FC<Props> = ({ comment, onThread, onReply, onDelete, cu
   };
 
   const canDelete = !!currentUserId && (currentUserId === comment.userId || (!!contentOwnerId && currentUserId === contentOwnerId));
+  const commenterProfileId =
+    typeof comment.user?.id === 'string' && comment.user.id.trim().length > 0
+      ? comment.user.id.trim()
+      : typeof comment.userId === 'string' && comment.userId.trim().length > 0
+        ? comment.userId.trim()
+        : null;
+  const commenterDisplayName = (() => {
+    const username = comment.user?.username;
+    const full = `${comment.user?.firstName ?? ''} ${comment.user?.lastName ?? ''}`.trim();
+    return (username ?? full) || 'User';
+  })();
+
+  const handleOpenCommenterProfile = () => {
+    if (!commenterProfileId) return;
+    navigate(`/profile/${commenterProfileId}`);
+  };
 
   const [replying, setReplying] = React.useState(false);
   const [replyText, setReplyText] = React.useState('');
@@ -92,31 +110,59 @@ const CommentItem: React.FC<Props> = ({ comment, onThread, onReply, onDelete, cu
 
   return (
     <div className="flex gap-2 py-0.5">
-      <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold">
-        {comment.user?.profileImage ? (
-          <MediaRenderer
-            kind="image"
-            src={comment.user.profileImage}
-            alt={comment.user?.username ?? 'User'}
-            maxHeightClassName="max-h-8"
-            maxWidthClassName="max-w-8"
-            className="rounded-full"
-            mediaClassName="rounded-full"
-          />
-        ) : (
-          <span>{(comment.user?.username ?? 'U').charAt(0).toUpperCase()}</span>
-        )}
-      </div>
+      {commenterProfileId ? (
+        <button
+          type="button"
+          onClick={handleOpenCommenterProfile}
+          className="h-8 w-8 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold transition-transform hover:scale-105"
+          title={`Open ${commenterDisplayName} profile`}
+        >
+          {comment.user?.profileImage ? (
+            <MediaRenderer
+              kind="image"
+              src={comment.user.profileImage}
+              alt={comment.user?.username ?? 'User'}
+              maxHeightClassName="max-h-8"
+              maxWidthClassName="max-w-8"
+              className="rounded-xl"
+              mediaClassName="rounded-xl"
+            />
+          ) : (
+            <span>{(comment.user?.username ?? 'U').charAt(0).toUpperCase()}</span>
+          )}
+        </button>
+      ) : (
+        <div className="h-8 w-8 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+          {comment.user?.profileImage ? (
+            <MediaRenderer
+              kind="image"
+              src={comment.user.profileImage}
+              alt={comment.user?.username ?? 'User'}
+              maxHeightClassName="max-h-8"
+              maxWidthClassName="max-w-8"
+              className="rounded-xl"
+              mediaClassName="rounded-xl"
+            />
+          ) : (
+            <span>{(comment.user?.username ?? 'U').charAt(0).toUpperCase()}</span>
+          )}
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         {/* Header: Username on left, Time and Thread on right */}
         <div className="flex items-center justify-between gap-2 text-xs leading-snug">
-          <span className="font-semibold truncate">
-            {(() => {
-              const username = comment.user?.username;
-              const full = `${comment.user?.firstName ?? ''} ${comment.user?.lastName ?? ''}`.trim();
-              return (username ?? full) || 'User';
-            })()}
-          </span>
+          {commenterProfileId ? (
+            <button
+              type="button"
+              onClick={handleOpenCommenterProfile}
+              className="font-semibold truncate text-left transition-colors hover:text-indigo-600"
+              title={`Open ${commenterDisplayName} profile`}
+            >
+              {commenterDisplayName}
+            </button>
+          ) : (
+            <span className="font-semibold truncate">{commenterDisplayName}</span>
+          )}
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-gray-500 text-[11px]">
               {formatRelativeTime(comment.createdAt)}

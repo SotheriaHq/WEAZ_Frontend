@@ -366,7 +366,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
       setCustomConfigurationId(resolvedConfigurationId);
       setCustomComposerOpen(true);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to start custom order from this design.');
+      toast.error(error?.response?.data?.message || 'Unable to bag this design.');
     } finally {
       setOpeningCustomComposer(false);
     }
@@ -609,8 +609,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     disabled={
                       openingCustomComposer ||
                       resolvingCustomConfiguration ||
-                      isOwnBrandContent ||
-                      !customConfigurationId
+                      isOwnBrandContent
                     }
                     className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
                     onClick={() => {
@@ -620,14 +619,14 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       isOwnBrandContent
                         ? 'Brands cannot place custom orders on their own designs'
                         : resolvingCustomConfiguration
-                          ? 'Checking custom-order setup for this design'
+                          ? 'Checking bag setup for this design'
                           : !customConfigurationId
-                            ? 'This design is not configured for custom orders yet'
-                          : 'Start custom order from this design'
+                            ? 'Check and bag this design'
+                          : 'Bag it from this design'
                     }
                   >
                     <span aria-hidden="true">👜</span>
-                    {openingCustomComposer ? 'Loading...' : 'Bag it'}
+                    {openingCustomComposer ? 'Loading...' : 'Bag It'}
                   </button>
                   <button
                     type="button"

@@ -12,7 +12,6 @@ import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble'
 import ComposeArea from '@/components/messaging/ComposeArea';
 import ChatContactSidebar from '@/components/messaging/ChatContactSidebar';
 import VLoader from '@/components/loaders/VLoader';
-import { buildOrderRoute } from '@/utils/orderNavigation';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -29,6 +28,9 @@ type ConversationItem = {
   contextId?: string;
   orderId?: string | null;
   customOrderId?: string | null;
+  targetUrl?: string | null;
+  /** Canonical order-detail page URL — use this for the "View Order" action. */
+  orderDetailUrl?: string | null;
   title: string;
   subtitle: string;
   participantName: string;
@@ -97,6 +99,8 @@ const mapInboxItem = (item: InboxItem): ConversationItem => ({
         : item.threadId,
   orderId: item.orderId ?? null,
   customOrderId: item.customOrderId ?? null,
+  targetUrl: item.targetUrl ?? null,
+  orderDetailUrl: item.orderDetailUrl ?? null,
   title: item.title,
   subtitle: item.subtitle,
   participantName:
@@ -404,6 +408,8 @@ const MessagingManagementPage: React.FC = () => {
         contextType: activeConversation.contextType,
         orderId: activeConversation.orderId,
         customOrderId: activeConversation.customOrderId,
+        targetUrl: activeConversation.targetUrl,
+        orderDetailUrl: activeConversation.orderDetailUrl,
         status: activeConversation.status,
         mutedUntil: activeConversation.mutedUntil,
         archivedAt: activeConversation.archivedAt,
@@ -1054,21 +1060,11 @@ const MessagingManagementPage: React.FC = () => {
                   </button>
                 )}
 
-                {/* View Order (not inquiry) */}
-                {activeConversation.contextType !== 'INQUIRY' && (
+                {/* View Order (not inquiry) — uses orderDetailUrl for canonical order page */}
+                {activeConversation.contextType !== 'INQUIRY' && activeConversation.orderDetailUrl && (
                   <button
                     type="button"
-                    onClick={() => {
-                      const route = buildOrderRoute({
-                        surface,
-                        contextType: activeConversation.contextType,
-                        orderId: activeConversation.orderId,
-                        customOrderId: activeConversation.customOrderId,
-                      });
-                      if (route) {
-                        navigate(route);
-                      }
-                    }}
+                    onClick={() => navigate(activeConversation.orderDetailUrl as string)}
                     className="rounded-lg px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
                     title="View Order"
                   >

@@ -1,10 +1,7 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import type { ThreadMessage } from '@/api/MessagingApi';
-import { buildOrderRoute } from '@/utils/orderNavigation';
 
 type ConversationContext = 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
 
@@ -18,6 +15,9 @@ interface ChatContactSidebarProps {
   contextType: ConversationContext;
   orderId?: string | null;
   customOrderId?: string | null;
+  targetUrl?: string | null;
+  /** Canonical order-detail page URL for the "View Order" action. */
+  orderDetailUrl?: string | null;
   status?: string | null;
   mutedUntil?: string | null;
   archivedAt?: string | null;
@@ -49,6 +49,8 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
   contextType,
   orderId,
   customOrderId,
+  targetUrl,
+  orderDetailUrl,
   status,
   mutedUntil,
   archivedAt,
@@ -59,16 +61,11 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
   onToggleArchive,
 }) => {
   const navigate = useNavigate();
-  const profile = useSelector((s: RootState) => s.user.profile);
-
-  const orderUrl = useMemo(() => {
-    return buildOrderRoute({
-      surface: profile?.type === 'BRAND' ? 'BRAND' : 'BUYER',
-      contextType,
-      orderId,
-      customOrderId,
-    });
-  }, [contextType, customOrderId, orderId, profile?.type]);
+  // orderDetailUrl is the canonical order page (e.g. /custom-orders/{id}).
+  // targetUrl is the notification deep-link (messaging surface). We use
+  // orderDetailUrl for the "View Order" button so the user lands on the order,
+  // not on the messages page they are already viewing.
+  const orderUrl = useMemo(() => orderDetailUrl ?? null, [orderDetailUrl]);
 
   const sharedMedia = useMemo(() => {
     const images: { id: string; url: string; name: string }[] = [];
@@ -239,7 +236,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
                   rel="noreferrer"
                   className="aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-white/5 hover:opacity-80 transition-opacity"
                 >
-                  <img src={img.url} alt={img.name} className="h-full w-full object-cover" loading="lazy" />
+                  <img src={img.url} alt={img.name} className="h-full w-full object-cover" loading="eager" />
                 </a>
               ))}
             </div>

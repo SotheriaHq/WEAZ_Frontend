@@ -72,6 +72,18 @@ export const userSlice = createSlice({
         localStorage.setItem(env.userStorageKey, JSON.stringify(normalized));
       }
     },
+    setUserFromStorage: (state, action: PayloadAction<AuthUserDto | null>) => {
+      if (!action.payload) {
+        state.profile = null;
+        state.isAuthenticated = false;
+        return;
+      }
+
+      const merged = state.profile ? ({ ...state.profile, ...action.payload } as AuthUserDto) : action.payload;
+      const normalized = normalizeUser(merged);
+      state.profile = normalized;
+      state.isAuthenticated = true;
+    },
     clearUser: (state) => {
       state.profile = null;
       state.isAuthenticated = false;
@@ -82,5 +94,5 @@ export const userSlice = createSlice({
   },
 });
 
-export const { setUser, clearUser } = userSlice.actions;
+export const { setUser, setUserFromStorage, clearUser } = userSlice.actions;
 export default userSlice.reducer;

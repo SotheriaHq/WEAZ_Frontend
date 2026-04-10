@@ -64,11 +64,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       text-gray-900 dark:text-white
       placeholder-gray-400 dark:placeholder-zinc-500
       shadow-sm
-      focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500
+      focus:outline-none focus:ring-0 focus:border-transparent
       transition-all duration-200
       ${
         error
-          ? 'border-red-500 dark:border-red-500 focus:ring-red-500/50 focus:border-red-500'
+          ? 'border-red-500 dark:border-red-500'
           : 'border-gray-300/80 dark:border-zinc-700/60'
       }
       ${

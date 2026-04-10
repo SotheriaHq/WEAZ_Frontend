@@ -1,5 +1,5 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { getMyOrders, type Order } from '@/api/StoreApi';
 import { customOrdersBuyerApi, type CustomOrderListItem } from '@/api/CustomOrderApi';
@@ -35,7 +35,7 @@ const standardStatusOptions = [
 const customStatusOptions = [
   { value: 'ALL', label: 'All statuses' },
   { value: 'PENDING_PAYMENT', label: 'Pending payment' },
-  { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pending brand acceptance' },
+  { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pre-production hold' },
   { value: 'IN_PRODUCTION', label: 'In production' },
   { value: 'READY_FOR_DISPATCH', label: 'Ready for dispatch' },
   { value: 'IN_TRANSIT', label: 'In transit' },
@@ -82,6 +82,7 @@ const StatCard: React.FC<{ label: string; value: number; tone: string }> = ({ la
 );
 
 const MyOrders: React.FC = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const { flags } = useReviewRuntimeFlags();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -99,6 +100,18 @@ const MyOrders: React.FC = () => {
   const [customSearchQuery, setCustomSearchQuery] = useState('');
   const deferredCustomSearchQuery = useDeferredValue(customSearchQuery);
   const [activeReviewItem, setActiveReviewItem] = useState<any | null>(null);
+
+  useEffect(() => {
+    const paymentFailureReason =
+      (location.state as { paymentFailureReason?: string } | null)
+        ?.paymentFailureReason;
+    if (!paymentFailureReason) {
+      return;
+    }
+
+    toast.error(paymentFailureReason);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);

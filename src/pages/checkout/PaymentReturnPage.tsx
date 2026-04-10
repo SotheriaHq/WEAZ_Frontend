@@ -5,11 +5,12 @@ import Button from '@/components/ui/Button';
 import { paymentApi, type PaymentAttemptSummary, type PaymentAttemptStatus, type PaymentVerifyResult } from '@/api/PaymentApi';
 import { customOrdersBuyerApi } from '@/api/CustomOrderApi';
 import { getCheckoutStatusCopy } from '@/pages/checkout/checkoutStatusCopy';
+import { cancelActivePaystackInline, openPaystackInline } from '@/lib/paystackInline';
 
 type ViewState = 'verifying' | 'resolved' | 'missing';
 
 const AUTO_VERIFY_INTERVAL_MS = 10000;
-const AUTO_VERIFY_MAX_ATTEMPTS = 6;
+const AUTO_VERIFY_MAX_ATTEMPTS = 18;
 
 const PaymentReturnPage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,10 +21,17 @@ const PaymentReturnPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [autoVerifyAttempts, setAutoVerifyAttempts] = useState(0);
   const [autoVerifying, setAutoVerifying] = useState(false);
+  const [retryingPayment, setRetryingPayment] = useState(false);
 
   const reference = searchParams.get('reference')?.trim() || '';
   const gateway = searchParams.get('gateway')?.trim() || '';
   const statusHint = searchParams.get('status')?.trim() || undefined;
+
+  useEffect(() => {
+    return () => {
+      void cancelActivePaystackInline();
+    };
+  }, []);
 
   const verifyAttempt = useCallback(async (
     summary: PaymentAttemptSummary,
@@ -32,12 +40,18 @@ const PaymentReturnPage: React.FC = () => {
   ): Promise<PaymentVerifyResult> => {
     const hint = includeStatusHint ? statusHint : undefined;
 
-    if (summary.subjectType === 'CUSTOM_ORDER' && summary.customOrderId) {
-      const customResult = await customOrdersBuyerApi.verifyPayment(summary.customOrderId, {
-        reference,
-        gateway: resolvedGateway,
-        statusHint: hint,
-      });
+    if (summary.subjectType === 'CUSTOM_ORDER') {
+      const customResult = summary.customOrderId
+        ? await customOrdersBuyerApi.verifyPayment(summary.customOrderId, {
+            reference,
+            gateway: resolvedGateway,
+            statusHint: hint,
+          })
+        : await customOrdersBuyerApi.verifyPaymentByReference({
+            reference,
+            gateway: resolvedGateway,
+            statusHint: hint,
+          });
       return {
         success: customResult.success,
         status: customResult.status as PaymentAttemptStatus,
@@ -86,8 +100,35 @@ const PaymentReturnPage: React.FC = () => {
         setViewState('resolved');
 
         if (result?.status === 'PAID') {
+          toast.success('Your order is placed successfully, Thank you for shopping.');
           navigate(`/checkout/confirmation?reference=${encodeURIComponent(reference)}`, {
             replace: true,
+          });
+          return;
+        }
+
+        if (
+          result?.status === 'FAILED' ||
+          result?.status === 'CANCELLED' ||
+          result?.status === 'EXPIRED'
+        ) {
+          const failureReason =
+            result.failureMessage ||
+            'Payment failed before completion. Please restart checkout.';
+          toast.error(failureReason);
+          if (refreshedSummary.subjectType === 'CUSTOM_ORDER') {
+            if (refreshedSummary.customOrderId) {
+              navigate(`/custom-orders/${refreshedSummary.customOrderId}`, {
+                replace: true,
+                state: { paymentFailureReason: failureReason, paymentReference: reference },
+              });
+            }
+            return;
+          }
+
+          navigate('/orders', {
+            replace: true,
+            state: { paymentFailureReason: failureReason, paymentReference: reference },
           });
         }
       } catch (error: any) {
@@ -137,7 +178,34 @@ const PaymentReturnPage: React.FC = () => {
       }
 
       if (result.status === 'PAID') {
+        toast.success('Your order is placed successfully, Thank you for shopping.');
         navigate(`/checkout/confirmation?reference=${encodeURIComponent(reference)}`);
+        return;
+      }
+
+      if (
+        result.status === 'FAILED' ||
+        result.status === 'CANCELLED' ||
+        result.status === 'EXPIRED'
+      ) {
+        const failureReason =
+          result.failureMessage ||
+          'Payment failed before completion. Please restart checkout.';
+        toast.error(failureReason);
+        if (summary.subjectType === 'CUSTOM_ORDER') {
+          if (summary.customOrderId) {
+            navigate(`/custom-orders/${summary.customOrderId}`, {
+              replace: true,
+              state: { paymentFailureReason: failureReason, paymentReference: reference },
+            });
+          }
+          return;
+        }
+
+        navigate('/orders', {
+          replace: true,
+          state: { paymentFailureReason: failureReason, paymentReference: reference },
+        });
       }
     } catch (error: any) {
       if (!options?.auto) {
@@ -151,6 +219,68 @@ const PaymentReturnPage: React.FC = () => {
       }
     }
   }, [attempt, gateway, navigate, reference, verifyAttempt]);
+
+  const handleRetryCustomOrderPayment = useCallback(async () => {
+    if (!attempt?.checkoutIntentId) {
+      toast.error('No checkout intent is linked to this payment attempt.');
+      return;
+    }
+    const paymentData = attempt.paymentData ?? {};
+    const email = typeof paymentData.email === 'string' ? paymentData.email : '';
+    if (!email) {
+      toast.error('Payment email is missing. Restart checkout to continue.');
+      return;
+    }
+
+    setRetryingPayment(true);
+    try {
+      const paymentMethod =
+        (attempt.paymentMethod as 'PAYSTACK' | 'FLUTTERWAVE' | 'BANK_TRANSFER') || 'PAYSTACK';
+      const init = await customOrdersBuyerApi.initializePaymentForCheckoutIntent(
+        attempt.checkoutIntentId,
+        {
+          paymentMethod,
+          email,
+          callbackUrl: `${window.location.origin}/checkout/payment-return`,
+          paymentData: paymentData as Record<string, unknown>,
+        },
+      );
+
+      if (init.providerAccessCode) {
+        await openPaystackInline(init.providerAccessCode, {
+          onSuccess: (response) => {
+            navigate(
+              `/checkout/payment-return?reference=${encodeURIComponent(response.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
+            );
+          },
+          onCancel: () => {
+            toast.error('Payment was cancelled before completion.');
+          },
+          onError: (inlineError) => {
+            toast.error(inlineError.message || 'Unable to open the payment window.');
+          },
+        });
+        return;
+      }
+      if (init.authorizationUrl) {
+        const fallbackUrl = new URL(init.authorizationUrl, window.location.origin);
+        if (fallbackUrl.origin === window.location.origin) {
+          window.location.assign(fallbackUrl.toString());
+          return;
+        }
+        throw new Error('Payment provider did not return an inline payment session for this attempt.');
+      }
+      if (init.reference) {
+        navigate(
+          `/checkout/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
+        );
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to retry payment');
+    } finally {
+      setRetryingPayment(false);
+    }
+  }, [attempt, navigate]);
 
   const resolvedStatus = verifyResult?.status ?? attempt?.status ?? 'PENDING';
 
@@ -200,6 +330,12 @@ const PaymentReturnPage: React.FC = () => {
   }
 
   const statusCopy = getCheckoutStatusCopy('return', resolvedStatus);
+  const isCustomOrderAttempt = attempt?.subjectType === 'CUSTOM_ORDER';
+  const shouldOfferCustomOrderRetry =
+    isCustomOrderAttempt &&
+    !attempt?.customOrderId &&
+    Boolean(attempt?.checkoutIntentId) &&
+    (resolvedStatus === 'FAILED' || resolvedStatus === 'CANCELLED' || resolvedStatus === 'EXPIRED');
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 text-center">
@@ -220,13 +356,26 @@ const PaymentReturnPage: React.FC = () => {
         )}
       </div>
 
-      {resolvedStatus === 'PROCESSING' && (
+      {resolvedStatus === 'PROCESSING' && autoVerifyAttempts < AUTO_VERIFY_MAX_ATTEMPTS && (
         <div className="mb-8 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-left text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
           <p>
-            Threadly will keep checking automatically every 10 seconds (attempt {Math.min(autoVerifyAttempts + 1, AUTO_VERIFY_MAX_ATTEMPTS)} of {AUTO_VERIFY_MAX_ATTEMPTS}).
+            Threadly is checking automatically every 10 seconds (attempt {Math.min(autoVerifyAttempts + 1, AUTO_VERIFY_MAX_ATTEMPTS)} of {AUTO_VERIFY_MAX_ATTEMPTS}).
           </p>
           <p className="mt-1">
-            If it still shows processing, you can leave this page and check your order later while provider confirmation continues in the background.
+            You can safely leave this page — your payment is being confirmed in the background.
+          </p>
+        </div>
+      )}
+
+      {resolvedStatus === 'PROCESSING' && autoVerifyAttempts >= AUTO_VERIFY_MAX_ATTEMPTS && (
+        <div className="mb-8 rounded-xl border border-blue-200/80 bg-blue-50/80 px-4 py-3 text-left text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
+          <p className="font-semibold">Still waiting on your bank or payment provider.</p>
+          <p className="mt-1">
+            Your payment is still being processed — this can take a few minutes when bank confirmation is delayed.
+            We will send you a notification the moment it is confirmed. You can safely close this page now.
+          </p>
+          <p className="mt-1">
+            If you believe payment was charged, tap <strong>Verify again</strong> in a few minutes or contact support with reference <strong>{reference}</strong>.
           </p>
         </div>
       )}
@@ -241,15 +390,26 @@ const PaymentReturnPage: React.FC = () => {
             Verify again
           </Button>
         )}
+        {shouldOfferCustomOrderRetry ? (
+          <Button onClick={handleRetryCustomOrderPayment} loading={retryingPayment} variant="secondary">
+            Retry payment
+          </Button>
+        ) : null}
         <Button
           variant="secondary"
           onClick={() =>
-            attempt?.subjectType === 'CUSTOM_ORDER' && attempt.customOrderId
-              ? navigate(`/custom-orders/${attempt.customOrderId}`)
+            isCustomOrderAttempt
+              ? attempt?.customOrderId
+                ? navigate(`/custom-orders/${attempt.customOrderId}`)
+                : navigate('/custom-orders')
               : navigate('/orders')
           }
         >
-          {attempt?.subjectType === 'CUSTOM_ORDER' ? 'Open custom order' : 'Open my orders'}
+          {isCustomOrderAttempt
+            ? attempt?.customOrderId
+              ? 'Open custom order'
+              : 'Open custom orders'
+            : 'Open my orders'}
         </Button>
         <Button variant="ghost" onClick={() => navigate('/checkout')}>Return to checkout</Button>
       </div>

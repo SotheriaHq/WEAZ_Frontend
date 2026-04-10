@@ -6,7 +6,7 @@ import React, {
   useCallback,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import VLoader from "@/components/loaders/VLoader";
 import {
@@ -28,11 +28,10 @@ import {
   FiPlus,
 } from "react-icons/fi";
 import { HiOutlineSparkles } from "react-icons/hi";
-import { useMeasurementPoints } from '@/hooks/useMeasurementPoints';
-import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import CustomOrderConfigurationEditor, {
   type CustomOrderConfigurationEditorHandle,
 } from '@/components/custom-orders/CustomOrderConfigurationEditor';
+import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 
 // Context & Hooks
 import TextField from "../../components/forms/TextField";
@@ -81,6 +80,15 @@ type DesignSizingMode = Extract<SizingMode, (typeof DESIGN_SIZING_MODE_OPTIONS)[
 const normalizeMeasurementLabel = (value: string) =>
   value.trim().toLowerCase().replace(/[\s_]+/g, ' ');
 
+const normalizeMeasurementKeyList = (keys: string[]) =>
+  Array.from(
+    new Set(
+      keys
+        .map((key) => String(key ?? '').trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  );
+
 const measurementKeyToLabel = (key: string) =>
   key
     .replace(/^BRAND_[^_]+_/, '')
@@ -111,6 +119,30 @@ const dedupeMeasurementKeysByLabel = (keys: string[]) => {
   return deduped;
 };
 
+const extractCollectionId = (response: unknown): string | undefined => {
+  if (!response || typeof response !== 'object') {
+    return undefined;
+  }
+
+  const record = response as Record<string, unknown>;
+  if (typeof record.collectionId === 'string') {
+    return record.collectionId;
+  }
+  if (typeof record.id === 'string') {
+    return record.id;
+  }
+
+  const nestedData =
+    record.data && typeof record.data === 'object'
+      ? (record.data as Record<string, unknown>)
+      : null;
+  if (nestedData && typeof nestedData.id === 'string') {
+    return nestedData.id;
+  }
+
+  return undefined;
+};
+
 const CreateDesignInner: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
@@ -118,8 +150,8 @@ const CreateDesignInner: React.FC = () => {
   const mediaStore = useMediaStore();
   const files = mediaStore.items;
   const navigate = useNavigate();
+  const location = useLocation();
   const customOrderEditorRef = useRef<CustomOrderConfigurationEditorHandle | null>(null);
-  const storeSetupComplete = useStoreSetupStatus();
 
   // Form state
   const [title, setTitle] = useState("");
@@ -208,6 +240,11 @@ const CreateDesignInner: React.FC = () => {
     cancelUploads,
   } = useCollectionUpload();
   const { user, fetchCollections } = useBrandProfile();
+  const emailVerificationRedirect = useMemo(() => {
+    const nextPath = `${location.pathname}${location.search}`;
+    return `/profile?verifyEmailPrompt=design-create&next=${encodeURIComponent(nextPath)}`;
+  }, [location.pathname, location.search]);
+  const requiresEmailVerification = !isEditMode && user?.isEmailVerified === false;
 
   const disabled = isSubmitting || isUploading;
   const titleDescriptionLocked = useMemo(() => {
@@ -530,48 +567,19 @@ const CreateDesignInner: React.FC = () => {
     (): 'MEN' | 'WOMEN' | 'UNISEX' => (type === 'MALE' ? 'MEN' : type === 'FEMALE' ? 'WOMEN' : 'UNISEX'),
     [type],
   );
-  const designMeasurementFilter = useMemo(
-    (): { gender?: 'MEN' | 'WOMEN' | 'UNISEX' } | undefined =>
-      measurementGender === 'UNISEX' ? undefined : { gender: measurementGender },
-    [measurementGender],
-  );
-  const { points: designMeasurementPoints } = useMeasurementPoints(designMeasurementFilter);
-  const defaultDesignMeasurementKeys = useMemo(() => {
-    const prioritized = [...designMeasurementPoints].sort(
-      (left, right) => (left.sortOrder ?? Number.MAX_SAFE_INTEGER) - (right.sortOrder ?? Number.MAX_SAFE_INTEGER),
-    );
-    const seenLabels = new Set<string>();
-    const dedupedKeys: string[] = [];
-
-    for (const point of prioritized) {
-      const key = String(point?.key ?? '').trim().toUpperCase();
-      if (!key) {
-        continue;
-      }
-      const label = normalizeMeasurementLabel(point.label || measurementKeyToLabel(key));
-      if (!label || seenLabels.has(label)) {
-        continue;
-      }
-      seenLabels.add(label);
-      dedupedKeys.push(key);
-    }
-
-    return dedupeMeasurementKeysByLabel(dedupedKeys);
-  }, [designMeasurementPoints]);
-
-  useEffect(() => {
-    if (defaultDesignMeasurementKeys.length === 0) {
-      return;
-    }
-    setCustomMeasurementKeys((current) =>
-      current.length > 0 ? dedupeMeasurementKeysByLabel(current) : defaultDesignMeasurementKeys,
-    );
-  }, [defaultDesignMeasurementKeys]);
-
   const normalizedCustomMeasurementKeys = useMemo(
     () => dedupeMeasurementKeysByLabel(customMeasurementKeys),
     [customMeasurementKeys],
   );
+
+  const handleCustomOrderMeasurementKeysChange = useCallback((keys: string[]) => {
+    const normalizedKeys = normalizeMeasurementKeyList(keys);
+    setCustomMeasurementKeys((current) => {
+      const currentSignature = normalizeMeasurementKeyList(current).join('|');
+      const nextSignature = normalizedKeys.join('|');
+      return currentSignature === nextSignature ? current : normalizedKeys;
+    });
+  }, []);
 
   // Handlers
   const handleDelete = (itemId: string) => {
@@ -686,6 +694,15 @@ const CreateDesignInner: React.FC = () => {
     setSubmitIntent("draft");
     setIsSubmitting(true);
     try {
+      const pendingCustomOrderDraft =
+        !isEditMode && isMadeToOrder
+          ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
+          : null;
+
+      if (!isEditMode && isMadeToOrder && !pendingCustomOrderDraft) {
+        return;
+      }
+
       if (isEditMode && id && isMadeToOrder) {
         const saved = await customOrderEditorRef.current?.saveConfiguration({
           silentSuccess: true,
@@ -726,7 +743,7 @@ const CreateDesignInner: React.FC = () => {
           targetAgeGroup: 'ADULT',
         } as any);
       } else {
-        await uploadCollection(
+        const response = await uploadCollection(
           files,
           draftTitle,
           description,
@@ -745,12 +762,28 @@ const CreateDesignInner: React.FC = () => {
             sizingMode,
             rtwSizeSystem: undefined,
             customMeasurementKeys: normalizedCustomMeasurementKeys,
+            customOrderEnabled: isMadeToOrder,
             fitPreference: undefined,
             targetAgeGroup: 'ADULT',
           },
           undefined,
           false, // shouldPublish = false
         );
+
+        const newCollectionId = extractCollectionId(response);
+        if (pendingCustomOrderDraft && newCollectionId) {
+          await customOrderConfigurationsApi.create({
+            ...pendingCustomOrderDraft,
+            fabricRuleBasisId: pendingCustomOrderDraft.fabricRuleBasisId || (
+              await customOrderConfigurationsApi.createFabricRuleBasis({
+                label: `${draftTitle} fabric rules`,
+                measurementKeys: pendingCustomOrderDraft.requiredMeasurementKeys,
+                gender: measurementGender,
+              })
+            ).id,
+            sourceId: newCollectionId,
+          });
+        }
       }
 
       setLastSaved(new Date());
@@ -784,6 +817,15 @@ const CreateDesignInner: React.FC = () => {
       toast.error(`Please provide ${reasons.join(", ")}.`);
       return;
     }
+
+    if (isMadeToOrder) {
+      const pendingCustomOrderDraft =
+        customOrderEditorRef.current?.buildConfigurationDraft() ?? null;
+      if (!pendingCustomOrderDraft) {
+        return;
+      }
+    }
+
     setShowPublishModal(true);
   };
 
@@ -791,6 +833,15 @@ const CreateDesignInner: React.FC = () => {
     setSubmitIntent("publish");
     setIsSubmitting(true);
     try {
+      const pendingCustomOrderDraft =
+        !isEditMode && isMadeToOrder
+          ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
+          : null;
+
+      if (!isEditMode && isMadeToOrder && !pendingCustomOrderDraft) {
+        return;
+      }
+
       if (isEditMode && id && isMadeToOrder) {
         const saved = await customOrderEditorRef.current?.saveConfiguration({
           silentSuccess: true,
@@ -805,20 +856,6 @@ const CreateDesignInner: React.FC = () => {
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
       const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
       const finalTags = selectedTags.slice(0, 10);
-
-      const extractCollectionId = (res: any): string | undefined => {
-        if (!res || typeof res !== "object") return undefined;
-        if (typeof (res as any).collectionId === "string")
-          return (res as any).collectionId;
-        if (typeof (res as any).id === "string") return (res as any).id;
-        if (
-          (res as any).data &&
-          typeof (res as any).data === "object" &&
-          typeof (res as any).data.id === "string"
-        )
-          return (res as any).data.id;
-        return undefined;
-      };
 
       if (isEditMode && id) {
         // Build a preview URL from the existing cover
@@ -906,6 +943,7 @@ const CreateDesignInner: React.FC = () => {
                   sizingMode,
                   rtwSizeSystem: undefined,
                   customMeasurementKeys: normalizedCustomMeasurementKeys,
+                  customOrderEnabled: isMadeToOrder,
                   fitPreference: undefined,
                   targetAgeGroup: 'ADULT',
                 },
@@ -993,6 +1031,7 @@ const CreateDesignInner: React.FC = () => {
                 sizingMode,
                 rtwSizeSystem: undefined,
                 customMeasurementKeys: normalizedCustomMeasurementKeys,
+                customOrderEnabled: isMadeToOrder,
                 fitPreference: undefined,
                 targetAgeGroup: 'ADULT',
               },
@@ -1006,6 +1045,24 @@ const CreateDesignInner: React.FC = () => {
             );
 
             const newCollectionId = extractCollectionId(response);
+            if (pendingCustomOrderDraft && newCollectionId) {
+              updatePublishTask(task.id, {
+                status: 'finalizing',
+                progress: 98,
+                message: 'Saving custom-order setup...',
+              });
+              await customOrderConfigurationsApi.create({
+                ...pendingCustomOrderDraft,
+                fabricRuleBasisId: pendingCustomOrderDraft.fabricRuleBasisId || (
+                  await customOrderConfigurationsApi.createFabricRuleBasis({
+                    label: `${title.trim() || 'Custom order'} fabric rules`,
+                    measurementKeys: pendingCustomOrderDraft.requiredMeasurementKeys,
+                    gender: measurementGender,
+                  })
+                ).id,
+                sourceId: newCollectionId,
+              });
+            }
             updatePublishTask(task.id, {
               status: 'published',
               progress: 100,
@@ -1152,6 +1209,10 @@ const CreateDesignInner: React.FC = () => {
     [],
   );
 
+  if (requiresEmailVerification) {
+    return <Navigate to={emailVerificationRedirect} replace />;
+  }
+
   return (
     <div className="min-h-screen bg-transparent text-[var(--text-primary)] transition-colors duration-300">
       {/* CreateStoreModal removed as per request */}
@@ -1162,22 +1223,22 @@ const CreateDesignInner: React.FC = () => {
             className="absolute inset-0 bg-black/60"
             onClick={() => setShowSaveDraftConfirm(false)}
           />
-          <div className="relative z-10 w-[420px] bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-6">
+          <div className="relative z-10 w-[min(92vw,420px)] max-h-[calc(100vh-2rem)] overflow-y-auto bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-5 sm:p-6">
             <h3 className="text-lg font-semibold mb-2">Save as Draft?</h3>
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
               Your media will be uploaded and saved as a draft. You can continue
               editing later.
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button
-                className="px-4 py-2 rounded-lg border"
+                className="w-full rounded-lg border px-4 py-2 sm:w-auto"
                 onClick={() => setShowSaveDraftConfirm(false)}
                 disabled={isSubmitting}
               >
                 Cancel
               </button>
               <button
-                className="px-4 py-2 rounded-lg bg-purple-600 text-white disabled:opacity-50"
+                className="w-full rounded-lg bg-purple-600 px-4 py-2 text-white disabled:opacity-50 sm:w-auto"
                 onClick={executeSaveDraft}
                 disabled={isSubmitting}
               >
@@ -1191,20 +1252,20 @@ const CreateDesignInner: React.FC = () => {
       {showDraftSavedChoices && (
         <div className="fixed inset-0 z-layer-modal flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60" />
-          <div className="relative z-10 w-[460px] bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-6">
+          <div className="relative z-10 w-[min(92vw,460px)] max-h-[calc(100vh-2rem)] overflow-y-auto bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-5 sm:p-6">
             <h3 className="text-lg font-semibold mb-2">Draft saved</h3>
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-5">
               Choose what you want to do next.
             </p>
-            <div className="flex flex-col sm:flex-row justify-end gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <button
-                className="px-4 py-2 rounded-lg border"
+                className="w-full rounded-lg border px-4 py-2 sm:w-auto"
                 onClick={handleCreateNewDesign}
               >
                 Create New Design
               </button>
               <button
-                className="px-4 py-2 rounded-lg bg-purple-600 text-white"
+                className="w-full rounded-lg bg-purple-600 px-4 py-2 text-white sm:w-auto"
                 onClick={handleGoToDrafts}
               >
                 Go to Drafts
@@ -1215,8 +1276,8 @@ const CreateDesignInner: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <main className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 py-6 pb-32">
-        <div className="mb-6 flex items-center justify-between">
+      <main className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-32">
+        <div className="mb-4 flex items-center justify-between sm:mb-6">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -1270,7 +1331,7 @@ const CreateDesignInner: React.FC = () => {
           )}
         </AnimatePresence>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-6 items-start mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-4 sm:gap-6 items-start mb-8">
           {/* Media Section */}
           <section id="design-media-section" className="h-full min-w-0">
             {files.length === 0 ? (
@@ -1318,7 +1379,7 @@ const CreateDesignInner: React.FC = () => {
                       </span>
                     </div>
                   )}
-                  <div className="relative w-full h-[360px] sm:h-[460px] lg:h-[620px] flex items-center justify-center overflow-hidden">
+                  <div className="relative w-full h-[280px] sm:h-[420px] lg:h-[620px] flex items-center justify-center overflow-hidden">
                     <AnimatePresence mode="wait">
                       {selectedFile && (
                         <motion.div
@@ -1360,11 +1421,7 @@ const CreateDesignInner: React.FC = () => {
                               className={`w-4 h-4 ${coverIndex === selectedIndex ? "fill-purple-400 text-purple-400" : ""}`}
                             />
                           }
-                          label={
-                            coverIndex === selectedIndex
-                              ? "Cover"
-                              : "Set as Cover"
-                          }
+                          label={coverIndex === selectedIndex ? "Cover" : "Set as Cover"}
                           onClick={() => handleSetCover(selectedIndex)}
                           disabled={disabled}
                           active={coverIndex === selectedIndex}
@@ -1495,6 +1552,10 @@ const CreateDesignInner: React.FC = () => {
                               : "Select a category"
                           }
                           disabled={disabled}
+                          searchable
+                          emptyMessage="No categories available"
+                          optionAllowWrap
+                          selectedAllowWrap
                         />
 
                         <UniversalSelect
@@ -1515,6 +1576,10 @@ const CreateDesignInner: React.FC = () => {
                           disabled={
                             disabled || categoryTypeOptions.length === 0
                           }
+                          searchable
+                          emptyMessage="No sub-categories available"
+                          optionAllowWrap
+                          selectedAllowWrap
                         />
                       </div>
 
@@ -1537,22 +1602,22 @@ const CreateDesignInner: React.FC = () => {
                         <div className="p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10">
                           {/* Selected tags */}
                           {selectedTags.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-3">
+                            <div className="flex flex-wrap gap-1.5 mb-3">
                               {selectedTags.map((tag, idx) => (
                                 <motion.span
                                   key={tag}
                                   initial={{ scale: 0.8, opacity: 0 }}
                                   animate={{ scale: 1, opacity: 1 }}
                                   exit={{ scale: 0.8, opacity: 0 }}
-                                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] font-semibold ${tagStylePalette[idx % tagStylePalette.length]}`}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold ${tagStylePalette[idx % tagStylePalette.length]}`}
                                 >
                                   #{tag}
                                   <button
                                     type="button"
                                     onClick={() => removeTag(tag)}
-                                    className="ml-1 hover:text-purple-200 transition-colors"
+                                    className="hover:text-purple-200 transition-colors"
                                   >
-                                    <FiX className="w-3.5 h-3.5" />
+                                    <FiX className="w-3 h-3" />
                                   </button>
                                 </motion.span>
                               ))}
@@ -1601,7 +1666,7 @@ const CreateDesignInner: React.FC = () => {
                               <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
                                 Popular Tags:
                               </p>
-                              <div className="flex flex-wrap gap-2">
+                              <div className="flex flex-wrap gap-1.5">
                                 {filteredSuggestions.map((tag) => {
                                   const isSelected = selectedTags.some(
                                     (t) => t.toLowerCase() === tag.toLowerCase(),
@@ -1612,7 +1677,7 @@ const CreateDesignInner: React.FC = () => {
                                       type="button"
                                       onClick={() => addTag(tag)}
                                       disabled={disabled || isSelected}
-                                      className={`tag-badge-outline px-3 py-1.5 rounded-full text-[13px] font-medium ${
+                                      className={`tag-badge-outline px-2.5 py-1 rounded-full text-[12px] font-medium ${
                                         isSelected
                                           ? 'opacity-40 cursor-not-allowed ring-1 ring-purple-400/40'
                                           : ''
@@ -1716,22 +1781,20 @@ const CreateDesignInner: React.FC = () => {
                   </div>
                 </label>
 
-                <label className={`flex items-start gap-3 p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 transition-colors ${storeSetupComplete === false ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-purple-500/30'}`}>
+                <label className="flex items-start gap-3 p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 cursor-pointer transition-colors hover:border-purple-500/30">
                   <input
                     type="checkbox"
                     checked={isMadeToOrder}
                     onChange={(e) => setIsMadeToOrder(e.target.checked)}
-                    disabled={disabled || storeSetupComplete === false}
+                    disabled={disabled}
                     className="w-5 h-5 mt-0.5 rounded border-gray-400 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-transparent"
                   />
                   <div>
                     <span className="text-gray-900 dark:text-white font-medium">
-                      Made to Order
+                      Custom Order
                     </span>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {storeSetupComplete === false
-                        ? 'Complete your store setup to enable custom orders'
-                        : 'Show "Custom Order" badge on design'}
+                      Allow buyers to request this design with their own measurements.
                     </p>
                   </div>
                 </label>
@@ -1742,10 +1805,12 @@ const CreateDesignInner: React.FC = () => {
                   ref={customOrderEditorRef}
                   sourceType="DESIGN"
                   sourceId={isEditMode ? id : undefined}
+                  sourceTitle={title}
                   measurementKeys={customMeasurementKeys}
                   measurementGender={measurementGender}
                   defaultBaseCharge={minPrice}
                   disabled={disabled}
+                  onRequiredMeasurementKeysChange={handleCustomOrderMeasurementKeysChange}
                 />
               )}
             </div>
@@ -1800,6 +1865,9 @@ const CreateDesignInner: React.FC = () => {
                   label: option.label,
                 }))}
                 disabled={disabled}
+                searchable
+                optionAllowWrap
+                selectedAllowWrap
               />
 
               {/* Visibility */}
@@ -2263,13 +2331,13 @@ const FormSection: React.FC<{
     <button
       type="button"
       onClick={onToggle}
-      className="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors"
+      className="w-full flex items-center justify-between p-3 text-left hover:bg-white/5 transition-colors sm:p-4"
     >
-      <div className="flex items-center gap-3">
-        <span className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center text-lg">
+      <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-primary text-base sm:h-10 sm:w-10 sm:text-lg">
           {icon}
         </span>
-        <span className="text-lg font-semibold text-gray-900 dark:text-white">
+        <span className="truncate text-base font-semibold text-gray-900 dark:text-white sm:text-lg">
           {title}
         </span>
       </div>
@@ -2288,7 +2356,7 @@ const FormSection: React.FC<{
           transition={{ duration: 0.2 }}
           className="overflow-hidden"
         >
-          <div className="px-4 pb-4 flex-1">{children}</div>
+          <div className="flex-1 px-3 pb-4 sm:px-4">{children}</div>
         </motion.div>
       )}
     </AnimatePresence>

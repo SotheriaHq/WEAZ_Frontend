@@ -22,6 +22,10 @@ import {
   upsertCustomOrderAddress,
   type CustomOrderSavedAddress,
 } from '@/lib/customOrderAddressBook';
+import {
+  cancelActivePaystackInline,
+  openPaystackInline,
+} from '@/lib/paystackInline';
 
 interface CustomOrderComposerPageProps {
   configurationIdOverride?: string | null;
@@ -109,11 +113,18 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   const [noDirectMatchAcknowledged, setNoDirectMatchAcknowledged] = useState(false);
 
   const createKeyRef = useRef(createIdempotencyKey());
+  const paymentInitKeyRef = useRef<string | null>(null);
   const configurationId = configurationIdOverride ?? searchParams.get('configurationId');
 
   useEffect(() => {
     setCustomerName([profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim());
   }, [profile?.firstName, profile?.lastName]);
+
+  useEffect(() => {
+    return () => {
+      void cancelActivePaystackInline();
+    };
+  }, []);
 
   const applySavedAddress = useCallback((address: CustomOrderSavedAddress) => {
     setCustomerName(address.customerName);
@@ -444,6 +455,9 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   };
 
   const handleCreateOrder = async () => {
+    // Guard against double-submit: state updates are async so we gate at
+    // the top of the handler before setSubmitting(true) is reached.
+    if (submitting) return;
     if (!configuration) return;
     if (!preview) {
       toast.error('Create a price preview before placing the custom order.');
@@ -471,8 +485,15 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
     }
 
     setSubmitting(true);
+    let createdOrderId: string | null = null;
+    let checkoutIntentId: string | null = null;
+    // Tracks whether the Paystack popup was successfully launched.
+    // When true, setSubmitting(false) is deferred to the Paystack callbacks so
+    // the button stays in the loading state while the popup is open — preventing
+    // the user from thinking nothing happened and accidentally closing the modal.
+    let paystackLaunched = false;
     try {
-      const order = await customOrdersBuyerApi.create({
+      const submission = await customOrdersBuyerApi.create({
         checkoutIntentId: preview.checkoutIntentId,
         configurationId: configuration.id,
         configurationVersionId: preview.configurationVersionId,
@@ -484,22 +505,135 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
         idempotencyKey: createKeyRef.current,
         noDirectMatchAcknowledged,
       });
+      createdOrderId = submission.customOrderId ?? null;
+      checkoutIntentId = submission.checkoutIntentId;
 
       const nextAddresses = upsertCustomOrderAddress(profile?.id, currentAddressDraft);
       setSavedAddresses(nextAddresses);
       if (nextAddresses[0]) setEditingAddressId(nextAddresses[0].id);
 
-      if (embedded) {
-        toast.success('Custom order created. Open your custom orders to continue payment.');
-        onOrderCreated?.(order.id);
-      } else {
-        toast.success('Custom order created. Continue to payment on the next screen.');
-        navigate(`/custom-orders/${order.id}`);
+      // ALREADY_PLACED: order exists (e.g. idempotent retry). Navigate to it.
+      if (createdOrderId) {
+        navigate(`/custom-orders/${createdOrderId}`);
+        onOrderCreated?.(createdOrderId);
+        return;
       }
+
+      if (!checkoutIntentId) {
+        throw new Error('Checkout intent is missing after submission.');
+      }
+
+      const trimmedCustomerName = customerName.trim();
+      const nameParts = trimmedCustomerName.split(/\s+/).filter(Boolean);
+      const firstName = nameParts[0] || 'Customer';
+      const lastName = nameParts.slice(1).join(' ') || 'Customer';
+      const paymentData = {
+        email: contactEmail.trim(),
+        phone: contactPhone.trim(),
+        channel: 'CARD',
+        consentAccepted: true,
+        billingSameAsShipping: true,
+        shippingAddress: {
+          firstName,
+          lastName,
+          street: street.trim(),
+          apartment: '',
+          city: city.trim(),
+          state: stateRegion.trim(),
+          postalCode: '',
+          country: country.trim() || 'Nigeria',
+          phone: contactPhone.trim(),
+        },
+      };
+
+      const paymentInitKey =
+        paymentInitKeyRef.current ?? createIdempotencyKey();
+      paymentInitKeyRef.current = paymentInitKey;
+
+      const paymentInit = await customOrdersBuyerApi.initializePaymentForCheckoutIntent(checkoutIntentId, {
+        paymentMethod: 'PAYSTACK',
+        email: contactEmail.trim(),
+        callbackUrl: `${window.location.origin}/checkout/payment-return`,
+        paymentData,
+        idempotencyKey: paymentInitKey,
+      });
+
+      if (paymentInit.providerAccessCode) {
+        // Mark as launched BEFORE the call so the finally block skips setSubmitting(false).
+        // Each Paystack callback is responsible for releasing the submitting state.
+        paystackLaunched = true;
+        await openPaystackInline(paymentInit.providerAccessCode, {
+          onSuccess: (response) => {
+            setSubmitting(false);
+            navigate(
+              `/checkout/payment-return?reference=${encodeURIComponent(response.reference)}&gateway=${encodeURIComponent(paymentInit.gateway || 'PAYSTACK')}`,
+            );
+          },
+          onCancel: () => {
+            setSubmitting(false);
+            paymentInitKeyRef.current = null;
+            toast.error('Payment was cancelled before the order could be placed.');
+          },
+          onError: (inlineError) => {
+            setSubmitting(false);
+            paymentInitKeyRef.current = null;
+            toast.error(inlineError.message || 'Unable to open the payment window.');
+          },
+        });
+        return;
+      }
+
+      if (paymentInit.authorizationUrl) {
+        const fallbackUrl = new URL(paymentInit.authorizationUrl, window.location.origin);
+        if (fallbackUrl.origin === window.location.origin) {
+          window.location.assign(fallbackUrl.toString());
+          return;
+        }
+
+        throw new Error('Payment provider did not return an inline payment session for this attempt.');
+      }
+
+      const nextReference = encodeURIComponent(paymentInit.reference);
+      const nextGateway = encodeURIComponent(paymentInit.gateway || 'PAYSTACK');
+      navigate(`/checkout/payment-return?reference=${nextReference}&gateway=${nextGateway}`);
+      return;
+
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to create custom order');
+      paymentInitKeyRef.current = null;
+
+      const apiMessage: string = error?.response?.data?.message ?? '';
+
+      // Specific recovery: price lock expired between preview and submission.
+      // Prompt the user to re-preview so they get a fresh checkout intent.
+      if (
+        apiMessage === 'CUSTOM_ORDER_CHECKOUT_INTENT_EXPIRED' ||
+        apiMessage.includes('INTENT_EXPIRED')
+      ) {
+        setPreview(null);
+        toast.error(
+          'Your pricing lock expired before the order could be placed. Your measurements are still saved — tap "Preview & Lock Price" to get a fresh quote and try again.',
+        );
+        return;
+      }
+
+      const fallbackMessage =
+        createdOrderId
+          ? 'Order was already placed. Open it to review the payment status.'
+          : checkoutIntentId
+            ? 'Checkout submitted, but payment could not start. Retry to complete payment.'
+            : 'Unable to submit the custom order checkout.';
+      toast.error(apiMessage || fallbackMessage);
+      if (createdOrderId) {
+        navigate(`/custom-orders/${createdOrderId}`);
+        onOrderCreated?.(createdOrderId);
+      }
     } finally {
-      setSubmitting(false);
+      // Do NOT release submitting when Paystack popup is open — the callbacks handle it.
+      // This keeps the button in the "loading" state so the user knows payment is pending
+      // and doesn't accidentally close the modal or double-submit.
+      if (!paystackLaunched) {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -616,7 +750,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600 dark:text-emerald-300">Custom Order</div>
           <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{configuration.title}</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-            Build the request, lock the price preview, then create the order and continue to payment.
+            Build the request, lock the price preview, then submit checkout to start payment.
           </p>
         </div>
         <button
@@ -834,8 +968,14 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
             </div>
             <div className="mt-5 space-y-3">
               <button type="button" onClick={handlePreview} disabled={submitting} className="w-full rounded-full border border-black/10 px-4 py-3 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white">{submitting ? 'Calculating preview...' : 'Lock price preview'}</button>
-              <button type="button" onClick={handleCreateOrder} disabled={submitting || !preview || preview.quoteStatus === 'MANUAL_QUOTE_REQUIRED'} className="w-full rounded-full bg-emerald-500 px-4 py-3 text-sm font-semibold text-black disabled:opacity-60">{submitting ? 'Creating custom order...' : 'Create custom order'}</button>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Payment starts after the custom order is created, on the next screen.</p>
+              <button type="button" onClick={handleCreateOrder} disabled={submitting || !preview || preview.quoteStatus === 'MANUAL_QUOTE_REQUIRED'} className="w-full rounded-full bg-emerald-500 px-4 py-3 text-sm font-semibold text-black disabled:opacity-60">
+                {submitting ? 'Opening payment...' : preview?.checkoutIntentId ? 'Proceed to Payment →' : 'Create custom order'}
+              </button>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {preview?.checkoutIntentId
+                  ? 'Your price is locked. Tap above to open the secure payment window.'
+                  : 'Lock the price preview above, then proceed to payment.'}
+              </p>
             </div>
           </section>
         </div>

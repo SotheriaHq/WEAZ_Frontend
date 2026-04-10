@@ -115,6 +115,7 @@ export function useCollectionUpload() {
         rtwSizeType?: 'PREDEFINED' | 'FREEFORM' | 'MIXED';
         customGender?: 'MEN' | 'WOMEN' | 'UNISEX';
         customMeasurementKeys?: string[];
+        customOrderEnabled?: boolean;
         fitPreference?: 'SLIM' | 'REGULAR' | 'LOOSE' | 'OVERSIZED';
         targetAgeGroup?: 'ADULT' | 'CHILD';
       },
@@ -227,6 +228,7 @@ export function useCollectionUpload() {
           customMeasurementKeys: Array.isArray(meta?.customMeasurementKeys)
             ? meta.customMeasurementKeys
             : undefined,
+          customOrderEnabled: meta?.customOrderEnabled,
           fitPreference: meta?.fitPreference,
           targetAgeGroup: meta?.targetAgeGroup,
         }) as InitializeCollectionResponse & { id?: string };
@@ -346,6 +348,7 @@ export function useCollectionUpload() {
             filterValueIds: Array.isArray(meta?.filterValueIds)
               ? meta?.filterValueIds
               : undefined,
+            customOrderEnabled: meta?.customOrderEnabled,
           },
         };
 
@@ -355,6 +358,7 @@ export function useCollectionUpload() {
           Boolean(meta?.type) ||
           Boolean(normalizedCategoryId) ||
           Boolean(normalizedSubCategoryId) ||
+          meta?.customOrderEnabled !== undefined ||
           Boolean(Array.isArray(meta?.filterValueIds));
 
         const finalizeResp = (await (hasFinalizeOptions

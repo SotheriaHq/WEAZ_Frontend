@@ -25,15 +25,17 @@ import { formatPrice } from '@/utils/helpers';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
+import { useActiveCustomOrderConfiguration } from '@/hooks/useActiveCustomOrderConfiguration';
 import ProductReviewSection from '@/components/reviews/ProductReviewSection';
 import { isRtwSizingMode, normalizeSizingMode } from '@/types/sizing';
-import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
 import {
   isCustomOrderOnlyProduct,
   isStrictlyOutOfStockProduct,
 } from '@/lib/productAvailability';
+import { resolveVariantColorPresentation } from '@/utils/variantColors';
 
 const findMappedColorValue = (
   map: Record<string, string> | undefined,
@@ -49,28 +51,6 @@ const findMappedColorValue = (
   );
   if (partialMatch) return partialMatch[1];
   return null;
-};
-
-// Color name to hex mapping
-const COLOR_HEX_MAP: Record<string, string> = {
-  'Black': '#000000',
-  'White': '#FFFFFF',
-  'Navy': '#1E3A5F',
-  'Indigo': '#4F46E5',
-  'Red': '#DC2626',
-  'Green': '#16A34A',
-  'Yellow': '#EAB308',
-  'Purple': '#9333EA',
-  'Orange': '#EA580C',
-  'Blue': '#2563EB',
-  'Pink': '#EC4899',
-  'Brown': '#92400E',
-  'Gray': '#6B7280',
-  'Burgundy': '#800020',
-  'Teal': '#14B8A6',
-  'Gold': '#D4AF37',
-  'Black/Gold': 'linear-gradient(135deg, #000000 50%, #D4AF37 50%)',
-  'Multi': 'linear-gradient(135deg, #EC4899, #8B5CF6, #3B82F6, #10B981)',
 };
 
 // Helper component to render signed media
@@ -196,6 +176,7 @@ export default function ProductDetailsPage() {
   const [savingMeasurements, setSavingMeasurements] = useState(false);
   /* showQr disabled — only brand profile QR codes active */
   const [startingCustomOrder, setStartingCustomOrder] = useState(false);
+  const [customOrderComposerOpen, setCustomOrderComposerOpen] = useState(false);
   
   // Fetch product
   useEffect(() => {
@@ -287,19 +268,48 @@ export default function ProductDetailsPage() {
     return normalizeSizingMode(product?.sizingMode);
   }, [product?.sizingMode]);
 
+  const isCustomAvailable =
+    product?.customAvailable === true || product?.customOrderEnabled === true;
+  const customOrderAvailability = useActiveCustomOrderConfiguration({
+    sourceType: 'PRODUCT',
+    sourceId: product?.id,
+    enabled: isCustomAvailable,
+    unavailableReason:
+      'This product is marked custom-order enabled, but it is not configured for custom bagging yet. Ask the brand to complete custom-order setup.',
+  });
+  const customOrderUnavailableReason = customOrderAvailability.isAvailable
+    ? null
+    : customOrderAvailability.isLoading
+      ? 'Checking custom-order availability...'
+      : customOrderAvailability.unavailableReason ||
+        'This product is not configured for custom orders yet. Ask the brand to complete custom-order setup.';
+
+  const customOrderMeasurementKeys = useMemo(() => {
+    if (customOrderAvailability.isLoading && isCustomAvailable) {
+      return [];
+    }
+    if (!customOrderAvailability.configuration) {
+      return null;
+    }
+    return customOrderAvailability.configuration.requiredMeasurementKeys.filter(
+      (key): key is string => typeof key === 'string' && key.trim().length > 0,
+    );
+  }, [customOrderAvailability.configuration, customOrderAvailability.isLoading, isCustomAvailable]);
+
   const requiredMeasurementKeys = useMemo(() => {
+    if (customOrderMeasurementKeys !== null) {
+      return customOrderMeasurementKeys;
+    }
     if (!Array.isArray(product?.customMeasurementKeys)) return [];
     return product.customMeasurementKeys.filter(
       (key): key is string => typeof key === 'string' && key.trim().length > 0,
     );
-  }, [product?.customMeasurementKeys]);
+  }, [customOrderMeasurementKeys, product?.customMeasurementKeys]);
 
   const requiresRtwSelection = isRtwSizingMode(sizingMode) && availableSizes.length > 0;
-  const isCustomAvailable =
-    product?.customAvailable === true || product?.customOrderEnabled === true;
   const isCustomOrderOnly = isCustomOrderOnlyProduct(product);
   const requiresMeasurements =
-    isCustomAvailable && requiredMeasurementKeys.length > 0;
+    sizingMode === 'RTW_PLUS_FITTINGS' && requiredMeasurementKeys.length > 0;
 
   useEffect(() => {
     if (!product?.id || !isAuth) return;
@@ -392,9 +402,8 @@ export default function ProductDetailsPage() {
       (!selectedColor || v.color === selectedColor) && 
       (!selectedSize || v.size === selectedSize)
     );
-
     // If variants exist but none selected/found
-    if (variants.length > 0 && (!variant)) {
+    if (variants.length > 0 && !variant) {
        toast.error('Please select options');
        return;
     }
@@ -504,14 +513,13 @@ export default function ProductDetailsPage() {
     if (startingCustomOrder) {
       return;
     }
+    if (!customOrderAvailability.isAvailable || !customOrderAvailability.configurationId) {
+      toast.error(customOrderUnavailableReason || 'This product is not configured for custom orders yet. Ask the brand to complete custom-order setup.');
+      return;
+    }
     try {
       setStartingCustomOrder(true);
-      const activeConfiguration = await customOrderConfigurationsApi.getActiveForProduct(product.id);
-      if (!activeConfiguration?.id) {
-        toast.error('Custom order is not available for this product yet.');
-        return;
-      }
-      navigate(`/custom-orders/new?configurationId=${encodeURIComponent(activeConfiguration.id)}`);
+      setCustomOrderComposerOpen(true);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to open custom-order checkout.');
     } finally {
@@ -899,26 +907,42 @@ export default function ProductDetailsPage() {
                         <div className="flex flex-wrap gap-2">
                           {colors.map((color) => {
                             const isActive = selectedColor === color;
-                            const colorStyle = findMappedColorValue(colorHexCodes, color) || COLOR_HEX_MAP[color] || '#9CA3AF';
-                            const isGradient = colorStyle.includes('gradient');
+                            const presentation = resolveVariantColorPresentation(color, {
+                              colorHexCodes,
+                              colorImages: product?.colorImages ?? null,
+                            });
                             return (
                               <button
                                 key={color}
                                 onClick={() => setSelectedColor(color)}
                                 type="button"
-                                className={`w-10 h-10 rounded-full border-2 transition-all relative ${
+                                className={`flex min-h-16 min-w-[8.5rem] items-center gap-2 rounded-2xl border px-3 py-2 text-left transition-all ${
                                   isActive
-                                    ? 'border-emerald-500 ring-2 ring-emerald-500/30 scale-110'
+                                    ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-500/10'
                                     : 'border-black/10 dark:border-white/15 hover:border-emerald-500/60'
                                 }`}
-                                style={{
-                                  background: isGradient ? colorStyle : colorStyle,
-                                }}
                                 title={color}
                               >
-                                {isActive && (
-                                  <Check size={16} className={`absolute inset-0 m-auto ${color === 'White' || color === 'Yellow' ? 'text-gray-900' : 'text-white'}`} />
-                                )}
+                                <span
+                                  className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border ${
+                                    isActive
+                                      ? 'border-emerald-500/50'
+                                      : 'border-black/10 dark:border-white/15'
+                                  }`}
+                                  style={presentation.swatchStyle}
+                                >
+                                  {isActive ? (
+                                    <Check size={15} className="absolute inset-0 m-auto text-white drop-shadow" />
+                                  ) : null}
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-xs font-semibold text-slate-900 dark:text-white">
+                                    {presentation.label}
+                                  </span>
+                                  <span className="block text-[10px] text-slate-500 dark:text-slate-400">
+                                    {presentation.toneLabel}
+                                  </span>
+                                </span>
                               </button>
                             );
                           })}
@@ -987,32 +1011,36 @@ export default function ProductDetailsPage() {
 
                 {showAddToBag ? (
                   <div className="space-y-2.5">
-                    {isCustomAvailable ? (
-                      <button
-                        onClick={handleStartCustomOrder}
-                        type="button"
-                        disabled={startingCustomOrder}
-                        className="w-full rounded-full border border-emerald-400/50 bg-emerald-500/10 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:text-emerald-200"
-                      >
-                        {startingCustomOrder ? 'Opening custom order...' : '✂️ Start Custom Order'}
-                      </button>
-                    ) : null}
-                    <button
-                      onClick={handleAddToCart}
-                      disabled={isOutOfStock}
-                      className={`w-full font-bold py-3.5 rounded-full transition-all flex items-center justify-center gap-2 ${
-                        isOutOfStock
-                          ? 'bg-slate-300 dark:bg-white/15 text-slate-500 dark:text-slate-400 cursor-not-allowed'
-                          : 'bg-emerald-500 hover:bg-emerald-400 text-black'
-                      }`}
-                    >
-                      <ShoppingBag size={18} />
-                      {isOutOfStock
-                        ? 'Sold Out'
-                        : isCustomOrderOnly
-                          ? '🛍️ Bag as custom order'
-                          : '🛍️ Bag it'}
-                    </button>
+                    <div className={`grid gap-2 ${isCustomAvailable && !isCustomOrderOnly ? 'sm:grid-cols-2' : ''}`}>
+                      {isCustomAvailable ? (
+                        <span className="block w-full" title={customOrderUnavailableReason ?? undefined}>
+                          <button
+                            onClick={handleStartCustomOrder}
+                            type="button"
+                            disabled={startingCustomOrder || customOrderAvailability.isLoading || !customOrderAvailability.isAvailable}
+                            className="w-full rounded-full border border-emerald-400/50 bg-emerald-500/10 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:text-emerald-200"
+                          >
+                            {startingCustomOrder
+                              ? 'Opening custom-order bag...'
+                              : '✂️ Custom Bag It'}
+                          </button>
+                        </span>
+                      ) : null}
+                      {!isCustomOrderOnly ? (
+                        <button
+                          onClick={handleAddToCart}
+                          disabled={isOutOfStock}
+                          className={`w-full font-bold py-3.5 rounded-full transition-all flex items-center justify-center gap-2 ${
+                            isOutOfStock
+                              ? 'bg-slate-300 dark:bg-white/15 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                              : 'bg-emerald-500 hover:bg-emerald-400 text-black'
+                          }`}
+                        >
+                          <ShoppingBag size={18} />
+                          {isOutOfStock ? 'Sold Out' : '🛍️ Bag it'}
+                        </button>
+                      ) : null}
+                    </div>
                     <button
                       onClick={handleWishlist}
                       disabled={wishlistBusy}
@@ -1102,6 +1130,36 @@ export default function ProductDetailsPage() {
           </div>
         </div>
       </main>
+
+      {customOrderComposerOpen && customOrderAvailability.configurationId ? (
+        <OverlayPortal>
+          <div
+            className="fixed inset-0 z-layer-modal flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                setCustomOrderComposerOpen(false);
+              }
+            }}
+          >
+            <div className="relative h-[92vh] w-[98vw] max-w-[1280px] overflow-y-auto rounded-3xl border border-white/20 bg-white/90 p-4 text-slate-900 shadow-2xl dark:bg-[#0d0b12] dark:text-white">
+              <button
+                type="button"
+                aria-label="Close custom order composer"
+                onClick={() => setCustomOrderComposerOpen(false)}
+                className="sticky top-2 float-right z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/80 text-slate-700 shadow-sm hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+              >
+                <span aria-hidden="true" className="text-base">×</span>
+              </button>
+              <CustomOrderComposerPage
+                embedded
+                configurationIdOverride={customOrderAvailability.configurationId}
+                onClose={() => setCustomOrderComposerOpen(false)}
+                onOrderCreated={() => setCustomOrderComposerOpen(false)}
+              />
+            </div>
+          </div>
+        </OverlayPortal>
+      ) : null}
 
       <div className="mx-auto w-full max-w-[1440px] px-4 pb-10 md:px-8 lg:px-12">
         <ProductReviewSection productId={product.id} />

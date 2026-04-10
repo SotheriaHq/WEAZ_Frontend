@@ -2,9 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'sonner';
-import marketApi from '@/api/MarketApi';
 import { apiClient } from '@/api/httpClient';
-import { unwrapApiResponse } from '@/types/auth';
+import { unwrapApiResponse, type ApiSuccessPayload } from '@/types/auth';
 import type { AppDispatch, RootState } from '@/store';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
@@ -21,30 +20,72 @@ interface RawProductsPayload {
   items?: any[];
   total?: number;
   hasNextPage?: boolean;
+  nextCursor?: string | null;
 }
 
 const BASE_FILTERS = ['FOR_YOU', 'MENSWEAR', 'WOMENSWEAR', 'EVERYBODY', 'ON_SALE'] as const;
 
+type MarketplaceProduct = StoreProduct & {
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 // Speed in pixels per second for the marquee
 const MARQUEE_PX_PER_S = 40;
-// Width per card (min-w-[400px]) + gap-3 (12px)
-const CARD_WIDTH = 412;
+// Width per card (416px) + gap-4 (16px)
+const CARD_WIDTH = 432;
+const FRESH_DROP_DAY_MS = 24 * 60 * 60 * 1000;
+const FRESH_DROP_MAX_AGE_MS = 7 * FRESH_DROP_DAY_MS;
+const SYSTEM_FRESH_DROPS_LIMIT = 20;
+const ADMIN_FRESH_DROPS_LIMIT = 10;
+
+const MARKET_LOAD_PAGE_LIMIT = 120;
+const MARKET_LOAD_MAX_PAGES = 40;
+const MARKET_LOAD_MAX_ROWS = 4800;
+
+const parseTimestamp = (value?: string | null): number => {
+  if (!value) return 0;
+  const ts = new Date(value).getTime();
+  return Number.isFinite(ts) ? ts : 0;
+};
+
+const getProductRecencyTimestamp = (product: MarketplaceProduct): number => {
+  const createdTs = parseTimestamp(product.createdAt);
+  const updatedTs = parseTimestamp(product.updatedAt);
+  const publishedTs = parseTimestamp(product.publishAt ?? null);
+  return Math.max(createdTs, updatedTs, publishedTs);
+};
+
+const getUtcDayIndex = (nowMs: number): number => Math.floor(nowMs / FRESH_DROP_DAY_MS);
+
+const selectDailyBatch = <T,>(items: T[], batchSize: number, utcDayIndex: number): T[] => {
+  if (items.length === 0 || batchSize <= 0) return [];
+  const batchCount = Math.max(1, Math.ceil(items.length / batchSize));
+  const safeDayIndex = Number.isFinite(utcDayIndex) ? Math.max(0, Math.floor(utcDayIndex)) : 0;
+  const batchIndex = safeDayIndex % batchCount;
+  const start = batchIndex * batchSize;
+  return items.slice(start, start + batchSize);
+};
 
 const ProductCarousel: React.FC<{
   title: string;
-  products: StoreProduct[];
+  products: MarketplaceProduct[];
   onViewProduct: (product: StoreProduct) => void;
 }> = ({ title, products, onViewProduct }) => {
   const [isPaused, setIsPaused] = useState(false);
+  const [previewNavigationActive, setPreviewNavigationActive] = useState(false);
+  const useMarquee = products.length > 2;
 
-  // Duplicate so the seamless loop works.
-  // The CSS animation translates by -50% of the track's own (max-content) width,
-  // which equals exactly the width of one copy → loops without a visible seam.
-  const duplicatedProducts = useMemo(() => [...products, ...products], [products]);
+  // Duplicate only when marquee is active so the seamless loop works.
+  // The CSS animation translates by -50% of the track width, which equals one copy.
+  const duplicatedProducts = useMemo(
+    () => (useMarquee ? [...products, ...products] : products),
+    [products, useMarquee],
+  );
 
   // Duration: time to scroll one full copy width
   const durationS = useMemo(
-    () => Math.round((products.length * CARD_WIDTH) / MARQUEE_PX_PER_S),
+    () => Math.max(18, Math.round((products.length * CARD_WIDTH) / MARQUEE_PX_PER_S)),
     [products.length],
   );
 
@@ -62,50 +103,67 @@ const ProductCarousel: React.FC<{
 
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
-        <button
-          type="button"
-          onClick={() => setIsPaused((p) => !p)}
-          className="rounded-full border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/10"
-          aria-label={isPaused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
-        >
-          {isPaused ? '▶' : '⏸'}
-        </button>
+        {useMarquee ? (
+          <button
+            type="button"
+            onClick={() => setIsPaused((p) => !p)}
+            className="rounded-full border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/10"
+            aria-label={isPaused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
+          >
+            {isPaused ? '▶' : '⏸'}
+          </button>
+        ) : null}
       </div>
 
-      {/*
-        Outer: overflow-hidden clips the second copy until it scrolls into view.
-        Inner: width:max-content ensures translateX(-50%) equals exactly one copy's width.
-      */}
-      <div
-        className="overflow-hidden"
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-        onTouchStart={() => setIsPaused(true)}
-        onTouchEnd={() => setIsPaused(false)}
-      >
+      {useMarquee ? (
         <div
-          className="flex gap-3"
-          style={{
-            width: 'max-content',
-            animation: `threadly-marquee ${durationS}s linear infinite`,
-            animationPlayState: isPaused ? 'paused' : 'running',
-          }}
+          className="overflow-hidden"
+          onMouseLeave={() => setPreviewNavigationActive(false)}
         >
-          {duplicatedProducts.map((product, index) => (
-            <div
-              key={`${product.id}-${index}`}
-              className="min-w-[400px] max-w-[400px] shrink-0"
-            >
-              <StoreProductCard product={product} onViewProduct={onViewProduct} />
-            </div>
-          ))}
+          <div
+            className="flex gap-4"
+            style={{
+              width: 'max-content',
+              animation: `threadly-marquee ${durationS}s linear infinite`,
+              animationPlayState: isPaused || previewNavigationActive ? 'paused' : 'running',
+            }}
+          >
+            {duplicatedProducts.map((product, index) => (
+              <div
+                key={`${product.id}-${index}`}
+                className="w-[416px] max-w-[92vw] shrink-0"
+              >
+                <StoreProductCard
+                  product={product}
+                  onViewProduct={onViewProduct}
+                  enableHoverGallery
+                  onPreviewNavigationActiveChange={setPreviewNavigationActive}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex gap-4">
+            {products.map((product) => (
+              <div key={product.id} className="w-[416px] max-w-[92vw] shrink-0">
+                <StoreProductCard
+                  product={product}
+                  onViewProduct={onViewProduct}
+                  enableHoverGallery
+                  onPreviewNavigationActiveChange={() => undefined}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 };
 
-const normalizeProduct = (raw: any): StoreProduct | null => {
+const normalizeProduct = (raw: any): MarketplaceProduct | null => {
   const id = String(raw?.id ?? '').trim();
   if (!id) return null;
 
@@ -195,6 +253,10 @@ const normalizeProduct = (raw: any): StoreProduct | null => {
     isLowStock: totalStock > 0 && totalStock <= 5,
     isOutOfStock: totalStock <= 0,
     isFeatured: Boolean(raw?.isFeatured),
+    isActive: typeof raw?.isActive === 'boolean' ? raw.isActive : undefined,
+    publishAt: raw?.publishAt ? String(raw.publishAt) : null,
+    createdAt: raw?.createdAt ? String(raw.createdAt) : undefined,
+    updatedAt: raw?.updatedAt ? String(raw.updatedAt) : undefined,
     threadsCount: Number(raw?.threadsCount ?? 0),
     viewsCount: Number(raw?.viewsCount ?? 0),
     brand: {
@@ -206,18 +268,26 @@ const normalizeProduct = (raw: any): StoreProduct | null => {
   };
 };
 
+const isOutOfStockCustomOrderProduct = (product: MarketplaceProduct) =>
+  Boolean(
+    product.isCustomOrderOnly ||
+      product.canBagWhenOutOfStock ||
+      (product.customOrderEnabled && Number(product.totalStock ?? 0) <= 0),
+  );
+
 const MarketPlace: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const isAuth = useSelector((state: RootState) => state.user.isAuthenticated);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [products, setProducts] = useState<StoreProduct[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
+  const [products, setProducts] = useState<MarketplaceProduct[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<string>('FOR_YOU');
-  const [visibleCount, setVisibleCount] = useState(16);
+  const [visibleCount, setVisibleCount] = useState(18);
   const [heroIndex, setHeroIndex] = useState(0);
+  const [utcDayIndex, setUtcDayIndex] = useState<number>(() => getUtcDayIndex(Date.now()));
 
 
   const loadProducts = useCallback(async () => {
@@ -225,47 +295,53 @@ const MarketPlace: React.FC = () => {
     setError(null);
 
     try {
-      const feed = await marketApi.getFeed({ limit: 48 });
-      const uniqueBrandIds = Array.from(
-        new Set((feed.items ?? []).map((item) => item.brandId).filter(Boolean)),
-      ).slice(0, 12);
+      const aggregatedRows: any[] = [];
+      let cursor: string | null | undefined = null;
+      let hasNextPage = true;
+      let pagesFetched = 0;
 
+      while (
+        hasNextPage &&
+        pagesFetched < MARKET_LOAD_MAX_PAGES &&
+        aggregatedRows.length < MARKET_LOAD_MAX_ROWS
+      ) {
+        const response: { data: unknown } = await apiClient.get('/store/products/market', {
+          params: {
+            limit: MARKET_LOAD_PAGE_LIMIT,
+            sortBy: 'newest',
+            ...(cursor ? { cursor } : {}),
+          },
+        });
 
+        const payload: RawProductsPayload = unwrapApiResponse<RawProductsPayload>(
+          response.data as ApiSuccessPayload<RawProductsPayload>,
+        );
+        const rows = Array.isArray(payload?.items) ? payload.items : [];
+        aggregatedRows.push(...rows);
 
-      const productResults = await Promise.allSettled(
-        uniqueBrandIds.map(async (brandId) => {
-          const response = await apiClient.get(`/brands/${brandId}/products`, {
-            params: {
-              limit: 8,
-              sortBy: 'newest',
-              status: 'PUBLISHED',
-            },
-          });
+        hasNextPage = Boolean(payload?.hasNextPage);
+        cursor = payload?.nextCursor ?? null;
+        pagesFetched += 1;
 
-          const payload = unwrapApiResponse<RawProductsPayload>(response.data);
-          const rows = Array.isArray(payload?.items) ? payload.items : [];
-          return rows.map((row) => ({ ...row, __brandId: brandId }));
-        }),
-      );
+        if (!cursor || rows.length === 0) {
+          break;
+        }
+      }
 
-      const mapped = productResults
-        .filter((entry): entry is PromiseFulfilledResult<any[]> => entry.status === 'fulfilled')
-        .flatMap((entry) => entry.value)
+      const mapped = aggregatedRows
         .map((row) => normalizeProduct(row))
-        .filter((p): p is StoreProduct => Boolean(p));
+        .filter((p): p is MarketplaceProduct => Boolean(p));
 
-      const dedupedById = new Map<string, StoreProduct>();
+      const dedupedById = new Map<string, MarketplaceProduct>();
       for (const product of mapped) {
         if (!dedupedById.has(product.id)) {
           dedupedById.set(product.id, product);
         }
       }
 
-      const sorted = Array.from(dedupedById.values()).sort((a, b) => {
-        const aTs = Number(new Date((a as any)?.createdAt ?? 0));
-        const bTs = Number(new Date((b as any)?.createdAt ?? 0));
-        return (Number.isFinite(bTs) ? bTs : 0) - (Number.isFinite(aTs) ? aTs : 0);
-      });
+      const sorted = Array.from(dedupedById.values()).sort(
+        (a, b) => getProductRecencyTimestamp(b) - getProductRecencyTimestamp(a),
+      );
 
       setProducts(sorted);
     } catch (err: any) {
@@ -290,12 +366,11 @@ const MarketPlace: React.FC = () => {
   }, [dispatch, isAuth]);
 
   useEffect(() => {
-    if (products.length === 0) return;
-    const interval = window.setInterval(() => {
-      setHeroIndex((prev) => (prev + 1) % Math.min(products.length, 3));
-    }, 4500);
+    const updateDayIndex = () => setUtcDayIndex(getUtcDayIndex(Date.now()));
+    updateDayIndex();
+    const interval = window.setInterval(updateDayIndex, 60_000);
     return () => window.clearInterval(interval);
-  }, [products.length]);
+  }, []);
 
   const availableFilters = useMemo(() => {
     const fromProducts = new Set<string>(BASE_FILTERS);
@@ -305,8 +380,48 @@ const MarketPlace: React.FC = () => {
     return Array.from(fromProducts);
   }, [products]);
 
-  const freshDrops = useMemo(() => products.slice(0, 10), [products]);
-  const heroProducts = useMemo(() => products.slice(0, 3), [products]);
+  const recencySortedProducts = useMemo(
+    () => [...products].sort((a, b) => getProductRecencyTimestamp(b) - getProductRecencyTimestamp(a)),
+    [products],
+  );
+
+  const weeklyEligibleProducts = useMemo(() => {
+    const nowMs = Date.now();
+    return recencySortedProducts.filter((product) => {
+      const recencyTs = getProductRecencyTimestamp(product);
+      return recencyTs > 0 && nowMs - recencyTs <= FRESH_DROP_MAX_AGE_MS;
+    });
+  }, [recencySortedProducts, utcDayIndex]);
+
+  const adminFeaturedFreshDrops = useMemo(
+    () => weeklyEligibleProducts.filter((product) => product.isFeatured === true).slice(0, ADMIN_FRESH_DROPS_LIMIT),
+    [weeklyEligibleProducts],
+  );
+
+  const systemFreshDropPool = useMemo(() => {
+    const adminFeaturedIds = new Set(adminFeaturedFreshDrops.map((product) => product.id));
+    return weeklyEligibleProducts.filter((product) => !adminFeaturedIds.has(product.id));
+  }, [weeklyEligibleProducts, adminFeaturedFreshDrops]);
+
+  const systemFreshDrops = useMemo(
+    () => selectDailyBatch(systemFreshDropPool, SYSTEM_FRESH_DROPS_LIMIT, utcDayIndex),
+    [systemFreshDropPool, utcDayIndex],
+  );
+
+  const freshDrops = useMemo(() => {
+    const combined = [...adminFeaturedFreshDrops, ...systemFreshDrops];
+    return combined.slice(0, SYSTEM_FRESH_DROPS_LIMIT + ADMIN_FRESH_DROPS_LIMIT);
+  }, [adminFeaturedFreshDrops, systemFreshDrops]);
+
+  const heroProducts = useMemo(() => recencySortedProducts.slice(0, 3), [recencySortedProducts]);
+
+  useEffect(() => {
+    if (heroProducts.length === 0) return;
+    const interval = window.setInterval(() => {
+      setHeroIndex((prev) => (prev + 1) % heroProducts.length);
+    }, 4500);
+    return () => window.clearInterval(interval);
+  }, [heroProducts.length]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -324,13 +439,23 @@ const MarketPlace: React.FC = () => {
     });
   }, [products, selectedFilter]);
 
+  const outOfStockCustomOrderProducts = useMemo(
+    () => filteredProducts.filter((product) => isOutOfStockCustomOrderProduct(product)),
+    [filteredProducts],
+  );
+
+  const generalMarketProducts = useMemo(
+    () => filteredProducts.filter((product) => !isOutOfStockCustomOrderProduct(product)),
+    [filteredProducts],
+  );
+
   const visibleProducts = useMemo(
-    () => filteredProducts.slice(0, visibleCount),
-    [filteredProducts, visibleCount],
+    () => generalMarketProducts.slice(0, visibleCount),
+    [generalMarketProducts, visibleCount],
   );
 
   useEffect(() => {
-    setVisibleCount(16);
+    setVisibleCount(18);
   }, [selectedFilter]);
 
   const activeHero = heroProducts[heroIndex] ?? null;
@@ -444,9 +569,9 @@ const MarketPlace: React.FC = () => {
         {loading ? (
           <section>
             <div className="mb-3 h-7 w-40 animate-pulse rounded-lg bg-gray-200/80 dark:bg-white/10" />
-            <div className="flex gap-3 overflow-hidden">
+            <div className="flex gap-4 overflow-hidden">
               {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="min-w-[200px] max-w-[200px]">
+                <div key={index} className="min-w-[260px] max-w-[260px]">
                   <ProductCardSkeleton />
                 </div>
               ))}
@@ -524,7 +649,7 @@ const MarketPlace: React.FC = () => {
                 <ProductCardSkeleton key={index} />
               ))}
             </div>
-          ) : filteredProducts.length === 0 ? (
+          ) : generalMarketProducts.length === 0 && outOfStockCustomOrderProducts.length === 0 ? (
             <div className="rounded-2xl border border-gray-200 bg-white/70 p-10 text-center dark:border-white/10 dark:bg-white/5">
               <p className="text-3xl">🧭</p>
               <h3 className="mt-3 text-xl font-bold text-gray-900 dark:text-white">No products matched this view</h3>
@@ -541,30 +666,63 @@ const MarketPlace: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {visibleProducts.map((product) => (
-                  <motion.div
-                    key={product.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <StoreProductCard product={product} onViewProduct={setSelectedProduct} />
-                  </motion.div>
-                ))}
-              </div>
+              {visibleProducts.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                    {visibleProducts.map((product) => (
+                      <motion.div
+                        key={product.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="w-full"
+                      >
+                        <StoreProductCard product={product} onViewProduct={setSelectedProduct} />
+                      </motion.div>
+                    ))}
+                  </div>
 
-              {visibleCount < filteredProducts.length && (
-                <div className="flex justify-center pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setVisibleCount((prev) => prev + 16)}
-                    className="rounded-full border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-100 dark:border-white/15 dark:bg-white/5 dark:text-gray-100 dark:hover:bg-white/10"
-                  >
-                    Load more items
-                  </button>
+                  {visibleCount < generalMarketProducts.length && (
+                    <div className="flex justify-center pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleCount((prev) => prev + 18)}
+                        className="rounded-full border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-100 dark:border-white/15 dark:bg-white/5 dark:text-gray-100 dark:hover:bg-white/10"
+                      >
+                        Load more items
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="rounded-2xl border border-amber-300/70 bg-amber-50/80 p-5 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                  No in-stock products matched this view. Custom-order-only pieces that are temporarily out of stock are still available below.
                 </div>
               )}
+
+              {outOfStockCustomOrderProducts.length > 0 ? (
+                <section className="space-y-4 rounded-2xl border border-amber-300/70 bg-amber-50/60 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-black text-gray-900 dark:text-white">Out Of Stock, Still Open For Custom Orders</h3>
+                    <p className="text-sm text-gray-700 dark:text-amber-100/90">
+                      These products are sold out for standard checkout, but brands still accept custom-order bags. If they are not restocked within 7 days, they leave the market automatically.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                    {outOfStockCustomOrderProducts.map((product) => (
+                      <motion.div
+                        key={`custom-order-only-${product.id}`}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="w-full"
+                      >
+                        <StoreProductCard product={product} onViewProduct={setSelectedProduct} />
+                      </motion.div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
             </>
           )}
         </section>

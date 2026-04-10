@@ -1018,29 +1018,34 @@ const ProfilePage: React.FC = () => {
     const placeholders: CollectionDto[] = Object.entries(publishingStates)
       .filter(([key, state]) => {
         if (decoratedIds.has(key)) return false;
+        // Show both in-progress uploads AND failed tasks (so failed tasks surface as ghost cards)
+        if (state.status !== 'publishing' && state.status !== 'failed') return false;
+        // Require a preview URL so we have something to show in the card
         if (!state.previewUrl) return false;
-        if (state.status !== 'publishing') return false;
         const query = searchQuery.trim().toLowerCase();
         if (!query) return true;
         return (state.message ?? '').toLowerCase().includes(query);
       })
       .map(([key, state]) => {
         const nowIso = new Date(state.startedAt || Date.now()).toISOString();
+        const isFailed = state.status === 'failed';
         return {
           id: key,
           status: 'DRAFT',
-          name: state.message || 'Publishing design',
-          description: 'Uploading in background',
+          name: isFailed ? 'Publish failed' : (state.message || 'Publishing design'),
+          description: isFailed ? 'Tap retry to republish' : 'Uploading in background',
           ownerId: user?.id || '',
-          title: state.message || 'Publishing design',
+          title: isFailed ? 'Publish failed' : (state.message || 'Publishing design'),
           isPublic: true,
           visibility: 'PUBLIC',
           type: 'EVERYBODY',
           coverImage: state.previewUrl,
           createdAt: nowIso,
           updatedAt: nowIso,
-          clientStatus: 'publishing',
-          clientStatusMessage: state.message || 'Publishing your design...',
+          clientStatus: isFailed ? 'publish-failed' : 'publishing',
+          clientStatusMessage: isFailed
+            ? (state.message || 'Publish failed — tap Retry to try again')
+            : (state.message || 'Publishing your design...'),
           clientStatusMeta: {
             startedAt: state.startedAt,
             attempts: state.attempts,

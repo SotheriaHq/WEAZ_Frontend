@@ -26,7 +26,7 @@ const statusFilterOptions = [
   { value: '', label: 'All statuses' },
   { value: 'DRAFT', label: 'Draft' },
   { value: 'PENDING_PAYMENT', label: 'Pending payment' },
-  { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pending brand acceptance' },
+  { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pre-production hold' },
   { value: 'ACCEPTED', label: 'Accepted' },
   { value: 'IN_PRODUCTION', label: 'In production' },
   { value: 'READY_FOR_DISPATCH', label: 'Ready for dispatch' },

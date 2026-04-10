@@ -16,6 +16,9 @@ import type {
   NotificationTemplate,
   AdminCategory,
   AdminTagItem,
+  AdminTagLifecycleDetails,
+  AdminMeasurementPointRow,
+  AdminMeasurementPointLifecycleDetails,
   FeaturedItem,
   FeaturedSlotsSummary,
   EligibleEntity,
@@ -230,7 +233,18 @@ export const adminTaxonomyApi = {
 // ── Tags ──
 export const adminTagsApi = {
   list: (params?: Record<string, string | number>) => apiClient.get<AdminTagItem[] | Paginated<AdminTagItem>>('/tags', { params: { limit: 100, ...params } }),
-  search: (q: string, limit = 20) => apiClient.get<{ items: AdminTagItem[] }>('/tags/search', { params: { q, limit } }),
+  search: (q: string, limit = 20, params?: Record<string, string | number>) => apiClient.get<{ items: AdminTagItem[] }>('/tags/search', { params: { q, limit, ...params } }),
+  getLifecycle: (normalizedName: string) =>
+    apiClient.get<AdminTagLifecycleDetails>(`/tags/${encodeURIComponent(normalizedName)}/lifecycle`),
+  updateMetadata: (normalizedName: string, data: { displayName?: string }) =>
+    apiClient.patch<AdminTagItem>(`/tags/admin/meta/${encodeURIComponent(normalizedName)}`, data),
+  ban: (normalizedName: string, banned = true) =>
+    apiClient.post(`/tags/admin/ban/${encodeURIComponent(normalizedName)}`, null, {
+      params: { banned: banned ? 'true' : 'false' },
+    }),
+  merge: (sourceTag: string, targetTag: string) =>
+    apiClient.post('/tags/admin/merge', { sourceTag, targetTag }),
+  reindex: () => apiClient.post('/tags/admin/reindex'),
 };
 
 // ── Payouts ──
@@ -278,6 +292,23 @@ export const adminModerationApi = {
     apiClient.get('/admin/moderation/queue', { params }),
   reviewItem: (id: string, data: { action: string; reason?: string }) =>
     apiClient.patch(`/admin/moderation/items/${id}`, data),
+  listMeasurementPoints: (params?: Record<string, string | number>) =>
+    apiClient.get<{ items: AdminMeasurementPointRow[]; nextCursor?: string | null }>(
+      '/admin/moderation/measurement-points',
+      { params },
+    ),
+  getMeasurementPointLifecycle: (id: string) =>
+    apiClient.get<AdminMeasurementPointLifecycleDetails>(
+      `/admin/moderation/measurement-points/${encodeURIComponent(id)}/lifecycle`,
+    ),
+  updateMeasurementPointLifecycle: (
+    id: string,
+    data: { action: 'approve' | 'reject' | 'activate' | 'deactivate'; reason?: string },
+  ) =>
+    apiClient.patch(
+      `/admin/moderation/measurement-points/${encodeURIComponent(id)}/lifecycle`,
+      data,
+    ),
 };
 
 export const adminReviewsApi = {

@@ -49,6 +49,15 @@ export interface MediaRendererProps {
   srcSet?: string;
   sizes?: string;
 
+  /**
+   * Native browser loading hint for images.
+   * Default is omitted (browser default: eager).
+   * Only pass "lazy" for images that are definitely below the fold in a document-scroll layout.
+   * Avoid "lazy" in SPA routes — the IntersectionObserver used by the browser targets the
+   * document viewport, not custom scroll containers, so it silently skips visible images.
+   */
+  loading?: 'lazy' | 'eager';
+
   /** Optional direct access to the underlying element (for playback control, etc.) */
   imgRef?: React.Ref<HTMLImageElement>;
   videoRef?: React.Ref<HTMLVideoElement>;
@@ -83,6 +92,7 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
   onError,
   srcSet,
   sizes,
+  loading,
   imgRef,
   videoRef,
 }) => {
@@ -137,7 +147,7 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
         sizes={sizes}
         alt={alt ?? ''}
         className={elementClassName}
-        loading="lazy"
+        loading={loading}
         onLoad={onLoad}
         onError={onError}
       />

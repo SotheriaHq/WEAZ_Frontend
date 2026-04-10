@@ -1,4 +1,3 @@
-import { Check } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -12,9 +11,12 @@ import { addToCart } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { CONTENT_DISPLAY_FRAME_CLASS, CONTENT_DISPLAY_MEDIA_CLASS } from '@/components/media/contentDisplayPresets';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
+import { normalizeSizingMode } from '@/types/sizing';
+import { useActiveCustomOrderConfiguration } from '@/hooks/useActiveCustomOrderConfiguration';
 import {
   isCustomOrderOnlyProduct,
   isStrictlyOutOfStockProduct,
@@ -91,18 +93,50 @@ export default function InlineProductDetail({
   const [modalMeasurementValues, setModalMeasurementValues] = useState<Record<string, string>>({});
   const [showMeasurementModal, setShowMeasurementModal] = useState(false);
   const [savingMeasurements, setSavingMeasurements] = useState(false);
+  const [startingCustomOrder, setStartingCustomOrder] = useState(false);
+  const [customOrderComposerOpen, setCustomOrderComposerOpen] = useState(false);
   /* QR disabled — only brand profile QR codes active for now */
 
+  const sizingMode = useMemo(
+    () => normalizeSizingMode(product.sizingMode),
+    [product.sizingMode],
+  );
+
+  const isCustomOrderProduct =
+    product.customAvailable === true || product.customOrderEnabled === true;
+  const customOrderAvailability = useActiveCustomOrderConfiguration({
+    sourceType: 'PRODUCT',
+    sourceId: product.id,
+    enabled: isCustomOrderProduct,
+    unavailableReason:
+      'This product is marked custom-order enabled, but it is not configured for custom bagging yet. Ask the brand to complete custom-order setup.',
+  });
+
+  const customOrderMeasurementKeys = useMemo(() => {
+    if (customOrderAvailability.isLoading && isCustomOrderProduct) {
+      return [];
+    }
+    if (!customOrderAvailability.configuration) {
+      return null;
+    }
+    return customOrderAvailability.configuration.requiredMeasurementKeys.filter(
+      (key): key is string => typeof key === 'string' && key.trim().length > 0,
+    );
+  }, [customOrderAvailability.configuration, customOrderAvailability.isLoading, isCustomOrderProduct]);
+
   const requiredMeasurementKeys = useMemo(() => {
+    if (customOrderMeasurementKeys !== null) {
+      return customOrderMeasurementKeys;
+    }
     const raw = product.customMeasurementKeys;
     if (!Array.isArray(raw)) return [];
     return raw.filter((key): key is string => typeof key === 'string' && key.trim().length > 0);
-  }, [product.customMeasurementKeys]);
+  }, [customOrderMeasurementKeys, product.customMeasurementKeys]);
 
   const requiresMeasurements = useMemo(() => {
     if (requiredMeasurementKeys.length === 0) return false;
-    return product.customAvailable === true || product.customOrderEnabled === true;
-  }, [product.customAvailable, product.customOrderEnabled, requiredMeasurementKeys]);
+    return sizingMode === 'RTW_PLUS_FITTINGS';
+  }, [requiredMeasurementKeys, sizingMode]);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
   const isWishlisted = wishlistedIds.has(product.id);
 
@@ -198,6 +232,16 @@ export default function InlineProductDetail({
   const productImages = getProductImages();
   const currentImage = productImages[selectedImageIndex];
 
+  const moveImage = (direction: -1 | 1) => {
+    if (productImages.length <= 1) return;
+    setSelectedImageIndex((prev) => {
+      const next = prev + direction;
+      if (next < 0) return productImages.length - 1;
+      if (next >= productImages.length) return 0;
+      return next;
+    });
+  };
+
   const formatCurrency = (price?: number | null) => {
     if (price === null || price === undefined) return '—';
     try {
@@ -232,8 +276,23 @@ export default function InlineProductDetail({
     .map((value) => (typeof value === 'string' ? value.trim() : ''))
     .filter(Boolean);
   const isOwnProduct = viewerCandidates.some((viewerId) => ownerCandidates.includes(viewerId));
-  const isCustomOrderProduct =
-    product.customAvailable === true || product.customOrderEnabled === true;
+  const customOrderUnavailableReason = customOrderAvailability.isAvailable
+    ? null
+    : customOrderAvailability.isLoading
+      ? 'Checking custom-order availability...'
+      : customOrderAvailability.unavailableReason ||
+        'This product is not configured for custom orders yet. Ask the brand to complete custom-order setup.';
+  const brandProfileId = useMemo(() => {
+    const candidates = [product.brandId, product.brand?.id]
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .filter(Boolean);
+    return candidates[0] ?? null;
+  }, [product.brand?.id, product.brandId]);
+
+  const handleOpenBrandStore = () => {
+    if (!brandProfileId) return;
+    navigate(`/profile/${encodeURIComponent(brandProfileId)}?tab=Store`);
+  };
 
   const availableSizes = useMemo(() => {
     if (!hasVariants) return sizes;
@@ -343,7 +402,7 @@ export default function InlineProductDetail({
           quantity: 1,
           selectedSize: selectedSize || undefined,
           selectedColor: selectedColor || undefined,
-          sizingMode: product.sizingMode || 'NONE',
+          sizingMode,
           requiredMeasurementKeys,
           sizeFitData:
             Object.keys(normalizedMeasurements).length > 0
@@ -400,6 +459,40 @@ export default function InlineProductDetail({
     });
   };
 
+  const handleStartCustomOrder = async () => {
+    if (isOwnProduct) {
+      toast.info('You cannot start a custom order on your own product.');
+      return;
+    }
+    if (!isAuth) {
+      toast.info('Please sign in to start a custom order.');
+      navigate('/login');
+      return;
+    }
+    if (startingCustomOrder) {
+      return;
+    }
+    if (!customOrderAvailability.isAvailable || !customOrderAvailability.configurationId) {
+      toast.error(
+        customOrderUnavailableReason ||
+          'This product is not configured for custom orders yet. Ask the brand to complete custom-order setup.',
+      );
+      return;
+    }
+
+    try {
+      setStartingCustomOrder(true);
+      setCustomOrderComposerOpen(true);
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+          'Unable to open custom-order checkout.',
+      );
+    } finally {
+      setStartingCustomOrder(false);
+    }
+  };
+
   const handleModalSaveAndAdd = async () => {
     const normalized = normalizeMeasurements(modalMeasurementValues);
     const missing = requiredMeasurementKeys.filter((key) => !normalized[key]);
@@ -426,7 +519,7 @@ export default function InlineProductDetail({
           quantity: 1,
           selectedSize: selectedSize || undefined,
           selectedColor: selectedColor || undefined,
-          sizingMode: product.sizingMode || 'NONE',
+          sizingMode,
           requiredMeasurementKeys,
           sizeFitData: { measurements: normalized },
         }),
@@ -477,6 +570,33 @@ export default function InlineProductDetail({
                 <span className="text-gray-400 text-lg">No image available</span>
               </div>
             )}
+
+            {productImages.length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    moveImage(-1);
+                  }}
+                  className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/90 text-lg text-gray-900 shadow-lg backdrop-blur transition hover:scale-[1.03] dark:border-white/10 dark:bg-black/55 dark:text-white"
+                  aria-label="Show previous image"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    moveImage(1);
+                  }}
+                  className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/90 text-lg text-gray-900 shadow-lg backdrop-blur transition hover:scale-[1.03] dark:border-white/10 dark:bg-black/55 dark:text-white"
+                  aria-label="Show next image"
+                >
+                  →
+                </button>
+              </>
+            ) : null}
             
             {/* Zoom hint */}
             <div className="absolute bottom-4 right-4 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
@@ -518,7 +638,18 @@ export default function InlineProductDetail({
           {/* Header */}
           <div>
             {brandName && (
-              <p className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-1">{brandName}</p>
+              brandProfileId ? (
+                <button
+                  type="button"
+                  onClick={handleOpenBrandStore}
+                  className="mb-1 text-sm font-medium text-purple-600 transition-colors hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+                  title={`Open ${brandName} catalog`}
+                >
+                  {brandName}
+                </button>
+              ) : (
+                <p className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-1">{brandName}</p>
+              )
             )}
             <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">{product.name}</h1>
             {isCustomOrderProduct && (
@@ -615,7 +746,12 @@ export default function InlineProductDetail({
                       title={color}
                     >
                       {selectedColor === color && (
-                        <Check size={16} className={`absolute inset-0 m-auto ${color === 'White' || color === 'Yellow' ? 'text-gray-900' : 'text-white'}`} />
+                        <span
+                          className={`absolute inset-0 m-auto flex h-full w-full items-center justify-center text-sm ${color === 'White' || color === 'Yellow' ? 'text-gray-900' : 'text-white'}`}
+                          aria-hidden="true"
+                        >
+                          ✅
+                        </span>
                       )}
                     </button>
                   );
@@ -647,20 +783,41 @@ export default function InlineProductDetail({
           </div>
 
           {/* Action Buttons */}
+          {!isOwnProduct && isCustomOrderProduct ? (
+            <div className={`mb-3 grid gap-3 ${!isCustomOrderOnly ? 'sm:grid-cols-2' : ''}`}>
+              <span className="block w-full" title={customOrderUnavailableReason ?? undefined}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleStartCustomOrder();
+                  }}
+                  disabled={startingCustomOrder || customOrderAvailability.isLoading || !customOrderAvailability.isAvailable}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-purple-300/60 bg-purple-50 text-sm font-semibold text-purple-700 transition-all hover:border-purple-400 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-200 dark:hover:bg-purple-500/20"
+                >
+                  <span aria-hidden="true">✂️</span>
+                  {startingCustomOrder ? 'Bagging as custom order...' : 'Custom Bag It'}
+                </button>
+              </span>
+              {!isCustomOrderOnly ? (
+                <button
+                  onClick={handleAddToBag}
+                  disabled={isStrictlyOutOfStock || startingCustomOrder}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:scale-100"
+                >
+                  <span aria-hidden="true">🛍️</span>
+                  Bag it
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex gap-3 pt-4">
-            {!isOwnProduct ? (
-              <button
-                type="button"
-                onClick={handleAddToBag}
-                disabled={isStrictlyOutOfStock}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:scale-100"
-              >
-                <span aria-hidden="true">🛍️</span>
-                {isCustomOrderOnly ? 'Bag as custom order' : 'Bag it'}
-              </button>
-            ) : (
+            {isOwnProduct ? (
               <div className="flex-1 flex items-center justify-center px-6 py-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm font-medium text-gray-600 dark:text-gray-300">
                 Your product
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center px-6 py-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm font-medium text-gray-600 dark:text-gray-300">
+                {isCustomOrderOnly ? 'Custom-order only' : 'Bag the item above to continue'}
               </div>
             )}
             {!isOwnProduct ? (
@@ -791,6 +948,36 @@ export default function InlineProductDetail({
           </OverlayPortal>
         )}
       </AnimatePresence>
+
+      {customOrderComposerOpen && customOrderAvailability.configurationId ? (
+        <OverlayPortal>
+          <div
+            className="fixed inset-0 z-layer-modal flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                setCustomOrderComposerOpen(false);
+              }
+            }}
+          >
+            <div className="relative h-[92vh] w-[98vw] max-w-[1280px] overflow-y-auto rounded-3xl border border-white/20 bg-white/90 p-4 text-slate-900 shadow-2xl dark:bg-[#0d0b12] dark:text-white">
+              <button
+                type="button"
+                aria-label="Close custom order composer"
+                onClick={() => setCustomOrderComposerOpen(false)}
+                className="sticky top-2 float-right z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/80 text-slate-700 shadow-sm hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+              >
+                <span aria-hidden="true" className="text-base">×</span>
+              </button>
+              <CustomOrderComposerPage
+                embedded
+                configurationIdOverride={customOrderAvailability.configurationId}
+                onClose={() => setCustomOrderComposerOpen(false)}
+                onOrderCreated={() => setCustomOrderComposerOpen(false)}
+              />
+            </div>
+          </div>
+        </OverlayPortal>
+      ) : null}
 
       {/* Product QR modal disabled — only brand profile QR codes active */}
     </div>

@@ -314,11 +314,11 @@ export default function AdminBrandVerificationReviewPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <AdminBreadcrumb segments={[{ label: 'Brands', path: '/admin/brands' }, { label: 'Verification Review' }]} />
-      <section className="rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_28%),linear-gradient(135deg,_#f9fcff,_#ffffff_48%,_#f7f7ff)] p-6 shadow-[0_30px_80px_-40px_rgba(14,165,233,0.35)]">
+      <section className="min-w-0 rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_28%),linear-gradient(135deg,_#f9fcff,_#ffffff_48%,_#f7f7ff)] p-6 shadow-[0_30px_80px_-40px_rgba(14,165,233,0.35)]">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div>
+          <div className="min-w-0">
             <Link
               to="/admin/verification"
               className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700"
@@ -328,7 +328,7 @@ export default function AdminBrandVerificationReviewPage() {
             <h1 className="mt-3 text-3xl font-black tracking-tight text-gray-900">
               {details.name || 'Unnamed brand'}
             </h1>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 break-words text-sm text-gray-600">
               {details.owner?.firstName} {details.owner?.lastName} •{' '}
               {details.owner?.email}
             </p>
@@ -372,8 +372,8 @@ export default function AdminBrandVerificationReviewPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="space-y-6">
+      <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <div className="min-w-0 space-y-6">
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="rounded-[1.5rem] border border-gray-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
@@ -467,8 +467,8 @@ export default function AdminBrandVerificationReviewPage() {
               ) : null}
             </div>
 
-            <div className="mt-5 grid gap-5 xl:grid-cols-[240px_1fr]">
-              <div className="space-y-3">
+            <div className="mt-5 grid gap-5 2xl:grid-cols-[240px_minmax(0,1fr)]">
+              <div className="min-w-0 space-y-3">
                 {(details.documents ?? []).map((document) => (
                   <button
                     key={document.key}
@@ -504,7 +504,7 @@ export default function AdminBrandVerificationReviewPage() {
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-[1.5rem] border border-gray-200 bg-gray-50">
+              <div className="min-w-0 overflow-hidden rounded-[1.5rem] border border-gray-200 bg-gray-50">
                 {selectedDocument?.signedUrl ? (
                   isPdfDocument(selectedDocument) ? (
                     <iframe
@@ -540,7 +540,7 @@ export default function AdminBrandVerificationReviewPage() {
           </section>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
               Request information

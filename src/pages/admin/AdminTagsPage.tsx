@@ -1,23 +1,91 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { adminTagsApi } from '@/api/AdminApi';
-import type { AdminTagItem } from '@/types/admin';
+import type { AdminTagItem, AdminTagLifecycleDetails } from '@/types/admin';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { unwrapApiResponse } from '@/types/auth';
 import useDebounce from '@/hooks/useDebounce';
+import { toast } from 'sonner';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import Modal from '@/components/ui/Modal';
+import UniversalSelect from '@/components/forms/UniversalSelect';
+
+type TagSortMode = 'recent' | 'popular' | 'last-used' | 'name-asc';
+type TagStateFilter = 'all' | 'live' | 'rejected' | 'alias' | 'dormant';
+
+const TAG_SORT_OPTIONS = [
+  { value: 'recent', label: 'Sort: Newest first' },
+  { value: 'popular', label: 'Sort: Most used' },
+  { value: 'last-used', label: 'Sort: Last used' },
+  { value: 'name-asc', label: 'Sort: Name A-Z' },
+];
+
+const TAG_STATE_OPTIONS = [
+  { value: 'all', label: 'Stage: All lifecycle states' },
+  { value: 'live', label: 'Stage: Live' },
+  { value: 'rejected', label: 'Stage: Rejected' },
+  { value: 'alias', label: 'Stage: Alias' },
+  { value: 'dormant', label: 'Stage: Dormant' },
+];
+
+const getLifecycleStage = (tag: AdminTagItem): 'LIVE' | 'REJECTED' | 'ALIAS' | 'DORMANT' => {
+  if (tag.lifecycleStage) return tag.lifecycleStage;
+  if (tag.isBanned) return 'REJECTED';
+  if (tag.aliasOfTagName) return 'ALIAS';
+  if (tag.usageCount > 0) return 'LIVE';
+  return 'DORMANT';
+};
+
+const lifecycleStageLabel = (stage: 'LIVE' | 'REJECTED' | 'ALIAS' | 'DORMANT') => {
+  if (stage === 'REJECTED') return '🚫 Rejected';
+  if (stage === 'ALIAS') return '↪️ Alias';
+  if (stage === 'DORMANT') return '🌙 Dormant';
+  return '✅ Live';
+};
+
+const lifecycleStageClass = (stage: 'LIVE' | 'REJECTED' | 'ALIAS' | 'DORMANT') => {
+  if (stage === 'REJECTED') {
+    return 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200';
+  }
+  if (stage === 'ALIAS') {
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200';
+  }
+  if (stage === 'DORMANT') {
+    return 'bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-200';
+  }
+  return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200';
+};
 
 const AdminTagsPage: React.FC = () => {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query.trim(), 350);
+  const [sortMode, setSortMode] = useState<TagSortMode>('recent');
+  const [stateFilter, setStateFilter] = useState<TagStateFilter>('all');
+  const { isSuperAdmin } = useAdminPermissions();
+  const [updatingTag, setUpdatingTag] = useState<string | null>(null);
+  const [selectedTagName, setSelectedTagName] = useState<string | null>(null);
+  const [selectedTagLifecycle, setSelectedTagLifecycle] =
+    useState<AdminTagLifecycleDetails | null>(null);
+  const [selectedTagLoading, setSelectedTagLoading] = useState(false);
+  const [selectedTagBusy, setSelectedTagBusy] = useState(false);
+  const [displayNameDraft, setDisplayNameDraft] = useState('');
 
   const fetchPage = useCallback(
     async (cursor?: string, limit?: number) => {
       if (debouncedQuery.length > 0) {
-        const res = await adminTagsApi.search(debouncedQuery, limit ?? 50);
+        const res = await adminTagsApi.search(debouncedQuery, limit ?? 50, {
+          includeBanned: 'true',
+          sort: sortMode,
+          state: stateFilter,
+        });
         const data = unwrapApiResponse<{ items?: AdminTagItem[] }>(res.data as any);
         return { items: data?.items ?? [] };
       }
-      const params: Record<string, string | number> = {};
+      const params: Record<string, string | number> = {
+        sort: sortMode,
+        state: stateFilter,
+        includeBanned: 'true',
+      };
       if (cursor) params.cursor = cursor;
       if (limit) params.limit = limit;
       const res = await adminTagsApi.list(params);
@@ -27,24 +95,191 @@ const AdminTagsPage: React.FC = () => {
       if (Array.isArray(data)) return { items: data };
       return { items: data.items ?? [], nextCursor: data.nextCursor };
     },
-    [debouncedQuery],
+    [debouncedQuery, sortMode, stateFilter],
   );
 
-  const { items: tags, isLoading: loading, isLoadingMore, hasMore, error, sentinelRef } =
+  const { items: tags, isLoading: loading, isLoadingMore, hasMore, error, sentinelRef, reset } =
     useInfiniteScroll<AdminTagItem>(fetchPage, { limit: 50 });
+
+  useEffect(() => {
+    reset();
+  }, [debouncedQuery, sortMode, stateFilter, reset]);
+
+  const formatDate = useCallback((value?: string | null) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '—';
+    return parsed.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }, []);
+
+  const formatDateTime = useCallback((value?: string | null) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '—';
+    return parsed.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, []);
+
+  const loadTagLifecycle = useCallback(async (tagName: string) => {
+    setSelectedTagLoading(true);
+    try {
+      const response = await adminTagsApi.getLifecycle(tagName);
+      const payload = unwrapApiResponse<AdminTagLifecycleDetails>(response.data as any);
+      setSelectedTagLifecycle(payload);
+      setDisplayNameDraft(payload?.displayName ?? '');
+    } catch (error: any) {
+      setSelectedTagLifecycle(null);
+      toast.error(error?.response?.data?.message || 'Failed to load tag lifecycle');
+    } finally {
+      setSelectedTagLoading(false);
+    }
+  }, []);
+
+  const openTagLifecycle = useCallback(
+    (tagName: string) => {
+      setSelectedTagName(tagName);
+      void loadTagLifecycle(tagName);
+    },
+    [loadTagLifecycle],
+  );
+
+  const closeTagLifecycle = useCallback(() => {
+    setSelectedTagName(null);
+    setSelectedTagLifecycle(null);
+    setDisplayNameDraft('');
+    setSelectedTagLoading(false);
+    setSelectedTagBusy(false);
+  }, []);
+
+  const handleToggleTagBan = useCallback(
+    async (tag: AdminTagItem) => {
+      if (!isSuperAdmin || updatingTag) return;
+
+      setUpdatingTag(tag.name);
+      try {
+        await adminTagsApi.ban(tag.name, !tag.isBanned);
+        toast.success(
+          tag.isBanned
+            ? `#${tag.name} allowed globally.`
+            : `#${tag.name} rejected from global use.`,
+        );
+        if (selectedTagLifecycle?.name === tag.name) {
+          await loadTagLifecycle(tag.name);
+        }
+        reset();
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to update tag status');
+      } finally {
+        setUpdatingTag(null);
+      }
+    },
+    [isSuperAdmin, loadTagLifecycle, reset, selectedTagLifecycle?.name, updatingTag],
+  );
+
+  const handleSaveDisplayName = useCallback(async () => {
+    if (!isSuperAdmin || !selectedTagName) return;
+    setSelectedTagBusy(true);
+    try {
+      await adminTagsApi.updateMetadata(selectedTagName, {
+        displayName: displayNameDraft,
+      });
+      toast.success('Tag display name saved.');
+      await loadTagLifecycle(selectedTagName);
+      reset();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to save display name');
+    } finally {
+      setSelectedTagBusy(false);
+    }
+  }, [displayNameDraft, isSuperAdmin, loadTagLifecycle, reset, selectedTagName]);
+
+  const handleLifecycleStatusToggle = useCallback(async () => {
+    if (!isSuperAdmin || !selectedTagLifecycle) return;
+    setSelectedTagBusy(true);
+    try {
+      await adminTagsApi.ban(selectedTagLifecycle.name, !selectedTagLifecycle.isBanned);
+      toast.success(
+        selectedTagLifecycle.isBanned
+          ? `#${selectedTagLifecycle.name} allowed globally.`
+          : `#${selectedTagLifecycle.name} rejected from global use.`,
+      );
+      await loadTagLifecycle(selectedTagLifecycle.name);
+      reset();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to update tag status');
+    } finally {
+      setSelectedTagBusy(false);
+    }
+  }, [isSuperAdmin, loadTagLifecycle, reset, selectedTagLifecycle]);
+
+  const canModerate = isSuperAdmin;
+
+  const lifecycleSummary = useMemo(() => {
+    if (!selectedTagLifecycle) return null;
+    const entityTotal = Object.values(selectedTagLifecycle.entityCounts ?? {}).reduce(
+      (sum, count) => sum + Number(count || 0),
+      0,
+    );
+    return {
+      entityTotal,
+      users: selectedTagLifecycle.usage?.distinctUsersCount ?? 0,
+      collections: Number(selectedTagLifecycle.entityCounts?.COLLECTION ?? 0),
+      products: Number(selectedTagLifecycle.entityCounts?.PRODUCT ?? 0),
+      brands:
+        Number(selectedTagLifecycle.entityCounts?.BRAND ?? 0) +
+        Number(selectedTagLifecycle.entityCounts?.USER_BRAND ?? 0),
+    };
+  }, [selectedTagLifecycle]);
 
   return (
     <div className="space-y-6">
       <AdminBreadcrumb segments={[{ label: 'Tags' }]} />
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🏷️ Tags</h1>
 
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search tags..."
-        className="w-full max-w-md px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
-      />
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Review queue</p>
+            <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
+              Open any tag to review lifecycle history, usage actors, aliases, and moderation actions.
+            </p>
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {debouncedQuery
+              ? 'Filtered search results'
+              : `Sorted by ${sortMode.replace('-', ' ')}`}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_260px]">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search tags..."
+          className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+        />
+        <UniversalSelect
+          value={sortMode}
+          onChange={(value) => setSortMode(value as TagSortMode)}
+          options={TAG_SORT_OPTIONS}
+        />
+        <UniversalSelect
+          value={stateFilter}
+          onChange={(value) => setStateFilter(value as TagStateFilter)}
+          options={TAG_STATE_OPTIONS}
+        />
+      </div>
 
       {error && <div className="text-red-500 text-sm">{error}</div>}
 
@@ -52,23 +287,95 @@ const AdminTagsPage: React.FC = () => {
         <div className="text-gray-500 text-sm">Loading...</div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full table-fixed text-xs sm:text-sm">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-gray-500 dark:text-gray-400">
-                <th className="py-3 px-3">Tag</th>
-                <th className="py-3 px-3">Usage Count</th>
+                <th className="w-[24%] px-2 py-2.5">Tag</th>
+                <th className="w-[17%] px-2 py-2.5">Lifecycle</th>
+                <th className="w-[10%] px-2 py-2.5">Usage</th>
+                <th className="w-[13%] px-2 py-2.5">Last Used</th>
+                <th className="w-[13%] px-2 py-2.5">Created</th>
+                <th className="w-[23%] px-2 py-2.5">Manage</th>
               </tr>
             </thead>
             <tbody>
               {tags.map((tag) => (
                 <tr key={tag.name} className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-2.5 px-3 font-mono text-sm text-gray-900 dark:text-white">#{tag.name}</td>
-                  <td className="py-2.5 px-3 text-gray-600 dark:text-gray-400">{tag.usageCount}</td>
+                  <td className="px-2 py-2 align-top">
+                    <button
+                      type="button"
+                      onClick={() => openTagLifecycle(tag.name)}
+                      className="block truncate font-mono text-sm font-semibold text-indigo-700 hover:text-indigo-600 dark:text-indigo-300 dark:hover:text-indigo-200"
+                      title={`#${tag.name}`}
+                    >
+                      #{tag.name}
+                    </button>
+                    {tag.displayName && tag.displayName !== tag.name ? (
+                      <div
+                        className="mt-0.5 truncate text-[11px] leading-4 text-gray-500 dark:text-gray-400"
+                        title={`Display: ${tag.displayName}`}
+                      >
+                        Display: {tag.displayName}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="px-2 py-2 align-top">
+                    {(() => {
+                      const stage = getLifecycleStage(tag);
+                      return (
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${lifecycleStageClass(stage)}`}
+                        >
+                          {lifecycleStageLabel(stage)}
+                        </span>
+                      );
+                    })()}
+                    {tag.aliasOfTagName ? (
+                      <div
+                        className="mt-1 truncate text-[11px] leading-4 text-gray-500 dark:text-gray-400"
+                        title={`Alias of #${tag.aliasOfTagName}`}
+                      >
+                        Alias of #{tag.aliasOfTagName}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="px-2 py-2 align-top text-gray-600 dark:text-gray-400">{tag.usageCount}</td>
+                  <td className="px-2 py-2 align-top text-[11px] text-gray-600 dark:text-gray-400 sm:text-xs">
+                    <span className="whitespace-nowrap">{formatDate(tag.lastUsedAt)}</span>
+                  </td>
+                  <td className="px-2 py-2 align-top text-[11px] text-gray-600 dark:text-gray-400 sm:text-xs">
+                    <span className="whitespace-nowrap">{formatDate(tag.createdAt)}</span>
+                  </td>
+                  <td className="px-2 py-2 align-top">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => openTagLifecycle(tag.name)}
+                        className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15"
+                      >
+                        Open lifecycle
+                      </button>
+                      {canModerate ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleToggleTagBan(tag)}
+                          disabled={updatingTag === tag.name}
+                          className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${tag.isBanned ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-rose-600 text-white hover:bg-rose-500'} disabled:cursor-not-allowed disabled:opacity-60`}
+                        >
+                          {updatingTag === tag.name
+                            ? 'Working...'
+                            : tag.isBanned
+                              ? '✅ Allow'
+                              : '🚫 Reject'}
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
                 </tr>
               ))}
               {tags.length === 0 && (
                 <tr>
-                  <td colSpan={2} className="py-8 text-center text-gray-500">No tags found</td>
+                  <td colSpan={6} className="py-8 text-center text-gray-500">No tags found</td>
                 </tr>
               )}
             </tbody>
@@ -78,6 +385,239 @@ const AdminTagsPage: React.FC = () => {
           {!hasMore && tags.length > 0 && <div className="text-center text-gray-400 text-xs py-4">End of list</div>}
         </div>
       )}
+
+      <Modal
+        open={Boolean(selectedTagName)}
+        onClose={closeTagLifecycle}
+        title={selectedTagName ? `Tag lifecycle • #${selectedTagName}` : 'Tag lifecycle'}
+        size="lg"
+        backdropStyle="light"
+      >
+        {selectedTagLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-12 animate-pulse rounded-xl bg-slate-200/70 dark:bg-white/10"
+              />
+            ))}
+          </div>
+        ) : !selectedTagLifecycle ? (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+            Unable to load lifecycle details for this tag.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Canonical tag
+                  </div>
+                  <div className="font-mono text-lg font-bold text-slate-900 dark:text-white">
+                    #{selectedTagLifecycle.name}
+                  </div>
+                </div>
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${lifecycleStageClass(selectedTagLifecycle.lifecycleStage)}`}
+                >
+                  {lifecycleStageLabel(selectedTagLifecycle.lifecycleStage)}
+                </span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Display name
+                  </label>
+                  <input
+                    value={displayNameDraft}
+                    onChange={(event) => setDisplayNameDraft(event.target.value)}
+                    disabled={!canModerate || selectedTagBusy}
+                    placeholder="Optional display label"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 disabled:opacity-60 dark:border-white/10 dark:bg-black/20 dark:text-white"
+                  />
+                </div>
+                <div className="text-xs text-slate-600 dark:text-slate-300">
+                  <div>
+                    Created: {formatDateTime(selectedTagLifecycle.createdAt)}
+                  </div>
+                  <div className="mt-1">
+                    Last used: {formatDateTime(selectedTagLifecycle.lastUsedAt)}
+                  </div>
+                  <div className="mt-1">
+                    Updated: {formatDateTime(selectedTagLifecycle.updatedAt)}
+                  </div>
+                </div>
+              </div>
+
+              {canModerate ? (
+                <div className="mt-3 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveDisplayName()}
+                    disabled={selectedTagBusy}
+                    className="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                  >
+                    Save label
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleLifecycleStatusToggle()}
+                    disabled={selectedTagBusy}
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold text-white disabled:opacity-60 ${selectedTagLifecycle.isBanned ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'}`}
+                  >
+                    {selectedTagLifecycle.isBanned ? 'Allow globally' : 'Reject globally'}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            {lifecycleSummary ? (
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+                <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="text-slate-500 dark:text-slate-400">Usage count</div>
+                  <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                    {selectedTagLifecycle.usageCount}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="text-slate-500 dark:text-slate-400">Users</div>
+                  <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                    {lifecycleSummary.users}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="text-slate-500 dark:text-slate-400">Collections</div>
+                  <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                    {lifecycleSummary.collections}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="text-slate-500 dark:text-slate-400">Products</div>
+                  <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                    {lifecycleSummary.products}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="text-slate-500 dark:text-slate-400">Entities</div>
+                  <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                    {lifecycleSummary.entityTotal}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {selectedTagLifecycle.aliasOf ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                This tag is currently aliased to #{selectedTagLifecycle.aliasOf.name}.
+              </div>
+            ) : null}
+
+            {selectedTagLifecycle.aliases.length > 0 ? (
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Aliases pointing here
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedTagLifecycle.aliases.map((alias) => (
+                    <span
+                      key={alias.name}
+                      className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-mono text-slate-700 dark:bg-white/10 dark:text-slate-200"
+                    >
+                      #{alias.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Top usage actors
+                </div>
+                <div className="mt-2 max-h-52 overflow-y-auto space-y-1 pr-1">
+                  {selectedTagLifecycle.usage.users.length === 0 ? (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">No usage actors yet.</div>
+                  ) : (
+                    selectedTagLifecycle.usage.users.slice(0, 25).map((actor) => (
+                      <div
+                        key={actor.userId}
+                        className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-xs dark:border-white/10 dark:bg-black/20"
+                      >
+                        <div className="font-semibold text-slate-800 dark:text-slate-100">
+                          {actor.brandFullName || actor.username || actor.userId}
+                        </div>
+                        <div className="mt-0.5 text-slate-500 dark:text-slate-400">
+                          Used {actor.usageCount} times · Last tagged {formatDate(actor.latestTaggedAt)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Lifecycle timeline
+                </div>
+                <div className="mt-2 max-h-52 overflow-y-auto space-y-1 pr-1">
+                  {selectedTagLifecycle.timeline.length === 0 ? (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">No lifecycle events.</div>
+                  ) : (
+                    selectedTagLifecycle.timeline.map((event) => (
+                      <div
+                        key={event.id}
+                        className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-xs dark:border-white/10 dark:bg-black/20"
+                      >
+                        <div className="font-semibold text-slate-800 dark:text-slate-100">{event.summary}</div>
+                        <div className="mt-0.5 text-slate-500 dark:text-slate-400">
+                          {formatDateTime(event.at)} · {event.type}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Usage entities
+              </div>
+              {selectedTagLifecycle.usage.entities.length === 0 ? (
+                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  No entities found for this tag.
+                </div>
+              ) : (
+                <div className="mt-2 max-h-60 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200/80 text-left text-slate-500 dark:border-white/10 dark:text-slate-400">
+                        <th className="py-2 pr-2">Entity</th>
+                        <th className="py-2 pr-2">Type</th>
+                        <th className="py-2 pr-2">Usage</th>
+                        <th className="py-2">Last tagged</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedTagLifecycle.usage.entities.slice(0, 60).map((entity) => (
+                        <tr key={`${entity.entityType}:${entity.entityId}`} className="border-b border-slate-100/80 dark:border-white/5">
+                          <td className="py-2 pr-2 text-slate-800 dark:text-slate-100">{entity.label}</td>
+                          <td className="py-2 pr-2 text-slate-500 dark:text-slate-400">{entity.entityType}</td>
+                          <td className="py-2 pr-2 text-slate-700 dark:text-slate-200">{entity.usageCount}</td>
+                          <td className="py-2 text-slate-500 dark:text-slate-400">{formatDate(entity.latestTaggedAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

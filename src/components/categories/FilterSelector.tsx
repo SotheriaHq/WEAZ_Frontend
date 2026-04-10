@@ -202,7 +202,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                       )}
                     </div>
                     {hasSelection && (
-                      <p className="mt-0.5 truncate text-[11px] text-gray-500 dark:text-gray-400">
+                      <p className="mt-0.5 text-[11px] leading-4 whitespace-normal break-words text-gray-500 dark:text-gray-400">
                         {selectedLabels.slice(0, 2).join(", ")}
                         {selectedLabels.length > 2
                           ? ` +${selectedLabels.length - 2}`

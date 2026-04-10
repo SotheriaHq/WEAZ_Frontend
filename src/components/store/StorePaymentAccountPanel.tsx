@@ -152,7 +152,7 @@ const BankOptionIcon: React.FC<{ bankName: string }> = ({ bankName }) => {
           src={logoUrl}
           alt={`${bankName} logo`}
           className="h-full w-full object-contain"
-          loading="lazy"
+          loading="eager"
           referrerPolicy="no-referrer"
           onError={() => setLogoFailed(true)}
         />

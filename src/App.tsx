@@ -23,7 +23,6 @@ import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
 import CheckoutPage from './pages/checkout/CheckoutPage';
 import OrderConfirmation from './pages/checkout/OrderConfirmation';
 import PaymentReturnPage from './pages/checkout/PaymentReturnPage';
-import OrderAccessResolverPage from './pages/orders/OrderAccessResolverPage';
 // Placeholder pages for features under development
 import {
   NotFound,
@@ -73,6 +72,7 @@ const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
 const CustomOrdersIndexPage = lazy(() => import('./pages/custom-orders/CustomOrdersIndexPage'));
 const CustomOrderComposerPage = lazy(() => import('./pages/custom-orders/CustomOrderComposerPage'));
 const CustomOrderDetailPage = lazy(() => import('./pages/custom-orders/CustomOrderDetailPage'));
+const CustomOrderCheckoutResumePage = lazy(() => import('./pages/custom-orders/CustomOrderCheckoutResumePage'));
 const MessagingManagementPage = lazy(() => import('./pages/messages/MessagingManagementPage'));
 
 // Admin pages — lazy loaded for code splitting
@@ -85,7 +85,6 @@ const AdminBrandVerificationReviewPage = lazy(() => import('./pages/admin/AdminB
 const AdminContentManagementPage = lazy(() => import('./pages/admin/AdminContentManagementPage'));
 const AdminTaxonomyPage = lazy(() => import('./pages/admin/AdminTaxonomyPage'));
 const AdminTagsPage = lazy(() => import('./pages/admin/AdminTagsPage'));
-const AdminMeasurementsPage = lazy(() => import('./pages/admin/AdminMeasurementsPage'));
 const AdminFinancePage = lazy(() => import('./pages/admin/AdminFinancePage'));
 const AdminPayoutsPage = lazy(() => import('./pages/admin/AdminPayoutsPage'));
 const AdminOrderDetailPage = lazy(() => import('./pages/admin/AdminOrderDetailPage'));
@@ -104,7 +103,34 @@ const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const EmailVerifyPage = lazy(() => import('./pages/EmailVerify'));
 
 const AppRouteFallback: React.FC = () => (
-  <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">Loading page...</div>
+  /* Full-page skeleton shown while the lazy chunk is downloading.
+     Matches the general two-column layout (sidebar + masonry grid) so the
+     transition to the real page is seamless rather than a white flash. */
+  <div className="flex min-h-screen bg-white dark:bg-gray-950">
+    {/* Sidebar skeleton */}
+    <div className="hidden md:flex flex-col gap-4 w-16 px-2 py-6 border-r border-gray-100 dark:border-gray-800">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="w-10 h-10 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse mx-auto" />
+      ))}
+    </div>
+    {/* Content skeleton — masonry-like card grid */}
+    <div className="flex-1 p-4">
+      <div className="flex gap-2 mb-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-8 w-24 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse" />
+        ))}
+      </div>
+      <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <div
+            key={i}
+            className="break-inside-avoid mb-3 rounded-2xl bg-gray-200 dark:bg-gray-800 animate-pulse"
+            style={{ height: `${180 + (i % 3) * 60}px` }}
+          />
+        ))}
+      </div>
+    </div>
+  </div>
 );
 
 const AdminProfileRouteGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -491,8 +517,8 @@ const router = createBrowserRouter([
           },
           { path: '/custom-orders', element: <Layout><CustomOrdersIndexPage /></Layout> },
           { path: '/custom-orders/new', element: <Layout><CustomOrderComposerPage /></Layout> },
+          { path: '/custom-orders/resume/:token', element: <Layout><CustomOrderCheckoutResumePage /></Layout> },
           { path: '/custom-orders/:orderId', element: <Layout><CustomOrderDetailPage /></Layout> },
-          { path: '/orders/access/:orderId', element: <Layout><OrderAccessResolverPage /></Layout> },
           { path: '/orders/:orderId', element: <Layout><OrderDetail /></Layout> },
         ],
       },
@@ -573,7 +599,7 @@ const router = createBrowserRouter([
           { path: 'collections', element: <Navigate to="/admin/content?tab=collections" replace /> },
           { path: 'taxonomy', element: <RequireAdminPermission permission="TAXONOMY_READ"><AdminTaxonomyPage /></RequireAdminPermission> },
           { path: 'tags', element: <RequireAdminPermission permission="TAGS_READ"><AdminTagsPage /></RequireAdminPermission> },
-          { path: 'measurements', element: <RequireAdminPermission permission="MEASUREMENTS_READ"><AdminMeasurementsPage /></RequireAdminPermission> },
+          { path: 'measurements', element: <Navigate to="/admin/taxonomy?tab=measurements" replace /> },
           { path: 'finance', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminFinancePage /></RequireAdminPermission> },
           { path: 'finance/payments/:reference', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminFinancePage /></RequireAdminPermission> },
           { path: 'orders/:orderId', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminOrderDetailPage /></RequireAdminPermission> },

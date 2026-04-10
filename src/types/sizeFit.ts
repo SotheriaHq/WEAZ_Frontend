@@ -50,7 +50,8 @@ export interface SizeFitProfile {
 
 export interface SizeFitShareDto {
   profileUserId?: string;
-  targetUserId: string;
+  targetUserIdentifier: string;
+  targetUserId?: string;
   canReshare?: boolean;
   note?: string;
 }

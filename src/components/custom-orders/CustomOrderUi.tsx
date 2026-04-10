@@ -182,7 +182,10 @@ export const CustomOrderBadge: React.FC<{ value?: string | null; type?: 'status'
     return <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">—</span>;
   }
 
-  const text = type === 'stage' ? stageLabelMap[value as CustomOrderProgressStage] ?? prettify(value) : prettify(value);
+  const text =
+    type === 'stage'
+      ? stageLabelMap[value as CustomOrderProgressStage] ?? humanizeCustomOrderToken(value)
+      : humanizeCustomOrderToken(value);
   const tone = statusToneMap[value] ?? 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200';
   return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>{text}</span>;
 };

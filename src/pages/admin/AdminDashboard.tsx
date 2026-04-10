@@ -355,7 +355,7 @@ const AdminDashboard: React.FC = () => {
             items: [
               { label: 'Taxonomy', route: '/admin/taxonomy' },
               { label: 'Tags', route: '/admin/tags' },
-              { label: 'Measurements', route: '/admin/measurements' },
+              { label: 'Measurements', route: '/admin/taxonomy?tab=measurements' },
               { label: 'Settings', route: '/admin/settings' },
             ],
           },

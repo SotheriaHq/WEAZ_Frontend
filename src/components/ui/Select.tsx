@@ -26,7 +26,7 @@ const variantStyles: Record<SelectVariant, string> = {
     border rounded-xl
     text-gray-900 dark:text-white
     shadow-sm
-    focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500
+    focus:outline-none focus:ring-0 focus:border-transparent
     transition-all duration-200
     appearance-none pr-10 cursor-pointer
   `,
@@ -38,7 +38,7 @@ const variantStyles: Record<SelectVariant, string> = {
     text-gray-700 dark:text-gray-200
     shadow-sm
     hover:border-purple-300 dark:hover:border-purple-500/50
-    focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500
+    focus:outline-none focus:ring-0 focus:border-transparent
     transition-all duration-200
     cursor-pointer
     appearance-none
@@ -51,7 +51,7 @@ const variantStyles: Record<SelectVariant, string> = {
     rounded-md
     text-gray-600 dark:text-gray-300
     hover:bg-gray-50 dark:hover:bg-white/5
-    focus:outline-none focus:ring-1 focus:ring-purple-500/30
+    focus:outline-none focus:ring-0 focus:border-transparent
     transition-all duration-150
     cursor-pointer
     appearance-none
@@ -136,7 +136,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       ${variantStyles[variant]}
       ${
         error
-          ? "border-red-500 dark:border-red-500 focus:ring-red-500/50 focus:border-red-500"
+          ? "border-red-500 dark:border-red-500"
           : ""
       }
       ${disabled ? "opacity-60 cursor-not-allowed bg-gray-100 dark:bg-zinc-800/50" : ""}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useDispatch, useSelector } from 'react-redux';
@@ -115,18 +116,25 @@ export const EndUserProfile: React.FC = () => {
   const [displayChartFamily, setDisplayChartFamily] = useState<CustomOrderChartFamily>('UK');
   const [computedSize, setComputedSize] = useState<string | null>(null);
   const [computedAlphaSize, setComputedAlphaSize] = useState<string | null>(null);
-  const [computedGuidance, setComputedGuidance] = useState<string | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
   const [chartSaving, setChartSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarActionsOpen, setAvatarActionsOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const avatarActionsRef = useRef<HTMLDivElement | null>(null);
 
   const isOwner = !id || currentUser?.id === id;
   const profileId = id ?? currentUser?.id;
   const availableTabs = useMemo(() => (isOwner ? ['Saved', 'Patches', 'Orders'] : ['Patches']), [isOwner]);
   const [activeTab, setActiveTab] = useState<string>(isOwner ? 'Saved' : 'Patches');
   const [ordersSelection, setOrdersSelection] = useState<OrdersPanelSelection | null>(null);
+  const hasAvatarImage = Boolean(
+    avatarPreviewUrl ||
+      profile?.profileImage ||
+      profile?.profileImageFile ||
+      (isOwner && (currentUser?.profileImage || currentUser?.profileImageFile)),
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -218,7 +226,6 @@ export const EndUserProfile: React.FC = () => {
       } catch (err) {
         if (active) {
           setComputedSize(null);
-          setComputedGuidance(null);
         }
         console.error('Failed to load display chart/computed size', err);
       } finally {
@@ -244,7 +251,6 @@ export const EndUserProfile: React.FC = () => {
     );
     setComputedSize(recommendation.computedSize);
     setComputedAlphaSize(recommendation.alphaSize);
-    setComputedGuidance(recommendation.conversionGuidance);
   }, [displayChartFamily, isOwner, sizeFitProfile?.measurementGender, sizeFitProfile?.measurements]);
 
   useEffect(() => {
@@ -258,6 +264,20 @@ export const EndUserProfile: React.FC = () => {
       }
     };
   }, [avatarPreviewUrl]);
+
+  useEffect(() => {
+    if (!avatarActionsOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (avatarActionsRef.current && event.target instanceof Node && avatarActionsRef.current.contains(event.target)) {
+        return;
+      }
+      setAvatarActionsOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [avatarActionsOpen]);
 
   const handleShareProfile = useCallback(async () => {
     if (!profile) return;
@@ -358,7 +378,7 @@ export const EndUserProfile: React.FC = () => {
   );
 
   const handleShareSizeFit = useCallback(
-    async (payload: { targetUserId: string; canReshare?: boolean; note?: string }) => {
+    async (payload: { targetUserIdentifier: string; canReshare?: boolean; note?: string }) => {
       setSizeFitSaving(true);
       try {
         const result = await SizeFitApi.share(payload);
@@ -420,6 +440,7 @@ export const EndUserProfile: React.FC = () => {
   );
 
   const handleTriggerAvatarUpload = useCallback(() => {
+    setAvatarActionsOpen(false);
     avatarInputRef.current?.click();
   }, []);
 
@@ -506,6 +527,7 @@ export const EndUserProfile: React.FC = () => {
 
   const handleRemoveAvatar = useCallback(async () => {
     if (!currentUser) return;
+    setAvatarActionsOpen(false);
     setAvatarUploading(true);
     try {
       await apiClient.delete('/uploads/profile-image');
@@ -544,20 +566,48 @@ export const EndUserProfile: React.FC = () => {
     }
   }, [currentUser, dispatch]);
 
+  const handleAvatarButtonClick = useCallback(() => {
+    if (avatarUploading) return;
+
+    if (!hasAvatarImage) {
+      handleTriggerAvatarUpload();
+      return;
+    }
+
+    setAvatarActionsOpen((current) => !current);
+  }, [avatarUploading, handleTriggerAvatarUpload, hasAvatarImage]);
+
   if (loading) {
     return (
-      <div className="p-4 sm:p-6">
-        <div className="max-w-screen-xl mx-auto space-y-6">
-          <div className="animate-pulse">
-            <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-2xl mb-6" />
-            <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-              <div className="h-24 w-24 rounded-3xl bg-gray-200 dark:bg-gray-700" />
-              <div className="flex-1 space-y-2">
-                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4" />
-              </div>
-            </div>
+      <div className="mx-auto w-full max-w-[1280px] animate-pulse px-4 py-6">
+        {/* Avatar + name skeleton */}
+        <div className="flex items-center gap-4 mb-6">
+          <div className="h-32 w-32 shrink-0 rounded-2xl bg-gray-200 dark:bg-white/10 sm:h-44 sm:w-44" />
+          <div className="flex-1 space-y-2.5">
+            <div className="h-5 w-2/5 rounded-lg bg-gray-200 dark:bg-white/10" />
+            <div className="h-3.5 w-1/4 rounded-lg bg-gray-200 dark:bg-white/10" />
+            <div className="h-3 w-1/3 rounded-lg bg-gray-200 dark:bg-white/10" />
           </div>
+        </div>
+        {/* Actions bar skeleton */}
+        <div className="mb-5 flex gap-2">
+          {[90, 80, 110, 90, 80].map((w, i) => (
+            <div key={i} className="h-9 rounded-full bg-gray-200 dark:bg-white/10" style={{ width: w }} />
+          ))}
+        </div>
+        {/* Size card skeleton */}
+        <div className="mb-6 h-28 rounded-2xl bg-gray-200 dark:bg-white/10" />
+        {/* Tab bar skeleton */}
+        <div className="mb-5 flex gap-6 border-b border-gray-200 dark:border-white/10 pb-px">
+          {[70, 80, 70].map((w, i) => (
+            <div key={i} className="h-4 rounded bg-gray-200 dark:bg-white/10" style={{ width: w }} />
+          ))}
+        </div>
+        {/* Content skeleton grid */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="aspect-[4/5] rounded-2xl bg-gray-200 dark:bg-white/10" />
+          ))}
         </div>
       </div>
     );
@@ -565,13 +615,12 @@ export const EndUserProfile: React.FC = () => {
 
   if (error || !profile) {
     return (
-      <div className="p-4 sm:p-6">
-        <div className="max-w-screen-xl mx-auto text-center py-12">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Profile Not Found</h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            {error || 'The requested profile could not be found.'}
-          </p>
-        </div>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
+        <span className="text-5xl" aria-hidden="true">😕</span>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Profile Not Found</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {error || 'The requested profile could not be found.'}
+        </p>
       </div>
     );
   }
@@ -590,44 +639,40 @@ export const EndUserProfile: React.FC = () => {
   });
   const avatarFallback = getAvatarFallback(fullName, profile.username);
   const alphaFitLabel = describeAlphaFit(computedAlphaSize);
-  const tabs = availableTabs.map((tab) => ({
-    key: tab,
-    icon: tab === 'Saved' ? '🗂️' : '🪡',
-  }));
   const profileActions: ProfileAction[] = [
     {
       key: 'edit',
-      icon: '\u270F\uFE0F',
+      icon: '✏️',
       label: 'Edit',
       onClick: () => setIsQuickEditOpen(true),
     },
     {
       key: 'share',
-      icon: '\uD83D\uDD17',
+      icon: '🔗',
       label: 'Share',
       onClick: handleShareProfile,
     },
     {
       key: 'fits',
-      icon: '\uD83D\uDCCF',
-      label: 'Custom Fits',
+      icon: '📐',
+      label: 'My Fits',
       onClick: () => setIsSizeFitOpen(true),
     },
     {
       key: 'quick-share',
-      icon: '\u2197\uFE0F',
+      icon: '↗️',
       label: 'Quick Share',
       onClick: () => setIsQuickShareOpen(true),
     },
     {
       key: 'qr',
-      icon: '\uD83D\uDDF3',
+      icon: '🗳️',
       label: 'QR Code',
       onClick: () => setIsQrOpen(true),
     },
     {
       key: 'update-fits',
-      icon: '\u26A0\uFE0F',
+      icon: '⚠️',
       label: 'Update Fits',
       onClick: () => setIsReminderDialogOpen(true),
       pulse: true,
@@ -635,205 +680,304 @@ export const EndUserProfile: React.FC = () => {
     },
   ];
 
+  const TAB_ICONS: Record<string, string> = { Saved: '🗂️', Patches: '🪡', Orders: '📦' };
+
   return (
-    <div className="relative p-3 sm:p-5 lg:p-6">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-gradient-to-b from-fuchsia-500/10 via-indigo-500/5 to-transparent dark:from-fuchsia-400/10 dark:via-purple-500/10" />
-      <div className="mx-auto w-full max-w-[1280px]">
-        <section className="rounded-[2rem] p-4 sm:p-6">
-          <div className="flex flex-col gap-5">
-            {/* Profile info row: avatar + name on left, computed size on right */}
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center sm:gap-8">
-                <div className="relative h-32 w-32 shrink-0 rounded-xl bg-white/70 p-1 shadow-sm dark:bg-white/5 sm:h-36 sm:w-36">
-                  <ImageWithFallback
-                    src={avatar.src}
-                    fileId={avatar.fileId}
-                    alt={fullName}
-                    fit="cover"
-                    rounded="xl"
-                    fallbackName={avatarFallback}
-                    containerClassName="h-full w-full"
-                    className="h-full w-full rounded-lg object-cover"
-                    maxHeightClassName="max-h-full"
-                  />
-                  {avatarUploading ? (
-                    <div className="absolute inset-1 flex items-center justify-center rounded-lg bg-black/55">
-                      <div className="rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-slate-900">
-                        Uploading image...
-                      </div>
-                    </div>
-                  ) : null}
-                  {isOwner ? (
-                    <button
-                      type="button"
-                      onClick={handleTriggerAvatarUpload}
-                      disabled={avatarUploading}
-                      className="absolute bottom-2 right-2 rounded-full bg-white/95 px-3 py-2 text-sm font-semibold leading-none shadow-sm transition hover:scale-105 disabled:opacity-60 dark:bg-zinc-900"
-                      title="Upload profile image"
-                    >
-                      ✏️
-                    </button>
-                  ) : (
-                    <div className="absolute bottom-2 right-2 rounded-full bg-white/95 px-3 py-2 text-xs font-semibold leading-none shadow-sm dark:bg-zinc-900">
-                      {profile.profileVisibility === 'LOCKED' ? '🔒' : '🌐'}
-                    </div>
-                  )}
-                  {isOwner ? (
-                    <div className="absolute left-2 top-2 flex items-center gap-1">
-                      {avatar.src ? (
-                        <button
-                          type="button"
-                          onClick={() => void handleRemoveAvatar()}
-                          disabled={avatarUploading}
-                          className="rounded-full bg-white/95 px-3 py-2 text-xs font-semibold leading-none shadow-sm dark:bg-zinc-900"
-                          title="Remove profile image"
-                        >
-                          🗑️
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
+    <div className="relative min-h-screen">
+      {/* Ambient gradient — top of page */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px] bg-gradient-to-b from-fuchsia-500/10 via-purple-500/5 to-transparent dark:from-fuchsia-400/8 dark:via-purple-500/8" />
 
-                <div className="min-w-0 max-w-3xl">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <h1 className="truncate text-2xl font-black tracking-tight text-gray-900 dark:text-white sm:text-3xl">
-                      {fullName}
-                    </h1>
-                  </div>
-                  <p className="mt-1 truncate text-sm font-medium italic text-gray-500 dark:text-gray-400 sm:text-base">
-                    @{profile.username}
-                  </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-                    {profile.location ? <span>{profile.location}</span> : null}
-                    {profile.location ? (joinLabel ? <span className="h-1.5 w-1.5 rounded-full bg-gray-400/80 dark:bg-gray-500" /> : null) : null}
-                    {joinLabel ? <span>{joinLabel}</span> : null}
-                  </div>
-                  {isOwner ? (
-                    <div className="mt-4 flex flex-wrap items-center gap-3">
-                      <div className="rounded-full border border-emerald-300/60 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
-                        {avatarUploading ? 'Uploading your new profile image now.' : 'Profile photo updates appear here immediately.'}
-                      </div>
+      <div className="mx-auto w-full max-w-[1280px] px-3 pb-28 pt-4 sm:px-5 sm:pt-6 xl:pb-10">
+
+        {/* ── PROFILE HEADER ── */}
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
+          className="mb-5"
+        >
+          {/* Top row: avatar + identity + inline size widget */}
+          <div className="flex items-start gap-4 sm:gap-6">
+            {/* Avatar */}
+            <div className="relative shrink-0">
+              <div className="relative h-32 w-32 overflow-hidden rounded-xl sm:h-44 sm:w-44">
+                <ImageWithFallback
+                  src={avatar.src}
+                  fileId={avatar.fileId}
+                  alt={fullName}
+                  fit="cover"
+                  rounded="xl"
+                  fallbackName={avatarFallback}
+                  containerClassName="h-full w-full"
+                  className="h-full w-full rounded-[inherit] object-cover"
+                  maxHeightClassName="max-h-full"
+                />
+                {avatarUploading && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-[inherit] bg-black/55">
+                    <div className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-slate-900">
+                      Uploading…
                     </div>
-                  ) : null}
-                </div>
+                  </div>
+                )}
               </div>
-
-              {/* Computed size — displayed parallel to profile image on desktop */}
+              {/* Avatar action button */}
               {isOwner ? (
-                <div className="w-full max-w-sm shrink-0 lg:max-w-xs">
-                  {/* Minimal chart tabs */}
-                  <div className="mb-3 inline-flex flex-wrap gap-1 rounded-2xl bg-gray-100/70 p-1 dark:bg-white/5">
-                    {DISPLAY_CHART_OPTIONS.map((option) => {
-                      const active = displayChartFamily === option.value;
-                      return (
+                <div ref={avatarActionsRef} className="absolute -bottom-1.5 -right-1.5 z-20">
+                  <button
+                    type="button"
+                    onClick={handleAvatarButtonClick}
+                    disabled={avatarUploading}
+                    className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-purple-600 text-sm shadow-md transition hover:bg-purple-700 active:scale-95 disabled:opacity-60 dark:border-zinc-900"
+                    title={hasAvatarImage ? 'Profile photo actions' : 'Upload profile photo'}
+                    aria-label={hasAvatarImage ? 'Profile photo actions' : 'Upload profile photo'}
+                    aria-expanded={avatarActionsOpen}
+                    aria-haspopup={hasAvatarImage}
+                  >
+                    📷
+                  </button>
+
+                  <AnimatePresence>
+                    {avatarActionsOpen ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                        transition={{ duration: 0.16 }}
+                        className="absolute right-0 top-full mt-2 w-44 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
+                      >
                         <button
-                          key={option.value}
                           type="button"
-                          onClick={() => void handleDisplayChartChange(option.value)}
-                          disabled={chartSaving}
-                          className={`rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition sm:text-xs ${
-                            active
-                              ? 'bg-indigo-600 text-white shadow-sm'
-                              : 'text-gray-500 hover:text-gray-800 hover:bg-white dark:text-gray-400 dark:hover:text-white dark:hover:bg-zinc-800'
-                          }`}
-                          aria-pressed={active}
+                          onClick={handleTriggerAvatarUpload}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-gray-800 transition hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-white/5"
                         >
-                          {option.label
-                            .replace('Nigeria', 'NG')
-                            .replace('UK-Nigeria Hybrid', 'UK-NG')
-                            .replace('US-Nigeria Hybrid', 'US-NG')}
+                          <span aria-hidden="true">📷</span>
+                          Change photo
                         </button>
-                      );
-                    })}
-                  </div>
-                  {/* Computed size display */}
-                  <div className="rounded-2xl border border-indigo-200/70 bg-indigo-50/70 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/10">
-                    <div className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-500/80 dark:text-indigo-300/80">Computed size</div>
-                    <div className="mt-1 text-2xl font-black text-indigo-950 dark:text-indigo-100 sm:text-3xl">
-                      {chartLoading ? 'Loading…' : computedSize || '—'}
-                    </div>
-                    <div className="mt-3 rounded-xl bg-white/80 px-3 py-2.5 dark:bg-slate-950/40">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-500/70 dark:text-indigo-300/70">
-                        Alpha fit
-                      </div>
-                      <div className="mt-0.5 text-lg font-bold text-indigo-900 dark:text-indigo-100">
-                        {alphaFitLabel ?? 'Not available yet'}
-                      </div>
-                    </div>
-                    <div className="mt-3 text-xs text-indigo-900/75 dark:text-indigo-200/80">
-                      {computedGuidance || 'Computed from your live measurement profile.'}
-                    </div>
-                    {sizeFitProfile?.missingBaselineKeys?.length ? (
-                      <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
-                        Update: {sizeFitProfile.missingBaselineKeys
-                          .map((key) => key.replace(/^WOMEN_|^MEN_|^UNISEX_/g, '').replace(/_/g, ' '))
-                          .join(', ')}
-                      </div>
+                        {hasAvatarImage ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleRemoveAvatar()}
+                            className="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-left text-sm font-medium text-rose-600 transition hover:bg-rose-50 dark:border-white/5 dark:hover:bg-rose-500/10"
+                          >
+                            <span aria-hidden="true">🗑️</span>
+                            Remove photo
+                          </button>
+                        ) : null}
+                      </motion.div>
                     ) : null}
-                  </div>
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <div className="absolute -bottom-1.5 -right-1.5 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-white/90 text-sm shadow-sm dark:border-zinc-900 dark:bg-zinc-800">
+                  {profile.profileVisibility === 'LOCKED' ? '🔒' : '🌐'}
+                </div>
+              )}
+            </div>
+
+            {/* Identity */}
+            <div className="min-w-0 flex-1 pt-0.5">
+              <h1 className="truncate text-xl font-black tracking-tight text-gray-900 dark:text-white sm:text-3xl">
+                {fullName}
+              </h1>
+              <p className="mt-0.5 truncate text-sm text-gray-500 dark:text-gray-400">
+                @{profile.username}
+              </p>
+              {(profile.location || joinLabel) ? (
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-500 dark:text-gray-400 sm:text-xs">
+                  {profile.location ? (
+                    <span className="flex items-center gap-0.5">
+                      <span aria-hidden="true">📍</span> {profile.location}
+                    </span>
+                  ) : null}
+                  {profile.location && joinLabel ? <span className="h-1 w-1 rounded-full bg-gray-400" /> : null}
+                  {joinLabel ? <span>{joinLabel}</span> : null}
+                </div>
+              ) : null}
+
+              {/* Upload status pill — only shown while uploading */}
+              {avatarUploading ? (
+                <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-1 text-[11px] font-semibold text-purple-800 dark:bg-purple-500/15 dark:text-purple-200">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-purple-500" />
+                  Uploading photo…
                 </div>
               ) : null}
             </div>
 
+            {/* ── Compact inline size widget (owner only) ── */}
             {isOwner ? (
-              <ProfileActionsBar actions={profileActions} />
+              <div className="hidden shrink-0 flex-col items-end gap-2 sm:flex">
+                {/* Chart family tabs */}
+                <div className="flex gap-0.5 rounded-lg bg-indigo-50 p-0.5 dark:bg-indigo-950/40">
+                  {DISPLAY_CHART_OPTIONS.slice(0, 4).map((option) => {
+                    const active = displayChartFamily === option.value;
+                    const shortLabel = option.label
+                      .replace('Nigeria', 'NG')
+                      .replace('UK-Nigeria Hybrid', 'UK-NG')
+                      .replace('US-Nigeria Hybrid', 'US-NG')
+                      .replace('Asia', 'Asia');
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => void handleDisplayChartChange(option.value)}
+                        disabled={chartSaving}
+                        aria-pressed={active}
+                        className={`rounded-md px-2 py-1 text-[10px] font-bold transition ${
+                          active
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-indigo-500 hover:bg-indigo-100 dark:text-indigo-300 dark:hover:bg-indigo-900/40'
+                        }`}
+                      >
+                        {shortLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Size number */}
+                <div className="text-right">
+                  <div className="text-3xl font-black leading-none text-indigo-900 dark:text-indigo-100">
+                    {chartLoading ? '…' : computedSize || '—'}
+                  </div>
+                  {alphaFitLabel ? (
+                    <div className="mt-0.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300">
+                      {alphaFitLabel}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             ) : null}
+          </div>
 
-            <div className="mt-2 flex items-center gap-4 overflow-x-auto scrollbar-hide px-1 sm:gap-8">
-              {tabs.map(({ key }) => {
-                const active = activeTab === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setActiveTab(key)}
-                    className={`inline-flex items-center gap-2 pb-3.5 text-sm font-semibold transition-colors sm:text-base ${
-                      active
-                        ? 'border-b-2 border-fuchsia-500 text-gray-900 dark:text-white'
-                        : 'border-b-2 border-transparent text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-                    }`}
-                  >
-                    <span className="leading-none">
-                      {key === 'Saved' ? '🗂️' : key === 'Orders' ? '📦' : '🪡'}
-                    </span>
-                    <span className="whitespace-nowrap">{key}</span>
-                  </button>
-                );
-              })}
+          {/* ── ACTION BAR ── */}
+          {isOwner ? (
+            <div className="mt-4">
+              <ProfileActionsBar actions={profileActions} />
             </div>
-          </div>
-        </section>
+          ) : null}
 
-        {activeTab === 'Orders' && isOwner ? (
-          <div className="mt-6">
-            <OrdersPanel
-              mode="full"
-              initialSelection={ordersSelection}
-              onSelectionHandled={() => setOrdersSelection(null)}
-            />
+          {/* ── SIZE/FIT strip (mobile: compact inline below actions) ── */}
+          {isOwner ? (
+            <div className="mt-3 sm:hidden">
+              <div className="flex items-center gap-3 rounded-2xl border border-indigo-200/60 bg-indigo-50/70 px-4 py-2.5 dark:border-indigo-500/20 dark:bg-indigo-950/30">
+                {/* Chart tabs */}
+                <div className="flex gap-0.5 rounded-md bg-white/60 p-0.5 dark:bg-white/10">
+                  {DISPLAY_CHART_OPTIONS.slice(0, 4).map((option) => {
+                    const active = displayChartFamily === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => void handleDisplayChartChange(option.value)}
+                        disabled={chartSaving}
+                        aria-pressed={active}
+                        className={`rounded px-1.5 py-0.5 text-[9px] font-bold transition ${
+                          active ? 'bg-indigo-600 text-white' : 'text-indigo-500 dark:text-indigo-300'
+                        }`}
+                      >
+                        {option.label.replace('Nigeria', 'NG').replace('UK-Nigeria Hybrid', 'UK-NG').replace('US-Nigeria Hybrid', 'US-NG')}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Size number */}
+                <div className="text-2xl font-black leading-none text-indigo-900 dark:text-indigo-100">
+                  {chartLoading ? '…' : computedSize || '—'}
+                </div>
+                {alphaFitLabel ? (
+                  <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">
+                    {alphaFitLabel}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </motion.section>
+
+        {/* ── TAB BAR ── */}
+        <div className="sticky top-16 z-10 -mx-3 mb-4 border-b border-gray-200/70 bg-white/80 px-3 backdrop-blur-md dark:border-white/10 dark:bg-[#0a0812]/80 sm:-mx-5 sm:px-5">
+          <div className="flex items-center gap-0 overflow-x-auto scrollbar-hide">
+            {availableTabs.map((key) => {
+              const active = activeTab === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveTab(key)}
+                  className={`relative flex min-w-0 flex-shrink-0 items-center gap-2 px-4 py-3.5 text-sm font-semibold transition-colors sm:px-6 ${
+                    active
+                      ? 'text-fuchsia-600 dark:text-fuchsia-400'
+                      : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`}
+                >
+                  <span className="text-base leading-none">{TAB_ICONS[key]}</span>
+                  <span className="whitespace-nowrap">{key}</span>
+                  {active && (
+                    <motion.div
+                      layoutId="profile-tab-indicator"
+                      className="absolute inset-x-0 bottom-0 h-0.5 rounded-t-full bg-fuchsia-500"
+                      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
-        ) : (
-          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <div>
-              {activeTab === 'Saved' ? (
-                isOwner ? <SavedTab isOwner={isOwner} /> : <PatchesTab isOwner={isOwner} profileVisibility={profile.profileVisibility} />
+        </div>
+
+        {/* ── TAB CONTENT ── */}
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          {/* Main column */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+              {activeTab === 'Orders' && isOwner ? (
+                <OrdersPanel
+                  mode="full"
+                  initialSelection={ordersSelection}
+                  onSelectionHandled={() => setOrdersSelection(null)}
+                />
+              ) : activeTab === 'Saved' ? (
+                isOwner
+                  ? <SavedTab isOwner={isOwner} />
+                  : <PatchesTab isOwner={isOwner} profileVisibility={profile.profileVisibility} />
               ) : (
                 <PatchesTab isOwner={isOwner} profileVisibility={profile.profileVisibility} />
               )}
-            </div>
-            {isOwner ? (
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Desktop sidebar column: orders summary */}
+          {isOwner && activeTab !== 'Orders' ? (
+            <div className="hidden lg:flex lg:flex-col lg:gap-5">
               <OrdersPanel
                 onViewAll={(selection) => {
                   setOrdersSelection(selection ?? null);
                   setActiveTab('Orders');
                 }}
               />
-            ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Mobile: orders summary panel shown below content when on non-orders tab */}
+        {isOwner && activeTab !== 'Orders' ? (
+          <div className="mt-5 lg:hidden">
+            <OrdersPanel
+              onViewAll={(selection) => {
+                setOrdersSelection(selection ?? null);
+                setActiveTab('Orders');
+              }}
+            />
           </div>
-        )}
+        ) : null}
       </div>
 
+      {/* ── MODALS ── */}
       <EndUserQuickEditModal
         open={isQuickEditOpen}
         saving={savingQuickEdit}
@@ -876,17 +1020,25 @@ export const EndUserProfile: React.FC = () => {
 
       {isReminderDialogOpen ? (
         <OverlayPortal>
-          <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-layer-modal flex items-center justify-center p-4"
+          >
             <button
               type="button"
-              className="absolute inset-0 z-0 bg-black/55 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/55 backdrop-blur-sm"
               onClick={() => setIsReminderDialogOpen(false)}
-              aria-label="Close reminder details"
+              aria-label="Close"
             />
-            <section className="relative z-10 w-full max-w-md rounded-3xl border border-white/40 dark:border-white/10 bg-[color:var(--surface-primary)]/95 dark:bg-zinc-900/95 shadow-2xl p-5">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white">{'\u26A0\uFE0F'} Size/Fit Update Reminder
-              </h3>
-              <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+            <motion.section
+              initial={{ scale: 0.95, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              className="relative z-10 w-full max-w-sm rounded-3xl border border-white/30 bg-white/95 p-5 shadow-2xl dark:border-white/10 dark:bg-zinc-900/95"
+            >
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">⚠️ Size/Fit Update Reminder</h3>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
                 Keep your size/fits current every {sizeFitProfile?.requireUpdateEveryDays ?? 14} days.
                 Your latest fitting values are attached to new orders so fulfillment stays accurate.
               </p>
@@ -894,23 +1046,20 @@ export const EndUserProfile: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsReminderDialogOpen(false)}
-                  className="rounded-xl border border-gray-300/80 dark:border-white/20 px-3 py-2 text-xs font-semibold"
+                  className="rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/15 dark:text-gray-200 dark:hover:bg-white/5"
                 >
                   Close
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsReminderDialogOpen(false);
-                    setIsSizeFitOpen(true);
-                  }}
-                  className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 text-xs font-semibold"
+                  onClick={() => { setIsReminderDialogOpen(false); setIsSizeFitOpen(true); }}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 active:scale-95"
                 >
                   Open Fits
                 </button>
               </div>
-            </section>
-          </div>
+            </motion.section>
+          </motion.div>
         </OverlayPortal>
       ) : null}
 
