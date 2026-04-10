@@ -116,6 +116,12 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   const paymentInitKeyRef = useRef<string | null>(null);
   const configurationId = configurationIdOverride ?? searchParams.get('configurationId');
 
+  const dismissEmbeddedComposer = useCallback(() => {
+    if (embedded) {
+      onClose?.();
+    }
+  }, [embedded, onClose]);
+
   useEffect(() => {
     setCustomerName([profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim());
   }, [profile?.firstName, profile?.lastName]);
@@ -514,6 +520,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
 
       // ALREADY_PLACED: order exists (e.g. idempotent retry). Navigate to it.
       if (createdOrderId) {
+        dismissEmbeddedComposer();
         navigate(`/custom-orders/${createdOrderId}`);
         onOrderCreated?.(createdOrderId);
         return;
@@ -565,6 +572,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
         await openPaystackInline(paymentInit.providerAccessCode, {
           onSuccess: (response) => {
             setSubmitting(false);
+            dismissEmbeddedComposer();
             navigate(
               `/checkout/payment-return?reference=${encodeURIComponent(response.reference)}&gateway=${encodeURIComponent(paymentInit.gateway || 'PAYSTACK')}`,
             );
@@ -586,6 +594,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       if (paymentInit.authorizationUrl) {
         const fallbackUrl = new URL(paymentInit.authorizationUrl, window.location.origin);
         if (fallbackUrl.origin === window.location.origin) {
+          dismissEmbeddedComposer();
           window.location.assign(fallbackUrl.toString());
           return;
         }
@@ -595,6 +604,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
 
       const nextReference = encodeURIComponent(paymentInit.reference);
       const nextGateway = encodeURIComponent(paymentInit.gateway || 'PAYSTACK');
+      dismissEmbeddedComposer();
       navigate(`/checkout/payment-return?reference=${nextReference}&gateway=${nextGateway}`);
       return;
 

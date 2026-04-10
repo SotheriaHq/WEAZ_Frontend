@@ -378,6 +378,11 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     navigate(`/profile/${item.brandId}?tab=Store`);
   };
 
+  const handleCustomOrderComposerDismiss = () => {
+    setCustomComposerOpen(false);
+    onClose();
+  };
+
   const handleTogglePatch = async () => {
     if (!item.brandId) return;
     if (!canPatchBrand) {
@@ -780,8 +785,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               <CustomOrderComposerPage
                 embedded
                 configurationIdOverride={customConfigurationId}
-                onClose={() => setCustomComposerOpen(false)}
-                onOrderCreated={() => setCustomComposerOpen(false)}
+                onClose={handleCustomOrderComposerDismiss}
+                onOrderCreated={handleCustomOrderComposerDismiss}
               />
             </div>
           </div>
