@@ -49,7 +49,6 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
   contextType,
   orderId,
   customOrderId,
-  targetUrl,
   orderDetailUrl,
   status,
   mutedUntil,

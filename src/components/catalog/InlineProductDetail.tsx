@@ -783,21 +783,24 @@ export default function InlineProductDetail({
           </div>
 
           {/* Action Buttons */}
-          {!isOwnProduct && isCustomOrderProduct ? (
-            <div className={`mb-3 grid gap-3 ${!isCustomOrderOnly ? 'sm:grid-cols-2' : ''}`}>
-              <span className="block w-full" title={customOrderUnavailableReason ?? undefined}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleStartCustomOrder();
-                  }}
-                  disabled={startingCustomOrder || customOrderAvailability.isLoading || !customOrderAvailability.isAvailable}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-purple-300/60 bg-purple-50 text-sm font-semibold text-purple-700 transition-all hover:border-purple-400 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-200 dark:hover:bg-purple-500/20"
-                >
-                  <span aria-hidden="true">✂️</span>
-                  {startingCustomOrder ? 'Bagging as custom order...' : 'Custom Bag It'}
-                </button>
-              </span>
+          {!isOwnProduct ? (
+            <div className={`mb-3 grid gap-3 ${isCustomOrderProduct && !isCustomOrderOnly ? 'sm:grid-cols-2' : ''}`}>
+              {isCustomOrderProduct ? (
+                <span className="block w-full" title={customOrderUnavailableReason ?? undefined}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleStartCustomOrder();
+                    }}
+                    disabled={startingCustomOrder || customOrderAvailability.isLoading || !customOrderAvailability.isAvailable}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-purple-300/60 bg-purple-50 text-sm font-semibold text-purple-700 transition-all hover:border-purple-400 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-200 dark:hover:bg-purple-500/20"
+                  >
+                    <span aria-hidden="true">✂️</span>
+                    {startingCustomOrder ? 'Bagging as custom order...' : 'Custom Bag It'}
+                  </button>
+                </span>
+              ) : null}
+
               {!isCustomOrderOnly ? (
                 <button
                   onClick={handleAddToBag}

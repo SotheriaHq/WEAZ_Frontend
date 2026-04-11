@@ -217,7 +217,7 @@ const CustomOrdersIndexPage: React.FC = () => {
           Profile
         </button>
         <span>/</span>
-        <button type="button" onClick={() => navigate('/orders')} className="font-semibold text-slate-800 dark:text-white">
+        <button type="button" onClick={() => navigate('/profile?tab=orders')} className="font-semibold text-slate-800 dark:text-white">
           Orders
         </button>
         <span>/</span>

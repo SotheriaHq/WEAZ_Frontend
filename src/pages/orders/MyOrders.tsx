@@ -416,7 +416,7 @@ const MyOrders: React.FC = () => {
                             className="text-[11px] font-semibold text-amber-600 hover:underline dark:text-amber-400"
                             onClick={(event) => {
                               event.stopPropagation();
-                              navigate(`/checkout/confirmation?reference=${encodeURIComponent(order.paymentReference!)}`);
+                              navigate(`/bag/confirmation?reference=${encodeURIComponent(order.paymentReference!)}`);
                             }}
                           >
                             Resume payment

@@ -372,9 +372,9 @@ export const CustomOrderMediaPreview: React.FC<{ src?: string | null; title: str
           fallbackName={title}
           fit="contain"
           rounded="none"
-          containerClassName="w-full overflow-hidden"
-          className="h-auto w-full max-h-[36rem] transition-transform duration-700 group-hover:scale-[1.02]"
-          maxHeightClassName="max-h-[36rem]"
+          containerClassName="flex min-h-[240px] w-full items-center justify-center overflow-hidden lg:min-h-[320px]"
+          className="h-auto w-full max-h-[85vh] transition-transform duration-700 group-hover:scale-[1.02]"
+          maxHeightClassName="max-h-[85vh]"
         />
         <div className="pointer-events-none absolute inset-0 rounded-[2rem] ring-1 ring-inset ring-black/10 dark:ring-white/10" />
       </>

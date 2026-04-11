@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { X, Minus, Plus, Trash2, ShoppingBag, Lock, ArrowLeft, Tag, Check, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +23,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import {
+  customOrdersBuyerApi,
+  type CustomOrderCheckoutBagLine,
+} from '@/api/CustomOrderApi';
 
 // Promo code type
 interface PromoCode {
@@ -81,11 +85,38 @@ const CartDrawer: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
   const isAuthenticated = !!user;
 
+  const [customBagItems, setCustomBagItems] = useState<CustomOrderCheckoutBagLine[]>([]);
+  const [customBagLoading, setCustomBagLoading] = useState(false);
+  const [updatingCustomLineId, setUpdatingCustomLineId] = useState<string | null>(null);
+
+  const refreshCustomBag = useCallback(async () => {
+    if (!isAuthenticated) {
+      setCustomBagItems([]);
+      return;
+    }
+
+    setCustomBagLoading(true);
+    try {
+      const response = await customOrdersBuyerApi.listCheckoutBag();
+      setCustomBagItems(response.items || []);
+    } catch {
+      setCustomBagItems([]);
+    } finally {
+      setCustomBagLoading(false);
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
     if (!isOpen) {
       dispatch(clearCartNotices());
     }
   }, [isOpen, dispatch]);
+
+  useEffect(() => {
+    if (isOpen && isAuthenticated) {
+      void refreshCustomBag();
+    }
+  }, [isAuthenticated, isOpen, refreshCustomBag]);
 
   // Promo code state
   const [promoInput, setPromoInput] = useState('');
@@ -93,10 +124,10 @@ const CartDrawer: React.FC = () => {
   const [promoError, setPromoError] = useState<string | null>(null);
   const [applyingPromo, setApplyingPromo] = useState(false);
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number, preferredCurrency?: string) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
-      currency: currency || 'NGN',
+      currency: preferredCurrency || currency || 'NGN',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(price);
@@ -117,8 +148,18 @@ const CartDrawer: React.FC = () => {
     return 0;
   };
 
+  const customSubtotal = customBagItems.reduce(
+    (sum, item) => sum + Number(item?.buyerPriceSummary?.grandTotal ?? 0),
+    0,
+  );
+  const combinedSubtotal = subtotal + customSubtotal;
   const discount = calculateDiscount();
-  const total = Math.max(0, subtotal - discount);
+  const total = Math.max(0, combinedSubtotal - discount);
+  const combinedQuantity = totalQuantity + customBagItems.length;
+  const hasBagItems = combinedQuantity > 0;
+  const blockedCustomCount = customBagItems.filter(
+    (item) => !item.canProceedToPayment,
+  ).length;
 
   const handleApplyPromo = async () => {
     const code = promoInput.trim().toUpperCase();
@@ -177,9 +218,39 @@ const CartDrawer: React.FC = () => {
     }
   };
 
+  const handleRemoveCustomLine = async (sessionId: string) => {
+    setUpdatingCustomLineId(sessionId);
+    try {
+      await customOrdersBuyerApi.removeCheckoutBagLine(sessionId);
+      setCustomBagItems((current) =>
+        current.filter((item) => item.sessionId !== sessionId),
+      );
+      toast.success('Custom request removed from bag');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to remove custom request');
+    } finally {
+      setUpdatingCustomLineId(null);
+    }
+  };
+
+  const handleRelockCustomLine = async (sessionId: string) => {
+    setUpdatingCustomLineId(sessionId);
+    try {
+      const updated = await customOrdersBuyerApi.relockCheckoutBagLine(sessionId);
+      setCustomBagItems((current) =>
+        current.map((item) => (item.sessionId === sessionId ? updated : item)),
+      );
+      toast.success('Price lock refreshed for this custom request');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to refresh this price lock');
+    } finally {
+      setUpdatingCustomLineId(null);
+    }
+  };
+
   const handleCheckout = () => {
     dispatch(closeCartDrawer());
-    navigate('/checkout', { state: { promoCode: appliedPromo?.code } });
+    navigate('/bag/checkout', { state: { promoCode: appliedPromo?.code } });
   };
 
   const handleContinueShopping = () => {
@@ -239,9 +310,9 @@ const CartDrawer: React.FC = () => {
                   <h2 className="text-sm font-bold text-gray-900 dark:text-white">
                     Your Bag
                   </h2>
-                  {totalQuantity > 0 && (
+                  {combinedQuantity > 0 && (
                     <span className="px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-[10px] font-semibold">
-                      {totalQuantity} {totalQuantity === 1 ? 'item' : 'items'}
+                      {combinedQuantity} {combinedQuantity === 1 ? 'item' : 'items'}
                     </span>
                   )}
                 </div>
@@ -301,7 +372,7 @@ const CartDrawer: React.FC = () => {
                     </div>
                   </div>
                 )}
-                {items.length === 0 ? (
+                {!hasBagItems ? (
                   <div className="flex flex-col items-center justify-center h-full text-center p-6">
                     <div className="relative mb-6">
                       <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 flex items-center justify-center">
@@ -434,12 +505,109 @@ const CartDrawer: React.FC = () => {
                         </div>
                       </motion.div>
                     ))}
+
+                    {(customBagItems.length > 0 || customBagLoading) && (
+                      <div className="space-y-2 pt-1">
+                        <div className="flex items-center justify-between px-1">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                            Custom requests
+                          </p>
+                          {blockedCustomCount > 0 && (
+                            <p className="text-[10px] text-amber-600 dark:text-amber-300">
+                              {blockedCustomCount} need relock
+                            </p>
+                          )}
+                        </div>
+
+                        {customBagLoading ? (
+                          <div className="rounded-xl border border-gray-200/80 dark:border-gray-700/60 bg-gray-50 dark:bg-gray-900/70 p-3 text-xs text-gray-500 dark:text-gray-400">
+                            Loading custom requests...
+                          </div>
+                        ) : (
+                          customBagItems.map((customLine, index) => (
+                            <motion.div
+                              key={customLine.sessionId}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.04 }}
+                              className="relative flex gap-3 p-2.5 rounded-xl bg-indigo-50/65 dark:bg-indigo-900/20 border border-indigo-200/70 dark:border-indigo-700/40"
+                            >
+                              <button
+                                onClick={() => handleRemoveCustomLine(customLine.sessionId)}
+                                disabled={updatingCustomLineId === customLine.sessionId}
+                                className="absolute -top-1.5 -right-1.5 p-1 text-gray-400 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-sm hover:text-red-500 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 transition-all duration-200 z-10 disabled:opacity-50"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+
+                              <div className="w-16 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-white dark:bg-gray-900 border border-indigo-100 dark:border-indigo-700/30">
+                                {customLine.sourcePrimaryMediaUrl ? (
+                                  <CartItemThumbnail
+                                    src={customLine.sourcePrimaryMediaUrl}
+                                    alt={customLine.sourceTitle}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-lg">🧵</div>
+                                )}
+                              </div>
+
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <p className="text-xs font-semibold text-gray-900 dark:text-white line-clamp-1">
+                                  {customLine.sourceTitle}
+                                </p>
+                                <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">
+                                  {customLine.sourceBrandName || 'Custom order'} · Qty: 1
+                                </p>
+                                <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                                  {customLine.measurementCount} measurements
+                                  {customLine.rushSelected ? ' · Rush' : ''}
+                                </p>
+
+                                {customLine.isPriceLockExpired ? (
+                                  <div className="space-y-1">
+                                    <p className="text-[10px] text-amber-700 dark:text-amber-300">
+                                      Price lock expired.
+                                    </p>
+                                    {customLine.canRelockPrice ? (
+                                      <button
+                                        onClick={() => handleRelockCustomLine(customLine.sessionId)}
+                                        disabled={updatingCustomLineId === customLine.sessionId}
+                                        className="h-6 px-2 rounded-md bg-amber-500 text-[10px] font-semibold text-black disabled:opacity-60"
+                                      >
+                                        {updatingCustomLineId === customLine.sessionId ? 'Refreshing...' : 'Refresh lock'}
+                                      </button>
+                                    ) : (
+                                      <p className="text-[10px] text-amber-700/80 dark:text-amber-300/80">
+                                        Reopen this custom request to relock pricing.
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <p className="text-[10px] text-emerald-700 dark:text-emerald-300">
+                                    Locked until {new Date(customLine.priceLockExpiresAt).toLocaleString()}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-gray-900 dark:text-white">
+                                  {formatPrice(
+                                    customLine.buyerPriceSummary.grandTotal,
+                                    customLine.buyerPriceSummary.currency,
+                                  )}
+                                </p>
+                              </div>
+                            </motion.div>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
               {/* Footer - only show when cart has items */}
-              {items.length > 0 && (
+              {hasBagItems && (
                 <div className="border-t border-gray-200/60 dark:border-gray-800/60 bg-white/40 dark:bg-gray-950/40 backdrop-blur-2xl px-3 py-1.5">
                   {/* Promo Code Section */}
                   <div className="mb-1.5">
@@ -503,9 +671,16 @@ const CartDrawer: React.FC = () => {
                   {/* Order Summary */}
                   <div className="space-y-0.5 mb-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
+                      <span className="text-gray-500 dark:text-gray-400">Store items</span>
                       <span className="font-medium text-gray-900 dark:text-white">{formatPrice(subtotal)}</span>
                     </div>
+
+                    {customBagItems.length > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 dark:text-gray-400">Custom requests</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{formatPrice(customSubtotal)}</span>
+                      </div>
+                    )}
                     
                     {appliedPromo && discount > 0 && (
                       <div className="flex items-center justify-between text-xs">
@@ -516,7 +691,9 @@ const CartDrawer: React.FC = () => {
                     
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-500 dark:text-gray-400">Shipping</span>
-                      <span className="text-gray-400 dark:text-gray-500 text-[10px] italic">At checkout</span>
+                      <span className="text-gray-400 dark:text-gray-500 text-[10px] italic">
+                        Store items: at checkout
+                      </span>
                     </div>
                     
                     <div className="flex items-center justify-between pt-1 border-t border-gray-200 dark:border-gray-800">
@@ -524,6 +701,12 @@ const CartDrawer: React.FC = () => {
                       <span className="text-sm font-bold text-gray-900 dark:text-white">{formatPrice(total)}</span>
                     </div>
                   </div>
+
+                  {blockedCustomCount > 0 && (
+                    <div className="mb-1.5 rounded-md border border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 text-[10px] text-amber-800 dark:text-amber-200">
+                      {blockedCustomCount} custom {blockedCustomCount === 1 ? 'request has' : 'requests have'} expired locks. Refresh them before checkout.
+                    </div>
+                  )}
 
                   {/* Checkout + Continue */}
                   <div className="flex items-center gap-2">

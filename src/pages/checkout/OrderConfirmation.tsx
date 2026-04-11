@@ -278,7 +278,7 @@ const OrderConfirmation: React.FC = () => {
           onClick={() =>
             attempt?.subjectType === 'CUSTOM_ORDER' && attempt.customOrderId
               ? navigate(`/custom-orders/${attempt.customOrderId}`)
-              : navigate('/orders')
+              : navigate('/profile?tab=orders')
           }
           size="lg"
         >

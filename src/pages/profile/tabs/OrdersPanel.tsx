@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   confirmMyOrderDelivery,
@@ -108,6 +108,29 @@ const BUYER_STAGE_FLOW: Array<{ value: CustomOrderProgressStage; label: string }
   { value: 'FINAL_TOUCHES_AND_PACKAGING', label: 'Final touches and packaging' },
   { value: 'READY_FOR_DELIVERY', label: 'Ready for delivery' },
 ];
+
+const BUYER_TIMELINE_TAB_TONES = [
+  {
+    completed: 'border-emerald-300/80 bg-emerald-50/80 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-100',
+    current: 'border-sky-300/80 bg-sky-50/80 text-sky-900 ring-2 ring-sky-200/70 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-100 dark:ring-sky-500/30',
+  },
+  {
+    completed: 'border-cyan-300/80 bg-cyan-50/80 text-cyan-900 dark:border-cyan-500/30 dark:bg-cyan-500/15 dark:text-cyan-100',
+    current: 'border-cyan-300/80 bg-cyan-50/80 text-cyan-900 ring-2 ring-cyan-200/70 dark:border-cyan-500/30 dark:bg-cyan-500/15 dark:text-cyan-100 dark:ring-cyan-500/30',
+  },
+  {
+    completed: 'border-indigo-300/80 bg-indigo-50/80 text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-100',
+    current: 'border-indigo-300/80 bg-indigo-50/80 text-indigo-900 ring-2 ring-indigo-200/70 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-100 dark:ring-indigo-500/30',
+  },
+  {
+    completed: 'border-amber-300/80 bg-amber-50/80 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-100',
+    current: 'border-amber-300/80 bg-amber-50/80 text-amber-900 ring-2 ring-amber-200/70 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-100 dark:ring-amber-500/30',
+  },
+  {
+    completed: 'border-violet-300/80 bg-violet-50/80 text-violet-900 dark:border-violet-500/30 dark:bg-violet-500/15 dark:text-violet-100',
+    current: 'border-violet-300/80 bg-violet-50/80 text-violet-900 ring-2 ring-violet-200/70 dark:border-violet-500/30 dark:bg-violet-500/15 dark:text-violet-100 dark:ring-violet-500/30',
+  },
+] as const;
 
 const normalizeStatus = (value: string | undefined): string => {
   if (!value) return 'UNKNOWN';
@@ -434,10 +457,6 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
     };
   }, [orderId]);
 
-  useEffect(() => {
-    void refreshPaymentAttempts();
-  }, [refreshPaymentAttempts]);
-
   const handleConfirmDelivery = async () => {
     if (!order) return;
     setConfirmingDelivery(true);
@@ -485,7 +504,6 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
 
   return (
     <div className="space-y-6">
-      {ConfirmDialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
@@ -501,18 +519,19 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
 
       <section className="overflow-hidden rounded-[28px] border border-gray-200/80 bg-white/70 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
         <div className="grid gap-6 p-6 lg:grid-cols-[180px_minmax(0,1fr)]">
-          <div className="overflow-hidden rounded-3xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="aspect-square overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10">
             {firstItem?.thumbnail ? (
               <ImageWithFallback
                 src={firstItem.thumbnail}
                 alt={firstItem.name}
-                fit="cover"
+                fit="contain"
                 rounded="none"
-                className="h-full w-full object-cover"
-                containerClassName="h-full min-h-[180px] w-full"
+                className="h-full w-full"
+                containerClassName="h-full w-full overflow-hidden"
+                maxHeightClassName="max-h-[85vh]"
               />
             ) : (
-              <div className="flex min-h-[180px] w-full items-center justify-center text-sm font-semibold text-gray-400 dark:text-gray-500">
+              <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-gray-400 dark:text-gray-500">
                 No image
               </div>
             )}
@@ -573,7 +592,7 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-gray-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
+      <section className="rounded-[28px] bg-white/70 p-6 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white">Order progress</h3>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Every fulfillment stage appears here so you know exactly what is happening.
@@ -610,15 +629,16 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
               className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200/70 px-4 py-4 text-sm dark:border-gray-800/80"
             >
               <div className="flex min-w-0 items-center gap-3">
-                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-gray-100 dark:bg-white/10">
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-gray-200/70 dark:border-white/10">
                   {item.thumbnail ? (
                     <ImageWithFallback
                       src={item.thumbnail}
                       alt={item.name}
                       className="h-full w-full"
                       containerClassName="h-full w-full"
-                      fit="cover"
+                      fit="contain"
                       rounded="none"
+                      maxHeightClassName="max-h-[85vh]"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-xs text-gray-500 dark:text-gray-400">
@@ -697,7 +717,6 @@ export const BuyerCustomOrderDetailView: React.FC<{
   const [paymentGateway, setPaymentGateway] = useState<string>('PAYSTACK');
   const [paymentAttempts, setPaymentAttempts] = useState<CustomOrderPaymentAttempt[]>([]);
   const [paymentAttemptsLoading, setPaymentAttemptsLoading] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
   const [issueType, setIssueType] = useState<CustomOrderIssueType>('OTHER');
   const [issueDescription, setIssueDescription] = useState('');
   const [deliveryNote, setDeliveryNote] = useState('');
@@ -798,17 +817,14 @@ export const BuyerCustomOrderDetailView: React.FC<{
         : false,
     [order?.buyerAcceptanceWindowEndsAt],
   );
-  const canCancel =
-    order?.status === 'DRAFT' || order?.status === 'PENDING_PAYMENT';
   const canConfirmDelivery =
     order?.status === 'DELIVERED_PENDING_BUYER_CONFIRMATION';
   const canReportIssue =
     order?.status === 'DELIVERED_PENDING_BUYER_CONFIRMATION' &&
     acceptanceWindowOpen;
-  const contactInfo =
-    ((order?.contactInfo ?? null) as Record<string, unknown> | null) ?? {};
+  const contactInfo = (order?.contactInfo as Record<string, unknown> | undefined) ?? {};
   const shippingAddress =
-    ((order?.shippingAddress ?? null) as Record<string, unknown> | null) ?? {};
+    (order?.shippingAddress as Record<string, unknown> | undefined) ?? {};
   const paymentShippingAddress = useMemo<ShippingAddress>(
     () => ({
       firstName:
@@ -916,7 +932,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
       const init = await customOrdersBuyerApi.initializePayment(orderId, {
         paymentMethod,
         email: paymentSubmissionData.email,
-        callbackUrl: `${window.location.origin}/checkout/payment-return`,
+        callbackUrl: `${window.location.origin}/bag/payment-return`,
         paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
         idempotencyKey: paymentInitIdempotencyKey,
       });
@@ -924,9 +940,9 @@ export const BuyerCustomOrderDetailView: React.FC<{
       setPaymentVerification(null);
       if (init.providerAccessCode) {
         await openPaystackInline(init.providerAccessCode, {
-          onSuccess: (response) => {
+          onSuccess: () => {
             navigate(
-              `/checkout/payment-return?reference=${encodeURIComponent(response.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
+              `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
             );
           },
           onCancel: () => {
@@ -953,7 +969,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
       }
       if (init.reference) {
         navigate(
-          `/checkout/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
+          `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
         );
         return;
       }
@@ -1042,22 +1058,6 @@ export const BuyerCustomOrderDetailView: React.FC<{
     );
   };
 
-  const handleCancelOrder = async () => {
-    if (!canCancel || cancelReason.trim().length < 3 || !order) return;
-    const approved = await confirm({
-      title: 'Cancel this custom order?',
-      message: 'Use this before payment confirmation only.',
-      confirmText: 'Cancel order',
-      cancelText: 'Keep order',
-      isDestructive: true,
-    });
-    if (!approved) return;
-    await wrapMutation(
-      () => customOrdersBuyerApi.cancel(order.id, cancelReason.trim()),
-      'Custom order cancelled',
-    );
-  };
-
   const handleRespondToExtension = async () => {
     if (!latestOpenExtension || !order) return;
     const counterValue =
@@ -1075,6 +1075,34 @@ export const BuyerCustomOrderDetailView: React.FC<{
   const effectiveStage = getBuyerFacingProgressStage(
     order?.currentProgressStage ?? previewOrder?.currentProgressStage,
   );
+  const timelineStageIndex = Math.max(
+    BUYER_STAGE_FLOW.findIndex((step) => step.value === effectiveStage),
+    0,
+  );
+  const timelineReceiptEntries = useMemo(() => {
+    if (!order) return [];
+
+    const progressRows = order.progressEvents.map((event) => ({
+      id: `progress-${event.id}`,
+      label: humanizeCustomOrderToken(event.stage),
+      detail: event.note || 'Progress stage updated',
+      occurredAt: event.changedAt,
+      kind: 'PROGRESS' as const,
+    }));
+
+    const timelineRows = order.timelineEvents.slice(0, 10).map((event) => ({
+      id: `timeline-${event.id}`,
+      label: humanizeCustomOrderToken(event.eventType),
+      detail: '',
+      occurredAt: event.createdAt,
+      kind: 'TIMELINE' as const,
+    }));
+
+    return [...progressRows, ...timelineRows].sort(
+      (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+    );
+  }, [order]);
+  const hasTimelineEntries = timelineReceiptEntries.length > 0;
   const mediaUrl = order?.source.primaryMediaUrl ?? previewOrder?.sourcePrimaryMediaUrl ?? null;
   const title = order?.source.title ?? previewOrder?.sourceTitle ?? 'Custom order';
   const brandName = order?.source.brandName ?? previewOrder?.brand?.name ?? 'Brand';
@@ -1119,7 +1147,11 @@ export const BuyerCustomOrderDetailView: React.FC<{
 
         <section className="overflow-hidden rounded-[2rem] border border-black/10 bg-white/90 shadow-[0_30px_120px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04]">
           <div className="grid gap-6 p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-            <CustomOrderMediaPreview src={previewOrder.sourcePrimaryMediaUrl} title={previewOrder.sourceTitle} />
+            <CustomOrderMediaPreview
+              src={previewOrder.sourcePrimaryMediaUrl}
+              title={previewOrder.sourceTitle}
+              className="min-h-[240px] lg:min-h-[320px]"
+            />
             <div className="space-y-4">
               <BuyerCustomStageFiller
                 stage={previewOrder.currentProgressStage}
@@ -1173,6 +1205,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
 
   return (
     <div className="space-y-6">
+      {ConfirmDialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
@@ -1195,7 +1228,11 @@ export const BuyerCustomOrderDetailView: React.FC<{
 
       <section className="overflow-hidden rounded-[2rem] border border-black/10 bg-white/90 shadow-[0_30px_120px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04]">
         <div className="grid gap-6 p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <CustomOrderMediaPreview src={mediaUrl} title={title} />
+          <CustomOrderMediaPreview
+            src={mediaUrl}
+            title={title}
+            className="min-h-[240px] lg:min-h-[320px]"
+          />
           <div>
             <BuyerCustomStageFiller
               stage={effectiveStage}
@@ -1416,33 +1453,73 @@ export const BuyerCustomOrderDetailView: React.FC<{
 
       <section className="rounded-[28px] border border-gray-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white">Timeline</h3>
-        <div className="mt-4 grid gap-3 xl:grid-cols-2">
-          {order.progressEvents.length === 0 && order.timelineEvents.length === 0 ? (
-            <div className="text-sm text-gray-500 dark:text-gray-400">No custom-order activity has been recorded yet.</div>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Filled tabs show completed work, while the highlighted tab is the current phase.
+        </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          {BUYER_STAGE_FLOW.map((step, index) => {
+            const tone = BUYER_TIMELINE_TAB_TONES[index % BUYER_TIMELINE_TAB_TONES.length];
+            const isComplete = index < timelineStageIndex;
+            const isCurrent = index === timelineStageIndex;
+            const stateLabel = isCurrent ? 'Current' : isComplete ? 'Completed' : 'Upcoming';
+            const badgeEmoji = isCurrent ? '🟡' : isComplete ? '✅' : '⚪';
+
+            return (
+              <div
+                key={step.value}
+                className={`rounded-2xl border px-3 py-3 transition ${
+                  isCurrent
+                    ? tone.current
+                    : isComplete
+                      ? tone.completed
+                      : 'border-gray-200/80 bg-white/80 text-gray-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-400'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em]">{stateLabel}</div>
+                  <span className="text-sm" aria-hidden="true">{badgeEmoji}</span>
+                </div>
+                <div className="mt-2 text-sm font-semibold leading-5">{step.label}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200/90 dark:bg-white/10">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-sky-500 via-cyan-500 to-violet-500 transition-all duration-500"
+            style={{ width: `${((timelineStageIndex + 1) / BUYER_STAGE_FLOW.length) * 100}%` }}
+          />
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200/80 bg-white/85 text-gray-900 shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:text-white">
+          <div className="flex items-center justify-between border-b border-gray-200/80 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-600 dark:border-white/10 dark:text-gray-300">
+            <span>Activity receipt</span>
+            <span>{formatCustomOrderCode(order.id)}</span>
+          </div>
+
+          {!hasTimelineEntries ? (
+            <div className="px-4 py-5 text-sm text-gray-500 dark:text-gray-400">No custom-order activity has been recorded yet.</div>
           ) : (
-            <>
-              {order.progressEvents.map((event) => (
-                <div key={event.id} className="rounded-2xl border border-gray-200/80 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <CustomOrderBadge value={event.stage} type="stage" />
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{formatDateTime(event.changedAt)}</div>
-                  </div>
-                  {event.note ? (
-                    <div className="mt-3 text-sm text-gray-600 dark:text-gray-300">{event.note}</div>
-                  ) : null}
-                </div>
-              ))}
-              {order.timelineEvents.slice(0, 6).map((event) => (
-                <div key={event.id} className="rounded-2xl border border-gray-200/80 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {humanizeCustomOrderToken(event.eventType)}
+            <div className="divide-y divide-gray-200/80 dark:divide-white/10">
+              {timelineReceiptEntries.map((entry, index) => (
+                <div key={entry.id} className="px-4 py-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                          {String(index + 1).padStart(2, '0')}
+                        </span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{entry.label}</span>
+                      </div>
+                      {entry.detail ? (
+                        <div className="mt-1 pl-8 text-xs leading-5 text-gray-600 dark:text-gray-300">{entry.detail}</div>
+                      ) : null}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{formatDateTime(event.createdAt)}</div>
+                    <div className="font-mono text-[11px] text-gray-500 dark:text-gray-400">{formatDateTime(entry.occurredAt)}</div>
                   </div>
                 </div>
               ))}
-            </>
+            </div>
           )}
         </div>
       </section>
@@ -1582,24 +1659,6 @@ export const BuyerCustomOrderDetailView: React.FC<{
                   </div>
                 ) : null}
               </div>
-              <div className="rounded-2xl border border-gray-200/80 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">Cancel before payment confirmation</div>
-                <textarea
-                  value={cancelReason}
-                  onChange={(event) => setCancelReason(event.target.value)}
-                  rows={3}
-                  className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
-                  placeholder="Explain the cancellation reason"
-                />
-                <button
-                  type="button"
-                  disabled={busy || !canCancel || cancelReason.trim().length < 3}
-                  onClick={handleCancelOrder}
-                  className="mt-3 rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white"
-                >
-                  Cancel custom order
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -1615,6 +1674,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
   onSelectionHandled,
 }) => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [standardOrders, setStandardOrders] = useState<Order[]>([]);
   const [customOrders, setCustomOrders] = useState<CustomOrderListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1623,8 +1683,15 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
   const [standardStatus, setStandardStatus] = useState<StandardStatusFilter>('ALL');
   const [customStatus, setCustomStatus] = useState<CustomStatusFilter>('ALL');
   const [activeView, setActiveView] = useState<OrdersView>('standard');
-  const [selection, setSelection] = useState<OrdersPanelSelection | null>(null);
   const [selectedCustomPreview, setSelectedCustomPreview] = useState<CustomOrderListItem | null>(null);
+
+  // In full mode, selection is URL-driven so browser back/forward works correctly
+  const urlOrderId = mode === 'full' ? searchParams.get('orderId') : null;
+  const urlKind = mode === 'full' ? (searchParams.get('kind') as OrdersView | null) : null;
+  const urlSelection: OrdersPanelSelection | null =
+    urlOrderId && urlKind ? { kind: urlKind, id: urlOrderId } : null;
+  const [localSelection, setLocalSelection] = useState<OrdersPanelSelection | null>(null);
+  const selection = mode === 'full' ? urlSelection : localSelection;
   const [standardSummaryByOrderId, setStandardSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
   const [customSummaryByOrderId, setCustomSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
 
@@ -1695,14 +1762,21 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
   useEffect(() => {
     if (!initialSelection || mode !== 'full') return;
     setActiveView(initialSelection.kind);
-    setSelection(initialSelection);
+    // Update URL so browser back works
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('kind', initialSelection.kind);
+      next.set('orderId', initialSelection.id);
+      return next;
+    });
     setSelectedCustomPreview(
       initialSelection.kind === 'custom'
         ? customOrders.find((item) => item.id === initialSelection.id) ?? null
         : null,
     );
     onSelectionHandled?.();
-  }, [customOrders, initialSelection, mode, onSelectionHandled]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSelection, mode, onSelectionHandled]);
 
   const standardFilteredOrders = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -1736,15 +1810,19 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
         onViewAll(nextSelection);
         return;
       }
-
-      if (nextSelection.kind === 'standard') {
-        navigate(`/orders/${nextSelection.id}`);
-      } else {
-        navigate(`/custom-orders/${nextSelection.id}`);
-      }
+      // Summary mode without parent handler: navigate to profile orders tab with selection
+      navigate(`/profile?tab=orders&kind=${nextSelection.kind}&orderId=${nextSelection.id}`);
       return;
     }
 
+    // Full mode: push URL so browser back returns to the orders list
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('kind', nextSelection.kind);
+      next.set('orderId', nextSelection.id);
+      return next;
+    });
+    setActiveView(nextSelection.kind);
     if (nextSelection.kind === 'custom') {
       setSelectedCustomPreview(
         customOrders.find((item) => item.id === nextSelection.id) ?? null,
@@ -1752,27 +1830,35 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
     } else {
       setSelectedCustomPreview(null);
     }
-    setSelection(nextSelection);
+    setLocalSelection(nextSelection);
   };
+
+  const clearDetailSelection = useCallback(() => {
+    setLocalSelection(null);
+    setSelectedCustomPreview(null);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('orderId');
+      next.delete('kind');
+      return next;
+    });
+  }, [setSearchParams]);
 
   if (mode === 'full' && selection) {
     return selection.kind === 'standard' ? (
-      <StandardOrderDetailView orderId={selection.id} onBack={() => setSelection(null)} />
+      <StandardOrderDetailView orderId={selection.id} onBack={clearDetailSelection} />
     ) : (
       <BuyerCustomOrderDetailView
         orderId={selection.id}
         previewOrder={selectedCustomPreview}
-        onBack={() => {
-          setSelection(null);
-          setSelectedCustomPreview(null);
-        }}
+        onBack={clearDetailSelection}
       />
     );
   }
 
   return (
-    <div className={mode === 'full' ? 'space-y-4' : 'space-y-4 lg:sticky lg:top-24 lg:self-start'}>
-      <section className="glass-panel rounded-3xl border border-gray-200/70 bg-white/70 p-4 backdrop-blur-md dark:border-white/10 dark:bg-white/5 sm:p-5">
+    <div className={mode === 'full' ? '' : 'space-y-4 lg:sticky lg:top-24 lg:self-start'}>
+      <section className={mode === 'full' ? '' : 'glass-panel rounded-3xl border border-gray-200/70 bg-white/70 p-4 backdrop-blur-md dark:border-white/10 dark:bg-white/5 sm:p-5'}>
         <div className="mb-2 flex items-center justify-between gap-3">
           {mode === 'full' ? (
             <span className="text-xs font-bold uppercase tracking-widest text-fuchsia-600 dark:text-fuchsia-400">
@@ -1788,7 +1874,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                     onViewAll();
                     return;
                   }
-                  navigate('/orders');
+                  navigate('/profile?tab=orders');
                 }}
                 className="text-xs font-bold uppercase tracking-wide text-fuchsia-600 transition hover:text-gray-900 dark:text-fuchsia-300 dark:hover:text-white"
               >
@@ -1910,8 +1996,9 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                             alt={firstItem.name || 'Order item'}
                             className="h-full w-full"
                             containerClassName="h-full w-full"
-                            fit="cover"
+                            fit="contain"
                             rounded="none"
+                            maxHeightClassName="max-h-[85vh]"
                           />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-[11px] font-semibold text-gray-500 dark:text-gray-400">
@@ -1991,8 +2078,9 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                           alt={order.sourceTitle}
                           className="h-full w-full"
                           containerClassName="h-full w-full"
-                          fit="cover"
+                          fit="contain"
                           rounded="none"
+                          maxHeightClassName="max-h-[85vh]"
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-2xl opacity-30">

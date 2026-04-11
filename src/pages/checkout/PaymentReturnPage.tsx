@@ -6,11 +6,58 @@ import { paymentApi, type PaymentAttemptSummary, type PaymentAttemptStatus, type
 import { customOrdersBuyerApi } from '@/api/CustomOrderApi';
 import { getCheckoutStatusCopy } from '@/pages/checkout/checkoutStatusCopy';
 import { cancelActivePaystackInline, openPaystackInline } from '@/lib/paystackInline';
+import { unifiedCheckoutQueue } from '@/lib/unifiedCheckoutQueue';
 
 type ViewState = 'verifying' | 'resolved' | 'missing';
 
 const AUTO_VERIFY_INTERVAL_MS = 10000;
 const AUTO_VERIFY_MAX_ATTEMPTS = 18;
+const CUSTOM_ORDER_REFERENCE_PREFIX = 'TH-CO-';
+
+const normalizePaymentStatus = (status: unknown): PaymentAttemptStatus | undefined => {
+  const normalized = String(status ?? '').trim().toLowerCase();
+  switch (normalized) {
+    case 'paid':
+    case 'success':
+      return 'PAID';
+    case 'failed':
+    case 'fail':
+      return 'FAILED';
+    case 'cancelled':
+    case 'cancel':
+      return 'CANCELLED';
+    case 'expired':
+    case 'expire':
+      return 'EXPIRED';
+    case 'requires_action':
+    case 'requires-action':
+      return 'REQUIRES_ACTION';
+    case 'processing':
+    case 'pending':
+      return 'PROCESSING';
+    default:
+      return undefined;
+  }
+};
+
+const normalizeAttemptSummary = (
+  summary: PaymentAttemptSummary,
+  reference: string,
+): PaymentAttemptSummary => {
+  const normalizedStatus = normalizePaymentStatus(summary.status) ?? 'PENDING';
+  const referenceLooksCustom = reference
+    .trim()
+    .toUpperCase()
+    .startsWith(CUSTOM_ORDER_REFERENCE_PREFIX);
+  return {
+    ...summary,
+    status: normalizedStatus,
+    subjectType:
+      summary.subjectType === 'CUSTOM_ORDER' || referenceLooksCustom
+        ? 'CUSTOM_ORDER'
+        : summary.subjectType,
+  };
+};
 
 const PaymentReturnPage: React.FC = () => {
   const navigate = useNavigate();
@@ -22,10 +69,13 @@ const PaymentReturnPage: React.FC = () => {
   const [autoVerifyAttempts, setAutoVerifyAttempts] = useState(0);
   const [autoVerifying, setAutoVerifying] = useState(false);
   const [retryingPayment, setRetryingPayment] = useState(false);
+  const [queueContinuing, setQueueContinuing] = useState(false);
 
   const reference = searchParams.get('reference')?.trim() || '';
   const gateway = searchParams.get('gateway')?.trim() || '';
   const statusHint = searchParams.get('status')?.trim() || undefined;
+  const isUnifiedQueueReturn = searchParams.get('uq') === '1';
+  const referenceLooksCustom = reference.toUpperCase().startsWith(CUSTOM_ORDER_REFERENCE_PREFIX);
 
   useEffect(() => {
     return () => {
@@ -39,8 +89,11 @@ const PaymentReturnPage: React.FC = () => {
     includeStatusHint: boolean,
   ): Promise<PaymentVerifyResult> => {
     const hint = includeStatusHint ? statusHint : undefined;
+    const shouldUseCustomVerify =
+      summary.subjectType === 'CUSTOM_ORDER' ||
+      referenceLooksCustom;
 
-    if (summary.subjectType === 'CUSTOM_ORDER') {
+    if (shouldUseCustomVerify) {
       const customResult = summary.customOrderId
         ? await customOrdersBuyerApi.verifyPayment(summary.customOrderId, {
             reference,
@@ -52,9 +105,10 @@ const PaymentReturnPage: React.FC = () => {
             gateway: resolvedGateway,
             statusHint: hint,
           });
+      const normalizedStatus = normalizePaymentStatus(customResult.status) ?? 'PROCESSING';
       return {
         success: customResult.success,
-        status: customResult.status as PaymentAttemptStatus,
+        status: normalizedStatus,
         paymentAttemptId: customResult.paymentAttemptId,
         reference: customResult.reference,
         amount: customResult.amount,
@@ -69,8 +123,134 @@ const PaymentReturnPage: React.FC = () => {
       };
     }
 
-    return paymentApi.verifyWithStatus(reference, resolvedGateway, hint);
-  }, [reference, statusHint]);
+    const standardResult = await paymentApi.verifyWithStatus(reference, resolvedGateway, hint);
+    return {
+      ...standardResult,
+      status: normalizePaymentStatus(standardResult.status) ?? 'PROCESSING',
+    };
+  }, [reference, referenceLooksCustom, statusHint]);
+
+  const consumeQueuedSummary = useCallback(() => {
+    const queue = unifiedCheckoutQueue.load();
+    const summary = queue?.summary;
+    unifiedCheckoutQueue.clear();
+    return summary;
+  }, []);
+
+  const continueQueuedCustomPayment = useCallback(async (): Promise<boolean> => {
+    if (!isUnifiedQueueReturn) {
+      return false;
+    }
+
+    const initialQueue = unifiedCheckoutQueue.load();
+    if (!initialQueue || initialQueue.lines.length === 0) {
+      return false;
+    }
+
+    setQueueContinuing(true);
+    try {
+      while (true) {
+        const queueState = unifiedCheckoutQueue.load();
+        if (!queueState || queueState.lines.length === 0) {
+          return false;
+        }
+
+        const nextLine = unifiedCheckoutQueue.shiftNextLine();
+        if (!nextLine) {
+          return false;
+        }
+
+        try {
+          const init = await customOrdersBuyerApi.initializePaymentForCheckoutIntent(
+            nextLine.checkoutIntentId,
+            {
+              paymentMethod: queueState.paymentMethod,
+              email: queueState.email,
+              callbackUrl: `${window.location.origin}/bag/payment-return?uq=1`,
+              paymentData: queueState.paymentData,
+            },
+          );
+
+          if (init.providerAccessCode) {
+            await openPaystackInline(init.providerAccessCode, {
+              onSuccess: () => {
+                navigate(
+                  `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}&uq=1`,
+                );
+              },
+              onCancel: () => {
+                toast.error('Payment was cancelled before completion.');
+                navigate('/bag/checkout');
+              },
+              onError: (inlineError) => {
+                toast.error(inlineError.message || 'Unable to open the payment window.');
+                navigate('/bag/checkout');
+              },
+            });
+            return true;
+          }
+
+          if (init.authorizationUrl) {
+            window.location.assign(init.authorizationUrl);
+            return true;
+          }
+
+          navigate(
+            `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}&uq=1`,
+          );
+          return true;
+        } catch (error: any) {
+          toast.error(
+            error?.response?.data?.message ||
+              `${nextLine.sourceTitle} could not be prepared for payment and remains in your bag.`,
+          );
+        }
+      }
+    } finally {
+      setQueueContinuing(false);
+    }
+  }, [isUnifiedQueueReturn, navigate]);
+
+  const resolveTerminalStatus = useCallback(async (
+    status: PaymentAttemptStatus,
+    summary: PaymentAttemptSummary,
+    failureReason?: string,
+    options?: { replace?: boolean },
+  ) => {
+    const continued = await continueQueuedCustomPayment();
+    if (continued) return;
+
+    const queuedSummary = isUnifiedQueueReturn ? consumeQueuedSummary() : undefined;
+
+    if (status === 'PAID') {
+      toast.success('Your order is placed successfully, Thank you for shopping.');
+      navigate(`/bag/confirmation?reference=${encodeURIComponent(reference)}`, {
+        replace: options?.replace,
+        state: queuedSummary ? { reference, summary: queuedSummary } : undefined,
+      });
+      return;
+    }
+
+    const resolvedFailureReason =
+      failureReason ||
+      'Payment failed before completion. Please restart checkout.';
+    toast.error(resolvedFailureReason);
+
+    if (summary.subjectType === 'CUSTOM_ORDER') {
+      if (summary.customOrderId) {
+        navigate(`/custom-orders/${summary.customOrderId}`, {
+          replace: options?.replace,
+          state: { paymentFailureReason: resolvedFailureReason, paymentReference: reference },
+        });
+      }
+      return;
+    }
+
+    navigate('/profile?tab=orders', {
+      replace: options?.replace,
+      state: { paymentFailureReason: resolvedFailureReason, paymentReference: reference },
+    });
+  }, [consumeQueuedSummary, continueQueuedCustomPayment, isUnifiedQueueReturn, navigate, reference]);
 
   useEffect(() => {
     let active = true;
@@ -85,7 +265,7 @@ const PaymentReturnPage: React.FC = () => {
       setAutoVerifying(false);
       setViewState('verifying');
       try {
-        const summary = await paymentApi.getAttempt(reference);
+        const summary = normalizeAttemptSummary(await paymentApi.getAttempt(reference), reference);
         if (!active) return;
         setAttempt(summary);
 
@@ -94,48 +274,29 @@ const PaymentReturnPage: React.FC = () => {
 
         if (!active) return;
         setVerifyResult(result);
-        const refreshedSummary = await paymentApi.getAttempt(reference);
+        const refreshedSummary = normalizeAttemptSummary(await paymentApi.getAttempt(reference), reference);
         if (!active) return;
         setAttempt(refreshedSummary);
         setViewState('resolved');
 
-        if (result?.status === 'PAID') {
-          toast.success('Your order is placed successfully, Thank you for shopping.');
-          navigate(`/checkout/confirmation?reference=${encodeURIComponent(reference)}`, {
-            replace: true,
-          });
-          return;
-        }
-
         if (
+          result?.status === 'PAID' ||
           result?.status === 'FAILED' ||
           result?.status === 'CANCELLED' ||
           result?.status === 'EXPIRED'
         ) {
-          const failureReason =
-            result.failureMessage ||
-            'Payment failed before completion. Please restart checkout.';
-          toast.error(failureReason);
-          if (refreshedSummary.subjectType === 'CUSTOM_ORDER') {
-            if (refreshedSummary.customOrderId) {
-              navigate(`/custom-orders/${refreshedSummary.customOrderId}`, {
-                replace: true,
-                state: { paymentFailureReason: failureReason, paymentReference: reference },
-              });
-            }
-            return;
-          }
-
-          navigate('/orders', {
-            replace: true,
-            state: { paymentFailureReason: failureReason, paymentReference: reference },
-          });
+          await resolveTerminalStatus(
+            result.status,
+            refreshedSummary,
+            result.failureMessage,
+            { replace: true },
+          );
         }
       } catch (error: any) {
         if (!active) return;
         toast.error(error?.response?.data?.message || 'Unable to verify the payment attempt');
         try {
-          const summary = await paymentApi.getAttempt(reference);
+          const summary = normalizeAttemptSummary(await paymentApi.getAttempt(reference), reference);
           if (!active) return;
           setAttempt(summary);
           setViewState('resolved');
@@ -150,7 +311,7 @@ const PaymentReturnPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [gateway, navigate, reference, verifyAttempt]);
+  }, [gateway, reference, resolveTerminalStatus, verifyAttempt]);
 
   const handleVerifyAgain = useCallback(async (options?: { auto?: boolean }) => {
     const resolvedGateway = gateway || attempt?.gateway;
@@ -163,49 +324,31 @@ const PaymentReturnPage: React.FC = () => {
     }
 
     try {
-      const currentAttempt = attempt ?? await paymentApi.getAttempt(reference);
+      const currentAttempt = normalizeAttemptSummary(
+        attempt ?? await paymentApi.getAttempt(reference),
+        reference,
+      );
       if (!attempt) {
         setAttempt(currentAttempt);
       }
 
       const result = await verifyAttempt(currentAttempt, resolvedGateway, false);
       setVerifyResult(result);
-      const summary = await paymentApi.getAttempt(reference);
+      const summary = normalizeAttemptSummary(await paymentApi.getAttempt(reference), reference);
       setAttempt(summary);
 
       if (options?.auto) {
         setAutoVerifyAttempts((current) => current + 1);
       }
 
-      if (result.status === 'PAID') {
-        toast.success('Your order is placed successfully, Thank you for shopping.');
-        navigate(`/checkout/confirmation?reference=${encodeURIComponent(reference)}`);
-        return;
-      }
-
       if (
+        result.status === 'PAID' ||
         result.status === 'FAILED' ||
         result.status === 'CANCELLED' ||
         result.status === 'EXPIRED'
       ) {
-        const failureReason =
-          result.failureMessage ||
-          'Payment failed before completion. Please restart checkout.';
-        toast.error(failureReason);
-        if (summary.subjectType === 'CUSTOM_ORDER') {
-          if (summary.customOrderId) {
-            navigate(`/custom-orders/${summary.customOrderId}`, {
-              replace: true,
-              state: { paymentFailureReason: failureReason, paymentReference: reference },
-            });
-          }
-          return;
-        }
-
-        navigate('/orders', {
-          replace: true,
-          state: { paymentFailureReason: failureReason, paymentReference: reference },
-        });
+        await resolveTerminalStatus(result.status, summary, result.failureMessage);
+        return;
       }
     } catch (error: any) {
       if (!options?.auto) {
@@ -218,7 +361,7 @@ const PaymentReturnPage: React.FC = () => {
         setSubmitting(false);
       }
     }
-  }, [attempt, gateway, navigate, reference, verifyAttempt]);
+  }, [attempt, gateway, reference, resolveTerminalStatus, verifyAttempt]);
 
   const handleRetryCustomOrderPayment = useCallback(async () => {
     if (!attempt?.checkoutIntentId) {
@@ -241,16 +384,16 @@ const PaymentReturnPage: React.FC = () => {
         {
           paymentMethod,
           email,
-          callbackUrl: `${window.location.origin}/checkout/payment-return`,
+          callbackUrl: `${window.location.origin}/bag/payment-return`,
           paymentData: paymentData as Record<string, unknown>,
         },
       );
 
       if (init.providerAccessCode) {
         await openPaystackInline(init.providerAccessCode, {
-          onSuccess: (response) => {
+          onSuccess: () => {
             navigate(
-              `/checkout/payment-return?reference=${encodeURIComponent(response.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
+              `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
             );
           },
           onCancel: () => {
@@ -272,7 +415,7 @@ const PaymentReturnPage: React.FC = () => {
       }
       if (init.reference) {
         navigate(
-          `/checkout/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
+          `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
         );
       }
     } catch (error: any) {
@@ -282,10 +425,15 @@ const PaymentReturnPage: React.FC = () => {
     }
   }, [attempt, navigate]);
 
-  const resolvedStatus = verifyResult?.status ?? attempt?.status ?? 'PENDING';
+  const resolvedStatus =
+    normalizePaymentStatus(verifyResult?.status) ??
+    normalizePaymentStatus(attempt?.status) ??
+    'PENDING';
+  const shouldAutoVerify =
+    resolvedStatus === 'PROCESSING' || resolvedStatus === 'REQUIRES_ACTION';
 
   useEffect(() => {
-    if (viewState !== 'resolved' || resolvedStatus !== 'PROCESSING') {
+    if (viewState !== 'resolved' || !shouldAutoVerify) {
       return;
     }
     if (autoVerifyAttempts >= AUTO_VERIFY_MAX_ATTEMPTS || autoVerifying || submitting) {
@@ -299,7 +447,7 @@ const PaymentReturnPage: React.FC = () => {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [autoVerifyAttempts, autoVerifying, handleVerifyAgain, resolvedStatus, submitting, viewState]);
+  }, [autoVerifyAttempts, autoVerifying, handleVerifyAgain, shouldAutoVerify, submitting, viewState]);
 
   if (viewState === 'missing') {
     return (
@@ -310,8 +458,9 @@ const PaymentReturnPage: React.FC = () => {
           Threadly could not find the reference needed to resume this payment flow.
         </p>
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
-          <Button onClick={() => navigate('/orders')}>Open my orders</Button>
-          <Button variant="secondary" onClick={() => navigate('/checkout')}>Back to checkout</Button>
+          <Button onClick={() => navigate('/profile?tab=orders')}>Open my orders</Button>
+          <Button variant="secondary" onClick={() => navigate('/custom-orders')}>Open custom orders</Button>
+          <Button variant="ghost" onClick={() => navigate('/')}>Browse designs</Button>
         </div>
       </div>
     );
@@ -330,7 +479,9 @@ const PaymentReturnPage: React.FC = () => {
   }
 
   const statusCopy = getCheckoutStatusCopy('return', resolvedStatus);
-  const isCustomOrderAttempt = attempt?.subjectType === 'CUSTOM_ORDER';
+  const isCustomOrderAttempt =
+    attempt?.subjectType === 'CUSTOM_ORDER' ||
+    referenceLooksCustom;
   const shouldOfferCustomOrderRetry =
     isCustomOrderAttempt &&
     !attempt?.customOrderId &&
@@ -348,7 +499,7 @@ const PaymentReturnPage: React.FC = () => {
         <p className="text-sm text-gray-700 dark:text-zinc-300">Reference: {reference}</p>
         <p className="text-sm text-gray-700 dark:text-zinc-300">Gateway: {attempt?.gateway || gateway}</p>
         <p className="text-sm text-gray-700 dark:text-zinc-300">
-          Subject: {attempt?.subjectType === 'CUSTOM_ORDER' ? 'Custom order' : 'Standard order'}
+          Subject: {isCustomOrderAttempt ? 'Custom order' : 'Standard order'}
         </p>
         <p className="text-sm text-gray-700 dark:text-zinc-300">Status: {resolvedStatus}</p>
         {verifyResult?.failureMessage && (
@@ -356,7 +507,7 @@ const PaymentReturnPage: React.FC = () => {
         )}
       </div>
 
-      {resolvedStatus === 'PROCESSING' && autoVerifyAttempts < AUTO_VERIFY_MAX_ATTEMPTS && (
+      {shouldAutoVerify && autoVerifyAttempts < AUTO_VERIFY_MAX_ATTEMPTS && (
         <div className="mb-8 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-left text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
           <p>
             Threadly is checking automatically every 10 seconds (attempt {Math.min(autoVerifyAttempts + 1, AUTO_VERIFY_MAX_ATTEMPTS)} of {AUTO_VERIFY_MAX_ATTEMPTS}).
@@ -367,7 +518,7 @@ const PaymentReturnPage: React.FC = () => {
         </div>
       )}
 
-      {resolvedStatus === 'PROCESSING' && autoVerifyAttempts >= AUTO_VERIFY_MAX_ATTEMPTS && (
+      {shouldAutoVerify && autoVerifyAttempts >= AUTO_VERIFY_MAX_ATTEMPTS && (
         <div className="mb-8 rounded-xl border border-blue-200/80 bg-blue-50/80 px-4 py-3 text-left text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
           <p className="font-semibold">Still waiting on your bank or payment provider.</p>
           <p className="mt-1">
@@ -380,13 +531,19 @@ const PaymentReturnPage: React.FC = () => {
         </div>
       )}
 
+      {queueContinuing && (
+        <div className="mb-8 rounded-xl border border-indigo-200/80 bg-indigo-50/80 px-4 py-3 text-left text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
+          Preparing the next custom payment in your checkout queue...
+        </div>
+      )}
+
       <div className="flex flex-col justify-center gap-3 sm:flex-row">
         {resolvedStatus === 'PAID' ? (
-          <Button onClick={() => navigate(`/checkout/confirmation?reference=${encodeURIComponent(reference)}`)}>
+          <Button onClick={() => navigate(`/bag/confirmation?reference=${encodeURIComponent(reference)}`)}>
             Open confirmation
           </Button>
         ) : (
-          <Button onClick={() => void handleVerifyAgain()} loading={submitting || autoVerifying}>
+          <Button onClick={() => void handleVerifyAgain()} loading={submitting || autoVerifying || queueContinuing}>
             Verify again
           </Button>
         )}
@@ -402,7 +559,7 @@ const PaymentReturnPage: React.FC = () => {
               ? attempt?.customOrderId
                 ? navigate(`/custom-orders/${attempt.customOrderId}`)
                 : navigate('/custom-orders')
-              : navigate('/orders')
+              : navigate('/profile?tab=orders')
           }
         >
           {isCustomOrderAttempt
@@ -411,7 +568,9 @@ const PaymentReturnPage: React.FC = () => {
               : 'Open custom orders'
             : 'Open my orders'}
         </Button>
-        <Button variant="ghost" onClick={() => navigate('/checkout')}>Return to checkout</Button>
+        {!isCustomOrderAttempt && (
+          <Button variant="ghost" onClick={() => navigate('/bag/checkout')}>Return to checkout</Button>
+        )}
       </div>
     </div>
   );

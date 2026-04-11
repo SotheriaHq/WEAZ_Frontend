@@ -235,7 +235,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
       setOrder(data);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to load custom order');
-      navigate('/studio/custom-orders');
+      navigate('/studio?tab=orders&orderTab=custom');
     } finally {
       setLoading(false);
     }
@@ -852,10 +852,10 @@ const StudioCustomOrderDetailPage: React.FC = () => {
         <span>/</span>
         <button
           type="button"
-          onClick={() => navigate('/studio/custom-orders')}
+          onClick={() => navigate('/studio?tab=orders&orderTab=custom')}
           className="font-semibold text-slate-800 dark:text-white"
         >
-          Custom orders
+          Orders
         </button>
         <span>/</span>
         <span className="font-medium">{formatCustomOrderCode(order.id)}</span>
@@ -906,7 +906,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/studio/custom-orders')}
+                onClick={() => navigate('/studio?tab=orders&orderTab=custom')}
                 className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(15,23,42,0.15)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(15,23,42,0.2)] dark:bg-white dark:text-slate-950 dark:shadow-[0_4px_12px_rgba(255,255,255,0.1)]"
               >
                 Back to queue

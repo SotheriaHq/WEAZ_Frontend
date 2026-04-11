@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { brandApi } from '@/api/BrandApi';
+import { customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
 import VLoader from '@/components/loaders/VLoader';
 import Modal from '@/components/ui/Modal';
@@ -83,12 +84,23 @@ type HeldFundsItem = {
   counterparty?: string | null;
   currency: string;
   grossAmount: number | string;
+  commissionAmount?: number | string;
+  netBrandAmount?: number | string;
+  releasedGrossAmount?: number | string;
   releasedNetAmount: number | string;
+  heldGrossAmount?: number | string;
   heldNetAmount: number | string;
   status: string;
   nextReleaseAt?: string | null;
   releaseCondition?: string | null;
   frozenReason?: string | null;
+};
+
+type FinanceReceiptRow = {
+  label: string;
+  value: string;
+  tone?: string;
+  emphasized?: boolean;
 };
 
 const formatReferenceLabel = (referenceType?: string | null) => {
@@ -112,6 +124,17 @@ const getReferenceTone = (referenceType?: string | null) => {
 
 const formatReferenceCode = (referenceId?: string | null) =>
   referenceId ? `#${String(referenceId).slice(0, 8).toUpperCase()}` : null;
+
+const normalizeHoldType = (value?: string | null) => String(value || '').trim().toUpperCase();
+
+const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+const formatHoldTypeLabel = (value?: string | null) => {
+  const normalized = normalizeHoldType(value);
+  if (normalized === 'CUSTOM_ORDER') return 'Custom order';
+  if (normalized === 'STANDARD_ORDER') return 'Standard order';
+  return normalized.replaceAll('_', ' ').trim() || 'Order hold';
+};
 
 const formatIncomingStageLabel = (stage?: string | null) =>
   String(stage || 'PAYMENT')
@@ -162,6 +185,11 @@ const FinancePage: React.FC = () => {
   const [requesting, setRequesting] = useState(false);
   const [overview, setOverview] = useState<FinanceOverview | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<IncomingTransaction | null>(null);
+  const [selectedHeldFund, setSelectedHeldFund] = useState<HeldFundsItem | null>(null);
+  const [selectedHeldStandardOrder, setSelectedHeldStandardOrder] = useState<any | null>(null);
+  const [selectedHeldCustomOrder, setSelectedHeldCustomOrder] = useState<CustomOrderDetail | null>(null);
+  const [heldDetailLoading, setHeldDetailLoading] = useState(false);
+  const [heldDetailError, setHeldDetailError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
@@ -255,6 +283,272 @@ const FinancePage: React.FC = () => {
     [incomingTransactions],
   );
 
+  const acceptedReleaseByCustomOrderId = useMemo(() => {
+    const map = new Map<
+      string,
+      { gross: number; commission: number; net: number; currency: string }
+    >();
+
+    for (const transaction of incomingTransactions) {
+      const referenceType = String(transaction.referenceType || '').trim().toUpperCase();
+      const stage = String(transaction.stage || '').trim().toUpperCase();
+      const referenceId = String(transaction.referenceId || '').trim();
+
+      if (referenceType !== 'CUSTOMORDER' || stage !== 'ACCEPTED_RELEASE' || !referenceId) {
+        continue;
+      }
+
+      const current = map.get(referenceId) ?? {
+        gross: 0,
+        commission: 0,
+        net: 0,
+        currency: transaction.currency || currency,
+      };
+
+      current.gross += Number(transaction.grossAmount ?? transaction.amount ?? 0);
+      current.commission += Number(transaction.commissionAmount ?? 0);
+      current.net += Number(transaction.netAmount ?? transaction.amount ?? 0);
+      if (transaction.currency) {
+        current.currency = transaction.currency;
+      }
+
+      map.set(referenceId, current);
+    }
+
+    return map;
+  }, [currency, incomingTransactions]);
+
+  const displayHeldFunds = useMemo(() => {
+    return heldFunds.map((hold) => {
+      const holdType = normalizeHoldType(hold.holdType);
+      if (holdType !== 'CUSTOM_ORDER') {
+        return hold;
+      }
+
+      const currentReleasedNet = Number(hold.releasedNetAmount || 0);
+      if (currentReleasedNet > 0) {
+        return hold;
+      }
+
+      const referenceId = String(hold.referenceId || '').trim();
+      if (!referenceId) {
+        return hold;
+      }
+
+      const acceptedRelease = acceptedReleaseByCustomOrderId.get(referenceId);
+      if (!acceptedRelease) {
+        return hold;
+      }
+
+      const heldGrossAmount = Number(hold.heldGrossAmount ?? hold.grossAmount ?? 0);
+      const heldNetAmount = Number(hold.heldNetAmount || 0);
+      const heldCommissionAmount = Number(hold.commissionAmount || 0);
+
+      const releasedGrossAmount = roundMoney(acceptedRelease.gross);
+      const releasedNetAmount = roundMoney(acceptedRelease.net);
+      const grossAmount = roundMoney(heldGrossAmount + releasedGrossAmount);
+      const commissionAmount = roundMoney(heldCommissionAmount + acceptedRelease.commission);
+      const netBrandAmount = roundMoney(heldNetAmount + releasedNetAmount);
+
+      return {
+        ...hold,
+        currency: hold.currency || acceptedRelease.currency,
+        grossAmount,
+        commissionAmount,
+        netBrandAmount,
+        heldGrossAmount: roundMoney(heldGrossAmount),
+        releasedGrossAmount,
+        releasedNetAmount,
+      };
+    });
+  }, [acceptedReleaseByCustomOrderId, heldFunds]);
+
+  const formatCurrency = useCallback(
+    (value: number, activeCurrency = currency) =>
+      new Intl.NumberFormat('en-NG', { style: 'currency', currency: activeCurrency }).format(value),
+    [currency],
+  );
+
+  const heldBreakdown = useMemo(() => {
+    if (!selectedHeldFund) return null;
+
+    const holdType = normalizeHoldType(selectedHeldFund.holdType);
+    const holdGross = Number(selectedHeldFund.grossAmount || 0);
+    const releasedGross = Number(selectedHeldFund.releasedGrossAmount ?? 0);
+    const heldGross = Number(
+      selectedHeldFund.heldGrossAmount ?? Math.max(holdGross - releasedGross, 0),
+    );
+    const releasedNet = Number(selectedHeldFund.releasedNetAmount || 0);
+    const heldNet = Number(selectedHeldFund.heldNetAmount || 0);
+    const netBrandTotal = Number(selectedHeldFund.netBrandAmount ?? releasedNet + heldNet);
+    const commissionTotal = Number(
+      selectedHeldFund.commissionAmount ?? Math.max(holdGross - netBrandTotal, 0),
+    );
+    const buyerPaidTotal =
+      holdType === 'CUSTOM_ORDER'
+        ? Number(selectedHeldCustomOrder?.buyerPriceSummary?.grandTotal ?? holdGross)
+        : Number(
+            selectedHeldStandardOrder?.financeBreakdown?.grossAmount ??
+              selectedHeldStandardOrder?.totalAmount ??
+              holdGross,
+          );
+
+    return {
+      holdType,
+      holdGross,
+      releasedGross,
+      heldGross,
+      releasedNet,
+      heldNet,
+      commissionTotal,
+      netBrandTotal,
+      buyerPaidTotal,
+    };
+  }, [selectedHeldCustomOrder, selectedHeldFund, selectedHeldStandardOrder]);
+
+  const heldOrderFinanceRows = useMemo<FinanceReceiptRow[]>(() => {
+    if (!heldBreakdown || !selectedHeldFund) return [];
+
+    const activeCurrency = selectedHeldFund.currency || currency;
+
+    if (heldBreakdown.holdType === 'CUSTOM_ORDER') {
+      const summary = selectedHeldCustomOrder?.buyerPriceSummary;
+      const subtotal = Number(
+        summary?.subtotal ??
+          Math.max(
+            heldBreakdown.buyerPaidTotal -
+              Number(summary?.shippingFee ?? 0) -
+              Number(summary?.rushFee ?? 0),
+            0,
+          ),
+      );
+
+      const rows: FinanceReceiptRow[] = [
+        {
+          label: 'Item subtotal',
+          value: formatCurrency(subtotal, summary?.currency || activeCurrency),
+        },
+        {
+          label: 'Delivery fee',
+          value: formatCurrency(
+            Number(summary?.shippingFee ?? 0),
+            summary?.currency || activeCurrency,
+          ),
+        },
+      ];
+
+      if (summary?.rushFee != null) {
+        rows.push({
+          label: 'Rush fee',
+          value: formatCurrency(
+            Number(summary.rushFee || 0),
+            summary.currency || activeCurrency,
+          ),
+        });
+      }
+
+      rows.push({
+        label: 'Buyer paid total',
+        value: formatCurrency(heldBreakdown.buyerPaidTotal, summary?.currency || activeCurrency),
+        emphasized: true,
+      });
+
+      return rows;
+    }
+
+    const financeBreakdown = selectedHeldStandardOrder?.financeBreakdown;
+    return [
+      {
+        label: 'Item subtotal',
+        value: formatCurrency(
+          Number(financeBreakdown?.itemSubtotal ?? 0),
+          activeCurrency,
+        ),
+      },
+      {
+        label: 'Delivery fee',
+        value: formatCurrency(
+          Number(financeBreakdown?.shippingAmount ?? selectedHeldStandardOrder?.shippingCost ?? 0),
+          activeCurrency,
+        ),
+      },
+      {
+        label: 'Discount',
+        value: formatCurrency(
+          Number(financeBreakdown?.discountAmount ?? selectedHeldStandardOrder?.discountAmount ?? 0),
+          activeCurrency,
+        ),
+      },
+      {
+        label: 'Buyer paid total',
+        value: formatCurrency(heldBreakdown.buyerPaidTotal, activeCurrency),
+        emphasized: true,
+      },
+    ];
+  }, [
+    currency,
+    formatCurrency,
+    heldBreakdown,
+    selectedHeldCustomOrder?.buyerPriceSummary,
+    selectedHeldFund,
+    selectedHeldStandardOrder,
+  ]);
+
+  const heldEscrowAllocationRows = useMemo<FinanceReceiptRow[]>(() => {
+    if (!heldBreakdown || !selectedHeldFund) return [];
+    const activeCurrency = selectedHeldFund.currency || currency;
+
+    return [
+      {
+        label: 'Gross tracked in escrow',
+        value: formatCurrency(heldBreakdown.holdGross, activeCurrency),
+      },
+      {
+        label: 'Platform commission',
+        value: formatCurrency(heldBreakdown.commissionTotal, activeCurrency),
+        tone: 'text-rose-600 dark:text-rose-300',
+      },
+      {
+        label: 'Brand net total',
+        value: formatCurrency(heldBreakdown.netBrandTotal, activeCurrency),
+        tone: 'text-emerald-600 dark:text-emerald-300',
+      },
+      {
+        label: 'Released to brand',
+        value: formatCurrency(heldBreakdown.releasedNet, activeCurrency),
+        tone: 'text-sky-600 dark:text-sky-300',
+      },
+      {
+        label: 'Still held for brand',
+        value: formatCurrency(heldBreakdown.heldNet, activeCurrency),
+        tone: 'text-amber-700 dark:text-amber-300',
+        emphasized: true,
+      },
+    ];
+  }, [currency, formatCurrency, heldBreakdown, selectedHeldFund]);
+
+  const heldCustomReleaseRows = useMemo<FinanceReceiptRow[]>(() => {
+    if (!heldBreakdown || heldBreakdown.holdType !== 'CUSTOM_ORDER' || !selectedHeldFund) {
+      return [];
+    }
+
+    const activeCurrency =
+      selectedHeldCustomOrder?.buyerPriceSummary.currency ||
+      selectedHeldFund.currency ||
+      currency;
+
+    return [
+      {
+        label: 'Released gross tranche',
+        value: formatCurrency(heldBreakdown.releasedGross, activeCurrency),
+      },
+      {
+        label: 'Held gross tranche',
+        value: formatCurrency(heldBreakdown.heldGross, activeCurrency),
+      },
+    ];
+  }, [currency, formatCurrency, heldBreakdown, selectedHeldCustomOrder, selectedHeldFund]);
+
   const canRequestPayout = useMemo(
     () => !loading && !requesting && availableBalance >= 5000,
     [availableBalance, loading, requesting],
@@ -279,10 +573,35 @@ const FinancePage: React.FC = () => {
     }
   };
 
-  const formatCurrency = useCallback(
-    (value: number, activeCurrency = currency) =>
-      new Intl.NumberFormat('en-NG', { style: 'currency', currency: activeCurrency }).format(value),
-    [currency],
+  const openHeldFundDetail = useCallback(
+    async (hold: HeldFundsItem) => {
+      setSelectedHeldFund(hold);
+      setSelectedHeldStandardOrder(null);
+      setSelectedHeldCustomOrder(null);
+      setHeldDetailError(null);
+
+      if (!brandId || !hold.referenceId) {
+        setHeldDetailLoading(false);
+        return;
+      }
+
+      setHeldDetailLoading(true);
+      try {
+        const holdType = normalizeHoldType(hold.holdType);
+        if (holdType === 'CUSTOM_ORDER') {
+          const detail = await customOrdersBrandApi.getById(brandId, hold.referenceId);
+          setSelectedHeldCustomOrder(detail);
+        } else if (holdType === 'STANDARD_ORDER') {
+          const detail = await brandApi.getOrderDetail(brandId, hold.referenceId);
+          setSelectedHeldStandardOrder(detail);
+        }
+      } catch (error: any) {
+        setHeldDetailError(error?.response?.data?.message || 'Unable to load this hold breakdown right now.');
+      } finally {
+        setHeldDetailLoading(false);
+      }
+    },
+    [brandId],
   );
 
   return (
@@ -369,7 +688,7 @@ const FinancePage: React.FC = () => {
             </div>
             <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-200">
               <span aria-hidden="true">🔒</span>
-              {overview?.activeEscrowHolds ?? heldFunds.length} open hold{(overview?.activeEscrowHolds ?? heldFunds.length) === 1 ? '' : 's'}
+              {overview?.activeEscrowHolds ?? displayHeldFunds.length} open hold{(overview?.activeEscrowHolds ?? displayHeldFunds.length) === 1 ? '' : 's'}
             </div>
           </div>
         </div>
@@ -380,6 +699,7 @@ const FinancePage: React.FC = () => {
                 <th className="px-6 py-4 font-medium">Reference</th>
                 <th className="px-6 py-4 font-medium">Buyer</th>
                 <th className="px-6 py-4 font-medium">Gross</th>
+                <th className="px-6 py-4 font-medium">Commission</th>
                 <th className="px-6 py-4 font-medium">Released</th>
                 <th className="px-6 py-4 font-medium">Still held</th>
                 <th className="px-6 py-4 font-medium">Release rule</th>
@@ -389,28 +709,45 @@ const FinancePage: React.FC = () => {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <VLoader size={32} phase="loading" showLabel={false} />
                   </td>
                 </tr>
-              ) : heldFunds.length === 0 ? (
+              ) : displayHeldFunds.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                     No held funds right now.
                   </td>
                 </tr>
               ) : (
-                heldFunds.map((hold) => (
-                  <tr key={hold.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                displayHeldFunds.map((hold) => (
+                  <tr
+                    key={hold.id}
+                    tabIndex={0}
+                    role="button"
+                    onClick={() => {
+                      void openHeldFundDetail(hold);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        void openHeldFundDetail(hold);
+                      }
+                    }}
+                    className="cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400/30 dark:hover:bg-gray-800/40"
+                  >
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900 dark:text-white">{hold.title}</div>
                       <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        {String(hold.holdType || '').replaceAll('_', ' ')} {hold.referenceId ? `• ${formatReferenceCode(hold.referenceId)}` : ''}
+                        {formatHoldTypeLabel(hold.holdType)} {hold.referenceId ? `• ${formatReferenceCode(hold.referenceId)}` : ''}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{hold.counterparty || 'Buyer'}</td>
                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                       {formatCurrency(Number(hold.grossAmount || 0), hold.currency || currency)}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-rose-600 dark:text-rose-300">
+                      {formatCurrency(Number(hold.commissionAmount || 0), hold.currency || currency)}
                     </td>
                     <td className="px-6 py-4 font-medium text-sky-600 dark:text-sky-300">
                       {formatCurrency(Number(hold.releasedNetAmount || 0), hold.currency || currency)}
@@ -636,6 +973,146 @@ const FinancePage: React.FC = () => {
       </section>
 
       <Modal
+        open={Boolean(selectedHeldFund)}
+        onClose={() => {
+          setSelectedHeldFund(null);
+          setSelectedHeldStandardOrder(null);
+          setSelectedHeldCustomOrder(null);
+          setHeldDetailError(null);
+          setHeldDetailLoading(false);
+        }}
+        title="Order finance breakdown"
+        size="lg"
+      >
+        {selectedHeldFund ? (
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-gray-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                      {formatHoldTypeLabel(selectedHeldFund.holdType)}
+                    </span>
+                    {formatReferenceCode(selectedHeldFund.referenceId) ? (
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+                        {formatReferenceCode(selectedHeldFund.referenceId)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <h3 className="mt-3 text-xl font-bold text-gray-900 dark:text-white">{selectedHeldFund.title}</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {selectedHeldFund.counterparty || 'Buyer'}
+                    {selectedHeldFund.nextReleaseAt
+                      ? ` • Next release ${new Date(selectedHeldFund.nextReleaseAt).toLocaleString()}`
+                      : ' • Waiting for milestone completion'}
+                  </p>
+                </div>
+
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                    selectedHeldFund.status === 'FROZEN'
+                      ? 'bg-rose-100 text-rose-800 dark:bg-rose-500/10 dark:text-rose-200'
+                      : selectedHeldFund.status === 'PARTIALLY_RELEASED'
+                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-500/10 dark:text-sky-200'
+                        : 'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200'
+                  }`}
+                >
+                  {String(selectedHeldFund.status || 'HELD').replaceAll('_', ' ')}
+                </span>
+              </div>
+            </div>
+
+            {heldDetailLoading ? (
+              <div className="rounded-2xl border border-gray-200/80 bg-gray-50/80 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="flex items-center justify-center py-10">
+                  <VLoader size={34} phase="loading" showLabel={false} />
+                </div>
+              </div>
+            ) : null}
+
+            {heldDetailError ? (
+              <div className="rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+                {heldDetailError}
+              </div>
+            ) : null}
+
+            {heldBreakdown && !heldDetailLoading ? (
+              <>
+                <FinanceReceiptList
+                  title="Order receipt"
+                  subtitle="Presented as a checkout-style list so the customer-facing amount path is obvious at a glance."
+                  rows={heldOrderFinanceRows}
+                />
+                <FinanceReceiptList
+                  title="Escrow allocation"
+                  subtitle="This shows how the captured order value is split between Threadly commission, brand release, and the remaining held amount."
+                  rows={heldEscrowAllocationRows}
+                  footerNote="Gross tracked in escrow = platform commission + released net + still held net."
+                />
+              </>
+            ) : null}
+
+            {heldBreakdown?.holdType === 'CUSTOM_ORDER' && !heldDetailLoading ? (
+              <section className="rounded-2xl border border-gray-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+                <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                  Release split
+                </h4>
+                <div className="mt-3 rounded-xl border border-violet-200/80 bg-violet-50/80 px-3 py-3 text-sm text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200">
+                  This split uses recorded ledger allocations: acceptance tranche released to the brand and final tranche still held in escrow.
+                </div>
+                <div className="mt-4">
+                  <FinanceReceiptList rows={heldCustomReleaseRows} compact />
+                </div>
+              </section>
+            ) : null}
+
+            {heldBreakdown?.holdType === 'STANDARD_ORDER' && !heldDetailLoading ? (
+              <section className="rounded-2xl border border-gray-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+                <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                  Standard-order release schedule
+                </h4>
+                {(selectedHeldStandardOrder?.financeBreakdown?.releaseSchedule ?? []).length === 0 ? (
+                  <div className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                    No release schedule was returned for this order.
+                  </div>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {(selectedHeldStandardOrder?.financeBreakdown?.releaseSchedule ?? []).map((item: any, index: number) => (
+                      <div key={`${item?.stage || 'stage'}-${index}`} className="rounded-xl border border-gray-200/80 px-3 py-3 dark:border-white/10">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {String(item?.stage || 'RELEASE').replaceAll('_', ' ')}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {item?.releasedAt
+                              ? `Released ${new Date(item.releasedAt).toLocaleString()}`
+                              : item?.eligibleAt
+                                ? `Eligible ${new Date(item.eligibleAt).toLocaleString()}`
+                                : 'Awaiting milestone'}
+                          </div>
+                        </div>
+                        <div className="mt-2 grid gap-2 text-xs text-gray-600 dark:text-gray-300 sm:grid-cols-3">
+                          <div>
+                            Gross: {formatCurrency(Number(item?.grossAmount || 0), selectedHeldFund.currency || currency)}
+                          </div>
+                          <div>
+                            Commission: {formatCurrency(Number(item?.commissionAmount || 0), selectedHeldFund.currency || currency)}
+                          </div>
+                          <div>
+                            Net: {formatCurrency(Number(item?.netAmount || 0), selectedHeldFund.currency || currency)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
         open={Boolean(selectedTransaction)}
         onClose={() => setSelectedTransaction(null)}
         title="Seller receipt status"
@@ -749,5 +1226,62 @@ const FinanceReceiptMetric: React.FC<{
     <div className={`mt-1 text-lg font-bold ${tone}`}>{value}</div>
   </div>
 );
+
+const FinanceReceiptList: React.FC<{
+  title?: string;
+  subtitle?: string;
+  rows: FinanceReceiptRow[];
+  footerNote?: string;
+  compact?: boolean;
+}> = ({ title, subtitle, rows, footerNote, compact = false }) => {
+  if (!rows.length) return null;
+
+  return (
+    <section
+      className={`rounded-2xl border border-gray-200/80 bg-white/80 ${
+        compact ? 'p-4' : 'p-5'
+      } dark:border-white/10 dark:bg-white/[0.03]`}
+    >
+      {title ? (
+        <div className="mb-4">
+          <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+            {title}
+          </h4>
+          {subtitle ? (
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 dark:border-white/10 dark:bg-black/10">
+        {rows.map((row, index) => (
+          <div
+            key={`${row.label}-${index}`}
+            className={`flex items-center justify-between gap-4 py-3 ${
+              index === rows.length - 1 ? '' : 'border-b border-dashed border-gray-200 dark:border-white/10'
+            }`}
+          >
+            <span
+              className={`text-sm ${
+                row.emphasized
+                  ? 'font-semibold text-gray-900 dark:text-white'
+                  : 'text-gray-600 dark:text-gray-300'
+              }`}
+            >
+              {row.label}
+            </span>
+            <span className={`text-right text-sm font-semibold ${row.tone || 'text-gray-900 dark:text-white'}`}>
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {footerNote ? (
+        <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">{footerNote}</p>
+      ) : null}
+    </section>
+  );
+};
 
 export default FinancePage;

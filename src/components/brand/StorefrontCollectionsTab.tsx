@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import type { CollectionDto } from '@/types/profile';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { useNavigate } from 'react-router-dom';
@@ -9,7 +10,7 @@ interface StorefrontCollectionsTabProps {
   loading?: boolean;
 }
 
-const variants = {
+const variants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({
     opacity: 1,
@@ -17,7 +18,7 @@ const variants = {
     transition: {
       delay: i * 0.05,
       duration: 0.4,
-      ease: 'easeOut',
+      ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number],
     },
   }),
 };
@@ -66,7 +67,7 @@ export const StorefrontCollectionsTab: React.FC<StorefrontCollectionsTabProps> =
           className="group cursor-pointer"
         >
           <div className="aspect-[4/5] w-full overflow-hidden rounded-[1.5rem] border border-gray-100 bg-gray-50 shadow-sm transition-shadow hover:shadow-xl dark:border-white/5 dark:bg-zinc-900/40">
-            <motion.div className="h-full w-full" whileHover={{ scale: 1.05 }} transition={{ duration: 0.4, ease: 'easeOut' }}>
+            <motion.div className="h-full w-full" whileHover={{ scale: 1.05 }} transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}>
               <ImageWithFallback
                 src={collection.coverImage}
                 alt={collection.title || collection.name || 'Collection'}

@@ -147,7 +147,7 @@ const OrderDetail: React.FC = () => {
         setOrder(data as any);
       } catch (error: any) {
         toast.error(error?.response?.data?.message || 'Order not found');
-        navigate('/orders');
+        navigate('/profile?tab=orders');
       } finally {
         if (active) setLoading(false);
       }
@@ -273,7 +273,7 @@ const OrderDetail: React.FC = () => {
         <span>/</span>
         <button
           type="button"
-          onClick={() => navigate('/orders')}
+          onClick={() => navigate('/profile?tab=orders')}
           className="transition-colors hover:text-black dark:hover:text-white"
         >
           Orders
@@ -382,7 +382,7 @@ const OrderDetail: React.FC = () => {
                     type="button"
                     onClick={() =>
                       navigate(
-                        `/checkout/confirmation?reference=${encodeURIComponent(
+                        `/bag/confirmation?reference=${encodeURIComponent(
                           order.paymentReference!,
                         )}`,
                       )

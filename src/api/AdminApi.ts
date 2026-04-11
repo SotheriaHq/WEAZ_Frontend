@@ -8,6 +8,7 @@ import type {
   AdminDesign,
   AdminPayout,
   AdminPayoutDetail,
+  AdminStandardOrderListResponse,
   AdminStandardOrderDetail,
   AdminDispute,
   AdminAuditLog,
@@ -267,6 +268,8 @@ export const adminPayoutsApi = {
 };
 
 export const adminOrdersApi = {
+  list: (params?: Record<string, string>) =>
+    apiClient.get<AdminStandardOrderListResponse>('/admin/orders', { params }),
   getById: (id: string) =>
     apiClient.get<AdminStandardOrderDetail>(`/admin/orders/${id}`),
 };

@@ -88,6 +88,7 @@ const AdminTagsPage = lazy(() => import('./pages/admin/AdminTagsPage'));
 const AdminFinancePage = lazy(() => import('./pages/admin/AdminFinancePage'));
 const AdminPayoutsPage = lazy(() => import('./pages/admin/AdminPayoutsPage'));
 const AdminOrderDetailPage = lazy(() => import('./pages/admin/AdminOrderDetailPage'));
+const AdminOrdersPage = lazy(() => import('./pages/admin/AdminOrdersPage'));
 const AdminDisputesPage = lazy(() => import('./pages/admin/AdminDisputesPage'));
 const AdminModerationPage = lazy(() => import('./pages/admin/AdminModerationPage'));
 const AdminAuditPage = lazy(() => import('./pages/admin/AdminAuditPage'));
@@ -490,9 +491,9 @@ const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
-          { path: '/checkout', element: <Layout><CheckoutPage /></Layout> },
-          { path: '/checkout/payment-return', element: <Layout><PaymentReturnPage /></Layout> },
-          { path: '/checkout/confirmation', element: <Layout><OrderConfirmation /></Layout> },
+          { path: '/bag/checkout', element: <Layout><CheckoutPage /></Layout> },
+          { path: '/bag/payment-return', element: <Layout><PaymentReturnPage /></Layout> },
+          { path: '/bag/confirmation', element: <Layout><OrderConfirmation /></Layout> },
           { path: '/orders', element: <Layout><MyOrders /></Layout> },
           { path: '/messages', element: <Layout><MessagingManagementPage /></Layout> },
           {
@@ -600,6 +601,7 @@ const router = createBrowserRouter([
           { path: 'taxonomy', element: <RequireAdminPermission permission="TAXONOMY_READ"><AdminTaxonomyPage /></RequireAdminPermission> },
           { path: 'tags', element: <RequireAdminPermission permission="TAGS_READ"><AdminTagsPage /></RequireAdminPermission> },
           { path: 'measurements', element: <Navigate to="/admin/taxonomy?tab=measurements" replace /> },
+          { path: 'orders', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminOrdersPage /></RequireAdminPermission> },
           { path: 'finance', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminFinancePage /></RequireAdminPermission> },
           { path: 'finance/payments/:reference', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminFinancePage /></RequireAdminPermission> },
           { path: 'orders/:orderId', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminOrderDetailPage /></RequireAdminPermission> },

@@ -377,6 +377,7 @@ export interface CustomOrderDetail {
     currency?: string;
     shippingFee?: number;
     rushFee?: number;
+    fabricCharge?: number;
   };
   internalPriceBreakdown?: Record<string, unknown>;
   quoteStatus?: CustomOrderQuoteStatus;
@@ -430,6 +431,8 @@ export interface PricePreviewResponse {
     subtotal?: number;
     shippingFee?: number;
     rushFee?: number;
+    fabricCharge?: number;
+    currency?: string;
   } | null;
   priceLockExpiresAt: string | null;
   quoteStatus: CustomOrderQuoteStatus;
@@ -466,6 +469,48 @@ export interface CustomOrderCheckoutSession {
   resumeUrl?: string | null;
   resumePath?: string | null;
   uiState?: Record<string, unknown> | null;
+}
+
+export interface CustomOrderCheckoutBagLine {
+  sessionId: string;
+  status: string;
+  checkoutIntentId: string;
+  customOrderId?: string | null;
+  sourceType: CustomOrderSourceType;
+  sourceId: string;
+  sourceTitle: string;
+  sourcePrimaryMediaUrl?: string | null;
+  sourceBrandName?: string | null;
+  configurationId: string;
+  configurationVersionId: string;
+  quoteStatus: CustomOrderQuoteStatus;
+  pricingChartFamily: CustomOrderChartFamily;
+  displayChartFamily: CustomOrderChartFamily;
+  rushSelected: boolean;
+  measurementCount: number;
+  buyerPriceSummary: {
+    fabricCharge: number;
+    subtotal: number;
+    shippingFee: number;
+    rushFee: number;
+    grandTotal: number;
+    currency: string;
+  };
+  priceLockExpiresAt: string;
+  isPriceLockExpired: boolean;
+  canRelockPrice: boolean;
+  canProceedToPayment: boolean;
+  lastAttemptReference?: string | null;
+  lastAttemptStatus?: string | null;
+  attemptsCount: number;
+  submittedAt: string;
+  updatedAt: string;
+  resumePath?: string | null;
+}
+
+export interface CustomOrderCheckoutBagResponse {
+  items: CustomOrderCheckoutBagLine[];
+  total: number;
 }
 
 export interface DisplayChartPreference {
@@ -877,6 +922,21 @@ export const customOrdersBuyerApi = {
     return unwrapApiResponse<CustomOrderCheckoutSession>(response.data);
   },
 
+  async listCheckoutBag() {
+    const response = await apiClient.get('/custom-orders/checkout-bag');
+    return unwrapApiResponse<CustomOrderCheckoutBagResponse>(response.data);
+  },
+
+  async relockCheckoutBagLine(sessionId: string) {
+    const response = await apiClient.post(`/custom-orders/checkout-sessions/${sessionId}/relock`);
+    return unwrapApiResponse<CustomOrderCheckoutBagLine>(response.data);
+  },
+
+  async removeCheckoutBagLine(sessionId: string) {
+    const response = await apiClient.delete(`/custom-orders/checkout-sessions/${sessionId}`);
+    return unwrapApiResponse<{ removed: boolean }>(response.data);
+  },
+
   async initializePaymentForCheckoutIntent(
     checkoutIntentId: string,
     payload: {
@@ -960,11 +1020,6 @@ export const customOrdersBuyerApi = {
     return unwrapApiResponse<CustomOrderPaymentAttempt[]>(response.data);
   },
 
-  async cancel(orderId: string, reason: string) {
-    const response = await apiClient.post(`/custom-orders/${orderId}/cancel`, { reason });
-    return unwrapApiResponse<CustomOrderDetail>(response.data);
-  },
-
   async confirmDelivery(orderId: string, note?: string) {
     const response = await apiClient.post(`/custom-orders/${orderId}/confirm-delivery`, { note });
     return unwrapApiResponse<CustomOrderDetail>(response.data);
@@ -1011,11 +1066,6 @@ export const customOrdersBrandApi = {
 
   async accept(brandId: string, orderId: string, note?: string) {
     const response = await apiClient.post(`/brands/${brandId}/custom-orders/${orderId}/accept`, { note });
-    return unwrapApiResponse<CustomOrderDetail>(response.data);
-  },
-
-  async reject(brandId: string, orderId: string, reason: string) {
-    const response = await apiClient.post(`/brands/${brandId}/custom-orders/${orderId}/reject`, { reason });
     return unwrapApiResponse<CustomOrderDetail>(response.data);
   },
 

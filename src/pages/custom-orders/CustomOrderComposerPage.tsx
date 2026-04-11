@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '@/store';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import {
   customOrderConfigurationsApi,
@@ -22,10 +22,7 @@ import {
   upsertCustomOrderAddress,
   type CustomOrderSavedAddress,
 } from '@/lib/customOrderAddressBook';
-import {
-  cancelActivePaystackInline,
-  openPaystackInline,
-} from '@/lib/paystackInline';
+import { openCartDrawer } from '@/features/cartSlice';
 
 interface CustomOrderComposerPageProps {
   configurationIdOverride?: string | null;
@@ -83,6 +80,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   onClose,
   onOrderCreated,
 }) => {
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const profile = useSelector((state: RootState) => state.user.profile);
@@ -113,7 +111,6 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   const [noDirectMatchAcknowledged, setNoDirectMatchAcknowledged] = useState(false);
 
   const createKeyRef = useRef(createIdempotencyKey());
-  const paymentInitKeyRef = useRef<string | null>(null);
   const configurationId = configurationIdOverride ?? searchParams.get('configurationId');
 
   const dismissEmbeddedComposer = useCallback(() => {
@@ -125,12 +122,6 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   useEffect(() => {
     setCustomerName([profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim());
   }, [profile?.firstName, profile?.lastName]);
-
-  useEffect(() => {
-    return () => {
-      void cancelActivePaystackInline();
-    };
-  }, []);
 
   const applySavedAddress = useCallback((address: CustomOrderSavedAddress) => {
     setCustomerName(address.customerName);
@@ -446,7 +437,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       if (data.quoteStatus === 'MANUAL_QUOTE_REQUIRED') {
         toast.error('This measurement profile requires manual quote review before payment.');
       } else {
-        toast.success('Price preview locked for checkout.');
+        toast.success('Price preview locked. Add this custom request to your bag when ready.');
       }
 
       void customOrdersBuyerApi.updateDisplayChartPreference({
@@ -470,11 +461,11 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       return;
     }
     if (preview.quoteStatus === 'MANUAL_QUOTE_REQUIRED') {
-      toast.error('Manual quote review is pending. Checkout cannot continue yet.');
+      toast.error('Manual quote review is pending. This request cannot be added to your bag yet.');
       return;
     }
     if (!preview.checkoutIntentId) {
-      toast.error('Price preview is not locked for checkout yet.');
+      toast.error('Price preview is not locked yet.');
       return;
     }
     if (preview.noDirectMatch && !noDirectMatchAcknowledged) {
@@ -493,11 +484,6 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
     setSubmitting(true);
     let createdOrderId: string | null = null;
     let checkoutIntentId: string | null = null;
-    // Tracks whether the Paystack popup was successfully launched.
-    // When true, setSubmitting(false) is deferred to the Paystack callbacks so
-    // the button stays in the loading state while the popup is open — preventing
-    // the user from thinking nothing happened and accidentally closing the modal.
-    let paystackLaunched = false;
     try {
       const submission = await customOrdersBuyerApi.create({
         checkoutIntentId: preview.checkoutIntentId,
@@ -529,89 +515,20 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       if (!checkoutIntentId) {
         throw new Error('Checkout intent is missing after submission.');
       }
-
-      const trimmedCustomerName = customerName.trim();
-      const nameParts = trimmedCustomerName.split(/\s+/).filter(Boolean);
-      const firstName = nameParts[0] || 'Customer';
-      const lastName = nameParts.slice(1).join(' ') || 'Customer';
-      const paymentData = {
-        email: contactEmail.trim(),
-        phone: contactPhone.trim(),
-        channel: 'CARD',
-        consentAccepted: true,
-        billingSameAsShipping: true,
-        shippingAddress: {
-          firstName,
-          lastName,
-          street: street.trim(),
-          apartment: '',
-          city: city.trim(),
-          state: stateRegion.trim(),
-          postalCode: '',
-          country: country.trim() || 'Nigeria',
-          phone: contactPhone.trim(),
-        },
-      };
-
-      const paymentInitKey =
-        paymentInitKeyRef.current ?? createIdempotencyKey();
-      paymentInitKeyRef.current = paymentInitKey;
-
-      const paymentInit = await customOrdersBuyerApi.initializePaymentForCheckoutIntent(checkoutIntentId, {
-        paymentMethod: 'PAYSTACK',
-        email: contactEmail.trim(),
-        callbackUrl: `${window.location.origin}/checkout/payment-return`,
-        paymentData,
-        idempotencyKey: paymentInitKey,
-      });
-
-      if (paymentInit.providerAccessCode) {
-        // Mark as launched BEFORE the call so the finally block skips setSubmitting(false).
-        // Each Paystack callback is responsible for releasing the submitting state.
-        paystackLaunched = true;
-        await openPaystackInline(paymentInit.providerAccessCode, {
-          onSuccess: (response) => {
-            setSubmitting(false);
-            dismissEmbeddedComposer();
-            navigate(
-              `/checkout/payment-return?reference=${encodeURIComponent(response.reference)}&gateway=${encodeURIComponent(paymentInit.gateway || 'PAYSTACK')}`,
-            );
-          },
-          onCancel: () => {
-            setSubmitting(false);
-            paymentInitKeyRef.current = null;
-            toast.error('Payment was cancelled before the order could be placed.');
-          },
-          onError: (inlineError) => {
-            setSubmitting(false);
-            paymentInitKeyRef.current = null;
-            toast.error(inlineError.message || 'Unable to open the payment window.');
-          },
-        });
-        return;
-      }
-
-      if (paymentInit.authorizationUrl) {
-        const fallbackUrl = new URL(paymentInit.authorizationUrl, window.location.origin);
-        if (fallbackUrl.origin === window.location.origin) {
-          dismissEmbeddedComposer();
-          window.location.assign(fallbackUrl.toString());
-          return;
-        }
-
-        throw new Error('Payment provider did not return an inline payment session for this attempt.');
-      }
-
-      const nextReference = encodeURIComponent(paymentInit.reference);
-      const nextGateway = encodeURIComponent(paymentInit.gateway || 'PAYSTACK');
+      toast.success('Custom order added to your bag. Continue checkout from your bag.');
       dismissEmbeddedComposer();
-      navigate(`/checkout/payment-return?reference=${nextReference}&gateway=${nextGateway}`);
+      dispatch(openCartDrawer());
       return;
 
     } catch (error: any) {
-      paymentInitKeyRef.current = null;
-
       const apiMessage: string = error?.response?.data?.message ?? '';
+
+      if (apiMessage === 'CUSTOM_ORDER_DUPLICATE_IN_BAG') {
+        toast.error('This custom request is already in your bag.');
+        dismissEmbeddedComposer();
+        dispatch(openCartDrawer());
+        return;
+      }
 
       // Specific recovery: price lock expired between preview and submission.
       // Prompt the user to re-preview so they get a fresh checkout intent.
@@ -630,20 +547,15 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
         createdOrderId
           ? 'Order was already placed. Open it to review the payment status.'
           : checkoutIntentId
-            ? 'Checkout submitted, but payment could not start. Retry to complete payment.'
-            : 'Unable to submit the custom order checkout.';
+            ? 'Custom order was added to your bag, but refresh failed. Open your bag to continue.'
+            : 'Unable to add this custom order to your bag.';
       toast.error(apiMessage || fallbackMessage);
       if (createdOrderId) {
         navigate(`/custom-orders/${createdOrderId}`);
         onOrderCreated?.(createdOrderId);
       }
     } finally {
-      // Do NOT release submitting when Paystack popup is open — the callbacks handle it.
-      // This keeps the button in the "loading" state so the user knows payment is pending
-      // and doesn't accidentally close the modal or double-submit.
-      if (!paystackLaunched) {
-        setSubmitting(false);
-      }
+      setSubmitting(false);
     }
   };
 
@@ -760,7 +672,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600 dark:text-emerald-300">Custom Order</div>
           <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{configuration.title}</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-            Build the request, lock the price preview, then submit checkout to start payment.
+            Build the request, lock the price preview, then add this custom request to your bag.
           </p>
         </div>
         <button
@@ -951,16 +863,21 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
           </section>
 
           <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
-            <div className="text-lg font-semibold text-slate-900 dark:text-white">Checkout preview</div>
+            <div className="text-lg font-semibold text-slate-900 dark:text-white">Bag preview</div>
             <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <div className="flex items-center justify-between"><span>Base production charge</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(Number(configuration.baseProductionCharge))}</span></div>
               {preview ? (
                 <>
                   {preview.buyerPriceSummary ? (
                     <>
+                      {(preview.buyerPriceSummary.fabricCharge ?? 0) > 0 && (
+                        <div className="flex items-center justify-between"><span>Fabric charge</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.fabricCharge ?? 0, preview.currency)}</span></div>
+                      )}
+                      {(preview.buyerPriceSummary.rushFee ?? 0) > 0 && (
+                        <div className="flex items-center justify-between"><span>Rush fee</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.rushFee ?? 0, preview.currency)}</span></div>
+                      )}
                       <div className="flex items-center justify-between"><span>Subtotal</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.subtotal ?? preview.buyerPriceSummary.grandTotal, preview.currency)}</span></div>
                       <div className="flex items-center justify-between"><span>Shipping</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.shippingFee ?? 0, preview.currency)}</span></div>
-                      <div className="flex items-center justify-between"><span>Rush fee</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.rushFee ?? 0, preview.currency)}</span></div>
                       <div className="flex items-center justify-between border-t border-black/10 pt-3 text-base dark:border-white/10"><span className="font-semibold text-slate-900 dark:text-white">Grand total</span><span className="font-semibold text-emerald-600 dark:text-emerald-300">{formatCurrency(preview.buyerPriceSummary.grandTotal, preview.currency)}</span></div>
                     </>
                   ) : null}
@@ -979,12 +896,12 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
             <div className="mt-5 space-y-3">
               <button type="button" onClick={handlePreview} disabled={submitting} className="w-full rounded-full border border-black/10 px-4 py-3 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white">{submitting ? 'Calculating preview...' : 'Lock price preview'}</button>
               <button type="button" onClick={handleCreateOrder} disabled={submitting || !preview || preview.quoteStatus === 'MANUAL_QUOTE_REQUIRED'} className="w-full rounded-full bg-emerald-500 px-4 py-3 text-sm font-semibold text-black disabled:opacity-60">
-                {submitting ? 'Opening payment...' : preview?.checkoutIntentId ? 'Proceed to Payment →' : 'Create custom order'}
+                {submitting ? 'Adding to bag...' : preview?.checkoutIntentId ? 'Add custom order to bag' : 'Create custom order'}
               </button>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {preview?.checkoutIntentId
-                  ? 'Your price is locked. Tap above to open the secure payment window.'
-                  : 'Lock the price preview above, then proceed to payment.'}
+                  ? 'Your price is locked. Add this custom request to your bag, then pay from bag checkout.'
+                  : 'Lock the price preview above, then add this custom request to your bag.'}
               </p>
             </div>
           </section>

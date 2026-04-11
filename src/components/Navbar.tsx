@@ -132,7 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
     );
   };
   const profileHomeRoute = user ? getProfileOrHomeUrl(user) : '/profile';
-  const ordersRoute = user?.type === 'BRAND' ? '/studio?tab=orders' : '/orders';
+  const ordersRoute = user?.type === 'BRAND' ? '/studio?tab=orders' : '/profile?tab=orders';
   const savedRoute = user?.type === 'BRAND' ? '/profile?tab=Content' : profileHomeRoute;
   const helpRoute = '/help/verified-badge';
 

@@ -272,10 +272,53 @@ export interface AdminStandardOrderDetail {
     currency?: string | null;
     contactEmail?: string | null;
     owner?: {
+      id?: string;
       phoneNumber?: string | null;
       address?: string | null;
     } | null;
   } | null;
+}
+
+export interface AdminStandardOrderListItem {
+  id: string;
+  brandId: string;
+  buyerId?: string | null;
+  customerName: string;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  totalAmount: string | number;
+  currency: string;
+  status: string;
+  paymentStatus: string;
+  paymentReference?: string | null;
+  paidAt?: string | null;
+  createdAt: string;
+  updatedAt?: string | null;
+  itemCount: number;
+  primaryItemName?: string | null;
+  primaryItemImage?: string | null;
+  brand?: {
+    id: string;
+    ownerId: string;
+    name?: string | null;
+  } | null;
+}
+
+export interface AdminStandardOrderListResponse {
+  items: AdminStandardOrderListItem[];
+  total: number;
+  page: number;
+  totalPages: number;
+  summary?: {
+    totalOrders: number;
+    totalRevenue: string | number;
+    pendingCount: number;
+    processingCount: number;
+    shippedCount: number;
+    deliveredCount: number;
+    cancelledCount: number;
+    returnedCount: number;
+  };
 }
 
 export interface AdminProduct {
@@ -804,7 +847,11 @@ export interface AdminEscrowHold {
   buyerName?: string | null;
   currency: string;
   grossAmount: number;
+  commissionAmount?: number;
+  netBrandAmount?: number;
+  releasedGrossAmount?: number;
   releasedNetAmount: number;
+  heldGrossAmount?: number;
   heldNetAmount: number;
   status: string;
   nextReleaseAt?: string | null;

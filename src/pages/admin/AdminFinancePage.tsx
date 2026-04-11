@@ -5,7 +5,8 @@ import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import VLoader from '@/components/loaders/VLoader';
 import Modal from '@/components/ui/Modal';
-import { adminFinanceApi } from '@/api/AdminApi';
+import { adminFinanceApi, adminOrdersApi } from '@/api/AdminApi';
+import { customOrdersAdminApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { unwrapApiResponse } from '@/types/auth';
 import type {
   AdminCommissionRule,
@@ -17,6 +18,7 @@ import type {
   AdminFinanceTransaction,
   AdminReconciliationItem,
   AdminReconciliationRun,
+  AdminStandardOrderDetail,
 } from '@/types/admin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 
@@ -40,6 +42,8 @@ type CommissionDraft = {
   isDefault: boolean;
   isActive: boolean;
 };
+
+type OrderDetailKind = 'STANDARD' | 'CUSTOM';
 
 const FINANCE_TABS: Array<{ key: FinanceTab; label: string }> = [
   { key: 'overview', label: '📒 Overview' },
@@ -174,6 +178,34 @@ const toneFor = (value: string | null | undefined, kind: keyof typeof THEMES) =>
   THEMES[kind][String(value || '').trim().toUpperCase()] ||
   'bg-slate-100 text-slate-700 dark:bg-slate-500/10 dark:text-slate-300';
 
+const orderStatusTone = (value?: string | null) => {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized === 'DELIVERED' || normalized === 'COMPLETED') {
+    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300';
+  }
+  if (normalized === 'SHIPPED' || normalized === 'IN_TRANSIT') {
+    return 'bg-sky-100 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300';
+  }
+  if (
+    normalized === 'PROCESSING' ||
+    normalized === 'PENDING' ||
+    normalized === 'IN_PRODUCTION' ||
+    normalized === 'READY_FOR_DISPATCH'
+  ) {
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300';
+  }
+  if (
+    normalized === 'FAILED' ||
+    normalized === 'CANCELLED' ||
+    normalized === 'RETURNED' ||
+    normalized === 'REFUND_IN_PROGRESS' ||
+    normalized === 'DISPUTED'
+  ) {
+    return 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300';
+  }
+  return 'bg-slate-100 text-slate-700 dark:bg-slate-500/10 dark:text-slate-300';
+};
+
 const AdminFinancePage: React.FC = () => {
   const navigate = useNavigate();
   const { reference: routePaymentReference } = useParams<{ reference?: string }>();
@@ -181,6 +213,7 @@ const AdminFinancePage: React.FC = () => {
   const canProcess = hasPermission('PAYOUTS_PROCESS');
   const mountedRef = useRef(true);
   const requestRef = useRef<Record<string, number>>({});
+  const orderDetailRequestRef = useRef(0);
 
   const [activeTab, setActiveTab] = useState<FinanceTab>('overview');
   const [overview, setOverview] = useState<AdminFinanceOverview | null>(null);
@@ -192,6 +225,9 @@ const AdminFinancePage: React.FC = () => {
   const [reconciliationItems, setReconciliationItems] = useState<AdminReconciliationItem[]>([]);
   const [documents, setDocuments] = useState<AdminFinancialDocument[]>([]);
   const [paymentDetail, setPaymentDetail] = useState<AdminFinancePaymentDetail | null>(null);
+  const [orderDetailKind, setOrderDetailKind] = useState<OrderDetailKind | null>(null);
+  const [standardOrderDetail, setStandardOrderDetail] = useState<AdminStandardOrderDetail | null>(null);
+  const [customOrderDetail, setCustomOrderDetail] = useState<CustomOrderDetail | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<AdminFinancialDocument | null>(null);
   const [editingRule, setEditingRule] = useState<AdminCommissionRule | null>(null);
   const [commissionDraft, setCommissionDraft] = useState<CommissionDraft>(emptyCommissionDraft);
@@ -205,6 +241,8 @@ const AdminFinancePage: React.FC = () => {
   const [reconciliationLoading, setReconciliationLoading] = useState(false);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [paymentDetailLoading, setPaymentDetailLoading] = useState(false);
+  const [orderDetailLoading, setOrderDetailLoading] = useState(false);
+  const [orderDetailError, setOrderDetailError] = useState<string | null>(null);
   const [documentDetailLoading, setDocumentDetailLoading] = useState(false);
   const [commissionSubmitting, setCommissionSubmitting] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -411,24 +449,64 @@ const AdminFinancePage: React.FC = () => {
     if (activeTab === 'documents') void loadDocuments();
   }, [activeTab, loadCommissionRules, loadDocuments, loadEscrow, loadPayments, loadReconciliation, loadTransactions]);
 
+  const closeOrderDetail = useCallback(() => {
+    orderDetailRequestRef.current += 1;
+    setOrderDetailKind(null);
+    setStandardOrderDetail(null);
+    setCustomOrderDetail(null);
+    setOrderDetailLoading(false);
+    setOrderDetailError(null);
+  }, []);
+
   const openReference = useCallback(
-    (referenceType?: string | null, referenceId?: string | null) => {
+    async (referenceType?: string | null, referenceId?: string | null) => {
       const normalized = String(referenceType || '').trim().toUpperCase();
       if (!referenceId) {
         toast.error('This finance record has no linked order reference.');
         return;
       }
-      if (normalized === 'CUSTOMORDER' || normalized === 'CUSTOM_ORDER') {
-        navigate(`/admin/custom-orders/${referenceId}`);
+
+      const nextKind: OrderDetailKind | null =
+        normalized === 'CUSTOMORDER' || normalized === 'CUSTOM_ORDER'
+          ? 'CUSTOM'
+          : normalized === 'ORDER' || normalized === 'STANDARD_ORDER'
+            ? 'STANDARD'
+            : null;
+
+      if (!nextKind) {
+        toast.error('This finance record is linked, but the reference type is not routable in the admin app.');
         return;
       }
-      if (normalized === 'ORDER' || normalized === 'STANDARD_ORDER') {
-        navigate(`/admin/orders/${referenceId}`);
-        return;
+
+      const requestId = orderDetailRequestRef.current + 1;
+      orderDetailRequestRef.current = requestId;
+
+      setOrderDetailKind(nextKind);
+      setStandardOrderDetail(null);
+      setCustomOrderDetail(null);
+      setOrderDetailError(null);
+      setOrderDetailLoading(true);
+
+      try {
+        if (nextKind === 'CUSTOM') {
+          const detail = await customOrdersAdminApi.getById(referenceId);
+          if (!mountedRef.current || orderDetailRequestRef.current !== requestId) return;
+          setCustomOrderDetail(detail);
+        } else {
+          const response = await adminOrdersApi.getById(referenceId);
+          const detail = unwrapApiResponse<AdminStandardOrderDetail>(response.data as any);
+          if (!mountedRef.current || orderDetailRequestRef.current !== requestId) return;
+          setStandardOrderDetail(detail);
+        }
+      } catch (error: any) {
+        if (!mountedRef.current || orderDetailRequestRef.current !== requestId) return;
+        setOrderDetailError(error?.response?.data?.message || 'Unable to load the linked order right now.');
+      } finally {
+        if (!mountedRef.current || orderDetailRequestRef.current !== requestId) return;
+        setOrderDetailLoading(false);
       }
-      toast.error('This finance record is linked, but the reference type is not routable in the admin app.');
     },
-    [navigate],
+    [],
   );
 
   const refreshCurrentTab = useCallback(() => {
@@ -848,15 +926,16 @@ const AdminFinancePage: React.FC = () => {
                 <UniversalSelect value={escrowStatusFilter} onChange={setEscrowStatusFilter} options={SELECTS.escrowStatus} placeholder="Hold status" />
               </div>
               <TableWrap loading={escrowLoading} empty={!escrowHolds.length} emptyMessage="No escrow holds matched the current filters.">
-                <table className="w-full min-w-[1020px] text-left text-sm">
+                <table className="w-full min-w-[1140px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-black/5 text-slate-500 dark:border-white/5 dark:text-slate-400">
                       <th className="px-4 py-3 font-medium">Reference</th>
                       <th className="px-4 py-3 font-medium">Brand</th>
                       <th className="px-4 py-3 font-medium">Buyer</th>
                       <th className="px-4 py-3 font-medium">Gross</th>
-                      <th className="px-4 py-3 font-medium">Released</th>
-                      <th className="px-4 py-3 font-medium">Still held</th>
+                      <th className="px-4 py-3 font-medium">Commission</th>
+                      <th className="px-4 py-3 font-medium">Released (net)</th>
+                      <th className="px-4 py-3 font-medium">Still held (net)</th>
                       <th className="px-4 py-3 font-medium">Status</th>
                       <th className="px-4 py-3 font-medium">Actions</th>
                     </tr>
@@ -867,19 +946,28 @@ const AdminFinancePage: React.FC = () => {
                         <td className="px-4 py-3">
                           <div className="font-semibold text-slate-900 dark:text-white">{hold.title}</div>
                           <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{prettify(hold.holdType)} • {compactId(hold.referenceId)}</div>
+                          <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            Gross = Commission + Released net + Held net
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{hold.brand?.name || '—'}</td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{hold.buyerName || '—'}</td>
                         <td className="px-4 py-3 text-slate-900 dark:text-white">{amountOf(hold.grossAmount, hold.currency)}</td>
+                        <td className="px-4 py-3 text-amber-700 dark:text-amber-300">{amountOf(hold.commissionAmount ?? 0, hold.currency)}</td>
                         <td className="px-4 py-3 text-sky-700 dark:text-sky-300">{amountOf(hold.releasedNetAmount, hold.currency)}</td>
-                        <td className="px-4 py-3 font-semibold text-rose-700 dark:text-rose-300">{amountOf(hold.heldNetAmount, hold.currency)}</td>
+                        <td className="px-4 py-3 font-semibold text-rose-700 dark:text-rose-300">
+                          {amountOf(hold.heldNetAmount, hold.currency)}
+                          <div className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            Brand net total {amountOf(hold.netBrandAmount ?? hold.releasedNetAmount + hold.heldNetAmount, hold.currency)}
+                          </div>
+                        </td>
                         <td className="px-4 py-3">
                           <Badge tone={toneFor(hold.status, 'escrow')} label={prettify(hold.status)} />
                           {hold.frozenReason ? <div className="mt-1 text-xs text-rose-600 dark:text-rose-300">{hold.frozenReason}</div> : null}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-2">
-                            <button type="button" onClick={() => openReference(hold.holdType === 'CUSTOM_ORDER' ? 'CustomOrder' : 'Order', hold.referenceId)} className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]">
+                            <button type="button" onClick={() => void openReference(hold.holdType === 'CUSTOM_ORDER' ? 'CustomOrder' : 'Order', hold.referenceId)} className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]">
                               View order
                             </button>
                             {canProcess && hold.canManualRelease && (
@@ -947,7 +1035,7 @@ const AdminFinancePage: React.FC = () => {
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{transaction.buyerName || '—'}</td>
                         <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">{amountOf(transaction.totalAmount, transaction.currency)}</td>
                         <td className="px-4 py-3">
-                          <button type="button" onClick={() => openReference(transaction.referenceType, transaction.referenceId)} className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]">
+                          <button type="button" onClick={() => void openReference(transaction.referenceType, transaction.referenceId)} className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]">
                             View order
                           </button>
                         </td>
@@ -987,7 +1075,13 @@ const AdminFinancePage: React.FC = () => {
                       <tr key={rule.id} className="border-b border-black/5 last:border-b-0 dark:border-white/5">
                         <td className="px-4 py-3">
                           <div className="font-semibold text-slate-900 dark:text-white">{rule.name}</div>
-                          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{rule.isDefault ? 'Default rule' : 'Specific override'}</div>
+                          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {rule.id.startsWith('system-config-')
+                              ? 'System fallback rule'
+                              : rule.isDefault
+                                ? 'Default rule'
+                                : 'Specific override'}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{prettify(rule.scope)}</td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{rule.currency || '—'}</td>
@@ -997,9 +1091,15 @@ const AdminFinancePage: React.FC = () => {
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{rule.isActive ? 'Active' : 'Inactive'}{rule.isDefault ? ' • Default' : ''}</td>
                         {canProcess && (
                           <td className="px-4 py-3">
-                            <button type="button" onClick={() => openEditRule(rule)} className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]">
-                              Edit
-                            </button>
+                            {rule.id.startsWith('system-config-') ? (
+                              <span className="inline-flex rounded-full border border-dashed border-black/20 px-3 py-1.5 text-xs font-semibold text-slate-500 dark:border-white/20 dark:text-slate-400">
+                                Read only
+                              </span>
+                            ) : (
+                              <button type="button" onClick={() => openEditRule(rule)} className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]">
+                                Edit
+                              </button>
+                            )}
                           </td>
                         )}
                       </tr>
@@ -1143,6 +1243,322 @@ const AdminFinancePage: React.FC = () => {
         </div>
       </section>
 
+      <Modal
+        open={Boolean(orderDetailKind)}
+        onClose={closeOrderDetail}
+        title={
+          orderDetailKind === 'CUSTOM'
+            ? customOrderDetail
+              ? `🧵 ${customOrderDetail.source.title || 'Custom order'}`
+              : '🧵 Custom order'
+            : standardOrderDetail
+              ? `🧾 Standard ${compactId(standardOrderDetail.id)}`
+              : '🧾 Standard order'
+        }
+        size="xl"
+      >
+        {orderDetailLoading ? (
+          <LoaderBlock />
+        ) : orderDetailError ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+            {orderDetailError}
+          </div>
+        ) : orderDetailKind === 'STANDARD' && standardOrderDetail ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge tone={orderStatusTone(standardOrderDetail.status)} label={prettify(standardOrderDetail.status)} />
+              <Badge tone={toneFor(standardOrderDetail.paymentStatus, 'payment')} label={prettify(standardOrderDetail.paymentStatus)} />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <MetricCard
+                label="Order total"
+                value={amountOf(standardOrderDetail.totalAmount, standardOrderDetail.currency || 'NGN')}
+                note={`Created ${formatDate(standardOrderDetail.createdAt)}`}
+              />
+              <MetricCard
+                label="Buyer"
+                value={standardOrderDetail.customerName || 'Buyer'}
+                note={standardOrderDetail.customerEmail || 'No buyer email'}
+              />
+              <MetricCard
+                label="Payment reference"
+                value={standardOrderDetail.paymentReference || 'Not recorded'}
+                note={standardOrderDetail.paymentMethod || 'Payment method unavailable'}
+              />
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+              <Panel title="Order snapshot" description="Buyer, delivery, and fulfillment information without leaving finance.">
+                <DetailList
+                  items={[
+                    { label: 'Brand', value: standardOrderDetail.brand?.name || 'Brand' },
+                    { label: 'Buyer phone', value: standardOrderDetail.customerPhone || 'Not captured' },
+                    { label: 'Shipping address', value: standardOrderDetail.formattedShippingAddress || 'Not captured' },
+                    { label: 'Delivered at', value: formatDate(standardOrderDetail.deliveredAt) },
+                    { label: 'Updated at', value: formatDate(standardOrderDetail.updatedAt) },
+                    { label: 'Items', value: String(standardOrderDetail.orderItems?.length ?? 0) },
+                  ]}
+                />
+              </Panel>
+
+              <Panel title="Finance breakdown" description="Compact receipt-style order math for finance review.">
+                <DetailList
+                  items={[
+                    {
+                      label: 'Item subtotal',
+                      value: amountOf(
+                        standardOrderDetail.financeBreakdown?.itemSubtotal ?? 0,
+                        standardOrderDetail.currency || 'NGN',
+                      ),
+                    },
+                    {
+                      label: 'Delivery fee',
+                      value: amountOf(
+                        standardOrderDetail.financeBreakdown?.shippingAmount ??
+                          standardOrderDetail.shippingCost ??
+                          0,
+                        standardOrderDetail.currency || 'NGN',
+                      ),
+                    },
+                    {
+                      label: 'Discount',
+                      value: amountOf(
+                        standardOrderDetail.financeBreakdown?.discountAmount ??
+                          standardOrderDetail.discountAmount ??
+                          0,
+                        standardOrderDetail.currency || 'NGN',
+                      ),
+                    },
+                    {
+                      label: 'Buyer paid total',
+                      value: amountOf(
+                        standardOrderDetail.financeBreakdown?.grossAmount ??
+                          standardOrderDetail.totalAmount,
+                        standardOrderDetail.currency || 'NGN',
+                      ),
+                    },
+                    {
+                      label: 'Platform commission',
+                      value:
+                        standardOrderDetail.financeBreakdown?.commissionAmount != null
+                          ? amountOf(
+                              standardOrderDetail.financeBreakdown.commissionAmount,
+                              standardOrderDetail.currency || 'NGN',
+                            )
+                          : 'Not recorded',
+                    },
+                    {
+                      label: 'Brand net total',
+                      value:
+                        standardOrderDetail.financeBreakdown?.netBrandAmount != null
+                          ? amountOf(
+                              standardOrderDetail.financeBreakdown.netBrandAmount,
+                              standardOrderDetail.currency || 'NGN',
+                            )
+                          : 'Pending release',
+                    },
+                    {
+                      label: 'Escrow status',
+                      value: standardOrderDetail.financeBreakdown?.escrowStatus || 'Not available',
+                    },
+                  ]}
+                />
+              </Panel>
+            </div>
+
+            <Panel title="Line items" description="Saved checkout line items for quick order verification.">
+              {!standardOrderDetail.orderItems?.length ? (
+                <div className="rounded-2xl border border-dashed border-black/10 px-4 py-10 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+                  No line items were returned for this order.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {standardOrderDetail.orderItems.map((item) => (
+                    <div key={item.id} className="rounded-2xl border border-black/10 bg-slate-50/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="font-semibold text-slate-900 dark:text-white">
+                            {item.nameAtPurchase || 'Order item'}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Qty {item.quantity} • {item.selectedSize ? `Size ${item.selectedSize}` : 'No size'} • {item.selectedColor ? `Color ${item.selectedColor}` : 'No color'}
+                          </div>
+                        </div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                          {amountOf(item.totalPrice, standardOrderDetail.currency || 'NGN')}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            <Panel title="Escrow release schedule" description="Milestone release values tied to this order.">
+              {(standardOrderDetail.financeBreakdown?.releaseSchedule ?? []).length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-black/10 px-4 py-10 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+                  No release schedule is attached to this order.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(standardOrderDetail.financeBreakdown?.releaseSchedule ?? []).map((stage, index) => (
+                    <div key={`${stage.stage}-${index}`} className="rounded-2xl border border-black/10 bg-slate-50/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold text-slate-900 dark:text-white">{prettify(stage.stage)}</div>
+                          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {stage.releasedAt
+                              ? `Released ${formatDate(stage.releasedAt)}`
+                              : stage.eligibleAt
+                                ? `Eligible ${formatDate(stage.eligibleAt)}`
+                                : 'Awaiting milestone'}
+                          </div>
+                        </div>
+                        <div className="text-right text-xs text-slate-500 dark:text-slate-400">
+                          <div>Gross {amountOf(stage.grossAmount, standardOrderDetail.currency || 'NGN')}</div>
+                          <div>Commission {amountOf(stage.commissionAmount, standardOrderDetail.currency || 'NGN')}</div>
+                          <div>Net {amountOf(stage.netAmount, standardOrderDetail.currency || 'NGN')}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => navigate(`/admin/orders/${standardOrderDetail.id}`)}
+                className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]"
+              >
+                Open full order workspace
+              </button>
+            </div>
+          </div>
+        ) : orderDetailKind === 'CUSTOM' && customOrderDetail ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge tone={orderStatusTone(customOrderDetail.status)} label={prettify(customOrderDetail.status)} />
+              <Badge tone={toneFor(customOrderDetail.paymentStatus, 'payment')} label={prettify(customOrderDetail.paymentStatus)} />
+              {customOrderDetail.currentProgressStage ? (
+                <Badge tone="bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300" label={prettify(customOrderDetail.currentProgressStage)} />
+              ) : null}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <MetricCard
+                label="Buyer total"
+                value={amountOf(customOrderDetail.buyerPriceSummary.grandTotal, customOrderDetail.buyerPriceSummary.currency || 'NGN')}
+                note={`Created ${formatDate(customOrderDetail.createdAt)}`}
+              />
+              <MetricCard
+                label="Brand"
+                value={customOrderDetail.source.brandName || 'Brand'}
+                note={customOrderDetail.paymentReference || 'No payment reference'}
+              />
+              <MetricCard
+                label="Payment state"
+                value={prettify(customOrderDetail.paymentStatus)}
+                note={customOrderDetail.currentProgressStage ? prettify(customOrderDetail.currentProgressStage) : 'No progress stage yet'}
+              />
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+              <Panel title="Order snapshot" description="Core order context for finance-led custom-order review.">
+                <DetailList
+                  items={[
+                    { label: 'Source type', value: prettify(customOrderDetail.source.type) },
+                    { label: 'Source title', value: customOrderDetail.source.title || 'Custom order' },
+                    { label: 'Measurement confirmed', value: formatDate(customOrderDetail.measurementConfirmedAt) },
+                    { label: 'Accepted at', value: formatDate(customOrderDetail.acceptedAt) },
+                    { label: 'Production deadline', value: formatDate(customOrderDetail.promisedProductionAt) },
+                    { label: 'Delivery deadline', value: formatDate(customOrderDetail.promisedDeliveryAt) },
+                  ]}
+                />
+              </Panel>
+
+              <Panel title="Finance breakdown" description="Receipt-style custom-order price summary without leaving the finance console.">
+                <DetailList
+                  items={[
+                    {
+                      label: 'Item subtotal',
+                      value: amountOf(
+                        customOrderDetail.buyerPriceSummary.subtotal ?? 0,
+                        customOrderDetail.buyerPriceSummary.currency || 'NGN',
+                      ),
+                    },
+                    {
+                      label: 'Delivery fee',
+                      value: amountOf(
+                        customOrderDetail.buyerPriceSummary.shippingFee ?? 0,
+                        customOrderDetail.buyerPriceSummary.currency || 'NGN',
+                      ),
+                    },
+                    {
+                      label: 'Rush fee',
+                      value: amountOf(
+                        customOrderDetail.buyerPriceSummary.rushFee ?? 0,
+                        customOrderDetail.buyerPriceSummary.currency || 'NGN',
+                      ),
+                    },
+                    {
+                      label: 'Fabric charge',
+                      value: amountOf(
+                        customOrderDetail.buyerPriceSummary.fabricCharge ?? 0,
+                        customOrderDetail.buyerPriceSummary.currency || 'NGN',
+                      ),
+                    },
+                    {
+                      label: 'Buyer paid total',
+                      value: amountOf(
+                        customOrderDetail.buyerPriceSummary.grandTotal,
+                        customOrderDetail.buyerPriceSummary.currency || 'NGN',
+                      ),
+                    },
+                    {
+                      label: 'Issues raised',
+                      value: String(customOrderDetail.issues?.length ?? 0),
+                    },
+                    {
+                      label: 'Disputes opened',
+                      value: String(customOrderDetail.disputes?.length ?? 0),
+                    },
+                  ]}
+                />
+              </Panel>
+            </div>
+
+            <Panel title="Operational notes" description="Finance-adjacent lifecycle markers relevant to review.">
+              <DetailList
+                items={[
+                  { label: 'Buyer acceptance window', value: formatDate(customOrderDetail.buyerAcceptanceWindowEndsAt) },
+                  { label: 'Promised dispatch', value: formatDate(customOrderDetail.promisedDispatchAt) },
+                  { label: 'Completed at', value: formatDate(customOrderDetail.completedAt) },
+                  {
+                    label: 'Retention hold',
+                    value: customOrderDetail.retentionHoldType
+                      ? `${prettify(customOrderDetail.retentionHoldType)} until ${formatDate(customOrderDetail.retentionHoldUntil)}`
+                      : 'None',
+                  },
+                ]}
+              />
+            </Panel>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => navigate(`/admin/custom-orders/${customOrderDetail.id}`)}
+                className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]"
+              >
+                Open full order workspace
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
       <Modal open={paymentDetailLoading || Boolean(paymentDetail)} onClose={closePaymentDetail} title="Payment Detail" size="xl">
         {paymentDetailLoading ? <LoaderBlock /> : paymentDetail ? (
           <div className="space-y-4">
@@ -1154,12 +1570,12 @@ const AdminFinancePage: React.FC = () => {
             <Panel title="Linked Objects" description="Orders or custom orders tied to this payment">
               <div className="space-y-2">
                 {paymentDetail.customOrder ? (
-                  <button type="button" onClick={() => openReference('CustomOrder', paymentDetail.customOrder?.id)} className="w-full rounded-2xl border border-black/10 bg-slate-50/70 px-4 py-3 text-left dark:border-white/10 dark:bg-white/[0.03]">
+                  <button type="button" onClick={() => void openReference('CustomOrder', paymentDetail.customOrder?.id)} className="w-full rounded-2xl border border-black/10 bg-slate-50/70 px-4 py-3 text-left dark:border-white/10 dark:bg-white/[0.03]">
                     <div className="font-semibold text-slate-900 dark:text-white">{paymentDetail.customOrder.title || paymentDetail.customOrder.sourceTitleSnapshot || 'Custom order'}</div>
                     <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{paymentDetail.customOrder.brand?.name || '—'} • {compactId(paymentDetail.customOrder.id)}</div>
                   </button>
                 ) : paymentDetail.orders.map((order) => (
-                  <button key={order.id} type="button" onClick={() => openReference('Order', order.id)} className="w-full rounded-2xl border border-black/10 bg-slate-50/70 px-4 py-3 text-left dark:border-white/10 dark:bg-white/[0.03]">
+                  <button key={order.id} type="button" onClick={() => void openReference('Order', order.id)} className="w-full rounded-2xl border border-black/10 bg-slate-50/70 px-4 py-3 text-left dark:border-white/10 dark:bg-white/[0.03]">
                     <div className="font-semibold text-slate-900 dark:text-white">Standard order {compactId(order.id)}</div>
                     <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{order.brand?.name || '—'} • {amountOf(order.totalAmount, order.currency)}</div>
                   </button>
@@ -1246,8 +1662,21 @@ const TableWrap: React.FC<{ loading: boolean; empty: boolean; emptyMessage: stri
 };
 
 const LoaderBlock = () => (
-  <div className="py-16">
+  <div className="flex items-center justify-center py-16">
     <VLoader size={34} phase="loading" showLabel={false} />
+  </div>
+);
+
+const DetailList: React.FC<{ items: Array<{ label: string; value: React.ReactNode }> }> = ({ items }) => (
+  <div className="divide-y divide-dashed divide-black/10 dark:divide-white/10">
+    {items.map((item) => (
+      <div key={item.label} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+        <span className="text-sm text-slate-500 dark:text-slate-400">{item.label}</span>
+        <span className="max-w-[62%] text-right text-sm font-medium text-slate-900 dark:text-white">
+          {item.value}
+        </span>
+      </div>
+    ))}
   </div>
 );
 

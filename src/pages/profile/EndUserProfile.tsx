@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useDispatch, useSelector } from 'react-redux';
 import { SavedTab } from './tabs/SavedTab';
@@ -98,6 +98,8 @@ const describeAlphaFit = (value?: string | null): string | null => {
 
 export const EndUserProfile: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((state: RootState) => state.user.profile);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -127,8 +129,19 @@ export const EndUserProfile: React.FC = () => {
   const isOwner = !id || currentUser?.id === id;
   const profileId = id ?? currentUser?.id;
   const availableTabs = useMemo(() => (isOwner ? ['Saved', 'Patches', 'Orders'] : ['Patches']), [isOwner]);
-  const [activeTab, setActiveTab] = useState<string>(isOwner ? 'Saved' : 'Patches');
+  const tabParam = searchParams.get('tab');
+  const derivedTab = (() => {
+    if (tabParam === 'orders' && isOwner) return 'Orders';
+    return isOwner ? 'Saved' : 'Patches';
+  })();
+  const [activeTab, setActiveTab] = useState<string>(derivedTab);
   const [ordersSelection, setOrdersSelection] = useState<OrdersPanelSelection | null>(null);
+
+  // Keep activeTab in sync when URL changes (e.g. browser back/forward)
+  useEffect(() => {
+    setActiveTab(derivedTab);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam]);
   const hasAvatarImage = Boolean(
     avatarPreviewUrl ||
       profile?.profileImage ||
@@ -925,7 +938,7 @@ export const EndUserProfile: React.FC = () => {
         </div>
 
         {/* ── TAB CONTENT ── */}
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className={activeTab === 'Orders' ? '' : 'lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_360px]'}>
           {/* Main column */}
           <AnimatePresence mode="wait">
             <motion.div
@@ -956,6 +969,11 @@ export const EndUserProfile: React.FC = () => {
             <div className="hidden lg:flex lg:flex-col lg:gap-5">
               <OrdersPanel
                 onViewAll={(selection) => {
+                  if (selection) {
+                    navigate(`/profile?tab=orders&kind=${selection.kind}&orderId=${selection.id}`);
+                  } else {
+                    navigate('/profile?tab=orders');
+                  }
                   setOrdersSelection(selection ?? null);
                   setActiveTab('Orders');
                 }}
@@ -969,6 +987,11 @@ export const EndUserProfile: React.FC = () => {
           <div className="mt-5 lg:hidden">
             <OrdersPanel
               onViewAll={(selection) => {
+                if (selection) {
+                  navigate(`/profile?tab=orders&kind=${selection.kind}&orderId=${selection.id}`);
+                } else {
+                  navigate('/profile?tab=orders');
+                }
                 setOrdersSelection(selection ?? null);
                 setActiveTab('Orders');
               }}

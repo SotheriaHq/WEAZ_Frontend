@@ -6,6 +6,11 @@ import type { PaystackPaymentData, ShippingAddress } from '@/api/StoreApi';
 import { paymentApi } from '@/api/PaymentApi';
 import { createIdempotencyKey } from '@/api/idempotency';
 import {
+  customOrdersBuyerApi,
+  type CustomOrderCheckoutBagLine,
+  type CustomOrderPaymentInitResult,
+} from '@/api/CustomOrderApi';
+import {
   fetchCart,
   clearCart,
   selectCartPriceChangeNotices,
@@ -13,13 +18,15 @@ import {
 } from '@/features/cartSlice';
 import type { CartItem } from '@/features/cartSlice';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { formatPrice } from '@/utils/helpers';
+import { openPaystackInline } from '@/lib/paystackInline';
 import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
+import { unifiedCheckoutQueue } from '@/lib/unifiedCheckoutQueue';
 import {
   loadDeliveryAddressBook,
   removeDeliveryAddress,
@@ -176,6 +183,7 @@ const CheckoutPanel: React.FC<{
 const CheckoutPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const location = useLocation();
   const cart = useSelector((s: RootState) => s.cart);
   const priceChangeNotices = useSelector(selectCartPriceChangeNotices);
   const removedItemNotices = useSelector(selectCartRemovedItemNotices);
@@ -217,6 +225,28 @@ const CheckoutPage: React.FC = () => {
   /* ── Submission state ── */
   const [submitting, setSubmitting] = useState(false);
   const [cartLoading, setCartLoading] = useState(!cart.items.length);
+  const [customBagItems, setCustomBagItems] = useState<CustomOrderCheckoutBagLine[]>([]);
+  const [customBagLoading, setCustomBagLoading] = useState(true);
+  const [customBagError, setCustomBagError] = useState<string | null>(null);
+
+  const checkoutEntryState =
+    (location.state as { promoCode?: string } | null) ?? null;
+
+  const refreshCustomBag = useCallback(async () => {
+    setCustomBagLoading(true);
+    setCustomBagError(null);
+    try {
+      const response = await customOrdersBuyerApi.listCheckoutBag();
+      setCustomBagItems(response.items || []);
+    } catch (error: any) {
+      setCustomBagItems([]);
+      setCustomBagError(
+        error?.response?.data?.message || 'Unable to load custom requests from your bag.',
+      );
+    } finally {
+      setCustomBagLoading(false);
+    }
+  }, []);
 
   /* ── Fetch cart on mount if empty; redirect if still empty after fetch ── */
   useEffect(() => {
@@ -227,11 +257,22 @@ const CheckoutPage: React.FC = () => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!cartLoading && !cart.items.length) {
+    void refreshCustomBag();
+  }, [refreshCustomBag]);
+
+  useEffect(() => {
+    const incomingPromo = checkoutEntryState?.promoCode?.trim();
+    if (!incomingPromo) return;
+    setPromoCode(incomingPromo.toUpperCase());
+    setPromoApplied(true);
+  }, [checkoutEntryState?.promoCode]);
+
+  useEffect(() => {
+    if (!cartLoading && !customBagLoading && !cart.items.length && customBagItems.length === 0) {
       toast.error('Your bag is empty');
       navigate('/', { replace: true });
     }
-  }, [cartLoading, cart.items.length, navigate]);
+  }, [cartLoading, cart.items.length, customBagItems.length, customBagLoading, navigate]);
 
   useEffect(() => {
     let active = true;
@@ -304,9 +345,24 @@ const CheckoutPage: React.FC = () => {
     [priceChangeNotices],
   );
 
+  const payableCustomBagItems = useMemo(
+    () => customBagItems.filter((item) => item.canProceedToPayment),
+    [customBagItems],
+  );
+
+  const blockedCustomBagItems = useMemo(
+    () => customBagItems.filter((item) => !item.canProceedToPayment),
+    [customBagItems],
+  );
+
   const shippingCost = address.state ? getShippingCost(address.state) : 0;
   const discountAmount = promoApplied ? Math.round(cart.subtotal * 0.1) : 0; // scaffold: 10% off
-  const grandTotal = cart.subtotal + shippingCost - discountAmount;
+  const customSubtotal = payableCustomBagItems.reduce(
+    (sum, item) => sum + Number(item.buyerPriceSummary?.grandTotal ?? 0),
+    0,
+  );
+  const standardGrandTotal = Math.max(0, cart.subtotal + shippingCost - discountAmount);
+  const grandTotal = standardGrandTotal + customSubtotal;
   const brandGroups = useMemo(() => groupByBrand(cart.items), [cart.items]);
   const activePaymentData = paymentMethod === 'PENDING_SELECTION' ? null : paymentState[paymentMethod];
   const paymentSummaryLines = useMemo(
@@ -502,6 +558,58 @@ const CheckoutPage: React.FC = () => {
     setPaymentErrors({});
   }, []);
 
+  const launchInitializedPayment = useCallback(async (paymentInit: {
+    reference: string;
+    gateway?: string;
+    providerAccessCode?: string;
+    authorizationUrl?: string;
+  }) => {
+    const resolvedGateway = paymentInit.gateway || 'PAYSTACK';
+
+    if (paymentInit.providerAccessCode) {
+      await openPaystackInline(paymentInit.providerAccessCode, {
+        onSuccess: () => {
+          navigate(
+            `/bag/payment-return?reference=${encodeURIComponent(paymentInit.reference)}&gateway=${encodeURIComponent(resolvedGateway)}&uq=1`,
+          );
+        },
+        onCancel: () => {
+          toast.error('Payment was cancelled before completion.');
+        },
+        onError: (inlineError) => {
+          toast.error(inlineError.message || 'Unable to open the payment window.');
+        },
+      });
+      return;
+    }
+
+    if (paymentInit.authorizationUrl) {
+      window.location.assign(paymentInit.authorizationUrl);
+      return;
+    }
+
+    navigate(
+      `/bag/payment-return?reference=${encodeURIComponent(paymentInit.reference)}&gateway=${encodeURIComponent(resolvedGateway)}&uq=1`,
+    );
+  }, [navigate]);
+
+  const initializeCustomLinePayment = useCallback(async (params: {
+    checkoutIntentId: string;
+    paymentMethod: 'PAYSTACK' | 'FLUTTERWAVE' | 'BANK_TRANSFER';
+    email: string;
+    paymentData: Record<string, unknown>;
+  }): Promise<CustomOrderPaymentInitResult> => {
+    return customOrdersBuyerApi.initializePaymentForCheckoutIntent(
+      params.checkoutIntentId,
+      {
+        paymentMethod: params.paymentMethod,
+        email: params.email,
+        callbackUrl: `${window.location.origin}/bag/payment-return?uq=1`,
+        paymentData: params.paymentData,
+      },
+    );
+  }, []);
+
   /* ── Place order flow ── */
   const handlePlaceOrder = useCallback(async () => {
     if (submittingRef.current) return;
@@ -509,7 +617,10 @@ const CheckoutPage: React.FC = () => {
     setSubmitting(true);
 
     try {
-      if (!cart.items.length) {
+      const hasStoreItems = cart.items.length > 0;
+      const hasPayableCustomItems = payableCustomBagItems.length > 0;
+
+      if (!hasStoreItems && !hasPayableCustomItems) {
         toast.error('Your bag is empty');
         return;
       }
@@ -528,12 +639,6 @@ const CheckoutPage: React.FC = () => {
 
       const paymentSubmissionData = buildPaymentSubmissionData(activePaymentData, address);
       const contactInfo = buildContactInfo(paymentSubmissionData, address);
-      const checkoutIdempotencyKey =
-        checkoutIdempotencyKeyRef.current ?? createIdempotencyKey();
-      checkoutIdempotencyKeyRef.current = checkoutIdempotencyKey;
-      const paymentInitIdempotencyKey =
-        paymentInitIdempotencyKeyRef.current ?? createIdempotencyKey();
-      paymentInitIdempotencyKeyRef.current = paymentInitIdempotencyKey;
       const nextAddresses = upsertDeliveryAddress(user?.id, {
         ...currentAddressDraft,
         contactEmail: currentAddressDraft.contactEmail || paymentSubmissionData.email || '',
@@ -543,41 +648,20 @@ const CheckoutPage: React.FC = () => {
         setEditingAddressId(nextAddresses[0].id);
       }
 
-      // 1. Place order via checkout endpoint
-      const customerName = `${address.firstName} ${address.lastName}`.trim();
-      const result = await checkout({
-        customerName,
-        shippingAddress: address,
-        contactInfo,
-        paymentMethod,
-        promoCode: promoApplied ? promoCode : undefined,
-      }, {
-        idempotencyKey: checkoutIdempotencyKey,
-      });
-
-      const orderIds = result.orders.map((o) => o.id);
-
-      // 2. Initialize payment
-      const paymentResult = await paymentApi.initialize({
-        orderIds,
-        paymentMethod,
-        email: paymentSubmissionData.email,
-        callbackUrl: `${window.location.origin}/checkout/payment-return`,
-        paymentData: paymentSubmissionData,
-        idempotencyKey: paymentInitIdempotencyKey,
-      });
-
-      // 3. Clear cart
-      await dispatch(clearCart());
-
-      // Build summary for confirmation page
       const summary = {
-        items: cart.items.map((i) => ({
-          name: i.product.name,
-          quantity: i.quantity,
-          price: i.product.effectivePrice,
-        })),
-        subtotal: cart.subtotal,
+        items: [
+          ...cart.items.map((i) => ({
+            name: i.product.name,
+            quantity: i.quantity,
+            price: i.product.effectivePrice,
+          })),
+          ...payableCustomBagItems.map((line) => ({
+            name: `${line.sourceTitle} (Custom)` ,
+            quantity: 1,
+            price: Number(line.buyerPriceSummary?.grandTotal ?? 0),
+          })),
+        ],
+        subtotal: cart.subtotal + customSubtotal,
         shippingCost,
         discount: discountAmount,
         grandTotal,
@@ -586,35 +670,150 @@ const CheckoutPage: React.FC = () => {
         shippingState: address.state,
       };
 
-      // 4. Handle gateway-specific flows
-      if (paymentResult.authorizationUrl && paymentResult.nextAction?.type === 'REDIRECT') {
-        toast.success('Redirecting to payment flow...');
-        window.location.assign(paymentResult.authorizationUrl);
+      const normalizedPaymentMethod = paymentMethod as 'PAYSTACK' | 'FLUTTERWAVE' | 'BANK_TRANSFER';
+      const queueLines = payableCustomBagItems.map((line) => ({
+        checkoutIntentId: line.checkoutIntentId,
+        sessionId: line.sessionId,
+        sourceTitle: line.sourceTitle,
+      }));
+
+      let orderIds: string[] = [];
+      let standardOrdersPlaced = false;
+      let standardPaymentResult: Awaited<ReturnType<typeof paymentApi.initialize>> | null = null;
+      let standardError: string | null = null;
+
+      if (hasStoreItems) {
+        try {
+          const checkoutIdempotencyKey =
+            checkoutIdempotencyKeyRef.current ?? createIdempotencyKey();
+          checkoutIdempotencyKeyRef.current = checkoutIdempotencyKey;
+          const paymentInitIdempotencyKey =
+            paymentInitIdempotencyKeyRef.current ?? createIdempotencyKey();
+          paymentInitIdempotencyKeyRef.current = paymentInitIdempotencyKey;
+
+          const customerName = `${address.firstName} ${address.lastName}`.trim();
+          const result = await checkout({
+            customerName,
+            shippingAddress: address,
+            contactInfo,
+            paymentMethod,
+            promoCode: promoApplied ? promoCode : undefined,
+          }, {
+            idempotencyKey: checkoutIdempotencyKey,
+          });
+
+          orderIds = result.orders.map((o) => o.id);
+          standardOrdersPlaced = orderIds.length > 0;
+
+          standardPaymentResult = await paymentApi.initialize({
+            orderIds,
+            paymentMethod,
+            email: paymentSubmissionData.email,
+            callbackUrl: `${window.location.origin}/bag/payment-return?uq=1`,
+            paymentData: paymentSubmissionData,
+            idempotencyKey: paymentInitIdempotencyKey,
+          });
+        } catch (error: any) {
+          standardError =
+            error?.response?.data?.message ||
+            error?.message ||
+            'Store items could not be prepared for payment.';
+        }
+      }
+
+      let customPrimaryPayment: CustomOrderPaymentInitResult | null = null;
+      let remainingCustomQueue = [...queueLines];
+
+      if (!standardPaymentResult && remainingCustomQueue.length > 0) {
+        while (remainingCustomQueue.length > 0 && !customPrimaryPayment) {
+          const [candidate, ...rest] = remainingCustomQueue;
+          try {
+            customPrimaryPayment = await initializeCustomLinePayment({
+              checkoutIntentId: candidate.checkoutIntentId,
+              paymentMethod: normalizedPaymentMethod,
+              email: paymentSubmissionData.email,
+              paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
+            });
+            remainingCustomQueue = rest;
+          } catch (error: any) {
+            remainingCustomQueue = rest;
+            toast.error(
+              error?.response?.data?.message ||
+                `${candidate.sourceTitle} could not be prepared for payment and remains in your bag.`,
+            );
+          }
+        }
+      }
+
+      if (!standardPaymentResult && !customPrimaryPayment) {
+        if (standardError) {
+          throw new Error(standardError);
+        }
+        toast.error('No payable lines are ready. Refresh expired custom locks and try again.');
         return;
       }
 
-      toast.success(paymentResult?.bankAccount ? 'Payment instructions are ready' : 'Payment flow started');
+      if (standardError && customPrimaryPayment) {
+        toast.error(`${standardError} We started payment for available custom requests.`);
+      }
 
-      navigate(`/checkout/confirmation?reference=${encodeURIComponent(paymentResult.reference)}`, {
-        state: {
-          orderIds,
-          paymentMethod,
-          paymentData: paymentSubmissionData,
-          bankAccount: paymentResult.bankAccount,
-          authorizationUrl: paymentResult.authorizationUrl,
-          gateway: paymentResult.gateway,
-          reference: paymentResult.reference,
-          nextAction: paymentResult.nextAction,
-          summary,
-        },
+      if (blockedCustomBagItems.length > 0) {
+        toast.error(
+          `${blockedCustomBagItems.length} custom ${blockedCustomBagItems.length === 1 ? 'request has' : 'requests have'} expired locks and will stay in your bag.`,
+        );
+      }
+
+      if (standardOrdersPlaced && standardPaymentResult) {
+        await dispatch(clearCart());
+      }
+
+      if (standardOrdersPlaced && !standardPaymentResult) {
+        toast.error('Some store orders were created but payment could not start. Re-open Orders to retry payment.');
+      }
+
+      unifiedCheckoutQueue.save({
+        paymentMethod: normalizedPaymentMethod,
+        email: paymentSubmissionData.email,
+        paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
+        lines: standardPaymentResult ? queueLines : remainingCustomQueue,
+        summary,
       });
+
+      if (standardPaymentResult) {
+        await launchInitializedPayment(standardPaymentResult);
+        return;
+      }
+
+      if (customPrimaryPayment) {
+        await launchInitializedPayment(customPrimaryPayment);
+        return;
+      }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Checkout failed. Please try again.');
+      toast.error(error?.response?.data?.message || error?.message || 'Checkout failed. Please try again.');
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
     }
-  }, [cart.items.length, address, paymentMethod, activePaymentData, promoApplied, promoCode, dispatch, navigate]);
+  }, [
+    activePaymentData,
+    address,
+    blockedCustomBagItems,
+    cart.items,
+    cart.subtotal,
+    currentAddressDraft,
+    customSubtotal,
+    discountAmount,
+    dispatch,
+    grandTotal,
+    initializeCustomLinePayment,
+    launchInitializedPayment,
+    paymentMethod,
+    payableCustomBagItems,
+    promoApplied,
+    promoCode,
+    shippingCost,
+    user?.id,
+  ]);
 
   /* ─── Step Indicator ─── */
   const stepIdx = STEPS.indexOf(step);
@@ -676,7 +875,7 @@ const CheckoutPage: React.FC = () => {
       </nav>
 
       {/* Notices */}
-      {(priceChangeNotices.length > 0 || removedItemNotices.length > 0) && (
+      {(priceChangeNotices.length > 0 || removedItemNotices.length > 0 || blockedCustomBagItems.length > 0 || Boolean(customBagError)) && (
         <div className="rounded-xl border border-amber-200/70 dark:border-amber-700/40 bg-amber-50/70 dark:bg-amber-900/20 p-4 text-sm text-amber-900 dark:text-amber-100 mb-6">
           {removedItemNotices.length > 0 && (
             <p className="font-medium">Some items were removed because they are out of stock or no longer available.</p>
@@ -685,6 +884,14 @@ const CheckoutPage: React.FC = () => {
             <p className="font-medium">
               Prices were updated for {priceChangeNotices.length} item{priceChangeNotices.length > 1 ? 's' : ''}. Review the changes below.
             </p>
+          )}
+          {blockedCustomBagItems.length > 0 && (
+            <p className="font-medium">
+              {blockedCustomBagItems.length} custom request{blockedCustomBagItems.length > 1 ? 's have' : ' has'} expired pricing locks. Refresh them from your bag before payment.
+            </p>
+          )}
+          {customBagError && (
+            <p className="font-medium">{customBagError}</p>
           )}
         </div>
       )}
@@ -1051,8 +1258,9 @@ const CheckoutPage: React.FC = () => {
 
               {/* Items grouped by brand */}
               <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03] space-y-4">
-                <h3 className="font-semibold">🛍️ Items</h3>
-                {brandGroups.map((group) => (
+                <h3 className="font-semibold">🛍️ Bag lines</h3>
+
+                {brandGroups.length > 0 && brandGroups.map((group) => (
                   <div key={group.brandName} className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400">
                       {group.brandName}
@@ -1095,6 +1303,34 @@ const CheckoutPage: React.FC = () => {
                     })}
                   </div>
                 ))}
+
+                {payableCustomBagItems.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-300">
+                      Custom requests
+                    </p>
+                    {payableCustomBagItems.map((line) => (
+                      <div key={line.sessionId} className="flex items-center justify-between gap-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{line.sourceTitle}</p>
+                          <p className="text-gray-400 text-xs">
+                            Qty: 1 · {line.sourceBrandName || 'Custom order'}
+                            {line.rushSelected ? ' · Rush' : ''}
+                          </p>
+                        </div>
+                        <span className="font-medium flex-shrink-0">
+                          {formatPrice(line.buyerPriceSummary.grandTotal)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {blockedCustomBagItems.length > 0 && (
+                  <div className="rounded-2xl border border-amber-300/70 bg-amber-50/80 p-3 text-xs text-amber-800 dark:border-amber-600/40 dark:bg-amber-500/10 dark:text-amber-100">
+                    {blockedCustomBagItems.length} custom request{blockedCustomBagItems.length > 1 ? 's are' : ' is'} blocked by expired pricing locks and excluded from this payment.
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-4 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
@@ -1150,15 +1386,59 @@ const CheckoutPage: React.FC = () => {
                     </div>
                   </div>
                 ))}
+
+                {payableCustomBagItems.map((line) => (
+                  <div key={line.sessionId} className="flex items-start gap-3 rounded-[22px] border border-indigo-200/70 bg-indigo-50/70 p-3 dark:border-indigo-500/20 dark:bg-indigo-500/10">
+                    <div className="h-16 w-16 overflow-hidden rounded-2xl bg-white ring-1 ring-indigo-200/70 dark:bg-white/10 dark:ring-indigo-500/30">
+                      {line.sourcePrimaryMediaUrl ? (
+                        <ImageWithFallback
+                          src={line.sourcePrimaryMediaUrl}
+                          alt={line.sourceTitle}
+                          className="h-full w-full"
+                          fit="cover"
+                          rounded="none"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-xl">🧵</div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{line.sourceTitle}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{line.sourceBrandName || 'Custom order'}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-slate-950 dark:text-white">
+                          {formatPrice(line.buyerPriceSummary.grandTotal)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Qty: 1 · {line.measurementCount} measurements{line.rushSelected ? ' · Rush' : ''}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+
+                {customBagLoading && (
+                  <div className="rounded-[22px] border border-slate-200/80 bg-white/70 p-3 text-xs text-slate-500 dark:border-white/8 dark:bg-white/[0.03] dark:text-slate-400">
+                    Loading custom requests...
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3 border-t border-slate-200/80 pt-4 text-sm dark:border-white/8">
                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                  <span>Subtotal</span>
+                  <span>Store items</span>
                   <span className="text-slate-950 dark:text-white">{formatPrice(cart.subtotal)}</span>
                 </div>
+                {payableCustomBagItems.length > 0 && (
+                  <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                    <span>Custom requests</span>
+                    <span className="text-slate-950 dark:text-white">{formatPrice(customSubtotal)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                  <span>Shipping</span>
+                  <span>Store shipping</span>
                   <span className="text-slate-950 dark:text-white">{address.state ? formatPrice(shippingCost) : '—'}</span>
                 </div>
                 {discountAmount > 0 && (

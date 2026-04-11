@@ -95,6 +95,7 @@ const AdminCustomOrdersPage: React.FC = () => {
     () => pendingBases.find((entry) => entry.id === selectedBasisId) ?? null,
     [pendingBases, selectedBasisId],
   );
+  const selectedSource = selected?.source ?? null;
 
   const loadSelection = async (targetOrderId: string, sequence: number) => {
     const [detail, allocationData] = await Promise.all([
@@ -344,7 +345,7 @@ const AdminCustomOrdersPage: React.FC = () => {
                   <CustomOrderBadge value={selected.paymentStatus} type="payment" />
                   <CustomOrderBadge value={selected.currentProgressStage ?? 'ORDER_PLACED'} type="stage" />
                 </div>
-                <h2 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{selected.source.title}</h2>
+                <h2 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{selectedSource?.title ?? 'Custom order'}</h2>
                 <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">Payment: {selected.paymentStatus} • Disputes: {selected.disputes.length} • Issues: {selected.issues.length}</div>
               </div>
 
@@ -360,8 +361,8 @@ const AdminCustomOrdersPage: React.FC = () => {
                   <div className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Order snapshot</div>
                   <CustomOrderKeyValueList
                     items={[
-                      { label: 'Source type', value: selected.source.type },
-                      { label: 'Brand', value: selected.source.brandName ?? 'Brand' },
+                      { label: 'Source type', value: selectedSource?.type ?? 'Unknown' },
+                      { label: 'Brand', value: selectedSource?.brandName ?? 'Brand' },
                       { label: 'Promised dispatch', value: formatDateTime(selected.promisedDispatchAt) },
                       { label: 'Acceptance window', value: formatDateTime(selected.buyerAcceptanceWindowEndsAt) },
                       { label: 'Retention until', value: formatDateTime(selected.measurementRetentionUntil) },

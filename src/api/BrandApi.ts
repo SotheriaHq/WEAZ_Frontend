@@ -56,6 +56,46 @@ const getCollectionBasePath = (scope?: CollectionScope) =>
 const SIGNED_URL_TTL_MS = 4 * 60 * 1000;
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 const signedUrlPending = new Map<string, Promise<string | null>>();
+
+const extractS3KeyFromMaybeMalformedUrl = (rawS3Url: string): string | null => {
+  const raw = String(rawS3Url ?? '').trim();
+  if (!raw) return null;
+
+  if (!/^https?:\/\//i.test(raw)) {
+    const key = raw.replace(/^\/+/, '');
+    return key || null;
+  }
+
+  try {
+    const parsed = new URL(raw);
+    const key = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+    return key || null;
+  } catch {
+    const compact = raw.replace(/[\r\n\t]+/g, '').trim();
+
+    const marker = 'amazonaws.com/';
+    const markerIndex = compact.toLowerCase().lastIndexOf(marker);
+    if (markerIndex !== -1) {
+      const suffix = compact.slice(markerIndex + marker.length).split('?')[0].trim();
+      if (!suffix) return null;
+      try {
+        return decodeURIComponent(suffix);
+      } catch {
+        return suffix;
+      }
+    }
+
+    const fallbackMatch = compact.match(/\.s3\.[^/]+\/(.+)$/i);
+    const fallback = fallbackMatch?.[1]?.split('?')[0]?.trim();
+    if (!fallback) return null;
+    try {
+      return decodeURIComponent(fallback);
+    } catch {
+      return fallback;
+    }
+  }
+};
+
 const VERIFICATION_STATUS_TTL_MS = 1500;
 const verificationStatusCache = new Map<
   string,
@@ -1349,9 +1389,8 @@ export const brandApi = {
 
     const request = (async (): Promise<string | null> => {
       try {
-        // Extract the S3 key from the URL (path after the bucket hostname)
-        const parsed = new URL(rawS3Url);
-        const s3Key = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+        // Extract the S3 key from the URL (supports malformed legacy URL snapshots).
+        const s3Key = extractS3KeyFromMaybeMalformedUrl(rawS3Url);
         if (!s3Key) return rawS3Url;
 
         // Use the key-based signing endpoint (query param, not path param)

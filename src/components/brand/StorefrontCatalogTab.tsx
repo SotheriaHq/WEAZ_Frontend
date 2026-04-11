@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import type { ProductDto } from '@/types/product';
+import type { Variants } from 'framer-motion';
+import type { ProductDto } from '@/api/ProductApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,7 +10,7 @@ interface StorefrontCatalogTabProps {
   loading?: boolean;
 }
 
-const variants = {
+const variants: Variants = {
   hidden: { opacity: 0, y: 30 },
   visible: (i: number) => ({
     opacity: 1,
@@ -17,7 +18,7 @@ const variants = {
     transition: {
       delay: i * 0.05,
       duration: 0.5,
-      ease: [0.25, 0.1, 0.25, 1],
+      ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number],
     },
   }),
 };
@@ -59,7 +60,7 @@ export const StorefrontCatalogTab: React.FC<StorefrontCatalogTabProps> = ({
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-6 xl:grid-cols-5">
       {products.map((product, i) => {
-        const coverMedia = product.media?.find((m) => m.isCover) || product.media?.[0];
+        const coverMedia = product.media?.find((m) => m.isPrimary) || product.media?.[0];
 
         return (
           <motion.div
@@ -75,7 +76,7 @@ export const StorefrontCatalogTab: React.FC<StorefrontCatalogTabProps> = ({
               <motion.div
                 className="h-full w-full"
                 whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.5, ease: 'easeOut' }}
+                transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
               >
                 <ImageWithFallback
                   src={coverMedia?.url}

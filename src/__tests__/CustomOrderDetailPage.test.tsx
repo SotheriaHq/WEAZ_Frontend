@@ -6,7 +6,6 @@ import CustomOrderDetailPage from '@/pages/custom-orders/CustomOrderDetailPage';
 const getById = vi.fn();
 const confirmDelivery = vi.fn();
 const reportIssue = vi.fn();
-const cancelOrder = vi.fn();
 const initializePayment = vi.fn();
 const verifyPayment = vi.fn();
 const respondToExtension = vi.fn();
@@ -31,7 +30,6 @@ vi.mock('@/api/CustomOrderApi', () => ({
     getById: (...args: unknown[]) => getById(...args),
     confirmDelivery: (...args: unknown[]) => confirmDelivery(...args),
     reportIssue: (...args: unknown[]) => reportIssue(...args),
-    cancel: (...args: unknown[]) => cancelOrder(...args),
     initializePayment: (...args: unknown[]) => initializePayment(...args),
     verifyPayment: (...args: unknown[]) => verifyPayment(...args),
     respondToExtension: (...args: unknown[]) => respondToExtension(...args),
@@ -124,7 +122,6 @@ describe('CustomOrderDetailPage', () => {
     getById.mockResolvedValue(orderFixture);
     confirmDelivery.mockResolvedValue(orderFixture);
     reportIssue.mockResolvedValue(orderFixture);
-    cancelOrder.mockResolvedValue(orderFixture);
     initializePayment.mockResolvedValue({ authorizationUrl: null });
     verifyPayment.mockResolvedValue(orderFixture);
     respondToExtension.mockResolvedValue(orderFixture);
