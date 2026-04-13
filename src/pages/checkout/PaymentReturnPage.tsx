@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDispatch } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import Button from '@/components/ui/Button';
@@ -6,7 +7,14 @@ import { paymentApi, type PaymentAttemptSummary, type PaymentAttemptStatus, type
 import { customOrdersBuyerApi } from '@/api/CustomOrderApi';
 import { getCheckoutStatusCopy } from '@/pages/checkout/checkoutStatusCopy';
 import { cancelActivePaystackInline, openPaystackInline } from '@/lib/paystackInline';
+import { closeActiveHostedPaymentPopup, openHostedPaymentPopup } from '@/lib/paystackHostedPopup';
+import {
+  resolveInAppPaymentSession,
+  resolvePaymentGateway,
+} from '@/lib/inAppPaymentSession';
 import { unifiedCheckoutQueue } from '@/lib/unifiedCheckoutQueue';
+import { openCartDrawer } from '@/features/cartSlice';
+import type { AppDispatch } from '@/store';
 
 type ViewState = 'verifying' | 'resolved' | 'missing';
 
@@ -61,6 +69,7 @@ const normalizeAttemptSummary = (
 
 const PaymentReturnPage: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
   const [searchParams] = useSearchParams();
   const [viewState, setViewState] = useState<ViewState>('verifying');
   const [verifyResult, setVerifyResult] = useState<PaymentVerifyResult | null>(null);
@@ -77,9 +86,15 @@ const PaymentReturnPage: React.FC = () => {
   const isUnifiedQueueReturn = searchParams.get('uq') === '1';
   const referenceLooksCustom = reference.toUpperCase().startsWith(CUSTOM_ORDER_REFERENCE_PREFIX);
 
+  const openBag = useCallback((replace?: boolean) => {
+    dispatch(openCartDrawer());
+    navigate('/', { replace });
+  }, [dispatch, navigate]);
+
   useEffect(() => {
     return () => {
       void cancelActivePaystackInline();
+      void closeActiveHostedPaymentPopup();
     };
   }, []);
 
@@ -131,10 +146,7 @@ const PaymentReturnPage: React.FC = () => {
   }, [reference, referenceLooksCustom, statusHint]);
 
   const consumeQueuedSummary = useCallback(() => {
-    const queue = unifiedCheckoutQueue.load();
-    const summary = queue?.summary;
-    unifiedCheckoutQueue.clear();
-    return summary;
+    return unifiedCheckoutQueue.consumeConfirmationSummary();
   }, []);
 
   const continueQueuedCustomPayment = useCallback(async (): Promise<boolean> => {
@@ -143,7 +155,7 @@ const PaymentReturnPage: React.FC = () => {
     }
 
     const initialQueue = unifiedCheckoutQueue.load();
-    if (!initialQueue || initialQueue.lines.length === 0) {
+    if (!initialQueue || (!initialQueue.currentLine && initialQueue.lines.length === 0)) {
       return false;
     }
 
@@ -151,12 +163,17 @@ const PaymentReturnPage: React.FC = () => {
     try {
       while (true) {
         const queueState = unifiedCheckoutQueue.load();
-        if (!queueState || queueState.lines.length === 0) {
+        if (!queueState) {
           return false;
         }
 
-        const nextLine = unifiedCheckoutQueue.shiftNextLine();
+        const nextLine = queueState.currentLine ?? unifiedCheckoutQueue.startNextCustomLine();
         if (!nextLine) {
+          return false;
+        }
+
+        const queueForInit = unifiedCheckoutQueue.load();
+        if (!queueForInit) {
           return false;
         }
 
@@ -164,42 +181,56 @@ const PaymentReturnPage: React.FC = () => {
           const init = await customOrdersBuyerApi.initializePaymentForCheckoutIntent(
             nextLine.checkoutIntentId,
             {
-              paymentMethod: queueState.paymentMethod,
-              email: queueState.email,
+              paymentMethod: queueForInit.paymentMethod,
+              email: queueForInit.email,
               callbackUrl: `${window.location.origin}/bag/payment-return?uq=1`,
-              paymentData: queueState.paymentData,
+              paymentData: queueForInit.paymentData,
             },
           );
+          const resolvedGateway = resolvePaymentGateway(init);
+          const session = resolveInAppPaymentSession(init);
+          const returnPath =
+            `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(resolvedGateway)}&uq=1`;
 
-          if (init.providerAccessCode) {
-            await openPaystackInline(init.providerAccessCode, {
+          if (session.kind === 'access_code') {
+            await openPaystackInline(session.accessCode, {
               onSuccess: () => {
-                navigate(
-                  `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}&uq=1`,
-                );
+                navigate(returnPath);
               },
               onCancel: () => {
+                unifiedCheckoutQueue.markCurrentCustomResult(false);
                 toast.error('Payment was cancelled before completion.');
-                navigate('/bag/checkout');
+                openBag(true);
               },
               onError: (inlineError) => {
+                unifiedCheckoutQueue.markCurrentCustomResult(false);
                 toast.error(inlineError.message || 'Unable to open the payment window.');
-                navigate('/bag/checkout');
+                openBag(true);
               },
             });
-            return true;
+          } else {
+            await openHostedPaymentPopup({
+              authorizationUrl: session.authorizationUrl,
+              returnUrl: `${window.location.origin}${returnPath}`,
+              onReturn: (returnedUrl) => {
+                navigate(`${returnedUrl.pathname}${returnedUrl.search}`);
+              },
+              onCancel: () => {
+                unifiedCheckoutQueue.markCurrentCustomResult(false);
+                toast.error('Payment was cancelled before completion.');
+                openBag(true);
+              },
+              onError: (popupError) => {
+                unifiedCheckoutQueue.markCurrentCustomResult(false);
+                toast.error(popupError.message || 'Unable to open the payment window.');
+                openBag(true);
+              },
+            });
           }
-
-          if (init.authorizationUrl) {
-            window.location.assign(init.authorizationUrl);
-            return true;
-          }
-
-          navigate(
-            `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}&uq=1`,
-          );
           return true;
+
         } catch (error: any) {
+          unifiedCheckoutQueue.markCurrentCustomResult(false);
           toast.error(
             error?.response?.data?.message ||
               `${nextLine.sourceTitle} could not be prepared for payment and remains in your bag.`,
@@ -209,7 +240,7 @@ const PaymentReturnPage: React.FC = () => {
     } finally {
       setQueueContinuing(false);
     }
-  }, [isUnifiedQueueReturn, navigate]);
+  }, [isUnifiedQueueReturn, navigate, openBag]);
 
   const resolveTerminalStatus = useCallback(async (
     status: PaymentAttemptStatus,
@@ -217,6 +248,14 @@ const PaymentReturnPage: React.FC = () => {
     failureReason?: string,
     options?: { replace?: boolean },
   ) => {
+    if (isUnifiedQueueReturn) {
+      if (summary.subjectType === 'CUSTOM_ORDER') {
+        unifiedCheckoutQueue.markCurrentCustomResult(status === 'PAID');
+      } else {
+        unifiedCheckoutQueue.markStandardLaneResult(status);
+      }
+    }
+
     const continued = await continueQueuedCustomPayment();
     if (continued) return;
 
@@ -235,21 +274,9 @@ const PaymentReturnPage: React.FC = () => {
       failureReason ||
       'Payment failed before completion. Please restart checkout.';
     toast.error(resolvedFailureReason);
-
-    if (summary.subjectType === 'CUSTOM_ORDER') {
-      if (summary.customOrderId) {
-        navigate(`/custom-orders/${summary.customOrderId}`, {
-          replace: options?.replace,
-          state: { paymentFailureReason: resolvedFailureReason, paymentReference: reference },
-        });
-      }
-      return;
-    }
-
-    navigate('/profile?tab=orders', {
-      replace: options?.replace,
-      state: { paymentFailureReason: resolvedFailureReason, paymentReference: reference },
-    });
+    // Keep user on the return page for FAILED/CANCELLED/EXPIRED so they can see
+    // the exact gateway response and retry explicitly.
+    return;
   }, [consumeQueuedSummary, continueQueuedCustomPayment, isUnifiedQueueReturn, navigate, reference]);
 
   useEffect(() => {
@@ -288,7 +315,7 @@ const PaymentReturnPage: React.FC = () => {
           await resolveTerminalStatus(
             result.status,
             refreshedSummary,
-            result.failureMessage,
+            result.failureMessage || result.gatewayResponse,
             { replace: true },
           );
         }
@@ -347,7 +374,7 @@ const PaymentReturnPage: React.FC = () => {
         result.status === 'CANCELLED' ||
         result.status === 'EXPIRED'
       ) {
-        await resolveTerminalStatus(result.status, summary, result.failureMessage);
+        await resolveTerminalStatus(result.status, summary, result.failureMessage || result.gatewayResponse);
         return;
       }
     } catch (error: any) {
@@ -388,13 +415,15 @@ const PaymentReturnPage: React.FC = () => {
           paymentData: paymentData as Record<string, unknown>,
         },
       );
+      const resolvedGateway = resolvePaymentGateway(init);
+      const session = resolveInAppPaymentSession(init);
+      const returnPath =
+        `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
 
-      if (init.providerAccessCode) {
-        await openPaystackInline(init.providerAccessCode, {
+      if (session.kind === 'access_code') {
+        await openPaystackInline(session.accessCode, {
           onSuccess: () => {
-            navigate(
-              `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
-            );
+            navigate(returnPath);
           },
           onCancel: () => {
             toast.error('Payment was cancelled before completion.');
@@ -403,23 +432,23 @@ const PaymentReturnPage: React.FC = () => {
             toast.error(inlineError.message || 'Unable to open the payment window.');
           },
         });
-        return;
-      }
-      if (init.authorizationUrl) {
-        const fallbackUrl = new URL(init.authorizationUrl, window.location.origin);
-        if (fallbackUrl.origin === window.location.origin) {
-          window.location.assign(fallbackUrl.toString());
-          return;
-        }
-        throw new Error('Payment provider did not return an inline payment session for this attempt.');
-      }
-      if (init.reference) {
-        navigate(
-          `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
-        );
+      } else {
+        await openHostedPaymentPopup({
+          authorizationUrl: session.authorizationUrl,
+          returnUrl: `${window.location.origin}${returnPath}`,
+          onReturn: (returnedUrl) => {
+            navigate(`${returnedUrl.pathname}${returnedUrl.search}`);
+          },
+          onCancel: () => {
+            toast.error('Payment was cancelled before completion.');
+          },
+          onError: (popupError) => {
+            toast.error(popupError.message || 'Unable to open the payment window.');
+          },
+        });
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to retry payment');
+      toast.error(error?.response?.data?.message || error?.message || 'Unable to retry payment');
     } finally {
       setRetryingPayment(false);
     }
@@ -459,7 +488,7 @@ const PaymentReturnPage: React.FC = () => {
         </p>
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
           <Button onClick={() => navigate('/profile?tab=orders')}>Open my orders</Button>
-          <Button variant="secondary" onClick={() => navigate('/custom-orders')}>Open custom orders</Button>
+          <Button variant="secondary" onClick={() => navigate('/custom-orders/new')}>Start new custom order</Button>
           <Button variant="ghost" onClick={() => navigate('/')}>Browse designs</Button>
         </div>
       </div>
@@ -487,6 +516,14 @@ const PaymentReturnPage: React.FC = () => {
     !attempt?.customOrderId &&
     Boolean(attempt?.checkoutIntentId) &&
     (resolvedStatus === 'FAILED' || resolvedStatus === 'CANCELLED' || resolvedStatus === 'EXPIRED');
+  const isFailureStatus =
+    resolvedStatus === 'FAILED' ||
+    resolvedStatus === 'CANCELLED' ||
+    resolvedStatus === 'EXPIRED';
+  const resolvedFailureReason =
+    verifyResult?.failureMessage ||
+    verifyResult?.gatewayResponse ||
+    (isFailureStatus ? 'Payment was not completed successfully.' : null);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 text-center">
@@ -502,10 +539,23 @@ const PaymentReturnPage: React.FC = () => {
           Subject: {isCustomOrderAttempt ? 'Custom order' : 'Standard order'}
         </p>
         <p className="text-sm text-gray-700 dark:text-zinc-300">Status: {resolvedStatus}</p>
-        {verifyResult?.failureMessage && (
-          <p className="text-sm text-rose-600 dark:text-rose-300">{verifyResult.failureMessage}</p>
+        {resolvedFailureReason && (
+          <p className="text-sm text-rose-600 dark:text-rose-300">
+            Failure reason: {resolvedFailureReason}
+          </p>
+        )}
+        {verifyResult?.gatewayResponse && verifyResult.gatewayResponse !== resolvedFailureReason && (
+          <p className="text-xs text-rose-500 dark:text-rose-300/90">
+            Gateway response: {verifyResult.gatewayResponse}
+          </p>
         )}
       </div>
+
+      {(submitting || autoVerifying) && (
+        <div className="mb-8 rounded-xl border border-indigo-200/80 bg-indigo-50/80 px-4 py-3 text-left text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
+          Verifying with payment gateway... please wait.
+        </div>
+      )}
 
       {shouldAutoVerify && autoVerifyAttempts < AUTO_VERIFY_MAX_ATTEMPTS && (
         <div className="mb-8 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-left text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
@@ -557,8 +607,8 @@ const PaymentReturnPage: React.FC = () => {
           onClick={() =>
             isCustomOrderAttempt
               ? attempt?.customOrderId
-                ? navigate(`/custom-orders/${attempt.customOrderId}`)
-                : navigate('/custom-orders')
+                ? navigate(`/profile?tab=orders&kind=custom&orderId=${encodeURIComponent(attempt.customOrderId)}`)
+                : navigate('/profile?tab=orders')
               : navigate('/profile?tab=orders')
           }
         >
@@ -569,7 +619,7 @@ const PaymentReturnPage: React.FC = () => {
             : 'Open my orders'}
         </Button>
         {!isCustomOrderAttempt && (
-          <Button variant="ghost" onClick={() => navigate('/bag/checkout')}>Return to checkout</Button>
+          <Button variant="ghost" onClick={() => openBag()}>Return to bag</Button>
         )}
       </div>
     </div>

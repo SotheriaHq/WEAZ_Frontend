@@ -1654,12 +1654,27 @@ const EditProduct: React.FC = () => {
         if (isEditMode && productId) {
           await productApi.updateProduct(productId, payload);
           if (form.customOrderEnabled) {
-            const saved = await customOrderEditorRef.current?.saveConfiguration({
-              silentSuccess: true,
-            });
-            if (!saved) {
+            let saved = false;
+            try {
+              saved =
+                (await customOrderEditorRef.current?.saveConfiguration({
+                  silentSuccess: true,
+                })) === true;
+            } catch (customOrderError: any) {
+              await productApi.updateProduct(productId, {
+                customOrderEnabled: false,
+              });
               throw new Error(
-                "Custom-order setup could not be saved. The product update was kept, but custom-order availability was not finalized.",
+                customOrderError?.response?.data?.message ||
+                  "Custom-order setup could not be saved. The product update was kept, but custom-order availability was turned back off.",
+              );
+            }
+            if (!saved) {
+              await productApi.updateProduct(productId, {
+                customOrderEnabled: false,
+              });
+              throw new Error(
+                "Custom-order setup could not be saved. The product update was kept, but custom-order availability was turned back off.",
               );
             }
           }
@@ -1783,6 +1798,7 @@ const EditProduct: React.FC = () => {
         }
         const message =
           error?.response?.data?.message ||
+          error?.message ||
           "Failed to save product. Shipping policy may not have been saved.";
         toast.error(message);
       } finally {
@@ -1918,12 +1934,27 @@ const EditProduct: React.FC = () => {
       if (productId) {
         await productApi.updateProduct(productId, payload);
         if (form.customOrderEnabled) {
-          const saved = await customOrderEditorRef.current?.saveConfiguration({
-            silentSuccess: true,
-          });
-          if (!saved) {
+          let saved = false;
+          try {
+            saved =
+              (await customOrderEditorRef.current?.saveConfiguration({
+                silentSuccess: true,
+              })) === true;
+          } catch (customOrderError: any) {
+            await productApi.updateProduct(productId, {
+              customOrderEnabled: false,
+            });
             throw new Error(
-              "Custom-order setup could not be saved. The product update was kept, but custom-order availability was not finalized.",
+              customOrderError?.response?.data?.message ||
+                "Custom-order setup could not be saved. The product update was kept, but custom-order availability was turned back off.",
+            );
+          }
+          if (!saved) {
+            await productApi.updateProduct(productId, {
+              customOrderEnabled: false,
+            });
+            throw new Error(
+              "Custom-order setup could not be saved. The product update was kept, but custom-order availability was turned back off.",
             );
           }
         }
@@ -1964,6 +1995,7 @@ const EditProduct: React.FC = () => {
       }
       const message =
         error?.response?.data?.message ||
+        error?.message ||
         "Failed to save product. Shipping policy may not have been saved.";
       toast.error(message);
     } finally {
@@ -3120,8 +3152,8 @@ const EditProduct: React.FC = () => {
                     <p
                       className={`mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold ${
                         form.variants.length >= MIN_PUBLISH_VARIANT_COUNT
-                          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-100'
-                          : 'border-amber-500/20 bg-amber-500/10 text-amber-100'
+                          ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100'
+                          : 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100'
                       }`}
                     >
                       <span aria-hidden="true">
@@ -3134,7 +3166,7 @@ const EditProduct: React.FC = () => {
                   </div>
 
                   {!collapsedSections.variants && hasDuplicateVariants && (
-                    <div className="px-6 py-3 text-xs text-orange-300 bg-orange-500/10 border-b border-orange-500/20">
+                    <div className="px-6 py-3 text-xs text-orange-700 bg-orange-50 border-b border-orange-300 dark:text-orange-300 dark:bg-orange-500/10 dark:border-orange-500/20">
                       Duplicate variants detected (same size/color). Please
                       adjust or remove duplicates.
                     </div>

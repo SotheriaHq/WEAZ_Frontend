@@ -2,10 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import Button from '@/components/ui/Button';
+import { openPaystackInline } from '@/lib/paystackInline';
+import { openHostedPaymentPopup } from '@/lib/paystackHostedPopup';
+import {
+  resolveInAppPaymentSession,
+  resolvePaymentGateway,
+} from '@/lib/inAppPaymentSession';
 // import LazyOrderQrCard from '@/components/qr/LazyOrderQrCard'; // disabled — order QR codes off
 import {
   paymentApi,
-  type PaymentAttemptStatus,
   type PaymentAttemptSummary,
   type PaymentNextAction,
 } from '@/api/PaymentApi';
@@ -22,6 +27,7 @@ interface ConfirmationState {
   paymentMethod: CheckoutPaymentMethod;
   reference?: string;
   gateway?: string;
+  providerAccessCode?: string;
   authorizationUrl?: string;
   paymentData?: PaymentData;
   nextAction?: PaymentNextAction;
@@ -52,7 +58,8 @@ const OrderConfirmation: React.FC = () => {
   const locationState = (location.state as ConfirmationState | null) ?? null;
   const [attempt, setAttempt] = useState<PaymentAttemptSummary | null>(null);
   const [loading, setLoading] = useState(Boolean(searchParams.get('reference')) && !locationState?.summary);
-  const [simulating, setSimulating] = useState<PaymentAttemptStatus | null>(null);
+  const [resumingPayment, setResumingPayment] = useState(false);
+  const [paymentActionMessage, setPaymentActionMessage] = useState<string | null>(null);
 
   const reference = searchParams.get('reference')?.trim() || locationState?.reference || '';
 
@@ -89,27 +96,75 @@ const OrderConfirmation: React.FC = () => {
   const paymentData = (locationState?.paymentData ?? attempt?.paymentData ?? null) as PaymentData | null;
   const nextAction = locationState?.nextAction ?? attempt?.nextAction;
   const bankAccount = locationState?.bankAccount ?? attempt?.bankAccount;
+  const providerAccessCode =
+    locationState?.providerAccessCode ?? attempt?.providerAccessCode;
   const authorizationUrl = locationState?.authorizationUrl ?? attempt?.authorizationUrl;
   const summary = locationState?.summary ?? attempt?.summary;
   const status = attempt?.status ?? (nextAction?.type ? 'PENDING' : 'PAID');
   const statusCopy = getCheckoutStatusCopy('confirmation', status, nextAction);
+  const canResumePayment = Boolean(
+    String(providerAccessCode ?? '').trim() || String(authorizationUrl ?? '').trim(),
+  );
 
   const paymentSummaryLines = useMemo(() => {
     if (!paymentMethod || !paymentData || !isCheckoutPaymentMethod(paymentMethod)) return [];
     return getPaymentSummaryLines(paymentMethod, paymentData);
   }, [paymentData, paymentMethod]);
 
-  const handleSimulate = async (outcome: PaymentAttemptStatus) => {
+  const handleContinuePayment = async () => {
     if (!reference) return;
-    setSimulating(outcome);
+
+    setResumingPayment(true);
+    setPaymentActionMessage('Opening secure checkout inside Threadly...');
     try {
-      const result = await paymentApi.simulate(reference, outcome);
-      setAttempt(result);
-      toast.success(`Payment marked as ${outcome.toLowerCase()}`);
+      const session = resolveInAppPaymentSession({
+        providerAccessCode,
+        authorizationUrl,
+      });
+      const resolvedGateway = resolvePaymentGateway({
+        gateway: locationState?.gateway ?? attempt?.gateway,
+      });
+      const returnPath =
+        `/bag/payment-return?reference=${encodeURIComponent(reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
+
+      if (session.kind === 'access_code') {
+        await openPaystackInline(session.accessCode, {
+          onSuccess: () => {
+            navigate(returnPath);
+          },
+          onCancel: () => {
+            setPaymentActionMessage('Secure checkout was cancelled. Review the payment state and try again.');
+            toast.error('Payment was cancelled before completion.');
+          },
+          onError: (inlineError) => {
+            setPaymentActionMessage('Secure checkout could not be opened. Retry to continue.');
+            toast.error(inlineError.message || 'Unable to open the payment window.');
+          },
+        });
+      } else {
+        await openHostedPaymentPopup({
+          authorizationUrl: session.authorizationUrl,
+          returnUrl: `${window.location.origin}${returnPath}`,
+          onReturn: (returnedUrl) => {
+            navigate(`${returnedUrl.pathname}${returnedUrl.search}`);
+          },
+          onCancel: () => {
+            setPaymentActionMessage('Secure checkout was cancelled. Review the payment state and try again.');
+            toast.error('Payment was cancelled before completion.');
+          },
+          onError: (popupError) => {
+            setPaymentActionMessage('Secure checkout could not be opened. Retry to continue.');
+            toast.error(popupError.message || 'Unable to open the payment window.');
+          },
+        });
+      }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to simulate payment outcome');
+      setPaymentActionMessage(
+        'This payment can only continue from a secure in-app session. Retry the payment from inside Threadly.',
+      );
+      toast.error(error?.message || 'Unable to resume payment');
     } finally {
-      setSimulating(null);
+      setResumingPayment(false);
     }
   };
 
@@ -250,34 +305,22 @@ const OrderConfirmation: React.FC = () => {
         </div>
       )}
 
-      {attempt?.canSimulate && status !== 'PAID' && (
-        <div className="mb-6 space-y-3 rounded-xl border border-dashed border-gray-300/80 bg-white/70 p-5 text-left dark:border-zinc-700/60 dark:bg-zinc-900/40">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400">
-            Mock Payment Controls
-          </p>
-          <p className="text-sm text-gray-600 dark:text-zinc-300">
-            Dummy payments are enabled. Use these controls to move this attempt through realistic mock outcomes without live gateway credentials.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Button size="sm" onClick={() => handleSimulate('PAID')} loading={simulating === 'PAID'}>Mark paid</Button>
-            <Button size="sm" variant="secondary" onClick={() => handleSimulate('PROCESSING')} loading={simulating === 'PROCESSING'}>Mark processing</Button>
-            <Button size="sm" variant="ghost" onClick={() => handleSimulate('FAILED')} loading={simulating === 'FAILED'}>Mark failed</Button>
-            <Button size="sm" variant="ghost" onClick={() => handleSimulate('CANCELLED')} loading={simulating === 'CANCELLED'}>Mark cancelled</Button>
-            <Button size="sm" variant="ghost" onClick={() => handleSimulate('EXPIRED')} loading={simulating === 'EXPIRED'}>Mark expired</Button>
-          </div>
+      {paymentActionMessage ? (
+        <div className="mb-6 rounded-xl border border-sky-200/80 bg-sky-50/80 px-4 py-3 text-left text-sm text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100">
+          {paymentActionMessage}
         </div>
-      )}
+      ) : null}
 
       <div className="flex flex-col justify-center gap-3 sm:flex-row">
-        {authorizationUrl && status !== 'PAID' && (
-          <Button onClick={() => window.location.assign(authorizationUrl)} size="lg">
+        {canResumePayment && status !== 'PAID' && (
+          <Button onClick={() => void handleContinuePayment()} size="lg" loading={resumingPayment}>
             {nextAction?.ctaLabel || 'Continue Payment'}
           </Button>
         )}
         <Button
           onClick={() =>
             attempt?.subjectType === 'CUSTOM_ORDER' && attempt.customOrderId
-              ? navigate(`/custom-orders/${attempt.customOrderId}`)
+              ? navigate(`/profile?tab=orders&kind=custom&orderId=${encodeURIComponent(attempt.customOrderId)}`)
               : navigate('/profile?tab=orders')
           }
           size="lg"

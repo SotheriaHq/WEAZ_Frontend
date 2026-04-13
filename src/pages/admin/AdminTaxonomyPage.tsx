@@ -7,6 +7,7 @@ import UniversalSelect from '@/components/forms/UniversalSelect';
 import { adminModerationApi, adminTaxonomyApi } from '@/api/AdminApi';
 import { customOrdersAdminApi, type CustomFabricRuleBasis } from '@/api/CustomOrderApi';
 import { unwrapApiResponse } from '@/types/auth';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import type {
   AdminCategory,
   AdminMeasurementPointLifecycleDetails,
@@ -139,6 +140,11 @@ const AdminTaxonomyPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const isMeasurementsRoute = activeTab === 'measurements';
+  const { hasPermission } = useAdminPermissions();
+  const canReadMeasurementLifecycle = hasPermission('MEASUREMENTS_READ');
+  const canReviewMeasurementLifecycle = hasPermission('MEASUREMENTS_REVIEW');
+  const canReadModerationQueue = hasPermission('MODERATION_READ');
+  const canReviewModerationQueue = hasPermission('MODERATION_REVIEW');
   const notifications = useSelector((state: RootState) => state.notifications.items);
   const lastMeasurementNotificationIdRef = useRef<string | null>(null);
 
@@ -277,16 +283,57 @@ const AdminTaxonomyPage: React.FC = () => {
     setQueueLoading(true);
     setQueueError(null);
     try {
-      const res = await adminModerationApi.getQueue();
-      const payload = unwrapApiResponse<ModerationQueueResponse>(res.data as any);
-      setFreeformPoints(payload.freeformPoints ?? []);
-      setSizeCharts(payload.sizeCharts ?? []);
+      const [measurementLifecycleRes, moderationQueueRes] = await Promise.all([
+        canReadMeasurementLifecycle
+          ? adminModerationApi.listMeasurementPoints({
+              limit: 80,
+              status: 'BRAND_ONLY',
+              source: 'BRAND_FREEFORM',
+              sort: 'recent',
+            })
+          : Promise.resolve(null),
+        canReadModerationQueue
+          ? adminModerationApi.getQueue()
+          : Promise.resolve(null),
+      ]);
+
+      if (measurementLifecycleRes) {
+        const lifecyclePayload = unwrapApiResponse<
+          { items?: AdminMeasurementPointRow[] } | AdminMeasurementPointRow[]
+        >(measurementLifecycleRes.data as any);
+        const lifecycleRows = Array.isArray(lifecyclePayload)
+          ? lifecyclePayload
+          : Array.isArray(lifecyclePayload?.items)
+            ? lifecyclePayload.items
+            : [];
+        setFreeformPoints(lifecycleRows);
+      } else if (moderationQueueRes) {
+        const queuePayload = unwrapApiResponse<ModerationQueueResponse>(
+          moderationQueueRes.data as any,
+        );
+        setFreeformPoints(queuePayload.freeformPoints ?? []);
+      } else {
+        setFreeformPoints([]);
+      }
+
+      if (moderationQueueRes) {
+        const queuePayload = unwrapApiResponse<ModerationQueueResponse>(
+          moderationQueueRes.data as any,
+        );
+        setSizeCharts(queuePayload.sizeCharts ?? []);
+      } else {
+        setSizeCharts([]);
+      }
+
+      if (!canReadMeasurementLifecycle && !canReadModerationQueue) {
+        setQueueError('You do not have permission to view moderation queues.');
+      }
     } catch (error: any) {
       setQueueError(error?.response?.data?.message || 'Failed to load measurement moderation queue');
     } finally {
       setQueueLoading(false);
     }
-  }, []);
+  }, [canReadMeasurementLifecycle, canReadModerationQueue]);
 
   const fetchMeasurementPoints = useCallback(async () => {
     setMeasurementPointsLoading(true);
@@ -1055,6 +1102,11 @@ const AdminTaxonomyPage: React.FC = () => {
     pointId: string,
     action: 'approve' | 'reject',
   ) => {
+    if (!canReviewMeasurementLifecycle) {
+      toast.error('You do not have permission to review measurement points.');
+      return;
+    }
+
     const reason = rejectReasonByPointId[pointId]?.trim();
     if (action === 'reject' && !reason) {
       toast.error('Provide a rejection reason so the brand understands what to change.');
@@ -1063,7 +1115,7 @@ const AdminTaxonomyPage: React.FC = () => {
 
     setReviewingIds((current) => ({ ...current, [pointId]: true }));
     try {
-      await adminModerationApi.reviewItem(pointId, {
+      await adminModerationApi.updateMeasurementPointLifecycle(pointId, {
         action,
         reason: action === 'reject' ? reason : undefined,
       });
@@ -1073,7 +1125,11 @@ const AdminTaxonomyPage: React.FC = () => {
         delete next[pointId];
         return next;
       });
-      await Promise.all([fetchMeasurementQueue(), fetchMeasurementPoints()]);
+      await Promise.all([
+        fetchMeasurementQueue(),
+        fetchMeasurementPoints(),
+        fetchMeasurementLifecycleRows(),
+      ]);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to review measurement point');
     } finally {
@@ -1085,6 +1141,11 @@ const AdminTaxonomyPage: React.FC = () => {
     chartId: string,
     action: 'approve' | 'reject',
   ) => {
+    if (!canReviewModerationQueue) {
+      toast.error('You do not have permission to review size charts.');
+      return;
+    }
+
     setReviewingIds((current) => ({ ...current, [chartId]: true }));
     try {
       await adminModerationApi.reviewItem(chartId, { action });
@@ -1478,41 +1539,49 @@ const AdminTaxonomyPage: React.FC = () => {
                           Limits: {point.minValueCm ?? '—'} cm to {point.maxValueCm ?? '—'} cm
                         </div>
 
-                        <textarea
-                          value={rejectingReason}
-                          onChange={(event) =>
-                            setRejectReasonByPointId((current) => ({
-                              ...current,
-                              [point.id]: event.target.value,
-                            }))
-                          }
-                          rows={2}
-                          placeholder="If rejecting, explain why (required for reject)..."
-                          className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
-                        />
+                        {canReviewMeasurementLifecycle ? (
+                          <>
+                            <textarea
+                              value={rejectingReason}
+                              onChange={(event) =>
+                                setRejectReasonByPointId((current) => ({
+                                  ...current,
+                                  [point.id]: event.target.value,
+                                }))
+                              }
+                              rows={2}
+                              placeholder="If rejecting, explain why (required for reject)..."
+                              className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
+                            />
 
-                        <div className="mt-2 flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void handleReviewMeasurementPoint(point.id, 'approve');
-                            }}
-                            disabled={isReviewing}
-                            className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-500/20 dark:text-emerald-200"
-                          >
-                            Accept
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void handleReviewMeasurementPoint(point.id, 'reject');
-                            }}
-                            disabled={isReviewing}
-                            className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-200 disabled:opacity-60 dark:bg-rose-500/20 dark:text-rose-200"
-                          >
-                            Reject
-                          </button>
-                        </div>
+                            <div className="mt-2 flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void handleReviewMeasurementPoint(point.id, 'approve');
+                                }}
+                                disabled={isReviewing}
+                                className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-500/20 dark:text-emerald-200"
+                              >
+                                Accept
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void handleReviewMeasurementPoint(point.id, 'reject');
+                                }}
+                                disabled={isReviewing}
+                                className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-200 disabled:opacity-60 dark:bg-rose-500/20 dark:text-rose-200"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <p className="mt-3 text-xs text-slate-500 dark:text-slate-300">
+                            Read-only access. You need measurement review permission to approve or reject points.
+                          </p>
+                        )}
                       </div>
                     );
                   })}
@@ -1551,28 +1620,34 @@ const AdminTaxonomyPage: React.FC = () => {
                         <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">
                           Status: {chart.status} · Version: {chart.version ?? '—'}
                         </div>
-                        <div className="mt-2 flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void handleReviewSizeChart(chart.id, 'approve');
-                            }}
-                            disabled={isReviewing}
-                            className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-500/20 dark:text-emerald-200"
-                          >
-                            Publish
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void handleReviewSizeChart(chart.id, 'reject');
-                            }}
-                            disabled={isReviewing}
-                            className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-200 disabled:opacity-60 dark:bg-rose-500/20 dark:text-rose-200"
-                          >
-                            Send Back
-                          </button>
-                        </div>
+                        {canReviewModerationQueue ? (
+                          <div className="mt-2 flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void handleReviewSizeChart(chart.id, 'approve');
+                              }}
+                              disabled={isReviewing}
+                              className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-500/20 dark:text-emerald-200"
+                            >
+                              Publish
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void handleReviewSizeChart(chart.id, 'reject');
+                              }}
+                              disabled={isReviewing}
+                              className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-200 disabled:opacity-60 dark:bg-rose-500/20 dark:text-rose-200"
+                            >
+                              Send Back
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">
+                            Read-only access. You need moderation review permission to publish or send back charts.
+                          </p>
+                        )}
                       </div>
                     );
                   })}

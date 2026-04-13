@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { checkout, getMyOrders } from '@/api/StoreApi';
 import type { PaystackPaymentData, ShippingAddress } from '@/api/StoreApi';
-import { paymentApi } from '@/api/PaymentApi';
+import { paymentApi, type SavedPaymentCardSummary } from '@/api/PaymentApi';
 import { createIdempotencyKey } from '@/api/idempotency';
 import {
   customOrdersBuyerApi,
@@ -13,6 +13,7 @@ import {
 import {
   fetchCart,
   clearCart,
+  closeCartDrawer,
   selectCartPriceChangeNotices,
   selectCartRemovedItemNotices,
 } from '@/features/cartSlice';
@@ -25,6 +26,12 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { formatPrice } from '@/utils/helpers';
 import { openPaystackInline } from '@/lib/paystackInline';
+import {
+  resolveInAppPaymentSession,
+  resolvePaymentGateway,
+} from '@/lib/inAppPaymentSession';
+import { openHostedPaymentPopup } from '@/lib/paystackHostedPopup';
+import { AnimatePresence, motion } from 'framer-motion';
 import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
 import { unifiedCheckoutQueue } from '@/lib/unifiedCheckoutQueue';
 import {
@@ -137,6 +144,46 @@ function normalizeSavedAddress(address: unknown): ShippingAddress | null {
   };
 }
 
+function normalizeCheckoutMediaUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const lower = trimmed.toLowerCase();
+  if (
+    lower.includes('async () =>') ||
+    lower.includes('const providedregion') ||
+    lower.includes('[object promise]')
+  ) {
+    return null;
+  }
+
+  if (
+    lower.includes('x-amz-algorithm=') ||
+    lower.includes('x-amz-signature=') ||
+    lower.includes('x-amz-credential=') ||
+    /[?&]expires=/.test(lower)
+  ) {
+    const [withoutQuery] = trimmed.split('?');
+    return withoutQuery?.trim() || null;
+  }
+
+  return trimmed;
+}
+
+function toSavedCardDisplay(card: SavedPaymentCardSummary): NonNullable<PaystackPaymentData['savedCardDisplay']> {
+  return {
+    id: card.id,
+    brand: card.brand,
+    bank: card.bank,
+    last4: card.last4,
+    expMonth: card.expMonth,
+    expYear: card.expYear,
+    reusable: card.reusable,
+    lastUsedAt: card.lastUsedAt,
+  };
+}
+
 const CheckoutBackLink: React.FC<{
   label: string;
   onClick: () => void;
@@ -144,7 +191,7 @@ const CheckoutBackLink: React.FC<{
   <button
     type="button"
     onClick={onClick}
-    className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+    className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 underline decoration-slate-400/80 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 dark:text-slate-200 dark:decoration-slate-500 dark:hover:text-white"
   >
     <span aria-hidden>←</span>
     <span>{label}</span>
@@ -157,9 +204,8 @@ const CheckoutPanel: React.FC<{
   description: string;
   children: React.ReactNode;
 }> = ({ kicker, title, description, children }) => (
-  <section className="relative overflow-hidden rounded-[32px] border border-white/60 bg-white/78 p-6 shadow-[0_28px_80px_rgba(148,163,184,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-[#060816]/82 sm:p-8">
-    <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top_left,_rgba(244,114,182,0.16),_transparent_50%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.12),_transparent_45%)]" />
-    <div className="relative z-10 space-y-6">
+  <section className="threadly-chrome-surface relative overflow-hidden rounded-[32px] p-6 sm:p-8">
+    <div className="space-y-6">
       <div className="space-y-3">
         <div className="text-[11px] font-black uppercase tracking-[0.28em] text-fuchsia-500 dark:text-fuchsia-300">
           {kicker}
@@ -178,9 +224,19 @@ const CheckoutPanel: React.FC<{
   </section>
 );
 
+interface CheckoutPageProps {
+  embedded?: boolean;
+  onClose?: () => void;
+  initialPromoCode?: string;
+}
+
 /* ─── Component ─── */
 
-const CheckoutPage: React.FC = () => {
+const CheckoutPage: React.FC<CheckoutPageProps> = ({
+  embedded = false,
+  onClose,
+  initialPromoCode,
+}) => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -219,8 +275,12 @@ const CheckoutPage: React.FC = () => {
     createInitialPaymentState(user?.email ?? '', user?.phoneNumber ?? ''),
   );
   const [paymentErrors, setPaymentErrors] = useState<PaymentFormErrors>({});
+  const [savedCards, setSavedCards] = useState<SavedPaymentCardSummary[]>([]);
+  const [savedCardsLoading, setSavedCardsLoading] = useState(false);
+  const [savedCardsError, setSavedCardsError] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
+  const [checkoutProgressMessage, setCheckoutProgressMessage] = useState<string | null>(null);
 
   /* ── Submission state ── */
   const [submitting, setSubmitting] = useState(false);
@@ -261,18 +321,109 @@ const CheckoutPage: React.FC = () => {
   }, [refreshCustomBag]);
 
   useEffect(() => {
-    const incomingPromo = checkoutEntryState?.promoCode?.trim();
+    let active = true;
+
+    if (!user?.id) {
+      setSavedCards([]);
+      setSavedCardsError(null);
+      setSavedCardsLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    const loadSavedCards = async () => {
+      setSavedCardsLoading(true);
+      setSavedCardsError(null);
+      try {
+        const cards = await paymentApi.listSavedCards();
+        if (!active) return;
+        setSavedCards(cards);
+      } catch {
+        if (!active) return;
+        setSavedCards([]);
+        setSavedCardsError('Saved cards are temporarily unavailable. You can still continue with a new card.');
+      } finally {
+        if (active) {
+          setSavedCardsLoading(false);
+        }
+      }
+    };
+
+    void loadSavedCards();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (savedCards.length === 0) {
+      return;
+    }
+
+    setPaymentState((prev) => {
+      if (prev.PAYSTACK.savedCardId || prev.PAYSTACK.useSavedCard) {
+        return prev;
+      }
+
+      const first = savedCards[0];
+      return {
+        ...prev,
+        PAYSTACK: {
+          ...prev.PAYSTACK,
+          channel: 'CARD',
+          useSavedCard: true,
+          savedCardId: first.id,
+          savedCardDisplay: toSavedCardDisplay(first),
+        },
+      };
+    });
+  }, [savedCards]);
+
+  useEffect(() => {
+    const incomingPromo =
+      checkoutEntryState?.promoCode?.trim() ||
+      initialPromoCode?.trim();
     if (!incomingPromo) return;
     setPromoCode(incomingPromo.toUpperCase());
     setPromoApplied(true);
-  }, [checkoutEntryState?.promoCode]);
+  }, [checkoutEntryState?.promoCode, initialPromoCode]);
 
   useEffect(() => {
     if (!cartLoading && !customBagLoading && !cart.items.length && customBagItems.length === 0) {
       toast.error('Your bag is empty');
-      navigate('/', { replace: true });
+      if (embedded) {
+        onClose?.();
+      } else {
+        navigate('/', { replace: true });
+      }
     }
-  }, [cartLoading, cart.items.length, customBagItems.length, customBagLoading, navigate]);
+  }, [
+    cartLoading,
+    cart.items.length,
+    customBagItems.length,
+    customBagLoading,
+    embedded,
+    navigate,
+    onClose,
+  ]);
+
+  const handleBackToBag = useCallback(() => {
+    if (embedded) {
+      onClose?.();
+      return;
+    }
+    navigate(-1);
+  }, [embedded, navigate, onClose]);
+
+  const handleReturnToSourcePage = useCallback(() => {
+    if (embedded) {
+      dispatch(closeCartDrawer());
+      return;
+    }
+    navigate(-1);
+  }, [dispatch, embedded, navigate]);
 
   useEffect(() => {
     let active = true;
@@ -433,6 +584,13 @@ const CheckoutPage: React.FC = () => {
     return Object.keys(errors).length === 0;
   }, [address]);
 
+  const getFirstPaymentErrorMessage = useCallback((errors: PaymentFormErrors): string => {
+    const firstError = Object.values(errors).find(
+      (value) => typeof value === 'string' && value.trim().length > 0,
+    );
+    return firstError ?? 'Complete the payment details for the selected method';
+  }, []);
+
   /* ── Step navigation ── */
   const goNext = useCallback(() => {
     if (step === 'shipping') {
@@ -446,12 +604,12 @@ const CheckoutPage: React.FC = () => {
       const validationErrors = validatePaymentData(paymentMethod, paymentState[paymentMethod], address);
       setPaymentErrors(validationErrors);
       if (Object.keys(validationErrors).length > 0) {
-        toast.error('Complete the payment details for the selected method');
+        toast.error(getFirstPaymentErrorMessage(validationErrors));
         return;
       }
       setStep('review');
     }
-  }, [step, validateShipping, paymentMethod, paymentState, address]);
+  }, [step, validateShipping, paymentMethod, paymentState, address, getFirstPaymentErrorMessage]);
 
   const goBack = useCallback(() => {
     const idx = STEPS.indexOf(step);
@@ -551,11 +709,13 @@ const CheckoutPage: React.FC = () => {
       [selectedPaymentMethod]: updater(prev[selectedPaymentMethod]),
     }));
     setPaymentErrors({});
+    setCheckoutProgressMessage(null);
   }, [paymentMethod]);
 
   const handleSelectPaymentMethod = useCallback((method: keyof PaymentFormState) => {
     setPaymentMethod(method);
     setPaymentErrors({});
+    setCheckoutProgressMessage(null);
   }, []);
 
   const launchInitializedPayment = useCallback(async (paymentInit: {
@@ -564,34 +724,57 @@ const CheckoutPage: React.FC = () => {
     providerAccessCode?: string;
     authorizationUrl?: string;
   }) => {
-    const resolvedGateway = paymentInit.gateway || 'PAYSTACK';
+    const resolvedGateway = resolvePaymentGateway(paymentInit);
+    const session = resolveInAppPaymentSession(paymentInit);
+    const returnPath =
+      `/bag/payment-return?reference=${encodeURIComponent(paymentInit.reference)}&gateway=${encodeURIComponent(resolvedGateway)}&uq=1`;
 
-    if (paymentInit.providerAccessCode) {
-      await openPaystackInline(paymentInit.providerAccessCode, {
+    if (embedded) {
+      dispatch(closeCartDrawer());
+    }
+
+    setCheckoutProgressMessage('Opening secure checkout inside Threadly...');
+    if (session.kind === 'access_code') {
+      await openPaystackInline(session.accessCode, {
         onSuccess: () => {
-          navigate(
-            `/bag/payment-return?reference=${encodeURIComponent(paymentInit.reference)}&gateway=${encodeURIComponent(resolvedGateway)}&uq=1`,
-          );
+          navigate(returnPath);
         },
         onCancel: () => {
+          setCheckoutProgressMessage(
+            'Secure checkout was cancelled. Review the payment details and try again.',
+          );
           toast.error('Payment was cancelled before completion.');
         },
         onError: (inlineError) => {
+          setCheckoutProgressMessage(
+            'Secure checkout could not be opened. Retry to continue your payment.',
+          );
           toast.error(inlineError.message || 'Unable to open the payment window.');
         },
       });
       return;
     }
 
-    if (paymentInit.authorizationUrl) {
-      window.location.assign(paymentInit.authorizationUrl);
-      return;
-    }
-
-    navigate(
-      `/bag/payment-return?reference=${encodeURIComponent(paymentInit.reference)}&gateway=${encodeURIComponent(resolvedGateway)}&uq=1`,
-    );
-  }, [navigate]);
+    await openHostedPaymentPopup({
+      authorizationUrl: session.authorizationUrl,
+      returnUrl: `${window.location.origin}${returnPath}`,
+      onReturn: (returnedUrl) => {
+        navigate(`${returnedUrl.pathname}${returnedUrl.search}`);
+      },
+      onCancel: () => {
+        setCheckoutProgressMessage(
+          'Secure verification was closed before completion. Review the payment details and try again.',
+        );
+        toast.error('Payment was cancelled before completion.');
+      },
+      onError: (popupError) => {
+        setCheckoutProgressMessage(
+          'Secure verification could not be opened. Retry to continue your payment.',
+        );
+        toast.error(popupError.message || 'Unable to open the payment window.');
+      },
+    });
+  }, [dispatch, embedded, navigate]);
 
   const initializeCustomLinePayment = useCallback(async (params: {
     checkoutIntentId: string;
@@ -615,6 +798,7 @@ const CheckoutPage: React.FC = () => {
     if (submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
+    setCheckoutProgressMessage('Validating checkout details...');
 
     try {
       const hasStoreItems = cart.items.length > 0;
@@ -633,7 +817,8 @@ const CheckoutPage: React.FC = () => {
       const validationErrors = validatePaymentData(paymentMethod, activePaymentData, address);
       setPaymentErrors(validationErrors);
       if (Object.keys(validationErrors).length > 0) {
-        toast.error('Complete the payment details for the selected method');
+        setCheckoutProgressMessage('Resolve the highlighted payment details before continuing.');
+        toast.error(getFirstPaymentErrorMessage(validationErrors));
         return;
       }
 
@@ -656,7 +841,7 @@ const CheckoutPage: React.FC = () => {
             price: i.product.effectivePrice,
           })),
           ...payableCustomBagItems.map((line) => ({
-            name: `${line.sourceTitle} (Custom)` ,
+            name: `${line.sourceTitle} (Custom)`,
             quantity: 1,
             price: Number(line.buyerPriceSummary?.grandTotal ?? 0),
           })),
@@ -675,6 +860,7 @@ const CheckoutPage: React.FC = () => {
         checkoutIntentId: line.checkoutIntentId,
         sessionId: line.sessionId,
         sourceTitle: line.sourceTitle,
+        price: Number(line.buyerPriceSummary?.grandTotal ?? 0),
       }));
 
       let orderIds: string[] = [];
@@ -684,6 +870,7 @@ const CheckoutPage: React.FC = () => {
 
       if (hasStoreItems) {
         try {
+          setCheckoutProgressMessage('Preparing your order and secure payment session...');
           const checkoutIdempotencyKey =
             checkoutIdempotencyKeyRef.current ?? createIdempotencyKey();
           checkoutIdempotencyKeyRef.current = checkoutIdempotencyKey;
@@ -723,8 +910,10 @@ const CheckoutPage: React.FC = () => {
 
       let customPrimaryPayment: CustomOrderPaymentInitResult | null = null;
       let remainingCustomQueue = [...queueLines];
+      let customPrimaryLine: (typeof queueLines)[number] | null = null;
 
       if (!standardPaymentResult && remainingCustomQueue.length > 0) {
+        setCheckoutProgressMessage('Preparing your secure payment session...');
         while (remainingCustomQueue.length > 0 && !customPrimaryPayment) {
           const [candidate, ...rest] = remainingCustomQueue;
           try {
@@ -734,6 +923,7 @@ const CheckoutPage: React.FC = () => {
               email: paymentSubmissionData.email,
               paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
             });
+            customPrimaryLine = candidate;
             remainingCustomQueue = rest;
           } catch (error: any) {
             remainingCustomQueue = rest;
@@ -775,20 +965,42 @@ const CheckoutPage: React.FC = () => {
         paymentMethod: normalizedPaymentMethod,
         email: paymentSubmissionData.email,
         paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
-        lines: standardPaymentResult ? queueLines : remainingCustomQueue,
+        lines: remainingCustomQueue,
+        currentLine: customPrimaryLine ?? undefined,
+        successfulCustomLines: [],
+        failedCustomLines: [],
+        standardLane: {
+          attempted: hasStoreItems,
+          paid: false,
+          failed: Boolean(standardError),
+          items: cart.items.map((i) => ({
+            name: i.product.name,
+            quantity: i.quantity,
+            price: i.product.effectivePrice,
+          })),
+          subtotal: cart.subtotal,
+          shippingCost,
+          discount: discountAmount,
+        },
+        shippingName: `${address.firstName} ${address.lastName}`.trim(),
+        shippingCity: address.city,
+        shippingState: address.state,
         summary,
       });
 
       if (standardPaymentResult) {
+        setCheckoutProgressMessage('Opening secure checkout inside Threadly...');
         await launchInitializedPayment(standardPaymentResult);
         return;
       }
 
       if (customPrimaryPayment) {
+        setCheckoutProgressMessage('Opening secure checkout inside Threadly...');
         await launchInitializedPayment(customPrimaryPayment);
         return;
       }
     } catch (error: any) {
+      setCheckoutProgressMessage('Checkout could not be completed. Review the payment state and retry.');
       toast.error(error?.response?.data?.message || error?.message || 'Checkout failed. Please try again.');
     } finally {
       submittingRef.current = false;
@@ -807,6 +1019,7 @@ const CheckoutPage: React.FC = () => {
     grandTotal,
     initializeCustomLinePayment,
     launchInitializedPayment,
+    getFirstPaymentErrorMessage,
     paymentMethod,
     payableCustomBagItems,
     promoApplied,
@@ -817,25 +1030,35 @@ const CheckoutPage: React.FC = () => {
 
   /* ─── Step Indicator ─── */
   const stepIdx = STEPS.indexOf(step);
+  const shellClassName = embedded
+    ? 'threadly-shell-bg min-h-full'
+    : 'threadly-shell-bg min-h-screen';
+  const contentClassName = embedded
+    ? 'relative mx-auto max-w-7xl px-4 py-6 sm:px-5 lg:px-8 lg:py-8'
+    : 'relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12';
 
   return (
-    <div className="relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-20 top-20 h-72 w-72 rounded-full bg-fuchsia-300/18 blur-3xl dark:bg-fuchsia-500/12" />
-        <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-sky-300/14 blur-3xl dark:bg-sky-500/10" />
-        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-violet-300/12 blur-3xl dark:bg-violet-500/10" />
-      </div>
-
-      <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+    <div className={shellClassName}>
+      <div className={contentClassName}>
       <div className="mb-6 flex items-center justify-between gap-4">
-        <CheckoutBackLink label="Back to bag" onClick={() => navigate(-1)} />
-        <div className="hidden rounded-full border border-white/60 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-slate-400 sm:inline-flex">
-          Secure checkout
-        </div>
+        <CheckoutBackLink label="Back to bag" onClick={handleBackToBag} />
+        {embedded ? (
+          <button
+            type="button"
+            onClick={handleReturnToSourcePage}
+            className="rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-700 transition-colors hover:border-slate-400 hover:text-slate-900 dark:border-white/15 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:border-white/25 dark:hover:text-white"
+          >
+            Return to shopping
+          </button>
+        ) : (
+          <div className="hidden rounded-full border border-white/60 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-slate-400 sm:inline-flex">
+            Secure checkout
+          </div>
+        )}
       </div>
 
       {/* Step indicator */}
-      <nav className="mb-8 flex items-center justify-center gap-2 rounded-full border border-white/60 bg-white/72 px-3 py-3 shadow-[0_14px_40px_rgba(148,163,184,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-white/5" aria-label="Checkout steps">
+      <nav className="threadly-chrome-surface mb-8 flex items-center justify-center gap-2 rounded-full px-3 py-3" aria-label="Checkout steps">
         {STEPS.map((s, i) => {
           const isActive = s === step;
           const isCompleted = i < stepIdx;
@@ -899,6 +1122,14 @@ const CheckoutPage: React.FC = () => {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,0.95fr)] lg:items-start">
         {/* ─── Main panel ─── */}
         <div className="space-y-6">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
           {/* STEP 1: Shipping */}
           {step === 'shipping' && (
             <CheckoutPanel
@@ -941,7 +1172,7 @@ const CheckoutPage: React.FC = () => {
                           key={savedAddress.id}
                           className={`rounded-[24px] border p-4 text-left transition-all ${
                             isSelected
-                              ? 'border-fuchsia-300 bg-[linear-gradient(135deg,rgba(245,208,254,0.28),rgba(224,231,255,0.54))] shadow-[0_12px_28px_rgba(217,70,239,0.12)] dark:border-fuchsia-400/30 dark:bg-[linear-gradient(135deg,rgba(168,85,247,0.14),rgba(59,130,246,0.08))]'
+                              ? 'border-fuchsia-300 bg-white shadow-[0_12px_28px_rgba(99,102,241,0.12)] dark:border-fuchsia-400/35 dark:bg-white/[0.06]'
                               : 'border-white/60 bg-white/75 hover:border-fuchsia-200 dark:border-white/10 dark:bg-white/[0.03]'
                           }`}
                         >
@@ -1091,7 +1322,7 @@ const CheckoutPage: React.FC = () => {
               </div>
 
               <div className="flex flex-col gap-4 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
-                <CheckoutBackLink label="Back to bag" onClick={() => navigate(-1)} />
+                <CheckoutBackLink label="Back to bag" onClick={handleBackToBag} />
                 <Button onClick={goNext} size="lg" className="rounded-2xl px-8 shadow-[0_16px_36px_rgba(217,70,239,0.28)]">
                   Continue to Payment
                 </Button>
@@ -1117,7 +1348,7 @@ const CheckoutPage: React.FC = () => {
                       key={opt.value}
                       className={`rounded-[28px] border transition-all duration-200 ${
                         isSelected
-                          ? 'border-fuchsia-300/90 bg-[linear-gradient(135deg,rgba(245,208,254,0.26),rgba(224,231,255,0.54))] shadow-[0_14px_34px_rgba(217,70,239,0.12)] dark:bg-[linear-gradient(135deg,rgba(168,85,247,0.12),rgba(59,130,246,0.08))]'
+                          ? 'border-fuchsia-300/90 bg-white shadow-[0_14px_34px_rgba(99,102,241,0.12)] dark:border-fuchsia-400/35 dark:bg-white/[0.06]'
                           : 'border-white/60 bg-white/75 shadow-[0_14px_32px_rgba(15,23,42,0.06)] hover:border-fuchsia-200 dark:border-white/10 dark:bg-white/[0.03]'
                       }`}
                     >
@@ -1155,6 +1386,9 @@ const CheckoutPage: React.FC = () => {
                             shippingAddress={address}
                             errors={paymentErrors}
                             onChange={updateSelectedPaymentData}
+                            savedCards={savedCards}
+                            savedCardsLoading={savedCardsLoading}
+                            savedCardsError={savedCardsError}
                             compact
                           />
                         </div>
@@ -1213,11 +1447,16 @@ const CheckoutPage: React.FC = () => {
               description={STEP_DESCRIPTIONS.review}
             >
             <div className="space-y-6">
+              {checkoutProgressMessage && (
+                <div className="rounded-[24px] border border-sky-200/80 bg-sky-50/80 px-4 py-3 text-sm text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100">
+                  {checkoutProgressMessage}
+                </div>
+              )}
               {/* Shipping summary */}
               <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">📍 Shipping Address</h3>
-                  <button type="button" onClick={() => setStep('shipping')} className="text-sm font-semibold text-fuchsia-600 dark:text-fuchsia-300 hover:underline">
+                  <button type="button" onClick={() => setStep('shipping')} className="text-sm font-semibold text-indigo-700 underline decoration-indigo-300 decoration-2 underline-offset-4 dark:text-indigo-300 dark:decoration-indigo-500">
                     Edit
                   </button>
                 </div>
@@ -1234,7 +1473,7 @@ const CheckoutPage: React.FC = () => {
               <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">💳 Payment Method</h3>
-                  <button type="button" onClick={() => setStep('payment')} className="text-sm font-semibold text-fuchsia-600 dark:text-fuchsia-300 hover:underline">
+                  <button type="button" onClick={() => setStep('payment')} className="text-sm font-semibold text-indigo-700 underline decoration-indigo-300 decoration-2 underline-offset-4 dark:text-indigo-300 dark:decoration-indigo-500">
                     Edit
                   </button>
                 </div>
@@ -1309,20 +1548,38 @@ const CheckoutPage: React.FC = () => {
                     <p className="text-xs font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-300">
                       Custom requests
                     </p>
-                    {payableCustomBagItems.map((line) => (
-                      <div key={line.sessionId} className="flex items-center justify-between gap-3 text-sm">
-                        <div className="min-w-0">
-                          <p className="font-medium truncate">{line.sourceTitle}</p>
-                          <p className="text-gray-400 text-xs">
-                            Qty: 1 · {line.sourceBrandName || 'Custom order'}
-                            {line.rushSelected ? ' · Rush' : ''}
-                          </p>
+                    {payableCustomBagItems.map((line) => {
+                      const mediaUrl = normalizeCheckoutMediaUrl(line.sourcePrimaryMediaUrl);
+                      return (
+                        <div key={line.sessionId} className="flex items-center justify-between gap-3 text-sm">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="h-10 w-10 overflow-hidden rounded-xl bg-white ring-1 ring-indigo-200/70 dark:bg-white/10 dark:ring-indigo-500/30">
+                              {mediaUrl ? (
+                                <ImageWithFallback
+                                  src={mediaUrl}
+                                  alt={line.sourceTitle}
+                                  className="h-full w-full"
+                                  fit="cover"
+                                  rounded="none"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-base">🧵</div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium truncate">{line.sourceTitle}</p>
+                              <p className="text-gray-400 text-xs">
+                                Qty: 1 · {line.sourceBrandName || 'Custom order'}
+                                {line.rushSelected ? ' · Rush' : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="font-medium flex-shrink-0">
+                            {formatPrice(line.buyerPriceSummary.grandTotal)}
+                          </span>
                         </div>
-                        <span className="font-medium flex-shrink-0">
-                          {formatPrice(line.buyerPriceSummary.grandTotal)}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
@@ -1342,6 +1599,8 @@ const CheckoutPage: React.FC = () => {
             </div>
             </CheckoutPanel>
           )}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* ─── Order Summary Sidebar ─── */}
@@ -1387,37 +1646,40 @@ const CheckoutPage: React.FC = () => {
                   </div>
                 ))}
 
-                {payableCustomBagItems.map((line) => (
-                  <div key={line.sessionId} className="flex items-start gap-3 rounded-[22px] border border-indigo-200/70 bg-indigo-50/70 p-3 dark:border-indigo-500/20 dark:bg-indigo-500/10">
-                    <div className="h-16 w-16 overflow-hidden rounded-2xl bg-white ring-1 ring-indigo-200/70 dark:bg-white/10 dark:ring-indigo-500/30">
-                      {line.sourcePrimaryMediaUrl ? (
-                        <ImageWithFallback
-                          src={line.sourcePrimaryMediaUrl}
-                          alt={line.sourceTitle}
-                          className="h-full w-full"
-                          fit="cover"
-                          rounded="none"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-xl">🧵</div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{line.sourceTitle}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">{line.sourceBrandName || 'Custom order'}</p>
-                        </div>
-                        <span className="text-sm font-semibold text-slate-950 dark:text-white">
-                          {formatPrice(line.buyerPriceSummary.grandTotal)}
-                        </span>
+                {payableCustomBagItems.map((line) => {
+                  const mediaUrl = normalizeCheckoutMediaUrl(line.sourcePrimaryMediaUrl);
+                  return (
+                    <div key={line.sessionId} className="flex items-start gap-3 rounded-[22px] border border-indigo-200/70 bg-indigo-50/70 p-3 dark:border-indigo-500/20 dark:bg-indigo-500/10">
+                      <div className="h-16 w-16 overflow-hidden rounded-2xl bg-white ring-1 ring-indigo-200/70 dark:bg-white/10 dark:ring-indigo-500/30">
+                        {mediaUrl ? (
+                          <ImageWithFallback
+                            src={mediaUrl}
+                            alt={line.sourceTitle}
+                            className="h-full w-full"
+                            fit="cover"
+                            rounded="none"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xl">🧵</div>
+                        )}
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Qty: 1 · {line.measurementCount} measurements{line.rushSelected ? ' · Rush' : ''}
-                      </p>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{line.sourceTitle}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{line.sourceBrandName || 'Custom order'}</p>
+                          </div>
+                          <span className="text-sm font-semibold text-slate-950 dark:text-white">
+                            {formatPrice(line.buyerPriceSummary.grandTotal)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Qty: 1 · {line.measurementCount} measurements{line.rushSelected ? ' · Rush' : ''}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {customBagLoading && (
                   <div className="rounded-[22px] border border-slate-200/80 bg-white/70 p-3 text-xs text-slate-500 dark:border-white/8 dark:bg-white/[0.03] dark:text-slate-400">
@@ -1459,7 +1721,7 @@ const CheckoutPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="rounded-[22px] border border-fuchsia-300/35 bg-[linear-gradient(135deg,rgba(245,208,254,0.55),rgba(224,231,255,0.6))] px-4 py-4 text-sm text-slate-600 dark:border-fuchsia-500/16 dark:bg-[linear-gradient(135deg,rgba(168,85,247,0.18),rgba(59,130,246,0.08))] dark:text-slate-300">
+              <div className="threadly-chrome-surface rounded-[22px] px-4 py-4 text-sm text-slate-700 dark:text-slate-300">
                 <div className="flex gap-3">
                   <span className="mt-0.5 text-base text-fuchsia-500 dark:text-fuchsia-300">◉</span>
                   <p>

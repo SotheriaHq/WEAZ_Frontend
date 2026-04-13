@@ -41,14 +41,17 @@ const CustomOrderCheckoutResumePage: React.FC = () => {
   useEffect(() => {
     if (!session) return;
     if (session.customOrderId) {
-      navigate(`/custom-orders/${session.customOrderId}`, { replace: true });
+      navigate(
+        `/profile?tab=orders&kind=custom&orderId=${encodeURIComponent(session.customOrderId)}`,
+        { replace: true },
+      );
       return;
     }
     if (session.resumePath) {
       // Validate that resumePath is a relative path before navigating to prevent
       // open-redirect issues if the stored value is an absolute URL.
       const path = session.resumePath;
-      const safePath = typeof path === 'string' && path.startsWith('/') ? path : '/custom-orders';
+      const safePath = typeof path === 'string' && path.startsWith('/') ? path : '/profile?tab=orders';
       navigate(safePath, { replace: true });
     }
   }, [navigate, session]);
@@ -92,7 +95,7 @@ const CustomOrderCheckoutResumePage: React.FC = () => {
           <Button
             onClick={() => {
               const path = session.resumePath;
-              const safePath = typeof path === 'string' && path.startsWith('/') ? path : '/custom-orders';
+              const safePath = typeof path === 'string' && path.startsWith('/') ? path : '/profile?tab=orders';
               navigate(safePath);
             }}
           >
@@ -101,8 +104,8 @@ const CustomOrderCheckoutResumePage: React.FC = () => {
         ) : (
           <Button onClick={() => navigate('/custom-orders/new')}>Start new custom order</Button>
         )}
-        <Button variant="secondary" onClick={() => navigate('/custom-orders')}>
-          Open custom orders
+        <Button variant="secondary" onClick={() => navigate('/profile?tab=orders')}>
+          Open my orders
         </Button>
       </div>
     </div>

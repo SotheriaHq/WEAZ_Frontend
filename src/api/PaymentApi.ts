@@ -23,6 +23,7 @@ export interface PaymentInitRequest {
 export interface PaymentNextAction {
   type:
     | 'REDIRECT'
+    | 'INLINE_POPUP'
     | 'BANK_TRANSFER_INSTRUCTIONS'
     | 'USSD_INSTRUCTIONS'
     | 'MOBILE_MONEY_APPROVAL'
@@ -47,6 +48,7 @@ export interface PaymentInitResult {
   settlementAmount: number;
   exchangeRateSnapshotId?: string;
   channel?: string;
+  providerAccessCode?: string;
   authorizationUrl?: string;
   callbackUrl?: string;
   bankAccount?: {
@@ -93,6 +95,7 @@ export interface PaymentAttemptSummary {
   settlementAmount: number;
   exchangeRateSnapshotId?: string;
   channel?: string;
+  providerAccessCode?: string;
   authorizationUrl?: string;
   callbackUrl?: string;
   bankAccount?: PaymentInitResult['bankAccount'];
@@ -115,6 +118,19 @@ export interface PaymentAttemptSummary {
     shippingCity: string;
     shippingState: string;
   };
+}
+
+export interface SavedPaymentCardSummary {
+  id: string;
+  gateway: 'PAYSTACK';
+  brand: string | null;
+  bank: string | null;
+  last4: string;
+  expMonth: string | null;
+  expYear: string | null;
+  reusable: boolean;
+  addedAt: string;
+  lastUsedAt: string;
 }
 
 function extract<T>(res: any): T {
@@ -150,6 +166,11 @@ export const paymentApi = {
   async getAttemptByOrder(orderId: string): Promise<PaymentAttemptSummary> {
     const res = await apiClient.get(`/payment/attempts/by-order/${orderId}`);
     return extract<PaymentAttemptSummary>(res);
+  },
+
+  async listSavedCards(): Promise<SavedPaymentCardSummary[]> {
+    const res = await apiClient.get('/payment/saved-cards');
+    return extract<SavedPaymentCardSummary[]>(res) ?? [];
   },
 
   async simulate(reference: string, outcome: PaymentAttemptStatus): Promise<PaymentAttemptSummary> {

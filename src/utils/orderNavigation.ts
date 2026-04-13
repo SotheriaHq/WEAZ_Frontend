@@ -42,7 +42,21 @@ export const buildOrderRoute = ({
       return `/admin/custom-orders/${encodeURIComponent(customOrderId)}`;
     }
 
-    return `/custom-orders/${encodeURIComponent(customOrderId)}`;
+    const params = new URLSearchParams({
+      tab: 'orders',
+      kind: 'custom',
+      orderId: customOrderId,
+    });
+
+    if (openChat) {
+      params.set('openChat', '1');
+    }
+
+    if (messageId) {
+      params.set('messageId', messageId);
+    }
+
+    return `/profile?${params.toString()}`;
   }
 
   if (!orderId) {

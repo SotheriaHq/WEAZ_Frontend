@@ -6,9 +6,10 @@ import { closeSidebar, toggleSidebar } from '../features/uiSlice';
 import {
   openCartDrawer,
   closeCartDrawer,
-  selectCartTotalQuantity,
+  selectCartCombinedQuantity,
   selectCartIsDrawerOpen,
   fetchCart,
+  fetchCustomBagCount,
   resetCartState,
 } from '../features/cartSlice';
 import {
@@ -53,7 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const { profile: userProfile, isAuthenticated } = useSelector((state: RootState) => state.user);
   const isSidebarOpen = useSelector((state: RootState) => state.ui.isSidebarOpen);
   const { unreadCount } = useSelector((state: RootState) => state.notifications);
-  const cartQuantity = useSelector(selectCartTotalQuantity);
+  const cartQuantity = useSelector(selectCartCombinedQuantity);
   const isCartOpen = useSelector(selectCartIsDrawerOpen);
   const wishlistTotal = useSelector(selectWishlistTotal);
   const isWishlistOpen = useSelector(selectWishlistIsDrawerOpen);
@@ -72,6 +73,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   React.useEffect(() => {
     if (isAuthenticated) {
       dispatch(fetchCart());
+      dispatch(fetchCustomBagCount());
       dispatch(fetchWishlist({ page: 1, limit: 200 }));
     }
   }, [dispatch, isAuthenticated]);

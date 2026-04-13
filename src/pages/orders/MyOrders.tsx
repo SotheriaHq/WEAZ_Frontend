@@ -466,7 +466,9 @@ const MyOrders: React.FC = () => {
             return (
               <div
                 key={order.id}
-                onClick={() => navigate(`/custom-orders/${order.id}`)}
+                onClick={() =>
+                  navigate(`/profile?tab=orders&kind=custom&orderId=${encodeURIComponent(order.id)}`)
+                }
                 className="group relative cursor-pointer rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-all hover:border-gray-300 hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:bg-white/[0.05]"
               >
                 <div className="flex gap-4">

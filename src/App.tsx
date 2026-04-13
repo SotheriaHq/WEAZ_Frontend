@@ -1,5 +1,5 @@
 
-import React, { Suspense, useEffect, lazy } from 'react';
+import React, { Suspense, useEffect, lazy, useRef, useState } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet, Navigate, useParams, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import SettingsHome from './pages/settings/SettingsHome';
@@ -20,7 +20,6 @@ import ErrorPage from './pages/ErrorPage';
 import CartDrawer from './components/designs/CartDrawer';
 import WishlistDrawer from './components/designs/WishlistDrawer';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
-import CheckoutPage from './pages/checkout/CheckoutPage';
 import OrderConfirmation from './pages/checkout/OrderConfirmation';
 import PaymentReturnPage from './pages/checkout/PaymentReturnPage';
 // Placeholder pages for features under development
@@ -69,9 +68,7 @@ const StudioCustomOrderDetailPage = lazy(() => import('./pages/studio/StudioCust
 const BrandPayoutsPage = lazy(() => import('./pages/store/BrandPayoutsPage'));
 const MyOrders = lazy(() => import('./pages/orders/MyOrders'));
 const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
-const CustomOrdersIndexPage = lazy(() => import('./pages/custom-orders/CustomOrdersIndexPage'));
 const CustomOrderComposerPage = lazy(() => import('./pages/custom-orders/CustomOrderComposerPage'));
-const CustomOrderDetailPage = lazy(() => import('./pages/custom-orders/CustomOrderDetailPage'));
 const CustomOrderCheckoutResumePage = lazy(() => import('./pages/custom-orders/CustomOrderCheckoutResumePage'));
 const MessagingManagementPage = lazy(() => import('./pages/messages/MessagingManagementPage'));
 
@@ -196,14 +193,70 @@ const ViewportSync: React.FC<{ watchKey?: string }> = ({ watchKey }) => {
 
 const RootLayout: React.FC = () => {
   const location = useLocation();
+  const [showRouteIntentProgress, setShowRouteIntentProgress] = useState(false);
+  const routeIntentTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+
+      const anchor = target.closest('a[href]') as HTMLAnchorElement | null;
+      if (!anchor) return;
+
+      if (anchor.target && anchor.target !== '_self') return;
+      if (anchor.hasAttribute('download')) return;
+
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+        return;
+      }
+
+      const nextUrl = new URL(href, window.location.origin);
+      if (nextUrl.origin !== window.location.origin) return;
+
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const next = `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
+      if (next === current) return;
+
+      setShowRouteIntentProgress(true);
+      if (routeIntentTimeoutRef.current !== null) {
+        window.clearTimeout(routeIntentTimeoutRef.current);
+      }
+      routeIntentTimeoutRef.current = window.setTimeout(() => {
+        setShowRouteIntentProgress(false);
+      }, 1600);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      if (routeIntentTimeoutRef.current !== null) {
+        window.clearTimeout(routeIntentTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    setShowRouteIntentProgress(false);
+    if (routeIntentTimeoutRef.current !== null) {
+      window.clearTimeout(routeIntentTimeoutRef.current);
+      routeIntentTimeoutRef.current = null;
+    }
+  }, [location.pathname, location.search]);
 
   return (
     <>
+      {showRouteIntentProgress && (
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-[2147483646] h-0.5 overflow-hidden">
+          <div className="h-full w-full animate-pulse bg-gradient-to-r from-fuchsia-500 via-indigo-500 to-cyan-500" />
+        </div>
+      )}
       <ViewportSync watchKey={location.pathname} />
       <CartDrawer />
       <WishlistDrawer />
       <GlobalModalRouter />
-      <Suspense fallback={<AppRouteFallback />}>
+      <Suspense key={location.pathname} fallback={<AppRouteFallback />}>
         <Outlet />
       </Suspense>
     </>
@@ -213,6 +266,19 @@ const RootLayout: React.FC = () => {
 const LegacyProductEditRedirect: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   return <Navigate to={id ? `/studio/store/products/${id}/edit` : '/studio/store'} replace />;
+};
+
+const LegacyBuyerCustomOrdersRedirect: React.FC = () => {
+  const { orderId } = useParams<{ orderId?: string }>();
+  if (orderId) {
+    return (
+      <Navigate
+        to={`/profile?tab=orders&kind=custom&orderId=${encodeURIComponent(orderId)}`}
+        replace
+      />
+    );
+  }
+  return <Navigate to="/profile?tab=orders" replace />;
 };
 
 const profileChildren = [
@@ -491,7 +557,6 @@ const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
-          { path: '/bag/checkout', element: <Layout><CheckoutPage /></Layout> },
           { path: '/bag/payment-return', element: <Layout><PaymentReturnPage /></Layout> },
           { path: '/bag/confirmation', element: <Layout><OrderConfirmation /></Layout> },
           { path: '/orders', element: <Layout><MyOrders /></Layout> },
@@ -516,10 +581,10 @@ const router = createBrowserRouter([
               </RequireBrand>
             ),
           },
-          { path: '/custom-orders', element: <Layout><CustomOrdersIndexPage /></Layout> },
+          { path: '/custom-orders', element: <LegacyBuyerCustomOrdersRedirect /> },
           { path: '/custom-orders/new', element: <Layout><CustomOrderComposerPage /></Layout> },
           { path: '/custom-orders/resume/:token', element: <Layout><CustomOrderCheckoutResumePage /></Layout> },
-          { path: '/custom-orders/:orderId', element: <Layout><CustomOrderDetailPage /></Layout> },
+          { path: '/custom-orders/:orderId', element: <LegacyBuyerCustomOrdersRedirect /> },
           { path: '/orders/:orderId', element: <Layout><OrderDetail /></Layout> },
         ],
       },

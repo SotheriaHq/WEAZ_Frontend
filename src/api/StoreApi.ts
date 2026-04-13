@@ -272,6 +272,25 @@ export interface PaymentContactDetails {
 export interface PaystackPaymentData extends PaymentContactDetails {
   method: 'PAYSTACK';
   channel: 'CARD' | 'BANK_TRANSFER';
+  useSavedCard?: boolean;
+  savedCardId?: string | null;
+  saveNewCard?: boolean;
+  newCardDraft?: {
+    cardHolderName: string;
+    cardNumber: string;
+    expiry: string;
+    cvv: string;
+  } | null;
+  savedCardDisplay?: {
+    id: string;
+    brand: string | null;
+    bank: string | null;
+    last4: string;
+    expMonth: string | null;
+    expYear: string | null;
+    reusable: boolean;
+    lastUsedAt: string;
+  } | null;
 }
 
 export interface FlutterwavePaymentData extends PaymentContactDetails {

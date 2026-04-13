@@ -7,6 +7,7 @@ import {
   closeCartDrawer,
   updateCartItem,
   removeFromCart,
+  setCustomBagCount,
   selectCartItems,
   selectCartSubtotal,
   selectCartTotalQuantity,
@@ -23,6 +24,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import CheckoutPage from '@/pages/checkout/CheckoutPage';
 import {
   customOrdersBuyerApi,
   type CustomOrderCheckoutBagLine,
@@ -88,27 +90,33 @@ const CartDrawer: React.FC = () => {
   const [customBagItems, setCustomBagItems] = useState<CustomOrderCheckoutBagLine[]>([]);
   const [customBagLoading, setCustomBagLoading] = useState(false);
   const [updatingCustomLineId, setUpdatingCustomLineId] = useState<string | null>(null);
+  const [drawerView, setDrawerView] = useState<'bag' | 'checkout'>('bag');
 
   const refreshCustomBag = useCallback(async () => {
     if (!isAuthenticated) {
       setCustomBagItems([]);
+      dispatch(setCustomBagCount(0));
       return;
     }
 
     setCustomBagLoading(true);
     try {
       const response = await customOrdersBuyerApi.listCheckoutBag();
-      setCustomBagItems(response.items || []);
+      const nextItems = response.items || [];
+      setCustomBagItems(nextItems);
+      dispatch(setCustomBagCount(nextItems.length));
     } catch {
       setCustomBagItems([]);
+      dispatch(setCustomBagCount(0));
     } finally {
       setCustomBagLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [dispatch, isAuthenticated]);
 
   useEffect(() => {
     if (!isOpen) {
       dispatch(clearCartNotices());
+      setDrawerView('bag');
     }
   }, [isOpen, dispatch]);
 
@@ -222,9 +230,11 @@ const CartDrawer: React.FC = () => {
     setUpdatingCustomLineId(sessionId);
     try {
       await customOrdersBuyerApi.removeCheckoutBagLine(sessionId);
-      setCustomBagItems((current) =>
-        current.filter((item) => item.sessionId !== sessionId),
-      );
+      setCustomBagItems((current) => {
+        const nextItems = current.filter((item) => item.sessionId !== sessionId);
+        dispatch(setCustomBagCount(nextItems.length));
+        return nextItems;
+      });
       toast.success('Custom request removed from bag');
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to remove custom request');
@@ -248,14 +258,67 @@ const CartDrawer: React.FC = () => {
     }
   };
 
+  const resolveCustomLineRoute = useCallback(
+    (line: CustomOrderCheckoutBagLine): string => {
+      const isBrandUser = user?.type === 'BRAND';
+
+      if (line.customOrderId) {
+        return isBrandUser
+          ? `/studio/custom-orders/${line.customOrderId}`
+          : `/profile?tab=orders&kind=custom&orderId=${encodeURIComponent(line.customOrderId)}`;
+      }
+
+      const rawResumePath = String(line.resumePath ?? '').trim();
+      if (rawResumePath) {
+        try {
+          const normalizedResumePath = /^https?:\/\//i.test(rawResumePath)
+            ? (() => {
+                const parsed = new URL(rawResumePath);
+                return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+              })()
+            : rawResumePath;
+
+          const legacyResumeMatch = normalizedResumePath.match(
+            /\/custom-orders\/checkout-sessions\/resume\/([^/?#]+)/i,
+          );
+          if (legacyResumeMatch?.[1]) {
+            return `/custom-orders/resume/${legacyResumeMatch[1]}`;
+          }
+
+          return normalizedResumePath;
+        } catch {
+          return rawResumePath;
+        }
+      }
+
+      if (!isBrandUser) {
+        // Buyer fallback should stay on the custom table, not default to standard orders.
+        return '/profile?tab=orders&kind=custom';
+      }
+
+      return '/studio/custom-orders';
+    },
+    [user?.type],
+  );
+
+  const handleOpenCustomLine = useCallback(
+    (line: CustomOrderCheckoutBagLine) => {
+      const targetRoute = resolveCustomLineRoute(line);
+      dispatch(closeCartDrawer());
+      navigate(targetRoute);
+    },
+    [dispatch, navigate, resolveCustomLineRoute],
+  );
+
   const handleCheckout = () => {
-    dispatch(closeCartDrawer());
-    navigate('/bag/checkout', { state: { promoCode: appliedPromo?.code } });
+    setDrawerView('checkout');
   };
 
   const handleContinueShopping = () => {
     dispatch(closeCartDrawer());
   };
+
+  const isCheckoutView = drawerView === 'checkout';
 
   if (!isOpen) return null;
 
@@ -284,11 +347,19 @@ const CartDrawer: React.FC = () => {
               className="fixed inset-0 z-layer-overlay"
               onClick={() => dispatch(closeCartDrawer())}
             >
-              {/* Multi-layer gradient blur background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
-              <div className="absolute inset-0 bg-gradient-to-tr from-violet-600/20 via-transparent to-cyan-600/20" />
-              <div className="absolute inset-0 backdrop-blur-xl" />
-              <div className="absolute inset-0 bg-black/30" />
+              {isCheckoutView ? (
+                <>
+                  <div className="absolute inset-0 backdrop-blur-md" />
+                  <div className="absolute inset-0 bg-slate-900/30 dark:bg-black/45" />
+                </>
+              ) : (
+                <>
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-violet-600/20 via-transparent to-cyan-600/20" />
+                  <div className="absolute inset-0 backdrop-blur-xl" />
+                  <div className="absolute inset-0 bg-black/30" />
+                </>
+              )}
             </motion.div>
 
             {/* Drawer */}
@@ -297,13 +368,25 @@ const CartDrawer: React.FC = () => {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed right-0 top-0 bottom-0 z-layer-drawer w-full max-w-md flex flex-col"
+              className={`fixed right-0 top-0 bottom-0 z-layer-drawer w-full flex flex-col ${
+                drawerView === 'checkout' ? '' : 'max-w-md'
+              }`}
               role="dialog"
               aria-modal="true"
               aria-label="Shopping Bag"
             >
               {/* Glass panel */}
               <div className="h-full bg-white/98 dark:bg-gray-950/98 backdrop-blur-2xl border-l border-white/30 dark:border-white/10 shadow-2xl flex flex-col">
+              {drawerView === 'checkout' ? (
+                <div className="h-full overflow-y-auto">
+                  <CheckoutPage
+                    embedded
+                    initialPromoCode={appliedPromo?.code}
+                    onClose={() => setDrawerView('bag')}
+                  />
+                </div>
+              ) : (
+              <>
               {/* Header */}
               <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200/60 dark:border-gray-800/60">
                 <div className="flex items-center gap-2">
@@ -530,17 +613,31 @@ const CartDrawer: React.FC = () => {
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: index * 0.04 }}
-                              className="relative flex gap-3 p-2.5 rounded-xl bg-indigo-50/65 dark:bg-indigo-900/20 border border-indigo-200/70 dark:border-indigo-700/40"
+                              className="relative flex gap-3 p-2.5 rounded-xl bg-indigo-50/65 dark:bg-indigo-900/20 border border-indigo-200/70 dark:border-indigo-700/40 cursor-pointer"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => handleOpenCustomLine(customLine)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  handleOpenCustomLine(customLine);
+                                }
+                              }}
                             >
                               <button
-                                onClick={() => handleRemoveCustomLine(customLine.sessionId)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleRemoveCustomLine(customLine.sessionId);
+                                }}
                                 disabled={updatingCustomLineId === customLine.sessionId}
                                 className="absolute -top-1.5 -right-1.5 p-1 text-gray-400 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-sm hover:text-red-500 hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 transition-all duration-200 z-10 disabled:opacity-50"
                               >
                                 <Trash2 size={12} />
                               </button>
 
-                              <div className="w-16 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-white dark:bg-gray-900 border border-indigo-100 dark:border-indigo-700/30">
+                              <div
+                                className="w-16 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-white dark:bg-gray-900 border border-indigo-100 dark:border-indigo-700/30"
+                              >
                                 {customLine.sourcePrimaryMediaUrl ? (
                                   <CartItemThumbnail
                                     src={customLine.sourcePrimaryMediaUrl}
@@ -552,7 +649,7 @@ const CartDrawer: React.FC = () => {
                               </div>
 
                               <div className="min-w-0 flex-1 space-y-1">
-                                <p className="text-xs font-semibold text-gray-900 dark:text-white line-clamp-1">
+                                <p className="text-xs font-semibold text-gray-900 dark:text-white line-clamp-1 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors">
                                   {customLine.sourceTitle}
                                 </p>
                                 <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">
@@ -570,7 +667,10 @@ const CartDrawer: React.FC = () => {
                                     </p>
                                     {customLine.canRelockPrice ? (
                                       <button
-                                        onClick={() => handleRelockCustomLine(customLine.sessionId)}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          void handleRelockCustomLine(customLine.sessionId);
+                                        }}
                                         disabled={updatingCustomLineId === customLine.sessionId}
                                         className="h-6 px-2 rounded-md bg-amber-500 text-[10px] font-semibold text-black disabled:opacity-60"
                                       >
@@ -671,27 +771,27 @@ const CartDrawer: React.FC = () => {
                   {/* Order Summary */}
                   <div className="space-y-0.5 mb-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500 dark:text-gray-400">Store items</span>
+                      <span className="text-gray-700 dark:text-gray-300">Store items</span>
                       <span className="font-medium text-gray-900 dark:text-white">{formatPrice(subtotal)}</span>
                     </div>
 
                     {customBagItems.length > 0 && (
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500 dark:text-gray-400">Custom requests</span>
+                        <span className="text-gray-700 dark:text-gray-300">Custom requests</span>
                         <span className="font-medium text-gray-900 dark:text-white">{formatPrice(customSubtotal)}</span>
                       </div>
                     )}
                     
                     {appliedPromo && discount > 0 && (
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500 dark:text-gray-400">Discount</span>
+                        <span className="text-gray-700 dark:text-gray-300">Discount</span>
                         <span className="font-medium text-green-600 dark:text-green-400">-{formatPrice(discount)}</span>
                       </div>
                     )}
                     
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500 dark:text-gray-400">Shipping</span>
-                      <span className="text-gray-400 dark:text-gray-500 text-[10px] italic">
+                      <span className="text-gray-700 dark:text-gray-300">Shipping</span>
+                      <span className="text-gray-600 dark:text-gray-300 text-[11px] font-medium">
                         Store items: at checkout
                       </span>
                     </div>
@@ -729,9 +829,9 @@ const CartDrawer: React.FC = () => {
 
                   {/* Payment Methods */}
                   <div className="flex items-center justify-center gap-2 mt-1.5 pt-1 border-t border-gray-100 dark:border-gray-800/50">
-                    <span className="text-[9px] text-gray-400">Pay with</span>
-                    <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800/80 text-[9px] font-bold text-gray-500 dark:text-gray-400">PAYSTACK</span>
-                    <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800/80 text-[9px] font-bold text-gray-500 dark:text-gray-400">FLUTTERWAVE</span>
+                    <span className="text-[10px] text-gray-600 dark:text-gray-300">Secure payment</span>
+                    <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800/80 text-[9px] font-bold text-gray-600 dark:text-gray-300">CARD</span>
+                    <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800/80 text-[9px] font-bold text-gray-600 dark:text-gray-300">TRANSFER</span>
                     <div className="flex items-center gap-0.5">
                       <div className="w-6 h-3.5 rounded bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-center">
                         <span className="text-[6px] font-bold text-white">VISA</span>
@@ -744,6 +844,8 @@ const CartDrawer: React.FC = () => {
 
                 </div>
               )}
+            </>
+            )}
             </div>
             </motion.div>
           </>

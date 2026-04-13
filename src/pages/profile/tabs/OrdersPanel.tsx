@@ -53,6 +53,14 @@ import {
   cancelActivePaystackInline,
   openPaystackInline,
 } from '@/lib/paystackInline';
+import {
+  resolveInAppPaymentSession,
+  resolvePaymentGateway,
+} from '@/lib/inAppPaymentSession';
+import {
+  closeActiveHostedPaymentPopup,
+  openHostedPaymentPopup,
+} from '@/lib/paystackHostedPopup';
 
 const STANDARD_STATUS_OPTIONS = ['ALL', 'PENDING', 'PROCESSING', 'SHIPPED'] as const;
 const CUSTOM_STATUS_OPTIONS = ['ALL', 'PENDING', 'ACTIVE', 'COMPLETED', 'ISSUES'] as const;
@@ -715,6 +723,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
   );
   const [paymentErrors, setPaymentErrors] = useState<PaymentFormErrors>({});
   const [paymentGateway, setPaymentGateway] = useState<string>('PAYSTACK');
+  const [paymentActionMessage, setPaymentActionMessage] = useState<string | null>(null);
   const [paymentAttempts, setPaymentAttempts] = useState<CustomOrderPaymentAttempt[]>([]);
   const [paymentAttemptsLoading, setPaymentAttemptsLoading] = useState(false);
   const [issueType, setIssueType] = useState<CustomOrderIssueType>('OTHER');
@@ -763,6 +772,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
   useEffect(() => {
     return () => {
       void cancelActivePaystackInline();
+      void closeActiveHostedPaymentPopup();
     };
   }, []);
 
@@ -903,6 +913,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
       [paymentMethod]: updater(prev[paymentMethod]),
     }));
     setPaymentErrors({});
+    setPaymentActionMessage(null);
   };
 
   const handlePayNow = async () => {
@@ -916,6 +927,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
     );
     setPaymentErrors(validationErrors);
     if (Object.keys(validationErrors).length > 0) {
+      setPaymentActionMessage('Resolve the highlighted payment details before continuing.');
       toast.error('Complete the payment details for the selected method');
       return;
     }
@@ -928,6 +940,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
       paymentInitIdempotencyKeyRef.current ?? createIdempotencyKey();
     paymentInitIdempotencyKeyRef.current = paymentInitIdempotencyKey;
     setBusy(true);
+    setPaymentActionMessage('Preparing your secure payment session...');
     try {
       const init = await customOrdersBuyerApi.initializePayment(orderId, {
         paymentMethod,
@@ -936,49 +949,53 @@ export const BuyerCustomOrderDetailView: React.FC<{
         paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
         idempotencyKey: paymentInitIdempotencyKey,
       });
-      setPaymentGateway(init.gateway);
+      const resolvedGateway = resolvePaymentGateway(init);
+      const session = resolveInAppPaymentSession(init);
+      setPaymentGateway(resolvedGateway);
       setPaymentVerification(null);
-      if (init.providerAccessCode) {
-        await openPaystackInline(init.providerAccessCode, {
+      setPaymentActionMessage('Opening secure checkout inside Threadly...');
+      const returnPath = `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
+
+      if (session.kind === 'access_code') {
+        await openPaystackInline(session.accessCode, {
           onSuccess: () => {
-            navigate(
-              `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
-            );
+            navigate(returnPath);
           },
           onCancel: () => {
             paymentInitIdempotencyKeyRef.current = null;
+            setPaymentActionMessage('Secure checkout was cancelled. Review the details and try again.');
             toast.error('Payment was cancelled before the order could be placed.');
           },
           onError: (inlineError) => {
             paymentInitIdempotencyKeyRef.current = null;
+            setPaymentActionMessage('Secure checkout could not be opened. Retry to continue.');
             toast.error(inlineError.message || 'Unable to open the payment window.');
           },
         });
-        return;
+      } else {
+        await openHostedPaymentPopup({
+          authorizationUrl: session.authorizationUrl,
+          returnUrl: `${window.location.origin}${returnPath}`,
+          onReturn: (returnedUrl) => {
+            navigate(`${returnedUrl.pathname}${returnedUrl.search}`);
+          },
+          onCancel: () => {
+            paymentInitIdempotencyKeyRef.current = null;
+            setPaymentActionMessage('Secure checkout was cancelled. Review the details and try again.');
+            toast.error('Payment was cancelled before the order could be placed.');
+          },
+          onError: (popupError) => {
+            paymentInitIdempotencyKeyRef.current = null;
+            setPaymentActionMessage('Secure checkout could not be opened. Retry to continue.');
+            toast.error(popupError.message || 'Unable to open the payment window.');
+          },
+        });
       }
-      if (init.authorizationUrl) {
-        const fallbackUrl = new URL(init.authorizationUrl, window.location.origin);
-        if (fallbackUrl.origin === window.location.origin) {
-          window.location.assign(fallbackUrl.toString());
-          return;
-        }
-
-        throw new Error(
-          'Payment provider did not return an inline payment session for this attempt.',
-        );
-      }
-      if (init.reference) {
-        navigate(
-          `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
-        );
-        return;
-      }
-      const refreshed = await customOrdersBuyerApi.getById(orderId);
-      setOrder(refreshed);
-      await refreshPaymentAttempts();
+      return;
     } catch (error: any) {
       paymentInitIdempotencyKeyRef.current = null;
-      toast.error(error?.response?.data?.message || 'Unable to initialize payment');
+      setPaymentActionMessage('Payment could not be initialized. Retry from inside Threadly.');
+      toast.error(error?.response?.data?.message || error?.message || 'Unable to initialize payment');
     } finally {
       setBusy(false);
     }
@@ -1313,6 +1330,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
                   setPaymentMethod(option.value);
                   setPaymentGateway(option.value);
                   setPaymentErrors({});
+                  setPaymentActionMessage(null);
                 }}
                 className={`rounded-[1.4rem] border px-4 py-4 text-left transition ${
                   paymentMethod === option.value
@@ -1361,6 +1379,11 @@ export const BuyerCustomOrderDetailView: React.FC<{
               Verify payment
             </button>
           </div>
+          {paymentActionMessage ? (
+            <div className="mt-3 rounded-2xl border border-sky-200/80 bg-sky-50/80 px-4 py-3 text-sm text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100">
+              {paymentActionMessage}
+            </div>
+          ) : null}
           {order.paymentReference ? (
             <div className="mt-2 text-xs text-amber-900/80 dark:text-amber-200/80">
               Reference: {order.paymentReference}
@@ -1687,7 +1710,9 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
 
   // In full mode, selection is URL-driven so browser back/forward works correctly
   const urlOrderId = mode === 'full' ? searchParams.get('orderId') : null;
-  const urlKind = mode === 'full' ? (searchParams.get('kind') as OrdersView | null) : null;
+  const rawUrlKind = mode === 'full' ? searchParams.get('kind') : null;
+  const urlKind: OrdersView | null =
+    rawUrlKind === 'standard' || rawUrlKind === 'custom' ? rawUrlKind : null;
   const urlSelection: OrdersPanelSelection | null =
     urlOrderId && urlKind ? { kind: urlKind, id: urlOrderId } : null;
   const [localSelection, setLocalSelection] = useState<OrdersPanelSelection | null>(null);
@@ -1778,6 +1803,11 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSelection, mode, onSelectionHandled]);
 
+  useEffect(() => {
+    if (mode !== 'full' || !urlKind) return;
+    setActiveView(urlKind);
+  }, [mode, urlKind]);
+
   const standardFilteredOrders = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return standardOrders.filter((order) => {
@@ -1844,6 +1874,23 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
     });
   }, [setSearchParams]);
 
+  const handleViewChange = useCallback(
+    (view: OrdersView) => {
+      setActiveView(view);
+      if (mode !== 'full') return;
+
+      setLocalSelection(null);
+      setSelectedCustomPreview(null);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('kind', view);
+        next.delete('orderId');
+        return next;
+      });
+    },
+    [mode, setSearchParams],
+  );
+
   if (mode === 'full' && selection) {
     return selection.kind === 'standard' ? (
       <StandardOrderDetailView orderId={selection.id} onBack={clearDetailSelection} />
@@ -1891,7 +1938,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
               <button
                 key={view}
                 type="button"
-                onClick={() => setActiveView(view)}
+                onClick={() => handleViewChange(view)}
                 className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
                   active
                     ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
@@ -2157,7 +2204,7 @@ const EmptyOrdersState: React.FC<{
     <h4 className="text-base font-semibold text-gray-900 dark:text-white">
       {label === 'standard' ? 'No standard orders yet' : 'No custom orders yet'}
     </h4>
-    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+    <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
       {query || filtered
         ? 'No orders match your current filters.'
         : label === 'standard'

@@ -40,6 +40,7 @@ export interface CartState {
   items: CartItem[];
   itemCount: number;
   totalQuantity: number;
+  customBagCount: number;
   subtotal: number;
   currency: string;
   isLoading: boolean;
@@ -53,6 +54,7 @@ const initialState: CartState = {
   items: [],
   itemCount: 0,
   totalQuantity: 0,
+  customBagCount: 0,
   subtotal: 0,
   currency: 'NGN',
   isLoading: false,
@@ -85,6 +87,10 @@ const normalizeCartPayload = (payload: Partial<CartState> | null | undefined): C
       typeof payload?.totalQuantity === 'number'
         ? payload.totalQuantity
         : totalQuantityFromItems,
+    customBagCount:
+      typeof payload?.customBagCount === 'number'
+        ? payload.customBagCount
+        : 0,
     subtotal:
       typeof payload?.subtotal === 'number'
         ? payload.subtotal
@@ -188,6 +194,22 @@ export const clearCart = createAsyncThunk('cart/clearCart', async (_, { rejectWi
   }
 });
 
+export const fetchCustomBagCount = createAsyncThunk(
+  'cart/fetchCustomBagCount',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.get('/custom-orders/checkout-bag');
+      const payload = unwrapResponse(response.data);
+      const lines = Array.isArray(payload?.items) ? payload.items : [];
+      return lines.length;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || 'Failed to fetch custom bag count',
+      );
+    }
+  },
+);
+
 export const cartSlice = createSlice({
   name: 'cart',
   initialState,
@@ -200,6 +222,11 @@ export const cartSlice = createSlice({
     },
     toggleCartDrawer: (state) => {
       state.isDrawerOpen = !state.isDrawerOpen;
+    },
+    setCustomBagCount: (state, action: PayloadAction<number>) => {
+      state.customBagCount = Number.isFinite(action.payload)
+        ? Math.max(0, Math.trunc(action.payload))
+        : 0;
     },
     clearCartNotices: (state) => {
       state.removedItemNotices = [];
@@ -316,16 +343,36 @@ export const cartSlice = createSlice({
         state.itemCount = 0;
         state.totalQuantity = 0;
         state.subtotal = 0;
+      })
+
+      // Custom bag count
+      .addCase(fetchCustomBagCount.fulfilled, (state, action: PayloadAction<number>) => {
+        state.customBagCount = Number.isFinite(action.payload)
+          ? Math.max(0, Math.trunc(action.payload))
+          : 0;
+      })
+      .addCase(fetchCustomBagCount.rejected, (state) => {
+        state.customBagCount = 0;
       });
   },
 });
 
-export const { openCartDrawer, closeCartDrawer, toggleCartDrawer, clearCartNotices, resetCartState } = cartSlice.actions;
+export const {
+  openCartDrawer,
+  closeCartDrawer,
+  toggleCartDrawer,
+  setCustomBagCount,
+  clearCartNotices,
+  resetCartState,
+} = cartSlice.actions;
 
 // Selectors
 export const selectCartItems = (state: { cart: CartState }) => state.cart.items;
 export const selectCartItemCount = (state: { cart: CartState }) => state.cart.itemCount;
 export const selectCartTotalQuantity = (state: { cart: CartState }) => state.cart.totalQuantity;
+export const selectCartCustomBagCount = (state: { cart: CartState }) => state.cart.customBagCount;
+export const selectCartCombinedQuantity = (state: { cart: CartState }) =>
+  state.cart.totalQuantity + state.cart.customBagCount;
 export const selectCartSubtotal = (state: { cart: CartState }) => state.cart.subtotal;
 export const selectCartCurrency = (state: { cart: CartState }) => state.cart.currency;
 export const selectCartIsLoading = (state: { cart: CartState }) => state.cart.isLoading;

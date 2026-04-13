@@ -13,6 +13,7 @@ export interface PaymentOptionMeta {
 }
 
 export type PaymentFormErrors = Record<string, string>;
+export type CardholderNameMatchMode = 'strict' | 'soft' | 'off';
 
 export interface PaymentFormState {
   PAYSTACK: PaystackPaymentData;
@@ -21,9 +22,9 @@ export interface PaymentFormState {
 export const CHECKOUT_PAYMENT_OPTIONS: PaymentOptionMeta[] = [
   {
     value: 'PAYSTACK',
-    label: 'Pay with Paystack',
+    label: 'Card payment',
     emoji: '💳',
-    description: 'Choose hosted card checkout or hosted bank transfer for v1.',
+    description: 'Use a saved card or enter a new card on this payment step.',
   },
 ];
 
@@ -38,8 +39,86 @@ const EMPTY_BILLING_ADDRESS: BillingAddress = {
   country: 'Nigeria',
 };
 
+const EMPTY_CARD_DRAFT: NonNullable<PaystackPaymentData['newCardDraft']> = {
+  cardHolderName: '',
+  cardNumber: '',
+  expiry: '',
+  cvv: '',
+};
+
 const isPaystackPaymentData = (value: PaymentData): value is PaystackPaymentData =>
   value?.method === 'PAYSTACK';
+
+const normalizeNameTokens = (value: string): string[] =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .split(' ')
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .sort();
+
+const namesMatch = (left: string, right: string): boolean => {
+  const leftTokens = normalizeNameTokens(left);
+  const rightTokens = normalizeNameTokens(right);
+  if (leftTokens.length === 0 || rightTokens.length === 0) {
+    return true;
+  }
+  if (leftTokens.length !== rightTokens.length) {
+    return false;
+  }
+  return leftTokens.every((token, index) => token === rightTokens[index]);
+};
+
+const digitsOnly = (value: string): string => value.replace(/\D/g, '');
+
+const isLuhnValid = (value: string): boolean => {
+  const digits = digitsOnly(value);
+  if (digits.length < 12) {
+    return false;
+  }
+
+  let sum = 0;
+  let shouldDouble = false;
+  for (let index = digits.length - 1; index >= 0; index -= 1) {
+    let digit = Number(digits[index]);
+    if (shouldDouble) {
+      digit *= 2;
+      if (digit > 9) {
+        digit -= 9;
+      }
+    }
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+
+  return sum % 10 === 0;
+};
+
+const resolveCardholderNameMatchMode = (): CardholderNameMatchMode => {
+  const configuredMode = String(
+    import.meta.env.VITE_PAYSTACK_CARDHOLDER_NAME_MATCH_MODE ?? '',
+  )
+    .trim()
+    .toLowerCase();
+
+  if (configuredMode === 'strict' || configuredMode === 'soft' || configuredMode === 'off') {
+    return configuredMode;
+  }
+
+  return import.meta.env.DEV ? 'soft' : 'strict';
+};
+
+export const getCardholderNameHelperText = (): string => {
+  const mode = resolveCardholderNameMatchMode();
+  if (mode === 'strict') {
+    return 'Card holder name must match the billing name for this order.';
+  }
+  if (mode === 'soft') {
+    return 'Threadly checks this against the billing name in a softer test-mode rule.';
+  }
+  return 'Card holder name is collected for payment validation and review.';
+};
 
 export function shippingToBillingAddress(address: ShippingAddress): BillingAddress {
   return {
@@ -64,6 +143,11 @@ export function createInitialPaymentState(email: string, phone: string): Payment
       billingSameAsShipping: true,
       billingAddress: { ...EMPTY_BILLING_ADDRESS },
       consentAccepted: false,
+      useSavedCard: false,
+      saveNewCard: true,
+      newCardDraft: { ...EMPTY_CARD_DRAFT },
+      savedCardId: null,
+      savedCardDisplay: null,
     },
   };
 }
@@ -110,6 +194,71 @@ export function resolveBillingAddress(
     : paymentData.billingAddress ?? { ...EMPTY_BILLING_ADDRESS };
 }
 
+function normalizeCardDraft(
+  paymentData: Pick<PaystackPaymentData, 'newCardDraft'>,
+): NonNullable<PaystackPaymentData['newCardDraft']> {
+  return {
+    cardHolderName: String(paymentData.newCardDraft?.cardHolderName ?? '').trim(),
+    cardNumber: String(paymentData.newCardDraft?.cardNumber ?? ''),
+    expiry: String(paymentData.newCardDraft?.expiry ?? '').trim(),
+    cvv: String(paymentData.newCardDraft?.cvv ?? '').trim(),
+  };
+}
+
+function validateCardDraft(
+  paymentData: PaystackPaymentData,
+  shippingAddress: ShippingAddress,
+  errors: PaymentFormErrors,
+) {
+  const draft = normalizeCardDraft(paymentData);
+  const cardDigits = digitsOnly(draft.cardNumber);
+  const cvvDigits = digitsOnly(draft.cvv);
+  const expiryMatch = draft.expiry.match(/^(\d{2})\/(\d{2})$/);
+
+  if (!draft.cardHolderName) {
+    errors.cardHolderName = 'Card holder name is required';
+  }
+
+  const billingAddress = resolveBillingAddress(paymentData, shippingAddress);
+  const billingName = `${billingAddress.firstName} ${billingAddress.lastName}`.trim();
+  if (
+    draft.cardHolderName &&
+    billingName &&
+    resolveCardholderNameMatchMode() === 'strict' &&
+    !namesMatch(draft.cardHolderName, billingName)
+  ) {
+    errors.cardHolderName =
+      'Card holder name must match the billing name for this order';
+  }
+
+  if (!cardDigits) {
+    errors.cardNumber = 'Card number is required';
+  } else if (cardDigits.length < 12 || cardDigits.length > 19 || !isLuhnValid(cardDigits)) {
+    errors.cardNumber = 'Enter a valid card number';
+  }
+
+  if (!expiryMatch) {
+    errors.expiry = 'Expiry must be in MM/YY format';
+  } else {
+    const month = Number(expiryMatch[1]);
+    const year = Number(expiryMatch[2]);
+    const now = new Date();
+    const expiryDate = new Date(2000 + year, month, 0, 23, 59, 59, 999);
+
+    if (month < 1 || month > 12) {
+      errors.expiry = 'Enter a valid expiry month';
+    } else if (expiryDate.getTime() < now.getTime()) {
+      errors.expiry = 'Card expiry date has passed';
+    }
+  }
+
+  if (!cvvDigits) {
+    errors.cvv = 'CVV is required';
+  } else if (cvvDigits.length < 3 || cvvDigits.length > 4) {
+    errors.cvv = 'CVV must be 3 or 4 digits';
+  }
+}
+
 export function validatePaymentData(
   paymentMethod: string,
   paymentData: PaymentData,
@@ -118,7 +267,7 @@ export function validatePaymentData(
   const errors: PaymentFormErrors = {};
 
   if (!isPaystackPaymentData(paymentData) || paymentMethod !== 'PAYSTACK') {
-    errors.method = 'Checkout only supports Paystack right now';
+    errors.method = 'Checkout only supports secure card payment right now';
     return errors;
   }
 
@@ -145,7 +294,15 @@ export function validatePaymentData(
   }
 
   if (!['CARD', 'BANK_TRANSFER'].includes(paymentData.channel)) {
-    errors.channel = 'Select a Paystack payment channel';
+    errors.channel = 'Select a payment channel';
+  }
+
+  if (paymentData.channel === 'CARD' && paymentData.useSavedCard) {
+    if (!String(paymentData.savedCardId ?? '').trim()) {
+      errors.savedCardId = 'Select a saved card or switch to a new card';
+    }
+  } else if (paymentData.channel === 'CARD') {
+    validateCardDraft(paymentData, shippingAddress, errors);
   }
 
   return errors;
@@ -165,6 +322,11 @@ export function buildContactInfo(
         billingSameAsShipping: true,
         billingAddress: { ...EMPTY_BILLING_ADDRESS },
         consentAccepted: false,
+        useSavedCard: false,
+        saveNewCard: true,
+        newCardDraft: { ...EMPTY_CARD_DRAFT },
+        savedCardId: null,
+        savedCardDisplay: null,
       } satisfies PaystackPaymentData);
 
   return {
@@ -190,7 +352,14 @@ export function buildPaymentSubmissionData(
         billingSameAsShipping: true,
         billingAddress: { ...EMPTY_BILLING_ADDRESS },
         consentAccepted: false,
+        useSavedCard: false,
+        saveNewCard: true,
+        newCardDraft: { ...EMPTY_CARD_DRAFT },
+        savedCardId: null,
+        savedCardDisplay: null,
       } satisfies PaystackPaymentData);
+
+  const draft = normalizeCardDraft(paystackData);
 
   return {
     method: 'PAYSTACK',
@@ -200,6 +369,26 @@ export function buildPaymentSubmissionData(
     billingSameAsShipping: paystackData.billingSameAsShipping,
     billingAddress: resolveBillingAddress(paystackData, shippingAddress),
     consentAccepted: paystackData.consentAccepted,
+    useSavedCard:
+      paystackData.channel === 'CARD'
+        ? Boolean(paystackData.useSavedCard && paystackData.savedCardId)
+        : false,
+    saveNewCard:
+      paystackData.channel === 'CARD' && !paystackData.useSavedCard
+        ? Boolean(paystackData.saveNewCard ?? true)
+        : false,
+    newCardDraft:
+      paystackData.channel === 'CARD' && !paystackData.useSavedCard
+        ? draft
+        : null,
+    savedCardId:
+      paystackData.channel === 'CARD'
+        ? paystackData.savedCardId ?? null
+        : null,
+    savedCardDisplay:
+      paystackData.channel === 'CARD'
+        ? paystackData.savedCardDisplay ?? null
+        : null,
   } satisfies PaystackPaymentData;
 }
 
@@ -213,10 +402,23 @@ export function getPaymentSummaryLines(
     return lines.filter(Boolean);
   }
 
-  lines.push('Hosted card checkout via Paystack');
+  lines.push('Secure card checkout');
   if (paymentData.channel === 'BANK_TRANSFER') {
-    lines[lines.length - 1] = 'Hosted bank transfer checkout via Paystack';
-    lines.push('Paystack will show the transfer account details after redirect');
+    lines[lines.length - 1] = 'Hosted bank transfer checkout';
+    lines.push('Transfer account details appear on the next secure step');
+  } else if (paymentData.useSavedCard && paymentData.savedCardDisplay) {
+    const brand = paymentData.savedCardDisplay.brand || 'Saved card';
+    const bank = paymentData.savedCardDisplay.bank
+      ? ` (${paymentData.savedCardDisplay.bank})`
+      : '';
+    lines.push(`${brand}${bank} ending ${paymentData.savedCardDisplay.last4}`);
+    lines.push('Threadly will verify the saved-card authorization after you continue');
+  } else {
+    const digits = digitsOnly(String(paymentData.newCardDraft?.cardNumber ?? ''));
+    const last4 = digits.length >= 4 ? digits.slice(-4) : null;
+    lines[lines.length - 1] = 'Card checkout';
+    lines.push(last4 ? `New card ending ${last4}` : 'New card details entered');
+    lines.push('Final bank verification can still open a secure provider window');
   }
 
   return lines.filter(Boolean);
@@ -227,7 +429,13 @@ export function getReviewCtaLabel(
   paymentData: PaymentData,
 ): string {
   if (paymentMethod === 'PAYSTACK' && isPaystackPaymentData(paymentData)) {
-    return 'Continue to Paystack';
+    if (paymentData.channel === 'BANK_TRANSFER') {
+      return 'Continue to transfer instructions';
+    }
+    if (paymentData.channel === 'CARD' && paymentData.useSavedCard && paymentData.savedCardId) {
+      return 'Continue with saved card';
+    }
+    return 'Continue to card verification';
   }
 
   return 'Continue to Secure Payment';

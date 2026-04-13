@@ -507,7 +507,9 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       // ALREADY_PLACED: order exists (e.g. idempotent retry). Navigate to it.
       if (createdOrderId) {
         dismissEmbeddedComposer();
-        navigate(`/custom-orders/${createdOrderId}`);
+        navigate(
+          `/profile?tab=orders&kind=custom&orderId=${encodeURIComponent(createdOrderId)}`,
+        );
         onOrderCreated?.(createdOrderId);
         return;
       }
@@ -551,7 +553,9 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
             : 'Unable to add this custom order to your bag.';
       toast.error(apiMessage || fallbackMessage);
       if (createdOrderId) {
-        navigate(`/custom-orders/${createdOrderId}`);
+        navigate(
+          `/profile?tab=orders&kind=custom&orderId=${encodeURIComponent(createdOrderId)}`,
+        );
         onOrderCreated?.(createdOrderId);
       }
     } finally {
