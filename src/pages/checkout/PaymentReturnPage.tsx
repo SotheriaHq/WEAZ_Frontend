@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -7,7 +7,6 @@ import { paymentApi, type PaymentAttemptSummary, type PaymentAttemptStatus, type
 import { customOrdersBuyerApi } from '@/api/CustomOrderApi';
 import { getCheckoutStatusCopy } from '@/pages/checkout/checkoutStatusCopy';
 import { cancelActivePaystackInline, openPaystackInline } from '@/lib/paystackInline';
-import { closeActiveHostedPaymentPopup, openHostedPaymentPopup } from '@/lib/paystackHostedPopup';
 import {
   resolveInAppPaymentSession,
   resolvePaymentGateway,
@@ -94,7 +93,6 @@ const PaymentReturnPage: React.FC = () => {
   useEffect(() => {
     return () => {
       void cancelActivePaystackInline();
-      void closeActiveHostedPaymentPopup();
     };
   }, []);
 
@@ -192,41 +190,21 @@ const PaymentReturnPage: React.FC = () => {
           const returnPath =
             `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(resolvedGateway)}&uq=1`;
 
-          if (session.kind === 'access_code') {
-            await openPaystackInline(session.accessCode, {
-              onSuccess: () => {
-                navigate(returnPath);
-              },
-              onCancel: () => {
-                unifiedCheckoutQueue.markCurrentCustomResult(false);
-                toast.error('Payment was cancelled before completion.');
-                openBag(true);
-              },
-              onError: (inlineError) => {
-                unifiedCheckoutQueue.markCurrentCustomResult(false);
-                toast.error(inlineError.message || 'Unable to open the payment window.');
-                openBag(true);
-              },
-            });
-          } else {
-            await openHostedPaymentPopup({
-              authorizationUrl: session.authorizationUrl,
-              returnUrl: `${window.location.origin}${returnPath}`,
-              onReturn: (returnedUrl) => {
-                navigate(`${returnedUrl.pathname}${returnedUrl.search}`);
-              },
-              onCancel: () => {
-                unifiedCheckoutQueue.markCurrentCustomResult(false);
-                toast.error('Payment was cancelled before completion.');
-                openBag(true);
-              },
-              onError: (popupError) => {
-                unifiedCheckoutQueue.markCurrentCustomResult(false);
-                toast.error(popupError.message || 'Unable to open the payment window.');
-                openBag(true);
-              },
-            });
-          }
+          await openPaystackInline(session.accessCode, {
+            onSuccess: () => {
+              navigate(returnPath);
+            },
+            onCancel: () => {
+              unifiedCheckoutQueue.markCurrentCustomResult(false);
+              toast.error('Payment was cancelled before completion.');
+              openBag(true);
+            },
+            onError: (inlineError) => {
+              unifiedCheckoutQueue.markCurrentCustomResult(false);
+              toast.error(inlineError.message || 'Unable to open the payment window.');
+              openBag(true);
+            },
+          });
           return true;
 
         } catch (error: any) {
@@ -420,33 +398,17 @@ const PaymentReturnPage: React.FC = () => {
       const returnPath =
         `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
 
-      if (session.kind === 'access_code') {
-        await openPaystackInline(session.accessCode, {
-          onSuccess: () => {
-            navigate(returnPath);
-          },
-          onCancel: () => {
-            toast.error('Payment was cancelled before completion.');
-          },
-          onError: (inlineError) => {
-            toast.error(inlineError.message || 'Unable to open the payment window.');
-          },
-        });
-      } else {
-        await openHostedPaymentPopup({
-          authorizationUrl: session.authorizationUrl,
-          returnUrl: `${window.location.origin}${returnPath}`,
-          onReturn: (returnedUrl) => {
-            navigate(`${returnedUrl.pathname}${returnedUrl.search}`);
-          },
-          onCancel: () => {
-            toast.error('Payment was cancelled before completion.');
-          },
-          onError: (popupError) => {
-            toast.error(popupError.message || 'Unable to open the payment window.');
-          },
-        });
-      }
+      await openPaystackInline(session.accessCode, {
+        onSuccess: () => {
+          navigate(returnPath);
+        },
+        onCancel: () => {
+          toast.error('Payment was cancelled before completion.');
+        },
+        onError: (inlineError) => {
+          toast.error(inlineError.message || 'Unable to open the payment window.');
+        },
+      });
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || 'Unable to retry payment');
     } finally {
@@ -481,7 +443,7 @@ const PaymentReturnPage: React.FC = () => {
   if (viewState === 'missing') {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <div className="mb-6 text-6xl">🧾</div>
+        <div className="mb-6 text-6xl">[?]</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Payment return data is missing</h1>
         <p className="mb-8 text-gray-500 dark:text-zinc-400">
           Threadly could not find the reference needed to resume this payment flow.
@@ -498,7 +460,7 @@ const PaymentReturnPage: React.FC = () => {
   if (viewState === 'verifying') {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <div className="mb-6 text-6xl">🌀</div>
+        <div className="mb-6 text-6xl">[...]</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Verifying payment</h1>
         <p className="text-gray-500 dark:text-zinc-400">
           Threadly is checking the latest payment status for reference {reference || 'unknown'}.
@@ -563,7 +525,7 @@ const PaymentReturnPage: React.FC = () => {
             Threadly is checking automatically every 10 seconds (attempt {Math.min(autoVerifyAttempts + 1, AUTO_VERIFY_MAX_ATTEMPTS)} of {AUTO_VERIFY_MAX_ATTEMPTS}).
           </p>
           <p className="mt-1">
-            You can safely leave this page — your payment is being confirmed in the background.
+            You can safely leave this page - your payment is being confirmed in the background.
           </p>
         </div>
       )}
@@ -572,7 +534,7 @@ const PaymentReturnPage: React.FC = () => {
         <div className="mb-8 rounded-xl border border-blue-200/80 bg-blue-50/80 px-4 py-3 text-left text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
           <p className="font-semibold">Still waiting on your bank or payment provider.</p>
           <p className="mt-1">
-            Your payment is still being processed — this can take a few minutes when bank confirmation is delayed.
+            Your payment is still being processed - this can take a few minutes when bank confirmation is delayed.
             We will send you a notification the moment it is confirmed. You can safely close this page now.
           </p>
           <p className="mt-1">
@@ -627,3 +589,5 @@ const PaymentReturnPage: React.FC = () => {
 };
 
 export default PaymentReturnPage;
+
+

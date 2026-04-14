@@ -18,6 +18,7 @@ import type {
   AdminFinanceTransaction,
   AdminReconciliationItem,
   AdminReconciliationRun,
+  AdminStalePaymentReconcileResult,
   AdminStandardOrderDetail,
 } from '@/types/admin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -246,6 +247,10 @@ const AdminFinancePage: React.FC = () => {
   const [documentDetailLoading, setDocumentDetailLoading] = useState(false);
   const [commissionSubmitting, setCommissionSubmitting] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [staleOlderThanMinutes, setStaleOlderThanMinutes] = useState('30');
+  const [staleLimit, setStaleLimit] = useState('60');
+  const [staleReconcileResult, setStaleReconcileResult] =
+    useState<AdminStalePaymentReconcileResult | null>(null);
 
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [paymentGatewayFilter, setPaymentGatewayFilter] = useState('');
@@ -631,6 +636,40 @@ const AdminFinancePage: React.FC = () => {
     [loadOverview, loadReconciliation],
   );
 
+  const handleReconcileStalePayments = useCallback(async () => {
+    const parsedOlderThanMinutes = Number.parseInt(staleOlderThanMinutes, 10);
+    const parsedLimit = Number.parseInt(staleLimit, 10);
+
+    if (!Number.isFinite(parsedOlderThanMinutes) || parsedOlderThanMinutes < 1 || parsedOlderThanMinutes > 240) {
+      toast.error('Older-than minutes must be between 1 and 240');
+      return;
+    }
+
+    if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || parsedLimit > 200) {
+      toast.error('Limit must be between 1 and 200');
+      return;
+    }
+
+    setBusyKey('payments:reconcile-stale');
+    try {
+      const response = await adminFinanceApi.reconcileStalePayments({
+        olderThanMinutes: parsedOlderThanMinutes,
+        limit: parsedLimit,
+      });
+      const data = unwrapApiResponse<AdminStalePaymentReconcileResult>(response.data as any);
+      setStaleReconcileResult(data);
+      toast.success(
+        `Stale reconciliation complete: ${data.updated} updated out of ${data.scanned} scanned.`,
+      );
+      void loadPayments();
+      void loadOverview();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to reconcile stale payments');
+    } finally {
+      setBusyKey(null);
+    }
+  }, [loadOverview, loadPayments, staleLimit, staleOlderThanMinutes]);
+
   const handleReconciliationAction = useCallback(
     async (item: AdminReconciliationItem, action: 'claim' | 'release' | 'resolve') => {
       setBusyKey(`${action}:${item.id}`);
@@ -880,6 +919,69 @@ const AdminFinancePage: React.FC = () => {
                   <input value={paymentQuery} onChange={(event) => setPaymentQuery(event.target.value)} placeholder="Reference or gateway" className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400 dark:text-white" />
                 </InputShell>
               </div>
+              {canProcess && (
+                <div className="mb-4 rounded-2xl border border-black/10 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:max-w-[420px]">
+                      <InputShell>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Older than (minutes)</div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={240}
+                          value={staleOlderThanMinutes}
+                          onChange={(event) => setStaleOlderThanMinutes(event.target.value)}
+                          className="mt-1 w-full bg-transparent text-sm outline-none dark:text-white"
+                        />
+                      </InputShell>
+                      <InputShell>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Scan limit</div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={200}
+                          value={staleLimit}
+                          onChange={(event) => setStaleLimit(event.target.value)}
+                          className="mt-1 w-full bg-transparent text-sm outline-none dark:text-white"
+                        />
+                      </InputShell>
+                    </div>
+                    <div className="flex flex-col items-start gap-2 lg:items-end">
+                      <button
+                        type="button"
+                        onClick={() => void handleReconcileStalePayments()}
+                        disabled={busyKey === 'payments:reconcile-stale'}
+                        className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950"
+                      >
+                        {busyKey === 'payments:reconcile-stale' ? 'Reconciling...' : '🧹 Reconcile stale payments'}
+                      </button>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Re-verifies old pending attempts and updates status safely.
+                      </p>
+                    </div>
+                  </div>
+
+                  {staleReconcileResult && (
+                    <div className="mt-3 rounded-2xl border border-black/10 bg-white/80 px-3 py-3 text-xs text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
+                      <div className="font-semibold text-slate-900 dark:text-white">
+                        Last run: scanned {staleReconcileResult.scanned}, updated {staleReconcileResult.updated}, skipped {staleReconcileResult.skipped.length}, failed {staleReconcileResult.failed.length}
+                      </div>
+                      {staleReconcileResult.reconciled.length > 0 ? (
+                        <div className="mt-1">
+                          Reconciled: {staleReconcileResult.reconciled.slice(0, 5).join(', ')}
+                          {staleReconcileResult.reconciled.length > 5 ? '...' : ''}
+                        </div>
+                      ) : null}
+                      {staleReconcileResult.failed.length > 0 ? (
+                        <div className="mt-1 text-rose-600 dark:text-rose-300">
+                          Failures: {staleReconcileResult.failed.slice(0, 3).map((item) => `${item.reference} (${item.reason})`).join(', ')}
+                          {staleReconcileResult.failed.length > 3 ? '...' : ''}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              )}
               <TableWrap loading={paymentsLoading} empty={!payments.length} emptyMessage="No payment attempts matched the current filters.">
                 <table className="w-full min-w-[980px] text-left text-sm">
                   <thead>

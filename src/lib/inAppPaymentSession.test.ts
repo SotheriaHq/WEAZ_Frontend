@@ -12,20 +12,7 @@ describe('inAppPaymentSession', () => {
         providerAccessCode: '  ACCESS-CODE  ',
       }),
     ).toEqual({
-      kind: 'access_code',
       accessCode: 'ACCESS-CODE',
-    });
-  });
-
-  it('returns the hosted authorization URL when access code is unavailable', () => {
-    expect(
-      resolveInAppPaymentSession({
-        providerAccessCode: '',
-        authorizationUrl: 'https://checkout.paystack.com/example',
-      }),
-    ).toEqual({
-      kind: 'hosted_url',
-      authorizationUrl: 'https://checkout.paystack.com/example',
     });
   });
 
@@ -33,7 +20,6 @@ describe('inAppPaymentSession', () => {
     expect(() =>
       resolveInAppPaymentSession({
         providerAccessCode: '',
-        authorizationUrl: '',
       }),
     ).toThrow(IN_APP_PAYMENT_SESSION_ERROR);
   });

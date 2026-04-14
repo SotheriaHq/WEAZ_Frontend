@@ -540,7 +540,6 @@ export interface CustomOrderPaymentInitResult {
   channel?: string;
   providerAccessCode?: string;
   callbackUrl?: string;
-  authorizationUrl?: string;
   bankAccount?: Record<string, unknown>;
   nextAction?: Record<string, unknown>;
 }
@@ -945,6 +944,7 @@ export const customOrdersBuyerApi = {
       callbackUrl?: string;
       paymentData?: Record<string, unknown>;
       idempotencyKey?: string;
+      validationSessionId?: string;
     },
   ) {
     const idempotencyKey = payload.idempotencyKey ?? createIdempotencyKey();
@@ -969,6 +969,7 @@ export const customOrdersBuyerApi = {
       callbackUrl?: string;
       paymentData?: Record<string, unknown>;
       idempotencyKey?: string;
+      validationSessionId?: string;
     },
   ) {
     const idempotencyKey = payload.idempotencyKey ?? createIdempotencyKey();

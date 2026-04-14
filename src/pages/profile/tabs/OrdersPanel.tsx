@@ -10,6 +10,7 @@ import {
   type PaystackPaymentData,
   type ShippingAddress,
 } from '@/api/StoreApi';
+import { paymentApi } from '@/api/PaymentApi';
 import {
   customOrdersBuyerApi,
   type CustomOrderDetail,
@@ -43,6 +44,7 @@ import {
   CHECKOUT_PAYMENT_OPTIONS,
   buildPaymentSubmissionData,
   createInitialPaymentState,
+  setRuntimeCardholderNameMatchMode,
   type PaymentFormErrors,
   type PaymentFormState,
   validatePaymentData,
@@ -57,10 +59,6 @@ import {
   resolveInAppPaymentSession,
   resolvePaymentGateway,
 } from '@/lib/inAppPaymentSession';
-import {
-  closeActiveHostedPaymentPopup,
-  openHostedPaymentPopup,
-} from '@/lib/paystackHostedPopup';
 
 const STANDARD_STATUS_OPTIONS = ['ALL', 'PENDING', 'PROCESSING', 'SHIPPED'] as const;
 const CUSTOM_STATUS_OPTIONS = ['ALL', 'PENDING', 'ACTIVE', 'COMPLETED', 'ISSUES'] as const;
@@ -761,6 +759,29 @@ export const BuyerCustomOrderDetailView: React.FC<{
   }, []);
 
   useEffect(() => {
+    let active = true;
+
+    void paymentApi
+      .getPolicy()
+      .then((policy) => {
+        if (!active) {
+          return;
+        }
+
+        setRuntimeCardholderNameMatchMode(policy.paystack.cardholderNameMatchMode);
+      })
+      .catch(() => {
+        if (active) {
+          setRuntimeCardholderNameMatchMode(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const paymentFailureReason =
       (location.state as { paymentFailureReason?: string } | null)
         ?.paymentFailureReason;
@@ -772,7 +793,6 @@ export const BuyerCustomOrderDetailView: React.FC<{
   useEffect(() => {
     return () => {
       void cancelActivePaystackInline();
-      void closeActiveHostedPaymentPopup();
     };
   }, []);
 
@@ -936,6 +956,19 @@ export const BuyerCustomOrderDetailView: React.FC<{
       activePaymentData,
       paymentShippingAddress,
     );
+    let validationSessionId: string | undefined;
+    if (
+      paymentMethod === 'PAYSTACK' &&
+      (paymentSubmissionData as PaystackPaymentData).channel === 'CARD'
+    ) {
+      setPaymentActionMessage('Validating card details before secure checkout...');
+      const validated = await paymentApi.validateCard({
+        paymentMethod: 'PAYSTACK',
+        paymentData: paymentSubmissionData,
+      });
+      validationSessionId = validated.sessionId;
+    }
+
     const paymentInitIdempotencyKey =
       paymentInitIdempotencyKeyRef.current ?? createIdempotencyKey();
     paymentInitIdempotencyKeyRef.current = paymentInitIdempotencyKey;
@@ -948,6 +981,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
         callbackUrl: `${window.location.origin}/bag/payment-return`,
         paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
         idempotencyKey: paymentInitIdempotencyKey,
+        validationSessionId,
       });
       const resolvedGateway = resolvePaymentGateway(init);
       const session = resolveInAppPaymentSession(init);
@@ -956,41 +990,21 @@ export const BuyerCustomOrderDetailView: React.FC<{
       setPaymentActionMessage('Opening secure checkout inside Threadly...');
       const returnPath = `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
 
-      if (session.kind === 'access_code') {
-        await openPaystackInline(session.accessCode, {
-          onSuccess: () => {
-            navigate(returnPath);
-          },
-          onCancel: () => {
-            paymentInitIdempotencyKeyRef.current = null;
-            setPaymentActionMessage('Secure checkout was cancelled. Review the details and try again.');
-            toast.error('Payment was cancelled before the order could be placed.');
-          },
-          onError: (inlineError) => {
-            paymentInitIdempotencyKeyRef.current = null;
-            setPaymentActionMessage('Secure checkout could not be opened. Retry to continue.');
-            toast.error(inlineError.message || 'Unable to open the payment window.');
-          },
-        });
-      } else {
-        await openHostedPaymentPopup({
-          authorizationUrl: session.authorizationUrl,
-          returnUrl: `${window.location.origin}${returnPath}`,
-          onReturn: (returnedUrl) => {
-            navigate(`${returnedUrl.pathname}${returnedUrl.search}`);
-          },
-          onCancel: () => {
-            paymentInitIdempotencyKeyRef.current = null;
-            setPaymentActionMessage('Secure checkout was cancelled. Review the details and try again.');
-            toast.error('Payment was cancelled before the order could be placed.');
-          },
-          onError: (popupError) => {
-            paymentInitIdempotencyKeyRef.current = null;
-            setPaymentActionMessage('Secure checkout could not be opened. Retry to continue.');
-            toast.error(popupError.message || 'Unable to open the payment window.');
-          },
-        });
-      }
+      await openPaystackInline(session.accessCode, {
+        onSuccess: () => {
+          navigate(returnPath);
+        },
+        onCancel: () => {
+          paymentInitIdempotencyKeyRef.current = null;
+          setPaymentActionMessage('Secure checkout was cancelled. Review the details and try again.');
+          toast.error('Payment was cancelled before the order could be placed.');
+        },
+        onError: (inlineError) => {
+          paymentInitIdempotencyKeyRef.current = null;
+          setPaymentActionMessage('Secure checkout could not be opened. Retry to continue.');
+          toast.error(inlineError.message || 'Unable to open the payment window.');
+        },
+      });
       return;
     } catch (error: any) {
       paymentInitIdempotencyKeyRef.current = null;

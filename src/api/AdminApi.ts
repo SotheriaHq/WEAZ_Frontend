@@ -32,6 +32,7 @@ import type {
   AdminFinancePaymentAttempt,
   AdminFinancePaymentDetail,
   AdminFinanceTransaction,
+  AdminStalePaymentReconcileResult,
   AdminEscrowHold,
 } from '../types/admin';
 import type {
@@ -429,6 +430,8 @@ export const adminFinanceApi = {
     apiClient.get<AdminFinancialDocument>(`/admin/finance/documents/${id}`),
   listPayments: (params?: Record<string, string>) =>
     apiClient.get<{ items: AdminFinancePaymentAttempt[]; total: number }>('/admin/finance/payments', { params }),
+  reconcileStalePayments: (data?: { olderThanMinutes?: number; limit?: number }) =>
+    apiClient.post<AdminStalePaymentReconcileResult>('/payment/reconcile/stale', data ?? {}),
   getPayment: (reference: string) =>
     apiClient.get<AdminFinancePaymentDetail>(`/admin/finance/payments/${reference}`),
   listTransactions: (params?: Record<string, string>) =>

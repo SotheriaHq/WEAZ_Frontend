@@ -5,6 +5,7 @@ export interface UnifiedCheckoutQueuedLine {
   sessionId: string;
   sourceTitle: string;
   price: number;
+  validationSessionId?: string;
 }
 
 export interface UnifiedCheckoutSummary {
@@ -63,15 +64,20 @@ const parseQueue = (raw: string | null): UnifiedCheckoutQueueState | null => {
     if (typeof parsed.email !== 'string' || !parsed.email.trim()) return null;
     if (typeof parsed.paymentMethod !== 'string') return null;
 
-    const normalizeLine = (line: Partial<UnifiedCheckoutQueuedLine> | null | undefined) => {
+    const normalizeLine = (
+      line: Partial<UnifiedCheckoutQueuedLine> | null | undefined,
+    ): UnifiedCheckoutQueuedLine | null => {
       const checkoutIntentId = String(line?.checkoutIntentId ?? '');
       if (!checkoutIntentId) return null;
+      const validationSessionId = String(line?.validationSessionId ?? '').trim();
+
       return {
         checkoutIntentId,
         sessionId: String(line?.sessionId ?? ''),
         sourceTitle: String(line?.sourceTitle ?? ''),
         price: Number.isFinite(Number(line?.price)) ? Number(line?.price) : 0,
-      } satisfies UnifiedCheckoutQueuedLine;
+        ...(validationSessionId ? { validationSessionId } : {}),
+      };
     };
 
     const normalizedLines = parsed.lines

@@ -15,6 +15,8 @@ export interface PaymentOptionMeta {
 export type PaymentFormErrors = Record<string, string>;
 export type CardholderNameMatchMode = 'strict' | 'soft' | 'off';
 
+let runtimeCardholderNameMatchMode: CardholderNameMatchMode | null = null;
+
 export interface PaymentFormState {
   PAYSTACK: PaystackPaymentData;
 }
@@ -70,6 +72,17 @@ const namesMatch = (left: string, right: string): boolean => {
   return leftTokens.every((token, index) => token === rightTokens[index]);
 };
 
+const namesSoftMatch = (left: string, right: string): boolean => {
+  const leftTokens = normalizeNameTokens(left);
+  const rightTokens = normalizeNameTokens(right);
+  if (leftTokens.length === 0 || rightTokens.length === 0) {
+    return true;
+  }
+
+  const rightTokenSet = new Set(rightTokens);
+  return leftTokens.some((token) => rightTokenSet.has(token));
+};
+
 const digitsOnly = (value: string): string => value.replace(/\D/g, '');
 
 const isLuhnValid = (value: string): boolean => {
@@ -95,7 +108,22 @@ const isLuhnValid = (value: string): boolean => {
   return sum % 10 === 0;
 };
 
+const resolveFrontendEnvironmentMarker = (): string =>
+  String(
+    import.meta.env.VITE_APP_ENV ??
+      import.meta.env.VITE_DEPLOY_ENV ??
+      import.meta.env.VITE_NODE_ENV ??
+      import.meta.env.MODE ??
+      '',
+  )
+    .trim()
+    .toLowerCase();
+
 const resolveCardholderNameMatchMode = (): CardholderNameMatchMode => {
+  if (runtimeCardholderNameMatchMode) {
+    return runtimeCardholderNameMatchMode;
+  }
+
   const configuredMode = String(
     import.meta.env.VITE_PAYSTACK_CARDHOLDER_NAME_MATCH_MODE ?? '',
   )
@@ -106,7 +134,19 @@ const resolveCardholderNameMatchMode = (): CardholderNameMatchMode => {
     return configuredMode;
   }
 
-  return import.meta.env.DEV ? 'soft' : 'strict';
+  const envMarker = resolveFrontendEnvironmentMarker();
+  if (['development', 'dev', 'test', 'qa', 'uat', 'local'].includes(envMarker)) {
+    return 'soft';
+  }
+
+  return envMarker ? 'strict' : import.meta.env.DEV ? 'soft' : 'strict';
+};
+
+export const setRuntimeCardholderNameMatchMode = (
+  mode: CardholderNameMatchMode | null | undefined,
+) => {
+  runtimeCardholderNameMatchMode =
+    mode === 'strict' || mode === 'soft' || mode === 'off' ? mode : null;
 };
 
 export const getCardholderNameHelperText = (): string => {
@@ -115,7 +155,7 @@ export const getCardholderNameHelperText = (): string => {
     return 'Card holder name must match the billing name for this order.';
   }
   if (mode === 'soft') {
-    return 'Threadly checks this against the billing name in a softer test-mode rule.';
+    return 'Card holder name should closely match the billing name for this order.';
   }
   return 'Card holder name is collected for payment validation and review.';
 };
@@ -221,14 +261,19 @@ function validateCardDraft(
 
   const billingAddress = resolveBillingAddress(paymentData, shippingAddress);
   const billingName = `${billingAddress.firstName} ${billingAddress.lastName}`.trim();
-  if (
-    draft.cardHolderName &&
-    billingName &&
-    resolveCardholderNameMatchMode() === 'strict' &&
-    !namesMatch(draft.cardHolderName, billingName)
-  ) {
-    errors.cardHolderName =
-      'Card holder name must match the billing name for this order';
+  const nameMatchMode = resolveCardholderNameMatchMode();
+  if (draft.cardHolderName && billingName && (nameMatchMode === 'strict' || nameMatchMode === 'soft')) {
+    const isMatch =
+      nameMatchMode === 'strict'
+        ? namesMatch(draft.cardHolderName, billingName)
+        : namesSoftMatch(draft.cardHolderName, billingName);
+
+    if (!isMatch) {
+      errors.cardHolderName =
+        nameMatchMode === 'strict'
+          ? 'Card holder name must match the billing name for this order'
+          : 'Card holder name should closely match the billing name for this order';
+    }
   }
 
   if (!cardDigits) {

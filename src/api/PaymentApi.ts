@@ -18,6 +18,40 @@ export interface PaymentInitRequest {
   callbackUrl?: string;
   paymentData?: PaymentData;
   idempotencyKey?: string;
+  validationSessionId?: string;
+}
+
+export interface CardValidationSessionSummary {
+  sessionId: string;
+  status: 'VALIDATED' | 'EXPIRED';
+  gateway: 'PAYSTACK';
+  channel: 'CARD';
+  useSavedCard: boolean;
+  savedPaymentMethodId?: string | null;
+  savedCardId?: string | null;
+  email: string;
+  validatedAt: string;
+  expiresAt: string;
+  cardSummary: {
+    source: 'saved' | 'new';
+    brand: string | null;
+    bank: string | null;
+    last4: string;
+    expMonth: string | null;
+    expYear: string | null;
+    holderName: string | null;
+  };
+}
+
+export interface PaymentClientCheckoutPolicy {
+  paystack: {
+    customCardEntryEnabled: boolean;
+    cardholderNameMatchMode: 'strict' | 'soft' | 'off';
+    validationSessionRequired: boolean;
+  };
+  savedMethods: {
+    canonicalEnabled: boolean;
+  };
 }
 
 export interface PaymentNextAction {
@@ -49,7 +83,6 @@ export interface PaymentInitResult {
   exchangeRateSnapshotId?: string;
   channel?: string;
   providerAccessCode?: string;
-  authorizationUrl?: string;
   callbackUrl?: string;
   bankAccount?: {
     bankName: string;
@@ -96,7 +129,6 @@ export interface PaymentAttemptSummary {
   exchangeRateSnapshotId?: string;
   channel?: string;
   providerAccessCode?: string;
-  authorizationUrl?: string;
   callbackUrl?: string;
   bankAccount?: PaymentInitResult['bankAccount'];
   paymentData?: Record<string, any>;
@@ -129,8 +161,14 @@ export interface SavedPaymentCardSummary {
   expMonth: string | null;
   expYear: string | null;
   reusable: boolean;
+  isDefault?: boolean;
   addedAt: string;
   lastUsedAt: string;
+}
+
+export interface SavedPaymentMethodMutationResult {
+  success: boolean;
+  method: SavedPaymentCardSummary;
 }
 
 function extract<T>(res: any): T {
@@ -171,6 +209,41 @@ export const paymentApi = {
   async listSavedCards(): Promise<SavedPaymentCardSummary[]> {
     const res = await apiClient.get('/payment/saved-cards');
     return extract<SavedPaymentCardSummary[]>(res) ?? [];
+  },
+
+  async removeSavedCard(savedCardId: string): Promise<SavedPaymentMethodMutationResult> {
+    const res = await apiClient.delete(
+      `/payment/saved-cards/${encodeURIComponent(savedCardId)}`,
+    );
+    return extract<SavedPaymentMethodMutationResult>(res);
+  },
+
+  async setDefaultSavedCard(savedCardId: string): Promise<SavedPaymentMethodMutationResult> {
+    const res = await apiClient.post(
+      `/payment/saved-cards/${encodeURIComponent(savedCardId)}/default`,
+    );
+    return extract<SavedPaymentMethodMutationResult>(res);
+  },
+
+  async validateCard(req: {
+    paymentMethod: PaymentMethodType;
+    paymentData: PaymentData;
+  }): Promise<CardValidationSessionSummary> {
+    const idempotencyKey = createIdempotencyKey();
+    const res = await apiClient.post('/payment/cards/validate', req, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+    return extract<CardValidationSessionSummary>(res);
+  },
+
+  async getCardValidationSession(sessionId: string): Promise<CardValidationSessionSummary> {
+    const res = await apiClient.get(`/payment/cards/validate/${encodeURIComponent(sessionId)}`);
+    return extract<CardValidationSessionSummary>(res);
+  },
+
+  async getPolicy(): Promise<PaymentClientCheckoutPolicy> {
+    const res = await apiClient.get('/payment/policy');
+    return extract<PaymentClientCheckoutPolicy>(res);
   },
 
   async simulate(reference: string, outcome: PaymentAttemptStatus): Promise<PaymentAttemptSummary> {

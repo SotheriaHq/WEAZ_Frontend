@@ -1,6 +1,9 @@
 import React from 'react';
 import type { PaystackPaymentData, ShippingAddress } from '@/api/StoreApi';
-import type { SavedPaymentCardSummary } from '@/api/PaymentApi';
+import type {
+  CardValidationSessionSummary,
+  SavedPaymentCardSummary,
+} from '@/api/PaymentApi';
 import Input from '@/components/ui/Input';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import type { PaymentFormErrors } from '@/pages/checkout/paymentFlow';
@@ -14,6 +17,11 @@ interface PaymentDetailsSectionProps {
   savedCards?: SavedPaymentCardSummary[];
   savedCardsLoading?: boolean;
   savedCardsError?: string | null;
+  savedCardMutatingId?: string | null;
+  onSetDefaultSavedCard?: (savedCardId: string) => Promise<void> | void;
+  onRemoveSavedCard?: (savedCardId: string) => Promise<void> | void;
+  cardValidationSession?: CardValidationSessionSummary | null;
+  cardValidationLoading?: boolean;
   compact?: boolean;
 }
 
@@ -39,6 +47,14 @@ const formatExpiry = (value: string): string => {
 
 const digitsOnly = (value: string): string => value.replace(/\D/g, '');
 
+const formatValidationExpiry = (value: string): string => {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return 'soon';
+  }
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
+
 const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   paymentData,
   shippingAddress,
@@ -47,6 +63,11 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   savedCards = [],
   savedCardsLoading = false,
   savedCardsError = null,
+  savedCardMutatingId = null,
+  onSetDefaultSavedCard,
+  onRemoveSavedCard,
+  cardValidationSession = null,
+  cardValidationLoading = false,
   compact = false,
 }) => {
   const updateField = <K extends keyof PaystackPaymentData>(
@@ -201,6 +222,17 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
               </p>
             </div>
 
+            {cardValidationLoading ? (
+              <div className="rounded-2xl border border-sky-200/80 bg-sky-50/80 px-3 py-3 text-xs text-sky-800 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-100">
+                Validating card details and saved-card eligibility before review...
+              </div>
+            ) : cardValidationSession?.status === 'VALIDATED' ? (
+              <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/80 px-3 py-3 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+                Card validation is complete for this checkout.
+                {` Session expires at ${formatValidationExpiry(cardValidationSession.expiresAt)}.`}
+              </div>
+            ) : null}
+
             {savedCardsLoading ? (
               <p className="text-sm text-slate-500 dark:text-slate-400">Loading saved cards...</p>
             ) : savedCards.length > 0 ? (
@@ -208,13 +240,12 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                 {savedCards.map((card) => {
                   const isSelected =
                     paymentData.useSavedCard && paymentData.savedCardId === card.id;
+                  const isMutating = savedCardMutatingId === card.id;
                   const brand = card.brand || 'Card';
                   const bank = card.bank ? ` (${card.bank})` : '';
                   return (
-                    <button
+                    <div
                       key={card.id}
-                      type="button"
-                      onClick={() => selectSavedCard(card)}
                       className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                         isSelected
                           ? 'border-fuchsia-400/80 bg-fuchsia-50/70 dark:border-fuchsia-400/30 dark:bg-fuchsia-500/10'
@@ -222,7 +253,11 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <div>
+                        <button
+                          type="button"
+                          onClick={() => selectSavedCard(card)}
+                          className="min-w-0 flex-1 text-left"
+                        >
                           <p className="text-sm font-semibold text-slate-900 dark:text-white">
                             {brand}
                             {bank} ending {card.last4}
@@ -232,13 +267,40 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                               ? `Exp ${card.expMonth}/${card.expYear}`
                               : 'Expiration unavailable'}
                             {card.reusable ? ' · Reusable' : ''}
+                            {card.isDefault ? ' · Default' : ''}
                           </p>
+                        </button>
+                        <div className="flex items-center gap-2">
+                          {!card.isDefault && onSetDefaultSavedCard ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void onSetDefaultSavedCard(card.id);
+                              }}
+                              disabled={Boolean(savedCardMutatingId)}
+                              className="rounded-full border border-slate-300 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600 transition-colors hover:border-fuchsia-300 hover:text-fuchsia-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/20 dark:text-slate-300"
+                            >
+                              {isMutating ? 'Saving...' : 'Default'}
+                            </button>
+                          ) : null}
+                          {onRemoveSavedCard ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void onRemoveSavedCard(card.id);
+                              }}
+                              disabled={Boolean(savedCardMutatingId)}
+                              className="rounded-full border border-rose-300 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-rose-600 transition-colors hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-500/40 dark:text-rose-300"
+                            >
+                              {isMutating ? 'Removing...' : 'Remove'}
+                            </button>
+                          ) : null}
+                          <span className="text-lg" aria-hidden>
+                            {isSelected ? '✅' : '💳'}
+                          </span>
                         </div>
-                        <span className="text-lg" aria-hidden>
-                          {isSelected ? '✅' : '💳'}
-                        </span>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -350,6 +412,9 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
 
             {savedCardsError ? (
               <p className="text-xs text-amber-600 dark:text-amber-300">{savedCardsError}</p>
+            ) : null}
+            {errors.validationSessionId ? (
+              <p className="text-xs text-red-500">{errors.validationSessionId}</p>
             ) : null}
             {errors.savedCardId ? (
               <p className="text-xs text-red-500">{errors.savedCardId}</p>

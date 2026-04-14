@@ -3,7 +3,6 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-route
 import { toast } from 'sonner';
 import Button from '@/components/ui/Button';
 import { openPaystackInline } from '@/lib/paystackInline';
-import { openHostedPaymentPopup } from '@/lib/paystackHostedPopup';
 import {
   resolveInAppPaymentSession,
   resolvePaymentGateway,
@@ -28,7 +27,6 @@ interface ConfirmationState {
   reference?: string;
   gateway?: string;
   providerAccessCode?: string;
-  authorizationUrl?: string;
   paymentData?: PaymentData;
   nextAction?: PaymentNextAction;
   bankAccount?: {
@@ -98,13 +96,10 @@ const OrderConfirmation: React.FC = () => {
   const bankAccount = locationState?.bankAccount ?? attempt?.bankAccount;
   const providerAccessCode =
     locationState?.providerAccessCode ?? attempt?.providerAccessCode;
-  const authorizationUrl = locationState?.authorizationUrl ?? attempt?.authorizationUrl;
   const summary = locationState?.summary ?? attempt?.summary;
   const status = attempt?.status ?? (nextAction?.type ? 'PENDING' : 'PAID');
   const statusCopy = getCheckoutStatusCopy('confirmation', status, nextAction);
-  const canResumePayment = Boolean(
-    String(providerAccessCode ?? '').trim() || String(authorizationUrl ?? '').trim(),
-  );
+  const canResumePayment = Boolean(String(providerAccessCode ?? '').trim());
 
   const paymentSummaryLines = useMemo(() => {
     if (!paymentMethod || !paymentData || !isCheckoutPaymentMethod(paymentMethod)) return [];
@@ -119,7 +114,6 @@ const OrderConfirmation: React.FC = () => {
     try {
       const session = resolveInAppPaymentSession({
         providerAccessCode,
-        authorizationUrl,
       });
       const resolvedGateway = resolvePaymentGateway({
         gateway: locationState?.gateway ?? attempt?.gateway,
@@ -127,37 +121,19 @@ const OrderConfirmation: React.FC = () => {
       const returnPath =
         `/bag/payment-return?reference=${encodeURIComponent(reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
 
-      if (session.kind === 'access_code') {
-        await openPaystackInline(session.accessCode, {
-          onSuccess: () => {
-            navigate(returnPath);
-          },
-          onCancel: () => {
-            setPaymentActionMessage('Secure checkout was cancelled. Review the payment state and try again.');
-            toast.error('Payment was cancelled before completion.');
-          },
-          onError: (inlineError) => {
-            setPaymentActionMessage('Secure checkout could not be opened. Retry to continue.');
-            toast.error(inlineError.message || 'Unable to open the payment window.');
-          },
-        });
-      } else {
-        await openHostedPaymentPopup({
-          authorizationUrl: session.authorizationUrl,
-          returnUrl: `${window.location.origin}${returnPath}`,
-          onReturn: (returnedUrl) => {
-            navigate(`${returnedUrl.pathname}${returnedUrl.search}`);
-          },
-          onCancel: () => {
-            setPaymentActionMessage('Secure checkout was cancelled. Review the payment state and try again.');
-            toast.error('Payment was cancelled before completion.');
-          },
-          onError: (popupError) => {
-            setPaymentActionMessage('Secure checkout could not be opened. Retry to continue.');
-            toast.error(popupError.message || 'Unable to open the payment window.');
-          },
-        });
-      }
+      await openPaystackInline(session.accessCode, {
+        onSuccess: () => {
+          navigate(returnPath);
+        },
+        onCancel: () => {
+          setPaymentActionMessage('Secure checkout was cancelled. Review the payment state and try again.');
+          toast.error('Payment was cancelled before completion.');
+        },
+        onError: (inlineError) => {
+          setPaymentActionMessage('Secure checkout could not be opened. Retry to continue.');
+          toast.error(inlineError.message || 'Unable to open the payment window.');
+        },
+      });
     } catch (error: any) {
       setPaymentActionMessage(
         'This payment can only continue from a secure in-app session. Retry the payment from inside Threadly.',

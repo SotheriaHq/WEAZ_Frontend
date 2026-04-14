@@ -3,7 +3,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { checkout, getMyOrders } from '@/api/StoreApi';
 import type { PaystackPaymentData, ShippingAddress } from '@/api/StoreApi';
-import { paymentApi, type SavedPaymentCardSummary } from '@/api/PaymentApi';
+import {
+  paymentApi,
+  type CardValidationSessionSummary,
+  type SavedPaymentCardSummary,
+} from '@/api/PaymentApi';
 import { createIdempotencyKey } from '@/api/idempotency';
 import {
   customOrdersBuyerApi,
@@ -30,7 +34,6 @@ import {
   resolveInAppPaymentSession,
   resolvePaymentGateway,
 } from '@/lib/inAppPaymentSession';
-import { openHostedPaymentPopup } from '@/lib/paystackHostedPopup';
 import { AnimatePresence, motion } from 'framer-motion';
 import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
 import { unifiedCheckoutQueue } from '@/lib/unifiedCheckoutQueue';
@@ -48,6 +51,7 @@ import {
   createInitialPaymentState,
   getPaymentSummaryLines,
   getReviewCtaLabel,
+  setRuntimeCardholderNameMatchMode,
   type PaymentFormErrors,
   type PaymentFormState,
   validatePaymentData,
@@ -73,6 +77,20 @@ const DEFAULT_SHIPPING = 4000;
 
 type Step = 'shipping' | 'payment' | 'review';
 type CheckoutPaymentSelection = keyof PaymentFormState | 'PENDING_SELECTION';
+type CheckoutProgressStage =
+  | 'IDLE'
+  | 'VALIDATING_DETAILS'
+  | 'PREPARING_PAYMENT'
+  | 'OPENING_SECURE_WINDOW'
+  | 'POPUP_BLOCKED'
+  | 'FAILED';
+
+type InlinePaymentLaunchSession = {
+  reference: string;
+  gateway?: string;
+  providerAccessCode?: string;
+};
+
 const STEPS: Step[] = ['shipping', 'payment', 'review'];
 const STEP_LABELS: Record<Step, string> = {
   shipping: 'Shipping',
@@ -96,6 +114,32 @@ const STEP_DESCRIPTIONS: Record<Step, string> = {
   shipping: 'Keep your delivery information accurate so shipping and tracking stay smooth.',
   payment: 'Choose the payment route that fits your checkout flow today.',
   review: 'Double-check your address, payment method, and items before we lock the order in.',
+};
+
+const CHECKOUT_PROGRESS_STAGE_LABELS: Record<CheckoutProgressStage, string> = {
+  IDLE: 'Checkout status',
+  VALIDATING_DETAILS: 'Stage 1/3 - Validating details',
+  PREPARING_PAYMENT: 'Stage 2/3 - Preparing payment session',
+  OPENING_SECURE_WINDOW: 'Stage 3/3 - Opening secure window',
+  POPUP_BLOCKED: 'Secure window blocked',
+  FAILED: 'Checkout action required',
+};
+
+const POPUP_BLOCKED_CHECKOUT_MESSAGE =
+  'Secure checkout could not open because your browser blocked the popup window. Retry to continue payment.';
+
+const getBlockedCustomBagMessage = (count: number) =>
+  `${count} custom request${count > 1 ? 's have' : ' has'} expired pricing locks. Refresh them from your bag before payment.`;
+
+const isPopupBlockedInlineError = (error: { message?: string } | null | undefined) => {
+  const message = String(error?.message ?? '').trim().toLowerCase();
+  if (!message) {
+    return false;
+  }
+  return (
+    (message.includes('popup') && (message.includes('block') || message.includes('window'))) ||
+    message.includes('user gesture')
+  );
 };
 
 /* ─── Helpers ─── */
@@ -182,6 +226,16 @@ function toSavedCardDisplay(card: SavedPaymentCardSummary): NonNullable<Paystack
     reusable: card.reusable,
     lastUsedAt: card.lastUsedAt,
   };
+}
+
+function isActiveCardValidationSession(
+  session: CardValidationSessionSummary | null,
+): session is CardValidationSessionSummary {
+  if (!session || session.status !== 'VALIDATED') {
+    return false;
+  }
+  const expiry = new Date(session.expiresAt).getTime();
+  return Number.isFinite(expiry) && expiry > Date.now();
 }
 
 const CheckoutBackLink: React.FC<{
@@ -281,6 +335,15 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [checkoutProgressMessage, setCheckoutProgressMessage] = useState<string | null>(null);
+  const [checkoutProgressStage, setCheckoutProgressStage] =
+    useState<CheckoutProgressStage>('IDLE');
+  const [pendingInlineSession, setPendingInlineSession] =
+    useState<InlinePaymentLaunchSession | null>(null);
+  const [retryingInlineLaunch, setRetryingInlineLaunch] = useState(false);
+  const [savedCardMutatingId, setSavedCardMutatingId] = useState<string | null>(null);
+  const [cardValidationSession, setCardValidationSession] =
+    useState<CardValidationSessionSummary | null>(null);
+  const [cardValidationLoading, setCardValidationLoading] = useState(false);
 
   /* ── Submission state ── */
   const [submitting, setSubmitting] = useState(false);
@@ -291,6 +354,57 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
   const checkoutEntryState =
     (location.state as { promoCode?: string } | null) ?? null;
+
+  useEffect(() => {
+    let active = true;
+
+    void paymentApi
+      .getPolicy()
+      .then((policy) => {
+        if (!active) {
+          return;
+        }
+
+        setRuntimeCardholderNameMatchMode(policy.paystack.cardholderNameMatchMode);
+      })
+      .catch(() => {
+        if (active) {
+          setRuntimeCardholderNameMatchMode(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const clearCheckoutProgress = useCallback(() => {
+    setCheckoutProgressMessage(null);
+    setCheckoutProgressStage('IDLE');
+    setPendingInlineSession(null);
+  }, []);
+
+  const refreshSavedCards = useCallback(async () => {
+    if (!user?.id) {
+      setSavedCards([]);
+      setSavedCardsError(null);
+      return [] as SavedPaymentCardSummary[];
+    }
+
+    setSavedCardsLoading(true);
+    setSavedCardsError(null);
+    try {
+      const cards = await paymentApi.listSavedCards();
+      setSavedCards(cards);
+      return cards;
+    } catch {
+      setSavedCards([]);
+      setSavedCardsError('Saved cards are temporarily unavailable. You can still continue with a new card.');
+      return [] as SavedPaymentCardSummary[];
+    } finally {
+      setSavedCardsLoading(false);
+    }
+  }, [user?.id]);
 
   const refreshCustomBag = useCallback(async () => {
     setCustomBagLoading(true);
@@ -506,6 +620,14 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     [customBagItems],
   );
 
+  const blockedCustomBagMessage = useMemo(
+    () =>
+      blockedCustomBagItems.length > 0
+        ? getBlockedCustomBagMessage(blockedCustomBagItems.length)
+        : null,
+    [blockedCustomBagItems.length],
+  );
+
   const shippingCost = address.state ? getShippingCost(address.state) : 0;
   const discountAmount = promoApplied ? Math.round(cart.subtotal * 0.1) : 0; // scaffold: 10% off
   const customSubtotal = payableCustomBagItems.reduce(
@@ -535,6 +657,11 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     checkoutIdempotencyKeyRef.current = null;
     paymentInitIdempotencyKeyRef.current = null;
   }, [activePaymentData, address, cart.items, paymentMethod, promoApplied, promoCode]);
+
+  useEffect(() => {
+    setCardValidationSession(null);
+    clearCheckoutProgress();
+  }, [activePaymentData, address, clearCheckoutProgress, paymentMethod]);
 
   const currentAddressDraft = useMemo<SavedDeliveryAddress>(
     () => ({
@@ -591,8 +718,70 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     return firstError ?? 'Complete the payment details for the selected method';
   }, []);
 
+  const ensureCardValidationSession = useCallback(
+    async (paymentSubmissionData: PaystackPaymentData): Promise<CardValidationSessionSummary> => {
+      if (paymentSubmissionData.channel !== 'CARD') {
+        throw new Error('Card validation is only required for card checkouts.');
+      }
+
+      if (isActiveCardValidationSession(cardValidationSession)) {
+        try {
+          const refreshed = await paymentApi.getCardValidationSession(
+            cardValidationSession.sessionId,
+          );
+          if (isActiveCardValidationSession(refreshed)) {
+            setCardValidationSession(refreshed);
+            return refreshed;
+          }
+        } catch {
+          // Fall through to fresh validation.
+        }
+      }
+
+      setCardValidationLoading(true);
+      setCheckoutProgressStage('VALIDATING_DETAILS');
+      setCheckoutProgressMessage('Validating card details before secure checkout...');
+
+      try {
+        const validated = await paymentApi.validateCard({
+          paymentMethod: 'PAYSTACK',
+          paymentData: paymentSubmissionData,
+        });
+
+        if (!isActiveCardValidationSession(validated)) {
+          throw new Error(
+            'Card validation session expired before checkout could continue. Validate and retry.',
+          );
+        }
+
+        setCardValidationSession(validated);
+        setPaymentErrors((prev) => {
+          if (!prev.validationSessionId) {
+            return prev;
+          }
+          const next = { ...prev };
+          delete next.validationSessionId;
+          return next;
+        });
+
+        return validated;
+      } catch (error: any) {
+        const message =
+          error?.response?.data?.message ||
+          error?.message ||
+          'Card validation failed. Review payment details and try again.';
+        setCheckoutProgressStage('FAILED');
+        setPaymentErrors((prev) => ({ ...prev, validationSessionId: message }));
+        throw new Error(message);
+      } finally {
+        setCardValidationLoading(false);
+      }
+    },
+    [cardValidationSession],
+  );
+
   /* ── Step navigation ── */
-  const goNext = useCallback(() => {
+  const goNext = useCallback(async () => {
     if (step === 'shipping') {
       if (!validateShipping()) return;
       setStep('payment');
@@ -604,24 +793,60 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       const validationErrors = validatePaymentData(paymentMethod, paymentState[paymentMethod], address);
       setPaymentErrors(validationErrors);
       if (Object.keys(validationErrors).length > 0) {
+        setCheckoutProgressStage('FAILED');
+        setCheckoutProgressMessage('Resolve the highlighted payment details before moving to review.');
         toast.error(getFirstPaymentErrorMessage(validationErrors));
         return;
       }
+
+      try {
+        const paymentSubmissionData = buildPaymentSubmissionData(
+          paymentState[paymentMethod],
+          address,
+        ) as PaystackPaymentData;
+
+        if (paymentSubmissionData.channel === 'CARD') {
+          await ensureCardValidationSession(paymentSubmissionData);
+        } else {
+          setCardValidationSession(null);
+        }
+      } catch (error: any) {
+        const message = error?.message || 'Card validation failed. Review details and try again.';
+        setCheckoutProgressStage('FAILED');
+        setCheckoutProgressMessage(message);
+        toast.error(message);
+        return;
+      }
+
       setStep('review');
     }
-  }, [step, validateShipping, paymentMethod, paymentState, address, getFirstPaymentErrorMessage]);
+  }, [
+    step,
+    validateShipping,
+    paymentMethod,
+    paymentState,
+    address,
+    getFirstPaymentErrorMessage,
+    ensureCardValidationSession,
+  ]);
 
   const goBack = useCallback(() => {
     const idx = STEPS.indexOf(step);
-    if (idx > 0) setStep(STEPS[idx - 1]);
-  }, [step]);
+    if (idx > 0) {
+      setStep(STEPS[idx - 1]);
+      clearCheckoutProgress();
+    }
+  }, [clearCheckoutProgress, step]);
 
   const goToStep = useCallback((target: Step) => {
     const targetIdx = STEPS.indexOf(target);
     const currentIdx = STEPS.indexOf(step);
     // Only allow going back to already-completed steps
-    if (targetIdx < currentIdx) setStep(target);
-  }, [step]);
+    if (targetIdx < currentIdx) {
+      setStep(target);
+      clearCheckoutProgress();
+    }
+  }, [clearCheckoutProgress, step]);
 
   /* ── Address field updater ── */
   const updateField = useCallback(<K extends keyof ShippingAddress>(field: K, value: ShippingAddress[K]) => {
@@ -709,21 +934,21 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       [selectedPaymentMethod]: updater(prev[selectedPaymentMethod]),
     }));
     setPaymentErrors({});
-    setCheckoutProgressMessage(null);
-  }, [paymentMethod]);
+    setCardValidationSession(null);
+    clearCheckoutProgress();
+  }, [clearCheckoutProgress, paymentMethod]);
 
   const handleSelectPaymentMethod = useCallback((method: keyof PaymentFormState) => {
     setPaymentMethod(method);
     setPaymentErrors({});
-    setCheckoutProgressMessage(null);
-  }, []);
+    setCardValidationSession(null);
+    clearCheckoutProgress();
+  }, [clearCheckoutProgress]);
 
-  const launchInitializedPayment = useCallback(async (paymentInit: {
-    reference: string;
-    gateway?: string;
-    providerAccessCode?: string;
-    authorizationUrl?: string;
-  }) => {
+  const launchInitializedPayment = useCallback(async (
+    paymentInit: InlinePaymentLaunchSession,
+    options?: { retry?: boolean },
+  ) => {
     const resolvedGateway = resolvePaymentGateway(paymentInit);
     const session = resolveInAppPaymentSession(paymentInit);
     const returnPath =
@@ -733,54 +958,124 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       dispatch(closeCartDrawer());
     }
 
-    setCheckoutProgressMessage('Opening secure checkout inside Threadly...');
-    if (session.kind === 'access_code') {
-      await openPaystackInline(session.accessCode, {
-        onSuccess: () => {
-          navigate(returnPath);
-        },
-        onCancel: () => {
-          setCheckoutProgressMessage(
-            'Secure checkout was cancelled. Review the payment details and try again.',
-          );
-          toast.error('Payment was cancelled before completion.');
-        },
-        onError: (inlineError) => {
-          setCheckoutProgressMessage(
-            'Secure checkout could not be opened. Retry to continue your payment.',
-          );
-          toast.error(inlineError.message || 'Unable to open the payment window.');
-        },
-      });
-      return;
-    }
+    setPendingInlineSession(paymentInit);
+    setCheckoutProgressStage('OPENING_SECURE_WINDOW');
+    setCheckoutProgressMessage(
+      options?.retry
+        ? 'Retrying secure checkout inside Threadly...'
+        : 'Opening secure checkout inside Threadly...',
+    );
 
-    await openHostedPaymentPopup({
-      authorizationUrl: session.authorizationUrl,
-      returnUrl: `${window.location.origin}${returnPath}`,
-      onReturn: (returnedUrl) => {
-        navigate(`${returnedUrl.pathname}${returnedUrl.search}`);
+    await openPaystackInline(session.accessCode, {
+      onSuccess: () => {
+        clearCheckoutProgress();
+        navigate(returnPath);
       },
       onCancel: () => {
+        setCheckoutProgressStage('FAILED');
         setCheckoutProgressMessage(
-          'Secure verification was closed before completion. Review the payment details and try again.',
+          'Secure checkout was cancelled before completion. Retry the secure window to continue payment.',
         );
         toast.error('Payment was cancelled before completion.');
       },
-      onError: (popupError) => {
+      onError: (inlineError) => {
+        if (isPopupBlockedInlineError(inlineError)) {
+          setCheckoutProgressStage('POPUP_BLOCKED');
+          setCheckoutProgressMessage(POPUP_BLOCKED_CHECKOUT_MESSAGE);
+          toast.error(POPUP_BLOCKED_CHECKOUT_MESSAGE);
+          return;
+        }
+
+        setCheckoutProgressStage('FAILED');
         setCheckoutProgressMessage(
-          'Secure verification could not be opened. Retry to continue your payment.',
+          'Secure checkout could not be opened. Retry to continue your payment.',
         );
-        toast.error(popupError.message || 'Unable to open the payment window.');
+        toast.error(inlineError.message || 'Unable to open the payment window.');
       },
     });
-  }, [dispatch, embedded, navigate]);
+  }, [clearCheckoutProgress, dispatch, embedded, navigate]);
+
+  const handleSetDefaultSavedCard = useCallback(async (savedCardId: string) => {
+    setSavedCardMutatingId(savedCardId);
+    try {
+      await paymentApi.setDefaultSavedCard(savedCardId);
+      await refreshSavedCards();
+      toast.success('Default card updated.');
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+          'Unable to set this card as default right now.',
+      );
+    } finally {
+      setSavedCardMutatingId(null);
+    }
+  }, [refreshSavedCards]);
+
+  const handleRemoveSavedCard = useCallback(async (savedCardId: string) => {
+    setSavedCardMutatingId(savedCardId);
+    try {
+      await paymentApi.removeSavedCard(savedCardId);
+      const nextCards = await refreshSavedCards();
+
+      setPaymentState((prev) => {
+        if (!prev.PAYSTACK.useSavedCard || prev.PAYSTACK.savedCardId !== savedCardId) {
+          return prev;
+        }
+
+        const nextSavedCard = nextCards[0] ?? null;
+        if (!nextSavedCard) {
+          return {
+            ...prev,
+            PAYSTACK: {
+              ...prev.PAYSTACK,
+              useSavedCard: false,
+              savedCardId: null,
+              savedCardDisplay: null,
+            },
+          };
+        }
+
+        return {
+          ...prev,
+          PAYSTACK: {
+            ...prev.PAYSTACK,
+            useSavedCard: true,
+            savedCardId: nextSavedCard.id,
+            savedCardDisplay: toSavedCardDisplay(nextSavedCard),
+          },
+        };
+      });
+
+      toast.success('Saved card removed.');
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+          'Unable to remove this card right now.',
+      );
+    } finally {
+      setSavedCardMutatingId(null);
+    }
+  }, [refreshSavedCards]);
+
+  const handleRetryInlineLaunch = useCallback(async () => {
+    if (!pendingInlineSession) {
+      return;
+    }
+
+    setRetryingInlineLaunch(true);
+    try {
+      await launchInitializedPayment(pendingInlineSession, { retry: true });
+    } finally {
+      setRetryingInlineLaunch(false);
+    }
+  }, [launchInitializedPayment, pendingInlineSession]);
 
   const initializeCustomLinePayment = useCallback(async (params: {
     checkoutIntentId: string;
     paymentMethod: 'PAYSTACK' | 'FLUTTERWAVE' | 'BANK_TRANSFER';
     email: string;
     paymentData: Record<string, unknown>;
+    validationSessionId?: string;
   }): Promise<CustomOrderPaymentInitResult> => {
     return customOrdersBuyerApi.initializePaymentForCheckoutIntent(
       params.checkoutIntentId,
@@ -789,6 +1084,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         email: params.email,
         callbackUrl: `${window.location.origin}/bag/payment-return?uq=1`,
         paymentData: params.paymentData,
+        validationSessionId: params.validationSessionId,
       },
     );
   }, []);
@@ -798,6 +1094,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     if (submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
+    setPendingInlineSession(null);
+    setCheckoutProgressStage('VALIDATING_DETAILS');
     setCheckoutProgressMessage('Validating checkout details...');
 
     try {
@@ -805,11 +1103,15 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       const hasPayableCustomItems = payableCustomBagItems.length > 0;
 
       if (!hasStoreItems && !hasPayableCustomItems) {
+        setCheckoutProgressStage('FAILED');
+        setCheckoutProgressMessage('Your bag is empty. Add an item before checkout.');
         toast.error('Your bag is empty');
         return;
       }
 
       if (paymentMethod === 'PENDING_SELECTION' || !activePaymentData) {
+        setCheckoutProgressStage('FAILED');
+        setCheckoutProgressMessage('Select and complete a payment method before placing your order.');
         toast.error('Select and complete a payment method first');
         return;
       }
@@ -817,12 +1119,59 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       const validationErrors = validatePaymentData(paymentMethod, activePaymentData, address);
       setPaymentErrors(validationErrors);
       if (Object.keys(validationErrors).length > 0) {
+        setCheckoutProgressStage('FAILED');
         setCheckoutProgressMessage('Resolve the highlighted payment details before continuing.');
         toast.error(getFirstPaymentErrorMessage(validationErrors));
         return;
       }
 
       const paymentSubmissionData = buildPaymentSubmissionData(activePaymentData, address);
+      let cardValidationSessionId: string | undefined;
+      const customValidationSessionByIntent = new Map<string, string>();
+      if (paymentMethod === 'PAYSTACK') {
+        const paystackSubmissionData = paymentSubmissionData as PaystackPaymentData;
+        if (paystackSubmissionData.channel === 'CARD') {
+          if (hasStoreItems) {
+            const validatedSession = await ensureCardValidationSession(
+              paystackSubmissionData,
+            );
+            cardValidationSessionId = validatedSession.sessionId;
+          }
+
+          if (hasPayableCustomItems) {
+            setCheckoutProgressStage('VALIDATING_DETAILS');
+            setCheckoutProgressMessage(
+              'Validating card details for each custom checkout line...',
+            );
+
+            for (const line of payableCustomBagItems) {
+              const validated = await paymentApi.validateCard({
+                paymentMethod: 'PAYSTACK',
+                paymentData: paystackSubmissionData,
+              });
+
+              if (!isActiveCardValidationSession(validated)) {
+                throw new Error(
+                  `${line.sourceTitle} validation session expired. Validate again before checkout.`,
+                );
+              }
+
+              customValidationSessionByIntent.set(
+                line.checkoutIntentId,
+                validated.sessionId,
+              );
+            }
+          }
+
+          if (cardValidationSessionId || customValidationSessionByIntent.size > 0) {
+            setCheckoutProgressStage('PREPARING_PAYMENT');
+            setCheckoutProgressMessage(
+              'Card details validated. Preparing your secure payment session...',
+            );
+          }
+        }
+      }
+
       const contactInfo = buildContactInfo(paymentSubmissionData, address);
       const nextAddresses = upsertDeliveryAddress(user?.id, {
         ...currentAddressDraft,
@@ -861,6 +1210,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         sessionId: line.sessionId,
         sourceTitle: line.sourceTitle,
         price: Number(line.buyerPriceSummary?.grandTotal ?? 0),
+        validationSessionId: customValidationSessionByIntent.get(line.checkoutIntentId),
       }));
 
       let orderIds: string[] = [];
@@ -870,6 +1220,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
       if (hasStoreItems) {
         try {
+          setCheckoutProgressStage('PREPARING_PAYMENT');
           setCheckoutProgressMessage('Preparing your order and secure payment session...');
           const checkoutIdempotencyKey =
             checkoutIdempotencyKeyRef.current ?? createIdempotencyKey();
@@ -899,6 +1250,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
             callbackUrl: `${window.location.origin}/bag/payment-return?uq=1`,
             paymentData: paymentSubmissionData,
             idempotencyKey: paymentInitIdempotencyKey,
+            validationSessionId: cardValidationSessionId,
           });
         } catch (error: any) {
           standardError =
@@ -913,6 +1265,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       let customPrimaryLine: (typeof queueLines)[number] | null = null;
 
       if (!standardPaymentResult && remainingCustomQueue.length > 0) {
+        setCheckoutProgressStage('PREPARING_PAYMENT');
         setCheckoutProgressMessage('Preparing your secure payment session...');
         while (remainingCustomQueue.length > 0 && !customPrimaryPayment) {
           const [candidate, ...rest] = remainingCustomQueue;
@@ -922,6 +1275,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
               paymentMethod: normalizedPaymentMethod,
               email: paymentSubmissionData.email,
               paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
+              validationSessionId: candidate.validationSessionId,
             });
             customPrimaryLine = candidate;
             remainingCustomQueue = rest;
@@ -939,6 +1293,10 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         if (standardError) {
           throw new Error(standardError);
         }
+        setCheckoutProgressStage('FAILED');
+        setCheckoutProgressMessage(
+          'No payable lines are ready. Refresh expired custom locks and retry checkout.',
+        );
         toast.error('No payable lines are ready. Refresh expired custom locks and try again.');
         return;
       }
@@ -947,10 +1305,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         toast.error(`${standardError} We started payment for available custom requests.`);
       }
 
-      if (blockedCustomBagItems.length > 0) {
-        toast.error(
-          `${blockedCustomBagItems.length} custom ${blockedCustomBagItems.length === 1 ? 'request has' : 'requests have'} expired locks and will stay in your bag.`,
-        );
+      if (blockedCustomBagMessage) {
+        toast.error(blockedCustomBagMessage);
       }
 
       if (standardOrdersPlaced && standardPaymentResult) {
@@ -961,10 +1317,37 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         toast.error('Some store orders were created but payment could not start. Re-open Orders to retry payment.');
       }
 
+      const queuedPaymentData: Record<string, unknown> =
+        paymentMethod === 'PAYSTACK'
+          ? (() => {
+              const paystackData = paymentSubmissionData as PaystackPaymentData;
+              if (paystackData.channel !== 'CARD' || paystackData.useSavedCard) {
+                return paystackData as unknown as Record<string, unknown>;
+              }
+
+              const rawCardDigits = String(paystackData.newCardDraft?.cardNumber ?? '').replace(/\D/g, '');
+              const last4 = rawCardDigits.length >= 4 ? rawCardDigits.slice(-4) : '';
+              const maskedCardNumber =
+                last4.length > 0
+                  ? `${'*'.repeat(Math.max(rawCardDigits.length - 4, 6))}${last4}`
+                  : '';
+
+              return {
+                ...paystackData,
+                newCardDraft: {
+                  cardHolderName: String(paystackData.newCardDraft?.cardHolderName ?? '').trim(),
+                  expiry: String(paystackData.newCardDraft?.expiry ?? '').trim(),
+                  last4,
+                  maskedCardNumber,
+                },
+              } as Record<string, unknown>;
+            })()
+          : (paymentSubmissionData as unknown as Record<string, unknown>);
+
       unifiedCheckoutQueue.save({
         paymentMethod: normalizedPaymentMethod,
         email: paymentSubmissionData.email,
-        paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
+        paymentData: queuedPaymentData,
         lines: remainingCustomQueue,
         currentLine: customPrimaryLine ?? undefined,
         successfulCustomLines: [],
@@ -989,17 +1372,20 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       });
 
       if (standardPaymentResult) {
-        setCheckoutProgressMessage('Opening secure checkout inside Threadly...');
+        setCheckoutProgressStage('OPENING_SECURE_WINDOW');
+        setPendingInlineSession(standardPaymentResult);
         await launchInitializedPayment(standardPaymentResult);
         return;
       }
 
       if (customPrimaryPayment) {
-        setCheckoutProgressMessage('Opening secure checkout inside Threadly...');
+        setCheckoutProgressStage('OPENING_SECURE_WINDOW');
+        setPendingInlineSession(customPrimaryPayment);
         await launchInitializedPayment(customPrimaryPayment);
         return;
       }
     } catch (error: any) {
+      setCheckoutProgressStage('FAILED');
       setCheckoutProgressMessage('Checkout could not be completed. Review the payment state and retry.');
       toast.error(error?.response?.data?.message || error?.message || 'Checkout failed. Please try again.');
     } finally {
@@ -1010,12 +1396,14 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     activePaymentData,
     address,
     blockedCustomBagItems,
+    blockedCustomBagMessage,
     cart.items,
     cart.subtotal,
     currentAddressDraft,
     customSubtotal,
     discountAmount,
     dispatch,
+    ensureCardValidationSession,
     grandTotal,
     initializeCustomLinePayment,
     launchInitializedPayment,
@@ -1036,6 +1424,12 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const contentClassName = embedded
     ? 'relative mx-auto max-w-7xl px-4 py-6 sm:px-5 lg:px-8 lg:py-8'
     : 'relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12';
+  const checkoutProgressToneClass =
+    checkoutProgressStage === 'FAILED'
+      ? 'border-rose-200/80 bg-rose-50/85 text-rose-900 dark:border-rose-500/35 dark:bg-rose-500/10 dark:text-rose-100'
+      : checkoutProgressStage === 'POPUP_BLOCKED'
+        ? 'border-amber-200/80 bg-amber-50/85 text-amber-900 dark:border-amber-500/35 dark:bg-amber-500/10 dark:text-amber-100'
+        : 'border-sky-200/80 bg-sky-50/80 text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100';
 
   return (
     <div className={shellClassName}>
@@ -1108,10 +1502,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
               Prices were updated for {priceChangeNotices.length} item{priceChangeNotices.length > 1 ? 's' : ''}. Review the changes below.
             </p>
           )}
-          {blockedCustomBagItems.length > 0 && (
-            <p className="font-medium">
-              {blockedCustomBagItems.length} custom request{blockedCustomBagItems.length > 1 ? 's have' : ' has'} expired pricing locks. Refresh them from your bag before payment.
-            </p>
+          {blockedCustomBagMessage && (
+            <p className="font-medium">{blockedCustomBagMessage}</p>
           )}
           {customBagError && (
             <p className="font-medium">{customBagError}</p>
@@ -1323,7 +1715,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <div className="flex flex-col gap-4 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
                 <CheckoutBackLink label="Back to bag" onClick={handleBackToBag} />
-                <Button onClick={goNext} size="lg" className="rounded-2xl px-8 shadow-[0_16px_36px_rgba(217,70,239,0.28)]">
+                <Button onClick={() => { void goNext(); }} size="lg" className="rounded-2xl px-8 shadow-[0_16px_36px_rgba(217,70,239,0.28)]">
                   Continue to Payment
                 </Button>
               </div>
@@ -1389,6 +1781,11 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                             savedCards={savedCards}
                             savedCardsLoading={savedCardsLoading}
                             savedCardsError={savedCardsError}
+                            savedCardMutatingId={savedCardMutatingId}
+                            onSetDefaultSavedCard={handleSetDefaultSavedCard}
+                            onRemoveSavedCard={handleRemoveSavedCard}
+                            cardValidationSession={cardValidationSession}
+                            cardValidationLoading={cardValidationLoading}
                             compact
                           />
                         </div>
@@ -1432,8 +1829,13 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <div className="flex flex-col gap-4 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
                 <CheckoutBackLink label="Back to shipping" onClick={goBack} />
-                <Button onClick={goNext} size="lg" className="rounded-2xl px-8 shadow-[0_16px_36px_rgba(217,70,239,0.28)]">
-                  Review Order
+                <Button
+                  onClick={() => { void goNext(); }}
+                  size="lg"
+                  disabled={cardValidationLoading}
+                  className="rounded-2xl px-8 shadow-[0_16px_36px_rgba(217,70,239,0.28)]"
+                >
+                  {cardValidationLoading ? 'Validating card details...' : 'Review Order'}
                 </Button>
               </div>
             </CheckoutPanel>
@@ -1448,8 +1850,28 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
             >
             <div className="space-y-6">
               {checkoutProgressMessage && (
-                <div className="rounded-[24px] border border-sky-200/80 bg-sky-50/80 px-4 py-3 text-sm text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100">
-                  {checkoutProgressMessage}
+                <div className={`rounded-[24px] border px-4 py-3 text-sm ${checkoutProgressToneClass}`}>
+                  <p className="text-[11px] font-black uppercase tracking-[0.22em]">
+                    {CHECKOUT_PROGRESS_STAGE_LABELS[checkoutProgressStage]}
+                  </p>
+                  <p className="mt-1">{checkoutProgressMessage}</p>
+                  {checkoutProgressStage === 'POPUP_BLOCKED' && pendingInlineSession ? (
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => { void handleRetryInlineLaunch(); }}
+                        loading={retryingInlineLaunch}
+                        disabled={retryingInlineLaunch || submitting}
+                        className="rounded-xl"
+                      >
+                        Retry secure checkout window
+                      </Button>
+                      <p className="text-xs">
+                        If this repeats, allow popups for this site and retry once.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               )}
               {/* Shipping summary */}
@@ -1583,9 +2005,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                   </div>
                 )}
 
-                {blockedCustomBagItems.length > 0 && (
+                {blockedCustomBagMessage && (
                   <div className="rounded-2xl border border-amber-300/70 bg-amber-50/80 p-3 text-xs text-amber-800 dark:border-amber-600/40 dark:bg-amber-500/10 dark:text-amber-100">
-                    {blockedCustomBagItems.length} custom request{blockedCustomBagItems.length > 1 ? 's are' : ' is'} blocked by expired pricing locks and excluded from this payment.
+                    {blockedCustomBagMessage} These lines are excluded from this payment run.
                   </div>
                 )}
               </div>

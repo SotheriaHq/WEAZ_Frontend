@@ -832,6 +832,19 @@ export interface AdminFinancePaymentDetail {
   }>;
 }
 
+export interface AdminStalePaymentReconcileFailure {
+  reference: string;
+  reason: string;
+}
+
+export interface AdminStalePaymentReconcileResult {
+  scanned: number;
+  updated: number;
+  skipped: string[];
+  reconciled: string[];
+  failed: AdminStalePaymentReconcileFailure[];
+}
+
 export interface AdminFinanceTransaction extends AdminLedgerTransaction {
   brand?: { id: string; name: string | null } | null;
   buyerName?: string | null;

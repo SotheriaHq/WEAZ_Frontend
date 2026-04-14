@@ -5,6 +5,7 @@ import {
   createInitialPaymentState,
   getPaymentSummaryLines,
   getReviewCtaLabel,
+  setRuntimeCardholderNameMatchMode,
   validatePaymentData,
 } from './paymentFlow';
 
@@ -21,6 +22,7 @@ const shippingAddress: ShippingAddress = {
 };
 
 afterEach(() => {
+  setRuntimeCardholderNameMatchMode(null);
   vi.unstubAllEnvs();
 });
 
@@ -81,6 +83,48 @@ describe('paymentFlow', () => {
 
     expect(validatePaymentData('PAYSTACK', paymentData, shippingAddress)).toMatchObject({
       cardHolderName: 'Card holder name must match the billing name for this order',
+    });
+  });
+
+  it('falls back to the backend-style soft mode in qa-like environments', () => {
+    vi.stubEnv('VITE_PAYSTACK_CARDHOLDER_NAME_MATCH_MODE', '');
+    vi.stubEnv('VITE_APP_ENV', 'qa');
+
+    const paymentState = createInitialPaymentState('buyer@example.com', '08030000000');
+    const paymentData = {
+      ...paymentState.PAYSTACK,
+      consentAccepted: true,
+      useSavedCard: false,
+      newCardDraft: {
+        cardHolderName: 'Test Person',
+        cardNumber: '4084 0840 8408 4081',
+        expiry: '12/99',
+        cvv: '408',
+      },
+    };
+
+    expect(validatePaymentData('PAYSTACK', paymentData, shippingAddress)).toEqual({});
+  });
+
+  it('rejects soft-mode name mismatch when there is no billing-name overlap', () => {
+    vi.stubEnv('VITE_PAYSTACK_CARDHOLDER_NAME_MATCH_MODE', '');
+    vi.stubEnv('VITE_APP_ENV', 'qa');
+
+    const paymentState = createInitialPaymentState('buyer@example.com', '08030000000');
+    const paymentData = {
+      ...paymentState.PAYSTACK,
+      consentAccepted: true,
+      useSavedCard: false,
+      newCardDraft: {
+        cardHolderName: 'Another Person',
+        cardNumber: '4084 0840 8408 4081',
+        expiry: '12/99',
+        cvv: '408',
+      },
+    };
+
+    expect(validatePaymentData('PAYSTACK', paymentData, shippingAddress)).toMatchObject({
+      cardHolderName: 'Card holder name should closely match the billing name for this order',
     });
   });
 
