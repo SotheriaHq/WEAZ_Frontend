@@ -100,7 +100,7 @@ describe('paymentRetryFlow', () => {
     ).toBe(true);
   });
 
-  it('resets raw card fields before retrying a failed new-card attempt', () => {
+  it('clears local card fields before retrying a failed new-card attempt', () => {
     const retryPaymentData = createCustomOrderRetryPaymentData(baseCustomOrderAttempt);
 
     expect(retryPaymentData.email).toBe('buyer@example.com');
@@ -111,12 +111,7 @@ describe('paymentRetryFlow', () => {
       street: '10 Broad Street',
     });
     expect(retryPaymentData.useSavedCard).toBe(false);
-    expect(retryPaymentData.newCardDraft).toEqual({
-      cardHolderName: '',
-      cardNumber: '',
-      expiry: '',
-      cvv: '',
-    });
+    expect(retryPaymentData.newCardDraft).toBeNull();
   });
 
   it('builds a synthetic shipping address from the retry billing data', () => {

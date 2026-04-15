@@ -75,6 +75,16 @@ const SHIPPING_RATES: Record<string, number> = {
 };
 const DEFAULT_SHIPPING = 4000;
 
+const hasCollectedPaystackCardDraft = (
+  paymentData: Pick<PaystackPaymentData, 'newCardDraft'>,
+): boolean =>
+  [
+    paymentData.newCardDraft?.cardHolderName,
+    paymentData.newCardDraft?.cardNumber,
+    paymentData.newCardDraft?.expiry,
+    paymentData.newCardDraft?.cvv,
+  ].some((value) => String(value ?? '').trim().length > 0);
+
 type Step = 'shipping' | 'payment' | 'review';
 type CheckoutPaymentSelection = keyof PaymentFormState | 'PENDING_SELECTION';
 type CheckoutProgressStage =
@@ -638,6 +648,11 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const grandTotal = standardGrandTotal + customSubtotal;
   const brandGroups = useMemo(() => groupByBrand(cart.items), [cart.items]);
   const activePaymentData = paymentMethod === 'PENDING_SELECTION' ? null : paymentState[paymentMethod];
+  const isHostedNewCardSelection =
+    paymentMethod === 'PAYSTACK' &&
+    activePaymentData?.channel === 'CARD' &&
+    !activePaymentData.useSavedCard &&
+    !hasCollectedPaystackCardDraft(activePaymentData);
   const paymentSummaryLines = useMemo(
     () => (activePaymentData && paymentMethod !== 'PENDING_SELECTION' ? getPaymentSummaryLines(paymentMethod, activePaymentData) : []),
     [activePaymentData, paymentMethod],
@@ -804,8 +819,12 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
           paymentState[paymentMethod],
           address,
         ) as PaystackPaymentData;
+        const requiresCardValidation =
+          paymentSubmissionData.channel === 'CARD' &&
+          (paymentSubmissionData.useSavedCard ||
+            hasCollectedPaystackCardDraft(paymentSubmissionData));
 
-        if (paymentSubmissionData.channel === 'CARD') {
+        if (requiresCardValidation) {
           await ensureCardValidationSession(paymentSubmissionData);
         } else {
           setCardValidationSession(null);
@@ -1130,7 +1149,12 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       const customValidationSessionByIntent = new Map<string, string>();
       if (paymentMethod === 'PAYSTACK') {
         const paystackSubmissionData = paymentSubmissionData as PaystackPaymentData;
-        if (paystackSubmissionData.channel === 'CARD') {
+        const requiresCardValidation =
+          paystackSubmissionData.channel === 'CARD' &&
+          (paystackSubmissionData.useSavedCard ||
+            hasCollectedPaystackCardDraft(paystackSubmissionData));
+
+        if (requiresCardValidation) {
           if (hasStoreItems) {
             const validatedSession = await ensureCardValidationSession(
               paystackSubmissionData,
@@ -1326,11 +1350,15 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
               }
 
               const rawCardDigits = String(paystackData.newCardDraft?.cardNumber ?? '').replace(/\D/g, '');
-              const last4 = rawCardDigits.length >= 4 ? rawCardDigits.slice(-4) : '';
-              const maskedCardNumber =
-                last4.length > 0
-                  ? `${'*'.repeat(Math.max(rawCardDigits.length - 4, 6))}${last4}`
-                  : '';
+              if (rawCardDigits.length < 4) {
+                return {
+                  ...paystackData,
+                  newCardDraft: null,
+                } as Record<string, unknown>;
+              }
+
+              const last4 = rawCardDigits.slice(-4);
+              const maskedCardNumber = `${'*'.repeat(Math.max(rawCardDigits.length - 4, 6))}${last4}`;
 
               return {
                 ...paystackData,
@@ -1786,6 +1814,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                             onRemoveSavedCard={handleRemoveSavedCard}
                             cardValidationSession={cardValidationSession}
                             cardValidationLoading={cardValidationLoading}
+                            onStartNewCardCheckout={handlePlaceOrder}
+                            startingNewCardCheckout={submitting}
                             compact
                           />
                         </div>
@@ -1829,14 +1859,16 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <div className="flex flex-col gap-4 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
                 <CheckoutBackLink label="Back to shipping" onClick={goBack} />
-                <Button
-                  onClick={() => { void goNext(); }}
-                  size="lg"
-                  disabled={cardValidationLoading}
-                  className="rounded-2xl px-8 shadow-[0_16px_36px_rgba(217,70,239,0.28)]"
-                >
-                  {cardValidationLoading ? 'Validating card details...' : 'Review Order'}
-                </Button>
+                {!isHostedNewCardSelection ? (
+                  <Button
+                    onClick={() => { void goNext(); }}
+                    size="lg"
+                    disabled={cardValidationLoading}
+                    className="rounded-2xl px-8 shadow-[0_16px_36px_rgba(217,70,239,0.28)]"
+                  >
+                    {cardValidationLoading ? 'Validating card details...' : 'Review Order'}
+                  </Button>
+                ) : null}
               </div>
             </CheckoutPanel>
           )}

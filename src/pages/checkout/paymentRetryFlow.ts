@@ -15,13 +15,6 @@ const EMPTY_BILLING_ADDRESS: BillingAddress = {
   country: '',
 };
 
-const EMPTY_CARD_DRAFT = {
-  cardHolderName: '',
-  cardNumber: '',
-  expiry: '',
-  cvv: '',
-};
-
 const asRecord = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
@@ -167,7 +160,7 @@ export const createCustomOrderRetryPaymentData = (
     saveNewCard: Boolean(paymentData.saveNewCard ?? true),
     savedCardId: useSavedCard ? asTrimmedString(paymentData.savedCardId) : null,
     savedCardDisplay: useSavedCard ? toSavedCardDisplay(paymentData.savedCardDisplay) : null,
-    newCardDraft: useSavedCard ? base.newCardDraft : { ...EMPTY_CARD_DRAFT },
+    newCardDraft: useSavedCard ? base.newCardDraft : null,
   };
 };
 

@@ -245,6 +245,15 @@ function normalizeCardDraft(
   };
 }
 
+function hasRawCardDraft(
+  paymentData: Pick<PaystackPaymentData, 'newCardDraft'>,
+): boolean {
+  const draft = normalizeCardDraft(paymentData);
+  return [draft.cardHolderName, draft.cardNumber, draft.expiry, draft.cvv].some(
+    (value) => value.trim().length > 0,
+  );
+}
+
 function validateCardDraft(
   paymentData: PaystackPaymentData,
   shippingAddress: ShippingAddress,
@@ -347,7 +356,9 @@ export function validatePaymentData(
       errors.savedCardId = 'Select a saved card or switch to a new card';
     }
   } else if (paymentData.channel === 'CARD') {
-    validateCardDraft(paymentData, shippingAddress, errors);
+    if (hasRawCardDraft(paymentData)) {
+      validateCardDraft(paymentData, shippingAddress, errors);
+    }
   }
 
   return errors;
@@ -423,7 +434,9 @@ export function buildPaymentSubmissionData(
         ? Boolean(paystackData.saveNewCard ?? true)
         : false,
     newCardDraft:
-      paystackData.channel === 'CARD' && !paystackData.useSavedCard
+      paystackData.channel === 'CARD' &&
+      !paystackData.useSavedCard &&
+      hasRawCardDraft(paystackData)
         ? draft
         : null,
     savedCardId:
@@ -459,11 +472,16 @@ export function getPaymentSummaryLines(
     lines.push(`${brand}${bank} ending ${paymentData.savedCardDisplay.last4}`);
     lines.push('Threadly will verify the saved-card authorization after you continue');
   } else {
-    const digits = digitsOnly(String(paymentData.newCardDraft?.cardNumber ?? ''));
-    const last4 = digits.length >= 4 ? digits.slice(-4) : null;
     lines[lines.length - 1] = 'Card checkout';
-    lines.push(last4 ? `New card ending ${last4}` : 'New card details entered');
-    lines.push('Final bank verification can still open a secure provider window');
+    if (hasRawCardDraft(paymentData)) {
+      const digits = digitsOnly(String(paymentData.newCardDraft?.cardNumber ?? ''));
+      const last4 = digits.length >= 4 ? digits.slice(-4) : null;
+      lines.push(last4 ? `New card ending ${last4}` : 'New card details entered');
+      lines.push('Final bank verification can still open a secure provider window');
+    } else {
+      lines.push('New card will be entered inside Paystack secure checkout');
+      lines.push('Card details stay inside the secure provider window');
+    }
   }
 
   return lines.filter(Boolean);
@@ -480,7 +498,7 @@ export function getReviewCtaLabel(
     if (paymentData.channel === 'CARD' && paymentData.useSavedCard && paymentData.savedCardId) {
       return 'Continue with saved card';
     }
-    return 'Continue to card verification';
+    return 'Open secure card checkout';
   }
 
   return 'Continue to Secure Payment';

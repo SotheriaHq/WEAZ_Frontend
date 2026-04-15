@@ -79,6 +79,16 @@ type OrdersPanelProps = {
   onSelectionHandled?: () => void;
 };
 
+const hasCollectedPaystackCardDraft = (
+  paymentData: Pick<PaystackPaymentData, 'newCardDraft'>,
+): boolean =>
+  [
+    paymentData.newCardDraft?.cardHolderName,
+    paymentData.newCardDraft?.cardNumber,
+    paymentData.newCardDraft?.expiry,
+    paymentData.newCardDraft?.cvv,
+  ].some((value) => String(value ?? '').trim().length > 0);
+
 const paymentAttemptEmoji = (status: string) => {
   switch (status) {
     case 'PAID':
@@ -891,6 +901,11 @@ export const BuyerCustomOrderDetailView: React.FC<{
     ],
   );
   const activePaymentData = paymentState[paymentMethod];
+  const isHostedNewCardSelection =
+    paymentMethod === 'PAYSTACK' &&
+    activePaymentData.channel === 'CARD' &&
+    !activePaymentData.useSavedCard &&
+    !hasCollectedPaystackCardDraft(activePaymentData);
 
   useEffect(() => {
     setPaymentState((prev) => ({
@@ -957,10 +972,14 @@ export const BuyerCustomOrderDetailView: React.FC<{
       paymentShippingAddress,
     );
     let validationSessionId: string | undefined;
-    if (
+    const requiresCardValidation =
       paymentMethod === 'PAYSTACK' &&
-      (paymentSubmissionData as PaystackPaymentData).channel === 'CARD'
-    ) {
+      (paymentSubmissionData as PaystackPaymentData).channel === 'CARD' &&
+      (
+        (paymentSubmissionData as PaystackPaymentData).useSavedCard ||
+        hasCollectedPaystackCardDraft(paymentSubmissionData as PaystackPaymentData)
+      );
+    if (requiresCardValidation) {
       setPaymentActionMessage('Validating card details before secure checkout...');
       const validated = await paymentApi.validateCard({
         paymentMethod: 'PAYSTACK',
@@ -1372,18 +1391,22 @@ export const BuyerCustomOrderDetailView: React.FC<{
               shippingAddress={paymentShippingAddress}
               errors={paymentErrors}
               onChange={updateSelectedPaymentData}
+              onStartNewCardCheckout={handlePayNow}
+              startingNewCardCheckout={busy}
               compact
             />
           </div>
           <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={handlePayNow}
-              disabled={busy}
-              className="rounded-full bg-amber-400 px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
-            >
-              {busy ? 'Opening payment...' : 'Pay now'}
-            </button>
+            {!isHostedNewCardSelection ? (
+              <button
+                type="button"
+                onClick={handlePayNow}
+                disabled={busy}
+                className="rounded-full bg-amber-400 px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
+              >
+                {busy ? 'Opening payment...' : 'Pay now'}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={handleVerifyPayment}

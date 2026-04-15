@@ -27,42 +27,34 @@ afterEach(() => {
 });
 
 describe('paymentFlow', () => {
-  it('accepts a valid new-card draft on the payment step', () => {
+  it('accepts a hosted new-card selection without local card fields', () => {
     const paymentState = createInitialPaymentState('buyer@example.com', '08030000000');
     const paymentData = {
       ...paymentState.PAYSTACK,
       consentAccepted: true,
       useSavedCard: false,
-      newCardDraft: {
-        cardHolderName: 'Buyer Test',
-        cardNumber: '4084 0840 8408 4081',
-        expiry: '12/99',
-        cvv: '408',
-      },
+      newCardDraft: null,
     };
 
     expect(validatePaymentData('PAYSTACK', paymentData, shippingAddress)).toEqual({});
   });
 
-  it('describes the inline new-card path in the payment summary and CTA', () => {
+  it('describes the hosted new-card path in the payment summary and CTA', () => {
     const paymentState = createInitialPaymentState('buyer@example.com', '08030000000');
     const paymentData = {
       ...paymentState.PAYSTACK,
       consentAccepted: true,
       useSavedCard: false,
-      newCardDraft: {
-        cardHolderName: 'Test Buyer',
-        cardNumber: '4084 0840 8408 4081',
-        expiry: '12/99',
-        cvv: '408',
-      },
+      newCardDraft: null,
     };
 
-    expect(getPaymentSummaryLines('PAYSTACK', paymentData)).toContain('New card ending 4081');
     expect(getPaymentSummaryLines('PAYSTACK', paymentData)).toContain(
-      'Final bank verification can still open a secure provider window',
+      'New card will be entered inside Paystack secure checkout',
     );
-    expect(getReviewCtaLabel('PAYSTACK', paymentData)).toBe('Continue to card verification');
+    expect(getPaymentSummaryLines('PAYSTACK', paymentData)).toContain(
+      'Card details stay inside the secure provider window',
+    );
+    expect(getReviewCtaLabel('PAYSTACK', paymentData)).toBe('Open secure card checkout');
   });
 
   it('enforces the card-holder and billing-name match when strict mode is enabled', () => {
@@ -149,12 +141,7 @@ describe('paymentFlow', () => {
         ...paymentState.PAYSTACK,
         consentAccepted: true,
         useSavedCard: false,
-        newCardDraft: {
-          cardHolderName: 'Test Buyer',
-          cardNumber: '4084 0840 8408 4081',
-          expiry: '12/99',
-          cvv: '408',
-        },
+        newCardDraft: null,
       },
       shippingAddress,
     );
@@ -162,12 +149,7 @@ describe('paymentFlow', () => {
     expect(newCardPayload).toMatchObject({
       useSavedCard: false,
       saveNewCard: true,
-      newCardDraft: {
-        cardHolderName: 'Test Buyer',
-        cardNumber: '4084 0840 8408 4081',
-        expiry: '12/99',
-        cvv: '408',
-      },
+      newCardDraft: null,
       savedCardId: null,
     });
 

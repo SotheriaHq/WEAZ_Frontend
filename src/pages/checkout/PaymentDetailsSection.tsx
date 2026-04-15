@@ -4,10 +4,10 @@ import type {
   CardValidationSessionSummary,
   SavedPaymentCardSummary,
 } from '@/api/PaymentApi';
+import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import type { PaymentFormErrors } from '@/pages/checkout/paymentFlow';
-import { getCardholderNameHelperText } from '@/pages/checkout/paymentFlow';
 
 interface PaymentDetailsSectionProps {
   paymentData: PaystackPaymentData;
@@ -22,6 +22,8 @@ interface PaymentDetailsSectionProps {
   onRemoveSavedCard?: (savedCardId: string) => Promise<void> | void;
   cardValidationSession?: CardValidationSessionSummary | null;
   cardValidationLoading?: boolean;
+  onStartNewCardCheckout?: () => Promise<void> | void;
+  startingNewCardCheckout?: boolean;
   compact?: boolean;
 }
 
@@ -31,21 +33,6 @@ const selectClassName =
   '[&>div>button]:rounded-2xl [&>div>button]:border-white/60 [&>div>button]:bg-white/80 [&>div>button]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&>div>button]:border-white/10 dark:[&>div>button]:bg-white/[0.03]';
 const infoCardClassName =
   'rounded-[24px] border border-slate-200/80 bg-white/70 p-4 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300';
-
-const formatCardNumber = (value: string): string => {
-  const digits = value.replace(/\D/g, '').slice(0, 19);
-  return digits.replace(/(.{4})/g, '$1 ').trim();
-};
-
-const formatExpiry = (value: string): string => {
-  const digits = value.replace(/\D/g, '').slice(0, 4);
-  if (digits.length <= 2) {
-    return digits;
-  }
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-};
-
-const digitsOnly = (value: string): string => value.replace(/\D/g, '');
 
 const formatValidationExpiry = (value: string): string => {
   const date = new Date(value);
@@ -68,6 +55,8 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   onRemoveSavedCard,
   cardValidationSession = null,
   cardValidationLoading = false,
+  onStartNewCardCheckout,
+  startingNewCardCheckout = false,
   compact = false,
 }) => {
   const updateField = <K extends keyof PaystackPaymentData>(
@@ -75,23 +64,6 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
     value: PaystackPaymentData[K],
   ) => {
     onChange((current) => ({ ...current, [field]: value }));
-  };
-
-  const updateNewCardField = (
-    field: keyof NonNullable<PaystackPaymentData['newCardDraft']>,
-    value: string,
-  ) => {
-    onChange((current) => ({
-      ...current,
-      useSavedCard: false,
-      newCardDraft: {
-        cardHolderName: current.newCardDraft?.cardHolderName ?? '',
-        cardNumber: current.newCardDraft?.cardNumber ?? '',
-        expiry: current.newCardDraft?.expiry ?? '',
-        cvv: current.newCardDraft?.cvv ?? '',
-        [field]: value,
-      },
-    }));
   };
 
   const handleChannelChange = (value: string) => {
@@ -136,20 +108,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
       savedCardId: null,
       savedCardDisplay: null,
       saveNewCard: current.saveNewCard ?? true,
-      newCardDraft: current.newCardDraft ?? {
-        cardHolderName: '',
-        cardNumber: '',
-        expiry: '',
-        cvv: '',
-      },
     }));
-  };
-
-  const cardDraft = paymentData.newCardDraft ?? {
-    cardHolderName: '',
-    cardNumber: '',
-    expiry: '',
-    cvv: '',
   };
 
   return (
@@ -166,7 +125,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
           Complete your payment details
         </h3>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Enter payer details, choose your card option, and validate the card before review.
+          Enter payer details, reuse a saved card, or open Paystack secure checkout to add a new card.
         </p>
       </div>
 
@@ -201,7 +160,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
             {
               value: 'CARD',
               label: 'Card',
-              description: 'Use a saved card or enter a new card for this checkout.',
+              description: 'Use a saved card or launch secure checkout to add a new one.',
             },
             {
               value: 'BANK_TRANSFER',
@@ -224,11 +183,11 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
 
             {cardValidationLoading ? (
               <div className="rounded-2xl border border-sky-200/80 bg-sky-50/80 px-3 py-3 text-xs text-sky-800 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-100">
-                Validating card details and saved-card eligibility before review...
+                Checking saved-card eligibility before secure checkout...
               </div>
             ) : cardValidationSession?.status === 'VALIDATED' ? (
               <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/80 px-3 py-3 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-                Card validation is complete for this checkout.
+                Saved-card validation is complete for this checkout.
                 {` Session expires at ${formatValidationExpiry(cardValidationSession.expiresAt)}.`}
               </div>
             ) : null}
@@ -324,73 +283,19 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">Use a new card</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">Add a new card securely</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Enter your new card details on this screen before review.
+                    Threadly will prepare Paystack checkout and you will enter card details there.
                   </p>
                 </div>
                 <span className="text-lg" aria-hidden>
-                  {paymentData.useSavedCard ? '➕' : '✅'}
+                  {paymentData.useSavedCard ? '💳' : '✅'}
                 </span>
               </div>
             </button>
 
             {!paymentData.useSavedCard ? (
               <div className="space-y-4 rounded-[22px] border border-slate-200/80 bg-white/55 p-4 dark:border-white/10 dark:bg-white/[0.02]">
-                <Input
-                  label="Card holder name"
-                  value={cardDraft.cardHolderName}
-                  onChange={(event) =>
-                    updateNewCardField('cardHolderName', event.target.value)
-                  }
-                  error={errors.cardHolderName}
-                  helperText={getCardholderNameHelperText()}
-                  required
-                  className={inputClassName}
-                />
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(140px,1fr)_minmax(120px,1fr)]">
-                  <Input
-                    label="Card number"
-                    inputMode="numeric"
-                    autoComplete="cc-number"
-                    placeholder="1234 5678 9012 3456"
-                    value={cardDraft.cardNumber}
-                    onChange={(event) =>
-                      updateNewCardField('cardNumber', formatCardNumber(event.target.value))
-                    }
-                    error={errors.cardNumber}
-                    required
-                    className={inputClassName}
-                  />
-                  <Input
-                    label="Expiry"
-                    inputMode="numeric"
-                    autoComplete="cc-exp"
-                    placeholder="MM/YY"
-                    value={cardDraft.expiry}
-                    onChange={(event) =>
-                      updateNewCardField('expiry', formatExpiry(event.target.value))
-                    }
-                    error={errors.expiry}
-                    required
-                    className={inputClassName}
-                  />
-                  <Input
-                    label="CVV"
-                    inputMode="numeric"
-                    autoComplete="cc-csc"
-                    placeholder="123"
-                    value={cardDraft.cvv}
-                    onChange={(event) =>
-                      updateNewCardField('cvv', digitsOnly(event.target.value).slice(0, 4))
-                    }
-                    error={errors.cvv}
-                    required
-                    className={inputClassName}
-                  />
-                </div>
-
                 <label className="flex items-start gap-3 rounded-[20px] border border-slate-200/80 bg-white/70 px-4 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
                   <input
                     type="checkbox"
@@ -404,16 +309,28 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                 </label>
 
                 <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 px-3 py-3 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-                  Threadly validates your card details here first. Your bank can still ask for a secure
-                  provider challenge before final payment confirmation.
+                  Threadly will prepare Paystack secure checkout inside this flow. Enter card number,
+                  expiry, CVV, PIN, or OTP only inside the secure payment window that opens next.
                 </div>
+
+                <Button
+                  type="button"
+                  onClick={() => {
+                    void onStartNewCardCheckout?.();
+                  }}
+                  loading={startingNewCardCheckout}
+                  disabled={!onStartNewCardCheckout || startingNewCardCheckout}
+                  className="w-full rounded-2xl px-5 shadow-[0_16px_36px_rgba(217,70,239,0.24)]"
+                >
+                  {startingNewCardCheckout ? 'Preparing payment...' : 'Add new card securely'}
+                </Button>
               </div>
             ) : null}
 
             {savedCardsError ? (
               <p className="text-xs text-amber-600 dark:text-amber-300">{savedCardsError}</p>
             ) : null}
-            {errors.validationSessionId ? (
+            {paymentData.useSavedCard && errors.validationSessionId ? (
               <p className="text-xs text-red-500">{errors.validationSessionId}</p>
             ) : null}
             {errors.savedCardId ? (
@@ -442,7 +359,8 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
         <span>
           I confirm these payment details are correct, and I understand this payment can require
           issuer verification, provider challenges, or delayed confirmation before the order is
-          fulfilled.
+          fulfilled. If I add a new card, the details will be entered only inside the secure
+          Paystack checkout window.
           {errors.consentAccepted ? (
             <span className="mt-1 block text-xs text-red-500">{errors.consentAccepted}</span>
           ) : null}
