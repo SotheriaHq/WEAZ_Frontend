@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -38,27 +38,17 @@ import {
   humanizeCustomOrderToken,
 } from '@/components/custom-orders/customOrderFormatting';
 import { messagingApi, type ThreadSummaryResponse } from '@/api/MessagingApi';
-import type { RootState } from '@/store';
+import { fetchCustomBagCount, openCartDrawer } from '@/features/cartSlice';
+import type { AppDispatch, RootState } from '@/store';
 import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
 import {
   CHECKOUT_PAYMENT_OPTIONS,
-  buildPaymentSubmissionData,
   createInitialPaymentState,
   setRuntimeCardholderNameMatchMode,
   type PaymentFormErrors,
   type PaymentFormState,
-  validatePaymentData,
 } from '@/pages/checkout/paymentFlow';
 import { useConfirm } from '@/components/ui/useConfirm';
-import { createIdempotencyKey } from '@/api/idempotency';
-import {
-  cancelActivePaystackInline,
-  openPaystackInline,
-} from '@/lib/paystackInline';
-import {
-  resolveInAppPaymentSession,
-  resolvePaymentGateway,
-} from '@/lib/inAppPaymentSession';
 
 const STANDARD_STATUS_OPTIONS = ['ALL', 'PENDING', 'PROCESSING', 'SHIPPED'] as const;
 const CUSTOM_STATUS_OPTIONS = ['ALL', 'PENDING', 'ACTIVE', 'COMPLETED', 'ISSUES'] as const;
@@ -717,6 +707,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
   previewOrder?: CustomOrderListItem | null;
 }> = ({ orderId, onBack, previewOrder = null }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
   const profile = useSelector((state: RootState) => state.user.profile);
   const [order, setOrder] = useState<CustomOrderDetail | null>(null);
@@ -741,7 +732,6 @@ export const BuyerCustomOrderDetailView: React.FC<{
     useState<CustomOrderExtensionResponseStatus>('ACCEPTED');
   const [counterDays, setCounterDays] = useState('');
   const { confirm, ConfirmDialog } = useConfirm();
-  const paymentInitIdempotencyKeyRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const refreshPaymentAttempts = useCallback(async () => {
     if (!orderId) return;
@@ -799,12 +789,6 @@ export const BuyerCustomOrderDetailView: React.FC<{
       toast.error(paymentFailureReason);
     }
   }, [location.state]);
-
-  useEffect(() => {
-    return () => {
-      void cancelActivePaystackInline();
-    };
-  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -919,10 +903,6 @@ export const BuyerCustomOrderDetailView: React.FC<{
     }));
   }, [contactInfo.email, paymentShippingAddress.phone, profile?.email]);
 
-  useEffect(() => {
-    paymentInitIdempotencyKeyRef.current = null;
-  }, [activePaymentData, orderId, paymentMethod, paymentShippingAddress]);
-
   const wrapMutation = async (
     work: () => Promise<unknown>,
     successMessage: string,
@@ -955,80 +935,24 @@ export const BuyerCustomOrderDetailView: React.FC<{
     // Guard against double-submit before setBusy(true) is reached.
     if (busy) return;
     if (!orderId) return;
-    const validationErrors = validatePaymentData(
-      paymentMethod,
-      activePaymentData,
-      paymentShippingAddress,
-    );
-    setPaymentErrors(validationErrors);
-    if (Object.keys(validationErrors).length > 0) {
-      setPaymentActionMessage('Resolve the highlighted payment details before continuing.');
-      toast.error('Complete the payment details for the selected method');
-      return;
-    }
-
-    const paymentSubmissionData = buildPaymentSubmissionData(
-      activePaymentData,
-      paymentShippingAddress,
-    );
-    let validationSessionId: string | undefined;
-    const requiresCardValidation =
-      paymentMethod === 'PAYSTACK' &&
-      (paymentSubmissionData as PaystackPaymentData).channel === 'CARD' &&
-      (
-        (paymentSubmissionData as PaystackPaymentData).useSavedCard ||
-        hasCollectedPaystackCardDraft(paymentSubmissionData as PaystackPaymentData)
-      );
-    if (requiresCardValidation) {
-      setPaymentActionMessage('Validating card details before secure checkout...');
-      const validated = await paymentApi.validateCard({
-        paymentMethod: 'PAYSTACK',
-        paymentData: paymentSubmissionData,
-      });
-      validationSessionId = validated.sessionId;
-    }
-
-    const paymentInitIdempotencyKey =
-      paymentInitIdempotencyKeyRef.current ?? createIdempotencyKey();
-    paymentInitIdempotencyKeyRef.current = paymentInitIdempotencyKey;
+    setPaymentErrors({});
     setBusy(true);
-    setPaymentActionMessage('Preparing your secure payment session...');
+    setPaymentActionMessage('Adding this custom order to your checkout bag...');
     try {
-      const init = await customOrdersBuyerApi.initializePayment(orderId, {
-        paymentMethod,
-        email: paymentSubmissionData.email,
-        callbackUrl: `${window.location.origin}/bag/payment-return`,
-        paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
-        idempotencyKey: paymentInitIdempotencyKey,
-        validationSessionId,
-      });
-      const resolvedGateway = resolvePaymentGateway(init);
-      const session = resolveInAppPaymentSession(init);
-      setPaymentGateway(resolvedGateway);
+      await customOrdersBuyerApi.prepareForUnifiedCheckout(orderId);
+      await dispatch(fetchCustomBagCount()).unwrap();
+      dispatch(openCartDrawer());
       setPaymentVerification(null);
-      setPaymentActionMessage('Opening secure checkout inside Threadly...');
-      const returnPath = `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
-
-      await openPaystackInline(session.accessCode, {
-        onSuccess: () => {
-          navigate(returnPath);
-        },
-        onCancel: () => {
-          paymentInitIdempotencyKeyRef.current = null;
-          setPaymentActionMessage('Secure checkout was cancelled. Review the details and try again.');
-          toast.error('Payment was cancelled before the order could be placed.');
-        },
-        onError: (inlineError) => {
-          paymentInitIdempotencyKeyRef.current = null;
-          setPaymentActionMessage('Secure checkout could not be opened. Retry to continue.');
-          toast.error(inlineError.message || 'Unable to open the payment window.');
-        },
-      });
-      return;
+      setPaymentActionMessage('Custom order is ready in your bag. Continue in checkout.');
+      toast.success('Custom order added to your bag checkout.');
+      navigate('/bag');
     } catch (error: any) {
-      paymentInitIdempotencyKeyRef.current = null;
-      setPaymentActionMessage('Payment could not be initialized. Retry from inside Threadly.');
-      toast.error(error?.response?.data?.message || error?.message || 'Unable to initialize payment');
+      setPaymentActionMessage('Could not prepare this order for unified checkout. Try again.');
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          'Unable to prepare custom order for checkout',
+      );
     } finally {
       setBusy(false);
     }
@@ -1404,7 +1328,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
                 disabled={busy}
                 className="rounded-full bg-amber-400 px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
               >
-                {busy ? 'Opening payment...' : 'Pay now'}
+                {busy ? 'Preparing checkout...' : 'Pay now'}
               </button>
             ) : null}
             <button

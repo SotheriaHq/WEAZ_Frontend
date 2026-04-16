@@ -936,54 +936,15 @@ export const customOrdersBuyerApi = {
     return unwrapApiResponse<{ removed: boolean }>(response.data);
   },
 
-  async initializePaymentForCheckoutIntent(
-    checkoutIntentId: string,
-    payload: {
-      paymentMethod: 'PAYSTACK' | 'FLUTTERWAVE' | 'BANK_TRANSFER';
-      email: string;
-      callbackUrl?: string;
-      paymentData?: Record<string, unknown>;
-      idempotencyKey?: string;
-      validationSessionId?: string;
-    },
-  ) {
-    const idempotencyKey = payload.idempotencyKey ?? createIdempotencyKey();
-    const response = await apiClient.post(
-      `/custom-orders/checkout/${checkoutIntentId}/payment/initialize`,
-      {
-        ...payload,
-        idempotencyKey,
-      },
-      {
-        headers: { 'Idempotency-Key': idempotencyKey },
-      },
-    );
-    return unwrapApiResponse<CustomOrderPaymentInitResult>(response.data);
-  },
-
-  async initializePayment(
-    orderId: string,
-    payload: {
-      paymentMethod: 'PAYSTACK' | 'FLUTTERWAVE' | 'BANK_TRANSFER';
-      email: string;
-      callbackUrl?: string;
-      paymentData?: Record<string, unknown>;
-      idempotencyKey?: string;
-      validationSessionId?: string;
-    },
-  ) {
-    const idempotencyKey = payload.idempotencyKey ?? createIdempotencyKey();
-    const response = await apiClient.post(
-      `/custom-orders/${orderId}/payment/initialize`,
-      {
-        ...payload,
-        idempotencyKey,
-      },
-      {
-        headers: { 'Idempotency-Key': idempotencyKey },
-      },
-    );
-    return unwrapApiResponse<CustomOrderPaymentInitResult>(response.data);
+  async prepareForUnifiedCheckout(orderId: string) {
+    const response = await apiClient.post(`/custom-orders/${orderId}/checkout/prepare`);
+    return unwrapApiResponse<{
+      customOrderId: string;
+      checkoutSessionId: string;
+      checkoutIntentId: string;
+      resumeUrl: string;
+      bagLine?: CustomOrderCheckoutBagLine;
+    }>(response.data);
   },
 
   async verifyPayment(orderId: string, payload: {

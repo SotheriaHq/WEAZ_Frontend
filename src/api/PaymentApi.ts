@@ -228,16 +228,6 @@ function extract<T>(res: any): T {
 }
 
 export const paymentApi = {
-  async initialize(req: PaymentInitRequest): Promise<PaymentInitResult> {
-    const idempotencyKey = req.idempotencyKey ?? createIdempotencyKey();
-    const res = await apiClient.post(
-      '/payment/initialize',
-      { ...req, idempotencyKey },
-      { headers: { 'Idempotency-Key': idempotencyKey } },
-    );
-    return extract<PaymentInitResult>(res);
-  },
-
   async initializeUnified(req: InitializeUnifiedCheckoutRequest): Promise<PaymentInitResult> {
     const idempotencyKey = req.idempotencyKey ?? createIdempotencyKey();
     const res = await apiClient.post(

@@ -455,18 +455,7 @@ export const clearCart = async (): Promise<void> => {
   await apiClient.delete('/store/cart');
 };
 
-// ============= Checkout & Orders =============
-
-export const checkout = async (
-  payload: CheckoutPayload,
-  options?: { idempotencyKey?: string },
-): Promise<{ orders: Order[] }> => {
-  const idempotencyKey = options?.idempotencyKey ?? createIdempotencyKey();
-  const res = await apiClient.post('/store/checkout', payload, {
-    headers: { 'Idempotency-Key': idempotencyKey },
-  });
-  return extractData<{ orders: Order[] }>(res);
-};
+// ============= Orders =============
 
 export const getMyOrders = async (page = 1, limit = 20): Promise<{ items: Order[]; total: number; totalPages: number; hasNextPage?: boolean; page: number; limit: number }> => {
   const params = new URLSearchParams();
