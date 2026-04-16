@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
-import { checkout, getMyOrders } from '@/api/StoreApi';
+import { getMyOrders } from '@/api/StoreApi';
 import type { PaystackPaymentData, ShippingAddress } from '@/api/StoreApi';
 import {
   paymentApi,
@@ -12,11 +12,9 @@ import { createIdempotencyKey } from '@/api/idempotency';
 import {
   customOrdersBuyerApi,
   type CustomOrderCheckoutBagLine,
-  type CustomOrderPaymentInitResult,
 } from '@/api/CustomOrderApi';
 import {
   fetchCart,
-  clearCart,
   closeCartDrawer,
   selectCartPriceChangeNotices,
   selectCartRemovedItemNotices,
@@ -36,7 +34,6 @@ import {
 } from '@/lib/inAppPaymentSession';
 import { AnimatePresence, motion } from 'framer-motion';
 import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
-import { unifiedCheckoutQueue } from '@/lib/unifiedCheckoutQueue';
 import {
   loadDeliveryAddressBook,
   removeDeliveryAddress,
@@ -309,7 +306,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const removedItemNotices = useSelector(selectCartRemovedItemNotices);
   const user = useSelector((s: RootState) => s.user.profile);
   const submittingRef = useRef(false);
-  const checkoutIdempotencyKeyRef = useRef<string | null>(null);
   const paymentInitIdempotencyKeyRef = useRef<string | null>(null);
 
   /* ── Step state ── */
@@ -669,7 +665,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   }, [user?.email, address.phone]);
 
   useEffect(() => {
-    checkoutIdempotencyKeyRef.current = null;
     paymentInitIdempotencyKeyRef.current = null;
   }, [activePaymentData, address, cart.items, paymentMethod, promoApplied, promoCode]);
 
@@ -971,7 +966,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     const resolvedGateway = resolvePaymentGateway(paymentInit);
     const session = resolveInAppPaymentSession(paymentInit);
     const returnPath =
-      `/bag/payment-return?reference=${encodeURIComponent(paymentInit.reference)}&gateway=${encodeURIComponent(resolvedGateway)}&uq=1`;
+      `/bag/payment-return?reference=${encodeURIComponent(paymentInit.reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
 
     if (embedded) {
       dispatch(closeCartDrawer());
@@ -1089,25 +1084,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     }
   }, [launchInitializedPayment, pendingInlineSession]);
 
-  const initializeCustomLinePayment = useCallback(async (params: {
-    checkoutIntentId: string;
-    paymentMethod: 'PAYSTACK' | 'FLUTTERWAVE' | 'BANK_TRANSFER';
-    email: string;
-    paymentData: Record<string, unknown>;
-    validationSessionId?: string;
-  }): Promise<CustomOrderPaymentInitResult> => {
-    return customOrdersBuyerApi.initializePaymentForCheckoutIntent(
-      params.checkoutIntentId,
-      {
-        paymentMethod: params.paymentMethod,
-        email: params.email,
-        callbackUrl: `${window.location.origin}/bag/payment-return?uq=1`,
-        paymentData: params.paymentData,
-        validationSessionId: params.validationSessionId,
-      },
-    );
-  }, []);
-
   /* ── Place order flow ── */
   const handlePlaceOrder = useCallback(async () => {
     if (submittingRef.current) return;
@@ -1146,7 +1122,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
       const paymentSubmissionData = buildPaymentSubmissionData(activePaymentData, address);
       let cardValidationSessionId: string | undefined;
-      const customValidationSessionByIntent = new Map<string, string>();
+
       if (paymentMethod === 'PAYSTACK') {
         const paystackSubmissionData = paymentSubmissionData as PaystackPaymentData;
         const requiresCardValidation =
@@ -1155,44 +1131,15 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
             hasCollectedPaystackCardDraft(paystackSubmissionData));
 
         if (requiresCardValidation) {
-          if (hasStoreItems) {
-            const validatedSession = await ensureCardValidationSession(
-              paystackSubmissionData,
-            );
-            cardValidationSessionId = validatedSession.sessionId;
-          }
+          const validatedSession = await ensureCardValidationSession(
+            paystackSubmissionData,
+          );
+          cardValidationSessionId = validatedSession.sessionId;
 
-          if (hasPayableCustomItems) {
-            setCheckoutProgressStage('VALIDATING_DETAILS');
-            setCheckoutProgressMessage(
-              'Validating card details for each custom checkout line...',
-            );
-
-            for (const line of payableCustomBagItems) {
-              const validated = await paymentApi.validateCard({
-                paymentMethod: 'PAYSTACK',
-                paymentData: paystackSubmissionData,
-              });
-
-              if (!isActiveCardValidationSession(validated)) {
-                throw new Error(
-                  `${line.sourceTitle} validation session expired. Validate again before checkout.`,
-                );
-              }
-
-              customValidationSessionByIntent.set(
-                line.checkoutIntentId,
-                validated.sessionId,
-              );
-            }
-          }
-
-          if (cardValidationSessionId || customValidationSessionByIntent.size > 0) {
-            setCheckoutProgressStage('PREPARING_PAYMENT');
-            setCheckoutProgressMessage(
-              'Card details validated. Preparing your secure payment session...',
-            );
-          }
+          setCheckoutProgressStage('PREPARING_PAYMENT');
+          setCheckoutProgressMessage(
+            'Card details validated. Preparing your secure payment session...',
+          );
         }
       }
 
@@ -1206,212 +1153,38 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         setEditingAddressId(nextAddresses[0].id);
       }
 
-      const summary = {
-        items: [
-          ...cart.items.map((i) => ({
-            name: i.product.name,
-            quantity: i.quantity,
-            price: i.product.effectivePrice,
-          })),
-          ...payableCustomBagItems.map((line) => ({
-            name: `${line.sourceTitle} (Custom)`,
-            quantity: 1,
-            price: Number(line.buyerPriceSummary?.grandTotal ?? 0),
-          })),
-        ],
-        subtotal: cart.subtotal + customSubtotal,
-        shippingCost,
-        discount: discountAmount,
-        grandTotal,
-        shippingName: `${address.firstName} ${address.lastName}`,
-        shippingCity: address.city,
-        shippingState: address.state,
-      };
+      setCheckoutProgressStage('PREPARING_PAYMENT');
+      setCheckoutProgressMessage('Preparing your secure payment session...');
 
-      const normalizedPaymentMethod = paymentMethod as 'PAYSTACK' | 'FLUTTERWAVE' | 'BANK_TRANSFER';
-      const queueLines = payableCustomBagItems.map((line) => ({
-        checkoutIntentId: line.checkoutIntentId,
-        sessionId: line.sessionId,
-        sourceTitle: line.sourceTitle,
-        price: Number(line.buyerPriceSummary?.grandTotal ?? 0),
-        validationSessionId: customValidationSessionByIntent.get(line.checkoutIntentId),
-      }));
+      const paymentInitIdempotencyKey =
+        paymentInitIdempotencyKeyRef.current ?? createIdempotencyKey();
+      paymentInitIdempotencyKeyRef.current = paymentInitIdempotencyKey;
 
-      let orderIds: string[] = [];
-      let standardOrdersPlaced = false;
-      let standardPaymentResult: Awaited<ReturnType<typeof paymentApi.initialize>> | null = null;
-      let standardError: string | null = null;
-
-      if (hasStoreItems) {
-        try {
-          setCheckoutProgressStage('PREPARING_PAYMENT');
-          setCheckoutProgressMessage('Preparing your order and secure payment session...');
-          const checkoutIdempotencyKey =
-            checkoutIdempotencyKeyRef.current ?? createIdempotencyKey();
-          checkoutIdempotencyKeyRef.current = checkoutIdempotencyKey;
-          const paymentInitIdempotencyKey =
-            paymentInitIdempotencyKeyRef.current ?? createIdempotencyKey();
-          paymentInitIdempotencyKeyRef.current = paymentInitIdempotencyKey;
-
-          const customerName = `${address.firstName} ${address.lastName}`.trim();
-          const result = await checkout({
-            customerName,
-            shippingAddress: address,
-            contactInfo,
-            paymentMethod,
-            promoCode: promoApplied ? promoCode : undefined,
-          }, {
-            idempotencyKey: checkoutIdempotencyKey,
-          });
-
-          orderIds = result.orders.map((o) => o.id);
-          standardOrdersPlaced = orderIds.length > 0;
-
-          standardPaymentResult = await paymentApi.initialize({
-            orderIds,
-            paymentMethod,
-            email: paymentSubmissionData.email,
-            callbackUrl: `${window.location.origin}/bag/payment-return?uq=1`,
-            paymentData: paymentSubmissionData,
-            idempotencyKey: paymentInitIdempotencyKey,
-            validationSessionId: cardValidationSessionId,
-          });
-        } catch (error: any) {
-          standardError =
-            error?.response?.data?.message ||
-            error?.message ||
-            'Store items could not be prepared for payment.';
-        }
-      }
-
-      let customPrimaryPayment: CustomOrderPaymentInitResult | null = null;
-      let remainingCustomQueue = [...queueLines];
-      let customPrimaryLine: (typeof queueLines)[number] | null = null;
-
-      if (!standardPaymentResult && remainingCustomQueue.length > 0) {
-        setCheckoutProgressStage('PREPARING_PAYMENT');
-        setCheckoutProgressMessage('Preparing your secure payment session...');
-        while (remainingCustomQueue.length > 0 && !customPrimaryPayment) {
-          const [candidate, ...rest] = remainingCustomQueue;
-          try {
-            customPrimaryPayment = await initializeCustomLinePayment({
-              checkoutIntentId: candidate.checkoutIntentId,
-              paymentMethod: normalizedPaymentMethod,
-              email: paymentSubmissionData.email,
-              paymentData: paymentSubmissionData as unknown as Record<string, unknown>,
-              validationSessionId: candidate.validationSessionId,
-            });
-            customPrimaryLine = candidate;
-            remainingCustomQueue = rest;
-          } catch (error: any) {
-            remainingCustomQueue = rest;
-            toast.error(
-              error?.response?.data?.message ||
-                `${candidate.sourceTitle} could not be prepared for payment and remains in your bag.`,
-            );
-          }
-        }
-      }
-
-      if (!standardPaymentResult && !customPrimaryPayment) {
-        if (standardError) {
-          throw new Error(standardError);
-        }
-        setCheckoutProgressStage('FAILED');
-        setCheckoutProgressMessage(
-          'No payable lines are ready. Refresh expired custom locks and retry checkout.',
-        );
-        toast.error('No payable lines are ready. Refresh expired custom locks and try again.');
-        return;
-      }
-
-      if (standardError && customPrimaryPayment) {
-        toast.error(`${standardError} We started payment for available custom requests.`);
-      }
+      const customerName = `${address.firstName} ${address.lastName}`.trim();
+      const unifiedPaymentInit = await paymentApi.initializeUnified({
+        paymentMethod,
+        email: paymentSubmissionData.email,
+        customerName,
+        shippingAddress: address,
+        contactInfo,
+        callbackUrl: `${window.location.origin}/bag/payment-return`,
+        paymentData: paymentSubmissionData,
+        idempotencyKey: paymentInitIdempotencyKey,
+        validationSessionId: cardValidationSessionId,
+      });
 
       if (blockedCustomBagMessage) {
         toast.error(blockedCustomBagMessage);
       }
 
-      if (standardOrdersPlaced && standardPaymentResult) {
-        await dispatch(clearCart());
+      if ((unifiedPaymentInit.blockedLines?.length ?? 0) > 0) {
+        toast.error(getBlockedCustomBagMessage(unifiedPaymentInit.blockedLines!.length));
       }
 
-      if (standardOrdersPlaced && !standardPaymentResult) {
-        toast.error('Some store orders were created but payment could not start. Re-open Orders to retry payment.');
-      }
-
-      const queuedPaymentData: Record<string, unknown> =
-        paymentMethod === 'PAYSTACK'
-          ? (() => {
-              const paystackData = paymentSubmissionData as PaystackPaymentData;
-              if (paystackData.channel !== 'CARD' || paystackData.useSavedCard) {
-                return paystackData as unknown as Record<string, unknown>;
-              }
-
-              const rawCardDigits = String(paystackData.newCardDraft?.cardNumber ?? '').replace(/\D/g, '');
-              if (rawCardDigits.length < 4) {
-                return {
-                  ...paystackData,
-                  newCardDraft: null,
-                } as Record<string, unknown>;
-              }
-
-              const last4 = rawCardDigits.slice(-4);
-              const maskedCardNumber = `${'*'.repeat(Math.max(rawCardDigits.length - 4, 6))}${last4}`;
-
-              return {
-                ...paystackData,
-                newCardDraft: {
-                  cardHolderName: String(paystackData.newCardDraft?.cardHolderName ?? '').trim(),
-                  expiry: String(paystackData.newCardDraft?.expiry ?? '').trim(),
-                  last4,
-                  maskedCardNumber,
-                },
-              } as Record<string, unknown>;
-            })()
-          : (paymentSubmissionData as unknown as Record<string, unknown>);
-
-      unifiedCheckoutQueue.save({
-        paymentMethod: normalizedPaymentMethod,
-        email: paymentSubmissionData.email,
-        paymentData: queuedPaymentData,
-        lines: remainingCustomQueue,
-        currentLine: customPrimaryLine ?? undefined,
-        successfulCustomLines: [],
-        failedCustomLines: [],
-        standardLane: {
-          attempted: hasStoreItems,
-          paid: false,
-          failed: Boolean(standardError),
-          items: cart.items.map((i) => ({
-            name: i.product.name,
-            quantity: i.quantity,
-            price: i.product.effectivePrice,
-          })),
-          subtotal: cart.subtotal,
-          shippingCost,
-          discount: discountAmount,
-        },
-        shippingName: `${address.firstName} ${address.lastName}`.trim(),
-        shippingCity: address.city,
-        shippingState: address.state,
-        summary,
-      });
-
-      if (standardPaymentResult) {
-        setCheckoutProgressStage('OPENING_SECURE_WINDOW');
-        setPendingInlineSession(standardPaymentResult);
-        await launchInitializedPayment(standardPaymentResult);
-        return;
-      }
-
-      if (customPrimaryPayment) {
-        setCheckoutProgressStage('OPENING_SECURE_WINDOW');
-        setPendingInlineSession(customPrimaryPayment);
-        await launchInitializedPayment(customPrimaryPayment);
-        return;
-      }
+      setCheckoutProgressStage('OPENING_SECURE_WINDOW');
+      setPendingInlineSession(unifiedPaymentInit);
+      await launchInitializedPayment(unifiedPaymentInit);
+      return;
     } catch (error: any) {
       setCheckoutProgressStage('FAILED');
       setCheckoutProgressMessage('Checkout could not be completed. Review the payment state and retry.');
@@ -1423,24 +1196,14 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   }, [
     activePaymentData,
     address,
-    blockedCustomBagItems,
     blockedCustomBagMessage,
     cart.items,
-    cart.subtotal,
     currentAddressDraft,
-    customSubtotal,
-    discountAmount,
-    dispatch,
     ensureCardValidationSession,
-    grandTotal,
-    initializeCustomLinePayment,
     launchInitializedPayment,
     getFirstPaymentErrorMessage,
     paymentMethod,
     payableCustomBagItems,
-    promoApplied,
-    promoCode,
-    shippingCost,
     user?.id,
   ]);
 

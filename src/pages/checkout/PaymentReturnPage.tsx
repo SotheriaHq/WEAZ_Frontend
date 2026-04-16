@@ -1,25 +1,52 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import Button from '@/components/ui/Button';
-import { paymentApi, type PaymentAttemptSummary, type PaymentAttemptStatus, type PaymentVerifyResult } from '@/api/PaymentApi';
+import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
+import { paymentApi, type PaymentAttemptSummary, type PaymentAttemptStatus, type PaymentVerifyResult, type SavedPaymentCardSummary } from '@/api/PaymentApi';
 import { customOrdersBuyerApi } from '@/api/CustomOrderApi';
 import { getCheckoutStatusCopy } from '@/pages/checkout/checkoutStatusCopy';
-import { cancelActivePaystackInline, openPaystackInline } from '@/lib/paystackInline';
 import {
-  resolveInAppPaymentSession,
-  resolvePaymentGateway,
-} from '@/lib/inAppPaymentSession';
-import { unifiedCheckoutQueue } from '@/lib/unifiedCheckoutQueue';
-import { openCartDrawer } from '@/features/cartSlice';
+  buildPaymentSubmissionData,
+  setRuntimeCardholderNameMatchMode,
+  type PaymentFormErrors,
+  validatePaymentData,
+} from '@/pages/checkout/paymentFlow';
+import {
+  canOfferCustomOrderCardRetry,
+  createCustomOrderRetryPaymentData,
+  createRetryShippingAddress,
+} from '@/pages/checkout/paymentRetryFlow';
+import { cancelActivePaystackInline, openPaystackInline } from '@/lib/paystackInline';
+import { fetchCart, openCartDrawer } from '@/features/cartSlice';
+import type { PaystackPaymentData } from '@/api/StoreApi';
 import type { AppDispatch } from '@/store';
 
 type ViewState = 'verifying' | 'resolved' | 'missing';
 
+type BlockedInlineSession = {
+  accessCode: string;
+  reference: string;
+  gateway: string;
+};
+
 const AUTO_VERIFY_INTERVAL_MS = 10000;
 const AUTO_VERIFY_MAX_ATTEMPTS = 18;
 const CUSTOM_ORDER_REFERENCE_PREFIX = 'TH-CO-';
+const POPUP_BLOCKED_RETURN_MESSAGE =
+  'Secure payment window was blocked by your browser. Retry opening it to continue.';
+
+const isPopupBlockedInlineError = (error: { message?: string } | null | undefined) => {
+  const message = String(error?.message ?? '').trim().toLowerCase();
+  if (!message) {
+    return false;
+  }
+  return (
+    (message.includes('popup') && (message.includes('block') || message.includes('window'))) ||
+    message.includes('user gesture')
+  );
+};
 
 const normalizePaymentStatus = (status: unknown): PaymentAttemptStatus | undefined => {
   const normalized = String(status ?? '').trim().toLowerCase();
@@ -77,13 +104,22 @@ const PaymentReturnPage: React.FC = () => {
   const [autoVerifyAttempts, setAutoVerifyAttempts] = useState(0);
   const [autoVerifying, setAutoVerifying] = useState(false);
   const [retryingPayment, setRetryingPayment] = useState(false);
-  const [queueContinuing, setQueueContinuing] = useState(false);
+  const [retryPaymentData, setRetryPaymentData] = useState<PaystackPaymentData | null>(null);
+  const [retryPaymentErrors, setRetryPaymentErrors] = useState<PaymentFormErrors>({});
+  const [retrySavedCards, setRetrySavedCards] = useState<SavedPaymentCardSummary[]>([]);
+  const [retrySavedCardsLoading, setRetrySavedCardsLoading] = useState(false);
+  const [retrySavedCardsError, setRetrySavedCardsError] = useState<string | null>(null);
+  const [blockedInlineSession, setBlockedInlineSession] =
+    useState<BlockedInlineSession | null>(null);
+  const [retryingBlockedInlineSession, setRetryingBlockedInlineSession] = useState(false);
+  const retryPaymentSeedReferenceRef = useRef<string | null>(null);
+  const retrySavedCardsSeedReferenceRef = useRef<string | null>(null);
 
   const reference = searchParams.get('reference')?.trim() || '';
   const gateway = searchParams.get('gateway')?.trim() || '';
   const statusHint = searchParams.get('status')?.trim() || undefined;
-  const isUnifiedQueueReturn = searchParams.get('uq') === '1';
   const referenceLooksCustom = reference.toUpperCase().startsWith(CUSTOM_ORDER_REFERENCE_PREFIX);
+  const shouldOfferCustomOrderRetry = canOfferCustomOrderCardRetry(attempt);
 
   const openBag = useCallback((replace?: boolean) => {
     dispatch(openCartDrawer());
@@ -93,6 +129,29 @@ const PaymentReturnPage: React.FC = () => {
   useEffect(() => {
     return () => {
       void cancelActivePaystackInline();
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    void paymentApi
+      .getPolicy()
+      .then((policy) => {
+        if (!active) {
+          return;
+        }
+
+        setRuntimeCardholderNameMatchMode(policy.paystack.cardholderNameMatchMode);
+      })
+      .catch(() => {
+        if (active) {
+          setRuntimeCardholderNameMatchMode(null);
+        }
+      });
+
+    return () => {
+      active = false;
     };
   }, []);
 
@@ -143,107 +202,20 @@ const PaymentReturnPage: React.FC = () => {
     };
   }, [reference, referenceLooksCustom, statusHint]);
 
-  const consumeQueuedSummary = useCallback(() => {
-    return unifiedCheckoutQueue.consumeConfirmationSummary();
-  }, []);
-
-  const continueQueuedCustomPayment = useCallback(async (): Promise<boolean> => {
-    if (!isUnifiedQueueReturn) {
-      return false;
-    }
-
-    const initialQueue = unifiedCheckoutQueue.load();
-    if (!initialQueue || (!initialQueue.currentLine && initialQueue.lines.length === 0)) {
-      return false;
-    }
-
-    setQueueContinuing(true);
-    try {
-      while (true) {
-        const queueState = unifiedCheckoutQueue.load();
-        if (!queueState) {
-          return false;
-        }
-
-        const nextLine = queueState.currentLine ?? unifiedCheckoutQueue.startNextCustomLine();
-        if (!nextLine) {
-          return false;
-        }
-
-        const queueForInit = unifiedCheckoutQueue.load();
-        if (!queueForInit) {
-          return false;
-        }
-
-        try {
-          const init = await customOrdersBuyerApi.initializePaymentForCheckoutIntent(
-            nextLine.checkoutIntentId,
-            {
-              paymentMethod: queueForInit.paymentMethod,
-              email: queueForInit.email,
-              callbackUrl: `${window.location.origin}/bag/payment-return?uq=1`,
-              paymentData: queueForInit.paymentData,
-            },
-          );
-          const resolvedGateway = resolvePaymentGateway(init);
-          const session = resolveInAppPaymentSession(init);
-          const returnPath =
-            `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(resolvedGateway)}&uq=1`;
-
-          await openPaystackInline(session.accessCode, {
-            onSuccess: () => {
-              navigate(returnPath);
-            },
-            onCancel: () => {
-              unifiedCheckoutQueue.markCurrentCustomResult(false);
-              toast.error('Payment was cancelled before completion.');
-              openBag(true);
-            },
-            onError: (inlineError) => {
-              unifiedCheckoutQueue.markCurrentCustomResult(false);
-              toast.error(inlineError.message || 'Unable to open the payment window.');
-              openBag(true);
-            },
-          });
-          return true;
-
-        } catch (error: any) {
-          unifiedCheckoutQueue.markCurrentCustomResult(false);
-          toast.error(
-            error?.response?.data?.message ||
-              `${nextLine.sourceTitle} could not be prepared for payment and remains in your bag.`,
-          );
-        }
-      }
-    } finally {
-      setQueueContinuing(false);
-    }
-  }, [isUnifiedQueueReturn, navigate, openBag]);
-
   const resolveTerminalStatus = useCallback(async (
     status: PaymentAttemptStatus,
     summary: PaymentAttemptSummary,
     failureReason?: string,
     options?: { replace?: boolean },
   ) => {
-    if (isUnifiedQueueReturn) {
-      if (summary.subjectType === 'CUSTOM_ORDER') {
-        unifiedCheckoutQueue.markCurrentCustomResult(status === 'PAID');
-      } else {
-        unifiedCheckoutQueue.markStandardLaneResult(status);
-      }
-    }
-
-    const continued = await continueQueuedCustomPayment();
-    if (continued) return;
-
-    const queuedSummary = isUnifiedQueueReturn ? consumeQueuedSummary() : undefined;
+    setBlockedInlineSession(null);
 
     if (status === 'PAID') {
+      await dispatch(fetchCart());
       toast.success('Your order is placed successfully, Thank you for shopping.');
       navigate(`/bag/confirmation?reference=${encodeURIComponent(reference)}`, {
         replace: options?.replace,
-        state: queuedSummary ? { reference, summary: queuedSummary } : undefined,
+        state: summary.summary ? { reference, summary: summary.summary } : undefined,
       });
       return;
     }
@@ -255,7 +227,77 @@ const PaymentReturnPage: React.FC = () => {
     // Keep user on the return page for FAILED/CANCELLED/EXPIRED so they can see
     // the exact gateway response and retry explicitly.
     return;
-  }, [consumeQueuedSummary, continueQueuedCustomPayment, isUnifiedQueueReturn, navigate, reference]);
+  }, [dispatch, navigate, reference]);
+
+  useEffect(() => {
+    if (!shouldOfferCustomOrderRetry || !attempt) {
+      retryPaymentSeedReferenceRef.current = null;
+      retrySavedCardsSeedReferenceRef.current = null;
+      setRetryPaymentData(null);
+      setRetryPaymentErrors({});
+      setRetrySavedCards([]);
+      setRetrySavedCardsLoading(false);
+      setRetrySavedCardsError(null);
+      return;
+    }
+
+    if (retryPaymentSeedReferenceRef.current === attempt.reference) {
+      return;
+    }
+
+    retryPaymentSeedReferenceRef.current = attempt.reference;
+    retrySavedCardsSeedReferenceRef.current = null;
+    setRetryPaymentData(createCustomOrderRetryPaymentData(attempt));
+    setRetryPaymentErrors({});
+    setRetrySavedCards([]);
+    setRetrySavedCardsLoading(false);
+    setRetrySavedCardsError(null);
+  }, [attempt, shouldOfferCustomOrderRetry]);
+
+  useEffect(() => {
+    if (!shouldOfferCustomOrderRetry || !attempt || !retryPaymentData) {
+      return;
+    }
+
+    if (retrySavedCardsSeedReferenceRef.current === attempt.reference) {
+      return;
+    }
+
+    retrySavedCardsSeedReferenceRef.current = attempt.reference;
+    let active = true;
+
+    setRetrySavedCardsLoading(true);
+    setRetrySavedCardsError(null);
+
+    void paymentApi
+      .listSavedCards()
+      .then((cards) => {
+        if (!active) {
+          return;
+        }
+
+        setRetrySavedCards(cards);
+      })
+      .catch((error: any) => {
+        if (!active) {
+          return;
+        }
+
+        setRetrySavedCards([]);
+        setRetrySavedCardsError(
+          error?.response?.data?.message || 'Unable to load saved cards right now.',
+        );
+      })
+      .finally(() => {
+        if (active) {
+          setRetrySavedCardsLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [attempt, retryPaymentData, shouldOfferCustomOrderRetry]);
 
   useEffect(() => {
     let active = true;
@@ -268,6 +310,7 @@ const PaymentReturnPage: React.FC = () => {
 
       setAutoVerifyAttempts(0);
       setAutoVerifying(false);
+      setBlockedInlineSession(null);
       setViewState('verifying');
       try {
         const summary = normalizeAttemptSummary(await paymentApi.getAttempt(reference), reference);
@@ -325,6 +368,7 @@ const PaymentReturnPage: React.FC = () => {
     if (options?.auto) {
       setAutoVerifying(true);
     } else {
+      setBlockedInlineSession(null);
       setSubmitting(true);
     }
 
@@ -373,48 +417,119 @@ const PaymentReturnPage: React.FC = () => {
       toast.error('No checkout intent is linked to this payment attempt.');
       return;
     }
-    const paymentData = attempt.paymentData ?? {};
-    const email = typeof paymentData.email === 'string' ? paymentData.email : '';
-    if (!email) {
-      toast.error('Payment email is missing. Restart checkout to continue.');
+    if (!retryPaymentData) {
+      toast.error('Retry payment details are still loading. Please try again in a moment.');
+      return;
+    }
+
+    const shippingAddress = createRetryShippingAddress(retryPaymentData);
+    const validationErrors = validatePaymentData('PAYSTACK', retryPaymentData, shippingAddress);
+    setRetryPaymentErrors(validationErrors);
+
+    if (Object.keys(validationErrors).length > 0) {
+      toast.error('Complete the payment details before retrying.');
       return;
     }
 
     setRetryingPayment(true);
     try {
-      const paymentMethod =
-        (attempt.paymentMethod as 'PAYSTACK' | 'FLUTTERWAVE' | 'BANK_TRANSFER') || 'PAYSTACK';
+      const paymentSubmissionData = buildPaymentSubmissionData(retryPaymentData, shippingAddress);
+      const paymentSubmissionPayload = paymentSubmissionData as unknown as Record<string, unknown>;
+      let validationSessionId: string | undefined;
+
+      if (paymentSubmissionData.channel === 'CARD') {
+        const validated = await paymentApi.validateCard({
+          paymentMethod: 'PAYSTACK',
+          paymentData: paymentSubmissionData,
+        });
+        validationSessionId = validated.sessionId;
+      }
+
       const init = await customOrdersBuyerApi.initializePaymentForCheckoutIntent(
         attempt.checkoutIntentId,
         {
-          paymentMethod,
-          email,
+          paymentMethod: 'PAYSTACK',
+          email: paymentSubmissionData.email,
           callbackUrl: `${window.location.origin}/bag/payment-return`,
-          paymentData: paymentData as Record<string, unknown>,
+          paymentData: paymentSubmissionPayload,
+          validationSessionId,
         },
       );
-      const resolvedGateway = resolvePaymentGateway(init);
-      const session = resolveInAppPaymentSession(init);
-      const returnPath =
-        `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
 
-      await openPaystackInline(session.accessCode, {
+      if (init.providerAccessCode) {
+        setBlockedInlineSession(null);
+        await openPaystackInline(init.providerAccessCode, {
+          onSuccess: () => {
+            setBlockedInlineSession(null);
+            navigate(
+              `/bag/payment-return?reference=${encodeURIComponent(init.reference)}&gateway=${encodeURIComponent(init.gateway || 'PAYSTACK')}`,
+            );
+          },
+          onCancel: () => {
+            setBlockedInlineSession(null);
+            toast.error('Payment was cancelled before completion.');
+          },
+          onError: (inlineError) => {
+            if (isPopupBlockedInlineError(inlineError)) {
+              setBlockedInlineSession({
+                accessCode: init.providerAccessCode as string,
+                reference: init.reference,
+                gateway: init.gateway || 'PAYSTACK',
+              });
+              toast.error(POPUP_BLOCKED_RETURN_MESSAGE);
+              return;
+            }
+
+            setBlockedInlineSession(null);
+            toast.error(inlineError.message || 'Unable to open the payment window.');
+          },
+        });
+        return;
+      }
+      throw new Error('Payment provider did not return an inline payment session for this attempt.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to retry payment');
+    } finally {
+      setRetryingPayment(false);
+    }
+  }, [attempt, navigate, retryPaymentData]);
+
+  const handleRetryBlockedInlineSession = useCallback(async () => {
+    if (!blockedInlineSession) {
+      return;
+    }
+
+    const retrySession = blockedInlineSession;
+    setRetryingBlockedInlineSession(true);
+    setBlockedInlineSession(null);
+
+    try {
+      await openPaystackInline(retrySession.accessCode, {
         onSuccess: () => {
-          navigate(returnPath);
+          navigate(
+            `/bag/payment-return?reference=${encodeURIComponent(retrySession.reference)}&gateway=${encodeURIComponent(retrySession.gateway)}`,
+          );
         },
         onCancel: () => {
           toast.error('Payment was cancelled before completion.');
         },
         onError: (inlineError) => {
+          if (isPopupBlockedInlineError(inlineError)) {
+            setBlockedInlineSession(retrySession);
+            toast.error(POPUP_BLOCKED_RETURN_MESSAGE);
+            return;
+          }
+
           toast.error(inlineError.message || 'Unable to open the payment window.');
         },
       });
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.message || 'Unable to retry payment');
+      setBlockedInlineSession(retrySession);
+      toast.error(error?.message || 'Unable to retry the secure payment window.');
     } finally {
-      setRetryingPayment(false);
+      setRetryingBlockedInlineSession(false);
     }
-  }, [attempt, navigate]);
+  }, [blockedInlineSession, navigate]);
 
   const resolvedStatus =
     normalizePaymentStatus(verifyResult?.status) ??
@@ -443,7 +558,7 @@ const PaymentReturnPage: React.FC = () => {
   if (viewState === 'missing') {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <div className="mb-6 text-6xl">[?]</div>
+        <div className="mb-6 text-6xl">🧾</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Payment return data is missing</h1>
         <p className="mb-8 text-gray-500 dark:text-zinc-400">
           Threadly could not find the reference needed to resume this payment flow.
@@ -460,24 +575,20 @@ const PaymentReturnPage: React.FC = () => {
   if (viewState === 'verifying') {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <div className="mb-6 text-6xl">[...]</div>
+        <div className="mb-6 text-6xl">🌀</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Verifying payment</h1>
         <p className="text-gray-500 dark:text-zinc-400">
-          Threadly is checking the latest payment status for reference {reference || 'unknown'}.
+          Stage 1/2 - Threadly is checking the latest payment status for reference {reference || 'unknown'}.
         </p>
       </div>
     );
   }
 
   const statusCopy = getCheckoutStatusCopy('return', resolvedStatus);
+  const isUnifiedCheckoutAttempt = attempt?.subjectType === 'UNIFIED_CHECKOUT';
   const isCustomOrderAttempt =
     attempt?.subjectType === 'CUSTOM_ORDER' ||
     referenceLooksCustom;
-  const shouldOfferCustomOrderRetry =
-    isCustomOrderAttempt &&
-    !attempt?.customOrderId &&
-    Boolean(attempt?.checkoutIntentId) &&
-    (resolvedStatus === 'FAILED' || resolvedStatus === 'CANCELLED' || resolvedStatus === 'EXPIRED');
   const isFailureStatus =
     resolvedStatus === 'FAILED' ||
     resolvedStatus === 'CANCELLED' ||
@@ -498,7 +609,7 @@ const PaymentReturnPage: React.FC = () => {
         <p className="text-sm text-gray-700 dark:text-zinc-300">Reference: {reference}</p>
         <p className="text-sm text-gray-700 dark:text-zinc-300">Gateway: {attempt?.gateway || gateway}</p>
         <p className="text-sm text-gray-700 dark:text-zinc-300">
-          Subject: {isCustomOrderAttempt ? 'Custom order' : 'Standard order'}
+          Subject: {isUnifiedCheckoutAttempt ? 'Unified checkout' : isCustomOrderAttempt ? 'Custom order' : 'Standard order'}
         </p>
         <p className="text-sm text-gray-700 dark:text-zinc-300">Status: {resolvedStatus}</p>
         {resolvedFailureReason && (
@@ -515,7 +626,8 @@ const PaymentReturnPage: React.FC = () => {
 
       {(submitting || autoVerifying) && (
         <div className="mb-8 rounded-xl border border-indigo-200/80 bg-indigo-50/80 px-4 py-3 text-left text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
-          Verifying with payment gateway... please wait.
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em]">Stage - Verification in progress</p>
+          <p className="mt-1">Verifying with payment gateway... please wait.</p>
         </div>
       )}
 
@@ -525,7 +637,7 @@ const PaymentReturnPage: React.FC = () => {
             Threadly is checking automatically every 10 seconds (attempt {Math.min(autoVerifyAttempts + 1, AUTO_VERIFY_MAX_ATTEMPTS)} of {AUTO_VERIFY_MAX_ATTEMPTS}).
           </p>
           <p className="mt-1">
-            You can safely leave this page - your payment is being confirmed in the background.
+            You can safely leave this page — your payment is being confirmed in the background.
           </p>
         </div>
       )}
@@ -534,7 +646,7 @@ const PaymentReturnPage: React.FC = () => {
         <div className="mb-8 rounded-xl border border-blue-200/80 bg-blue-50/80 px-4 py-3 text-left text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
           <p className="font-semibold">Still waiting on your bank or payment provider.</p>
           <p className="mt-1">
-            Your payment is still being processed - this can take a few minutes when bank confirmation is delayed.
+            Your payment is still being processed — this can take a few minutes when bank confirmation is delayed.
             We will send you a notification the moment it is confirmed. You can safely close this page now.
           </p>
           <p className="mt-1">
@@ -543,11 +655,92 @@ const PaymentReturnPage: React.FC = () => {
         </div>
       )}
 
-      {queueContinuing && (
-        <div className="mb-8 rounded-xl border border-indigo-200/80 bg-indigo-50/80 px-4 py-3 text-left text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
-          Preparing the next custom payment in your checkout queue...
+      {blockedInlineSession && (
+        <div className="mb-8 rounded-xl border border-amber-200/80 bg-amber-50/85 px-4 py-3 text-left text-sm text-amber-900 dark:border-amber-500/35 dark:bg-amber-500/10 dark:text-amber-100">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em]">Secure window blocked</p>
+          <p className="mt-1">{POPUP_BLOCKED_RETURN_MESSAGE}</p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button
+              type="button"
+              onClick={() => { void handleRetryBlockedInlineSession(); }}
+              loading={retryingBlockedInlineSession}
+              disabled={retryingBlockedInlineSession}
+            >
+              Retry secure payment window
+            </Button>
+            <p className="text-xs">
+              Allow popups for this site if the secure window keeps getting blocked.
+            </p>
+          </div>
         </div>
       )}
+
+      {shouldOfferCustomOrderRetry && retryPaymentData ? (
+        <section className="mb-8 rounded-3xl border border-fuchsia-200/80 bg-fuchsia-50/70 p-5 text-left shadow-sm dark:border-fuchsia-500/25 dark:bg-fuchsia-500/10">
+          <div className="mb-4 space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-fuchsia-700 dark:text-fuchsia-200">
+              Fresh card retry
+            </p>
+            <h2 className="text-lg font-bold text-slate-950 dark:text-white">
+              Retry this custom order with a new card
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              The failed card snapshot is not reused here. Enter a fresh card or choose one of your saved cards, then submit again.
+            </p>
+          </div>
+
+          {retrySavedCardsError ? (
+            <div className="mb-4 rounded-2xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+              {retrySavedCardsError}
+            </div>
+          ) : null}
+
+          <PaymentDetailsSection
+            paymentData={retryPaymentData}
+            shippingAddress={createRetryShippingAddress(retryPaymentData)}
+            errors={retryPaymentErrors}
+            onChange={(updater) => {
+              setRetryPaymentData((current) => (current ? updater(current) : current));
+              setRetryPaymentErrors({});
+            }}
+            savedCards={retrySavedCards}
+            savedCardsLoading={retrySavedCardsLoading}
+            savedCardsError={retrySavedCardsError}
+            cardValidationLoading={retryingPayment}
+            compact
+          />
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Button
+              type="button"
+              onClick={() => { void handleRetryCustomOrderPayment(); }}
+              loading={retryingPayment}
+              disabled={retryingPayment}
+            >
+              Retry payment
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                if (!attempt) {
+                  return;
+                }
+
+                setRetryPaymentData(createCustomOrderRetryPaymentData(attempt));
+                setRetryPaymentErrors({});
+              }}
+              disabled={retryingPayment}
+            >
+              Reset retry form
+            </Button>
+          </div>
+        </section>
+      ) : shouldOfferCustomOrderRetry ? (
+        <div className="mb-8 rounded-3xl border border-fuchsia-200/80 bg-fuchsia-50/70 px-4 py-3 text-left text-sm text-fuchsia-900 dark:border-fuchsia-500/25 dark:bg-fuchsia-500/10 dark:text-fuchsia-100">
+          Preparing a fresh retry form for this custom order...
+        </div>
+      ) : null}
 
       <div className="flex flex-col justify-center gap-3 sm:flex-row">
         {resolvedStatus === 'PAID' ? (
@@ -555,15 +748,13 @@ const PaymentReturnPage: React.FC = () => {
             Open confirmation
           </Button>
         ) : (
-          <Button onClick={() => void handleVerifyAgain()} loading={submitting || autoVerifying || queueContinuing}>
+          <Button
+            onClick={() => void handleVerifyAgain()}
+            loading={submitting || autoVerifying || retryingPayment}
+          >
             Verify again
           </Button>
         )}
-        {shouldOfferCustomOrderRetry ? (
-          <Button onClick={handleRetryCustomOrderPayment} loading={retryingPayment} variant="secondary">
-            Retry payment
-          </Button>
-        ) : null}
         <Button
           variant="secondary"
           onClick={() =>
@@ -589,5 +780,3 @@ const PaymentReturnPage: React.FC = () => {
 };
 
 export default PaymentReturnPage;
-
-

@@ -1,6 +1,6 @@
 import { apiClient } from './httpClient';
 import { createIdempotencyKey } from './idempotency';
-import type { PaymentData, PaymentMethodType } from './StoreApi';
+import type { PaymentData, PaymentMethodType, ShippingAddress } from './StoreApi';
 
 export type PaymentAttemptStatus =
   | 'PENDING'
@@ -15,6 +15,18 @@ export interface PaymentInitRequest {
   orderIds: string[];
   paymentMethod: PaymentMethodType;
   email: string;
+  callbackUrl?: string;
+  paymentData?: PaymentData;
+  idempotencyKey?: string;
+  validationSessionId?: string;
+}
+
+export interface InitializeUnifiedCheckoutRequest {
+  paymentMethod: PaymentMethodType;
+  email: string;
+  customerName: string;
+  shippingAddress: ShippingAddress;
+  contactInfo: Record<string, unknown>;
   callbackUrl?: string;
   paymentData?: PaymentData;
   idempotencyKey?: string;
@@ -94,6 +106,28 @@ export interface PaymentInitResult {
   };
   directApproval?: boolean;
   nextAction?: PaymentNextAction;
+  checkoutSessionId?: string;
+  summary?: {
+    items: Array<{
+      name: string;
+      quantity: number;
+      price: number;
+    }>;
+    subtotal: number;
+    shippingCost: number;
+    discount: number;
+    grandTotal: number;
+    shippingName: string;
+    shippingCity: string;
+    shippingState: string;
+  };
+  blockedLines?: Array<{
+    type: 'CUSTOM_ORDER';
+    sessionId: string;
+    checkoutIntentId: string;
+    sourceTitle: string;
+    reason: string;
+  }>;
 }
 
 export interface PaymentVerifyResult {
@@ -111,14 +145,32 @@ export interface PaymentVerifyResult {
   gatewayResponse?: string;
   failureMessage?: string;
   orderIds?: string[];
+  customOrderIds?: string[];
+  checkoutSessionId?: string;
+  summary?: {
+    items: Array<{
+      name: string;
+      quantity: number;
+      price: number;
+    }>;
+    subtotal: number;
+    shippingCost: number;
+    discount: number;
+    grandTotal: number;
+    shippingName: string;
+    shippingCity: string;
+    shippingState: string;
+  };
 }
 
 export interface PaymentAttemptSummary {
   paymentAttemptId: string;
   reference: string;
-  subjectType: 'STANDARD_ORDER' | 'CUSTOM_ORDER';
+  subjectType: 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'UNIFIED_CHECKOUT';
   customOrderId?: string;
+  customOrderIds?: string[];
   checkoutIntentId?: string;
+  checkoutSessionId?: string;
   gateway: string;
   providerMode: 'mock' | 'live';
   paymentMethod: PaymentMethodType;
@@ -180,6 +232,16 @@ export const paymentApi = {
     const idempotencyKey = req.idempotencyKey ?? createIdempotencyKey();
     const res = await apiClient.post(
       '/payment/initialize',
+      { ...req, idempotencyKey },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+    return extract<PaymentInitResult>(res);
+  },
+
+  async initializeUnified(req: InitializeUnifiedCheckoutRequest): Promise<PaymentInitResult> {
+    const idempotencyKey = req.idempotencyKey ?? createIdempotencyKey();
+    const res = await apiClient.post(
+      '/payment/initialize-unified',
       { ...req, idempotencyKey },
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
