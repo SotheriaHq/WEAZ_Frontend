@@ -112,15 +112,16 @@ const toSavedCardDisplay = (
 export const canOfferCustomOrderCardRetry = (
   attempt: PaymentAttemptSummary | null,
 ): boolean => {
-  if (!attempt || attempt.subjectType !== 'CUSTOM_ORDER' || !attempt.checkoutIntentId) {
+  if (
+    !attempt ||
+    attempt.subjectType !== 'CUSTOM_ORDER' ||
+    !attempt.checkoutIntentId ||
+    !attempt.customOrderId
+  ) {
     return false;
   }
 
   if (attempt.paymentMethod !== 'PAYSTACK') {
-    return false;
-  }
-
-  if (attempt.customOrderId) {
     return false;
   }
 

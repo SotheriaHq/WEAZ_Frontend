@@ -11,16 +11,6 @@ export type PaymentAttemptStatus =
   | 'CANCELLED'
   | 'EXPIRED';
 
-export interface PaymentInitRequest {
-  orderIds: string[];
-  paymentMethod: PaymentMethodType;
-  email: string;
-  callbackUrl?: string;
-  paymentData?: PaymentData;
-  idempotencyKey?: string;
-  validationSessionId?: string;
-}
-
 export interface InitializeUnifiedCheckoutRequest {
   paymentMethod: PaymentMethodType;
   email: string;

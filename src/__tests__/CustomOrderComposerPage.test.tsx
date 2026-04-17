@@ -5,8 +5,10 @@ import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPa
 
 const getById = vi.fn();
 const getMyProfile = vi.fn();
+const dispatchMock = vi.fn();
 
 vi.mock('react-redux', () => ({
+  useDispatch: () => dispatchMock,
   useSelector: (selector: (state: unknown) => unknown) =>
     selector({
       user: {
@@ -52,6 +54,7 @@ vi.mock('sonner', () => ({
 describe('CustomOrderComposerPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    dispatchMock.mockReset();
     getMyProfile.mockResolvedValue({ measurements: {} });
   });
 

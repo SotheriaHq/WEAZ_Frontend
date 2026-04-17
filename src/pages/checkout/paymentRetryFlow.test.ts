@@ -10,6 +10,7 @@ const baseCustomOrderAttempt: PaymentAttemptSummary = {
   paymentAttemptId: 'attempt-1',
   reference: 'TH-CO-123456',
   subjectType: 'CUSTOM_ORDER',
+  customOrderId: 'custom-order-1',
   checkoutIntentId: 'intent-1',
   gateway: 'PAYSTACK',
   providerMode: 'live',
@@ -65,6 +66,12 @@ const baseCustomOrderAttempt: PaymentAttemptSummary = {
 describe('paymentRetryFlow', () => {
   it('offers retry only for failed custom-order Paystack card attempts', () => {
     expect(canOfferCustomOrderCardRetry(baseCustomOrderAttempt)).toBe(true);
+    expect(
+      canOfferCustomOrderCardRetry({
+        ...baseCustomOrderAttempt,
+        customOrderId: undefined,
+      }),
+    ).toBe(false);
     expect(
       canOfferCustomOrderCardRetry({
         ...baseCustomOrderAttempt,
