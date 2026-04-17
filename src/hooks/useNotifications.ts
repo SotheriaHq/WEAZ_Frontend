@@ -91,12 +91,19 @@ export function useNotificationsBootstrap() {
         ingestRealtime({
           id: payload.id,
           type: payload.type,
+          version: payload.version,
           message: payload.message,
           createdAt: payload.createdAt,
           isRead: payload.isRead,
           actor: payload.actor ?? null,
+          target: payload.target ?? payload.payload?.target ?? null,
+          subTargetId:
+            payload.subTargetId ??
+            payload.payload?.subTargetId ??
+            payload.payload?.commentId ??
+            null,
           payload: payload.payload ?? undefined,
-          targetUrl: payload.payload?.targetUrl ?? undefined,
+          targetUrl: payload.targetUrl ?? payload.payload?.targetUrl ?? undefined,
         }),
       );
       dispatch(fetchUnreadCount());

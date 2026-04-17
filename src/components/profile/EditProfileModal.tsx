@@ -33,28 +33,37 @@ const optionalSocialSchema = z
     { message: 'Enter a valid URL or username/handle' },
   );
 
-const profileSchema = z.object({
-  brandFullName: z
-    .string()
-    .trim()
-    .min(2, { message: 'Brand name must be at least 2 characters' })
-    .max(120, { message: 'Brand name must be 120 characters or fewer' }),
-  brandDescription: z
-    .string()
-    .trim()
-    .min(20, { message: 'Tell us at least 20 characters about your brand' })
-    .max(2000, { message: 'Keep your description under 2000 characters' }),
-  brandCountry: z.string().optional(),
-  brandState: z.string().optional(),
-  brandCity: z.string().optional(),
-  brandTags: z.array(z.string()).optional(),
-  socialInstagram: optionalSocialSchema,
-  socialFacebook: optionalSocialSchema,
-  socialTwitter: optionalSocialSchema,
-  socialWebsite: optionalSocialSchema,
-  phoneNumber: z.string().trim().max(30, { message: 'Phone number is too long' }).optional(),
-  businessType: z.string().trim().max(120, { message: 'Business type is too long' }).optional(),
-});
+const profileSchema = z
+  .object({
+    brandFullName: z
+      .string()
+      .trim()
+      .min(2, { message: 'Brand name must be at least 2 characters' })
+      .max(120, { message: 'Brand name must be 120 characters or fewer' }),
+    brandDescription: z
+      .string()
+      .trim()
+      .min(20, { message: 'Tell us at least 20 characters about your brand' })
+      .max(2000, { message: 'Keep your description under 2000 characters' }),
+    brandCountry: z.string().optional(),
+    brandState: z.string().optional(),
+    brandCity: z.string().optional(),
+    brandTags: z.array(z.string()).optional(),
+    socialInstagram: optionalSocialSchema,
+    socialFacebook: optionalSocialSchema,
+    socialTwitter: optionalSocialSchema,
+    socialWebsite: optionalSocialSchema,
+    phoneNumber: z.string().trim().max(30, { message: 'Phone number is too long' }).optional(),
+    businessType: z.string().trim().max(120, { message: 'Business type is too long' }).optional(),
+  })
+  .refine(
+    (values) =>
+      Boolean((values.brandCountry ?? '').trim() || (values.brandState ?? '').trim()),
+    {
+      path: ['brandCountry'],
+      message: 'Add at least country or state to complete setup',
+    },
+  );
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 const MAX_TAGS = 5;
@@ -301,13 +310,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
         toast.success('Profile updated successfully');
         await onSaved(updatedUser);
-        onClose();
       } catch (error) {
         if (error instanceof Error) toast.error(error.message);
         else toast.error('Unable to update profile.');
       }
     },
-    [onSaved, user.id, onClose, selectedTags],
+    [onSaved, user.id, selectedTags],
   );
 
   const onInvalid = useCallback(
@@ -412,6 +420,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <button
                     type="button"
                     onClick={onSkip}
+                    disabled={isSubmitting}
                     className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition"
                   >
                     Skip
@@ -420,6 +429,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
+                  disabled={isSubmitting}
                   className="w-10 h-10 rounded-full flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10 transition"
                   aria-label="Close"
                 >
@@ -616,6 +626,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           className="w-full"
                       />
                   </div>
+                  {errors.brandCountry && (
+                    <p className="text-xs text-red-500 font-medium">{errors.brandCountry.message}</p>
+                  )}
               </div>
 
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -684,6 +697,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <button 
                 type="button"
                 onClick={onClose}
+                disabled={isSubmitting}
                 className="px-6 py-3 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition"
               >
                 Cancel
@@ -692,9 +706,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 type="button"
                 onClick={() => handleSubmit(onSubmit, onInvalid)()}
                 disabled={isSubmitting}
-                className="px-8 py-3 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg shadow-purple-500/20 transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                aria-busy={isSubmitting}
+                className="min-w-[12rem] px-8 py-3 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg shadow-purple-500/20 transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
-                {isSubmitting ? 'Saving Profile...' : 'Save & Continue'}
+                <span className="inline-flex w-full items-center justify-center">
+                  {isSubmitting ? 'Saving profile...' : 'Save and Continue'}
+                </span>
               </button>
             </div>
             

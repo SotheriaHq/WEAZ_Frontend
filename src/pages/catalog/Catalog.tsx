@@ -146,6 +146,7 @@ const ProfilePage: React.FC = () => {
   const [storeStatus, setStoreStatus] = useState<StoreStatusResponse | null>(null);
   const [storeStatusLoading, setStoreStatusLoading] = useState(false);
   const [hasDismissedStoreSetup, setHasDismissedStoreSetup] = useState(false);
+  const [isStoreSetupNavigating, setIsStoreSetupNavigating] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
@@ -188,7 +189,11 @@ const ProfilePage: React.FC = () => {
 
   useEffect(() => {
     if (!isOwner) return;
-    if (bannerPreviewUrl && displayData.bannerImage && displayData.bannerImage !== bannerPreviewUrl) {
+    if (
+      bannerPreviewUrl?.startsWith('blob:') &&
+      displayData.bannerImage &&
+      displayData.bannerImage !== bannerPreviewUrl
+    ) {
       updateBannerPreview(null);
     }
   }, [isOwner, displayData.bannerImage, bannerPreviewUrl]);
@@ -471,6 +476,20 @@ const ProfilePage: React.FC = () => {
     setHasDismissedStoreSetup(true);
   }, []);
 
+  const handleOpenStoreSetup = useCallback(() => {
+    if (isStoreSetupNavigating) return;
+    setIsStoreSetupNavigating(true);
+    navigate('/studio/store');
+  }, [isStoreSetupNavigating, navigate]);
+
+  useEffect(() => {
+    if (!isStoreSetupNavigating) return;
+    const timer = window.setTimeout(() => {
+      setIsStoreSetupNavigating(false);
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [isStoreSetupNavigating]);
+
   useEffect(() => {
     const hasDismissedSetup = getHasDismissedBrandSetup();
     if (
@@ -550,35 +569,17 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  const handleTriggerAvatarUpload = () => {
+  const handleTriggerAvatarUpload = useCallback(() => {
     if (isOwner) {
       avatarInputRef.current?.click();
     }
-  };
+  }, [isOwner]);
 
-  const handleTriggerBannerUpload = () => {
+  const handleTriggerBannerUpload = useCallback(() => {
     if (isOwner) {
       bannerInputRef.current?.click();
     }
-  };
-
-  const handleShareProfile = async () => {
-    const url = window.location.href;
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: viewDisplayData.brandName,
-          text: `Check out ${viewDisplayData.brandName} on Threadly`,
-          url,
-        });
-      } else {
-        await navigator.clipboard.writeText(url);
-        toast.success('Profile link copied to clipboard');
-      }
-    } catch {
-      // Silently ignore cancellation
-    }
-  };
+  }, [isOwner]);
 
   const processAvatarUpload = async (file: File, previewUrl: string, disposePreview?: () => void) => {
     if (!user) return;
@@ -769,7 +770,7 @@ const ProfilePage: React.FC = () => {
     return () => { mounted = false; };
   }, [showPatchAction, routeBrandId]);
 
-  const handleTogglePatch = async () => {
+  const handleTogglePatch = useCallback(async () => {
     if (!routeBrandId) return;
     if (!user) {
       navigate('/login');
@@ -794,7 +795,7 @@ const ProfilePage: React.FC = () => {
     } finally {
       setPatchLoading(false);
     }
-  };
+  }, [isPatched, navigate, routeBrandId, user]);
 
   const viewIsStoreOpen = useMemo(() => {
     if (isVisitorView) return Boolean(visitorProfile?.isStoreOpen);
@@ -1213,10 +1214,15 @@ const ProfilePage: React.FC = () => {
   const { url: visitorBannerUrl } = useSignedFileUrlHook(visitorProfile?.bannerImageMeta?.fileId ?? null, visitorBannerInitial);
   const { url: visitorLogoUrl } = useSignedFileUrlHook(visitorProfile?.logoImageMeta?.fileId ?? null, visitorLogoInitial);
 
-  const viewDisplayData = isVisitorView && visitorProfile
-    ? {
+  const viewDisplayData = useMemo(() => {
+    if (isVisitorView && visitorProfile) {
+      return {
         brandName: visitorProfile.brandFullName,
-        location: visitorProfile.location ?? [visitorProfile.city, visitorProfile.state, visitorProfile.country].filter(Boolean).join(', '),
+        location:
+          visitorProfile.location ??
+          [visitorProfile.city, visitorProfile.state, visitorProfile.country]
+            .filter(Boolean)
+            .join(', '),
         username: '',
         logoImage: visitorLogoUrl ?? undefined,
         bannerImage: visitorBannerUrl ?? undefined,
@@ -1231,8 +1237,79 @@ const ProfilePage: React.FC = () => {
         isVerifiedBrand: Boolean(visitorProfile.verified),
         verifiedExplanationUrl:
           visitorProfile.verifiedExplanationUrl ?? '/help/verified-badge',
+      };
+    }
+    return displayData;
+  }, [displayData, isVisitorView, visitorBannerUrl, visitorLogoUrl, visitorProfile]);
+
+  const handleShareProfile = useCallback(async () => {
+    const shareBrandName = viewDisplayData.brandName || 'Threadly';
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: shareBrandName,
+          text: `Check out ${shareBrandName} on Threadly`,
+          url,
+        });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success('Profile link copied to clipboard');
       }
-    : displayData;
+    } catch {
+      // Silently ignore cancellation
+    }
+  }, [viewDisplayData.brandName]);
+
+  const handleOpenHeaderQuickEdit = useCallback(() => {
+    setIsHeaderQuickEditOpen(true);
+  }, []);
+
+  const handleViewAvatar = useCallback(() => {
+    if (localAvatarPreview || viewDisplayData.logoImage) {
+      setIsAvatarModalOpen(true);
+      if (avatarHighlight) {
+        setAvatarHighlight(false);
+      }
+    }
+  }, [avatarHighlight, localAvatarPreview, viewDisplayData.logoImage]);
+
+  const headerProfile = useMemo(
+    () => ({
+      id: (isVisitorView ? routeBrandId : user?.id) ?? '',
+      username: viewDisplayData.username ?? '',
+      firstName: viewDisplayData.brandName ?? '',
+      lastName: '',
+      profileImage: (localAvatarPreview ?? viewDisplayData.logoImage) ?? undefined,
+      bannerImage: (bannerPreviewUrl ?? viewDisplayData.bannerImage) ?? undefined,
+      address: viewDisplayData.location ?? undefined,
+      location: viewDisplayData.location ?? undefined,
+      tags: viewDisplayData.hashtags ?? [],
+      verificationBadgeVisible: Boolean(viewDisplayData.verificationBadgeVisible),
+      isVerifiedBrand: Boolean(viewDisplayData.isVerifiedBrand),
+      verifiedExplanationUrl:
+        viewDisplayData.verifiedExplanationUrl ?? '/help/verified-badge',
+      isOwner,
+      profileVisibility: 'UNLOCKED' as const,
+    }),
+    [
+      bannerPreviewUrl,
+      isOwner,
+      isVisitorView,
+      localAvatarPreview,
+      routeBrandId,
+      user?.id,
+      viewDisplayData.bannerImage,
+      viewDisplayData.brandName,
+      viewDisplayData.hashtags,
+      viewDisplayData.isVerifiedBrand,
+      viewDisplayData.location,
+      viewDisplayData.logoImage,
+      viewDisplayData.username,
+      viewDisplayData.verifiedExplanationUrl,
+      viewDisplayData.verificationBadgeVisible,
+    ],
+  );
 
   const brandData = {
     brandName: viewDisplayData.brandName,
@@ -1355,10 +1432,21 @@ const ProfilePage: React.FC = () => {
               </p>
             </div>
             <div className="mt-3 flex items-center justify-end gap-2">
-              <FrostedButton size="sm" variant="primary" onClick={() => navigate('/studio/store')}>
+              <FrostedButton
+                size="sm"
+                variant="primary"
+                onClick={handleOpenStoreSetup}
+                loading={isStoreSetupNavigating}
+                className="min-w-[7.5rem] justify-center"
+              >
                 Set up
               </FrostedButton>
-              <FrostedButton size="sm" variant="ghost" onClick={dismissStoreSetupNudge}>
+              <FrostedButton
+                size="sm"
+                variant="ghost"
+                onClick={dismissStoreSetupNudge}
+                disabled={isStoreSetupNavigating}
+              >
                 Not now
               </FrostedButton>
             </div>
@@ -1368,49 +1456,30 @@ const ProfilePage: React.FC = () => {
         <div className="fixed bottom-24 right-4 sm:right-6 z-[60]">
           <button
             type="button"
-            onClick={() => navigate('/studio/store')}
-            className="glass-chip chip-sm chip-purple inline-flex items-center gap-2 shadow-xl ring-1 ring-purple-300/40 hover:bg-black/5 dark:hover:bg-white/10 transition"
+            onClick={handleOpenStoreSetup}
+            disabled={isStoreSetupNavigating}
+            aria-busy={isStoreSetupNavigating}
+            className="glass-chip chip-sm chip-purple inline-flex items-center gap-2 shadow-xl ring-1 ring-purple-300/40 hover:bg-black/5 dark:hover:bg-white/10 transition disabled:cursor-not-allowed disabled:opacity-75"
             aria-label="Continue store setup"
           >
-            <span className="font-semibold">Continue store setup</span>
+            <span className="font-semibold min-w-[9.5rem] text-center">
+              {isStoreSetupNavigating ? 'Opening...' : 'Continue store setup'}
+            </span>
           </button>
         </div>
       ) : null}
 
       <ProfileHeader
-        profile={{
-          id: (isVisitorView ? routeBrandId : user?.id) ?? '',
-          username: viewDisplayData.username ?? '',
-          firstName: viewDisplayData.brandName ?? '',
-          lastName: '',
-          profileImage: (localAvatarPreview ?? viewDisplayData.logoImage) ?? undefined,
-          bannerImage: (bannerPreviewUrl ?? viewDisplayData.bannerImage) ?? undefined,
-          address: viewDisplayData.location ?? undefined,
-          location: viewDisplayData.location ?? undefined,
-          tags: viewDisplayData.hashtags ?? [],
-          verificationBadgeVisible: Boolean(viewDisplayData.verificationBadgeVisible),
-          isVerifiedBrand: Boolean(viewDisplayData.isVerifiedBrand),
-          verifiedExplanationUrl:
-            viewDisplayData.verifiedExplanationUrl ?? '/help/verified-badge',
-          isOwner,
-          profileVisibility: 'UNLOCKED',
-        }}
+        profile={headerProfile}
         canEdit={isOwner}
-        onEditProfile={() => setIsHeaderQuickEditOpen(true)}
+        onEditProfile={handleOpenHeaderQuickEdit}
         onShareProfile={handleShareProfile}
         onEditAvatar={handleTriggerAvatarUpload}
         onEditBanner={handleTriggerBannerUpload}
         avatarLoading={avatarUploading}
         bannerLoading={bannerUploading}
         avatarHighlight={avatarHighlight}
-        onViewAvatar={() => {
-          if (localAvatarPreview || viewDisplayData.logoImage) {
-            setIsAvatarModalOpen(true);
-            if (avatarHighlight) {
-              setAvatarHighlight(false);
-            }
-          }
-        }}
+        onViewAvatar={handleViewAvatar}
         showPatchAction={showPatchAction}
         isPatched={isPatched}
         patchLoading={patchLoading}

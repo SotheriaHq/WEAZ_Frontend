@@ -4,9 +4,11 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/httpClient';
 import { unwrapApiResponse } from '@/types/auth';
 import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { setUser } from '@/features/userSlice';
 import BrandWordmark from '@/components/brand/BrandWordmark';
+import type { RootState } from '@/store';
+import { useAuth } from '@/context/AuthContext';
 
 type VerifyStatus = 'verifying' | 'success' | 'error' | 'pending';
 
@@ -16,16 +18,42 @@ const sanitizeNextPath = (path: string): string => {
   return path;
 };
 
-const HOME_REDIRECT_PATH = '/?emailVerified=1';
+const maskEmailHint = (email: string): string => {
+  const normalized = email.trim();
+  if (!normalized || !normalized.includes('@')) return normalized;
+
+  const [local, domain] = normalized.split('@');
+  if (!domain) return normalized;
+
+  const [domainName, ...rest] = domain.split('.');
+  const tld = rest.join('.');
+  const maskedLocal = local.length <= 2 ? `${local.slice(0, 1)}*` : `${local.slice(0, 2)}***`;
+  const maskedDomain = domainName.length <= 2 ? `${domainName.slice(0, 1)}*` : `${domainName.slice(0, 2)}***`;
+  return `${maskedLocal}@${maskedDomain}${tld ? `.${tld}` : ''}`;
+};
+
 const SUCCESS_REDIRECT_SECONDS = 4;
+
+type SuccessDestination = {
+  path: string;
+  label: string;
+  target: 'profile' | 'login';
+};
 
 const EmailVerifyPage: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { loading: authLoading } = useAuth();
+  const authenticatedUser = useSelector((state: RootState) => state.user.profile);
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<VerifyStatus>('verifying');
   const [message, setMessage] = useState('Preparing email verification...');
   const [redirectSeconds, setRedirectSeconds] = useState<number | null>(null);
+  const [successDestination, setSuccessDestination] = useState<SuccessDestination>({
+    path: '/login',
+    label: 'Go to Sign In',
+    target: 'login',
+  });
   const verificationStartedRef = useRef(false);
 
   const token = useMemo(
@@ -43,9 +71,39 @@ const EmailVerifyPage: React.FC = () => {
     [searchParams],
   );
 
+  const maskedPendingEmailHint = useMemo(
+    () => (emailHint ? maskEmailHint(emailHint) : ''),
+    [emailHint],
+  );
+
   const nextPath = useMemo(
     () => sanitizeNextPath(searchParams.get('next')?.trim() ?? '/'),
     [searchParams],
+  );
+
+  const resolveSuccessDestination = useCallback(
+    (verifiedMessage: string, refreshedUser: AuthUserDto | null): SuccessDestination => {
+      const hasTrustedSession =
+        Boolean(refreshedUser?.id) || (!authLoading && Boolean(authenticatedUser?.id));
+
+      if (hasTrustedSession) {
+        const params = new URLSearchParams();
+        params.set('emailVerified', '1');
+        params.set('emailVerifiedMessage', verifiedMessage);
+        return {
+          path: `/profile?${params.toString()}`,
+          label: 'Go to Profile',
+          target: 'profile',
+        };
+      }
+
+      return {
+        path: '/login',
+        label: 'Go to Sign In',
+        target: 'login',
+      };
+    },
+    [authLoading, authenticatedUser?.id],
   );
 
   const refreshLocalProfile = useCallback(async (): Promise<AuthUserDto | null> => {
@@ -70,9 +128,9 @@ const EmailVerifyPage: React.FC = () => {
     return null;
   }, [dispatch]);
 
-  const goHome = useCallback(() => {
-    navigate(HOME_REDIRECT_PATH, { replace: true });
-  }, [navigate]);
+  const goToSuccessDestination = useCallback(() => {
+    navigate(successDestination.path, { replace: true });
+  }, [navigate, successDestination.path]);
 
   const verifyTokenNow = useCallback(async () => {
     if (!token) return;
@@ -94,10 +152,16 @@ const EmailVerifyPage: React.FC = () => {
         payload?.data?.message ??
         'Your email has been verified successfully.';
 
-      await refreshLocalProfile();
+      const refreshedUser = await refreshLocalProfile();
+      const destination = resolveSuccessDestination(resolvedMessage, refreshedUser);
 
       setStatus('success');
-      setMessage(resolvedMessage);
+      setSuccessDestination(destination);
+      setMessage(
+        destination.target === 'profile'
+          ? resolvedMessage
+          : `${resolvedMessage} Sign in to continue to your account.`,
+      );
       setRedirectSeconds(SUCCESS_REDIRECT_SECONDS);
     } catch (error: unknown) {
       let errorMessage =
@@ -111,8 +175,17 @@ const EmailVerifyPage: React.FC = () => {
 
       const refreshedUser = await refreshLocalProfile();
       if (refreshedUser?.isEmailVerified) {
+        const destination = resolveSuccessDestination(
+          'Your email is already verified.',
+          refreshedUser,
+        );
         setStatus('success');
-        setMessage('Your email is already verified. Redirecting you to home.');
+        setSuccessDestination(destination);
+        setMessage(
+          destination.target === 'profile'
+            ? 'Your email is already verified.'
+            : 'Your email is already verified. Sign in to continue.',
+        );
         setRedirectSeconds(SUCCESS_REDIRECT_SECONDS);
         return;
       }
@@ -124,7 +197,7 @@ const EmailVerifyPage: React.FC = () => {
           : errorMessage,
       );
     }
-  }, [refreshLocalProfile, token]);
+  }, [refreshLocalProfile, resolveSuccessDestination, token]);
 
   useEffect(() => {
     if (!token) {
@@ -132,8 +205,8 @@ const EmailVerifyPage: React.FC = () => {
       if (pendingMode) {
         setStatus('pending');
         setMessage(
-          emailHint
-            ? `We sent a verification link to ${emailHint}. Open your inbox and click the link to verify your account.`
+          maskedPendingEmailHint
+            ? `We sent a verification link to ${maskedPendingEmailHint}. Open your inbox and click the link to verify your account.`
             : 'We sent you a verification email. Open your inbox and click the link to verify your account.',
         );
         return;
@@ -150,14 +223,14 @@ const EmailVerifyPage: React.FC = () => {
 
     verificationStartedRef.current = true;
     void verifyTokenNow();
-  }, [emailHint, pendingMode, token, verifyTokenNow]);
+  }, [maskedPendingEmailHint, pendingMode, token, verifyTokenNow]);
 
   useEffect(() => {
     if (status !== 'success') return;
     if (redirectSeconds == null) return;
 
     if (redirectSeconds <= 0) {
-      goHome();
+      goToSuccessDestination();
       return;
     }
 
@@ -169,7 +242,7 @@ const EmailVerifyPage: React.FC = () => {
     }, 1000);
 
     return () => window.clearTimeout(timer);
-  }, [goHome, redirectSeconds, status]);
+  }, [goToSuccessDestination, redirectSeconds, status]);
 
   const heading =
     status === 'success'
@@ -210,7 +283,7 @@ const EmailVerifyPage: React.FC = () => {
 
         {status === 'success' && redirectSeconds != null && (
           <p className="mt-4 text-xs text-emerald-700">
-            Redirecting to home in {Math.max(0, redirectSeconds)}s...
+            Redirecting to {successDestination.target === 'profile' ? 'profile' : 'sign in'} in {Math.max(0, redirectSeconds)}s...
           </p>
         )}
 
@@ -218,17 +291,26 @@ const EmailVerifyPage: React.FC = () => {
           <div className="mt-8 flex w-full gap-3">
             <button
               type="button"
-              onClick={goHome}
+              onClick={goToSuccessDestination}
               className="flex-1 rounded-xl bg-[var(--brand-primary)] px-4 py-3 text-sm font-semibold text-white hover:bg-[var(--brand-primary-strong)] transition-colors"
             >
-              Go to Home
+              {successDestination.label}
             </button>
-            <Link
-              to={nextPath}
-              className="flex-1 rounded-xl border border-[var(--brand-primary)] px-4 py-3 text-sm font-semibold text-[var(--brand-primary)] hover:bg-purple-50 transition-colors"
-            >
-              Continue
-            </Link>
+            {successDestination.target === 'profile' && nextPath !== '/profile' ? (
+              <Link
+                to={nextPath}
+                className="flex-1 rounded-xl border border-[var(--brand-primary)] px-4 py-3 text-sm font-semibold text-[var(--brand-primary)] hover:bg-purple-50 transition-colors"
+              >
+                Continue
+              </Link>
+            ) : (
+              <Link
+                to="/"
+                className="flex-1 rounded-xl border border-[var(--brand-primary)] px-4 py-3 text-sm font-semibold text-[var(--brand-primary)] hover:bg-purple-50 transition-colors"
+              >
+                Open Home
+              </Link>
+            )}
           </div>
         )}
 

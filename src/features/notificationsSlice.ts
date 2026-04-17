@@ -134,10 +134,17 @@ export const notificationsSlice = createSlice({
       action: PayloadAction<{
         id: string;
         type: string;
+        version?: 1 | 2;
         message: string;
         createdAt: string;
         isRead: boolean;
         actor?: RemoteNotificationActor | null;
+        target?: {
+          type: 'POST' | 'COLLECTION' | 'COLLECTION_MEDIA' | 'PRODUCT' | 'USER' | 'SYSTEM';
+          id: string;
+          preview?: string;
+        } | null;
+        subTargetId?: string | null;
         payload?: any;
         targetUrl?: string;
       }>,
@@ -147,10 +154,17 @@ export const notificationsSlice = createSlice({
         const incoming: RemoteNotification = {
           id: action.payload.id,
           type: action.payload.type,
+          version: action.payload.version,
           message: action.payload.message,
           createdAt: action.payload.createdAt,
           isRead: action.payload.isRead,
           actor: action.payload.actor ?? null,
+          target: action.payload.target ?? action.payload.payload?.target ?? null,
+          subTargetId:
+            action.payload.subTargetId ??
+            action.payload.payload?.subTargetId ??
+            action.payload.payload?.commentId ??
+            null,
           payload: action.payload.payload,
           targetUrl: action.payload.targetUrl ?? action.payload.payload?.targetUrl,
         };
@@ -176,20 +190,72 @@ export const notificationsSlice = createSlice({
         const incoming = Array.isArray(payload.items) ? payload.items : [];
         const hasNextPage = !!payload.hasNextPage;
         const endCursor = typeof payload.endCursor === 'string' || payload.endCursor === null ? payload.endCursor : null;
-        const existingIds = new Set(state.items.map((n) => n.id));
         for (const n of incoming) {
-          if (n && typeof n === 'object' && typeof n.id === 'string' && !existingIds.has(n.id)) {
-            state.items.push({
-              id: n.id,
-              type: n.type,
-              message: n.message,
-              createdAt: typeof n.createdAt === 'string' ? n.createdAt : new Date(n.createdAt).toISOString(),
-              isRead: !!n.isRead,
-              actor: n.actor ?? null,
-              payload: n.payload,
-              targetUrl: n.targetUrl ?? n.payload?.targetUrl,
-            });
+          if (!(n && typeof n === 'object' && typeof n.id === 'string')) {
+            continue;
           }
+
+          const normalizedTarget =
+            n.target &&
+            typeof n.target === 'object' &&
+            typeof n.target.type === 'string' &&
+            typeof n.target.id === 'string'
+              ? {
+                  type: n.target.type,
+                  id: n.target.id,
+                  preview: typeof n.target.preview === 'string' ? n.target.preview : undefined,
+                }
+              : undefined;
+
+          const normalizedSubTargetId =
+            typeof n.subTargetId === 'string'
+              ? n.subTargetId
+              : typeof n.payload?.subTargetId === 'string'
+                ? n.payload.subTargetId
+                : typeof n.payload?.commentId === 'string'
+                  ? n.payload.commentId
+                  : undefined;
+
+          const normalizedTargetUrl =
+            typeof n.targetUrl === 'string'
+              ? n.targetUrl
+              : typeof n.payload?.targetUrl === 'string'
+                ? n.payload.targetUrl
+                : undefined;
+
+          const normalized: RemoteNotification = {
+            id: n.id,
+            type: n.type,
+            version: n.version,
+            message: n.message,
+            createdAt:
+              typeof n.createdAt === 'string'
+                ? n.createdAt
+                : new Date(n.createdAt).toISOString(),
+            isRead: !!n.isRead,
+            actor: n.actor ?? null,
+            target: normalizedTarget ?? null,
+            subTargetId: normalizedSubTargetId ?? null,
+            payload: n.payload,
+            targetUrl: normalizedTargetUrl,
+          };
+
+          const existingIndex = state.items.findIndex((item) => item.id === n.id);
+          if (existingIndex >= 0) {
+            const existing = state.items[existingIndex];
+            state.items[existingIndex] = {
+              ...existing,
+              ...normalized,
+              actor: normalized.actor ?? existing.actor ?? null,
+              target: normalized.target ?? existing.target ?? null,
+              subTargetId: normalized.subTargetId ?? existing.subTargetId ?? null,
+              payload: normalized.payload ?? existing.payload,
+              targetUrl: normalized.targetUrl ?? existing.targetUrl,
+            };
+            continue;
+          }
+
+          state.items.push(normalized);
         }
         state.items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         state.hasNextPage = hasNextPage;

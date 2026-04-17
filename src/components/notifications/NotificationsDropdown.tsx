@@ -276,11 +276,12 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   };
 
   const actionTextFor = (n: NormalizedNotification): string => {
-    const action = getActionText(n.type).trim() || 'updated your';
+    const knownActionText = getActionText(n.type).trim();
+    const action = knownActionText || 'updated your';
     const title = contentTitleFor(n);
     const payload = (n.payload as Record<string, unknown> | undefined) ?? {};
     const trimmedMessage = (n.message || '').trim();
-    const actorName = n.actor ? getActorDisplayName(n) : '';
+    const actorName = getActorDisplayName(n);
 
     const removeActorPrefix = (text: string): string => {
       if (!actorName) return text;
@@ -315,6 +316,9 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
       return `${text} "${resolvedTitle}"`;
     };
 
+    const lowerMessage = trimmedMessage.toLowerCase();
+    const isGenericFallbackMessage = lowerMessage === 'you have a new notification';
+
     if (
       trimmedMessage &&
       (
@@ -331,7 +335,16 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
       return trimmedMessage;
     }
 
-    const lowerMessage = trimmedMessage.toLowerCase();
+    if (trimmedMessage && !isGenericFallbackMessage) {
+      const normalizedMessage = removeActorPrefix(trimmedMessage);
+      if (!knownActionText || !n.actor) {
+        return normalizedMessage;
+      }
+      if (normalizedMessage.toLowerCase().startsWith('you ') || normalizedMessage.toLowerCase().startsWith('your ')) {
+        return normalizedMessage;
+      }
+    }
+
     const hasExplicitTitle = lowerMessage.includes(title.toLowerCase());
     if (hasExplicitTitle && trimmedMessage) {
       return trimmedMessage;
@@ -458,7 +471,16 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
           <ul className="space-y-2" role="list">
             {normalizedItems.map((n) => {
               const isUnread = !n.isRead;
-              const actorDisplayName = n.actor ? getActorDisplayName(n) : null;
+              const actorDisplayName = getActorDisplayName(n);
+              const hasActorLink = Boolean(n.actor?.id);
+              const hasActorLabel =
+                Boolean(actorDisplayName) &&
+                actorDisplayName.toLowerCase() !== COMPANY_NAME.toLowerCase();
+              const hasMeaningfulMessage =
+                typeof n.message === 'string' &&
+                n.message.trim().length > 0 &&
+                n.message.trim().toLowerCase() !== 'you have a new notification';
+              const showCompanyPrefix = !hasActorLabel && !hasMeaningfulMessage;
               const actionText = actionTextFor(n);
               const quotedTitleMatch = actionText.match(/"([^"]+)"/);
               const explicitTitle = quotedTitleMatch ? quotedTitleMatch[1].trim() : '';
@@ -507,22 +529,26 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="text-xs text-gray-800 dark:text-gray-200 line-clamp-2 leading-5">
-                              {actorDisplayName ? (
-                                <button
-                                  type="button"
-                                  className="font-semibold text-purple-600 dark:text-purple-400 hover:underline underline-offset-2 transition-colors"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handleActorClick(n);
-                                  }}
-                                  aria-label={`View ${actorDisplayName}'s profile`}
-                                >
-                                  @{actorDisplayName}
-                                </button>
+                              {hasActorLabel ? (
+                                hasActorLink ? (
+                                  <button
+                                    type="button"
+                                    className="font-semibold text-purple-600 dark:text-purple-400 hover:underline underline-offset-2 transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void handleActorClick(n);
+                                    }}
+                                    aria-label={`View ${actorDisplayName}'s profile`}
+                                  >
+                                    @{actorDisplayName}
+                                  </button>
+                                ) : (
+                                  <span className="font-semibold text-[color:var(--text-primary)]">@{actorDisplayName}</span>
+                                )
                               ) : (
-                                <span className="font-semibold text-[color:var(--text-primary)]">{COMPANY_NAME}</span>
+                                showCompanyPrefix ? <span className="font-semibold text-[color:var(--text-primary)]">{COMPANY_NAME}</span> : null
                               )}
-                              <span className="ml-1">{actionTextWithoutTitle}</span>
+                              <span className={hasActorLabel || showCompanyPrefix ? 'ml-1' : undefined}>{actionTextWithoutTitle}</span>
                               {contentTitle ? (
                                 <span className="ml-1 inline-flex max-w-[180px] items-center truncate rounded-md border border-purple-300/50 bg-purple-100/70 px-1.5 py-0.5 font-semibold text-purple-700 dark:border-purple-400/30 dark:bg-purple-500/15 dark:text-purple-300">
                                   "{contentTitle}"

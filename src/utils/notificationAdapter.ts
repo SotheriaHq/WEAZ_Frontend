@@ -155,6 +155,21 @@ function deriveTarget(
     // Parse from targetUrl as last resort
     const url = (raw.targetUrl as string) || (payload?.targetUrl as string);
     if (url) {
+        try {
+            const parsed = new URL(url, 'https://threadly.local');
+            const openMediaId = parsed.searchParams.get('openMedia');
+            if (openMediaId) {
+                return { type: 'COLLECTION_MEDIA', id: openMediaId };
+            }
+
+            const openDesignId = parsed.searchParams.get('openDesign');
+            if (openDesignId) {
+                return { type: 'COLLECTION', id: openDesignId };
+            }
+        } catch {
+            // Ignore URL parsing errors and continue with regex fallbacks.
+        }
+
         const collectionMatch = url.match(/\/collections\/([a-f0-9-]+)/);
         if (collectionMatch) {
             return { type: 'COLLECTION', id: collectionMatch[1] };
@@ -212,7 +227,24 @@ export function hasValidTarget(notification: NormalizedNotification): boolean {
  * Gets display name for actor with fallback to Threadly for system events
  */
 export function getActorDisplayName(notification: NormalizedNotification): string {
-    if (!notification.actor) return 'Threadly';
+    if (!notification.actor) {
+        const payload = (notification.payload as Record<string, unknown> | undefined) ?? {};
+        const inferred = [
+            payload.actorName,
+            payload.senderName,
+            payload.brandName,
+            payload.customerName,
+        ].find((value) => typeof value === 'string' && value.trim().length > 0) as string | undefined;
+
+        if (inferred) {
+            const normalized = inferred.trim();
+            if (!/^a\s+(customer|brand)$/i.test(normalized)) {
+                return normalized;
+            }
+        }
+
+        return 'Threadly';
+    }
 
     if (notification.actor.username) {
         return notification.actor.username;

@@ -3,39 +3,31 @@ import React from 'react';
 const ProfileHeaderSkeleton: React.FC = () => {
   return (
     <div className="w-full animate-pulse">
-      {/* Container for banner and overlapping avatar */}
-      <div className="relative mb-16">
-        {/* Banner Skeleton */}
-        <div className="h-48 rounded-lg bg-gray-200 dark:bg-gray-700"></div>
-
-        {/* QR Code Skeleton */}
-        <div className="absolute top-4 right-4 h-20 w-20 rounded-md bg-gray-300 dark:bg-gray-600"></div>
-        
-        {/* Profile Image Skeleton */}
-        <div className="absolute left-6 -bottom-12 w-32 h-32 rounded-full border-4 border-white dark:border-gray-900 bg-gray-300 dark:bg-gray-600"></div>
+      <div className="relative rounded-3xl overflow-hidden">
+        <div className="h-64 w-full rounded-3xl bg-gray-200 dark:bg-gray-700" />
+        <div className="absolute top-3 left-3 h-10 w-28 rounded-full bg-gray-300/80 dark:bg-gray-600/80" />
       </div>
 
-      {/* Profile Info & Actions Skeleton */}
-      <div className="px-6">
-        <div className="flex justify-between items-start">
-          {/* Left side: Info Skeleton */}
-          <div className="flex-1">
-            <div className="pl-[132px + 1rem]">
-              <div className="h-7 w-48 bg-gray-200 dark:bg-gray-700 rounded-md"></div>
-              <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded-md mt-2"></div>
-            </div>
-            {/* Tags Skeleton */}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
-              <div className="h-6 w-24 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
-              <div className="h-6 w-28 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+      <div className="-mt-16 px-4 sm:-mt-20 sm:px-6">
+        <div className="relative z-20 flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+          <div className="shrink-0 rounded-xl border-2 border-gray-300 bg-white dark:bg-gray-900">
+            <div className="h-40 w-40 rounded-xl bg-gray-300 dark:bg-gray-600 sm:h-44 sm:w-44 md:h-52 md:w-52" />
+          </div>
+
+          <div className="mt-4 flex flex-1 flex-col gap-2 sm:mt-2">
+            <div className="h-7 w-56 rounded-md bg-gray-200 dark:bg-gray-700" />
+            <div className="h-5 w-48 rounded-md bg-gray-200 dark:bg-gray-700" />
+            <div className="h-5 w-36 rounded-md bg-gray-200 dark:bg-gray-700" />
+            <div className="mt-2 flex flex-wrap gap-2">
+              <div className="h-6 w-24 rounded-full bg-gray-200 dark:bg-gray-700" />
+              <div className="h-6 w-28 rounded-full bg-gray-200 dark:bg-gray-700" />
+              <div className="h-6 w-20 rounded-full bg-gray-200 dark:bg-gray-700" />
             </div>
           </div>
-          
-          {/* Right side: Action Buttons Skeleton */}
-          <div className="flex items-center gap-2 mt-1">
-            <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-            <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+
+          <div className="mt-1 flex items-center gap-2 self-end sm:self-start">
+            <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700" />
+            <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700" />
           </div>
         </div>
       </div>

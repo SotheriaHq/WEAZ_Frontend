@@ -41,6 +41,33 @@ const sanitizeNextPath = (path: string): string | null => {
   return path;
 };
 
+const maskEmailForPrompt = (email?: string | null): string => {
+  const normalized = (email ?? '').trim();
+  if (!normalized || !normalized.includes('@')) {
+    return 'your inbox';
+  }
+
+  const [local, domain] = normalized.split('@');
+  if (!domain) {
+    return 'your inbox';
+  }
+
+  const domainParts = domain.split('.');
+  const domainName = domainParts[0] ?? '';
+  const tld = domainParts.slice(1).join('.');
+
+  const maskedLocal =
+    local.length <= 2
+      ? `${local.slice(0, 1)}*`
+      : `${local.slice(0, 2)}***`;
+  const maskedDomain =
+    domainName.length <= 2
+      ? `${domainName.slice(0, 1)}*`
+      : `${domainName.slice(0, 2)}***`;
+
+  return `${maskedLocal}@${maskedDomain}${tld ? `.${tld}` : ''}`;
+};
+
 export const ProfileLayout: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
@@ -122,49 +149,66 @@ export const ProfileLayout: React.FC = () => {
     return location.pathname === '/profile';
   }, [isVisitorRoute, user, location.pathname]);
 
-  const verificationPromptDetails = useMemo(() => {
-    const emailAddress = user?.email?.trim() || 'your email address';
+  const maskedVerificationEmail = useMemo(
+    () => maskEmailForPrompt(user?.email),
+    [user?.email],
+  );
 
+  const verificationPromptDetails = useMemo(() => {
     if (verificationPromptContext === 'design-create') {
       return {
-        title: 'Verify your email before creating designs',
+        title: 'Verify email to create designs',
         description: (
           <>
-            Design creation is locked until email verification is complete. We sent a verification link to <span className="font-semibold">{emailAddress}</span>. Click it, then return here.
+            Design creation is locked until verification is complete. Open the link sent to <span className="font-semibold">{maskedVerificationEmail}</span> and return.
           </>
         ),
         toastMessage:
           'Verify your email before creating designs. Check your inbox and click the verification link, then come back here.',
-        actionLabel: verificationNextPath ? 'I Have Verified - Continue' : 'I Have Verified',
+        actionLabel: verificationNextPath ? "I've Verified - Continue" : "I've Verified",
+      };
+    }
+
+    if (verificationPromptContext === 'catalog-create') {
+      return {
+        title: 'Verify email to create catalog products',
+        description: (
+          <>
+            Catalog product creation is locked until verification is complete. Open the link sent to <span className="font-semibold">{maskedVerificationEmail}</span> and return.
+          </>
+        ),
+        toastMessage:
+          'Verify your email before creating catalog products. Check your inbox and click the verification link, then come back here.',
+        actionLabel: verificationNextPath ? "I've Verified - Continue" : "I've Verified",
       };
     }
 
     if (verificationPromptContext === 'store-setup') {
       return {
-        title: 'Verify your email before store setup',
+        title: 'Verify email to continue store setup',
         description: (
           <>
-            Store setup is locked until email verification is complete. We sent a verification link to <span className="font-semibold">{emailAddress}</span>. Click it, then return here.
+            Store setup is locked until verification is complete. Open the link sent to <span className="font-semibold">{maskedVerificationEmail}</span> and return.
           </>
         ),
         toastMessage:
           'Verify your email before starting store setup. Check your inbox for the verification link.',
-        actionLabel: verificationNextPath ? 'I Have Verified - Continue' : 'I Have Verified',
+        actionLabel: verificationNextPath ? "I've Verified - Continue" : "I've Verified",
       };
     }
 
     return {
-      title: 'Verify your email to secure your account',
+      title: 'Verify your email to secure this account',
       description: (
         <>
-          We sent a verification link to <span className="font-semibold">{emailAddress}</span>. Click it, then come back and confirm below.
+          We sent a verification link to <span className="font-semibold">{maskedVerificationEmail}</span>. Open it, then confirm below.
         </>
       ),
       toastMessage:
         'Verify your email before continuing. Check your inbox and click the verification link, or use the resend button on your profile if you have not received it.',
-      actionLabel: verificationNextPath ? 'I Have Verified - Continue' : 'I Have Verified',
+      actionLabel: verificationNextPath ? "I've Verified - Continue" : "I've Verified",
     };
-  }, [verificationNextPath, user?.email, verificationPromptContext]);
+  }, [maskedVerificationEmail, verificationNextPath, verificationPromptContext]);
 
   useEffect(() => {
     if (!user) return;
@@ -332,24 +376,26 @@ export const ProfileLayout: React.FC = () => {
         >
           {showEmailVerificationPrompt ? (
             <div className="px-4 sm:px-6 pt-4">
-              <div className="rounded-2xl border border-purple-300/60 bg-purple-50/70 dark:bg-purple-500/10 dark:border-purple-400/30 px-4 sm:px-5 py-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="rounded-xl border border-purple-300/55 bg-purple-50/80 dark:bg-purple-500/10 dark:border-purple-400/30 px-3.5 sm:px-4 py-3">
+                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-purple-800 dark:text-purple-200">
+                    <p className="text-sm font-semibold leading-tight text-purple-800 dark:text-purple-200">
                       {verificationPromptDetails.title}
                     </p>
-                    <p className="text-xs sm:text-sm text-purple-700/90 dark:text-purple-100/80 mt-1">
+                    <p className="text-xs sm:text-sm text-purple-700/90 dark:text-purple-100/80 mt-0.5">
                       {verificationPromptDetails.description}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={resendVerificationEmail}
                       disabled={isResendingVerification}
                       className="inline-flex items-center justify-center rounded-xl border border-purple-500/40 bg-white/80 dark:bg-transparent px-4 py-2 text-sm font-semibold text-purple-800 dark:text-purple-200 hover:bg-purple-100/70 dark:hover:bg-purple-500/20 disabled:opacity-70 disabled:cursor-not-allowed transition"
                     >
-                      {isResendingVerification ? 'Resending...' : 'Resend Email'}
+                      <span className="inline-flex min-w-[8.75rem] justify-center">
+                        {isResendingVerification ? 'Resending...' : 'Resend Email'}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -357,9 +403,11 @@ export const ProfileLayout: React.FC = () => {
                       disabled={isRefreshingVerification}
                       className="inline-flex items-center justify-center rounded-xl bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-strong)] disabled:opacity-70 disabled:cursor-not-allowed transition"
                     >
-                      {isRefreshingVerification
-                        ? 'Checking...'
-                        : verificationPromptDetails.actionLabel}
+                      <span className="inline-flex min-w-[11.5rem] justify-center">
+                        {isRefreshingVerification
+                          ? 'Checking...'
+                          : verificationPromptDetails.actionLabel}
+                      </span>
                     </button>
                   </div>
                 </div>

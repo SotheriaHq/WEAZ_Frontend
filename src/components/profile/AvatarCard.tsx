@@ -17,9 +17,9 @@ interface AvatarCardProps {
 }
 
 const sizeMap: Record<'sm' | 'md' | 'lg', string> = {
-  sm: 'max-w-20 max-h-20',
-  md: 'max-w-28 max-h-28',
-  lg: 'max-w-52 max-h-52',
+  sm: 'w-20 h-20',
+  md: 'w-28 h-28',
+  lg: 'w-40 h-40 sm:w-44 sm:h-44 md:w-52 md:h-52',
 };
 
 const AvatarCard: React.FC<AvatarCardProps> = ({
@@ -46,7 +46,7 @@ const AvatarCard: React.FC<AvatarCardProps> = ({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl ${sizeMap[size]} ${className} ${clickable ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-00' : ''}`}
+      className={`relative shrink-0 overflow-hidden rounded-xl ${sizeMap[size]} ${className} ${clickable ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-300' : ''}`}
       onClick={onClick}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}

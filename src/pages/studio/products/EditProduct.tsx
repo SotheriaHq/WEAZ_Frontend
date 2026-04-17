@@ -17,7 +17,7 @@ import {
   X,
 
 } from "lucide-react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import VLoader from "@/components/loaders/VLoader";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
@@ -66,6 +66,10 @@ import {
 } from "@/api/StoreApi";
 import { emitProductStudioSync } from "@/utils/productStudioEvents";
 import { TourOverlay, type TourStep } from "@/components/ui/TourOverlay";
+import {
+  isBrandProfileComplete,
+  resolveBrandProfileSetupDestination,
+} from "@/utils/storeSetup";
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -403,6 +407,18 @@ const EditProduct: React.FC = () => {
     () => new URLSearchParams(location.search).get("includeDeleted") === "true",
     [location.search],
   );
+  const catalogVerificationRedirect = useMemo(() => {
+    const nextPath = `${location.pathname}${location.search}`;
+    return `/profile?verifyEmailPrompt=catalog-create&next=${encodeURIComponent(nextPath)}`;
+  }, [location.pathname, location.search]);
+  const catalogProfileSetupRedirect = useMemo(() => {
+    const nextPath = `${location.pathname}${location.search}`;
+    return resolveBrandProfileSetupDestination(nextPath);
+  }, [location.pathname, location.search]);
+  const requiresCatalogEmailVerification =
+    !isEditMode && user?.type === "BRAND" && user?.isEmailVerified === false;
+  const requiresCatalogProfileSetup =
+    !isEditMode && user?.type === "BRAND" && !isBrandProfileComplete(user);
 
   // State
   const [form, setForm] = useState<FormState>(defaultFormState);
@@ -2413,6 +2429,14 @@ const EditProduct: React.FC = () => {
   // =====================
   // Loading State
   // =====================
+
+  if (requiresCatalogEmailVerification) {
+    return <Navigate to={catalogVerificationRedirect} replace />;
+  }
+
+  if (requiresCatalogProfileSetup) {
+    return <Navigate to={catalogProfileSetupRedirect} replace />;
+  }
 
   if (loading) {
     return (

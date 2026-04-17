@@ -518,7 +518,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     return () => {
       active = false;
     };
-  }, [measurementKeys, sourceId, sourceType]);
+  }, [sourceId, sourceType]);
 
   useEffect(() => {
     if (configuration || hasEditedBaseCharge) {
@@ -885,7 +885,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       return null;
     };
 
-    if (!brandId) {
+    if (sourceId && !brandId) {
       return failDraftValidation('Brand context is unavailable for this store session.');
     }
 
@@ -1040,6 +1040,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     showFabricRules,
     ruleRows,
     sizeExtraRows,
+    sourceId,
     sourceType,
   ]);
 

@@ -1379,7 +1379,7 @@ const CreateDesignInner: React.FC = () => {
                       </span>
                     </div>
                   )}
-                  <div className="relative w-full h-[280px] sm:h-[420px] lg:h-[620px] flex items-center justify-center overflow-hidden">
+                  <div className="relative w-full min-h-[280px] sm:min-h-[420px] lg:min-h-[620px] max-h-[85vh] flex items-center justify-center overflow-y-auto">
                     <AnimatePresence mode="wait">
                       {selectedFile && (
                         <motion.div
@@ -1397,8 +1397,10 @@ const CreateDesignInner: React.FC = () => {
                             src={selectedFile.url}
                             alt={selectedFile.file?.name || "Preview"}
                             className="w-full h-full flex items-center justify-center"
-                            maxHeightClassName="max-h-full"
+                            mediaClassName="h-full w-full object-contain"
+                            maxHeightClassName="max-h-[85vh]"
                             maxWidthClassName="max-w-full"
+                            allowScroll
                           />
                         </motion.div>
                       )}

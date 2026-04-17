@@ -304,12 +304,13 @@ const ProfileHeaderQuickEditModal: React.FC<ProfileHeaderQuickEditModalProps> = 
                         <button 
                             type="submit"
                             disabled={saving}
+                            aria-busy={saving}
                             className="w-full relative group overflow-hidden rounded-xl py-4 font-bold text-white shadow-lg transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:hover:scale-100 bg-purple-600"
                         >
                             <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-600 opacity-90 group-hover:opacity-100 transition-opacity"></div>
-                            <span className="relative z-10 flex items-center justify-center gap-2 text-lg tracking-wide">
-                                {saving ? 'Saving...' : 'Save Changes'}
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 group-hover:translate-x-1 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <span className="relative z-10 flex min-w-[12rem] items-center justify-center gap-2 text-lg tracking-wide">
+                                {saving ? 'Saving changes...' : 'Save Changes'}
+                                <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${saving ? 'opacity-0' : 'opacity-100 group-hover:translate-x-1'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <line x1="5" y1="12" x2="19" y2="12"></line>
                                     <polyline points="12 5 19 12 12 19"></polyline>
                                 </svg>

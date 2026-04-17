@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -22,7 +22,17 @@ function clearModalSearchParams(searchParams: URLSearchParams): URLSearchParams 
 function sanitizeNextPath(path: string): string | null {
   if (!path) return null;
   if (!path.startsWith('/') || path.startsWith('//')) return null;
-  return path;
+
+  const [pathAndQuery, hash = ''] = path.split('#', 2);
+  const [pathname, query = ''] = pathAndQuery.split('?', 2);
+  const params = new URLSearchParams(query);
+  params.delete('modal');
+  params.delete('modalOrigin');
+  params.delete('next');
+  const nextQuery = params.toString();
+  const nextHash = hash ? `#${hash}` : '';
+
+  return `${pathname}${nextQuery ? `?${nextQuery}` : ''}${nextHash}`;
 }
 
 export const GlobalModalRouter: React.FC = () => {
@@ -41,6 +51,10 @@ export const GlobalModalRouter: React.FC = () => {
   const showSkip = modalOrigin === 'prompt';
 
   const [brandProfile, setBrandProfile] = useState<BrandProfileDto | null>(null);
+
+  const clearCurrentModalParams = useCallback(() => {
+    setSearchParams((prev) => clearModalSearchParams(prev), { replace: true });
+  }, [setSearchParams]);
 
   // Lazily fetch brand profile when the brand setup modal opens.
   useEffect(() => {
@@ -62,22 +76,30 @@ export const GlobalModalRouter: React.FC = () => {
     };
   }, [isBrandSetupOpen, user]);
 
-  const closeModal = useMemo(() => {
-    return (opts?: { dismissPrompt?: boolean }) => {
-      if (opts?.dismissPrompt && showSkip) {
-        const until = Date.now() + 7 * 24 * 60 * 60 * 1000;
-        localStorage.setItem(BRAND_SETUP_DISMISS_KEY, String(until));
-      }
-      setSearchParams((prev) => clearModalSearchParams(prev));
-    };
-  }, [setSearchParams, showSkip]);
+  useEffect(() => {
+    if (!isBrandSetupOpen) {
+      setBrandProfile(null);
+    }
+  }, [isBrandSetupOpen]);
+
+  useEffect(() => {
+    if (!modal) return;
+    if (modal === 'brand-setup' && user?.type === 'BRAND') return;
+    clearCurrentModalParams();
+  }, [clearCurrentModalParams, modal, user?.type]);
+
+  const closeModal = useCallback((opts?: { dismissPrompt?: boolean }) => {
+    if (opts?.dismissPrompt && showSkip) {
+      const until = Date.now() + 7 * 24 * 60 * 60 * 1000;
+      localStorage.setItem(BRAND_SETUP_DISMISS_KEY, String(until));
+    }
+    clearCurrentModalParams();
+  }, [clearCurrentModalParams, showSkip]);
 
   if (!modal) return null;
 
   if (modal === 'brand-setup') {
     if (!user || user.type !== 'BRAND') {
-      // If the URL has a modal but we can't render it, clean up.
-      setSearchParams((prev) => clearModalSearchParams(prev));
       return null;
     }
 
@@ -92,17 +114,16 @@ export const GlobalModalRouter: React.FC = () => {
         onSaved={async (updatedUser) => {
           dispatch(setUser(updatedUser));
           localStorage.removeItem(BRAND_SETUP_DISMISS_KEY);
+          closeModal();
           if (nextPath) {
             navigate(nextPath, { replace: true });
             return;
           }
-          closeModal();
         }}
       />
     );
   }
 
-  // Unknown modal key: clean it up.
-  setSearchParams((prev) => clearModalSearchParams(prev));
+  // Unknown modal key cleanup is handled by effect above.
   return null;
 };

@@ -117,12 +117,43 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
     mediaClassName
   );
 
+  const normalizedSrc = React.useMemo(
+    () => (typeof src === 'string' ? src.trim() : ''),
+    [src],
+  );
+  const [hasLoadError, setHasLoadError] = React.useState(false);
+
+  React.useEffect(() => {
+    setHasLoadError(false);
+  }, [kind, normalizedSrc]);
+
+  const shouldRenderMedia = normalizedSrc.length > 0 && !hasLoadError;
+
+  if (!shouldRenderMedia) {
+    return (
+      <div className={frameClassName}>
+        <div
+          className={cn(
+            'flex w-full items-center justify-center text-sm',
+            isCover ? 'h-full bg-gray-200/70 dark:bg-white/10' : 'min-h-[6rem] bg-gray-100 dark:bg-white/5',
+            !isCover && maxHeightClassName,
+            !isCover && maxWidthClassName,
+          )}
+          role="img"
+          aria-label={alt && alt.trim().length > 0 ? alt : 'Media unavailable'}
+        >
+          🖼️
+        </div>
+      </div>
+    );
+  }
+
   if (kind === 'video') {
     return (
       <div className={frameClassName}>
         <video
           ref={videoRef}
-          src={src}
+          src={normalizedSrc}
           controls={controls}
           autoPlay={autoPlay}
           playsInline={playsInline}
@@ -132,7 +163,10 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
           poster={poster}
           className={elementClassName}
           onLoadedData={onLoadedData}
-          onError={onError}
+          onError={() => {
+            setHasLoadError(true);
+            onError?.();
+          }}
         />
       </div>
     );
@@ -142,14 +176,17 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
     <div className={frameClassName}>
       <img
         ref={imgRef}
-        src={src}
+        src={normalizedSrc}
         srcSet={srcSet}
         sizes={sizes}
         alt={alt ?? ''}
         className={elementClassName}
         loading={loading}
         onLoad={onLoad}
-        onError={onError}
+        onError={() => {
+          setHasLoadError(true);
+          onError?.();
+        }}
       />
     </div>
   );

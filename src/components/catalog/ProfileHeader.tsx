@@ -39,7 +39,7 @@ interface ProfileHeaderProps {
   onShareProfile?: () => void;
 }
 
-const ProfileHeader: React.FC<ProfileHeaderProps> = ({
+const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
   profile,
   onEditAvatar,
   onEditBanner,
@@ -292,4 +292,4 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   );
 };
 
-export default ProfileHeader;
+export default React.memo(ProfileHeaderComponent);
