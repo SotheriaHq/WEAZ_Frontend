@@ -4,37 +4,39 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PaymentAttemptSummary } from '@/api/PaymentApi';
 import PaymentReturnPage from './PaymentReturnPage';
 
-const dispatchMock = vi.fn();
-const getPolicy = vi.fn();
-const getAttempt = vi.fn();
-const verifyWithStatus = vi.fn();
-const verifyCustomOrderPayment = vi.fn();
-const prepareForUnifiedCheckout = vi.fn();
-const fetchCart = vi.fn(() => ({ type: 'cart/fetch' }));
-const openCartDrawer = vi.fn(() => ({ type: 'cart/open' }));
+const mockFns = vi.hoisted(() => ({
+  dispatchMock: vi.fn(),
+  getPolicy: vi.fn(),
+  getAttempt: vi.fn(),
+  verifyWithStatus: vi.fn(),
+  verifyCustomOrderPayment: vi.fn(),
+  prepareForUnifiedCheckout: vi.fn(),
+  fetchCart: vi.fn(() => ({ type: 'cart/fetch' })),
+  openCartDrawer: vi.fn(() => ({ type: 'cart/open' })),
+}));
 
 vi.mock('react-redux', () => ({
-  useDispatch: () => dispatchMock,
+  useDispatch: () => mockFns.dispatchMock,
 }));
 
 vi.mock('@/api/PaymentApi', () => ({
   paymentApi: {
-    getPolicy: (...args: unknown[]) => getPolicy(...args),
-    getAttempt: (...args: unknown[]) => getAttempt(...args),
-    verifyWithStatus: (...args: unknown[]) => verifyWithStatus(...args),
+    getPolicy: mockFns.getPolicy,
+    getAttempt: mockFns.getAttempt,
+    verifyWithStatus: mockFns.verifyWithStatus,
   },
 }));
 
 vi.mock('@/api/CustomOrderApi', () => ({
   customOrdersBuyerApi: {
-    verifyPayment: (...args: unknown[]) => verifyCustomOrderPayment(...args),
-    prepareForUnifiedCheckout: (...args: unknown[]) => prepareForUnifiedCheckout(...args),
+    verifyPayment: mockFns.verifyCustomOrderPayment,
+    prepareForUnifiedCheckout: mockFns.prepareForUnifiedCheckout,
   },
 }));
 
 vi.mock('@/features/cartSlice', () => ({
-  fetchCart: (...args: unknown[]) => fetchCart(...args),
-  openCartDrawer: (...args: unknown[]) => openCartDrawer(...args),
+  fetchCart: mockFns.fetchCart,
+  openCartDrawer: mockFns.openCartDrawer,
 }));
 
 vi.mock('@/pages/checkout/paymentFlow', () => ({
@@ -150,13 +152,13 @@ function renderPage(initialEntry: string) {
 describe('PaymentReturnPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    dispatchMock.mockImplementation((action: unknown) => action);
-    getPolicy.mockResolvedValue(paymentPolicy);
+    mockFns.dispatchMock.mockImplementation((action: unknown) => action);
+    mockFns.getPolicy.mockResolvedValue(paymentPolicy);
   });
 
   it('routes a failed custom-order retry back through bag checkout', async () => {
-    getAttempt.mockResolvedValue(failedCustomOrderAttempt);
-    verifyCustomOrderPayment.mockResolvedValue({
+    mockFns.getAttempt.mockResolvedValue(failedCustomOrderAttempt);
+    mockFns.verifyCustomOrderPayment.mockResolvedValue({
       success: false,
       status: 'FAILED',
       reference: failedCustomOrderAttempt.reference,
@@ -169,7 +171,7 @@ describe('PaymentReturnPage', () => {
       recoveryMessage: 'Card authorization failed.',
       customOrderId: failedCustomOrderAttempt.customOrderId,
     });
-    prepareForUnifiedCheckout.mockResolvedValue({
+    mockFns.prepareForUnifiedCheckout.mockResolvedValue({
       customOrderId: failedCustomOrderAttempt.customOrderId,
       checkoutSessionId: 'checkout-session-1',
       checkoutIntentId: failedCustomOrderAttempt.checkoutIntentId,
@@ -187,13 +189,13 @@ describe('PaymentReturnPage', () => {
     fireEvent.click(screen.getByText('Prepare in bag checkout'));
 
     await waitFor(() => {
-      expect(prepareForUnifiedCheckout).toHaveBeenCalledWith('custom-order-1');
+      expect(mockFns.prepareForUnifiedCheckout).toHaveBeenCalledWith('custom-order-1');
     });
 
-    expect(fetchCart).toHaveBeenCalledTimes(1);
-    expect(openCartDrawer).toHaveBeenCalledTimes(1);
-    expect(dispatchMock).toHaveBeenCalledWith({ type: 'cart/fetch' });
-    expect(dispatchMock).toHaveBeenCalledWith({ type: 'cart/open' });
+    expect(mockFns.fetchCart).toHaveBeenCalledTimes(1);
+    expect(mockFns.openCartDrawer).toHaveBeenCalledTimes(1);
+    expect(mockFns.dispatchMock).toHaveBeenCalledWith({ type: 'cart/fetch' });
+    expect(mockFns.dispatchMock).toHaveBeenCalledWith({ type: 'cart/open' });
 
     await waitFor(() => {
       expect(screen.getByText('Bag route')).toBeInTheDocument();
@@ -201,10 +203,10 @@ describe('PaymentReturnPage', () => {
   });
 
   it('routes a paid unified checkout attempt to confirmation', async () => {
-    getAttempt
+    mockFns.getAttempt
       .mockResolvedValueOnce(paidUnifiedAttempt)
       .mockResolvedValueOnce(paidUnifiedAttempt);
-    verifyWithStatus.mockResolvedValue({
+    mockFns.verifyWithStatus.mockResolvedValue({
       success: true,
       status: 'PAID',
       reference: paidUnifiedAttempt.reference,
@@ -228,7 +230,7 @@ describe('PaymentReturnPage', () => {
       expect(screen.getByText('Confirmation route')).toBeInTheDocument();
     });
 
-    expect(fetchCart).toHaveBeenCalledTimes(1);
-    expect(dispatchMock).toHaveBeenCalledWith({ type: 'cart/fetch' });
+    expect(mockFns.fetchCart).toHaveBeenCalledTimes(1);
+    expect(mockFns.dispatchMock).toHaveBeenCalledWith({ type: 'cart/fetch' });
   });
 });
