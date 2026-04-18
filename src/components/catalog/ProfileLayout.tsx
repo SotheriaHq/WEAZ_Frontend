@@ -223,9 +223,7 @@ export const ProfileLayout: React.FC = () => {
     if (emailVerifiedFlag === '1') {
       toast.success(emailVerifiedMessage);
       shouldCleanQuery = true;
-    }
-
-    if (!user.isEmailVerified && verificationPromptContext) {
+    } else if (!user.isEmailVerified && verificationPromptContext) {
       toast.info(verificationPromptDetails.toastMessage);
       shouldCleanQuery = true;
     }

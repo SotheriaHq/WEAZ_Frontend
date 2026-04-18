@@ -45,7 +45,10 @@ import { isCustomSizingMode, isRtwSizingMode, normalizeSizingMode, type SizingMo
 import CustomOrderConfigurationEditor, {
   type CustomOrderConfigurationEditorHandle,
 } from '@/components/custom-orders/CustomOrderConfigurationEditor';
-import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
+import {
+  customOrderConfigurationsApi,
+  type CustomOrderConfigurationUpsertInput,
+} from '@/api/CustomOrderApi';
 import {
   normalizePrimary,
   reorderItems,
@@ -368,6 +371,32 @@ const formatCurrency = (amount: number, currency = "NGN"): string => {
   } catch {
     return `₦${amount.toLocaleString()}`;
   }
+};
+
+const buildHiddenCustomOrderBasisLabel = (productTitle: string): string => {
+  const trimmedTitle = productTitle.trim();
+  return `${trimmedTitle || 'Product'} fabric rules`;
+};
+
+const createCustomOrderConfigurationWithBasis = async (
+  draft: CustomOrderConfigurationUpsertInput,
+  sourceId: string,
+  productTitle: string,
+) => {
+  const payload: CustomOrderConfigurationUpsertInput = { ...draft };
+
+  if (!payload.fabricRuleBasisId) {
+    const hiddenBasis = await customOrderConfigurationsApi.createFabricRuleBasis({
+      label: buildHiddenCustomOrderBasisLabel(productTitle),
+      measurementKeys: payload.requiredMeasurementKeys,
+    });
+    payload.fabricRuleBasisId = hiddenBasis.id;
+  }
+
+  return customOrderConfigurationsApi.create({
+    ...payload,
+    sourceId,
+  });
 };
 
 // =====================
@@ -1715,10 +1744,11 @@ const EditProduct: React.FC = () => {
 
           if (pendingCustomOrderDraft) {
             try {
-              await customOrderConfigurationsApi.create({
-                ...pendingCustomOrderDraft,
-                sourceId: created.id,
-              });
+              await createCustomOrderConfigurationWithBasis(
+                pendingCustomOrderDraft,
+                created.id,
+                form.title,
+              );
             } catch (customOrderError: any) {
               await productApi.updateProduct(created.id, {
                 customOrderEnabled: false,
@@ -1978,10 +2008,11 @@ const EditProduct: React.FC = () => {
         const created = await productApi.createProduct(payload);
         if (pendingCustomOrderDraft) {
           try {
-            await customOrderConfigurationsApi.create({
-              ...pendingCustomOrderDraft,
-              sourceId: created.id,
-            });
+            await createCustomOrderConfigurationWithBasis(
+              pendingCustomOrderDraft,
+              created.id,
+              form.title,
+            );
           } catch (customOrderError: any) {
             await productApi.updateProduct(created.id, {
               customOrderEnabled: false,

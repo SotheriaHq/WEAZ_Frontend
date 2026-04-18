@@ -240,6 +240,10 @@ const CreateDesignInner: React.FC = () => {
     cancelUploads,
   } = useCollectionUpload();
   const { user, fetchCollections } = useBrandProfile();
+  const publishTaskScope = useMemo(
+    () => ({ ownerId: user?.id ?? undefined }),
+    [user?.id],
+  );
   const emailVerificationRedirect = useMemo(() => {
     const nextPath = `${location.pathname}${location.search}`;
     return `/profile?verifyEmailPrompt=design-create&next=${encodeURIComponent(nextPath)}`;
@@ -866,6 +870,7 @@ const CreateDesignInner: React.FC = () => {
         })();
 
         const task = createPublishTask({
+          ownerId: user?.id,
           title,
           coverPreviewUrl: editPreviewUrl,
           collectionId: id,
@@ -886,7 +891,7 @@ const CreateDesignInner: React.FC = () => {
 
         void (async () => {
           try {
-            updatePublishTask(task.id, { progress: 10, message: 'Updating metadata...' });
+            updatePublishTask(task.id, { progress: 10, message: 'Updating metadata...' }, publishTaskScope);
 
             await brandApi.updateCollection(id, {
               title,
@@ -909,7 +914,7 @@ const CreateDesignInner: React.FC = () => {
               targetAgeGroup: 'ADULT',
             } as any);
 
-            updatePublishTask(task.id, { progress: 40, message: 'Cleaning up items...' });
+            updatePublishTask(task.id, { progress: 40, message: 'Cleaning up items...' }, publishTaskScope);
 
             const currentIds = new Set(files.map((f) => f.id));
             const toDelete = Array.from(originalItemIds.current).filter(
@@ -921,7 +926,7 @@ const CreateDesignInner: React.FC = () => {
               );
             }
 
-            updatePublishTask(task.id, { status: 'finalizing', progress: 70, message: 'Finalizing...' });
+            updatePublishTask(task.id, { status: 'finalizing', progress: 70, message: 'Finalizing...' }, publishTaskScope);
 
             await finalizeCollectionUploads(
               id,
@@ -956,20 +961,23 @@ const CreateDesignInner: React.FC = () => {
               collectionId: id,
               coverPreviewUrl: undefined,
               message: 'Published',
-            });
+            }, publishTaskScope);
             toast.success('Design published');
-            window.setTimeout(() => removePublishTask(task.id), 30_000);
+            window.setTimeout(() => removePublishTask(task.id, publishTaskScope), 30_000);
           } catch (backgroundError) {
-            const errMsg =
+            const rawErrMsg =
               (backgroundError as any)?.response?.data?.message ||
               (backgroundError instanceof Error ? backgroundError.message : 'Failed to publish design');
+            const errMsg = Array.isArray(rawErrMsg)
+              ? rawErrMsg[0] ?? 'Failed to publish design'
+              : String(rawErrMsg);
             updatePublishTask(task.id, {
               status: 'failed',
               progress: 100,
               message: 'Publish failed',
-              error: String(errMsg),
-            });
-            toast.error(String(errMsg));
+              error: errMsg,
+            }, publishTaskScope);
+            toast.error(errMsg);
           }
         })();
         return;
@@ -993,9 +1001,10 @@ const CreateDesignInner: React.FC = () => {
 
         const previewDataUrl = await buildCoverPreviewDataUrl();
         const task = createPublishTask({
+          ownerId: user?.id,
           title,
           coverPreviewUrl: previewDataUrl,
-          message: 'Preparing upload...',
+          message: 'Preparing draft upload...',
         });
 
         setShowPublishModal(false);
@@ -1007,10 +1016,10 @@ const CreateDesignInner: React.FC = () => {
             publishingStartedAt: task.startedAt,
           },
         });
-
         toast.info('Publishing in background. You can keep browsing your profile.');
 
         void (async () => {
+          let uploadedCollectionId: string | undefined;
           try {
             const response = await uploadCollection(
               files,
@@ -1036,21 +1045,28 @@ const CreateDesignInner: React.FC = () => {
                 targetAgeGroup: 'ADULT',
               },
               (value) => {
+                const mappedProgress = Math.max(5, Math.min(90, Math.round(value * 0.9)));
                 updatePublishTask(task.id, {
                   status: value >= 100 ? 'finalizing' : 'uploading',
-                  progress: value >= 100 ? 96 : value,
-                  message: value >= 100 ? 'Finalizing design...' : 'Uploading media...',
-                });
+                  progress: mappedProgress,
+                  message: value >= 100 ? 'Draft uploaded. Preparing publish...' : 'Uploading media...',
+                }, publishTaskScope);
               },
+              false,
             );
 
-            const newCollectionId = extractCollectionId(response);
-            if (pendingCustomOrderDraft && newCollectionId) {
+            uploadedCollectionId = extractCollectionId(response);
+            if (!uploadedCollectionId) {
+              throw new Error('Upload completed but no design id was returned. Please retry publish.');
+            }
+
+            if (pendingCustomOrderDraft) {
               updatePublishTask(task.id, {
                 status: 'finalizing',
-                progress: 98,
+                progress: 94,
+                collectionId: uploadedCollectionId,
                 message: 'Saving custom-order setup...',
-              });
+              }, publishTaskScope);
               await customOrderConfigurationsApi.create({
                 ...pendingCustomOrderDraft,
                 fabricRuleBasisId: pendingCustomOrderDraft.fabricRuleBasisId || (
@@ -1060,31 +1076,82 @@ const CreateDesignInner: React.FC = () => {
                     gender: measurementGender,
                   })
                 ).id,
-                sourceId: newCollectionId,
+                sourceId: uploadedCollectionId,
               });
             }
+
+            updatePublishTask(task.id, {
+              status: 'finalizing',
+              progress: 97,
+              collectionId: uploadedCollectionId,
+              message: 'Publishing design...',
+            }, publishTaskScope);
+
+            await finalizeCollectionUploads(
+              uploadedCollectionId,
+              [],
+              true,
+              {
+                action: 'publish',
+                coverIndex,
+                collectionMetadata: {
+                  title,
+                  description,
+                  visibility,
+                  type,
+                  categoryId,
+                  subCategoryId: categoryTypeId,
+                  categoryTypeId,
+                  tags: finalTags,
+                  filterValueIds: getSelectedFilterValueIds(),
+                  sizingMode,
+                  rtwSizeSystem: undefined,
+                  customMeasurementKeys: normalizedCustomMeasurementKeys,
+                  customOrderEnabled: isMadeToOrder,
+                  fitPreference: undefined,
+                  targetAgeGroup: 'ADULT',
+                },
+              },
+            );
+
             updatePublishTask(task.id, {
               status: 'published',
               progress: 100,
-              collectionId: newCollectionId,
+              collectionId: uploadedCollectionId,
               coverPreviewUrl: undefined,
               message: 'Published',
-            });
+            }, publishTaskScope);
+
+            if (user?.id) {
+              await fetchCollections(user.id);
+            }
+
             toast.success('Design published');
-            window.setTimeout(() => removePublishTask(task.id), 30_000);
+            window.setTimeout(() => removePublishTask(task.id, publishTaskScope), 30_000);
           } catch (backgroundError) {
-            const errMsg =
+            const rawErrMsg =
               (backgroundError as any)?.response?.data?.message ||
               (backgroundError instanceof Error ? backgroundError.message : 'Failed to publish design');
+            const errMsg = Array.isArray(rawErrMsg)
+              ? rawErrMsg[0] ?? 'Failed to publish design'
+              : String(rawErrMsg);
             updatePublishTask(task.id, {
               status: 'failed',
               progress: 100,
-              message: 'Publish failed',
-              error: String(errMsg),
-            });
-            toast.error(String(errMsg));
+              collectionId: uploadedCollectionId,
+              message: uploadedCollectionId
+                ? 'Uploaded with setup issue. Open editor to complete and republish.'
+                : 'Publish failed',
+              error: errMsg,
+            }, publishTaskScope);
+            toast.error(
+              uploadedCollectionId
+                ? `${errMsg}. Your media was uploaded; open the design editor to finish setup.`
+                : errMsg,
+            );
           }
         })();
+
         return;
       }
     } catch (error) {

@@ -161,10 +161,10 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     const run = async () => {
       // If src/fileId changed, reset error
       setHadError(false);
+      setLoaded(false);
 
       // When fileId exists, prefer resolving by fileId to avoid stale signed URLs.
       if (!fileId && src && isS3LikeUrl(src)) {
-        setLoaded(false);
         const url = await resolveSignedUrl(src, () => brandApi.getSignedS3Url(src));
         if (mounted) {
           setResolved(url || src);
@@ -174,7 +174,6 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
 
       // Handle storage keys persisted without full host (e.g. "POST_IMAGE/.../file.jpg")
       if (!fileId && src && !src.includes('?') && !/^https?:\/\//i.test(src)) {
-        setLoaded(false);
         const url = await resolveSignedUrl(`key:${src}`, () => brandApi.getSignedS3KeyUrl(src));
         if (mounted) {
           setResolved(url || src);
@@ -193,12 +192,8 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         const cachedUrl = getCachedUrl(fileId);
         if (cachedUrl) {
           setResolved(cachedUrl);
-          setLoaded(true);
           return; // Use cached URL, no need to fetch
         }
-
-        // No cached URL, need to fetch
-        setLoaded(false);
 
         const url = await resolveSignedUrl(fileId, () => brandApi.getSignedFileUrl(fileId));
         if (mounted) {

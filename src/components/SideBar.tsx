@@ -12,6 +12,7 @@ interface SidebarLinkProps {
   active?: boolean;
   onClick?: () => void;
   isRail?: boolean;
+  disabled?: boolean;
 }
 
 interface SidebarProps {
@@ -24,22 +25,33 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
   active = false,
   onClick,
   isRail = false,
+  disabled = false,
 }) => {
+  const isSelected = active && !disabled;
+
   if (isRail) {
     return (
       <button
-        onClick={onClick}
+        type="button"
+        disabled={disabled}
+        onClick={disabled ? undefined : onClick}
         className={`w-full py-3 flex flex-col items-center justify-center gap-1 rounded-lg transition-colors ${
-          active
+          disabled
+            ? 'cursor-not-allowed opacity-50'
+            : isSelected
             ? 'bg-[linear-gradient(180deg,rgba(217,70,239,0.12),rgba(255,255,255,0.1))] dark:bg-[linear-gradient(180deg,rgba(168,85,247,0.18),rgba(255,255,255,0.05))]'
             : 'hover:bg-white/28 dark:hover:bg-white/6'
         }`}
-        title={label}
+        title={disabled ? `${label} (locked until store setup is complete)` : label}
       >
         <span className="text-xl">{emoji}</span>
         <span
           className={`text-[10px] truncate w-full text-center ${
-            active ? 'text-primary font-medium' : 'text-gray-600 dark:text-gray-400'
+            disabled
+              ? 'text-gray-500 dark:text-gray-500'
+              : isSelected
+                ? 'text-primary font-medium'
+                : 'text-gray-600 dark:text-gray-400'
           }`}
         >
           {label}
@@ -50,13 +62,17 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
 
   return (
     <button
-      onClick={onClick}
+      type="button"
+      disabled={disabled}
+      onClick={disabled ? undefined : onClick}
       className={`w-full flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-all duration-200 ${
-        active
+        disabled
+          ? 'cursor-not-allowed opacity-50'
+          : isSelected
           ? 'bg-[linear-gradient(90deg,rgba(217,70,239,0.12),rgba(255,255,255,0.12))] font-semibold text-gray-900 dark:bg-[linear-gradient(90deg,rgba(168,85,247,0.18),rgba(255,255,255,0.04))] dark:text-white'
           : 'text-gray-700 dark:text-gray-300 hover:bg-white/28 dark:hover:bg-white/5'
       }`}
-      title={isRail ? label : undefined}
+      title={disabled ? `${label} (locked until store setup is complete)` : isRail ? label : undefined}
     >
       <span className="w-6 shrink-0 text-center text-xl">{emoji}</span>
       <span className="flex-1 truncate text-[17px] font-medium">{label}</span>
@@ -90,8 +106,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
     if (isSidebarOpen) dispatch(closeSidebar());
   };
 
-  // Brands without complete store setup should not see Studio or Messages
+  // Brands without complete store setup should keep the same nav shape.
   const isBrandWithIncompleteSetup = user?.type === 'BRAND' && storeSetupComplete === false;
+  const studioFeaturesLocked = Boolean(isBrandWithIncompleteSetup);
 
   const mainLinks = [
     {
@@ -106,13 +123,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
       path: '/market-place',
       active: location.pathname === '/market-place',
     },
-    ...(user?.type === 'BRAND' && !isBrandWithIncompleteSetup
+    ...(user?.type === 'BRAND'
       ? [
           {
             emoji: '🎬',
             label: 'Studio',
             path: '/studio',
             active: location.pathname.startsWith('/studio'),
+            disabled: studioFeaturesLocked,
           },
         ]
       : []),
@@ -122,13 +140,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
       path: '/subscriptions',
       active: location.pathname === '/subscriptions',
     },
-    ...(!isBrandWithIncompleteSetup
+    ...(user?.type === 'BRAND'
       ? [
           {
             emoji: '💬',
             label: 'Messages',
             path: '/messages',
             active: location.pathname === '/messages' || location.pathname.startsWith('/studio/messages'),
+            disabled: studioFeaturesLocked,
           },
         ]
       : []),
@@ -167,9 +186,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
             <button
               key={link.path}
               type="button"
-              onClick={() => navigate(link.path)}
+              disabled={link.disabled}
+              onClick={link.disabled ? undefined : () => navigate(link.path)}
               className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium transition-colors ${
-                link.active
+                link.disabled
+                  ? 'cursor-not-allowed opacity-50'
+                  : link.active
                   ? 'bg-purple-50 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300'
                   : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10'
               }`}
@@ -193,6 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
             emoji={link.emoji}
             label={link.label}
             active={link.active}
+            disabled={link.disabled}
             onClick={() => handleLinkClick(link.path)}
             isRail={isRailMode}
           />

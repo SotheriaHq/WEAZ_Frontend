@@ -2,6 +2,7 @@ export type PublishTaskStatus = 'uploading' | 'finalizing' | 'published' | 'fail
 
 export interface PublishTask {
   id: string;
+  ownerId?: string;
   title: string;
   startedAt: number;
   status: PublishTaskStatus;
@@ -13,15 +14,31 @@ export interface PublishTask {
   updatedAt: number;
 }
 
-const STORAGE_KEY = 'threadly.publish.designTasks.v1';
+type PublishTaskScope = {
+  ownerId?: string | null;
+};
+
+const STORAGE_KEY = 'threadly.publish.designTasks.v2';
+const LEGACY_STORAGE_KEY = 'threadly.publish.designTasks.v1';
 const EVENT_NAME = 'threadly:publish-tasks-updated';
-const MAX_TASKS = 12;
+const MAX_TASKS_PER_SCOPE = 12;
+const MAX_TOTAL_TASKS = 120;
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 const PUBLISHED_GRACE_MS = 30 * 1000;
 
 const clampProgress = (value: number) => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, Math.round(value)));
+};
+
+const normalizeOwnerId = (ownerId?: string | null) => {
+  if (typeof ownerId !== 'string') return undefined;
+  const trimmed = ownerId.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const resolveScopeOwnerId = (scope?: PublishTaskScope) => {
+  return normalizeOwnerId(scope?.ownerId);
 };
 
 const emitTasksUpdated = () => {
@@ -34,6 +51,7 @@ const isTaskLike = (value: unknown): value is PublishTask => {
   const task = value as Partial<PublishTask>;
   return (
     typeof task.id === 'string' &&
+    (task.ownerId === undefined || typeof task.ownerId === 'string') &&
     typeof task.title === 'string' &&
     typeof task.startedAt === 'number' &&
     typeof task.status === 'string' &&
@@ -42,31 +60,72 @@ const isTaskLike = (value: unknown): value is PublishTask => {
   );
 };
 
-export const readPublishTasks = (): PublishTask[] => {
+const normalizeTaskList = (tasks: PublishTask[]) => {
+  const now = Date.now();
+  const fresh = tasks
+    .filter((task) => {
+      if (now - task.updatedAt > STALE_AFTER_MS) return false;
+      if (task.status === 'published' && now - task.updatedAt > PUBLISHED_GRACE_MS) return false;
+      return true;
+    })
+    .map((task) => ({
+      ...task,
+      ownerId: normalizeOwnerId(task.ownerId),
+    }))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+
+  const byScope = new Map<string, PublishTask[]>();
+  for (const task of fresh) {
+    const key = task.ownerId ?? '__legacy__';
+    const existing = byScope.get(key) ?? [];
+    if (existing.length < MAX_TASKS_PER_SCOPE) {
+      existing.push(task);
+      byScope.set(key, existing);
+    }
+  }
+
+  return Array.from(byScope.values())
+    .flat()
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, MAX_TOTAL_TASKS);
+};
+
+const readRawPublishTasks = (): PublishTask[] => {
   if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
+    const legacyRaw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    const parsed = JSON.parse(raw || legacyRaw || '[]');
     if (!Array.isArray(parsed)) return [];
-    const now = Date.now();
-    return parsed
+    return normalizeTaskList(
+      parsed
       .filter(isTaskLike)
-      .filter((task) => {
-        if (now - task.updatedAt > STALE_AFTER_MS) return false;
-        if (task.status === 'published' && now - task.updatedAt > PUBLISHED_GRACE_MS) return false;
-        return true;
-      })
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, MAX_TASKS);
+        .map((task) => ({
+          ...task,
+          ownerId: normalizeOwnerId(task.ownerId),
+        })),
+    );
   } catch {
     return [];
   }
 };
 
+const taskBelongsToScope = (task: PublishTask, scopeOwnerId: string | undefined) => {
+  if (!scopeOwnerId) {
+    return !task.ownerId;
+  }
+  return task.ownerId === scopeOwnerId;
+};
+
+export const readPublishTasks = (scope?: PublishTaskScope): PublishTask[] => {
+  const scopeOwnerId = resolveScopeOwnerId(scope);
+  return readRawPublishTasks().filter((task) => taskBelongsToScope(task, scopeOwnerId));
+};
+
 const writePublishTasks = (tasks: PublishTask[]) => {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks.slice(0, MAX_TASKS)));
+  const normalized = normalizeTaskList(tasks);
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
   emitTasksUpdated();
 };
 
@@ -76,6 +135,7 @@ export const savePublishTasks = (tasks: PublishTask[]) => {
 
 export const createPublishTask = (payload: {
   title: string;
+  ownerId?: string | null;
   coverPreviewUrl?: string;
   collectionId?: string;
   message?: string;
@@ -84,6 +144,7 @@ export const createPublishTask = (payload: {
   const now = Date.now();
   const task: PublishTask = {
     id,
+    ownerId: normalizeOwnerId(payload.ownerId),
     title: payload.title,
     startedAt: now,
     status: 'uploading',
@@ -94,18 +155,28 @@ export const createPublishTask = (payload: {
     updatedAt: now,
   };
 
-  const existing = readPublishTasks().filter((entry) => entry.id !== id);
+  const existing = readRawPublishTasks().filter((entry) => entry.id !== id);
   writePublishTasks([task, ...existing]);
   return task;
 };
 
-export const updatePublishTask = (id: string, update: Partial<Omit<PublishTask, 'id' | 'startedAt'>>) => {
-  const tasks = readPublishTasks();
+export const updatePublishTask = (
+  id: string,
+  update: Partial<Omit<PublishTask, 'id' | 'startedAt'>>,
+  scope?: PublishTaskScope,
+) => {
+  const scopeOwnerId = resolveScopeOwnerId(scope);
+  const tasks = readRawPublishTasks();
   const next = tasks.map((task) => {
     if (task.id !== id) return task;
+    if (!taskBelongsToScope(task, scopeOwnerId)) return task;
     const merged: PublishTask = {
       ...task,
       ...update,
+      ownerId:
+        update.ownerId === undefined
+          ? task.ownerId
+          : normalizeOwnerId(update.ownerId),
       progress: update.progress === undefined ? task.progress : clampProgress(update.progress),
       updatedAt: Date.now(),
     };
@@ -114,13 +185,17 @@ export const updatePublishTask = (id: string, update: Partial<Omit<PublishTask, 
   writePublishTasks(next);
 };
 
-export const removePublishTask = (id: string) => {
-  const next = readPublishTasks().filter((task) => task.id !== id);
+export const removePublishTask = (id: string, scope?: PublishTaskScope) => {
+  const scopeOwnerId = resolveScopeOwnerId(scope);
+  const next = readRawPublishTasks().filter((task) => {
+    if (task.id !== id) return true;
+    return !taskBelongsToScope(task, scopeOwnerId);
+  });
   writePublishTasks(next);
 };
 
 export const prunePublishTasks = () => {
-  writePublishTasks(readPublishTasks());
+  writePublishTasks(readRawPublishTasks());
 };
 
 export const subscribePublishTasks = (listener: () => void) => {
@@ -129,7 +204,9 @@ export const subscribePublishTasks = (listener: () => void) => {
   }
 
   const onStorage = (event: StorageEvent) => {
-    if (event.key === STORAGE_KEY) listener();
+    if (event.key === STORAGE_KEY || event.key === LEGACY_STORAGE_KEY) {
+      listener();
+    }
   };
   const onCustom = () => listener();
 

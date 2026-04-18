@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
 import { useDispatch } from 'react-redux';
 
 import { toast } from 'sonner';
 import ProfileHeader from '../../components/catalog/ProfileHeader';
+import OwnerCatalogMediaHeader from '../../components/catalog/OwnerCatalogMediaHeader';
 import Tabs from '../../components/Tabs';
 import AddCollectionModal from '../../components/profile/AddCollectionModal';
 import CollectionsGrid from '../../components/profile/CollectionsGrid';
@@ -17,13 +18,11 @@ import ReviewsTab from '../../components/profile/tabs/ReviewsTab';
 import InlineCollectionViewer from '../../components/collections/InlineCollectionViewer';
 import CollectionCard from '../../components/profile/CollectionCard';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import type { AuthUserDto } from '../../types/auth';
 import { setUser } from '../../features/userSlice';
 import { brandApi } from '../../api/BrandApi';
 import { apiClient } from '@/api/httpClient';
-import ProfileImageModal from '../../components/profile/ProfileImageModal';
+import { finalizeCollectionUploads } from '@/api/collectionUploads';
 import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQuickEditModal';
-import ImageCropModal from '../../components/upload/ImageCropModal';
 import type { BrandProfileDto, CollectionDto } from '../../types/profile';
 import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedFileUrl';
 import { getStoreStatus, type StoreStatusResponse } from '../../api/StoreApi';
@@ -93,7 +92,7 @@ const ProfilePage: React.FC = () => {
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
   const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string }>>({});
-  const [publishTasks, setPublishTasks] = useState<PublishTask[]>(() => readPublishTasks());
+  const [publishTasks, setPublishTasks] = useState<PublishTask[]>([]);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -147,105 +146,21 @@ const ProfilePage: React.FC = () => {
   const [storeStatusLoading, setStoreStatusLoading] = useState(false);
   const [hasDismissedStoreSetup, setHasDismissedStoreSetup] = useState(false);
   const [isStoreSetupNavigating, setIsStoreSetupNavigating] = useState(false);
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [bannerUploading, setBannerUploading] = useState(false);
-  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
-  const [avatarHighlight, setAvatarHighlight] = useState(false);
-  const [bannerPreviewUrl, setBannerPreviewUrlState] = useState<string | null>(null);
-  const [localAvatarPreview, setLocalAvatarPreviewState] = useState<string | null>(null);
-  const [cropTask, setCropTask] = useState<{ type: 'avatar' | 'banner'; file: File } | null>(null);
   const [isHeaderQuickEditOpen, setIsHeaderQuickEditOpen] = useState(false);
   const [isSavingHeader, setIsSavingHeader] = useState(false);
-  const avatarPreviewObjectUrl = useRef<string | null>(null);
-  const bannerPreviewObjectUrl = useRef<string | null>(null);
 
-  const updateAvatarPreview = (url: string | null) => {
-    const current = avatarPreviewObjectUrl.current;
-    if (current && current !== url) {
-      URL.revokeObjectURL(current);
-      avatarPreviewObjectUrl.current = null;
-    }
-    if (url && url.startsWith('blob:')) {
-      avatarPreviewObjectUrl.current = url;
-    } else if (!url) {
-      avatarPreviewObjectUrl.current = null;
-    }
-    setLocalAvatarPreviewState(url);
-  };
-
-  const updateBannerPreview = (url: string | null) => {
-    const current = bannerPreviewObjectUrl.current;
-    if (current && current !== url) {
-      URL.revokeObjectURL(current);
-      bannerPreviewObjectUrl.current = null;
-    }
-    if (url && url.startsWith('blob:')) {
-      bannerPreviewObjectUrl.current = url;
-    } else if (!url) {
-      bannerPreviewObjectUrl.current = null;
-    }
-    setBannerPreviewUrlState(url);
-  };
-
-  useEffect(() => {
-    if (!isOwner) return;
-    if (
-      bannerPreviewUrl?.startsWith('blob:') &&
-      displayData.bannerImage &&
-      displayData.bannerImage !== bannerPreviewUrl
-    ) {
-      updateBannerPreview(null);
-    }
-  }, [isOwner, displayData.bannerImage, bannerPreviewUrl]);
-
-  useEffect(() => {
-    return () => {
-      if (avatarPreviewObjectUrl.current) {
-        URL.revokeObjectURL(avatarPreviewObjectUrl.current);
-      }
-      if (bannerPreviewObjectUrl.current) {
-        URL.revokeObjectURL(bannerPreviewObjectUrl.current);
-      }
-    };
-  }, []);
-
-  // Always try to resolve a signed avatar URL for owner after refresh
-  useEffect(() => {
-    if (!isOwner) return;
-    const run = async () => {
-      if (!user?.profileImageId) return;
-      try {
-        const signed = await brandApi.getSignedFileUrl(user.profileImageId);
-        if (signed) {
-          updateAvatarPreview(signed);
-        }
-      } catch (e) {
-        console.warn('Failed to resolve signed avatar URL', e);
-      }
-    };
-    void run();
-  }, [isOwner, user?.profileImageId]);
-
-  useEffect(() => {
-    if (!isOwner) return;
-    if (
-      displayData.logoImage &&
-      (!localAvatarPreview || localAvatarPreview.startsWith('blob:'))
-    ) {
-      updateAvatarPreview(displayData.logoImage);
-    }
-  }, [isOwner, displayData.logoImage, localAvatarPreview]);
+  const publishTaskScope = useMemo(
+    () => ({ ownerId: user?.id ?? undefined }),
+    [user?.id],
+  );
 
   useEffect(() => {
     prunePublishTasks();
-    setPublishTasks(readPublishTasks());
+    setPublishTasks(readPublishTasks(publishTaskScope));
     return subscribePublishTasks(() => {
-      setPublishTasks(readPublishTasks());
+      setPublishTasks(readPublishTasks(publishTaskScope));
     });
-  }, []);
-
-  const avatarInputRef = useRef<HTMLInputElement | null>(null);
-  const bannerInputRef = useRef<HTMLInputElement | null>(null);
+  }, [publishTaskScope]);
 
   const handleOpenAddModal = () => {
     // collection type passed from dropdown; modal uses internal defaults for now
@@ -569,149 +484,6 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  const handleTriggerAvatarUpload = useCallback(() => {
-    if (isOwner) {
-      avatarInputRef.current?.click();
-    }
-  }, [isOwner]);
-
-  const handleTriggerBannerUpload = useCallback(() => {
-    if (isOwner) {
-      bannerInputRef.current?.click();
-    }
-  }, [isOwner]);
-
-  const processAvatarUpload = async (file: File, previewUrl: string, disposePreview?: () => void) => {
-    if (!user) return;
-    const currentUser = user;
-    const previousPreview = localAvatarPreview;
-    updateAvatarPreview(previewUrl);
-    setAvatarUploading(true);
-    try {
-      const uploaded = await brandApi.uploadLogo(currentUser.id, file);
-      if (!uploaded) {
-        throw new Error('No upload payload returned');
-      }
-      const signedUrl = (await brandApi.getSignedFileUrl(uploaded.id)) ?? uploaded.url;
-      toast.success('Profile photo updated');
-      // Use signed for immediate preview, but persist stable URL in user state
-      updateAvatarPreview(signedUrl);
-      const updatedUser: AuthUserDto = {
-        ...currentUser,
-        profileImage: uploaded.url,
-        profileImageId: uploaded.id,
-        profileImageFile: {
-          id: uploaded.id,
-          s3Url: uploaded.url,
-          fileName: uploaded.fileName,
-          originalName: uploaded.originalName,
-          createdAt: uploaded.createdAt,
-          updatedAt: uploaded.updatedAt,
-        },
-      };
-      dispatch(setUser(updatedUser));
-      await fetchBrandProfile(currentUser.id);
-      setAvatarHighlight(true);
-    } catch (error) {
-      console.error('Failed to upload profile photo', error);
-      toast.error('Could not update profile photo. Please try again.');
-      updateAvatarPreview(previousPreview ?? null);
-    } finally {
-      setAvatarUploading(false);
-      disposePreview?.();
-    }
-  };
-
-  const processBannerUpload = async (file: File, previewUrl: string, disposePreview?: () => void) => {
-    if (!user) return;
-    const currentUser = user;
-    const previousPreview = bannerPreviewUrl;
-    updateBannerPreview(previewUrl);
-    setBannerUploading(true);
-    try {
-      const uploaded = await brandApi.uploadBanner(currentUser.id, file);
-      if (!uploaded) {
-        throw new Error('No banner upload payload returned');
-      }
-
-      const signedUrl = (await brandApi.getSignedFileUrl(uploaded.id)) ?? uploaded.url;
-      toast.success('Banner image updated');
-      // Use signed for immediate preview, but persist stable URL in user state
-      updateBannerPreview(signedUrl);
-      const updatedUser: AuthUserDto = {
-        ...currentUser,
-        bannerImage: uploaded.url,
-        bannerImageId: uploaded.id,
-        bannerImageFile: {
-          id: uploaded.id,
-          s3Url: uploaded.url,
-          fileName: uploaded.fileName,
-          originalName: uploaded.originalName,
-          createdAt: uploaded.createdAt,
-          updatedAt: uploaded.updatedAt,
-        },
-      };
-      dispatch(setUser(updatedUser));
-      try {
-        await fetchBrandProfile(currentUser.id);
-      } catch (fetchError) {
-        console.warn('Banner uploaded but profile refresh failed', fetchError);
-      }
-    } catch (error) {
-      console.error('Failed to upload banner image', error);
-      toast.error('Could not update banner. Please try again.');
-      updateBannerPreview(previousPreview ?? null);
-    } finally {
-      setBannerUploading(false);
-      disposePreview?.();
-    }
-  };
-
-  const handleAvatarSelected: React.ChangeEventHandler<HTMLInputElement> = (event) => {
-    const file = event.target.files?.[0];
-    if (!file || !user) {
-      event.target.value = '';
-      return;
-    }
-    setCropTask({ type: 'avatar', file });
-    event.target.value = '';
-  };
-
-  const handleBannerSelected: React.ChangeEventHandler<HTMLInputElement> = (event) => {
-    const file = event.target.files?.[0];
-    if (!file || !user) {
-      event.target.value = '';
-      return;
-    }
-    setCropTask({ type: 'banner', file });
-    event.target.value = '';
-  };
-
-  const handleCropConfirm = async (result: { file: File; previewUrl: string; disposePreview: () => void }) => {
-    const activeTask = cropTask;
-    setCropTask(null);
-    if (!activeTask) {
-      result.disposePreview();
-      return;
-    }
-
-    if (activeTask.type === 'avatar') {
-      await processAvatarUpload(result.file, result.previewUrl, result.disposePreview);
-    } else {
-      await processBannerUpload(result.file, result.previewUrl, result.disposePreview);
-    }
-  };
-
-  const handleCropUseOriginal = async (result: { file: File; previewUrl: string; disposePreview: () => void }) => {
-    const activeTask = cropTask;
-    setCropTask(null);
-    if (!activeTask || activeTask.type !== 'avatar') {
-      result.disposePreview();
-      return;
-    }
-    await processAvatarUpload(result.file, result.previewUrl, result.disposePreview);
-  };
-
   // ---------------- Visitor data fetch ----------------
   const [visitorProfile, setVisitorProfile] = useState<BrandProfileDto | null>(null);
   const [visitorCollections, setVisitorCollections] = useState<CollectionDto[]>([]);
@@ -883,7 +655,7 @@ const ProfilePage: React.FC = () => {
           const latest = !isVisitorView ? collections : visitorCollections;
           const isLive = latest.some((entry) => entry.id === collectionId);
           if (isLive) {
-            removePublishTask(task.id);
+            removePublishTask(task.id, publishTaskScope);
             setPublishingStates((prev) => {
               const next = { ...prev };
               delete next[task.id];
@@ -898,7 +670,7 @@ const ProfilePage: React.FC = () => {
     };
 
     void checkAndCleanup();
-  }, [collections, fetchCollections, isVisitorView, publishTasks, user?.id, visitorCollections]);
+  }, [collections, fetchCollections, isVisitorView, publishTaskScope, publishTasks, user?.id, visitorCollections]);
 
   // Auto-clear stale failed publish states for collections that exist on the server
   useEffect(() => {
@@ -912,11 +684,11 @@ const ProfilePage: React.FC = () => {
       const next = { ...prev };
       for (const [id, state] of staleFailed) {
         delete next[id];
-        if (state.taskId) removePublishTask(state.taskId);
+        if (state.taskId) removePublishTask(state.taskId, publishTaskScope);
       }
       return next;
     });
-  }, [activeCollections, publishingStates]);
+  }, [activeCollections, publishTaskScope, publishingStates]);
 
   const handleCollectionViewerBack = useCallback(() => {
     setSelectedCollectionId(null);
@@ -1076,61 +848,171 @@ const ProfilePage: React.FC = () => {
   const isDraftVisibility = visibilityFilter === 'Drafts';
   const isDeletedVisibility = visibilityFilter === 'Deleted';
 
+  const ownerEmptyStateDescription = isDraftVisibility
+    ? "You don't have any unfinished designs."
+    : isDeletedVisibility
+      ? 'Deleted designs will appear here until permanently removed.'
+      : requiresProfileSetup
+        ? 'Complete your brand profile so buyers understand your story, then publish your first design.'
+        : (showStoreSetupNudge || showStoreSetupChip)
+          ? 'Your design feed is empty. Continue store setup so new designs are ready for storefront publishing.'
+          : 'Create your first design to showcase your work.';
+
+  const ownerEmptyStateCta = isDraftVisibility || isDeletedVisibility
+    ? null
+    : requiresProfileSetup
+      ? (
+          <button
+            type="button"
+            onClick={() => handleOpenEditModal(true)}
+            className="inline-flex items-center rounded-lg bg-black text-white px-4 py-2 text-sm font-semibold hover:bg-black/90"
+          >
+            Complete brand profile
+          </button>
+        )
+      : (showStoreSetupNudge || showStoreSetupChip)
+        ? (
+            <button
+              type="button"
+              onClick={handleOpenStoreSetup}
+              disabled={isStoreSetupNavigating}
+              className="inline-flex items-center rounded-lg bg-black text-white px-4 py-2 text-sm font-semibold hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isStoreSetupNavigating ? 'Opening setup...' : 'Continue store setup'}
+            </button>
+          )
+        : (
+            <button
+              type="button"
+              onClick={() => navigate('/profile/collections/create')}
+              className="inline-flex items-center rounded-lg bg-black text-white px-4 py-2 text-sm font-semibold hover:bg-black/90"
+            >
+              Create first design
+            </button>
+          );
+
   const handleRetryPublishCheck = useCallback(async (collectionId: string) => {
     if (!collectionId) return;
     const state = publishingStates[collectionId];
-    const targetCollectionId = state?.taskId && state.taskId === collectionId ? null : collectionId;
+    const linkedTask = state?.taskId
+      ? publishTasks.find((entry) => entry.id === state.taskId)
+      : publishTasks.find((entry) => entry.id === collectionId);
+    const targetCollectionId = linkedTask?.collectionId ?? (state?.taskId && state.taskId === collectionId ? null : collectionId);
+
     if (!targetCollectionId) {
-      toast.info('Still preparing upload session. Progress is updating in real time.');
+      setPublishingStates((prev) => ({
+        ...prev,
+        [collectionId]: {
+          status: 'publishing',
+          startedAt: prev[collectionId]?.startedAt ?? Date.now(),
+          attempts: prev[collectionId]?.attempts ?? 0,
+          progress: prev[collectionId]?.progress,
+          previewUrl: prev[collectionId]?.previewUrl,
+          taskId: prev[collectionId]?.taskId,
+          message: 'Upload session is still initializing. Progress will continue automatically.',
+        },
+      }));
+      toast.info('Upload session is still initializing. Retry in a few seconds.');
       return;
     }
+
     try {
       setPublishingStates((prev) => ({
         ...prev,
-        [targetCollectionId]: {
+        [collectionId]: {
           status: 'publishing',
-          startedAt: prev[targetCollectionId]?.startedAt ?? Date.now(),
-          attempts: (prev[targetCollectionId]?.attempts ?? 0) + 1,
-          progress: prev[targetCollectionId]?.progress,
-          previewUrl: prev[targetCollectionId]?.previewUrl,
-          taskId: prev[targetCollectionId]?.taskId,
-          message: 'Checking publish status...',
+          startedAt: prev[collectionId]?.startedAt ?? Date.now(),
+          attempts: (prev[collectionId]?.attempts ?? 0) + 1,
+          progress: prev[collectionId]?.progress,
+          previewUrl: prev[collectionId]?.previewUrl,
+          taskId: prev[collectionId]?.taskId,
+          message: 'Re-checking publish status...',
         },
       }));
-      await brandApi.getCollectionDetail(targetCollectionId);
+
+      const current = await brandApi.getCollectionDetail(targetCollectionId);
+      if (current?.status !== 'PUBLISHED') {
+        await finalizeCollectionUploads(targetCollectionId, [], true, { action: 'publish' });
+      }
+
+      const refreshedDetail = await brandApi.getCollectionDetail(targetCollectionId);
+      if (refreshedDetail?.status !== 'PUBLISHED') {
+        setPublishingStates((prev) => ({
+          ...prev,
+          [collectionId]: {
+            status: 'publishing',
+            startedAt: prev[collectionId]?.startedAt ?? Date.now(),
+            attempts: (prev[collectionId]?.attempts ?? 0) + 1,
+            progress: prev[collectionId]?.progress,
+            previewUrl: prev[collectionId]?.previewUrl,
+            taskId: prev[collectionId]?.taskId,
+            message: 'Reprocessing started. We will keep checking in the background.',
+          },
+        }));
+        toast.info('Reprocessing started. We will keep checking status.');
+        return;
+      }
+
       if (!isVisitorView && user?.id) {
         await fetchCollections(user.id);
       } else if (isVisitorView && routeBrandId) {
         const cols = await brandApi.getCollections(routeBrandId, { visibility: 'all' });
         setVisitorCollections(cols ?? []);
       }
+
       setPublishingStates((prev) => {
         const next = { ...prev };
+        delete next[collectionId];
         delete next[targetCollectionId];
+        if (state?.taskId) {
+          delete next[state.taskId];
+        }
         return next;
       });
+
+      if (state?.taskId) {
+        removePublishTask(state.taskId, publishTaskScope);
+      }
+
       toast.success('Design is live');
     } catch (error) {
       console.error('Publish status check failed', error);
+
+      const rawMessage =
+        (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message ??
+        (error as Error)?.message ??
+        'Publish is still processing. Try again shortly.';
+      const nextMessage = Array.isArray(rawMessage)
+        ? rawMessage[0] ?? 'Publish is still processing. Try again shortly.'
+        : String(rawMessage);
+
       setPublishingStates((prev) => ({
         ...prev,
-        [targetCollectionId]: {
+        [collectionId]: {
           status: 'failed',
-          startedAt: prev[targetCollectionId]?.startedAt ?? Date.now(),
-          attempts: (prev[targetCollectionId]?.attempts ?? 0) + 1,
-          progress: prev[targetCollectionId]?.progress,
-          previewUrl: prev[targetCollectionId]?.previewUrl,
-          taskId: prev[targetCollectionId]?.taskId,
-          message: 'Publish is still processing. Try again shortly.',
+          startedAt: prev[collectionId]?.startedAt ?? Date.now(),
+          attempts: (prev[collectionId]?.attempts ?? 0) + 1,
+          progress: prev[collectionId]?.progress,
+          previewUrl: prev[collectionId]?.previewUrl,
+          taskId: prev[collectionId]?.taskId,
+          message: nextMessage,
         },
       }));
     }
-  }, [fetchCollections, isVisitorView, publishingStates, routeBrandId, user]);
+  }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, publishingStates, routeBrandId, user]);
 
   // Poll publish status for any pending ids
   useEffect(() => {
     const pending = Object.entries(publishingStates)
-      .filter(([id, state]) => state.status === 'publishing' && (!state.taskId || state.taskId !== id));
+      .filter(([, state]) => state.status === 'publishing')
+      .map(([id, state]) => {
+        const task = state.taskId
+          ? publishTasks.find((entry) => entry.id === state.taskId)
+          : publishTasks.find((entry) => entry.id === id);
+        const resolvedCollectionId = task?.collectionId ?? (state.taskId && state.taskId === id ? null : id);
+        return { id, state, resolvedCollectionId };
+      });
+
     if (pending.length === 0) return;
 
     const poll = async () => {
@@ -1138,7 +1020,7 @@ const ProfilePage: React.FC = () => {
       if (offline) {
         setPublishingStates((prev) => {
           const next = { ...prev };
-          pending.forEach(([id, state]) => {
+          pending.forEach(({ id, state }) => {
             next[id] = { ...state, message: 'Offline. We will resume when back online.' };
           });
           return next;
@@ -1146,20 +1028,57 @@ const ProfilePage: React.FC = () => {
         return;
       }
 
-      await Promise.all(pending.map(async ([id, state]) => {
+      await Promise.all(pending.map(async ({ id, state, resolvedCollectionId }) => {
+        if (!resolvedCollectionId) {
+          setPublishingStates((prev) => ({
+            ...prev,
+            [id]: {
+              ...state,
+              message: 'Upload session is still initializing. We will continue checking automatically.',
+            },
+          }));
+          return;
+        }
+
         try {
-          await brandApi.getCollectionDetail(id);
+          const detail = await brandApi.getCollectionDetail(resolvedCollectionId);
+          if (detail?.status !== 'PUBLISHED') {
+            const attempts = state.attempts + 1;
+            const tookTooLong = Date.now() - state.startedAt > 90_000;
+            setPublishingStates((prev) => ({
+              ...prev,
+              [id]: {
+                ...state,
+                attempts,
+                status: tookTooLong ? 'failed' : 'publishing',
+                message: tookTooLong
+                  ? 'Publishing is taking longer than usual. Retry to force another publish attempt.'
+                  : 'Still processing your design...',
+              },
+            }));
+            return;
+          }
+
           if (!isVisitorView && user?.id) {
             await fetchCollections(user.id);
           } else if (isVisitorView && routeBrandId) {
             const cols = await brandApi.getCollections(routeBrandId, { visibility: 'all' });
             setVisitorCollections(cols ?? []);
           }
+
           setPublishingStates((prev) => {
             const next = { ...prev };
             delete next[id];
+            delete next[resolvedCollectionId];
+            if (state.taskId) {
+              delete next[state.taskId];
+            }
             return next;
           });
+
+          if (state.taskId) {
+            removePublishTask(state.taskId, publishTaskScope);
+          }
         } catch {
           const attempts = state.attempts + 1;
           const tookTooLong = Date.now() - state.startedAt > 90_000;
@@ -1170,8 +1089,8 @@ const ProfilePage: React.FC = () => {
               attempts,
               status: tookTooLong ? 'failed' : 'publishing',
               message: tookTooLong
-                ? 'Publishing is taking longer than usual. Retry to check again.'
-                : 'Still processing your design...'
+                ? 'Publishing is taking longer than usual. Retry to force another publish attempt.'
+                : 'Still processing your design...',
             },
           }));
         }
@@ -1185,7 +1104,7 @@ const ProfilePage: React.FC = () => {
     void poll();
 
     return () => clearInterval(interval);
-  }, [publishingStates, fetchCollections, isVisitorView, routeBrandId, user]);
+  }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, publishingStates, routeBrandId, user]);
 
   // Debug: track filtering pipeline when tab or lists change
   useEffect(() => {
@@ -1265,23 +1184,42 @@ const ProfilePage: React.FC = () => {
     setIsHeaderQuickEditOpen(true);
   }, []);
 
-  const handleViewAvatar = useCallback(() => {
-    if (localAvatarPreview || viewDisplayData.logoImage) {
-      setIsAvatarModalOpen(true);
-      if (avatarHighlight) {
-        setAvatarHighlight(false);
-      }
-    }
-  }, [avatarHighlight, localAvatarPreview, viewDisplayData.logoImage]);
-
-  const headerProfile = useMemo(
+  const ownerHeaderProfile = useMemo(
     () => ({
-      id: (isVisitorView ? routeBrandId : user?.id) ?? '',
+      id: user?.id ?? '',
+      username: displayData.username ?? '',
+      firstName: displayData.brandName ?? '',
+      lastName: '',
+      address: displayData.location ?? undefined,
+      location: displayData.location ?? undefined,
+      tags: displayData.hashtags ?? [],
+      verificationBadgeVisible: Boolean(displayData.verificationBadgeVisible),
+      isVerifiedBrand: Boolean(displayData.isVerifiedBrand),
+      verifiedExplanationUrl:
+        displayData.verifiedExplanationUrl ?? '/help/verified-badge',
+      isOwner: true as const,
+      profileVisibility: 'UNLOCKED' as const,
+    }),
+    [
+      displayData.brandName,
+      displayData.hashtags,
+      displayData.isVerifiedBrand,
+      displayData.location,
+      displayData.username,
+      displayData.verifiedExplanationUrl,
+      displayData.verificationBadgeVisible,
+      user?.id,
+    ],
+  );
+
+  const visitorHeaderProfile = useMemo(
+    () => ({
+      id: routeBrandId ?? '',
       username: viewDisplayData.username ?? '',
       firstName: viewDisplayData.brandName ?? '',
       lastName: '',
-      profileImage: (localAvatarPreview ?? viewDisplayData.logoImage) ?? undefined,
-      bannerImage: (bannerPreviewUrl ?? viewDisplayData.bannerImage) ?? undefined,
+      profileImage: viewDisplayData.logoImage ?? undefined,
+      bannerImage: viewDisplayData.bannerImage ?? undefined,
       address: viewDisplayData.location ?? undefined,
       location: viewDisplayData.location ?? undefined,
       tags: viewDisplayData.hashtags ?? [],
@@ -1289,16 +1227,11 @@ const ProfilePage: React.FC = () => {
       isVerifiedBrand: Boolean(viewDisplayData.isVerifiedBrand),
       verifiedExplanationUrl:
         viewDisplayData.verifiedExplanationUrl ?? '/help/verified-badge',
-      isOwner,
+      isOwner: false,
       profileVisibility: 'UNLOCKED' as const,
     }),
     [
-      bannerPreviewUrl,
-      isOwner,
-      isVisitorView,
-      localAvatarPreview,
       routeBrandId,
-      user?.id,
       viewDisplayData.bannerImage,
       viewDisplayData.brandName,
       viewDisplayData.hashtags,
@@ -1359,7 +1292,7 @@ const ProfilePage: React.FC = () => {
     return <div className="max-w-screen-xl mx-auto p-6">Catalog not found.</div>;
   }
 
-  if ((!user && !isVisitorView) || (isOwner && brandProfileLoading && collectionsLoading)) {
+  if (!user && !isVisitorView) {
     return (
       <div className="w-full">
         <div className="max-w-screen-xl mx-auto p-4 space-y-6">
@@ -1374,12 +1307,6 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="w-full">
-      <ProfileImageModal
-        open={isAvatarModalOpen && Boolean(localAvatarPreview ?? displayData.logoImage)}
-        src={(localAvatarPreview ?? displayData.logoImage) ?? undefined}
-        alt={displayData.brandName}
-        onClose={() => setIsAvatarModalOpen(false)}
-      />
       {isOwner && user && (
         <ProfileHeaderQuickEditModal
           open={isHeaderQuickEditOpen}
@@ -1398,27 +1325,6 @@ const ProfilePage: React.FC = () => {
           }}
           onOpenFullEditor={() => handleOpenEditModal(false)}
         />
-      )}
-      {isOwner && (
-        <>
-          {/* Keep inputs in the DOM (sr-only) so programmatic click reliably opens the picker */}
-          <input
-            id="avatar-file-input"
-            ref={avatarInputRef}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={handleAvatarSelected}
-          />
-          <input
-            id="banner-file-input"
-            ref={bannerInputRef}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={handleBannerSelected}
-          />
-        </>
       )}
       {showStoreSetupNudge ? (
         <div className="fixed bottom-24 right-4 sm:right-6 z-[60] w-[min(92vw,380px)]">
@@ -1469,33 +1375,26 @@ const ProfilePage: React.FC = () => {
         </div>
       ) : null}
 
-      <ProfileHeader
-        profile={headerProfile}
-        canEdit={isOwner}
-        onEditProfile={handleOpenHeaderQuickEdit}
-        onShareProfile={handleShareProfile}
-        onEditAvatar={handleTriggerAvatarUpload}
-        onEditBanner={handleTriggerBannerUpload}
-        avatarLoading={avatarUploading}
-        bannerLoading={bannerUploading}
-        avatarHighlight={avatarHighlight}
-        onViewAvatar={handleViewAvatar}
-        showPatchAction={showPatchAction}
-        isPatched={isPatched}
-        patchLoading={patchLoading}
-        onTogglePatch={handleTogglePatch}
-      />
-      <ImageCropModal
-        open={Boolean(cropTask)}
-        file={cropTask?.file ?? null}
-        aspect={cropTask?.type === 'banner' ? 3.2 : 1}
-        title={cropTask?.type === 'banner' ? 'Crop banner image' : 'Adjust profile photo'}
-        enforceAspect={cropTask?.type === 'banner'}
-        allowUseOriginal={cropTask?.type === 'avatar'}
-        onConfirm={handleCropConfirm}
-        onUseOriginal={cropTask?.type === 'avatar' ? handleCropUseOriginal : undefined}
-        onClose={() => setCropTask(null)}
-      />
+      {isOwner ? (
+        <OwnerCatalogMediaHeader
+          profile={ownerHeaderProfile}
+          onEditProfile={handleOpenHeaderQuickEdit}
+          onShareProfile={handleShareProfile}
+          showPatchAction={showPatchAction}
+          isPatched={isPatched}
+          patchLoading={patchLoading}
+          onTogglePatch={handleTogglePatch}
+        />
+      ) : (
+        <ProfileHeader
+          profile={visitorHeaderProfile}
+          onShareProfile={handleShareProfile}
+          showPatchAction={showPatchAction}
+          isPatched={isPatched}
+          patchLoading={patchLoading}
+          onTogglePatch={handleTogglePatch}
+        />
+      )}
 
       <div className="w-full px-4 sm:px-6 pb-12">
         <div className="mt-6">
@@ -1768,7 +1667,7 @@ const ProfilePage: React.FC = () => {
                         </div>
                       ) : (isOwner ? ownerContentLoading : visitorLoading) ? (
                         <CollectionsSkeleton />
-                      ) : searchAndVisibilityFiltered.length > 0 ? (
+                      ) : decoratedCollections.length > 0 ? (
                         <CollectionsGrid
                           collections={decoratedCollections}
                           isDraft={isDraftVisibility}
@@ -1803,14 +1702,8 @@ const ProfilePage: React.FC = () => {
                                   ? 'No deleted designs'
                                   : 'No designs yet'
                             }
-                            description={
-                              isDraftVisibility
-                                ? "You don't have any unfinished designs."
-                                : isDeletedVisibility
-                                  ? 'Deleted designs will appear here until permanently removed.'
-                                  : 'Create a design to showcase your work.'
-                            }
-                            // Removed redundant CTA button as requested
+                            description={ownerEmptyStateDescription}
+                            cta={ownerEmptyStateCta}
                           />
                         ) : (
                           <div className="text-center text-gray-500">

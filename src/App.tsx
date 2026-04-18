@@ -256,7 +256,7 @@ const RootLayout: React.FC = () => {
       <CartDrawer />
       <WishlistDrawer />
       <GlobalModalRouter />
-      <Suspense key={location.pathname} fallback={<AppRouteFallback />}>
+      <Suspense fallback={<AppRouteFallback />}>
         <Outlet />
       </Suspense>
     </>

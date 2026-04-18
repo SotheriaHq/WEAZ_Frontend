@@ -19,7 +19,7 @@ interface CollectionsGridProps {
   onRetryPublish?: (id: string) => void;
 }
 
-const CollectionsGrid: React.FC<CollectionsGridProps> = ({ 
+const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   collections, 
   onEdit, 
   onDelete,
@@ -139,4 +139,4 @@ const CollectionsGrid: React.FC<CollectionsGridProps> = ({
   );
 };
 
-export default CollectionsGrid;
+export default React.memo(CollectionsGridComponent);

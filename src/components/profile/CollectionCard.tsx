@@ -30,7 +30,7 @@ interface CollectionCardProps {
   saveBusy?: boolean;
 }
 
-const CollectionCard: React.FC<CollectionCardProps> = ({ 
+const CollectionCardComponent: React.FC<CollectionCardProps> = ({
   collection, 
   onClick,
   onEdit, 
@@ -74,6 +74,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
     ? Math.max(0, Math.min(100, Math.round(collection.clientStatusMeta.progress)))
     : null;
   const clientPreviewUrl = collection.clientStatusMeta?.previewUrl;
+  const hasPersistedCollectionId = !collection.id.startsWith('publish_');
 
   const displayItemCount = itemCount || postsCount;
   const [resolvedCover, setResolvedCover] = useState<string | undefined>(coverImage && coverImage.length > 0 ? coverImage : undefined);
@@ -288,9 +289,9 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
       onMouseLeave={handleMouseLeave}
     >
       {/* Background Media */}
-      <div className="relative w-full overflow-hidden">
+      <div className="relative w-full overflow-hidden bg-transparent">
         {(isPublishing || publishFailed) && (
-          <div className="absolute inset-0 z-40 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-white px-4 text-center">
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/70 px-4 text-center text-white backdrop-blur-sm">
             {isPublishing ? (
               <>
                 <VLoader size={24} progress={publishProgress} phase="loading" showLabel={false} />
@@ -303,68 +304,44 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
               <>
                 <AlertTriangle className="w-6 h-6 text-amber-300" />
                 <div className="text-sm font-semibold">{statusMessage || 'Publish delayed'}</div>
-                <div className="text-xs text-white/70">Tap retry to check again.</div>
-                {onRetryPublish && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onRetryPublish(collection.id); }}
-                    className="px-3 py-1 rounded-lg bg-white/15 border border-white/25 text-xs font-semibold hover:bg-white/20"
-                  >
-                    Retry status
-                  </button>
-                )}
+                <div className="text-xs text-white/70">
+                  {hasPersistedCollectionId
+                    ? 'Open editor to fix and republish, or retry status check.'
+                    : 'Retry status after network stabilizes.'}
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {hasPersistedCollectionId && onEdit ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(collection.id);
+                      }}
+                      className="px-3 py-1 rounded-lg bg-white/20 border border-white/30 text-xs font-semibold hover:bg-white/25"
+                    >
+                      Open editor
+                    </button>
+                  ) : null}
+                  {onRetryPublish && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onRetryPublish(collection.id); }}
+                      className="px-3 py-1 rounded-lg bg-white/15 border border-white/25 text-xs font-semibold hover:bg-white/20"
+                    >
+                      Retry status
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </div>
         )}
-        {previewSources.length > 1 ? (
-          <>
-            {/* Opacity-based crossfade stack — prevents shaking/layout shift */}
-            {previewSources.map((source, sIdx) => (
-              <div
-                key={`${source.src ?? source.fileId ?? sIdx}`}
-                className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${
-                  sIdx === hoverFrame ? 'opacity-100 z-10' : 'opacity-0 z-0'
-                }`}
-              >
-                <ImageWithFallback
-                  src={source.src}
-                  fileId={source.fileId}
-                  alt={title}
-                  fit="cover"
-                  rounded="none"
-                  containerClassName="h-full w-full"
-                  className="h-full w-full"
-                  fallbackName={title}
-                />
-              </div>
-            ))}
-            {/* Product name overlay */}
-            {previewSources[hoverFrame]?.productName && (
-              <div className="absolute bottom-2 left-3 z-20 max-w-[calc(100%-4rem)]">
-                <span className="inline-block rounded-full bg-white/15 dark:bg-black/25 backdrop-blur-md border border-white/20 dark:border-white/10 px-3 py-1 text-xs font-medium text-white truncate shadow-sm transition-opacity duration-300">
-                  {previewSources[hoverFrame].productName}
-                </span>
-              </div>
-            )}
-            {/* Hover preview dots indicator */}
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1">
-              {previewSources.map((_, idx) => (
-                <div
-                  key={idx}
-                  className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
-                    idx === hoverFrame ? 'bg-white scale-125' : 'bg-white/40'
-                  }`}
-                />
-              ))}
-            </div>
-          </>
-        ) : resolvedDisplaySrc ? (
-          <>
+        {resolvedDisplaySrc ? (
+          <div className="relative w-full min-h-[320px]">
             {!imgLoaded && (
-              <div className="absolute inset-0 animate-pulse bg-white/10 dark:bg-white/5" />
+              <div className="absolute inset-0 min-h-[320px] animate-pulse bg-black/15 dark:bg-black/35" />
             )}
-            
+
             {/* Check if video based on extension */}
             {(() => {
               const isVideo = resolvedDisplaySrc.match(/\.(mp4|webm|mov|m4v)($|\?)/i);
@@ -380,8 +357,9 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
                     playsInline
                     fit="contain"
                     maxHeightClassName="max-h-none"
-                    className={`w-full h-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-                    mediaClassName="w-full h-full object-contain"
+                    maxWidthClassName="max-w-full"
+                    className="w-full"
+                    mediaClassName="block w-full h-auto object-contain"
                     onLoadedData={() => setImgLoaded(true)}
                   />
                 );
@@ -393,15 +371,35 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
                   alt={title}
                   fit="contain"
                   maxHeightClassName="max-h-none"
-                  className={`w-full h-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-                  mediaClassName="w-full h-full object-contain"
+                  maxWidthClassName="max-w-full"
+                  className="w-full"
+                  mediaClassName="block w-full h-auto object-contain"
                   onLoad={() => setImgLoaded(true)}
                 />
               );
             })()}
-          </>
-          ) : (
-            <div className="relative flex min-h-[320px] w-full items-center justify-center glass-panel">
+            {previewSources.length > 1 && previewSources[hoverFrame]?.productName && (
+              <div className="absolute bottom-2 left-3 z-20 max-w-[calc(100%-4rem)]">
+                <span className="inline-block rounded-full border border-white/20 bg-black/45 px-3 py-1 text-xs font-medium text-white backdrop-blur-md truncate shadow-sm transition-opacity duration-300">
+                  {previewSources[hoverFrame].productName}
+                </span>
+              </div>
+            )}
+            {previewSources.length > 1 && (
+              <div className="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1">
+                {previewSources.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`h-1.5 w-1.5 rounded-full transition-all duration-200 ${
+                      idx === hoverFrame ? 'bg-white scale-125' : 'bg-white/40'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+            <div className="relative flex min-h-[320px] items-center justify-center bg-black/15 dark:bg-black/40 glass-panel">
               <span className="text-white text-3xl font-bold opacity-70">
                 {title.charAt(0)}
               </span>
@@ -534,7 +532,12 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
                   </div>
                 </>
               ) : (
-                <div className="text-xs font-semibold {saleBand ? 'text-emerald-300' : ''}" aria-label="Price band">{singleBand}</div>
+                <div
+                  className={`text-xs font-semibold ${saleBand ? 'text-emerald-300' : 'text-white'}`}
+                  aria-label="Price band"
+                >
+                  {singleBand}
+                </div>
               )}
             </div>
           )}
@@ -605,6 +608,6 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   );
 };
 
-export default CollectionCard;
+export default React.memo(CollectionCardComponent);
 
 

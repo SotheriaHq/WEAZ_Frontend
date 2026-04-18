@@ -2,12 +2,14 @@ import {
   startTransition,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import VLoader from '@/components/loaders/VLoader';
+import MediaRenderer from '@/components/media/MediaRenderer';
 import VerificationHero from '@/components/studio/verification/VerificationHero';
 import {
   AUTHORITY_OPTIONS,
@@ -60,6 +62,7 @@ export default function VerificationWizardPage() {
   const location = useLocation();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.user.profile);
+  const userRef = useRef(user);
   const brandId = user?.id;
 
   const [status, setStatus] = useState<VerificationStatusResponse | null>(null);
@@ -77,6 +80,13 @@ export default function VerificationWizardPage() {
   const [showSubmitPreview, setShowSubmitPreview] = useState(false);
   const [uploadPreviewUrls, setUploadPreviewUrls] = useState<Partial<Record<UploadFieldKey, string>>>({});
   const [lastSignedAt, setLastSignedAt] = useState<string | null>(null);
+  const saveDraftLockRef = useRef(false);
+  const submitLockRef = useRef(false);
+  const ownerPhoneNumberEditedRef = useRef(false);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   const originPath =
     typeof (location.state as { from?: unknown } | null)?.from === 'string'
@@ -122,6 +132,7 @@ export default function VerificationWizardPage() {
     const load = async () => {
       try {
         setLoading(true);
+        ownerPhoneNumberEditedRef.current = false;
         const [statusData, draftData, letterData] = await Promise.all([
           brandApi.getVerificationStatus(brandId),
           brandApi.getVerificationDraft(brandId),
@@ -152,10 +163,11 @@ export default function VerificationWizardPage() {
         if (Number.isFinite(draftStep) && draftStep > 0) {
           setStepIndex(Math.min(VERIFICATION_STEPS.length - 1, draftStep - 1));
         }
-        if (user) {
+        const currentUser = userRef.current;
+        if (currentUser) {
           dispatch(
             setUser({
-              ...user,
+              ...currentUser,
               verificationStatus: statusData.verificationStatus,
               isVerifiedBrand: statusData.badgeState.isVerifiedBrand,
               verificationBadgeVisible:
@@ -206,12 +218,12 @@ export default function VerificationWizardPage() {
 
   useEffect(() => {
     const savedPhoneNumber = String(user?.phoneNumber ?? '').trim();
-    if (!savedPhoneNumber) {
+    if (!savedPhoneNumber || ownerPhoneNumberEditedRef.current) {
       return;
     }
 
     setForm((current) => {
-      if (current.ownerPhoneNumber?.trim()) {
+      if ((current.ownerPhoneNumber ?? '').trim() === savedPhoneNumber) {
         return current;
       }
 
@@ -254,6 +266,9 @@ export default function VerificationWizardPage() {
     key: K,
     value: VerificationDraftData[K],
   ) => {
+    if (key === 'ownerPhoneNumber') {
+      ownerPhoneNumberEditedRef.current = true;
+    }
     setForm((current) => ({ ...current, [key]: value }));
   };
 
@@ -275,10 +290,20 @@ export default function VerificationWizardPage() {
     nextStep = stepIndex + 1,
     options?: { redirectToCatalog?: boolean; silent?: boolean },
   ) => {
-    if (!brandId) return;
+    if (!brandId || saveDraftLockRef.current) return;
     try {
+      saveDraftLockRef.current = true;
       setSavingDraft(true);
       await brandApi.saveVerificationDraft(brandId, form, nextStep);
+      const resolvedPhoneNumber = String(form.ownerPhoneNumber ?? '').trim();
+      if (user && resolvedPhoneNumber && (user.phoneNumber ?? '').trim() !== resolvedPhoneNumber) {
+        dispatch(
+          setUser({
+            ...user,
+            phoneNumber: resolvedPhoneNumber,
+          }),
+        );
+      }
       if (!options?.silent) {
         toast.success('Draft saved');
       }
@@ -291,6 +316,7 @@ export default function VerificationWizardPage() {
       );
     } finally {
       setSavingDraft(false);
+      saveDraftLockRef.current = false;
     }
   };
 
@@ -430,9 +456,10 @@ export default function VerificationWizardPage() {
   };
 
   const handleSubmit = async () => {
-    if (!brandId || !status) return;
+    if (!brandId || !status || submitLockRef.current) return;
 
     try {
+      submitLockRef.current = true;
       validateStep(4);
       const resolvedPhoneNumber =
         form.ownerPhoneNumber?.trim() || String(user?.phoneNumber ?? '').trim();
@@ -475,6 +502,7 @@ export default function VerificationWizardPage() {
         dispatch(
           setUser({
             ...user,
+            phoneNumber: resolvedPhoneNumber || user.phoneNumber,
             verificationStatus: refreshed.verificationStatus,
             isVerifiedBrand: refreshed.badgeState.isVerifiedBrand,
             verificationBadgeVisible:
@@ -493,6 +521,7 @@ export default function VerificationWizardPage() {
       );
     } finally {
       setSubmitting(false);
+      submitLockRef.current = false;
     }
   };
 
@@ -637,11 +666,11 @@ export default function VerificationWizardPage() {
                 label="Phone number"
                 required
                 value={form.ownerPhoneNumber ?? ''}
-                readOnly
+                onChange={(event) => setField('ownerPhoneNumber', event.target.value)}
                 helperText={
                   form.ownerPhoneNumber?.trim()
-                    ? 'Loaded from your saved profile and locked for verification.'
-                    : 'No phone number is on file. Add it in Settings before continuing.'
+                    ? 'This number syncs with your profile, and you can edit it here before submitting.'
+                    : 'Add the phone number you want attached to this verification attempt.'
                 }
               />
               <Input
@@ -804,10 +833,14 @@ export default function VerificationWizardPage() {
                           {uploadPreviewUrls[item.key as UploadFieldKey] ? (
                             /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?|$)/i.test(uploadPreviewUrls[item.key as UploadFieldKey] as string)
                               ? (
-                                <img
+                                <MediaRenderer
+                                  kind="image"
                                   src={uploadPreviewUrls[item.key as UploadFieldKey] as string}
                                   alt={`${item.label} preview`}
-                                  className="h-10 w-10 rounded-lg object-cover"
+                                  className="w-10 rounded-lg border border-emerald-200 bg-white"
+                                  mediaClassName="object-contain"
+                                  maxHeightClassName="max-h-10"
+                                  maxWidthClassName="max-w-10"
                                 />
                               )
                               : <span className="text-base" aria-hidden="true">📄</span>

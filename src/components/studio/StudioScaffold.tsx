@@ -5,7 +5,6 @@ import { Sidebar } from '@/components/SideBar';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { closeSidebar } from '@/features/uiSlice';
-import { useLocation } from 'react-router-dom';
 
 type StudioScaffoldProps = {
   active: string;
@@ -15,16 +14,9 @@ type StudioScaffoldProps = {
 
 const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, children }) => {
   const dispatch = useDispatch<AppDispatch>();
-  const location = useLocation();
 
   useEffect(() => {
     dispatch(closeSidebar());
-  }, [dispatch, location.pathname]);
-
-  useEffect(() => {
-    return () => {
-      dispatch(closeSidebar());
-    };
   }, [dispatch]);
 
   return (

@@ -60,6 +60,111 @@ const initialState: NotificationState = {
   initialized: false,
 };
 
+const SEMANTIC_DEDUPE_WINDOW_MS = 45_000;
+
+const toIsoDate = (value: string | undefined): string => {
+  if (!value) return new Date().toISOString();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+};
+
+const safeLower = (value: unknown): string =>
+  typeof value === 'string' ? value.trim().toLowerCase() : '';
+
+const resolveTargetFromNotification = (
+  value: Pick<RemoteNotification, 'target' | 'payload'>,
+): { type: string; id: string } | null => {
+  if (value.target?.type && value.target?.id) {
+    return { type: value.target.type, id: value.target.id };
+  }
+
+  const payload = value.payload;
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const nestedTarget = (payload as Record<string, unknown>).target;
+  if (
+    nestedTarget &&
+    typeof nestedTarget === 'object' &&
+    !Array.isArray(nestedTarget) &&
+    typeof (nestedTarget as Record<string, unknown>).type === 'string' &&
+    typeof (nestedTarget as Record<string, unknown>).id === 'string'
+  ) {
+    return {
+      type: String((nestedTarget as Record<string, unknown>).type),
+      id: String((nestedTarget as Record<string, unknown>).id),
+    };
+  }
+
+  const payloadRecord = payload as Record<string, unknown>;
+  if (typeof payloadRecord.collectionId === 'string') {
+    return { type: 'COLLECTION', id: payloadRecord.collectionId };
+  }
+  if (typeof payloadRecord.postId === 'string') {
+    return { type: 'POST', id: payloadRecord.postId };
+  }
+  if (typeof payloadRecord.productId === 'string') {
+    return { type: 'PRODUCT', id: payloadRecord.productId };
+  }
+
+  return null;
+};
+
+const resolveSubTargetId = (
+  value: Pick<RemoteNotification, 'subTargetId' | 'payload'>,
+): string => {
+  if (typeof value.subTargetId === 'string') return value.subTargetId;
+  const payload = value.payload as Record<string, unknown> | undefined;
+  if (!payload || typeof payload !== 'object') return '';
+  if (typeof payload.subTargetId === 'string') return payload.subTargetId;
+  if (typeof payload.commentId === 'string') return payload.commentId;
+  if (typeof payload.parentId === 'string') return payload.parentId;
+  return '';
+};
+
+const resolveTargetUrl = (value: Pick<RemoteNotification, 'targetUrl' | 'payload'>): string => {
+  if (typeof value.targetUrl === 'string') return value.targetUrl;
+  const payload = value.payload as Record<string, unknown> | undefined;
+  if (payload && typeof payload.targetUrl === 'string') return payload.targetUrl;
+  return '';
+};
+
+const buildSemanticKey = (
+  value: Pick<RemoteNotification, 'type' | 'actor' | 'message' | 'target' | 'subTargetId' | 'payload' | 'targetUrl'>,
+): string => {
+  const target = resolveTargetFromNotification(value);
+  const actorId = value.actor?.id ?? '';
+  const subTargetId = resolveSubTargetId(value);
+  const targetUrl = resolveTargetUrl(value);
+  const message = safeLower(value.message).slice(0, 160);
+  return [
+    value.type,
+    actorId,
+    target?.type ?? '',
+    target?.id ?? '',
+    subTargetId,
+    targetUrl,
+    message,
+  ].join('|');
+};
+
+const findSemanticDuplicateIndex = (
+  items: RemoteNotification[],
+  incoming: RemoteNotification,
+): number => {
+  const incomingKey = buildSemanticKey(incoming);
+  const incomingTs = new Date(incoming.createdAt).getTime();
+  const safeIncomingTs = Number.isNaN(incomingTs) ? Date.now() : incomingTs;
+
+  return items.findIndex((existing) => {
+    if (buildSemanticKey(existing) !== incomingKey) return false;
+    const existingTs = new Date(existing.createdAt).getTime();
+    const safeExistingTs = Number.isNaN(existingTs) ? safeIncomingTs : existingTs;
+    return Math.abs(safeExistingTs - safeIncomingTs) <= SEMANTIC_DEDUPE_WINDOW_MS;
+  });
+};
+
 // Thunks
 export const fetchUnreadCount = createAsyncThunk('notifications/fetchUnreadCount', async () => {
   const res = await NotificationsApi.getUnreadCount();
@@ -149,30 +254,49 @@ export const notificationsSlice = createSlice({
         targetUrl?: string;
       }>,
     ) => {
-      const exists = state.items.find((n) => n.id === action.payload.id);
-      if (!exists) {
-        const incoming: RemoteNotification = {
-          id: action.payload.id,
-          type: action.payload.type,
-          version: action.payload.version,
-          message: action.payload.message,
-          createdAt: action.payload.createdAt,
-          isRead: action.payload.isRead,
-          actor: action.payload.actor ?? null,
-          target: action.payload.target ?? action.payload.payload?.target ?? null,
-          subTargetId:
-            action.payload.subTargetId ??
-            action.payload.payload?.subTargetId ??
-            action.payload.payload?.commentId ??
-            null,
-          payload: action.payload.payload,
-          targetUrl: action.payload.targetUrl ?? action.payload.payload?.targetUrl,
+      const incoming: RemoteNotification = {
+        id: action.payload.id,
+        type: action.payload.type,
+        version: action.payload.version,
+        message: action.payload.message,
+        createdAt: toIsoDate(action.payload.createdAt),
+        isRead: action.payload.isRead,
+        actor: action.payload.actor ?? null,
+        target: action.payload.target ?? action.payload.payload?.target ?? null,
+        subTargetId:
+          action.payload.subTargetId ??
+          action.payload.payload?.subTargetId ??
+          action.payload.payload?.commentId ??
+          null,
+        payload: action.payload.payload,
+        targetUrl: action.payload.targetUrl ?? action.payload.payload?.targetUrl,
+      };
+
+      const existingIndex = state.items.findIndex((n) => n.id === incoming.id);
+      if (existingIndex >= 0) {
+        state.items[existingIndex] = {
+          ...state.items[existingIndex],
+          ...incoming,
         };
-        state.items.unshift(incoming);
-        state.unreadCount += 1;
-        // cap list length
-        if (state.items.length > 200) state.items.pop();
+        return;
       }
+
+      const semanticDuplicateIndex = findSemanticDuplicateIndex(state.items, incoming);
+      if (semanticDuplicateIndex >= 0) {
+        const existing = state.items[semanticDuplicateIndex];
+        state.items[semanticDuplicateIndex] = {
+          ...existing,
+          ...incoming,
+          id: existing.id,
+          isRead: existing.isRead || incoming.isRead,
+        };
+        return;
+      }
+
+      state.items.unshift(incoming);
+      state.unreadCount += 1;
+      // cap list length
+      if (state.items.length > 200) state.items.pop();
     },
   },
   extraReducers: (builder) => {
@@ -228,10 +352,11 @@ export const notificationsSlice = createSlice({
             type: n.type,
             version: n.version,
             message: n.message,
-            createdAt:
+            createdAt: toIsoDate(
               typeof n.createdAt === 'string'
                 ? n.createdAt
                 : new Date(n.createdAt).toISOString(),
+            ),
             isRead: !!n.isRead,
             actor: n.actor ?? null,
             target: normalizedTarget ?? null,
@@ -246,6 +371,23 @@ export const notificationsSlice = createSlice({
             state.items[existingIndex] = {
               ...existing,
               ...normalized,
+              actor: normalized.actor ?? existing.actor ?? null,
+              target: normalized.target ?? existing.target ?? null,
+              subTargetId: normalized.subTargetId ?? existing.subTargetId ?? null,
+              payload: normalized.payload ?? existing.payload,
+              targetUrl: normalized.targetUrl ?? existing.targetUrl,
+            };
+            continue;
+          }
+
+          const semanticDuplicateIndex = findSemanticDuplicateIndex(state.items, normalized);
+          if (semanticDuplicateIndex >= 0) {
+            const existing = state.items[semanticDuplicateIndex];
+            state.items[semanticDuplicateIndex] = {
+              ...existing,
+              ...normalized,
+              id: existing.id,
+              isRead: existing.isRead || normalized.isRead,
               actor: normalized.actor ?? existing.actor ?? null,
               target: normalized.target ?? existing.target ?? null,
               subTargetId: normalized.subTargetId ?? existing.subTargetId ?? null,

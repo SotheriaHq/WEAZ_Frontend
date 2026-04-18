@@ -1027,6 +1027,26 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           { showBanner: false },
         );
       }
+
+      const maxOutputYards = payload.rules.reduce((currentMax, rule) => {
+        const yards = Number(rule.outputYards);
+        return Number.isFinite(yards) ? Math.max(currentMax, yards) : currentMax;
+      }, 0);
+      const estimatedPreDeliverySubtotal =
+        Number(payload.baseProductionCharge) + maxOutputYards * Number(payload.fabricCostPerYard);
+      if (
+        estimatedPreDeliverySubtotal > 0 &&
+        rushFeeValue > estimatedPreDeliverySubtotal * 0.7
+      ) {
+        return failDraftValidation(
+          'Rush fee cannot exceed 70% of the estimated outfit subtotal before delivery',
+          {
+            rushFee:
+              'Rush fee cannot exceed 70% of the estimated outfit subtotal before delivery',
+          },
+          { showBanner: false },
+        );
+      }
     }
 
     setValidationMessage(null);

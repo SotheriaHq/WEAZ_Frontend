@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 
@@ -20,13 +20,8 @@ const ALL_ITEMS = [
 export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }) => {
   const navigate = useNavigate();
   const storeSetupComplete = useStoreSetupStatus();
-
-  const groups = useMemo(() => {
-    const items = storeSetupComplete === false
-      ? ALL_ITEMS.filter((item) => !item.requiresSetup)
-      : ALL_ITEMS;
-    return [{ title: 'Studio', items }];
-  }, [storeSetupComplete]);
+  const isSetupLocked = storeSetupComplete === false;
+  const groups = [{ title: 'Studio', items: ALL_ITEMS }];
 
   const handleSelect = (key: string, path: string) => {
     onSelect(key);
@@ -49,16 +44,26 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
                 <div className="space-y-1">
                   {group.items.map(({ key, label, path, emoji }) => {
                     const isActive = active === key;
+                    const isLocked = isSetupLocked && ALL_ITEMS.find((item) => item.key === key)?.requiresSetup;
 
                     return (
                       <button
                         key={key}
-                        onClick={() => handleSelect(key, path)}
+                        type="button"
+                        disabled={Boolean(isLocked)}
+                        onClick={() => {
+                          if (!isLocked) {
+                            handleSelect(key, path);
+                          }
+                        }}
                         className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-all duration-150 flex items-center gap-2 group ${
-                          isActive
+                          isLocked
+                            ? 'cursor-not-allowed opacity-50'
+                            : isActive
                             ? 'font-medium text-primary border-l-4 border-primary bg-primary/10'
                             : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                         }`}
+                        title={isLocked ? 'Complete store setup to unlock this section' : label}
                       >
                         <span className="text-base leading-none">{emoji}</span>
                         <span className="text-sm truncate">{label}</span>
@@ -76,13 +81,21 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
         <div className="mx-auto flex max-w-4xl items-stretch gap-1 overflow-x-auto scrollbar-hide">
           {flatItems.map(({ key, label, path, emoji }) => {
             const isActive = active === key;
+            const isLocked = isSetupLocked && ALL_ITEMS.find((item) => item.key === key)?.requiresSetup;
             return (
               <button
                 key={key}
                 type="button"
-                onClick={() => handleSelect(key, path)}
+                disabled={Boolean(isLocked)}
+                onClick={() => {
+                  if (!isLocked) {
+                    handleSelect(key, path);
+                  }
+                }}
                 className={`flex min-w-[74px] flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium transition-colors ${
-                  isActive
+                  isLocked
+                    ? 'cursor-not-allowed opacity-50'
+                    : isActive
                     ? 'bg-purple-50 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300'
                     : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10'
                 }`}
