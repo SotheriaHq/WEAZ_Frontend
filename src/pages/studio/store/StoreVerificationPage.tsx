@@ -14,6 +14,7 @@ import {
   verificationStatusTone,
 } from '@/components/studio/verification/verificationShared';
 import type { VerificationInfoItem, VerificationStatusResponse } from '@/types/verification';
+import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 
 export default function StoreVerificationPage() {
   const navigate = useNavigate();
@@ -214,11 +215,7 @@ export default function StoreVerificationPage() {
       : callToAction.primaryLabel;
 
   if (loading) {
-    return (
-      <div className="rounded-[2rem] border border-gray-200 bg-white p-8 text-sm text-gray-500 shadow-sm">
-        Loading verification workspace...
-      </div>
-    );
+    return <StudioPageSkeleton variant="detail" />;
   }
 
   return (

@@ -250,7 +250,7 @@ const CreateDesignInner: React.FC = () => {
   }, [location.pathname, location.search]);
   const requiresEmailVerification = !isEditMode && user?.isEmailVerified === false;
 
-  const disabled = isSubmitting || isUploading;
+  const disabled = false;
   const titleDescriptionLocked = useMemo(() => {
     if (!isEditMode || !metadataEditedAt) return false;
     const cooldownMs = 30 * 24 * 60 * 60 * 1000;
@@ -459,6 +459,11 @@ const CreateDesignInner: React.FC = () => {
     }
   }, [files.length, selectedIndex, coverIndex]);
 
+  const normalizedCustomMeasurementKeys = useMemo(
+    () => dedupeMeasurementKeysByLabel(customMeasurementKeys),
+    [customMeasurementKeys],
+  );
+
   // Validation
   const MIN_PUBLISH_IMAGES = 4; // Front, Left, Right, Back
   const isValid =
@@ -467,6 +472,22 @@ const CreateDesignInner: React.FC = () => {
     selectedTags.length > 0 &&
     categoryId.trim().length > 0 &&
     categoryTypeId.trim().length > 0;
+  const hasDraftContent = Boolean(
+    title.trim().length > 0 ||
+    description.trim().length > 0 ||
+    minPrice.trim().length > 0 ||
+    maxPrice.trim().length > 0 ||
+    selectedTags.length > 0 ||
+    categoryId.trim().length > 0 ||
+    categoryTypeId.trim().length > 0 ||
+    files.length > 0 ||
+    isMadeToOrder ||
+    sizingMode !== 'RTW_PLUS_FITTINGS' ||
+    normalizedCustomMeasurementKeys.length > 0 ||
+    type !== 'EVERYBODY' ||
+    visibility !== 'PUBLIC' ||
+    Object.values(filterSelection).some((values) => values.length > 0),
+  );
 
   const resolveMediaWithUrl = useCallback((item?: MediaItem | null) => {
     if (!item) return null;
@@ -570,10 +591,6 @@ const CreateDesignInner: React.FC = () => {
   const measurementGender = useMemo(
     (): 'MEN' | 'WOMEN' | 'UNISEX' => (type === 'MALE' ? 'MEN' : type === 'FEMALE' ? 'WOMEN' : 'UNISEX'),
     [type],
-  );
-  const normalizedCustomMeasurementKeys = useMemo(
-    () => dedupeMeasurementKeysByLabel(customMeasurementKeys),
-    [customMeasurementKeys],
   );
 
   const handleCustomOrderMeasurementKeysChange = useCallback((keys: string[]) => {
@@ -683,9 +700,8 @@ const CreateDesignInner: React.FC = () => {
   };
 
   const handleSaveDraft = async () => {
-    // Drafts require only media selection; auto-fill other fields for backend validation
-    if (files.length === 0) {
-      toast.error("Please upload at least one file to save");
+    if (!hasDraftContent) {
+      toast.error('Add at least one detail to save a draft');
       return;
     }
     setShowSaveDraftConfirm(true);
@@ -697,15 +713,12 @@ const CreateDesignInner: React.FC = () => {
 
     setSubmitIntent("draft");
     setIsSubmitting(true);
+    setShowSaveDraftConfirm(false);
     try {
       const pendingCustomOrderDraft =
         !isEditMode && isMadeToOrder
           ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
           : null;
-
-      if (!isEditMode && isMadeToOrder && !pendingCustomOrderDraft) {
-        return;
-      }
 
       if (isEditMode && id && isMadeToOrder) {
         const saved = await customOrderEditorRef.current?.saveConfiguration({
@@ -778,7 +791,7 @@ const CreateDesignInner: React.FC = () => {
         if (pendingCustomOrderDraft && newCollectionId) {
           await customOrderConfigurationsApi.create({
             ...pendingCustomOrderDraft,
-            fabricRuleBasisId: pendingCustomOrderDraft.fabricRuleBasisId || (
+            fabricRuleBasisId: String(pendingCustomOrderDraft.fabricRuleBasisId ?? '').trim() || (
               await customOrderConfigurationsApi.createFabricRuleBasis({
                 label: `${draftTitle} fabric rules`,
                 measurementKeys: pendingCustomOrderDraft.requiredMeasurementKeys,
@@ -1044,7 +1057,7 @@ const CreateDesignInner: React.FC = () => {
                 fitPreference: undefined,
                 targetAgeGroup: 'ADULT',
               },
-              (value) => {
+              (value: number) => {
                 const mappedProgress = Math.max(5, Math.min(90, Math.round(value * 0.9)));
                 updatePublishTask(task.id, {
                   status: value >= 100 ? 'finalizing' : 'uploading',
@@ -1069,7 +1082,7 @@ const CreateDesignInner: React.FC = () => {
               }, publishTaskScope);
               await customOrderConfigurationsApi.create({
                 ...pendingCustomOrderDraft,
-                fabricRuleBasisId: pendingCustomOrderDraft.fabricRuleBasisId || (
+                fabricRuleBasisId: String(pendingCustomOrderDraft.fabricRuleBasisId ?? '').trim() || (
                   await customOrderConfigurationsApi.createFabricRuleBasis({
                     label: `${title.trim() || 'Custom order'} fabric rules`,
                     measurementKeys: pendingCustomOrderDraft.requiredMeasurementKeys,

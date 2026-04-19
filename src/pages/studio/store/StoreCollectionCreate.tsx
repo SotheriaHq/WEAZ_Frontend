@@ -358,6 +358,7 @@ const StoreCollectionCreate: React.FC = () => {
   const [collectionSessionId, setCollectionSessionId] = useState<string | null>(
     null,
   );
+  const [openingProductEditor, setOpeningProductEditor] = useState(false);
   const [sessionDraftProductIds, setSessionDraftProductIds] = useState<
     string[]
   >([]);
@@ -373,6 +374,7 @@ const StoreCollectionCreate: React.FC = () => {
   const hydratedSessionRef = useRef<string | null>(null);
   const submitLockRef = useRef(false);
   const hydratedSelectionMetaRef = useRef<Set<string>>(new Set());
+  const ensureSessionPromiseRef = useRef<Promise<string> | null>(null);
   const autoCleanupSessionRef = useRef(
     autoCleanupParam === "1" || returnMode === "new" || returnMode === "existing",
   );
@@ -1192,51 +1194,60 @@ const StoreCollectionCreate: React.FC = () => {
     }
   }, [primaryProductId, selectedProductIds]);
 
-  const ensureCollectionSession = async () => {
+  const ensureCollectionSession = useCallback(async () => {
     if (collectionSessionId) {
-      try {
-        await brandApi.getCollectionDetail(collectionSessionId, {
-          scope: "store",
-        });
-        return collectionSessionId;
-      } catch (error: any) {
-        const statusCode = Number(error?.response?.status ?? 0);
-        const rawMessage = error?.response?.data?.message;
-        const message =
-          typeof rawMessage === "string"
-            ? rawMessage
-            : typeof rawMessage?.message === "string"
-              ? rawMessage.message
-              : "";
-        const sessionMissing =
-          statusCode === 404 ||
-          /collection not found|does not belong to you/i.test(message);
-        if (!sessionMissing) {
-          throw error;
-        }
-        clearSessionFilterCache(collectionSessionId);
-        setCollectionSessionId(null);
-      }
+      return collectionSessionId;
     }
 
-    const init = await initializeStoreCollection({
-      mode: creationMode === "new" ? "new-individual" : "existing",
-      title: title.trim() || undefined,
-      description: description.trim() || undefined,
-      visibility,
-      categoryId: categoryId || undefined,
-      categoryTypeId: categoryTypeId || undefined,
-      type,
-      tags: normalizedTags,
-      isAvailableInStore: true,
-      subCategoryId: categoryTypeId || undefined,
+    if (!ensureSessionPromiseRef.current) {
+      ensureSessionPromiseRef.current = (async () => {
+        const init = await initializeStoreCollection({
+          mode: creationMode === "new" ? "new-individual" : "existing",
+          title: title.trim() || undefined,
+          description: description.trim() || undefined,
+          visibility,
+          categoryId: categoryId || undefined,
+          categoryTypeId: categoryTypeId || undefined,
+          type,
+          tags: normalizedTags,
+          isAvailableInStore: true,
+          subCategoryId: categoryTypeId || undefined,
+        });
+        autoCleanupSessionRef.current = true;
+        setCollectionSessionId(init.sessionId);
+        return init.sessionId;
+      })();
+    }
+
+    try {
+      return await ensureSessionPromiseRef.current;
+    } finally {
+      ensureSessionPromiseRef.current = null;
+    }
+  }, [
+    categoryId,
+    categoryTypeId,
+    collectionSessionId,
+    creationMode,
+    description,
+    normalizedTags,
+    title,
+    type,
+    visibility,
+  ]);
+
+  useEffect(() => {
+    if (creationMode !== "new" || collectionSessionId) {
+      return;
+    }
+
+    void ensureCollectionSession().catch(() => {
+      // Ignore warm-up errors; explicit button click still surfaces failures.
     });
-    autoCleanupSessionRef.current = true;
-    setCollectionSessionId(init.sessionId);
-    return init.sessionId;
-  };
+  }, [collectionSessionId, creationMode, ensureCollectionSession]);
 
   const openCollectionProductEditor = async (productId?: string) => {
+    setOpeningProductEditor(true);
     try {
       const sessionId = await ensureCollectionSession();
       const mode = creationMode === "new" ? "new" : "existing";
@@ -1254,6 +1265,8 @@ const StoreCollectionCreate: React.FC = () => {
         error?.response?.data?.message ??
           "Failed to start product flow for this collection.",
       );
+    } finally {
+      setOpeningProductEditor(false);
     }
   };
 
@@ -1792,7 +1805,8 @@ const StoreCollectionCreate: React.FC = () => {
               event.stopPropagation();
               void openCollectionProductEditor(product.id);
             }}
-            className={`${actionButtonBase} bg-violet-600 text-white hover:bg-violet-500 shadow-sm`}
+            disabled={openingProductEditor}
+            className={`${actionButtonBase} bg-violet-600 text-white hover:bg-violet-500 shadow-sm disabled:cursor-not-allowed disabled:opacity-60`}
           >
             Edit
           </button>
@@ -1945,9 +1959,10 @@ const StoreCollectionCreate: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => void openCollectionProductEditor()}
-                    className="rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white hover:bg-purple-700"
+                    disabled={openingProductEditor}
+                    className="rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Create a Product
+                    {openingProductEditor ? "Opening product editor..." : "Create a Product"}
                   </button>
                   <button
                     type="button"
@@ -2306,7 +2321,8 @@ const StoreCollectionCreate: React.FC = () => {
                             onClick={() =>
                               void openCollectionProductEditor(product.id)
                             }
-                            className="text-indigo-600 hover:text-indigo-700"
+                            disabled={openingProductEditor}
+                            className="text-indigo-600 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             Edit
                           </button>

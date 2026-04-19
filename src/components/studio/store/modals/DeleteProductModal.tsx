@@ -5,14 +5,14 @@ import VLoader from '@/components/loaders/VLoader';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DELETE PRODUCT MODAL
-// 3-screen flow: Impact Preview → Type Confirmation → Success
+// 2-screen flow: Impact Preview → Type Confirmation
 // Follows NN Group best practices for destructive actions
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface DeleteProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onDeleted: () => void;
+  onDeleted: (deletedProductId: string) => void;
   product: {
     id: string;
     name: string;
@@ -33,7 +33,7 @@ interface DeleteImpact {
   mustArchiveReason?: string;
 }
 
-type ModalScreen = 'impact' | 'confirm' | 'success';
+type ModalScreen = 'impact' | 'confirm';
 
 const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
   isOpen,
@@ -94,7 +94,8 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
     
     try {
       await productApi.deleteProduct(product.id);
-      setScreen('success');
+      onDeleted(product.id);
+      onClose();
     } catch (e: any) {
       const message = e?.response?.data?.message || 'Failed to delete product';
       setError(message);
@@ -102,11 +103,6 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
     } finally {
       setDeleting(false);
     }
-  };
-
-  const handleSuccessClose = () => {
-    onDeleted();
-    onClose();
   };
 
   if (!isOpen || !product) return null;
@@ -118,7 +114,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={screen !== 'success' ? onClose : undefined}
+        onClick={deleting ? undefined : onClose}
       />
       
       {/* Modal */}
@@ -285,7 +281,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
                   <span className="text-4xl">🗑️</span>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400">
-                  To permanently delete <strong className="text-gray-900 dark:text-white">{product.name}</strong>, 
+                  To move <strong className="text-gray-900 dark:text-white">{product.name}</strong> to trash,
                   type <strong className="text-rose-600">DELETE</strong> below.
                 </p>
               </div>
@@ -324,33 +320,11 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
                     Deleting...
                   </>
                 ) : (
-                  <>🗑️ Delete Permanently</>
+                  <>🗑️ Move to Trash</>
                 )}
               </button>
             </div>
           </>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* SCREEN 3: Success */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {screen === 'success' && (
-          <div className="p-8 text-center">
-            <div className="w-20 h-20 mx-auto bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-4 animate-in zoom-in duration-300">
-              <span className="text-4xl">✅</span>
-            </div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Product Deleted</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              <strong>{product.name}</strong> has been moved to trash. 
-              You can undo this within 30 days.
-            </p>
-            <button
-              onClick={handleSuccessClose}
-              className="px-8 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors"
-            >
-              Done
-            </button>
-          </div>
         )}
       </div>
     </div>

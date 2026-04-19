@@ -33,7 +33,7 @@ type DashboardStats = {
 
 const humanAction = (action: string): { label: string; verb: string } => {
   const map: Record<string, { label: string; verb: string }> = {
-    USER_SIGNUP: { label: 'User Signup', verb: 'created account for' },
+    USER_SIGNUP: { label: 'User Signup', verb: 'signed up' },
     ADMIN_BRAND_VERIFY: { label: 'Brand Verified', verb: 'verified' },
     ADMIN_BRAND_REJECT: { label: 'Brand Rejected', verb: 'rejected' },
     ADMIN_BRAND_SUSPEND: { label: 'Brand Suspended', verb: 'suspended' },
@@ -234,6 +234,7 @@ const AdminDashboard: React.FC = () => {
                 {stats.recentLogs.slice(0, 6).map((log) => {
                   const { verb } = humanAction(log.action);
                   const targetLabel = log.targetName || (log.targetId ? `${log.targetId.slice(0, 8)}...` : '');
+                  const shouldShowTarget = log.action !== 'USER_SIGNUP' && Boolean(targetLabel) && targetLabel !== log.actorName;
                   return (
                     <button
                       key={log.id}
@@ -256,7 +257,7 @@ const AdminDashboard: React.FC = () => {
                         <p className="text-[13px] leading-snug text-gray-700 dark:text-gray-200">
                           <span className="font-semibold text-gray-900 dark:text-white">{log.actorName || 'User'}</span>{' '}
                           <span className={`font-medium ${actionColor(log.action)}`}>{verb}</span>{' '}
-                          {targetLabel ? <span className="font-semibold text-gray-900 transition-colors group-hover:text-purple-600 dark:text-white dark:group-hover:text-fuchsia-400">{targetLabel}</span> : null}
+                          {shouldShowTarget ? <span className="font-semibold text-gray-900 transition-colors group-hover:text-purple-600 dark:text-white dark:group-hover:text-fuchsia-400">{targetLabel}</span> : null}
                         </p>
                         <div className="mt-0.5 flex items-center gap-2">
                           <span className="text-[10px] text-gray-400 dark:text-gray-500">{relativeTime(log.createdAt)}</span>
@@ -286,6 +287,8 @@ const AdminDashboard: React.FC = () => {
             ) : stats?.recentLogs?.length ? (
               stats.recentLogs.slice(0, 5).map((log, index) => {
                 const { label } = humanAction(log.action);
+                const targetLabel = log.targetName || (log.targetId ? `${log.targetId.slice(0, 8)}...` : '');
+                const shouldShowTarget = log.action !== 'USER_SIGNUP' && Boolean(targetLabel) && targetLabel !== log.actorName;
                 return (
                   <button
                     key={log.id}
@@ -311,7 +314,7 @@ const AdminDashboard: React.FC = () => {
                     />
                     <div className="min-w-0">
                       <p className="text-xs font-semibold leading-tight text-gray-900 dark:text-white">{label}</p>
-                      {log.targetName ? <p className="truncate text-[10px] font-medium text-gray-600 dark:text-gray-300">{log.targetName}</p> : null}
+                      {shouldShowTarget ? <p className="truncate text-[10px] font-medium text-gray-600 dark:text-gray-300">{targetLabel}</p> : null}
                       <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">{relativeTime(log.createdAt)}</p>
                     </div>
                   </button>

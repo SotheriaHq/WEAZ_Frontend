@@ -69,6 +69,7 @@ import {
 } from "@/api/StoreApi";
 import { emitProductStudioSync } from "@/utils/productStudioEvents";
 import { TourOverlay, type TourStep } from "@/components/ui/TourOverlay";
+import StudioPageSkeleton from "@/components/studio/StudioPageSkeleton";
 import {
   isBrandProfileComplete,
   resolveBrandProfileSetupDestination,
@@ -379,18 +380,21 @@ const buildHiddenCustomOrderBasisLabel = (productTitle: string): string => {
 };
 
 const createCustomOrderConfigurationWithBasis = async (
-  draft: CustomOrderConfigurationUpsertInput,
+  draft: Omit<CustomOrderConfigurationUpsertInput, 'sourceId'>,
   sourceId: string,
   productTitle: string,
 ) => {
-  const payload: CustomOrderConfigurationUpsertInput = { ...draft };
+  const payload: Omit<CustomOrderConfigurationUpsertInput, 'sourceId'> = { ...draft };
+  const basisId = String(payload.fabricRuleBasisId ?? '').trim();
 
-  if (!payload.fabricRuleBasisId) {
+  if (!basisId) {
     const hiddenBasis = await customOrderConfigurationsApi.createFabricRuleBasis({
       label: buildHiddenCustomOrderBasisLabel(productTitle),
       measurementKeys: payload.requiredMeasurementKeys,
     });
     payload.fabricRuleBasisId = hiddenBasis.id;
+  } else if (basisId !== payload.fabricRuleBasisId) {
+    payload.fabricRuleBasisId = basisId;
   }
 
   return customOrderConfigurationsApi.create({
@@ -1400,6 +1404,24 @@ const EditProduct: React.FC = () => {
     [productId],
   );
 
+  const rollbackCreatedProduct = useCallback(
+    async (createdProductId: string) => {
+      if (!createdProductId) return;
+      try {
+        await productApi.permanentlyDeleteProduct(createdProductId);
+      } catch {
+        try {
+          await productApi.deleteProduct(createdProductId);
+        } catch {
+          // Keep original failure surfaced; rollback best-effort is enough here.
+        }
+      } finally {
+        notifyProductStudioSync("product-create-rollback", createdProductId);
+      }
+    },
+    [notifyProductStudioSync],
+  );
+
   // =====================
   // Save / Submit
   // =====================
@@ -1447,106 +1469,56 @@ const EditProduct: React.FC = () => {
       const hasMissingVariantSize = form.variants.some(
         (variant) => String(variant.size ?? "").trim().length === 0,
       );
-
-      if (form.variants.length === 0) {
-        toast.error(
-          "Add at least one size variant before saving this product.",
-        );
-        return;
-      }
-      if (
-        shouldValidatePublish &&
-        form.variants.length < MIN_PUBLISH_VARIANT_COUNT
-      ) {
-        toast.error(
-          `Add at least ${MIN_PUBLISH_VARIANT_COUNT} size variants before publishing this product.`,
-        );
-        return;
-      }
-      if (hasMissingVariantSize) {
-        toast.error(`Each variant needs a supported size: ${PRODUCT_VARIANT_SIZE_LABELS}`);
-        return;
-      }
-      if (variantTotalStock <= 0) {
-        toast.error(
-          "Add stock to at least one size variant before saving this product.",
-        );
-        return;
-      }
-      if (invalidVariantSizes.length > 0) {
-        toast.error(`Supported sizes: ${PRODUCT_VARIANT_SIZE_LABELS}`);
-        return;
-      }
-
+      let validationError: string | null = null;
       if (!shouldValidatePublish) {
         if (!hasDraftContent) {
-          toast.error("Add at least one detail to save a draft");
-          return;
-        }
-        if (form.variants.length > 0) {
-          const invalid = form.variants.find(
-            (v) => Number.isNaN(Number(v.stock)) || v.stock < 0,
-          );
-          if (invalid) {
-            toast.error("Variant stock must be 0 or greater");
-            return;
-          }
-        } else if (
-          form.trackInventory &&
-          (Number.isNaN(Number(form.stock)) || form.stock < 0)
-        ) {
-          toast.error("Stock must be 0 or greater");
-          return;
+          validationError = 'Add at least one detail to save a draft';
+        } else if (mediaUrls.length > maxMediaCount) {
+          validationError = `You can upload up to ${maxMediaCount} images`;
         }
       } else {
-        // Validation for published products
-        if (!form.title.trim()) {
-          toast.error("Please enter a product title");
-          return;
-        }
-        if (!form.description.trim()) {
-          toast.error("Please enter a product description");
-          return;
-        }
-        if (!form.taxonomyCategoryId) {
-          toast.error("Please select a category");
-          return;
-        }
-        if (!form.categoryTypeId) {
-          toast.error("Please select a sub-category");
-          return;
-        }
-        if (form.tags.length === 0) {
-          toast.error("Add at least one tag before publishing");
-          return;
-        }
-        if (form.price <= 0) {
-          toast.error("Please enter a valid price");
-          return;
-        }
-        if (
-          form.onSale &&
-          form.compareAtPrice > 0 &&
-          form.compareAtPrice >= form.price
-        ) {
-          toast.error("Sale price must be less than the price");
-          return;
-        }
-        if (hasDuplicateVariants) {
-          toast.error(
-            "Please remove duplicate variant options (same size/color)",
-          );
-          return;
-        }
-        {
-          const invalid = form.variants.find(
-            (v) => Number.isNaN(Number(v.stock)) || v.stock < 0,
-          );
-          if (invalid) {
-            toast.error("Variant stock must be 0 or greater");
-            return;
-          }
-        }
+        const publishValidationErrors = [
+          !form.variants.length
+            ? 'Add at least one size variant before publishing this product.'
+            : null,
+          form.variants.length < MIN_PUBLISH_VARIANT_COUNT
+            ? `Add at least ${MIN_PUBLISH_VARIANT_COUNT} size variants before publishing this product.`
+            : null,
+          hasMissingVariantSize
+            ? `Each variant needs a supported size: ${PRODUCT_VARIANT_SIZE_LABELS}`
+            : null,
+          variantTotalStock <= 0
+            ? 'Add stock to at least one size variant before publishing this product.'
+            : null,
+          invalidVariantSizes.length > 0
+            ? `Supported sizes: ${PRODUCT_VARIANT_SIZE_LABELS}`
+            : null,
+          !form.title.trim() ? 'Please enter a product title' : null,
+          !form.description.trim() ? 'Please enter a product description' : null,
+          !form.taxonomyCategoryId ? 'Please select a category' : null,
+          !form.categoryTypeId ? 'Please select a sub-category' : null,
+          form.tags.length === 0 ? 'Add at least one tag before publishing' : null,
+          form.price <= 0 ? 'Please enter a valid price' : null,
+          form.onSale && form.compareAtPrice > 0 && form.compareAtPrice >= form.price
+            ? 'Sale price must be less than the price'
+            : null,
+          hasDuplicateVariants
+            ? 'Please remove duplicate variant options (same size/color)'
+            : null,
+          form.variants.some(
+            (variant) => Number.isNaN(Number(variant.stock)) || variant.stock < 0,
+          )
+            ? 'Variant stock must be 0 or greater'
+            : null,
+        ];
+
+        validationError =
+          publishValidationErrors.find((error) => Boolean(error)) ?? null;
+      }
+
+      if (validationError) {
+        toast.error(validationError);
+        return;
       }
 
       const mediaValidation = validateMedia(
@@ -1612,22 +1584,23 @@ const EditProduct: React.FC = () => {
           ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
           : null;
 
-      if (form.customOrderEnabled && !pendingCustomOrderDraft) {
+      if (shouldValidatePublish && form.customOrderEnabled && !pendingCustomOrderDraft) {
+        toast.error('Save the custom-order setup before publishing this product.');
         return;
       }
 
       setSaving(true);
       try {
+        const resolvedCustomsRegion = await syncShippingRegions({
+          // Collection flow should not block on store policy updates.
+          persistPolicy: !isCollectionContext,
+        });
         const ensuredSku =
           form.sku?.trim() ||
           buildBaseSku({
             brandInitials: brandInitialsFromProfile(user),
             title: form.title,
           });
-        const resolvedCustomsRegion = await syncShippingRegions({
-          // Collection flow should not block on store policy updates.
-          persistPolicy: !isCollectionContext,
-        });
         const normalizedVariants =
           form.variants.length > 0
             ? form.variants.map((v, idx) => ({
@@ -1697,7 +1670,6 @@ const EditProduct: React.FC = () => {
         };
 
         if (isEditMode && productId) {
-          await productApi.updateProduct(productId, payload);
           if (form.customOrderEnabled) {
             let saved = false;
             try {
@@ -1706,23 +1678,19 @@ const EditProduct: React.FC = () => {
                   silentSuccess: true,
                 })) === true;
             } catch (customOrderError: any) {
-              await productApi.updateProduct(productId, {
-                customOrderEnabled: false,
-              });
               throw new Error(
                 customOrderError?.response?.data?.message ||
-                  "Custom-order setup could not be saved. The product update was kept, but custom-order availability was turned back off.",
+                  "Custom-order setup could not be saved. Product changes were not saved.",
               );
             }
             if (!saved) {
-              await productApi.updateProduct(productId, {
-                customOrderEnabled: false,
-              });
               throw new Error(
-                "Custom-order setup could not be saved. The product update was kept, but custom-order availability was turned back off.",
+                "Custom-order setup could not be saved. Product changes were not saved.",
               );
             }
           }
+
+          await productApi.updateProduct(productId, payload);
           notifyProductStudioSync("product-updated", productId);
           toast.success(
             isCollectionContext
@@ -1742,83 +1710,64 @@ const EditProduct: React.FC = () => {
               : payload,
           );
 
-          if (pendingCustomOrderDraft) {
-            try {
+          try {
+            if (pendingCustomOrderDraft) {
               await createCustomOrderConfigurationWithBasis(
                 pendingCustomOrderDraft,
                 created.id,
                 form.title,
               );
-            } catch (customOrderError: any) {
-              await productApi.updateProduct(created.id, {
-                customOrderEnabled: false,
-              });
-              throw new Error(
-                customOrderError?.response?.data?.message ||
-                  "Custom-order setup could not be saved for the new product. The product was kept, but custom-order availability was turned back off.",
+            }
+
+            // Build media upload list after product creation.
+            let pendingUploads: Array<{ file: File; isPrimary: boolean }> = [];
+            if (pendingMediaFiles.length > 0) {
+              const pendingById = new Map(
+                pendingMediaFiles.map((p) => [p.tempId, p]),
               );
+              const orderedPending = mediaUrls
+                .map((m) => pendingById.get(m.id))
+                .filter(Boolean)
+                .map((p) => ({
+                  ...(p as {
+                    id: string;
+                    tempId: string;
+                    file: File;
+                    previewUrl: string;
+                    isPrimary: boolean;
+                  }),
+                  id:
+                    (p as { id: string }).id || (p as { tempId: string }).tempId,
+                }));
+              pendingUploads = normalizePrimary(orderedPending);
             }
-          }
 
-          // Build media upload list (needed for both flow paths)
-          let pendingUploads: Array<{ file: File; isPrimary: boolean }> = [];
-          if (pendingMediaFiles.length > 0) {
-            const pendingById = new Map(
-              pendingMediaFiles.map((p) => [p.tempId, p]),
-            );
-            const orderedPending = mediaUrls
-              .map((m) => pendingById.get(m.id))
-              .filter(Boolean)
-              .map((p) => ({
-                ...(p as {
-                  id: string;
-                  tempId: string;
-                  file: File;
-                  previewUrl: string;
-                  isPrimary: boolean;
-                }),
-                id:
-                  (p as { id: string }).id || (p as { tempId: string }).tempId,
-              }));
-            pendingUploads = normalizePrimary(orderedPending);
-          }
-
-          const doUploads = async () => {
-            await Promise.all(
-              pendingUploads.map((upload) =>
-                productApi.uploadProductMedia(
-                  created.id,
-                  upload.file,
-                  upload.isPrimary,
-                ),
-              ),
-            );
-            notifyProductStudioSync("product-media-uploaded", created.id);
-          };
-
-          // For collection flow: navigate immediately and upload media in background
-          // so the user isn't blocked waiting for potentially large file uploads.
-          if (isCollectionFlow && returnTo && returnContext === "collection") {
             if (pendingUploads.length > 0) {
-              void doUploads();
+              await Promise.all(
+                pendingUploads.map((upload) =>
+                  productApi.uploadProductMedia(
+                    created.id,
+                    upload.file,
+                    upload.isPrimary,
+                  ),
+                ),
+              );
+              notifyProductStudioSync("product-media-uploaded", created.id);
             }
-            notifyProductStudioSync("product-created", created.id);
-            toast.success("Product added to collection draft.");
-            const joiner = returnTo.includes("?") ? "&" : "?";
-            navigate(`${returnTo}${joiner}productId=${created.id}`);
-            return;
-          }
 
-          // Non-collection flow: wait for uploads before navigating
-          if (pendingUploads.length > 0) {
-            await doUploads();
-          }
-
-          if (shouldCreateAsDraftForUploads) {
-            await productApi.updateProduct(created.id, {
-              ...payload,
-              status: finalStatus,
-            });
+            if (shouldCreateAsDraftForUploads) {
+              await productApi.updateProduct(created.id, {
+                ...payload,
+                status: finalStatus,
+              });
+            }
+          } catch (createError: any) {
+            await rollbackCreatedProduct(created.id);
+            throw new Error(
+              createError?.response?.data?.message ||
+                createError?.message ||
+                "Product save failed and was rolled back.",
+            );
           }
 
           const successMessage = isCollectionContext
@@ -1842,10 +1791,11 @@ const EditProduct: React.FC = () => {
           toast.error("Select at least one shipping country for this product.");
           return;
         }
+
         const message =
           error?.response?.data?.message ||
           error?.message ||
-          "Failed to save product. Shipping policy may not have been saved.";
+          "Failed to save product. No changes were committed.";
         toast.error(message);
       } finally {
         setSaving(false);
@@ -1869,6 +1819,7 @@ const EditProduct: React.FC = () => {
       originalPrice,
       showPricePreview,
       notifyProductStudioSync,
+      rollbackCreatedProduct,
       returnContext,
       returnTo,
       syncShippingRegions,
@@ -1978,7 +1929,6 @@ const EditProduct: React.FC = () => {
       };
 
       if (productId) {
-        await productApi.updateProduct(productId, payload);
         if (form.customOrderEnabled) {
           let saved = false;
           try {
@@ -1987,41 +1937,36 @@ const EditProduct: React.FC = () => {
                 silentSuccess: true,
               })) === true;
           } catch (customOrderError: any) {
-            await productApi.updateProduct(productId, {
-              customOrderEnabled: false,
-            });
             throw new Error(
               customOrderError?.response?.data?.message ||
-                "Custom-order setup could not be saved. The product update was kept, but custom-order availability was turned back off.",
+                "Custom-order setup could not be saved. Product changes were not saved.",
             );
           }
           if (!saved) {
-            await productApi.updateProduct(productId, {
-              customOrderEnabled: false,
-            });
             throw new Error(
-              "Custom-order setup could not be saved. The product update was kept, but custom-order availability was turned back off.",
+              "Custom-order setup could not be saved. Product changes were not saved.",
             );
           }
         }
+
+        await productApi.updateProduct(productId, payload);
       } else {
         const created = await productApi.createProduct(payload);
-        if (pendingCustomOrderDraft) {
-          try {
+        try {
+          if (pendingCustomOrderDraft) {
             await createCustomOrderConfigurationWithBasis(
               pendingCustomOrderDraft,
               created.id,
               form.title,
             );
-          } catch (customOrderError: any) {
-            await productApi.updateProduct(created.id, {
-              customOrderEnabled: false,
-            });
-            throw new Error(
-              customOrderError?.response?.data?.message ||
-                "Custom-order setup could not be saved for the new product. The product was kept, but custom-order availability was turned back off.",
-            );
           }
+        } catch (customOrderError: any) {
+          await rollbackCreatedProduct(created.id);
+          throw new Error(
+            customOrderError?.response?.data?.message ||
+              customOrderError?.message ||
+              "Custom-order setup could not be saved for the new product. The draft was rolled back.",
+          );
         }
       }
       notifyProductStudioSync("product-updated", productId || undefined);
@@ -2066,6 +2011,7 @@ const EditProduct: React.FC = () => {
     returnTo,
     syncShippingRegions,
     notifyProductStudioSync,
+    rollbackCreatedProduct,
   ]);
 
   const triggerSave = useCallback(
@@ -2430,11 +2376,19 @@ const EditProduct: React.FC = () => {
     try {
       await productApi.deleteProduct(productId);
       toast.success("Product deleted");
+      if (isCollectionContext && returnTo) {
+        navigate(returnTo);
+        return;
+      }
+      if (typeof window !== "undefined" && window.history.length > 1) {
+        navigate(-1);
+        return;
+      }
       navigate("/studio/store");
     } catch (error) {
       toast.error("Failed to delete product");
     }
-  }, [confirm, productId, navigate]);
+  }, [confirm, isCollectionContext, productId, navigate, returnTo]);
 
   void handleReorderMedia;
   void handleDuplicate;
@@ -2469,15 +2423,32 @@ const EditProduct: React.FC = () => {
     return <Navigate to={catalogProfileSetupRedirect} replace />;
   }
 
-  if (loading) {
+  const createScreenInitializing =
+    !isEditMode && (categoriesLoading || shippingRegionsLoading);
+
+  if (createScreenInitializing) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-4">
-          <VLoader size={48} phase="loading" />
-          <p className="text-gray-400">Loading product...</p>
+      <div className="min-h-[560px] animate-pulse">
+        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
+          <div className="mb-6 h-8 w-64 rounded-xl bg-gray-200/70 dark:bg-white/10" />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              <div className="h-44 rounded-2xl bg-gray-200/70 dark:bg-white/10" />
+              <div className="h-44 rounded-2xl bg-gray-200/70 dark:bg-white/10" />
+              <div className="h-44 rounded-2xl bg-gray-200/70 dark:bg-white/10" />
+            </div>
+            <div className="space-y-4">
+              <div className="h-36 rounded-2xl bg-gray-200/70 dark:bg-white/10" />
+              <div className="h-36 rounded-2xl bg-gray-200/70 dark:bg-white/10" />
+            </div>
+          </div>
         </div>
       </div>
     );
+  }
+
+  if (loading) {
+    return <StudioPageSkeleton variant="form" />;
   }
 
   // =====================
@@ -3208,15 +3179,15 @@ const EditProduct: React.FC = () => {
                       className={`mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold ${
                         form.variants.length >= MIN_PUBLISH_VARIANT_COUNT
                           ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100'
-                          : 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100'
+                          : 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100'
                       }`}
                     >
                       <span aria-hidden="true">
-                        {form.variants.length >= MIN_PUBLISH_VARIANT_COUNT ? '✅' : '⚠️'}
+                        {form.variants.length >= MIN_PUBLISH_VARIANT_COUNT ? '✅' : 'ℹ️'}
                       </span>
                       {form.variants.length >= MIN_PUBLISH_VARIANT_COUNT
                         ? `Publish ready: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants.`
-                        : `Publish requires at least ${MIN_PUBLISH_VARIANT_COUNT} size variants (${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} added).`}
+                        : `Progress: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants added. Add ${MIN_PUBLISH_VARIANT_COUNT - form.variants.length} more to publish.`}
                     </p>
                   </div>
 

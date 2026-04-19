@@ -21,6 +21,7 @@ import {
 import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildStorefrontUrl } from '@/utils/publicLinks';
 import type { VerificationStatusResponse } from '@/types/verification';
+import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 
 export default function StoreManagement() {
   const navigate = useNavigate();
@@ -318,13 +319,7 @@ export default function StoreManagement() {
   }, [user?.id]);
 
   if (loading) {
-    return (
-      <div className="animate-in fade-in duration-300">
-        <div className="mb-3 h-8 w-48 animate-pulse rounded bg-gray-200/80 dark:bg-white/10" />
-        <div className="h-4 w-96 animate-pulse rounded bg-gray-200/80 dark:bg-white/10" />
-        <div className="mt-6 h-72 animate-pulse rounded-2xl border border-gray-200 bg-white/70 dark:border-white/10 dark:bg-white/5" />
-      </div>
-    );
+    return <StudioPageSkeleton variant="dashboard" />;
   }
 
   if (!status) {

@@ -12,7 +12,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { Calendar } from 'lucide-react';
-import VLoader from '@/components/loaders/VLoader';
+import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 
 const AnalyticsPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
@@ -37,11 +37,7 @@ const AnalyticsPage: React.FC = () => {
   }, [user?.id, range]);
 
   if (loading && !data) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <VLoader size={48} phase="loading" />
-      </div>
-    );
+    return <StudioPageSkeleton variant="dashboard" />;
   }
 
   const currency = data?.currency || 'NGN';

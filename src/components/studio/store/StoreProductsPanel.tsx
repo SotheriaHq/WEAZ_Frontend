@@ -3323,9 +3323,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       <DeleteProductModal
         isOpen={!!deleteModalProduct}
         onClose={() => setDeleteModalProduct(null)}
-        onDeleted={() => {
-          refresh();
-          setSelectedProducts([]);
+        onDeleted={(deletedProductId) => {
+          setProducts((prev) => prev.filter((product) => product.id !== deletedProductId));
+          setSelectedProducts((prev) => prev.filter((id) => id !== deletedProductId));
+          setInlineProduct((prev) => (prev?.id === deletedProductId ? null : prev));
+          toast.success('Product deleted');
+          void refresh();
         }}
         product={deleteModalProduct}
       />

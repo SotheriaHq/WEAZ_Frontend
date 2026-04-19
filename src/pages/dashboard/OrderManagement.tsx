@@ -6,7 +6,6 @@ import { getStoreStatus } from '@/api/StoreApi';
 import OrderDetailsModal from '@/components/dashboard/OrderDetailsModal';
 import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
 import ImageWithFallback from '@/components/ImageWithFallback';
-import VLoader from '@/components/loaders/VLoader';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 
@@ -622,8 +621,13 @@ const OrderManagement: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={9} className="px-6 py-16 text-center">
-                    <div className="flex justify-center">
-                      <VLoader size={56} phase="loading" />
+                    <div className="space-y-3">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <div
+                          key={`order-skeleton-${index}`}
+                          className="h-14 animate-pulse rounded-xl bg-slate-200/80 dark:bg-white/[0.08]"
+                        />
+                      ))}
                     </div>
                   </td>
                 </tr>

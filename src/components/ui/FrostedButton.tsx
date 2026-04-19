@@ -26,6 +26,7 @@ export const FrostedButton: React.FC<FrostedButtonProps> = ({
 }) => (
   <button
     className={clsx(
+      'relative',
       variant === 'primary' && 'btn-frost-primary',
       variant === 'ghost' && 'btn-frost-ghost',
       variant === 'outline' && 'btn-frost-outline',
@@ -39,21 +40,16 @@ export const FrostedButton: React.FC<FrostedButtonProps> = ({
     aria-busy={loading ? true : undefined}
     {...props}
   >
+    <span className={clsx('inline-flex items-center gap-2', loading && 'invisible')}>
+      {leftIcon ? <span className="shrink-0">{leftIcon}</span> : null}
+      <span>{children}</span>
+      {rightIcon ? <span className="shrink-0">{rightIcon}</span> : null}
+    </span>
     {loading ? (
-      <VLoader size={16} phase="loading" showLabel={false} className="text-current" />
-    ) : (
-      leftIcon
-    )}
-    {children}
-    {loading ? (
-      <span className="inline-flex items-center gap-0.5" aria-hidden>
-        <span className="h-1 w-1 rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
-        <span className="h-1 w-1 rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
-        <span className="h-1 w-1 rounded-full bg-current animate-bounce" />
+      <span className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
+        <VLoader size={16} phase="loading" showLabel={false} className="text-current" />
       </span>
-    ) : (
-      rightIcon
-    )}
+    ) : null}
   </button>
 );
 

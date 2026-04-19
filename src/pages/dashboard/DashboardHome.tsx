@@ -10,7 +10,7 @@ import { Select } from '@/components/ui/Select';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { getAvatarFallback } from '@/utils/profileImage';
 import { DraftExpiryStats as DraftExpiryStatsComponent } from '@/components/collections/DraftExpiryComponents';
-import VLoader from '@/components/loaders/VLoader';
+import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 import { normalizeNotification } from '@/utils/notificationAdapter';
 import { determineNotificationRoute } from '@/utils/notificationRouting';
 
@@ -289,11 +289,7 @@ const DashboardHome: React.FC = () => {
   );
 
   if (loading && !overview) {
-    return (
-      <div className="flex h-96 items-center justify-center">
-        <VLoader size={48} phase="loading" />
-      </div>
-    );
+    return <StudioPageSkeleton variant="dashboard" />;
   }
 
   return (

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import Select from '@/components/ui/Select';
 import { MeasurementPointsApi } from '@/api/MeasurementPointsApi';
@@ -53,27 +53,19 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
   const [isSubmittingFreeform, setIsSubmittingFreeform] = useState(false);
   const [addedPoints, setAddedPoints] = useState<MeasurementPoint[]>([]);
   const [showAllPoints, setShowAllPoints] = useState(false);
-  const [selectedKeys, setSelectedKeys] = useState<string[]>(customMeasurementKeys);
+  const selectedKeys = customMeasurementKeys;
 
   const INITIAL_DISPLAY_COUNT = 12;
 
-  useEffect(() => {
-    setSelectedKeys(customMeasurementKeys);
-  }, [customMeasurementKeys]);
-
   const syncSelectedKeys = (nextKeys: string[]) => {
-    setSelectedKeys(nextKeys);
     onCustomMeasurementKeysChange(nextKeys);
   };
 
   const toggleMeasurementKey = (key: string) => {
-    setSelectedKeys((current) => {
-      const next = current.includes(key)
-        ? current.filter((existing) => existing !== key)
-        : [...current, key];
-      onCustomMeasurementKeysChange(next);
-      return next;
-    });
+    const next = selectedKeys.includes(key)
+      ? selectedKeys.filter((existing) => existing !== key)
+      : [...selectedKeys, key];
+    syncSelectedKeys(next);
   };
 
   const mergedPoints = useMemo(() => {

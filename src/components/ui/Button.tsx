@@ -48,7 +48,7 @@ const Button: React.FC<ButtonProps> = ({
   const inferredLoading = /\b(saving|loading|submitting|uploading|signing)\b/i.test(inferredText);
   const showLoader = loading || Boolean(disabled && inferredLoading);
 
-  const baseClasses = 'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-0 focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed';
+  const baseClasses = 'relative inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-0 focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed';
 
   const variantClasses = {
     // Black fill — confident, editorial, fashion-native. Default for all actions.
@@ -81,11 +81,18 @@ const Button: React.FC<ButtonProps> = ({
         className
       )}
       disabled={disabled || loading}
+      aria-busy={showLoader ? true : undefined}
       {...props}
     >
-      {showLoader && <VLoader size={16} phase="loading" showLabel={false} />}
-      {icon && !showLoader && icon}
-      {children}
+      <span className={clsx('inline-flex items-center gap-2', showLoader && 'invisible')}>
+        {icon && <span className="shrink-0">{icon}</span>}
+        <span>{children}</span>
+      </span>
+      {showLoader ? (
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
+          <VLoader size={16} phase="loading" showLabel={false} />
+        </span>
+      ) : null}
     </button>
   );
 };

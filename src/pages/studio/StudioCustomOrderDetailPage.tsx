@@ -25,6 +25,7 @@ import {
   formatMeasurementValue,
   humanizeCustomOrderToken,
 } from '@/components/custom-orders/customOrderFormatting';
+import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 
 type StudioDetailTab = 'overview' | 'measurements' | 'operations' | 'timeline';
 
@@ -836,7 +837,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="px-4 py-10 text-sm text-slate-500">Loading custom order...</div>;
+    return <StudioPageSkeleton variant="detail" />;
   }
 
   if (!order) {

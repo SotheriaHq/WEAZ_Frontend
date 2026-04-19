@@ -257,6 +257,7 @@ export async function initializeCollectionUploads(
     isAvailableInStore?: boolean;
     tags: string[];
     files: { name: string; type: string; size: number }[];
+    draftOnly?: boolean;
     // New metadata required by backend
     categoryId?: string;
     subCategoryId?: string;

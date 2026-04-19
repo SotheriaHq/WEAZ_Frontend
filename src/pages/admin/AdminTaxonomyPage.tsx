@@ -129,6 +129,76 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
+const formatMeasurementLifecycleStatusLabel = (status: string) => {
+  if (status === 'APPROVED_GLOBAL') return 'Approved globally';
+  if (status === 'REJECTED') return 'Rejected';
+  return 'Pending review';
+};
+
+const mapAdminMeasurementPointRowToMeasurementPoint = (
+  row: AdminMeasurementPointRow,
+): MeasurementPoint => ({
+  id: row.id,
+  key: row.key,
+  label: normalizeMeasurementLabel(row.label),
+  description: row.description,
+  category: row.category as MeasurementPointCategory,
+  gender: (row.gender as MeasurementPoint['gender']) ?? null,
+  source: row.source as MeasurementPoint['source'],
+  status: row.status as MeasurementPoint['status'],
+  brandId: row.brandId,
+  minValueCm: row.minValueCm,
+  maxValueCm: row.maxValueCm,
+  minValueChildCm: row.minValueChildCm ?? null,
+  maxValueChildCm: row.maxValueChildCm ?? null,
+  sortOrder: row.sortOrder,
+  isActive: row.isActive,
+});
+
+const measurementLifecycleRowMatchesFilters = (
+  row: AdminMeasurementPointRow,
+  filters: {
+    search: string;
+    status: MeasurementLifecycleStatusMode;
+    source: MeasurementLifecycleSourceMode;
+    category: string;
+    active: MeasurementLifecycleActiveMode;
+  },
+) => {
+  const search = filters.search.trim().toLowerCase();
+  if (search) {
+    const label = normalizeMeasurementLabel(row.label).toLowerCase();
+    const key = normalizeMeasurementKey(row.key).toLowerCase();
+    const description = String(row.description ?? '').toLowerCase();
+
+    if (!label.includes(search) && !key.includes(search) && !description.includes(search)) {
+      return false;
+    }
+  }
+
+  if (filters.status !== 'all' && row.status.toLowerCase() !== filters.status) {
+    return false;
+  }
+
+  if (filters.source !== 'all' && row.source.toLowerCase() !== filters.source) {
+    return false;
+  }
+
+  if (filters.category !== 'all' && row.category !== filters.category) {
+    return false;
+  }
+
+  if (filters.active === 'active' && !row.isActive) {
+    return false;
+  }
+
+  if (filters.active === 'inactive' && row.isActive) {
+    return false;
+  }
+
+  return true;
+};
+
 const AdminTaxonomyPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -356,25 +426,7 @@ const AdminTaxonomyPage: React.FC = () => {
             ? payload.items
             : [];
 
-        points.push(
-          ...rows.map((row) => ({
-            id: row.id,
-            key: row.key,
-            label: normalizeMeasurementLabel(row.label),
-            description: row.description,
-            category: row.category as MeasurementPointCategory,
-            gender: (row.gender as MeasurementPoint['gender']) ?? null,
-            source: row.source as MeasurementPoint['source'],
-            status: row.status as MeasurementPoint['status'],
-            brandId: row.brandId,
-            minValueCm: row.minValueCm,
-            maxValueCm: row.maxValueCm,
-            minValueChildCm: row.minValueChildCm ?? null,
-            maxValueChildCm: row.maxValueChildCm ?? null,
-            sortOrder: row.sortOrder,
-            isActive: row.isActive,
-          })),
-        );
+        points.push(...rows.map(mapAdminMeasurementPointRowToMeasurementPoint));
 
         const nextCursor = Array.isArray(payload) ? null : payload?.nextCursor ?? null;
         if (!nextCursor || rows.length === 0) {
@@ -507,22 +559,40 @@ const AdminTaxonomyPage: React.FC = () => {
         };
         toast.success(successMessageByAction[action]);
 
-        await Promise.all([
-          fetchMeasurementQueue(),
-          fetchMeasurementPoints(),
-          fetchMeasurementLifecycleRows(),
-        ]);
-
         const lifecycleResponse =
           await adminModerationApi.getMeasurementPointLifecycle(selectedMeasurementPoint.id);
         const lifecyclePayload =
           unwrapApiResponse<AdminMeasurementPointLifecycleDetails>(
             lifecycleResponse.data as any,
           );
+        const updatedPoint = lifecyclePayload.point;
         setSelectedMeasurementLifecycle(lifecyclePayload);
-        setSelectedMeasurementPoint(lifecyclePayload.point);
-        setMeasurementLifecycleRejectReason(
-          lifecyclePayload.point.rejectionReason ?? '',
+        setSelectedMeasurementPoint(updatedPoint);
+        setMeasurementLifecycleRejectReason(updatedPoint.rejectionReason ?? '');
+        setMeasurementLifecycleRows((current) => {
+          const nextRows = current.map((row) =>
+            row.id === updatedPoint.id ? updatedPoint : row,
+          );
+          if (
+            !measurementLifecycleRowMatchesFilters(updatedPoint, {
+              search: debouncedMeasurementLifecycleSearch,
+              status: measurementLifecycleStatusMode,
+              source: measurementLifecycleSourceMode,
+              category: measurementLifecycleCategoryMode,
+              active: measurementLifecycleActiveMode,
+            })
+          ) {
+            return nextRows.filter((row) => row.id !== updatedPoint.id);
+          }
+          return nextRows;
+        });
+        setFreeformPoints((current) => current.filter((row) => row.id !== updatedPoint.id));
+        setAllMeasurementPoints((current) =>
+          current.map((point) =>
+            point.id === updatedPoint.id
+              ? mapAdminMeasurementPointRowToMeasurementPoint(updatedPoint)
+              : point,
+          ),
         );
       } catch (error: any) {
         toast.error(
@@ -534,9 +604,11 @@ const AdminTaxonomyPage: React.FC = () => {
       }
     },
     [
-      fetchMeasurementLifecycleRows,
-      fetchMeasurementPoints,
-      fetchMeasurementQueue,
+      debouncedMeasurementLifecycleSearch,
+      measurementLifecycleActiveMode,
+      measurementLifecycleCategoryMode,
+      measurementLifecycleSourceMode,
+      measurementLifecycleStatusMode,
       measurementLifecycleRejectReason,
       selectedMeasurementPoint,
     ],
@@ -556,25 +628,22 @@ const AdminTaxonomyPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'measurements') {
-      void Promise.all([
-        fetchMeasurementQueue(),
-        fetchMeasurementPoints(),
-        fetchMeasurementLifecycleRows(),
-      ]);
-      return;
-    }
+    if (activeTab !== 'measurements') return;
 
-    if (activeTab === 'custom-order-configurations') {
-      void Promise.all([fetchMeasurementPoints(), fetchGlobalYardBases()]);
-    }
-  }, [
-    activeTab,
-    fetchGlobalYardBases,
-    fetchMeasurementLifecycleRows,
-    fetchMeasurementPoints,
-    fetchMeasurementQueue,
-  ]);
+    void Promise.all([fetchMeasurementQueue(), fetchMeasurementPoints()]);
+  }, [activeTab, fetchMeasurementPoints, fetchMeasurementQueue]);
+
+  useEffect(() => {
+    if (activeTab !== 'measurements') return;
+
+    void fetchMeasurementLifecycleRows();
+  }, [activeTab, fetchMeasurementLifecycleRows]);
+
+  useEffect(() => {
+    if (activeTab !== 'custom-order-configurations') return;
+
+    void Promise.all([fetchMeasurementPoints(), fetchGlobalYardBases()]);
+  }, [activeTab, fetchGlobalYardBases, fetchMeasurementPoints]);
 
   useEffect(() => {
     if (activeTab === 'taxonomy') {
@@ -880,7 +949,7 @@ const AdminTaxonomyPage: React.FC = () => {
   const measurementLifecycleStatusOptions = useMemo(
     () => [
       { value: 'all', label: 'Status: All' },
-      { value: 'brand_only', label: 'Status: Brand-only pending' },
+      { value: 'brand_only', label: 'Status: Pending review' },
       { value: 'approved_global', label: 'Status: Approved global' },
       { value: 'rejected', label: 'Status: Rejected' },
     ],
@@ -1119,17 +1188,45 @@ const AdminTaxonomyPage: React.FC = () => {
         action,
         reason: action === 'reject' ? reason : undefined,
       });
+
+      const lifecycleResponse = await adminModerationApi.getMeasurementPointLifecycle(pointId);
+      const lifecyclePayload = unwrapApiResponse<AdminMeasurementPointLifecycleDetails>(
+        lifecycleResponse.data as any,
+      );
+      const updatedPoint = lifecyclePayload.point;
+
       toast.success(action === 'approve' ? 'Measurement point approved globally.' : 'Measurement point rejected with feedback.');
       setRejectReasonByPointId((current) => {
         const next = { ...current };
         delete next[pointId];
         return next;
       });
-      await Promise.all([
-        fetchMeasurementQueue(),
-        fetchMeasurementPoints(),
-        fetchMeasurementLifecycleRows(),
-      ]);
+      setSelectedMeasurementPoint((current) => (current?.id === updatedPoint.id ? updatedPoint : current));
+      setSelectedMeasurementLifecycle((current) =>
+        current?.point.id === updatedPoint.id ? lifecyclePayload : current,
+      );
+      setMeasurementLifecycleRejectReason(updatedPoint.rejectionReason ?? '');
+      setMeasurementLifecycleRows((current) => {
+        const nextRows = current.map((row) => (row.id === updatedPoint.id ? updatedPoint : row));
+        if (
+          !measurementLifecycleRowMatchesFilters(updatedPoint, {
+            search: debouncedMeasurementLifecycleSearch,
+            status: measurementLifecycleStatusMode,
+            source: measurementLifecycleSourceMode,
+            category: measurementLifecycleCategoryMode,
+            active: measurementLifecycleActiveMode,
+          })
+        ) {
+          return nextRows.filter((row) => row.id !== updatedPoint.id);
+        }
+        return nextRows;
+      });
+      setFreeformPoints((current) => current.filter((row) => row.id !== updatedPoint.id));
+      setAllMeasurementPoints((current) =>
+        current.map((point) =>
+          point.id === updatedPoint.id ? mapAdminMeasurementPointRowToMeasurementPoint(updatedPoint) : point,
+        ),
+      );
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to review measurement point');
     } finally {
@@ -1150,7 +1247,7 @@ const AdminTaxonomyPage: React.FC = () => {
     try {
       await adminModerationApi.reviewItem(chartId, { action });
       toast.success(action === 'approve' ? 'Size chart published.' : 'Size chart sent back for revision.');
-      await fetchMeasurementQueue();
+      setSizeCharts((current) => current.filter((chart) => chart.id !== chartId));
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to review size chart');
     } finally {
@@ -1795,7 +1892,7 @@ const AdminTaxonomyPage: React.FC = () => {
                               <span
                                 className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${statusBadgeClass}`}
                               >
-                                {row.status}
+                                {formatMeasurementLifecycleStatusLabel(row.status)}
                               </span>
                               <span
                                 className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
@@ -2211,7 +2308,7 @@ const AdminTaxonomyPage: React.FC = () => {
                         : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
                   }`}
                 >
-                  {selectedMeasurementLifecycle.point.status}
+                  {formatMeasurementLifecycleStatusLabel(selectedMeasurementLifecycle.point.status)}
                 </span>
                 <span
                   className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${

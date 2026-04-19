@@ -29,6 +29,7 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
+import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 import { brandApi } from '@/api/BrandApi';
 import type { RootState } from '@/store';
 import type {
@@ -395,7 +396,7 @@ export default function VerificationWizardPage() {
         throw new Error('Date of birth and phone number are required');
       }
       if (!form.ownerNin?.trim()) {
-        throw new Error('NIN is required');
+        throw new Error('Owner NIN is required');
       }
     }
 
@@ -533,11 +534,7 @@ export default function VerificationWizardPage() {
   }, [form.businessAddress?.country, form.businessAddress?.state]);
 
   if (loading) {
-    return (
-      <div className="rounded-[2rem] border border-gray-200 bg-white p-8 text-sm text-gray-500 shadow-sm">
-        Loading verification wizard...
-      </div>
-    );
+    return <StudioPageSkeleton variant="form" />;
   }
 
   return (
@@ -675,8 +672,10 @@ export default function VerificationWizardPage() {
               />
               <Input
                 label="NIN"
+                required
                 value={form.ownerNin ?? ''}
                 onChange={(event) => setField('ownerNin', event.target.value)}
+                helperText="Required to submit this verification and must match the owner's legal documents."
               />
             </div>
           ) : null}

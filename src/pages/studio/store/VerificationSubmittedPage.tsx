@@ -12,6 +12,7 @@ import {
   verificationStatusLabel,
   verificationStatusTone,
 } from '@/components/studio/verification/verificationShared';
+import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 
 export default function VerificationSubmittedPage() {
   const navigate = useNavigate();
@@ -61,11 +62,7 @@ export default function VerificationSubmittedPage() {
   }, [brandId]);
 
   if (loading) {
-    return (
-      <div className="rounded-[2rem] border border-gray-200 bg-white p-8 text-sm text-gray-500 shadow-sm">
-        Loading submission summary...
-      </div>
-    );
+    return <StudioPageSkeleton variant="detail" />;
   }
 
   return (

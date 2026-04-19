@@ -74,7 +74,7 @@ const CreateCollectionInner: React.FC = () => {
   const { user, fetchCollections } = useBrandProfile();
   const navigate = useNavigate();
 
-  const disabled = isSubmitting || isUploading || readOnly;
+  const disabled = readOnly;
   const titleDescriptionLocked = isEditMode && collectionCreatedAt
     ? Date.now() > collectionCreatedAt.getTime() + 30 * 24 * 60 * 60 * 1000
     : false;
@@ -231,6 +231,19 @@ const CreateCollectionInner: React.FC = () => {
     selectedTags.length > 0 &&
     categoryId.trim().length > 0 &&
     categoryTypeId.trim().length > 0;
+  const hasDraftContent = Boolean(
+    title.trim().length > 0 ||
+    description.trim().length > 0 ||
+    minPrice.trim().length > 0 ||
+    maxPrice.trim().length > 0 ||
+    isAvailableInStore ||
+    selectedTags.length > 0 ||
+    categoryId.trim().length > 0 ||
+    categoryTypeId.trim().length > 0 ||
+    type !== 'EVERYBODY' ||
+    visibility !== 'PUBLIC' ||
+    files.length > 0,
+  );
 
   const handleDelete = (itemId: string) => {
     mediaStore.remove(itemId);
@@ -534,16 +547,10 @@ const CreateCollectionInner: React.FC = () => {
           size="lg" 
           className="flex-1" 
           disabled={disabled} 
+          loading={isSubmitting || isUploading}
           onClick={async () => {
-            if (!isValid) {
-              const reasons: string[] = [];
-              if (title.trim().length === 0) reasons.push('a title');
-              if (files.length === 0) reasons.push('at least one file');
-              const hasTags = selectedTags.length > 0;
-              if (!hasTags) reasons.push('at least one tag');
-              if (categoryId.trim().length === 0) reasons.push('a category');
-              if (categoryTypeId.trim().length === 0) reasons.push('a sub-category');
-              toast.error(`Please provide ${reasons.join(', ')}.`);
+            if (!hasDraftContent) {
+              toast.error('Add at least one detail to save a draft');
               return;
             }
 
@@ -552,10 +559,11 @@ const CreateCollectionInner: React.FC = () => {
               const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
               const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
               const finalTags = selectedTags.slice(0, 10);
+              const draftTitle = title.trim() || 'Untitled Draft';
 
               await uploadCollection(
                 files,
-                title,
+                draftTitle,
                 description,
                 parsedMinPrice,
                 parsedMaxPrice,

@@ -350,7 +350,16 @@ const CustomOrdersPage: React.FC = () => {
         </div>
 
         <div className="mt-5 space-y-2">
-          {loading ? <div className="text-sm text-slate-500 dark:text-slate-400">Loading custom-order queue...</div> : null}
+          {loading && orders.length === 0 ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={`custom-order-skeleton-${index}`}
+                  className="h-16 animate-pulse rounded-2xl border border-black/10 bg-slate-100/80 dark:border-white/10 dark:bg-white/[0.06]"
+                />
+              ))}
+            </div>
+          ) : null}
           {!loading && orders.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-black/10 px-4 py-10 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
               No custom orders match the current search and filter state.

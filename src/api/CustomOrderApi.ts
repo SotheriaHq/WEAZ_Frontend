@@ -108,7 +108,7 @@ export interface CustomOrderConfigurationUpsertInput {
   buyerInstructionText?: string;
   requiredMeasurementKeys: string[];
   requiredFreeformPointIds?: string[];
-  fabricRuleBasisId: string;
+  fabricRuleBasisId?: string;
   baseProductionCharge: string;
   fabricCostPerYard: string;
   rushEnabled: boolean;
@@ -753,6 +753,16 @@ const toConfigurationPayload = (
   payload: CustomOrderConfigurationUpsertInput | Partial<CustomOrderConfigurationUpsertInput>,
 ) => {
   const next = { ...payload } as Record<string, unknown>;
+  if (typeof next.fabricRuleBasisId === 'string') {
+    const normalizedBasisId = next.fabricRuleBasisId.trim();
+    if (normalizedBasisId.length === 0) {
+      delete next.fabricRuleBasisId;
+    } else {
+      next.fabricRuleBasisId = normalizedBasisId;
+    }
+  } else if (next.fabricRuleBasisId == null) {
+    delete next.fabricRuleBasisId;
+  }
   if (next.averageBaseYards === undefined) {
     delete next.averageBaseYards;
   }

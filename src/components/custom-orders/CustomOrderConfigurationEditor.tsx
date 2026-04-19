@@ -913,7 +913,9 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       buyerInstructionText: form.buyerInstructionText.trim() || undefined,
       requiredMeasurementKeys: form.requiredMeasurementKeys,
       requiredFreeformPointIds,
-      fabricRuleBasisId: form.fabricRuleBasisId,
+      ...(form.fabricRuleBasisId.trim()
+        ? { fabricRuleBasisId: form.fabricRuleBasisId.trim() }
+        : {}),
       baseProductionCharge: form.baseProductionCharge.trim(),
       fabricCostPerYard: form.fabricCostPerYard.trim(),
       rushEnabled: form.rushEnabled,
@@ -1079,7 +1081,8 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       sourceId,
     };
 
-    if (!payload.fabricRuleBasisId) {
+    const fabricRuleBasisId = String(payload.fabricRuleBasisId ?? '').trim();
+    if (!fabricRuleBasisId) {
       try {
         const hiddenBasis = await customOrderConfigurationsApi.createFabricRuleBasis({
           label: `${String(sourceTitle ?? '').trim() || (sourceType === 'PRODUCT' ? 'Product' : 'Design')} fabric rules`,
@@ -1096,6 +1099,11 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         toast.error(error?.response?.data?.message || 'Unable to prepare fabric-rule basis');
         return false;
       }
+    } else if (fabricRuleBasisId !== payload.fabricRuleBasisId) {
+      payload = {
+        ...payload,
+        fabricRuleBasisId,
+      };
     }
 
     setSaving(true);
