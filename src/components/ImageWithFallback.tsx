@@ -99,6 +99,18 @@ const isS3LikeUrl = (value?: string | null) => {
   return lower.includes('.s3.') || lower.includes('amazonaws.com');
 };
 
+const isRawStorageKey = (value?: string | null) => {
+  if (!value) return false;
+  return !/^https?:\/\//i.test(value) && !value.includes('?');
+};
+
+const resolveSourceCacheKey = (fileId?: string | null, src?: string | null) => {
+  if (fileId) return fileId;
+  if (!src) return null;
+  if (isRawStorageKey(src)) return `key:${src}`;
+  return src;
+};
+
 // In-flight dedup: prevents concurrent requests for the same fileId/src
 const inflight = new Map<string, Promise<string | null>>();
 
@@ -137,9 +149,11 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   draggable: _draggable = false,
   onClick,
 }) => {
+  const sourceCacheKey = resolveSourceCacheKey(fileId, src);
   const [resolved, setResolved] = useState<string | null>(() => {
     // fileId-based: always resolve via cache, never use the raw ID
     if (fileId) return getCachedUrl(fileId) ?? null;
+    if (src && isRawStorageKey(src)) return getCachedUrl(`key:${src}`) ?? src;
     // S3-like URLs may be expired signed URLs — check session cache first,
     // never use the raw URL directly (prevents loading expired/private URLs)
     if (src && isS3LikeUrl(src)) return getCachedUrl(src) ?? null;
@@ -149,6 +163,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const [hadError, setHadError] = useState(false);
   const [loaded, setLoaded] = useState(() => {
     if (fileId) return !!(getCachedUrl(fileId));
+    if (src && isRawStorageKey(src)) return !!(getCachedUrl(`key:${src}`));
     if (src && isS3LikeUrl(src)) return !!(getCachedUrl(src));
     return !!src;
   });
@@ -174,7 +189,9 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
 
       // Handle storage keys persisted without full host (e.g. "POST_IMAGE/.../file.jpg")
       if (!fileId && src && !src.includes('?') && !/^https?:\/\//i.test(src)) {
-        const url = await resolveSignedUrl(`key:${src}`, () => brandApi.getSignedS3KeyUrl(src));
+        const url = await resolveSignedUrl(`key:${src}`, () =>
+          brandApi.getSignedS3KeyUrl(src),
+        );
         if (mounted) {
           setResolved(url || src);
         }
@@ -228,25 +245,33 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     retryCountRef.current += 1;
     const timer = setTimeout(() => {
       setHadError(false);
-      const key = fileId || src;
-      if (!key) return;
+      if (!sourceCacheKey) return;
       // If the current URL failed to load, drop any cached mapping for this key
       // so the retry path is forced to request a fresh signed URL.
-      invalidateCachedUrl(key);
+      invalidateCachedUrl(sourceCacheKey);
+
+      if (fileId) {
+        brandApi.invalidateSignedUrlCache(fileId);
+      } else if (src && isS3LikeUrl(src)) {
+        brandApi.invalidateSignedUrlCache(src);
+      } else if (src && isRawStorageKey(src)) {
+        brandApi.invalidateSignedUrlCache(src);
+      }
+
       const fetcher = fileId
-        ? () => brandApi.getSignedFileUrl(fileId)
+        ? () => brandApi.getSignedFileUrl(fileId, { forceRefresh: true })
         : src && isS3LikeUrl(src)
-          ? () => brandApi.getSignedS3Url(src)
+          ? () => brandApi.getSignedS3Url(src, { forceRefresh: true })
           : src && !/^https?:\/\//i.test(src)
-            ? () => brandApi.getSignedS3KeyUrl(src)
+            ? () => brandApi.getSignedS3KeyUrl(src, { forceRefresh: true })
             : async () => src ?? null;
-      resolveSignedUrl(key, fetcher).then((url) => {
+      resolveSignedUrl(sourceCacheKey, fetcher).then((url) => {
         if (url) setResolved(url);
         else setHadError(true);
       });
     }, 2000);
     return () => clearTimeout(timer);
-  }, [hadError, fileId, src]);
+  }, [hadError, fileId, sourceCacheKey, src]);
 
   // Only treat as "resolving" when there is actually a source to resolve.
   // Without this guard, a null src causes the shimmer to show forever because

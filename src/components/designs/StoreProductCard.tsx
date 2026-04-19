@@ -1,11 +1,10 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { brandApi } from '@/api/BrandApi';
 import { toast } from 'sonner';
-import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import type { SizingMode } from '@/types/sizing';
 import {
@@ -72,10 +71,35 @@ interface StoreProductCardProps {
   className?: string;
   enableHoverGallery?: boolean;
   onPreviewNavigationActiveChange?: (active: boolean) => void;
-  /** Owner mode shows edit/manage controls instead of purchase controls */
   isOwnerView?: boolean;
   onEdit?: (product: StoreProduct) => void;
 }
+
+type GallerySource = {
+  key: string;
+  fileId?: string;
+  url?: string | null;
+};
+
+type ResolvedGalleryImage = {
+  key: string;
+  url: string;
+};
+
+const MAX_GALLERY_ITEMS = 6;
+const MEDIA_MAX_HEIGHT_CLASS = 'max-h-[320px]';
+
+const normalizeGalleryUrl = (value?: string | null) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return raw.split('?')[0] || raw;
+  }
+};
 
 export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   product,
@@ -91,15 +115,16 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const currentUser = useSelector((s: RootState) => s.user.profile);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
 
-  const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showCustomLabel, setShowCustomLabel] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
-  const [failedGalleryUrls, setFailedGalleryUrls] = useState<string[]>([]);
-  const [resolvedGalleryImages, setResolvedGalleryImages] = useState<string[]>([]);
+  const [failedGalleryKeys, setFailedGalleryKeys] = useState<string[]>([]);
+  const [resolvedGalleryImages, setResolvedGalleryImages] = useState<ResolvedGalleryImage[]>([]);
+  const [activeImage, setActiveImage] = useState<ResolvedGalleryImage | null>(null);
+
   const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
   const redHeartEmoji = String.fromCodePoint(0x2764, 0xfe0f);
   const whiteHeartEmoji = String.fromCodePoint(0x1f90d);
@@ -127,7 +152,6 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     return { emoji: '✅', label: 'Published', className: 'bg-emerald-500/90 text-white' };
   })();
 
-  // Derive wishlist state entirely from Redux for real-time sync
   const isProductWishlisted = wishlistedIds.has(product.id);
 
   const formatPrice = useCallback((price: number, currency: string = 'NGN') => {
@@ -170,7 +194,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const handleQuickAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isOwnProduct) {
-      toast.info('Brands cannot bag their own product.');
+      toast.info('Brands cannot bag their own products.');
       return;
     }
     if (!isAuth) {
@@ -188,8 +212,6 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       Array.isArray(product.customMeasurementKeys) &&
       product.customMeasurementKeys.length > 0;
 
-    // Products with selectable options, hybrid fittings, or custom-order
-    // availability need the detail surface so the buyer chooses the right path.
     if (
       product.sizes.length > 0 ||
       product.colors.length > 0 ||
@@ -220,38 +242,48 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     }
   };
 
-  // Determine which image to show (hover shows second image if available)
-  const primaryMedia = product.media?.find((m) => m.isPrimary) ?? product.media?.[0];
-  const secondaryMedia = product.media && product.media.length > 1
-    ? product.media.find((m) => !m.isPrimary) ?? product.media[1]
-    : undefined;
-  const primaryImage = primaryMedia?.url || product.thumbnail || product.images[0] || null;
-  const secondaryImage = secondaryMedia?.url || (product.images.length > 1 ? product.images[1] : null);
-
-  const primaryFileId = typeof primaryMedia?.id === 'string' && !primaryMedia.id.startsWith('http')
-    ? primaryMedia.id
-    : undefined;
-  const secondaryFileId = typeof secondaryMedia?.id === 'string' && !secondaryMedia.id.startsWith('http')
-    ? secondaryMedia.id
-    : undefined;
-
-  const { url: primarySignedUrl } = useSignedFileUrl(primaryFileId, primaryImage);
-  const { url: secondarySignedUrl } = useSignedFileUrl(secondaryFileId, secondaryImage);
-
   const gallerySources = useMemo(() => {
     const seen = new Set<string>();
-    const sources: Array<{ fileId?: string; url?: string | null }> = [];
+    const sources: GallerySource[] = [];
+
     const appendSource = (source: { fileId?: string; url?: string | null }) => {
-      const key = source.fileId || source.url || null;
+      const fileId = typeof source.fileId === 'string' && source.fileId.trim().length > 0
+        ? source.fileId.trim()
+        : undefined;
+      const normalizedUrl = normalizeGalleryUrl(source.url);
+      const key = fileId ?? (normalizedUrl ? `url:${normalizedUrl}` : null);
       if (!key || seen.has(key)) {
         return;
       }
+
       seen.add(key);
-      sources.push(source);
+      sources.push({
+        key,
+        fileId,
+        url: source.url ?? normalizedUrl,
+      });
     };
 
-    appendSource({ fileId: primaryFileId, url: primaryImage });
-    appendSource({ fileId: secondaryFileId, url: secondaryImage });
+    const primaryMedia = product.media?.find((item) => item.isPrimary) ?? product.media?.[0];
+    const secondaryMedia = product.media && product.media.length > 1
+      ? product.media.find((item) => !item.isPrimary) ?? product.media[1]
+      : undefined;
+
+    appendSource({
+      fileId:
+        typeof primaryMedia?.id === 'string' && !primaryMedia.id.startsWith('http')
+          ? primaryMedia.id
+          : undefined,
+      url: primaryMedia?.url || product.thumbnail || product.images[0] || null,
+    });
+
+    appendSource({
+      fileId:
+        typeof secondaryMedia?.id === 'string' && !secondaryMedia.id.startsWith('http')
+          ? secondaryMedia.id
+          : undefined,
+      url: secondaryMedia?.url || (product.images.length > 1 ? product.images[1] : null),
+    });
 
     product.media?.forEach((item) => {
       appendSource({
@@ -273,13 +305,13 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       appendSource({ url: imageUrl });
     });
 
-    return sources;
-  }, [primaryFileId, primaryImage, product.images, product.media, product.mediaIds, secondaryFileId, secondaryImage]);
+    return sources.slice(0, MAX_GALLERY_ITEMS);
+  }, [product.images, product.media, product.mediaIds, product.thumbnail]);
 
   useEffect(() => {
-    let active = true;
+    let alive = true;
 
-    const resolveGalleryImages = async () => {
+    const resolveImages = async () => {
       if (gallerySources.length === 0) {
         setResolvedGalleryImages([]);
         return;
@@ -297,11 +329,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             }
           }
 
-          if (
-            source.url &&
-            source.url.includes('.s3.') &&
-            !source.url.includes('?')
-          ) {
+          if (source.url && source.url.includes('.s3.') && !source.url.includes('?')) {
             try {
               const signed = await brandApi.getSignedS3Url(source.url);
               if (signed) {
@@ -315,68 +343,44 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         }),
       );
 
-      if (!active) {
-        return;
-      }
+      if (!alive) return;
 
       setResolvedGalleryImages(
-        resolved.reduce<string[]>((acc, candidate) => {
-          if (!candidate || acc.includes(candidate)) {
+        resolved.reduce<ResolvedGalleryImage[]>((acc, candidate, index) => {
+          if (!candidate) return acc;
+          const source = gallerySources[index];
+          if (!source || acc.some((entry) => entry.key === source.key)) {
             return acc;
           }
-          acc.push(candidate);
+          acc.push({ key: source.key, url: candidate });
           return acc;
         }, []),
       );
     };
 
-    void resolveGalleryImages();
+    void resolveImages();
 
     return () => {
-      active = false;
+      alive = false;
     };
   }, [gallerySources]);
 
-  const galleryImages = useMemo(() => {
-    const candidates = [
-      primarySignedUrl,
-      secondarySignedUrl,
-      ...resolvedGalleryImages,
-      primaryImage,
-      secondaryImage,
-      ...product.images,
-    ];
-
-    return candidates.reduce<string[]>((acc, candidate) => {
-      if (!candidate || acc.includes(candidate)) {
-        return acc;
-      }
-
-      acc.push(candidate);
-      return acc;
-    }, []).filter((candidate) => !failedGalleryUrls.includes(candidate));
-  }, [failedGalleryUrls, primaryImage, primarySignedUrl, product.images, resolvedGalleryImages, secondaryImage, secondarySignedUrl]);
+  const galleryImages = useMemo(
+    () => resolvedGalleryImages.filter((entry) => !failedGalleryKeys.includes(entry.key)),
+    [failedGalleryKeys, resolvedGalleryImages],
+  );
 
   const hoverGalleryEnabled = enableHoverGallery && galleryImages.length > 1;
-  const safePreviewIndex = galleryImages.length > 0
-    ? Math.min(previewIndex, galleryImages.length - 1)
-    : 0;
-  const primaryDisplayImage = primarySignedUrl && !failedGalleryUrls.includes(primarySignedUrl)
-    ? primarySignedUrl
-    : primaryImage && !failedGalleryUrls.includes(primaryImage)
-      ? primaryImage
-      : null;
-  const secondaryDisplayImage = secondarySignedUrl && !failedGalleryUrls.includes(secondarySignedUrl)
-    ? secondarySignedUrl
-    : secondaryImage && !failedGalleryUrls.includes(secondaryImage)
-      ? secondaryImage
-      : null;
-  const displayImage = hoverGalleryEnabled
-    ? galleryImages[safePreviewIndex] ?? galleryImages[0] ?? primaryDisplayImage
-    : isHovered && secondaryDisplayImage
-      ? secondaryDisplayImage
-      : primaryDisplayImage;
-  const hasDisplayImage = Boolean(displayImage);
+  const safePreviewIndex =
+    galleryImages.length > 0
+      ? Math.min(previewIndex, galleryImages.length - 1)
+      : 0;
+  const desiredImage = hoverGalleryEnabled
+    ? galleryImages[safePreviewIndex] ?? galleryImages[0] ?? null
+    : isHovered && galleryImages[1]
+      ? galleryImages[1]
+      : galleryImages[0] ?? null;
+  const hasDisplayImage = Boolean(activeImage?.url || desiredImage?.url);
 
   useEffect(() => {
     if (!isHovered || !hoverGalleryEnabled) {
@@ -386,12 +390,53 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   }, [hoverGalleryEnabled, isHovered, onPreviewNavigationActiveChange]);
 
   useEffect(() => {
-    setImgLoaded(false);
+    let cancelled = false;
+
+    if (!desiredImage?.url) {
+      setActiveImage(null);
+      setImgError(false);
+      return;
+    }
+
+    if (activeImage?.key === desiredImage.key && activeImage.url === desiredImage.url) {
+      setImgError(false);
+      return;
+    }
+
     setImgError(false);
-  }, [displayImage]);
+
+    const preloader = new window.Image();
+    preloader.decoding = 'async';
+    preloader.onload = () => {
+      if (cancelled) return;
+      setActiveImage(desiredImage);
+    };
+    preloader.onerror = () => {
+      if (cancelled) return;
+      if (galleryImages.length > 1) {
+        setFailedGalleryKeys((prev) => (
+          prev.includes(desiredImage.key) ? prev : [...prev, desiredImage.key]
+        ));
+        return;
+      }
+      setActiveImage(null);
+      setImgError(true);
+    };
+    preloader.src = desiredImage.url;
+
+    return () => {
+      cancelled = true;
+      preloader.onload = null;
+      preloader.onerror = null;
+    };
+  }, [activeImage?.key, activeImage?.url, desiredImage, galleryImages.length]);
 
   useEffect(() => {
-    setFailedGalleryUrls([]);
+    setFailedGalleryKeys([]);
+    setResolvedGalleryImages([]);
+    setPreviewIndex(0);
+    setActiveImage(null);
+    setImgError(false);
   }, [product.id]);
 
   const movePreview = useCallback((direction: -1 | 1) => {
@@ -411,21 +456,11 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     });
   }, [galleryImages.length, hoverGalleryEnabled]);
 
-  // Calculate available sizes
-  // const availableSizes = product.sizeAvailability.filter((s) => s.inStock);
-  // const sizesText = availableSizes.length > 0
-  //   ? availableSizes.slice(0, 4).map((s) => s.size).join(' · ') + (availableSizes.length > 4 ? ' +' : '')
-  //   : null;
-
   return (
     <article
       className={`
-        group relative
-        rounded-2xl overflow-hidden
-        aspect-[4/5]
-        shadow-sm hover:shadow-xl
-        transition-all duration-300 ease-out
-        cursor-pointer
+        group relative cursor-pointer overflow-hidden rounded-2xl
+        bg-transparent shadow-sm transition-all duration-300 ease-out hover:shadow-lg
         ${className}
       `}
       onClick={handleCardClick}
@@ -435,310 +470,271 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         onPreviewNavigationActiveChange?.(false);
       }}
     >
-      {/* Full-bleed Image */}
-      <div className="absolute inset-0 bg-gray-100 dark:bg-zinc-800/50">
-        {/* Skeleton loader */}
-        {hasDisplayImage && !imgLoaded && !imgError && (
+      <div
+        className="relative overflow-hidden bg-transparent"
+        style={activeImage?.url ? undefined : { minHeight: 240 }}
+      >
+        {hasDisplayImage && !activeImage?.url && !imgError ? (
           <div className="absolute inset-0 animate-pulse">
-            <div className="h-full w-full bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-zinc-800 dark:via-zinc-700 dark:to-zinc-800" />
+            <div className="h-full min-h-[240px] w-full bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-zinc-900/60 dark:via-zinc-800/50 dark:to-zinc-900/60" />
           </div>
-        )}
+        ) : null}
 
-        {/* Product Image */}
-        {!imgError && hasDisplayImage ? (
+        {!imgError && activeImage?.url ? (
           <MediaRenderer
             kind="image"
-            src={displayImage ?? ''}
+            src={activeImage.url}
             alt={product.name}
-            fit="cover"
-            className={`
-              h-full w-full
-              transition-all duration-500 ease-out
-              ${imgLoaded ? 'opacity-100' : 'opacity-0'}
-              ${isHovered ? 'scale-105' : 'scale-100'}
-            `}
-            mediaClassName="h-full w-full object-cover"
-            maxHeightClassName="max-h-full"
+            fit="contain"
+            className={`block w-full transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
+            mediaClassName="block h-auto w-full object-contain"
+            maxHeightClassName={MEDIA_MAX_HEIGHT_CLASS}
             maxWidthClassName="max-w-full"
-            onLoad={() => setImgLoaded(true)}
             onError={() => {
-              if (hoverGalleryEnabled && displayImage && galleryImages.length > 1) {
-                setFailedGalleryUrls((prev) => (prev.includes(displayImage) ? prev : [...prev, displayImage]));
-                setImgLoaded(true);
-                return;
+              setFailedGalleryKeys((prev) => (
+                activeImage?.key && !prev.includes(activeImage.key)
+                  ? [...prev, activeImage.key]
+                  : prev
+              ));
+              setActiveImage(null);
+              if (galleryImages.length <= 1) {
+                setImgError(true);
               }
-              setImgError(true);
-              setImgLoaded(true);
             }}
           />
         ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-zinc-800">
+          <div className="flex min-h-[240px] flex-col items-center justify-center bg-transparent">
             <span className="mb-1.5 text-3xl">🖼️</span>
             <span className="text-xs text-gray-400 dark:text-zinc-500">No image</span>
           </div>
         )}
-      </div>
 
-      {hoverGalleryEnabled && isHovered ? (
-        <div
-          className="absolute inset-x-3 top-1/2 z-20 flex -translate-y-1/2 items-center justify-between"
-          onMouseEnter={() => onPreviewNavigationActiveChange?.(true)}
-          onMouseLeave={() => onPreviewNavigationActiveChange?.(false)}
-        >
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              movePreview(-1);
-            }}
-            onFocus={() => onPreviewNavigationActiveChange?.(true)}
-            onBlur={() => onPreviewNavigationActiveChange?.(false)}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-black/55 text-lg text-white shadow-lg backdrop-blur-sm transition hover:bg-black/70"
-            aria-label="Show previous preview"
+        {hoverGalleryEnabled && isHovered ? (
+          <div
+            className="absolute inset-x-3 top-1/2 z-20 flex -translate-y-1/2 items-center justify-between"
+            onMouseEnter={() => onPreviewNavigationActiveChange?.(true)}
+            onMouseLeave={() => onPreviewNavigationActiveChange?.(false)}
           >
-            ←
-          </button>
-          <div className="rounded-full border border-white/20 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-            {safePreviewIndex + 1}/{galleryImages.length}
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                movePreview(-1);
+              }}
+              onFocus={() => onPreviewNavigationActiveChange?.(true)}
+              onBlur={() => onPreviewNavigationActiveChange?.(false)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-lg text-white shadow-lg backdrop-blur-sm transition hover:bg-black/70"
+              aria-label="Show previous preview"
+            >
+              ←
+            </button>
+            <div className="rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+              {safePreviewIndex + 1}/{galleryImages.length}
+            </div>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                movePreview(1);
+              }}
+              onFocus={() => onPreviewNavigationActiveChange?.(true)}
+              onBlur={() => onPreviewNavigationActiveChange?.(false)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-lg text-white shadow-lg backdrop-blur-sm transition hover:bg-black/70"
+              aria-label="Show next preview"
+            >
+              →
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              movePreview(1);
-            }}
-            onFocus={() => onPreviewNavigationActiveChange?.(true)}
-            onBlur={() => onPreviewNavigationActiveChange?.(false)}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-black/55 text-lg text-white shadow-lg backdrop-blur-sm transition hover:bg-black/70"
-            aria-label="Show next preview"
-          >
-            →
-          </button>
-        </div>
-      ) : null}
+        ) : null}
 
-      {/* Status Indicators - Top Left — minimal emoji with hover tooltip */}
-      <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 z-10">
-        {ownerStatus && (
-          <span
-            className="group/badge relative text-base leading-none drop-shadow-md cursor-default"
-            title={ownerStatus.label}
-          >
-            {ownerStatus.emoji}
-            <span className="absolute left-full ml-1.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-semibold text-white bg-gray-900/90 backdrop-blur-sm whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none">
-              {ownerStatus.label}
-            </span>
-          </span>
-        )}
-        {product.isOnSale && product.discountPercent && (
-          <span className="px-1.5 py-0.5 rounded-full bg-rose-500/90 text-white text-[10px] font-bold shadow-sm">
-            -{product.discountPercent}%
-          </span>
-        )}
-        {product.isLowStock && !isCustomOrderOnly && !product.isOutOfStock && (
-          <span
-            className="group/badge relative text-base leading-none drop-shadow-md cursor-default"
-            title="Low Stock"
-          >
-            ⚠️
-            <span className="absolute left-full ml-1.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-semibold text-white bg-gray-900/90 backdrop-blur-sm whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none">
-              Low Stock
-            </span>
-          </span>
-        )}
-        {isOwnerView && stockState !== 'OUT_OF_STOCK' && (
-          <span
-            className="group/badge relative text-base leading-none drop-shadow-md cursor-default"
-            title={
-              isCustomOrderOnly
-                ? 'Out of stock, but still baggable as a custom order'
-                : `${product.totalStock} in stock`
-            }
-          >
-            {isCustomOrderOnly ? '✂️' : '📦'}
-            <span className="absolute left-full ml-1.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-semibold text-white bg-gray-900/90 backdrop-blur-sm whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none">
-              {isCustomOrderOnly
-                ? 'Custom order only'
-                : `${product.totalStock} in stock`}
-            </span>
-          </span>
-        )}
-      </div>
-
-      {/* Wishlist Button - Top Right */}
-      {!isOwnerView && (
-        <button
-          type="button"
-          onClick={handleWishlistToggle}
-          disabled={wishlistLoading || isOwnProduct}
-          aria-label={isProductWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-          title={
-            isOwnProduct
-              ? 'Brands cannot wishlist their own products'
-              : isProductWishlisted
-                ? 'Remove from wishlist'
-                : 'Add to wishlist'
-          }
-          className={`
-            absolute top-2.5 right-2.5 z-10
-            h-8 w-8 rounded-full
-            bg-white/80 dark:bg-black/40 backdrop-blur-sm
-            flex items-center justify-center
-            shadow-sm border border-white/30 dark:border-white/10
-            transition-all duration-200 ease-out
-            ${wishlistLoading || isOwnProduct ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110 active:scale-95'}
-          `}
-        >
-          <span role="img" aria-hidden="true" className="text-sm leading-none">
-            {isProductWishlisted ? redHeartEmoji : whiteHeartEmoji}
-          </span>
-        </button>
-      )}
-
-      {/* Featured ribbon */}
-      {product.isFeatured && (
-        <div className="absolute top-0 right-0 z-[5]">
-          <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-bold uppercase tracking-wider px-3 py-1 rounded-bl-xl shadow-sm">
-            Featured
-          </div>
-        </div>
-      )}
-
-      {/* Owner View: Edit Overlay */}
-      {isOwnerView && onEdit && (
-        <div
-          className={`
-            absolute inset-0 z-20
-            flex items-center justify-center
-            bg-black/50 backdrop-blur-sm
-            transition-all duration-300
-            ${isHovered ? 'opacity-100' : 'opacity-0'}
-          `}
-        >
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onEdit?.(product);
-            }}
-            className="px-5 py-2.5 bg-white text-gray-900 rounded-xl font-semibold text-sm shadow-xl hover:bg-gray-100 transition-all active:scale-95"
-          >
-            Edit Product
-          </button>
-        </div>
-      )}
-
-      {/* Out of Stock Overlay */}
-      {isStrictlyOutOfStock && (
-        <div className="absolute inset-0 z-20 bg-white/60 dark:bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
-          <span className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold rounded-full shadow-xl">
-            Sold Out
-          </span>
-        </div>
-      )}
-
-      {isCustomOrderOnly && (
-        <div className="absolute inset-x-0 top-4 z-20 flex justify-center px-4">
-          <span className="rounded-full bg-violet-600/90 px-3 py-1 text-xs font-semibold text-white shadow-xl backdrop-blur-sm">
-            ✂️ Custom order only
-          </span>
-        </div>
-      )}
-
-      {/* Glassmorphism Info Overlay — bottom */}
-      <div
-        className="
-          absolute inset-x-0 bottom-0 z-10
-          backdrop-blur-xl
-          bg-black/30
-          border-t border-white/10
-          p-3
-        "
-      >
-        <h3 className="text-sm font-semibold text-white line-clamp-1 leading-snug drop-shadow-sm">
-          {product.name}
-        </h3>
-
-        <p className="text-[11px] text-white/70 line-clamp-1 mt-0.5">
-          {product.brand.name}
-        </p>
-
-        <div className="flex items-center justify-between mt-1.5">
-          <div className="flex items-baseline gap-1.5">
-            <span className={`text-sm font-bold drop-shadow-sm ${product.isOnSale ? 'text-rose-300' : 'text-white'}`}>
-              {formatPrice(product.effectivePrice, product.brand.currency)}
-            </span>
-            {product.isOnSale && product.salePrice && (
-              <span className="text-[11px] text-white/50 line-through">
-                {formatPrice(product.price, product.brand.currency)}
+        <div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">
+          {ownerStatus ? (
+            <span
+              className="group/badge relative cursor-default text-base leading-none drop-shadow-md"
+              title={ownerStatus.label}
+            >
+              {ownerStatus.emoji}
+              <span className="pointer-events-none absolute left-full top-1/2 ml-1.5 -translate-y-1/2 whitespace-nowrap rounded bg-gray-900/90 px-2 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover/badge:opacity-100">
+                {ownerStatus.label}
               </span>
-            )}
+            </span>
+          ) : null}
+          {product.isOnSale && product.discountPercent ? (
+            <span className="rounded-full bg-rose-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm">
+              -{product.discountPercent}%
+            </span>
+          ) : null}
+          {product.isLowStock && !isCustomOrderOnly && !product.isOutOfStock ? (
+            <span className="group/badge relative cursor-default text-base leading-none drop-shadow-md" title="Low Stock">
+              ⚠️
+              <span className="pointer-events-none absolute left-full top-1/2 ml-1.5 -translate-y-1/2 whitespace-nowrap rounded bg-gray-900/90 px-2 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover/badge:opacity-100">
+                Low Stock
+              </span>
+            </span>
+          ) : null}
+          {isOwnerView && stockState !== 'OUT_OF_STOCK' ? (
+            <span
+              className="group/badge relative cursor-default text-base leading-none drop-shadow-md"
+              title={
+                isCustomOrderOnly
+                  ? 'Out of stock, but still baggable as a custom order'
+                  : `${product.totalStock} in stock`
+              }
+            >
+              {isCustomOrderOnly ? '✂️' : '📦'}
+              <span className="pointer-events-none absolute left-full top-1/2 ml-1.5 -translate-y-1/2 whitespace-nowrap rounded bg-gray-900/90 px-2 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover/badge:opacity-100">
+                {isCustomOrderOnly ? 'Custom order only' : `${product.totalStock} in stock`}
+              </span>
+            </span>
+          ) : null}
+        </div>
+
+        {!isOwnerView ? (
+          <button
+            type="button"
+            onClick={handleWishlistToggle}
+            disabled={wishlistLoading || isOwnProduct}
+            aria-label={isProductWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+            title={
+              isOwnProduct
+                ? 'Brands cannot wishlist their own products'
+                : isProductWishlisted
+                  ? 'Remove from wishlist'
+                  : 'Add to wishlist'
+            }
+            className={`
+              absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-sm transition-all duration-200 ease-out dark:bg-black/40
+              ${wishlistLoading || isOwnProduct ? 'cursor-not-allowed opacity-50' : 'active:scale-95 hover:scale-110'}
+            `}
+          >
+            <span role="img" aria-hidden="true" className="text-sm leading-none">
+              {isProductWishlisted ? redHeartEmoji : whiteHeartEmoji}
+            </span>
+          </button>
+        ) : null}
+
+        {product.isFeatured ? (
+          <div className="absolute right-0 top-0 z-[5]">
+            <div className="rounded-bl-xl bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-white shadow-sm">
+              Featured
+            </div>
           </div>
+        ) : null}
 
-          {/* Quick actions */}
-          <div className="flex items-center gap-1">
-            {/* Custom badge */}
-            {isCustomAvailable && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setShowCustomLabel((prev) => !prev);
-                }}
-                onMouseEnter={() => setShowCustomLabel(true)}
-                onMouseLeave={() => setShowCustomLabel(false)}
-                onFocus={() => setShowCustomLabel(true)}
-                onBlur={() => setShowCustomLabel(false)}
-                className="inline-flex items-center gap-1 rounded-full bg-purple-500/80 backdrop-blur-sm px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm"
-                aria-label="Custom available"
-                title="Custom available"
-              >
-                <span role="img" aria-hidden="true">{String.fromCodePoint(0x2702, 0xfe0f)}</span>
-                {showCustomLabel && <span>Custom</span>}
-              </button>
-            )}
+        {isOwnerView && onEdit ? (
+          <div
+            className={`
+              absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-all duration-300
+              ${isHovered ? 'opacity-100' : 'opacity-0'}
+            `}
+          >
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onEdit?.(product);
+              }}
+              className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-xl transition-all hover:bg-gray-100 active:scale-95"
+            >
+              Edit Product
+            </button>
+          </div>
+        ) : null}
 
-            {!isOwnerView && (
-              <button
-                type="button"
-                onClick={handleQuickAddToCart}
-                disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
-                title={
-                  isOwnProduct
-                    ? 'Brands cannot bag their own products'
-                    : isStrictlyOutOfStock
-                      ? 'Item is out of stock'
-                      : isCustomOrderOnly
-                        ? 'Bag as a custom order'
-                      : 'Bag it'
-                }
-                className={`
-                  h-8 w-8 rounded-lg flex items-center justify-center
-                  transition-all duration-200
-                  ${isStrictlyOutOfStock || isOwnProduct
-                    ? 'text-white/30 cursor-not-allowed'
-                    : 'text-white/80 hover:bg-white/15 hover:text-white active:scale-95'
+        {isStrictlyOutOfStock ? (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[2px] dark:bg-black/60">
+            <span className="rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-xl dark:bg-white dark:text-gray-900">
+              Sold Out
+            </span>
+          </div>
+        ) : null}
+
+        {isCustomOrderOnly ? (
+          <div className="absolute inset-x-0 top-4 z-20 flex justify-center px-4">
+            <span className="rounded-full bg-violet-600/90 px-3 py-1 text-xs font-semibold text-white shadow-xl backdrop-blur-sm">
+              ✂️ Custom order only
+            </span>
+          </div>
+        ) : null}
+
+        <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/82 via-black/42 to-transparent px-4 pb-4 pt-16">
+          <h3 className="line-clamp-1 text-sm font-semibold leading-snug text-white drop-shadow-sm">
+            {product.name}
+          </h3>
+
+          <p className="mt-0.5 line-clamp-1 text-[11px] text-white/70">
+            {product.brand.name}
+          </p>
+
+          <div className="mt-1.5 flex items-center justify-between">
+            <div className="flex items-baseline gap-1.5">
+              <span className={`text-sm font-bold drop-shadow-sm ${product.isOnSale ? 'text-rose-300' : 'text-white'}`}>
+                {formatPrice(product.effectivePrice, product.brand.currency)}
+              </span>
+              {product.isOnSale && product.salePrice ? (
+                <span className="text-[11px] text-white/50 line-through">
+                  {formatPrice(product.price, product.brand.currency)}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="flex items-center gap-1">
+              {isCustomAvailable ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setShowCustomLabel((prev) => !prev);
+                  }}
+                  onMouseEnter={() => setShowCustomLabel(true)}
+                  onMouseLeave={() => setShowCustomLabel(false)}
+                  onFocus={() => setShowCustomLabel(true)}
+                  onBlur={() => setShowCustomLabel(false)}
+                  className="inline-flex items-center gap-1 rounded-full bg-purple-500/80 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm"
+                  aria-label="Custom available"
+                  title="Custom available"
+                >
+                  <span role="img" aria-hidden="true">{String.fromCodePoint(0x2702, 0xfe0f)}</span>
+                  {showCustomLabel ? <span>Custom</span> : null}
+                </button>
+              ) : null}
+
+              {!isOwnerView ? (
+                <button
+                  type="button"
+                  onClick={handleQuickAddToCart}
+                  disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
+                  title={
+                    isOwnProduct
+                      ? 'Brands cannot bag their own products'
+                      : isStrictlyOutOfStock
+                        ? 'Item is out of stock'
+                        : isCustomOrderOnly
+                          ? 'Bag as a custom order'
+                          : 'Bag it'
                   }
-                  ${cartLoading ? 'opacity-70 cursor-wait' : ''}
-                `}
-              >
-                <span role="img" aria-hidden="true" className="text-sm leading-none">
-                  🛍️
-                </span>
-              </button>
-            )}
-
-            {isOwnerView && (
-              <div className="flex items-center gap-2 text-[10px] text-white/50">
-                <span className="inline-flex items-center gap-0.5">
-                  <span role="img" aria-hidden="true">👁️</span>
-                  {product.viewsCount}
-                </span>
-              </div>
-            )}
+                  className={`
+                    flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200
+                    ${isStrictlyOutOfStock || isOwnProduct ? 'cursor-not-allowed text-white/30' : 'text-white/80 hover:bg-white/15 hover:text-white active:scale-95'}
+                    ${cartLoading ? 'cursor-wait opacity-70' : ''}
+                  `}
+                >
+                  <span role="img" aria-hidden="true" className="text-sm leading-none">
+                    🛍️
+                  </span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 text-[10px] text-white/50">
+                  <span className="inline-flex items-center gap-0.5">
+                    <span role="img" aria-hidden="true">👁️</span>
+                    {product.viewsCount}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -747,4 +743,3 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 };
 
 export default StoreProductCard;
-

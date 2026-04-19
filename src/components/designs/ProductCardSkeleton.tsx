@@ -12,7 +12,7 @@ interface ProductCardSkeletonProps {
  * Matches the new StoreProductCard design for seamless loading transitions
  * 
  * Features:
- * - 4:5 aspect ratio image placeholder (matches product card)
+ * - Natural-height media placeholder with reduced visual weight
  * - Rounded 2xl corners
  * - Shimmer animation effect
  * - Clean, minimal design
@@ -28,11 +28,11 @@ const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({
         relative
         rounded-2xl
         overflow-hidden
-        aspect-[4/5]
+        min-h-[320px]
       "
     >
       {/* Full-bleed image skeleton */}
-      <div className="absolute inset-0 bg-gray-100 dark:bg-zinc-800/50 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden bg-transparent">
         {/* Shimmer effect */}
         <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/10 to-transparent" />
         
@@ -49,10 +49,8 @@ const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({
       <div
         className="
           absolute inset-x-0 bottom-0 z-10
-          backdrop-blur-xl
-          bg-black/30
-          border-t border-white/10
-          p-3
+          bg-gradient-to-t from-black/82 via-black/42 to-transparent
+          px-4 pb-4 pt-16
         "
       >
         <div className="flex flex-col gap-2">

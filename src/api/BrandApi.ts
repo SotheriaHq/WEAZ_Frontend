@@ -57,6 +57,10 @@ const SIGNED_URL_TTL_MS = 4 * 60 * 1000;
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 const signedUrlPending = new Map<string, Promise<string | null>>();
 
+type SignedUrlResolveOptions = {
+  forceRefresh?: boolean;
+};
+
 const extractS3KeyFromMaybeMalformedUrl = (rawS3Url: string): string | null => {
   const raw = String(rawS3Url ?? '').trim();
   if (!raw) return null;
@@ -1321,28 +1325,40 @@ export const brandApi = {
     }
   },
 
-  async getSignedFileUrl(fileId: string): Promise<string | null> {
-    const existing = signedUrlCache.get(fileId);
+  async getSignedFileUrl(
+    fileId: string,
+    options?: SignedUrlResolveOptions,
+  ): Promise<string | null> {
+    const cacheKey = String(fileId ?? '').trim();
+    if (!cacheKey) return null;
+    const forceRefresh = options?.forceRefresh === true;
+
+    if (forceRefresh) {
+      signedUrlCache.delete(cacheKey);
+      signedUrlPending.delete(cacheKey);
+    }
+
+    const existing = signedUrlCache.get(cacheKey);
     if (existing && existing.expiresAt > Date.now()) {
       return existing.url;
     }
 
-    const inflight = signedUrlPending.get(fileId);
-    if (inflight) {
+    const inflight = signedUrlPending.get(cacheKey);
+    if (inflight && !forceRefresh) {
       return inflight;
     }
 
     const request = (async (): Promise<string | null> => {
       try {
         // Try public endpoint first (no auth required)
-        const response = await apiClient.get(`/uploads/public-url/${fileId}`);
+        const response = await apiClient.get(`/uploads/public-url/${cacheKey}`);
         const payload = unwrapApiResponse<{ url?: string }>(response.data);
         const directUrl =
           (payload as { url?: string })?.url ??
           (response.data as { url?: string })?.url ??
           null;
         if (typeof directUrl === 'string') {
-          signedUrlCache.set(fileId, {
+          signedUrlCache.set(cacheKey, {
             url: directUrl,
             expiresAt: Date.now() + SIGNED_URL_TTL_MS,
           });
@@ -1362,11 +1378,11 @@ export const brandApi = {
         }
         return existing?.url ?? null;
       } finally {
-        signedUrlPending.delete(fileId);
+        signedUrlPending.delete(cacheKey);
       }
     })();
 
-    signedUrlPending.set(fileId, request);
+    signedUrlPending.set(cacheKey, request);
     return request;
   },
 
@@ -1375,23 +1391,34 @@ export const brandApi = {
    * Extracts the S3 key from the URL and calls the public-url-by-key endpoint.
    * Falls back to returning the original URL if signing fails.
    */
-  async getSignedS3Url(rawS3Url: string): Promise<string | null> {
+  async getSignedS3Url(
+    rawS3Url: string,
+    options?: SignedUrlResolveOptions,
+  ): Promise<string | null> {
     if (!rawS3Url || typeof rawS3Url !== 'string') return null;
+    const cacheKey = String(rawS3Url).trim();
+    if (!cacheKey) return null;
+    const forceRefresh = options?.forceRefresh === true;
+
+    if (forceRefresh) {
+      signedUrlCache.delete(cacheKey);
+      signedUrlPending.delete(cacheKey);
+    }
 
     // Check cache using the raw URL as key
-    const existing = signedUrlCache.get(rawS3Url);
+    const existing = signedUrlCache.get(cacheKey);
     if (existing && existing.expiresAt > Date.now()) {
       return existing.url;
     }
 
-    const inflight = signedUrlPending.get(rawS3Url);
-    if (inflight) return inflight;
+    const inflight = signedUrlPending.get(cacheKey);
+    if (inflight && !forceRefresh) return inflight;
 
     const request = (async (): Promise<string | null> => {
       try {
         // Extract the S3 key from the URL (supports malformed legacy URL snapshots).
-        const s3Key = extractS3KeyFromMaybeMalformedUrl(rawS3Url);
-        if (!s3Key) return rawS3Url;
+        const s3Key = extractS3KeyFromMaybeMalformedUrl(cacheKey);
+        if (!s3Key) return cacheKey;
 
         // Use the key-based signing endpoint (query param, not path param)
         const response = await apiClient.get('/uploads/public-url-by-key', {
@@ -1403,29 +1430,38 @@ export const brandApi = {
           (response.data as { url?: string })?.url ??
           null;
         if (typeof signedUrl === 'string' && signedUrl.length > 0) {
-          signedUrlCache.set(rawS3Url, {
+          signedUrlCache.set(cacheKey, {
             url: signedUrl,
             expiresAt: Date.now() + SIGNED_URL_TTL_MS,
           });
           return signedUrl;
         }
         // Fall back to raw URL
-        return rawS3Url;
+        return cacheKey;
       } catch {
         // If signing fails, return the original raw URL as a best-effort fallback
-        return rawS3Url;
+        return cacheKey;
       } finally {
-        signedUrlPending.delete(rawS3Url);
+        signedUrlPending.delete(cacheKey);
       }
     })();
 
-    signedUrlPending.set(rawS3Url, request);
+    signedUrlPending.set(cacheKey, request);
     return request;
   },
 
-  async getSignedS3KeyUrl(s3Key: string): Promise<string | null> {
+  async getSignedS3KeyUrl(
+    s3Key: string,
+    options?: SignedUrlResolveOptions,
+  ): Promise<string | null> {
     const normalizedKey = String(s3Key ?? '').trim().replace(/^\/+/, '');
     if (!normalizedKey) return null;
+    const forceRefresh = options?.forceRefresh === true;
+
+    if (forceRefresh) {
+      signedUrlCache.delete(normalizedKey);
+      signedUrlPending.delete(normalizedKey);
+    }
 
     const existing = signedUrlCache.get(normalizedKey);
     if (existing && existing.expiresAt > Date.now()) {
@@ -1433,7 +1469,7 @@ export const brandApi = {
     }
 
     const inflight = signedUrlPending.get(normalizedKey);
-    if (inflight) return inflight;
+    if (inflight && !forceRefresh) return inflight;
 
     const request = (async (): Promise<string | null> => {
       try {
@@ -1462,6 +1498,23 @@ export const brandApi = {
 
     signedUrlPending.set(normalizedKey, request);
     return request;
+  },
+
+  invalidateSignedUrlCache(key?: string) {
+    if (!key) {
+      signedUrlCache.clear();
+      signedUrlPending.clear();
+      return;
+    }
+
+    const rawKey = String(key).trim();
+    if (!rawKey) return;
+
+    const normalizedKey = rawKey.replace(/^\/+/, '');
+    signedUrlCache.delete(rawKey);
+    signedUrlPending.delete(rawKey);
+    signedUrlCache.delete(normalizedKey);
+    signedUrlPending.delete(normalizedKey);
   },
   // Get one collection with medias
   async getCollectionDetail(

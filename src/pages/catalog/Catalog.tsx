@@ -91,7 +91,7 @@ const ProfilePage: React.FC = () => {
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
-  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string }>>({});
+  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; visibility?: 'PUBLIC' | 'PRIVATE' }>>({});
   const [publishTasks, setPublishTasks] = useState<PublishTask[]>([]);
 
   const navigate = useNavigate();
@@ -185,6 +185,12 @@ const ProfilePage: React.FC = () => {
           progress: task?.progress,
           previewUrl: task?.coverPreviewUrl,
           taskId,
+          visibility:
+            navState.publishingVisibility === 'PRIVATE'
+              ? 'PRIVATE'
+              : task?.visibility === 'PRIVATE'
+                ? 'PRIVATE'
+                : 'PUBLIC',
           message:
             task?.message ||
             (navState.publishingTitle
@@ -209,6 +215,7 @@ const ProfilePage: React.FC = () => {
           startedAt,
           attempts: 0,
           progress: typeof navState.publishingProgress === 'number' ? navState.publishingProgress : undefined,
+          visibility: navState.publishingVisibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC',
           message: navState.publishingTitle ? `Publishing "${navState.publishingTitle}"` : 'Publishing your design',
         },
       }));
@@ -631,6 +638,7 @@ const ProfilePage: React.FC = () => {
             progress: task.progress,
             previewUrl: task.coverPreviewUrl,
             taskId: task.id,
+            visibility: task.visibility,
             message: nextMessage,
           };
           changed = true;
@@ -783,16 +791,18 @@ const ProfilePage: React.FC = () => {
       } as CollectionDto;
     });
 
-    if (visibilityFilter !== 'Public') {
+    if (visibilityFilter !== 'Public' && visibilityFilter !== 'Private') {
       return decorated;
     }
 
     const decoratedIds = new Set(decorated.map((entry) => entry.id));
+    const targetVisibility = visibilityFilter === 'Private' ? 'PRIVATE' : 'PUBLIC';
     const placeholders: CollectionDto[] = Object.entries(publishingStates)
       .filter(([key, state]) => {
         if (decoratedIds.has(key)) return false;
         // Show both in-progress uploads AND failed tasks (so failed tasks surface as ghost cards)
         if (state.status !== 'publishing' && state.status !== 'failed') return false;
+        if ((state.visibility ?? 'PUBLIC') !== targetVisibility) return false;
         // Require a preview URL so we have something to show in the card
         if (!state.previewUrl) return false;
         const query = searchQuery.trim().toLowerCase();
@@ -809,8 +819,8 @@ const ProfilePage: React.FC = () => {
           description: isFailed ? 'Tap retry to republish' : 'Uploading in background',
           ownerId: user?.id || '',
           title: isFailed ? 'Publish failed' : (state.message || 'Publishing design'),
-          isPublic: true,
-          visibility: 'PUBLIC',
+          isPublic: targetVisibility !== 'PRIVATE',
+          visibility: targetVisibility,
           type: 'EVERYBODY',
           coverImage: state.previewUrl,
           createdAt: nowIso,
@@ -909,6 +919,7 @@ const ProfilePage: React.FC = () => {
           progress: prev[collectionId]?.progress,
           previewUrl: prev[collectionId]?.previewUrl,
           taskId: prev[collectionId]?.taskId,
+          visibility: prev[collectionId]?.visibility,
           message: 'Upload session is still initializing. Progress will continue automatically.',
         },
       }));
@@ -926,6 +937,7 @@ const ProfilePage: React.FC = () => {
           progress: prev[collectionId]?.progress,
           previewUrl: prev[collectionId]?.previewUrl,
           taskId: prev[collectionId]?.taskId,
+          visibility: prev[collectionId]?.visibility,
           message: 'Re-checking publish status...',
         },
       }));
@@ -946,6 +958,7 @@ const ProfilePage: React.FC = () => {
             progress: prev[collectionId]?.progress,
             previewUrl: prev[collectionId]?.previewUrl,
             taskId: prev[collectionId]?.taskId,
+            visibility: prev[collectionId]?.visibility,
             message: 'Reprocessing started. We will keep checking in the background.',
           },
         }));
@@ -995,6 +1008,7 @@ const ProfilePage: React.FC = () => {
           progress: prev[collectionId]?.progress,
           previewUrl: prev[collectionId]?.previewUrl,
           taskId: prev[collectionId]?.taskId,
+          visibility: prev[collectionId]?.visibility,
           message: nextMessage,
         },
       }));

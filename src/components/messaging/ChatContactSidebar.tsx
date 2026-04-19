@@ -44,6 +44,22 @@ const contextColor = (ct: ConversationContext) => {
   }
 };
 
+const isLikelyFileId = (value?: string | null) =>
+  Boolean(value && !/^https?:/i.test(value) && /^[0-9a-f-]{30,}$/i.test(value));
+
+const resolveAvatarMediaSource = (value?: string | null) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) {
+    return { fileId: undefined, src: undefined };
+  }
+
+  if (isLikelyFileId(raw)) {
+    return { fileId: raw, src: undefined };
+  }
+
+  return { fileId: undefined, src: raw };
+};
+
 const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
   participant,
   contextType,
@@ -93,6 +109,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
   }, [messages]);
 
   const referenceId = orderId || customOrderId;
+  const participantAvatarSource = resolveAvatarMediaSource(participant?.profileImage);
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
@@ -102,7 +119,8 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
           <div className="h-20 w-20 rounded-[1.5rem] overflow-hidden ring-2 ring-gray-200/60 dark:ring-white/10">
             {participant?.profileImage ? (
               <ImageWithFallback
-                fileId={participant.profileImage}
+                src={participantAvatarSource.src}
+                fileId={participantAvatarSource.fileId}
                 alt={participant.name}
                 fit="cover"
                 className="h-20 w-20"

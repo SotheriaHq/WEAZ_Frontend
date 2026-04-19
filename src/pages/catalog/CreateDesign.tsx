@@ -885,6 +885,7 @@ const CreateDesignInner: React.FC = () => {
         const task = createPublishTask({
           ownerId: user?.id,
           title,
+          visibility,
           coverPreviewUrl: editPreviewUrl,
           collectionId: id,
           message: 'Updating design...',
@@ -897,6 +898,7 @@ const CreateDesignInner: React.FC = () => {
             publishingTaskId: task.id,
             publishingTitle: title,
             publishingStartedAt: task.startedAt,
+            publishingVisibility: visibility,
           },
         });
 
@@ -1016,6 +1018,7 @@ const CreateDesignInner: React.FC = () => {
         const task = createPublishTask({
           ownerId: user?.id,
           title,
+          visibility,
           coverPreviewUrl: previewDataUrl,
           message: 'Preparing draft upload...',
         });
@@ -1027,6 +1030,7 @@ const CreateDesignInner: React.FC = () => {
             publishingTaskId: task.id,
             publishingTitle: title,
             publishingStartedAt: task.startedAt,
+            publishingVisibility: visibility,
           },
         });
         toast.info('Publishing in background. You can keep browsing your profile.');

@@ -5,7 +5,8 @@
  */
 
 import React from 'react';
-import MediaRenderer from '../media/MediaRenderer';
+import ImageWithFallback from '@/components/ImageWithFallback';
+import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 
 interface NotificationAvatarProps {
   actor: {
@@ -14,15 +15,21 @@ interface NotificationAvatarProps {
     firstName?: string | null;
     lastName?: string | null;
     profileImage?: string | null;
+    profileImageId?: string | null;
+    profileImageFile?: {
+      id?: string | null;
+      s3Url?: string | null;
+      url?: string | null;
+    } | null;
   } | null;
   isRead: boolean;
   size?: 'sm' | 'md' | 'lg';
 }
 
 const sizeClasses = {
-  sm: 'max-w-8 max-h-8 text-xs',
-  md: 'max-w-9 max-h-9 text-sm',
-  lg: 'max-w-11 max-h-11 text-base',
+  sm: 'h-8 w-8 text-xs',
+  md: 'h-9 w-9 text-sm',
+  lg: 'h-11 w-11 text-base',
 };
 
 export const NotificationAvatar = React.memo<NotificationAvatarProps>(
@@ -33,34 +40,21 @@ export const NotificationAvatar = React.memo<NotificationAvatarProps>(
     const displayName = actor?.username 
       || [actor?.firstName, actor?.lastName].filter(Boolean).join(' ')
       || 'Threadly';
-    
-    // Get initials for avatar fallback
-    const initials = actor?.username 
-      ? actor.username.slice(0, 2).toUpperCase()
-      : actor?.firstName && actor?.lastName
-        ? `${actor.firstName.charAt(0)}${actor.lastName.charAt(0)}`.toUpperCase()
-        : 'TH';
+    const avatar = resolveProfileImageSource(actor);
+    const initials = getAvatarFallback(displayName, actor?.username) || 'TH';
 
     return (
       <div className="relative shrink-0">
-        {actor?.profileImage ? (
-          <MediaRenderer
-            kind="image"
-            src={actor.profileImage}
-            alt={displayName}
-            maxHeightClassName={sizeClass.split(' ').find((c) => c.startsWith('max-h-')) || 'max-h-9'}
-            maxWidthClassName={sizeClass.split(' ').find((c) => c.startsWith('max-w-')) || 'max-w-9'}
-            className={`rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-transform duration-150`}
-            mediaClassName="rounded-xl"
-          />
-        ) : (
-          <div 
-            className={`${sizeClass} rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 flex items-center justify-center font-bold text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800`}
-            aria-label={displayName}
-          >
-            {initials}
-          </div>
-        )}
+        <ImageWithFallback
+          src={avatar.src}
+          fileId={avatar.fileId}
+          alt={displayName}
+          fallbackName={initials}
+          fit="cover"
+          rounded="xl"
+          className={`${sizeClass} object-cover`}
+          containerClassName={`${sizeClass} rounded-xl border border-gray-200 shadow-sm transition-transform duration-150 dark:border-gray-700`}
+        />
         
         {/* Unread indicator dot */}
         {!isRead && (

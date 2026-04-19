@@ -4,6 +4,7 @@ export interface PublishTask {
   id: string;
   ownerId?: string;
   title: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
   startedAt: number;
   status: PublishTaskStatus;
   progress: number;
@@ -53,6 +54,7 @@ const isTaskLike = (value: unknown): value is PublishTask => {
     typeof task.id === 'string' &&
     (task.ownerId === undefined || typeof task.ownerId === 'string') &&
     typeof task.title === 'string' &&
+    (task.visibility === undefined || task.visibility === 'PUBLIC' || task.visibility === 'PRIVATE') &&
     typeof task.startedAt === 'number' &&
     typeof task.status === 'string' &&
     typeof task.progress === 'number' &&
@@ -136,6 +138,7 @@ export const savePublishTasks = (tasks: PublishTask[]) => {
 export const createPublishTask = (payload: {
   title: string;
   ownerId?: string | null;
+  visibility?: 'PUBLIC' | 'PRIVATE';
   coverPreviewUrl?: string;
   collectionId?: string;
   message?: string;
@@ -146,6 +149,7 @@ export const createPublishTask = (payload: {
     id,
     ownerId: normalizeOwnerId(payload.ownerId),
     title: payload.title,
+    visibility: payload.visibility,
     startedAt: now,
     status: 'uploading',
     progress: 0,

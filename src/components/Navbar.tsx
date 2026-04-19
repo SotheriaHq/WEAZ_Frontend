@@ -35,6 +35,7 @@ import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
 import { generateUserUid } from '@/utils/userUid';
+import { resolveProfileImageSource } from '@/utils/profileImage';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import { COMPANY_NAME } from '@/lib/brand';
 
@@ -59,6 +60,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const wishlistTotal = useSelector(selectWishlistTotal);
   const isWishlistOpen = useSelector(selectWishlistIsDrawerOpen);
   const user = isAuthenticated ? userProfile : null;
+  const userAvatar = React.useMemo(
+    () => resolveProfileImageSource(user),
+    [user],
+  );
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const userUid = user ? generateUserUid(user.id, user.firstName) : null;
@@ -178,8 +183,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
               <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                 <div className="flex items-start gap-3">
                   <ImageWithFallback
-                    src={user.profileImage ?? user.profileImageFile?.s3Url ?? null}
-                    fileId={user.profileImageId ?? user.profileImageFile?.id ?? null}
+                    src={userAvatar.src}
+                    fileId={userAvatar.fileId}
                     alt={`${user.firstName} ${user.lastName}`}
                     fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
                     fit="cover"
@@ -415,8 +420,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                 aria-label="Profile menu"
               >
                 <ImageWithFallback
-                  src={user.profileImage ?? user.profileImageFile?.s3Url ?? null}
-                  fileId={user.profileImageId ?? user.profileImageFile?.id ?? null}
+                  src={userAvatar.src}
+                  fileId={userAvatar.fileId}
                   alt={`${user.firstName} ${user.lastName}`}
                   fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
                   fit="cover"

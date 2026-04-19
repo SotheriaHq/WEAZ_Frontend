@@ -192,7 +192,8 @@ const DashboardHome: React.FC = () => {
   const displayStoreName = store.name || user?.brandFullName || 'Store';
   const logoInitial =
     user?.profileImage ?? user?.profileImageFile?.s3Url ?? store.logoUrl ?? null;
-  const { url: resolvedLogoUrl } = useSignedFileUrl(user?.profileImageId ?? null, logoInitial);
+  const logoFileId = user?.profileImageId ?? user?.profileImageFile?.id ?? null;
+  const { url: resolvedLogoUrl } = useSignedFileUrl(logoFileId, logoInitial);
   const resolvedIsLive =
     storeOpenStatus ??
     (typeof store?.isStoreOpen === 'boolean' ? store.isStoreOpen : null) ??

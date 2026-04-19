@@ -16,6 +16,13 @@ const getCachedUrl = (key: string): string | null => {
   return entry && entry.expiresAt > Date.now() ? entry.url : null;
 };
 
+const invalidateCachedUrl = (key: string) => {
+  const cache = getCache();
+  if (!cache[key]) return;
+  delete cache[key];
+  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch { /* full */ }
+};
+
 const setCachedUrl = (key: string, url: string) => {
   const cache = getCache();
   cache[key] = { url, expiresAt: Date.now() + CACHE_EXPIRY_MS };
@@ -41,6 +48,17 @@ const dedup = async (
   return p;
 };
 
+const isS3LikeUrl = (value?: string | null) => {
+  if (!value) return false;
+  const lower = value.toLowerCase();
+  return lower.includes('.s3.') || lower.includes('amazonaws.com');
+};
+
+const isRawStorageKey = (value?: string | null) => {
+  if (!value) return false;
+  return !/^https?:\/\//i.test(value) && !value.includes('?');
+};
+
 /**
  * Resolve a signed URL for a given fileId with an optional initial fallback URL.
  * Guarantees a stable url string or null, plus loading/error states.
@@ -51,6 +69,12 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
     if (fileId) {
       const cached = getCachedUrl(fileId);
       if (cached) return cached;
+    }
+    if (initial && isRawStorageKey(initial)) {
+      return getCachedUrl(`key:${initial}`) ?? initial;
+    }
+    if (initial && isS3LikeUrl(initial)) {
+      return getCachedUrl(initial) ?? null;
     }
     return initial ?? null;
   });
@@ -64,14 +88,14 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
 
     // If no stable fileId is available, use initial-url optimization.
     // When fileId exists, prefer resolving by fileId to avoid stale signed URLs.
-    if (!fileId && initial && (initial.includes('?') || !initial.includes('s3'))) {
+    if (!fileId && initial && !isS3LikeUrl(initial) && !isRawStorageKey(initial)) {
         setUrl(initial);
         setLoading(false);
         return;
     }
 
-    // Handle unsigned S3 URLs (contain '.s3.' but no '?' query params) – sign via raw URL
-    if (!fileId && initial && initial.includes('.s3.') && !initial.includes('?')) {
+    // Handle S3 URLs (signed or unsigned) by resolving a fresh URL through API.
+    if (!fileId && initial && isS3LikeUrl(initial)) {
       setLoading(true);
       dedup(initial, () => brandApi.getSignedS3Url(initial)).then((signed) => {
         if (!cancelled) {
@@ -83,7 +107,11 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
 
           // Retry once after short delay for transient auth/network delays.
           retryTimer = setTimeout(() => {
-            void dedup(initial, () => brandApi.getSignedS3Url(initial)).then((retrySigned) => {
+            brandApi.invalidateSignedUrlCache(initial);
+            invalidateCachedUrl(initial);
+            void dedup(initial, () =>
+              brandApi.getSignedS3Url(initial, { forceRefresh: true }),
+            ).then((retrySigned) => {
               if (!cancelled) {
                 setUrl(retrySigned ?? initial);
                 setLoading(false);
@@ -92,6 +120,38 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
           }, 900);
         }
       });
+      return () => {
+        cancelled = true;
+        if (retryTimer) clearTimeout(retryTimer);
+      };
+    }
+
+    if (!fileId && initial && isRawStorageKey(initial)) {
+      const cacheKey = `key:${initial}`;
+      setLoading(true);
+      dedup(cacheKey, () => brandApi.getSignedS3KeyUrl(initial)).then((signed) => {
+        if (!cancelled) {
+          if (signed) {
+            setUrl(signed);
+            setLoading(false);
+            return;
+          }
+
+          retryTimer = setTimeout(() => {
+            brandApi.invalidateSignedUrlCache(initial);
+            invalidateCachedUrl(cacheKey);
+            void dedup(cacheKey, () =>
+              brandApi.getSignedS3KeyUrl(initial, { forceRefresh: true }),
+            ).then((retrySigned) => {
+              if (!cancelled) {
+                setUrl(retrySigned ?? initial);
+                setLoading(false);
+              }
+            });
+          }, 900);
+        }
+      });
+
       return () => {
         cancelled = true;
         if (retryTimer) clearTimeout(retryTimer);
@@ -124,7 +184,11 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
 
         // Retry once after short delay for transient auth/network delays.
         retryTimer = setTimeout(() => {
-          void dedup(fileId, () => brandApi.getSignedFileUrl(fileId)).then((retrySigned) => {
+          brandApi.invalidateSignedUrlCache(fileId);
+          invalidateCachedUrl(fileId);
+          void dedup(fileId, () =>
+            brandApi.getSignedFileUrl(fileId, { forceRefresh: true }),
+          ).then((retrySigned) => {
             if (!cancelled) {
               if (retrySigned) {
                 setUrl(retrySigned);

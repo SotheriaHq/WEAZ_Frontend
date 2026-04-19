@@ -11,7 +11,6 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble';
 import ComposeArea from '@/components/messaging/ComposeArea';
 import ChatContactSidebar from '@/components/messaging/ChatContactSidebar';
-import VLoader from '@/components/loaders/VLoader';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -121,6 +120,22 @@ const nextClientMessageId = () => {
     return crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+const isLikelyFileId = (value?: string | null) =>
+  Boolean(value && !/^https?:/i.test(value) && /^[0-9a-f-]{30,}$/i.test(value));
+
+const resolveAvatarMediaSource = (value?: string | null) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) {
+    return { fileId: undefined, src: undefined };
+  }
+
+  if (isLikelyFileId(raw)) {
+    return { fileId: raw, src: undefined };
+  }
+
+  return { fileId: undefined, src: raw };
 };
 
 /* ------------------------------------------------------------------ */
@@ -395,6 +410,7 @@ const MessagingManagementPage: React.FC = () => {
 
   /* ---- Derived ---- */
   const activeConversation = conversations.find((item) => item.id === activeId) || null;
+  const activeAvatarSource = resolveAvatarMediaSource(activeConversation?.participantImage);
   const contactSidebarProps = activeConversation
     ? {
         participant: activeConversation.participantId
@@ -907,9 +923,13 @@ const MessagingManagementPage: React.FC = () => {
         {/* Conversation list */}
         <div className="flex-1 overflow-y-auto px-2 pb-2">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <VLoader size={32} phase="loading" className="mx-auto" />
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Loading...</p>
+            <div className="space-y-1.5 py-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={`message-thread-skeleton-${index}`}
+                  className="h-14 animate-pulse rounded-xl bg-gray-200/80 dark:bg-white/[0.08]"
+                />
+              ))}
             </div>
           ) : visibleConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -919,6 +939,7 @@ const MessagingManagementPage: React.FC = () => {
           ) : (
             visibleConversations.map((item) => {
               const isActive = activeId === item.id;
+              const avatarSource = resolveAvatarMediaSource(item.participantImage);
               return (
                 <button
                   key={item.id}
@@ -935,7 +956,8 @@ const MessagingManagementPage: React.FC = () => {
                     <div className="h-10 w-10 rounded-2xl overflow-hidden">
                       {item.participantImage ? (
                         <ImageWithFallback
-                          fileId={item.participantImage}
+                          src={avatarSource.src}
+                          fileId={avatarSource.fileId}
                           alt={item.participantName}
                           fit="cover"
                           className="h-10 w-10"
@@ -1006,7 +1028,8 @@ const MessagingManagementPage: React.FC = () => {
                 <div className="h-9 w-9 rounded-2xl overflow-hidden shrink-0">
                   {activeConversation.participantImage ? (
                     <ImageWithFallback
-                      fileId={activeConversation.participantImage}
+                      src={activeAvatarSource.src}
+                      fileId={activeAvatarSource.fileId}
                       alt={activeConversation.participantName}
                       fit="cover"
                       className="h-9 w-9"
@@ -1095,8 +1118,15 @@ const MessagingManagementPage: React.FC = () => {
             {/* Messages area */}
             <div className="flex-1 overflow-y-auto px-4 py-3">
               {messagesLoading && messages.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <VLoader size={32} phase="loading" />
+                <div className="space-y-3 py-3">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <div
+                      key={`message-bubble-skeleton-${index}`}
+                      className={`h-12 animate-pulse rounded-2xl bg-gray-200/80 dark:bg-white/[0.08] ${
+                        index % 2 === 0 ? 'mr-14' : 'ml-14'
+                      }`}
+                    />
+                  ))}
                 </div>
               ) : messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">

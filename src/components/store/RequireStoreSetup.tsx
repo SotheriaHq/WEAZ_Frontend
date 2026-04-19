@@ -216,11 +216,7 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-[240px] items-center justify-center">
-        <div className="text-sm text-gray-500">Checking store setup...</div>
-      </div>
-    );
+    return <>{children}</>;
   }
 
   if (status?.isStoreOpen) {
@@ -234,7 +230,7 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const destination = resolveStoreSetupDestination(user?.id);
   if (hadError || !status) {
-    return <Navigate to={destination} replace />;
+    return <>{children}</>;
   }
 
   return status.isStoreOpen ? <>{children}</> : <Navigate to={destination} replace />;

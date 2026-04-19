@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import type { RootState } from '@/store';
 import FeaturedSection from '@/components/FeaturedSection';
 import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
+import { resolveProfileImageSource } from '@/utils/profileImage';
 
 // Error type detection
 type ErrorType = 'network' | 'timeout' | 'server' | 'empty' | 'category_empty' | 'unknown';
@@ -344,6 +345,8 @@ const Market: React.FC = () => {
         (typeof selectedMedia.url === 'string' && selectedMedia.url) ||
         '';
 
+      const ownerAvatar = resolveProfileImageSource(detail.owner ?? null);
+
       return {
         id: String(selectedMedia.id),
         collectionId: String(detail.id),
@@ -353,8 +356,8 @@ const Market: React.FC = () => {
         brandId: String(detail.owner?.id ?? ''),
         brandName: detail.owner?.brand?.brandName ?? detail.owner?.username ?? null,
         username: detail.owner?.username ?? null,
-        brandLogo: detail.owner?.brand?.logo ?? null,
-        brandLogoFileId: detail.owner?.brand?.logoFileId ?? null,
+        brandLogo: ownerAvatar.src,
+        brandLogoFileId: ownerAvatar.fileId,
         minPrice: typeof detail.minPrice === 'number' ? detail.minPrice : null,
         maxPrice: typeof detail.maxPrice === 'number' ? detail.maxPrice : null,
         saleMinPrice: typeof detail.saleMinPrice === 'number' ? detail.saleMinPrice : null,

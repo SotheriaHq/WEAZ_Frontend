@@ -32,8 +32,8 @@ type MarketplaceProduct = StoreProduct & {
 
 // Speed in pixels per second for the marquee
 const MARQUEE_PX_PER_S = 40;
-// Width per card (416px) + gap-4 (16px)
-const CARD_WIDTH = 432;
+// Width per compact carousel card (336px) + gap-4 (16px)
+const CARD_WIDTH = 352;
 const FRESH_DROP_DAY_MS = 24 * 60 * 60 * 1000;
 const FRESH_DROP_MAX_AGE_MS = 7 * FRESH_DROP_DAY_MS;
 const SYSTEM_FRESH_DROPS_LIMIT = 20;
@@ -131,7 +131,7 @@ const ProductCarousel: React.FC<{
             {duplicatedProducts.map((product, index) => (
               <div
                 key={`${product.id}-${index}`}
-                className="w-[416px] max-w-[92vw] shrink-0"
+                className="w-[336px] max-w-[82vw] shrink-0"
               >
                 <StoreProductCard
                   product={product}
@@ -147,7 +147,7 @@ const ProductCarousel: React.FC<{
         <div className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex gap-4">
             {products.map((product) => (
-              <div key={product.id} className="w-[416px] max-w-[92vw] shrink-0">
+              <div key={product.id} className="w-[336px] max-w-[82vw] shrink-0">
                 <StoreProductCard
                   product={product}
                   onViewProduct={onViewProduct}

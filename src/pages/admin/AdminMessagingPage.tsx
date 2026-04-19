@@ -47,6 +47,22 @@ const STATUS_BADGE: Record<string, string> = {
   BLOCKED: 'bg-red-500/10 text-red-600',
 };
 
+const isLikelyFileId = (value?: string | null) =>
+  Boolean(value && !/^https?:/i.test(value) && /^[0-9a-f-]{30,}$/i.test(value));
+
+const resolveAvatarMediaSource = (value?: string | null) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) {
+    return { fileId: undefined, src: undefined };
+  }
+
+  if (isLikelyFileId(raw)) {
+    return { fileId: raw, src: undefined };
+  }
+
+  return { fileId: undefined, src: raw };
+};
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -329,6 +345,9 @@ const AdminMessagingPage: React.FC = () => {
                     .map((p) => p.firstName || p.username || 'Unknown')
                     .join(', ');
                   const avatarParticipant = item.participants[0];
+                  const avatarSource = resolveAvatarMediaSource(
+                    avatarParticipant?.profileImage,
+                  );
 
                   return (
                     <button
@@ -342,14 +361,15 @@ const AdminMessagingPage: React.FC = () => {
                       }`}
                     >
                       <div className="relative shrink-0">
-                        <div className="h-9 w-9 rounded-full overflow-hidden">
+                        <div className="h-9 w-9 rounded-xl overflow-hidden">
                           {avatarParticipant?.profileImage ? (
                             <ImageWithFallback
-                              fileId={avatarParticipant.profileImage}
+                              src={avatarSource.src}
+                              fileId={avatarSource.fileId}
                               alt={displayName}
                               fit="cover"
                               className="h-9 w-9"
-                              rounded="full"
+                              rounded="xl"
                               fallbackName={displayName}
                             />
                           ) : (

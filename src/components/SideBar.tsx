@@ -284,7 +284,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ease-out ${
+        className={`fixed inset-0 z-layer-sidebar bg-black/40 backdrop-blur-sm transition-opacity duration-300 ease-out ${
           isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={() => dispatch(closeSidebar())}
@@ -293,7 +293,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
 
       {/* OVERLAY SIDEBAR (Always rendered but translated when closed) */}
       <div
-        className={`fixed left-0 top-0 h-full z-50 shadow-xl w-[240px] threadly-chrome-surface rounded-r-lg flex flex-col overflow-hidden transform transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${
+        className={`fixed left-0 top-0 h-full z-layer-sidebar shadow-xl w-[240px] threadly-chrome-surface rounded-r-lg flex flex-col overflow-hidden transform transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${
           isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'
         }`}
       >
