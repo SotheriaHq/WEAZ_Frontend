@@ -6,7 +6,6 @@ import type {
   AdminTagLifecycleDetails,
   AdminTagStatus,
 } from '@/types/admin';
-import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { unwrapApiResponse } from '@/types/auth';
 import useDebounce from '@/hooks/useDebounce';
 import { toast } from 'sonner';
@@ -30,6 +29,12 @@ const TAG_STATE_OPTIONS = [
   { value: 'approved', label: 'Status: Approved' },
   { value: 'rejected', label: 'Status: Rejected' },
 ];
+const TAGS_PAGE_SIZE = 20;
+
+type LoadedTagPage = {
+  items: AdminTagItem[];
+  nextCursor: string | null;
+};
 
 const getTagStatus = (tag: Pick<AdminTagItem, 'status' | 'isBanned'>): AdminTagStatus => {
   if (tag.status === 'PENDING' || tag.status === 'REJECTED') {
@@ -73,37 +78,39 @@ const AdminTagsPage: React.FC = () => {
   const [selectedTagLoading, setSelectedTagLoading] = useState(false);
   const [selectedTagBusy, setSelectedTagBusy] = useState(false);
   const [displayNameDraft, setDisplayNameDraft] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<AdminTagItem[]>([]);
+  const [cursorPages, setCursorPages] = useState<LoadedTagPage[]>([]);
+  const isSearchMode = debouncedQuery.length > 0;
 
-  const fetchPage = useCallback(
-    async (cursor?: string, limit?: number) => {
-      if (debouncedQuery.length > 0) {
-        const res = await adminTagsApi.search(debouncedQuery, limit ?? 50, {
-          includeBanned: 'true',
-          sort: sortMode,
-          state: stateFilter,
-        });
-        const data = unwrapApiResponse<{ items?: AdminTagItem[] }>(res.data as any);
-        return { items: data?.items ?? [] };
-      }
+  const fetchCursorPage = useCallback(
+    async (cursor?: string) => {
       const params: Record<string, string | number> = {
         sort: sortMode,
         state: stateFilter,
         includeBanned: 'true',
+        limit: TAGS_PAGE_SIZE,
       };
-      if (cursor) params.cursor = cursor;
-      if (limit) params.limit = limit;
+      if (cursor) {
+        params.cursor = cursor;
+      }
       const res = await adminTagsApi.list(params);
       const data = unwrapApiResponse<
-        { items?: AdminTagItem[]; nextCursor?: string } | AdminTagItem[]
+        { items?: AdminTagItem[]; nextCursor?: string | null } | AdminTagItem[]
       >(res.data as any);
-      if (Array.isArray(data)) return { items: data };
-      return { items: data.items ?? [], nextCursor: data.nextCursor };
+      if (Array.isArray(data)) {
+        return { items: data, nextCursor: null as string | null };
+      }
+      return {
+        items: data?.items ?? [],
+        nextCursor: data?.nextCursor ?? null,
+      };
     },
-    [debouncedQuery, sortMode, stateFilter],
+    [sortMode, stateFilter],
   );
-
-  const { items: tags, isLoading: loading, isLoadingMore, hasMore, error, sentinelRef, reset } =
-    useInfiniteScroll<AdminTagItem>(fetchPage, { limit: 50 });
 
   const applyLocalTagUpdate = useCallback((tagName: string, patch: Partial<AdminTagItem>) => {
     setLocalTagOverrides((current) => ({
@@ -115,8 +122,8 @@ const AdminTagsPage: React.FC = () => {
     }));
   }, []);
 
-  const visibleTags = useMemo(() => {
-    const merged = tags.map((tag) => {
+  const mergeAndFilterTags = useCallback((rows: AdminTagItem[]) => {
+    const merged = rows.map((tag) => {
       const override = localTagOverrides[tag.name] ?? null;
       return override ? { ...tag, ...override } : tag;
     });
@@ -126,12 +133,140 @@ const AdminTagsPage: React.FC = () => {
     }
 
     return merged.filter((tag) => getTagStatus(tag).toLowerCase() === stateFilter);
-  }, [localTagOverrides, stateFilter, tags]);
+  }, [localTagOverrides, stateFilter]);
 
   useEffect(() => {
-    setLocalTagOverrides({});
-    reset();
-  }, [debouncedQuery, sortMode, stateFilter, reset]);
+    let cancelled = false;
+
+    const run = async () => {
+      setLocalTagOverrides({});
+      setCurrentPage(1);
+      setError(null);
+
+      if (isSearchMode) {
+        setLoading(true);
+        setCursorPages([]);
+        try {
+          const res = await adminTagsApi.search(debouncedQuery, 200, {
+            includeBanned: 'true',
+            sort: sortMode,
+            state: stateFilter,
+          });
+          const data = unwrapApiResponse<{ items?: AdminTagItem[] }>(res.data as any);
+          if (!cancelled) {
+            setSearchResults(data?.items ?? []);
+          }
+        } catch (loadError: any) {
+          if (!cancelled) {
+            setSearchResults([]);
+            setError(loadError?.response?.data?.message || 'Failed to load tags');
+          }
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        }
+        return;
+      }
+
+      setSearchResults([]);
+      setLoading(true);
+      try {
+        const firstPage = await fetchCursorPage();
+        if (!cancelled) {
+          setCursorPages([firstPage]);
+        }
+      } catch (loadError: any) {
+        if (!cancelled) {
+          setCursorPages([]);
+          setError(loadError?.response?.data?.message || 'Failed to load tags');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQuery, fetchCursorPage, isSearchMode, sortMode, stateFilter]);
+
+  const mergedSearchTags = useMemo(
+    () => mergeAndFilterTags(searchResults),
+    [mergeAndFilterTags, searchResults],
+  );
+  const searchTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(mergedSearchTags.length / TAGS_PAGE_SIZE)),
+    [mergedSearchTags.length],
+  );
+  const pagedSearchTags = useMemo(() => {
+    const start = (currentPage - 1) * TAGS_PAGE_SIZE;
+    return mergedSearchTags.slice(start, start + TAGS_PAGE_SIZE);
+  }, [currentPage, mergedSearchTags]);
+  const currentCursorPage = cursorPages[currentPage - 1] ?? null;
+  const mergedCursorTags = useMemo(
+    () => mergeAndFilterTags(currentCursorPage?.items ?? []),
+    [currentCursorPage?.items, mergeAndFilterTags],
+  );
+  const visibleTags = isSearchMode ? pagedSearchTags : mergedCursorTags;
+  const canGoPrevious = currentPage > 1;
+  const canGoNext = isSearchMode
+    ? currentPage < searchTotalPages
+    : Boolean(currentCursorPage?.nextCursor) || currentPage < cursorPages.length;
+  const totalPagesLabel = isSearchMode
+    ? `${searchTotalPages}`
+    : currentCursorPage?.nextCursor
+      ? `${Math.max(cursorPages.length, currentPage + 1)}+`
+      : `${Math.max(cursorPages.length, 1)}`;
+
+  useEffect(() => {
+    if (!isSearchMode) return;
+    setCurrentPage((page) => Math.min(page, searchTotalPages));
+  }, [isSearchMode, searchTotalPages]);
+
+  const goToPreviousPage = useCallback(() => {
+    setCurrentPage((page) => Math.max(1, page - 1));
+  }, []);
+
+  const goToNextPage = useCallback(async () => {
+    if (!canGoNext || isLoadingMore) return;
+
+    if (isSearchMode) {
+      setCurrentPage((page) => Math.min(searchTotalPages, page + 1));
+      return;
+    }
+
+    if (currentPage < cursorPages.length) {
+      setCurrentPage((page) => page + 1);
+      return;
+    }
+
+    const nextCursor = currentCursorPage?.nextCursor;
+    if (!nextCursor) return;
+
+    setIsLoadingMore(true);
+    try {
+      const nextPage = await fetchCursorPage(nextCursor);
+      setCursorPages((existing) => [...existing, nextPage]);
+      setCurrentPage((page) => page + 1);
+    } catch (loadError: any) {
+      setError(loadError?.response?.data?.message || 'Failed to load more tags');
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [
+    canGoNext,
+    currentCursorPage?.nextCursor,
+    currentPage,
+    cursorPages.length,
+    fetchCursorPage,
+    isLoadingMore,
+    isSearchMode,
+    searchTotalPages,
+  ]);
 
   const formatDate = useCallback((value?: string | null) => {
     if (!value) return '—';
@@ -456,9 +591,32 @@ const AdminTagsPage: React.FC = () => {
               )}
             </tbody>
           </table>
-          {isLoadingMore && <div className="text-center text-gray-500 text-sm py-4">Loading more...</div>}
-          {hasMore && <div ref={sentinelRef} />}
-          {!hasMore && visibleTags.length > 0 && <div className="text-center text-gray-400 text-xs py-4">End of list</div>}
+          {isLoadingMore ? (
+            <div className="py-3 text-center text-sm text-gray-500">Loading next page...</div>
+          ) : null}
+          <div className="mt-3 flex items-center justify-between border-t border-gray-200 pt-3 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">
+            <button
+              type="button"
+              onClick={goToPreviousPage}
+              disabled={!canGoPrevious || loading}
+              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              Previous
+            </button>
+            <span>
+              Page {currentPage} of {totalPagesLabel}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                void goToNextPage();
+              }}
+              disabled={!canGoNext || loading || isLoadingMore}
+              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 

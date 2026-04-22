@@ -4,11 +4,12 @@ import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import UniversalSelect from '@/components/forms/UniversalSelect';
-import { adminModerationApi, adminTaxonomyApi } from '@/api/AdminApi';
+import { adminAuditApi, adminModerationApi, adminTaxonomyApi } from '@/api/AdminApi';
 import { customOrdersAdminApi, type CustomFabricRuleBasis } from '@/api/CustomOrderApi';
 import { unwrapApiResponse } from '@/types/auth';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import type {
+  AdminAuditLog,
   AdminCategory,
   AdminMeasurementPointLifecycleDetails,
   AdminMeasurementPointRow,
@@ -30,9 +31,22 @@ type AdminSubCategory = {
   isActive?: boolean;
 };
 
+type PendingSizeChart = {
+  id: string;
+  brandId?: string;
+  name?: string | null;
+  version?: number | null;
+  status?: string;
+  notes?: string | null;
+  data?: unknown;
+  publishedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 type ModerationQueueResponse = {
-  freeformPoints?: any[];
-  sizeCharts?: any[];
+  freeformPoints?: AdminMeasurementPointRow[];
+  sizeCharts?: PendingSizeChart[];
 };
 
 type MeasurementSortMode = 'CATEGORY_ORDER' | 'ALPHA' | 'RANGE_ASC' | 'RANGE_DESC';
@@ -43,6 +57,7 @@ type MeasurementLifecycleActiveMode = 'all' | 'active' | 'inactive';
 type MeasurementLifecycleStatusMode = 'all' | 'brand_only' | 'approved_global' | 'rejected';
 type MeasurementLifecycleSourceMode = 'all' | 'brand_freeform' | 'system';
 type MeasurementLifecycleAction = 'approve' | 'reject' | 'activate' | 'deactivate';
+const PENDING_QUEUE_PAGE_SIZE = 10;
 
 const CATEGORY_ORDER: MeasurementPointCategory[] = [
   'UPPER_BODY',
@@ -215,6 +230,7 @@ const AdminTaxonomyPage: React.FC = () => {
   const canReviewMeasurementLifecycle = hasPermission('MEASUREMENTS_REVIEW');
   const canReadModerationQueue = hasPermission('MODERATION_READ');
   const canReviewModerationQueue = hasPermission('MODERATION_REVIEW');
+  const canReadAuditLogs = hasPermission('AUDIT_READ');
   const notifications = useSelector((state: RootState) => state.notifications.items);
   const lastMeasurementNotificationIdRef = useRef<string | null>(null);
 
@@ -278,8 +294,14 @@ const AdminTaxonomyPage: React.FC = () => {
 
   const [queueLoading, setQueueLoading] = useState(true);
   const [queueError, setQueueError] = useState<string | null>(null);
-  const [freeformPoints, setFreeformPoints] = useState<any[]>([]);
-  const [sizeCharts, setSizeCharts] = useState<any[]>([]);
+  const [freeformPoints, setFreeformPoints] = useState<AdminMeasurementPointRow[]>([]);
+  const [sizeCharts, setSizeCharts] = useState<PendingSizeChart[]>([]);
+  const [freeformQueuePage, setFreeformQueuePage] = useState(1);
+  const [sizeChartQueuePage, setSizeChartQueuePage] = useState(1);
+  const [selectedSizeChart, setSelectedSizeChart] = useState<PendingSizeChart | null>(null);
+  const [selectedSizeChartHistory, setSelectedSizeChartHistory] = useState<AdminAuditLog[]>([]);
+  const [selectedSizeChartLoading, setSelectedSizeChartLoading] = useState(false);
+  const [sizeChartRejectReason, setSizeChartRejectReason] = useState('');
 
   const [allMeasurementPoints, setAllMeasurementPoints] = useState<MeasurementPoint[]>([]);
   const [measurementPointsLoading, setMeasurementPointsLoading] = useState(true);
@@ -299,9 +321,99 @@ const AdminTaxonomyPage: React.FC = () => {
   const [measurementLifecycleActionLoading, setMeasurementLifecycleActionLoading] = useState(false);
   const [measurementLifecycleRejectReason, setMeasurementLifecycleRejectReason] = useState('');
 
-  const [rejectReasonByPointId, setRejectReasonByPointId] = useState<Record<string, string>>({});
   const [reviewingIds, setReviewingIds] = useState<Record<string, boolean>>({});
   const debouncedMeasurementLifecycleSearch = useDebounce(measurementLifecycleSearch, 300);
+  const freeformQueueTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(freeformPoints.length / PENDING_QUEUE_PAGE_SIZE)),
+    [freeformPoints.length],
+  );
+  const sizeChartQueueTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(sizeCharts.length / PENDING_QUEUE_PAGE_SIZE)),
+    [sizeCharts.length],
+  );
+  const pagedFreeformPoints = useMemo(() => {
+    const start = (freeformQueuePage - 1) * PENDING_QUEUE_PAGE_SIZE;
+    return freeformPoints.slice(start, start + PENDING_QUEUE_PAGE_SIZE);
+  }, [freeformPoints, freeformQueuePage]);
+  const pagedSizeCharts = useMemo(() => {
+    const start = (sizeChartQueuePage - 1) * PENDING_QUEUE_PAGE_SIZE;
+    return sizeCharts.slice(start, start + PENDING_QUEUE_PAGE_SIZE);
+  }, [sizeCharts, sizeChartQueuePage]);
+  const selectedSizeChartTimeline = useMemo(() => {
+    if (!selectedSizeChart) return [];
+
+    type TimelineEntry = {
+      id: string;
+      at: string;
+      summary: string;
+      type: string;
+    };
+
+    const events: TimelineEntry[] = [];
+    if (selectedSizeChart.createdAt) {
+      events.push({
+        id: `size-chart-created:${selectedSizeChart.id}`,
+        at: selectedSizeChart.createdAt,
+        type: 'CREATED',
+        summary: 'Size chart request submitted by brand.',
+      });
+    }
+    if (
+      selectedSizeChart.updatedAt &&
+      selectedSizeChart.createdAt &&
+      selectedSizeChart.updatedAt !== selectedSizeChart.createdAt
+    ) {
+      events.push({
+        id: `size-chart-updated:${selectedSizeChart.id}`,
+        at: selectedSizeChart.updatedAt,
+        type: 'UPDATED',
+        summary: 'Size chart request data updated.',
+      });
+    }
+    if (selectedSizeChart.publishedAt) {
+      events.push({
+        id: `size-chart-published:${selectedSizeChart.id}`,
+        at: selectedSizeChart.publishedAt,
+        type: 'PUBLISHED',
+        summary: 'Size chart published.',
+      });
+    }
+
+    selectedSizeChartHistory.forEach((entry) => {
+      const nextState =
+        entry.newState && typeof entry.newState === 'object'
+          ? (entry.newState as Record<string, unknown>)
+          : null;
+      const statusValue =
+        nextState && typeof nextState.status === 'string' ? nextState.status : null;
+      const reasonValue =
+        nextState && typeof nextState.reason === 'string' ? nextState.reason : null;
+      const statusSummary = statusValue
+        ? `Moderation status changed to ${statusValue}.`
+        : `Moderation action ${entry.action} applied.`;
+      const summary = reasonValue?.trim()
+        ? `${statusSummary} Reason: ${reasonValue.trim()}`
+        : statusSummary;
+      events.push({
+        id: entry.id,
+        at: entry.createdAt,
+        type: entry.action,
+        summary,
+      });
+    });
+
+    return events.sort(
+      (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
+    );
+  }, [selectedSizeChart, selectedSizeChartHistory]);
+
+  useEffect(() => {
+    setFreeformQueuePage((current) => Math.min(current, freeformQueueTotalPages));
+  }, [freeformQueueTotalPages]);
+
+  useEffect(() => {
+    setSizeChartQueuePage((current) => Math.min(current, sizeChartQueueTotalPages));
+  }, [sizeChartQueueTotalPages]);
 
   const resetCategoryForm = useCallback(() => {
     setCategoryFormName('');
@@ -529,6 +641,48 @@ const AdminTaxonomyPage: React.FC = () => {
       }
     },
     [],
+  );
+
+  const closeSizeChartDetails = useCallback(() => {
+    setSelectedSizeChart(null);
+    setSelectedSizeChartHistory([]);
+    setSelectedSizeChartLoading(false);
+    setSizeChartRejectReason('');
+  }, []);
+
+  const openSizeChartDetails = useCallback(
+    async (chart: PendingSizeChart) => {
+      setSelectedSizeChart(chart);
+      setSelectedSizeChartHistory([]);
+      setSelectedSizeChartLoading(true);
+      setSizeChartRejectReason('');
+      try {
+        if (!canReadAuditLogs) {
+          return;
+        }
+        const response = await adminAuditApi.list({
+          limit: '80',
+          targetType: 'BrandSizeChart',
+          targetId: chart.id,
+        });
+        const payload = unwrapApiResponse<
+          { items?: AdminAuditLog[] } | AdminAuditLog[]
+        >(response.data as any);
+        const rows = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.items)
+            ? payload.items
+            : [];
+        setSelectedSizeChartHistory(rows);
+      } catch (error: any) {
+        toast.error(
+          error?.response?.data?.message || 'Failed to load size chart request history',
+        );
+      } finally {
+        setSelectedSizeChartLoading(false);
+      }
+    },
+    [canReadAuditLogs],
   );
 
   const applyMeasurementLifecycleAction = useCallback(
@@ -1167,87 +1321,33 @@ const AdminTaxonomyPage: React.FC = () => {
     });
   };
 
-  const handleReviewMeasurementPoint = async (
-    pointId: string,
-    action: 'approve' | 'reject',
-  ) => {
-    if (!canReviewMeasurementLifecycle) {
-      toast.error('You do not have permission to review measurement points.');
-      return;
-    }
-
-    const reason = rejectReasonByPointId[pointId]?.trim();
-    if (action === 'reject' && !reason) {
-      toast.error('Provide a rejection reason so the brand understands what to change.');
-      return;
-    }
-
-    setReviewingIds((current) => ({ ...current, [pointId]: true }));
-    try {
-      await adminModerationApi.updateMeasurementPointLifecycle(pointId, {
-        action,
-        reason: action === 'reject' ? reason : undefined,
-      });
-
-      const lifecycleResponse = await adminModerationApi.getMeasurementPointLifecycle(pointId);
-      const lifecyclePayload = unwrapApiResponse<AdminMeasurementPointLifecycleDetails>(
-        lifecycleResponse.data as any,
-      );
-      const updatedPoint = lifecyclePayload.point;
-
-      toast.success(action === 'approve' ? 'Measurement point approved globally.' : 'Measurement point rejected with feedback.');
-      setRejectReasonByPointId((current) => {
-        const next = { ...current };
-        delete next[pointId];
-        return next;
-      });
-      setSelectedMeasurementPoint((current) => (current?.id === updatedPoint.id ? updatedPoint : current));
-      setSelectedMeasurementLifecycle((current) =>
-        current?.point.id === updatedPoint.id ? lifecyclePayload : current,
-      );
-      setMeasurementLifecycleRejectReason(updatedPoint.rejectionReason ?? '');
-      setMeasurementLifecycleRows((current) => {
-        const nextRows = current.map((row) => (row.id === updatedPoint.id ? updatedPoint : row));
-        if (
-          !measurementLifecycleRowMatchesFilters(updatedPoint, {
-            search: debouncedMeasurementLifecycleSearch,
-            status: measurementLifecycleStatusMode,
-            source: measurementLifecycleSourceMode,
-            category: measurementLifecycleCategoryMode,
-            active: measurementLifecycleActiveMode,
-          })
-        ) {
-          return nextRows.filter((row) => row.id !== updatedPoint.id);
-        }
-        return nextRows;
-      });
-      setFreeformPoints((current) => current.filter((row) => row.id !== updatedPoint.id));
-      setAllMeasurementPoints((current) =>
-        current.map((point) =>
-          point.id === updatedPoint.id ? mapAdminMeasurementPointRowToMeasurementPoint(updatedPoint) : point,
-        ),
-      );
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to review measurement point');
-    } finally {
-      setReviewingIds((current) => ({ ...current, [pointId]: false }));
-    }
-  };
-
   const handleReviewSizeChart = async (
     chartId: string,
     action: 'approve' | 'reject',
+    reason?: string,
   ) => {
     if (!canReviewModerationQueue) {
       toast.error('You do not have permission to review size charts.');
       return;
     }
 
+    const rejectReason = String(reason ?? '').trim();
+    if (action === 'reject' && !rejectReason) {
+      toast.error('Provide a rejection reason before sending this chart back.');
+      return;
+    }
+
     setReviewingIds((current) => ({ ...current, [chartId]: true }));
     try {
-      await adminModerationApi.reviewItem(chartId, { action });
+      await adminModerationApi.reviewItem(chartId, {
+        action,
+        reason: action === 'reject' ? rejectReason : undefined,
+      });
       toast.success(action === 'approve' ? 'Size chart published.' : 'Size chart sent back for revision.');
       setSizeCharts((current) => current.filter((chart) => chart.id !== chartId));
+      if (selectedSizeChart?.id === chartId) {
+        closeSizeChartDetails();
+      }
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to review size chart');
     } finally {
@@ -1607,81 +1707,69 @@ const AdminTaxonomyPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {freeformPoints.map((point) => {
-                    const rejectingReason = rejectReasonByPointId[point.id] ?? '';
-                    const isReviewing = Boolean(reviewingIds[point.id]);
-
-                    return (
-                      <div
+                  <div className="max-h-[460px] space-y-3 overflow-y-auto pr-1">
+                    {pagedFreeformPoints.map((point) => (
+                      <button
                         key={point.id}
-                        className="rounded-2xl border border-slate-200/80 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]"
+                        type="button"
+                        onClick={() => {
+                          void openMeasurementLifecycle(point);
+                        }}
+                        className="w-full rounded-2xl border border-slate-200/80 bg-white p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/30 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-indigo-400/40 dark:hover:bg-indigo-500/10"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <div className="text-sm font-bold text-slate-900 dark:text-white">{point.label}</div>
+                            <div className="text-sm font-bold text-slate-900 dark:text-white">
+                              {point.label}
+                            </div>
                             <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">
-                              Key: {point.key} · {formatCategory(point.category)} · {formatGender(point.gender)}
+                              Key: {point.key} · {formatCategory(point.category)} ·{' '}
+                              {formatGender(point.gender)}
                             </div>
                           </div>
                           <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600 dark:bg-white/10 dark:text-slate-300">
                             {point.source}
                           </span>
                         </div>
-
                         <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
                           {point.description?.trim() || 'No description provided by brand.'}
                         </p>
-
                         <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
                           Limits: {point.minValueCm ?? '—'} cm to {point.maxValueCm ?? '—'} cm
                         </div>
-
-                        {canReviewMeasurementLifecycle ? (
-                          <>
-                            <textarea
-                              value={rejectingReason}
-                              onChange={(event) =>
-                                setRejectReasonByPointId((current) => ({
-                                  ...current,
-                                  [point.id]: event.target.value,
-                                }))
-                              }
-                              rows={2}
-                              placeholder="If rejecting, explain why (required for reject)..."
-                              className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
-                            />
-
-                            <div className="mt-2 flex items-center justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  void handleReviewMeasurementPoint(point.id, 'approve');
-                                }}
-                                disabled={isReviewing}
-                                className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-500/20 dark:text-emerald-200"
-                              >
-                                Accept
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  void handleReviewMeasurementPoint(point.id, 'reject');
-                                }}
-                                disabled={isReviewing}
-                                className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-200 disabled:opacity-60 dark:bg-rose-500/20 dark:text-rose-200"
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <p className="mt-3 text-xs text-slate-500 dark:text-slate-300">
-                            Read-only access. You need measurement review permission to approve or reject points.
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
+                        <div className="mt-2 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+                          Open full request details
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-300">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFreeformQueuePage((current) => Math.max(1, current - 1))
+                      }
+                      disabled={freeformQueuePage <= 1}
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-white/10 dark:bg-black/20 dark:text-slate-200 dark:hover:bg-white/10"
+                    >
+                      Previous
+                    </button>
+                    <span>
+                      Page {freeformQueuePage} of {freeformQueueTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFreeformQueuePage((current) =>
+                          Math.min(freeformQueueTotalPages, current + 1),
+                        )
+                      }
+                      disabled={freeformQueuePage >= freeformQueueTotalPages}
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-white/10 dark:bg-black/20 dark:text-slate-200 dark:hover:bg-white/10"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1706,48 +1794,59 @@ const AdminTaxonomyPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {sizeCharts.map((chart) => {
-                    const isReviewing = Boolean(reviewingIds[chart.id]);
-                    return (
-                      <div
+                  <div className="max-h-[460px] space-y-3 overflow-y-auto pr-1">
+                    {pagedSizeCharts.map((chart) => (
+                      <button
                         key={chart.id}
-                        className="rounded-2xl border border-slate-200/80 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]"
+                        type="button"
+                        onClick={() => {
+                          void openSizeChartDetails(chart);
+                        }}
+                        className="w-full rounded-2xl border border-slate-200/80 bg-white p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/30 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-indigo-400/40 dark:hover:bg-indigo-500/10"
                       >
-                        <div className="text-sm font-bold text-slate-900 dark:text-white">{chart.name ?? `Size Chart ${chart.version ?? ''}`}</div>
-                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">
-                          Status: {chart.status} · Version: {chart.version ?? '—'}
+                        <div className="text-sm font-bold text-slate-900 dark:text-white">
+                          {chart.name ?? `Size Chart ${chart.version ?? ''}`}
                         </div>
-                        {canReviewModerationQueue ? (
-                          <div className="mt-2 flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                void handleReviewSizeChart(chart.id, 'approve');
-                              }}
-                              disabled={isReviewing}
-                              className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-500/20 dark:text-emerald-200"
-                            >
-                              Publish
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                void handleReviewSizeChart(chart.id, 'reject');
-                              }}
-                              disabled={isReviewing}
-                              className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-200 disabled:opacity-60 dark:bg-rose-500/20 dark:text-rose-200"
-                            >
-                              Send Back
-                            </button>
-                          </div>
-                        ) : (
-                          <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">
-                            Read-only access. You need moderation review permission to publish or send back charts.
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
+                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+                          Status: {chart.status ?? 'PENDING'} · Version: {chart.version ?? '—'}
+                        </div>
+                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                          Created: {formatDateTime(chart.createdAt)} · Updated:{' '}
+                          {formatDateTime(chart.updatedAt)}
+                        </div>
+                        <div className="mt-2 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+                          Open full request details
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-300">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSizeChartQueuePage((current) => Math.max(1, current - 1))
+                      }
+                      disabled={sizeChartQueuePage <= 1}
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-white/10 dark:bg-black/20 dark:text-slate-200 dark:hover:bg-white/10"
+                    >
+                      Previous
+                    </button>
+                    <span>
+                      Page {sizeChartQueuePage} of {sizeChartQueueTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSizeChartQueuePage((current) =>
+                          Math.min(sizeChartQueueTotalPages, current + 1),
+                        )
+                      }
+                      disabled={sizeChartQueuePage >= sizeChartQueueTotalPages}
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-white/10 dark:bg-black/20 dark:text-slate-200 dark:hover:bg-white/10"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -2405,39 +2504,61 @@ const AdminTaxonomyPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  void applyMeasurementLifecycleAction('approve');
+                  setSelectedMeasurementPoint(null);
+                  setSelectedMeasurementLifecycle(null);
+                  setMeasurementLifecycleRejectReason('');
+                  setMeasurementLifecycleModalLoading(false);
+                  setMeasurementLifecycleActionLoading(false);
                 }}
                 disabled={measurementLifecycleActionLoading}
-                className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-500/20 dark:text-emerald-200"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-60 dark:border-white/10 dark:bg-black/20 dark:text-slate-200 dark:hover:bg-white/10"
               >
-                Approve Global
+                Cancel
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void applyMeasurementLifecycleAction('reject');
-                }}
-                disabled={measurementLifecycleActionLoading}
-                className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-200 disabled:opacity-60 dark:bg-rose-500/20 dark:text-rose-200"
-              >
-                Reject
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void applyMeasurementLifecycleAction(
-                    selectedMeasurementLifecycle.point.isActive
-                      ? 'deactivate'
-                      : 'activate',
-                  );
-                }}
-                disabled={measurementLifecycleActionLoading}
-                className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300 disabled:opacity-60 dark:bg-white/10 dark:text-slate-200"
-              >
-                {selectedMeasurementLifecycle.point.isActive
-                  ? 'Deactivate'
-                  : 'Activate'}
-              </button>
+              {canReviewMeasurementLifecycle ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void applyMeasurementLifecycleAction('approve');
+                    }}
+                    disabled={measurementLifecycleActionLoading}
+                    className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-500/20 dark:text-emerald-200"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void applyMeasurementLifecycleAction('reject');
+                    }}
+                    disabled={measurementLifecycleActionLoading}
+                    className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-200 disabled:opacity-60 dark:bg-rose-500/20 dark:text-rose-200"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void applyMeasurementLifecycleAction(
+                        selectedMeasurementLifecycle.point.isActive
+                          ? 'deactivate'
+                          : 'activate',
+                      );
+                    }}
+                    disabled={measurementLifecycleActionLoading}
+                    className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300 disabled:opacity-60 dark:bg-white/10 dark:text-slate-200"
+                  >
+                    {selectedMeasurementLifecycle.point.isActive
+                      ? 'Deactivate'
+                      : 'Activate'}
+                  </button>
+                </>
+              ) : (
+                <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                  Read-only: no review permission
+                </span>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
@@ -2559,6 +2680,160 @@ const AdminTaxonomyPage: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={Boolean(selectedSizeChart)}
+        onClose={closeSizeChartDetails}
+        title={
+          selectedSizeChart
+            ? `Size Chart Request • ${selectedSizeChart.name ?? `Version ${selectedSizeChart.version ?? '—'}`}`
+            : 'Size Chart Request'
+        }
+        size="lg"
+        backdropStyle="light"
+      >
+        {selectedSizeChart ? (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="grid grid-cols-1 gap-2 text-xs text-slate-600 dark:text-slate-300 md:grid-cols-2">
+                <div>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">ID:</span>{' '}
+                  {selectedSizeChart.id}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">Brand:</span>{' '}
+                  {selectedSizeChart.brandId ?? '—'}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">Status:</span>{' '}
+                  {selectedSizeChart.status ?? 'PENDING'}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">Version:</span>{' '}
+                  {selectedSizeChart.version ?? '—'}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">Created:</span>{' '}
+                  {formatDateTime(selectedSizeChart.createdAt)}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">Updated:</span>{' '}
+                  {formatDateTime(selectedSizeChart.updatedAt)}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">Published:</span>{' '}
+                  {formatDateTime(selectedSizeChart.publishedAt)}
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                <span className="font-semibold text-slate-800 dark:text-slate-100">Notes:</span>{' '}
+                {selectedSizeChart.notes?.trim() || 'No notes provided.'}
+              </div>
+              <div className="mt-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Full request payload
+                </div>
+                <pre className="mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-700 dark:border-white/10 dark:bg-black/20 dark:text-slate-200">
+{JSON.stringify(selectedSizeChart.data ?? {}, null, 2)}
+                </pre>
+              </div>
+            </div>
+
+            {canReviewModerationQueue ? (
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                  Rejection feedback
+                </label>
+                <textarea
+                  value={sizeChartRejectReason}
+                  onChange={(event) => setSizeChartRejectReason(event.target.value)}
+                  rows={2}
+                  placeholder="Required when rejecting this size chart request"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
+                />
+              </div>
+            ) : (
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 px-3 py-2 text-xs text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+                Read-only access. You need moderation review permission to approve or reject size chart requests.
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeSizeChartDetails}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-black/20 dark:text-slate-200 dark:hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              {canReviewModerationQueue ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleReviewSizeChart(selectedSizeChart.id, 'approve');
+                    }}
+                    disabled={Boolean(reviewingIds[selectedSizeChart.id])}
+                    className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-500/20 dark:text-emerald-200"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleReviewSizeChart(
+                        selectedSizeChart.id,
+                        'reject',
+                        sizeChartRejectReason,
+                      );
+                    }}
+                    disabled={Boolean(reviewingIds[selectedSizeChart.id])}
+                    className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-200 disabled:opacity-60 dark:bg-rose-500/20 dark:text-rose-200"
+                  >
+                    Reject
+                  </button>
+                </>
+              ) : null}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Lifecycle timeline
+              </div>
+              {selectedSizeChartLoading ? (
+                <div className="mt-2 space-y-2">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="h-12 animate-pulse rounded-lg bg-slate-200/70 dark:bg-white/10"
+                    />
+                  ))}
+                </div>
+              ) : selectedSizeChartTimeline.length === 0 ? (
+                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  No lifecycle entries available.
+                </div>
+              ) : (
+                <div className="mt-2 max-h-60 space-y-1 overflow-y-auto pr-1">
+                  {selectedSizeChartTimeline.map((event) => (
+                    <div
+                      key={event.id}
+                      className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-xs dark:border-white/10 dark:bg-black/20"
+                    >
+                      <div className="font-semibold text-slate-800 dark:text-slate-100">
+                        {event.summary}
+                      </div>
+                      <div className="mt-0.5 text-slate-500 dark:text-slate-400">
+                        {formatDateTime(event.at)} · {event.type}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
       </Modal>
 
       <ConfirmDialog

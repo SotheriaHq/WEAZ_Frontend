@@ -13,7 +13,7 @@ export const DROPDOWN_META_CLASS = 'mt-0.5 text-[11px] leading-4 text-[color:var
 export const DROPDOWN_DIVIDER_CLASS = 'mx-2 my-1 h-px bg-black/5 dark:bg-white/10';
 export const DROPDOWN_SURFACE_CLASS = 'glass-menu overflow-hidden';
 export const DROPDOWN_CONTENT_CLASS =
-  'flex h-full flex-col overflow-y-auto overscroll-contain p-1 no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
+  'flex h-full touch-pan-y flex-col overflow-x-hidden overflow-y-auto overscroll-contain p-1 no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
 export const DROPDOWN_ITEM_BASE_CLASS =
   'group flex w-full min-w-0 items-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors duration-150 focus:outline-none focus-visible:ring-0';
 export const DROPDOWN_ITEM_DESCRIPTION_CLASS =
@@ -252,7 +252,10 @@ export const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
           role="menu"
           aria-orientation="vertical"
         >
-          <div className={DROPDOWN_CONTENT_CLASS}>
+          <div
+            className={DROPDOWN_CONTENT_CLASS}
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
             {children}
           </div>
         </div>
