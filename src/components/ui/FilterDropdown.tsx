@@ -1,5 +1,4 @@
 import React from 'react';
-import { ChevronDown, Check } from 'lucide-react';
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from './Dropdown';
 
 export interface FilterOption {
@@ -32,7 +31,7 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
   const displayLabel = selectedOption?.label || placeholder;
 
   return (
-    <Dropdown open={undefined} onOpenChange={undefined}>
+    <Dropdown>
       <DropdownTrigger 
         className={`min-w-[140px] justify-between ${className}`}
         disabled={disabled}
@@ -41,18 +40,18 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
           {selectedOption?.icon}
           {displayLabel}
         </span>
-        <ChevronDown className="w-4 h-4 opacity-50 ml-2" />
+        <span aria-hidden="true" className="ml-2 text-base leading-none opacity-50">⌄</span>
       </DropdownTrigger>
       
-      <DropdownMenu>
+      <DropdownMenu className="w-[min(16rem,calc(100vw-1rem))]">
         {options.map((option) => {
           const isSelected = option.value === value;
           return (
             <DropdownItem
               key={option.value}
               onClick={() => onChange(option.value)}
-              className={isSelected ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 font-medium' : ''}
-              rightIcon={isSelected ? <Check className="w-4 h-4 text-purple-500" /> : undefined}
+              className={isSelected ? 'font-medium' : ''}
+              selected={isSelected}
             >
               <div className="flex items-center gap-2">
                 {option.icon}

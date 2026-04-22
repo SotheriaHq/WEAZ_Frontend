@@ -357,7 +357,6 @@ const defaultFormState: FormState = {
 
 const STANDALONE_COLLECTION_VALUE = "__standalone__";
 
-
 // =====================
 // Currency Formatting
 // =====================

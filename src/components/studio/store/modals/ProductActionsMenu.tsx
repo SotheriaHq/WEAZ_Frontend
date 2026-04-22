@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { DropdownDivider, DropdownItem } from '@/components/ui/Dropdown';
 
 export interface ProductAction {
   id: string;
@@ -20,24 +21,6 @@ interface ProductActionsMenuProps {
   /** Render inline within the parent container instead of a portal */
   renderInline?: boolean;
 }
-
-const variantStyles = {
-  default:
-    'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10',
-  danger:
-    'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10',
-  warning:
-    'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10',
-  success:
-    'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10',
-};
-
-const inlineVariantStyles = {
-  default: 'text-white/90 hover:bg-white/15',
-  danger: 'text-rose-300 hover:bg-rose-500/20',
-  warning: 'text-amber-300 hover:bg-amber-500/20',
-  success: 'text-emerald-300 hover:bg-emerald-500/20',
-};
 
 const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
   isOpen,
@@ -147,44 +130,22 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
     <React.Fragment>
       {actions.map((action, index) => (
         <React.Fragment key={action.id}>
-          {index > 0 && action.variant === 'danger' && (
-            <div className={`my-1 border-t ${
-              renderInline
-                ? 'border-white/20 dark:border-white/10'
-                : 'border-gray-100 dark:border-zinc-700'
-            }`} />
-          )}
-          <button
-            type="button"
+          {index > 0 && action.variant === 'danger' ? <DropdownDivider /> : null}
+          <DropdownItem
+            disabled={action.disabled}
+            tone={action.variant || 'default'}
             onClick={() => {
               if (!action.disabled) {
                 onAction(action.id);
                 onClose();
               }
             }}
-            disabled={action.disabled}
-            className={`w-full cursor-pointer items-center gap-3 text-left transition-colors group flex ${
-              renderInline ? 'px-3 py-2' : 'px-4 py-2.5'
-            } ${
-              renderInline
-                ? inlineVariantStyles[action.variant || 'default']
-                : variantStyles[action.variant || 'default']
-            } ${action.disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+            leftIcon={<span className={`${renderInline ? 'text-sm' : 'text-base'} leading-none`} aria-hidden="true">{action.emoji}</span>}
+            description={action.description}
+            className={renderInline ? 'px-3 py-2' : 'px-4 py-2.5'}
           >
-            <span className={`${renderInline ? 'text-sm' : 'text-base'} leading-none`}>{action.emoji}</span>
-            <div className="min-w-0 flex-1">
-              <div className={`${renderInline ? 'text-xs' : 'text-sm'} font-medium`}>{action.label}</div>
-              {action.description && (
-                <div className={`mt-0.5 whitespace-normal leading-4 ${
-                  renderInline
-                    ? 'text-[10px] text-white/60 dark:text-white/50'
-                    : 'text-xs text-gray-500 dark:text-gray-400'
-                }`}>
-                  {action.description}
-                </div>
-              )}
-            </div>
-          </button>
+            {action.label}
+          </DropdownItem>
         </React.Fragment>
       ))}
     </React.Fragment>
@@ -195,7 +156,7 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
     return (
       <div
         ref={menuRef}
-        className="absolute right-2 top-11 z-40 w-[min(14rem,calc(100%-1rem))] rounded-xl bg-black/50 backdrop-blur-xl border border-white/10 py-1.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+        className="absolute right-2 top-11 z-40 w-[min(18rem,calc(100%-1rem))] glass-menu overflow-hidden py-1 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {menuContent}
@@ -208,7 +169,7 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
       <div
         ref={menuRef}
         style={menuStyle}
-        className="pointer-events-auto fixed w-[min(20rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] rounded-xl border border-gray-200 bg-white py-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150 dark:border-zinc-700 dark:bg-zinc-800"
+        className="pointer-events-auto fixed w-[min(18rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] glass-menu overflow-hidden py-1 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {menuContent}

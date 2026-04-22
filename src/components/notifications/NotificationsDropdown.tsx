@@ -51,9 +51,9 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   const navigate = useNavigate();
   const isAdminConsoleUser = currentUser?.role === 'SuperAdmin' || currentUser?.role === 'Admin';
   const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number }>({
-    top: 72,
-    left: 12,
-    width: 420,
+    top: 68,
+    left: 8,
+    width: 384,
   });
 
   useEffect(() => {
@@ -78,17 +78,17 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     const update = () => {
       const anchorEl = anchorRef.current;
 
-      const padding = 12;
+      const padding = 8;
       const viewportW = window.innerWidth;
-      const desiredWidth = Math.min(420, Math.max(280, viewportW - padding * 2));
+      const desiredWidth = Math.min(384, Math.max(280, viewportW - padding * 2));
 
       if (!anchorEl) {
-        setPanelPos({ top: 72, left: padding, width: desiredWidth });
+        setPanelPos({ top: 68, left: padding, width: desiredWidth });
         return;
       }
 
       const rect = anchorEl.getBoundingClientRect();
-      const top = Math.round(rect.bottom + 10);
+      const top = Math.round(rect.bottom + 6);
       const leftAlignedRight = rect.right - desiredWidth;
       const left = Math.round(Math.min(Math.max(padding, leftAlignedRight), viewportW - desiredWidth - padding));
 
@@ -391,17 +391,17 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
           top: panelPos.top,
           left: panelPos.left,
           width: panelPos.width,
-          maxHeight: 'calc(100vh - var(--app-header-height) - 24px)',
+          maxHeight: 'calc(100vh - var(--app-header-height) - 16px)',
         }}
         role="dialog"
         aria-modal="false"
         aria-label="Notifications"
         tabIndex={-1}
       >
-      <div className="px-4 pt-4 pb-2">
+      <div className="px-3 pt-3 pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="inline-flex min-w-0 items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-[color:var(--brand-primary)]/15 flex items-center justify-center border border-white/20 dark:border-white/10 text-base" aria-hidden="true">🔔</div>
+            <div className="w-8 h-8 rounded-xl bg-[color:var(--brand-primary)]/15 flex items-center justify-center border border-white/20 dark:border-white/10 text-sm" aria-hidden="true">🔔</div>
             <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">
               Notifications {unreadCount > 0 ? `(${unreadCount})` : ''}
             </p>
@@ -428,12 +428,12 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto sleek-scrollbar px-4 pb-4" aria-live="polite">
+      <div className="flex-1 overflow-y-auto sleek-scrollbar px-3 pb-3" aria-live="polite">
         {/* Loading State */}
         {showLoading && (
           <div className="space-y-2">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="rounded-xl border border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 backdrop-blur p-2.5">
+              <div key={i} className="rounded-xl border border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 backdrop-blur p-2">
                 <div className="flex items-start gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-white/50 dark:bg-white/10" />
                   <div className="flex-1 space-y-2">
@@ -449,7 +449,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         {/* Empty State */}
         {showEmpty && (
           <div className="rounded-2xl border border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 backdrop-blur p-8 text-center">
-            <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center text-white text-xl" aria-hidden="true">
+            <div className="mx-auto w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center text-white text-lg" aria-hidden="true">
               🔔
             </div>
             <h4 className="mt-4 text-sm font-semibold text-[color:var(--text-primary)]">You're all caught up!</h4>
@@ -500,7 +500,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                 <li key={n.id} role="listitem">
                   <div
                     className={
-                      'group rounded-xl border backdrop-blur p-2.5 cursor-pointer transition ' +
+                      'group rounded-xl border backdrop-blur p-2 cursor-pointer transition ' +
                       (isUnread
                         ? 'border-purple-300/50 dark:border-purple-500/20 bg-purple-50/40 dark:bg-purple-500/5'
                         : 'border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/8')

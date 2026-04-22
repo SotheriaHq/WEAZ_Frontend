@@ -17,6 +17,7 @@ import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type { SizeFitProfile, SizeFitSharesPayload } from '@/types/sizeFit';
 import ProfileActionsBar, { type ProfileAction } from '@/components/profile/ProfileActionsBar';
+import ProfileSettingsEntry from '@/components/profile/ProfileSettingsEntry';
 import { buildProfileUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
 import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS } from '@/lib/sizeCharts';
@@ -865,6 +866,15 @@ export const EndUserProfile: React.FC = () => {
           {isOwner ? (
             <div className="mt-4">
               <ProfileActionsBar actions={profileActions} />
+            </div>
+          ) : null}
+
+          {isOwner ? (
+            <div className="mt-4">
+              <ProfileSettingsEntry
+                to="/settings"
+                description="Account, privacy, notifications & size fits"
+              />
             </div>
           ) : null}
 

@@ -13,6 +13,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import GuestRoute from './components/GuestRoute';
 import { AuthProvider } from './context/AuthContext';
 import { DropdownManagerProvider } from './context/DropdownManagerContext';
+import { BrandPatchProvider } from './context/BrandPatchContext';
 import { ProfileLayout } from './components/catalog/ProfileLayout';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
@@ -101,34 +102,42 @@ const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const EmailVerifyPage = lazy(() => import('./pages/EmailVerify'));
 
 const AppRouteFallback: React.FC = () => (
-  /* Full-page skeleton shown while the lazy chunk is downloading.
-     Matches the general two-column layout (sidebar + masonry grid) so the
-     transition to the real page is seamless rather than a white flash. */
-  <div className="flex min-h-screen bg-white dark:bg-gray-950">
-    {/* Sidebar skeleton */}
-    <div className="hidden md:flex flex-col gap-4 w-16 px-2 py-6 border-r border-gray-100 dark:border-gray-800">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="w-10 h-10 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse mx-auto" />
-      ))}
-    </div>
-    {/* Content skeleton — masonry-like card grid */}
-    <div className="flex-1 p-4">
-      <div className="flex gap-2 mb-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-8 w-24 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse" />
-        ))}
-      </div>
-      <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
-        {Array.from({ length: 12 }).map((_, i) => (
+  /* Route chunk fallback that stays inside content flow instead of rendering
+     a global full-screen overlay over navigation/chrome. */
+  <div className="px-4 pb-8 pt-20 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-6xl space-y-5">
+      <div className="h-10 w-44 animate-pulse rounded-full bg-gray-200/90 dark:bg-gray-800/85" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, index) => (
           <div
-            key={i}
-            className="break-inside-avoid mb-3 rounded-2xl bg-gray-200 dark:bg-gray-800 animate-pulse"
-            style={{ height: `${180 + (i % 3) * 60}px` }}
+            key={index}
+            className="h-52 animate-pulse rounded-2xl bg-gray-200/90 dark:bg-gray-800/80"
           />
         ))}
       </div>
     </div>
   </div>
+);
+
+const noopStudioSelect = () => {};
+
+const withRouteFallback = (element: React.ReactNode) => (
+  <Suspense fallback={<AppRouteFallback />}>{element}</Suspense>
+);
+
+const withStudioRouteFallback = (
+  active: string,
+  element: React.ReactNode,
+) => (
+  <Suspense
+    fallback={
+      <StudioScaffold active={active} onSelect={noopStudioSelect}>
+        <AppRouteFallback />
+      </StudioScaffold>
+    }
+  >
+    {element}
+  </Suspense>
 );
 
 const AdminProfileRouteGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -198,6 +207,9 @@ const RootLayout: React.FC = () => {
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
       const target = event.target as HTMLElement | null;
       if (!target) return;
 
@@ -225,6 +237,7 @@ const RootLayout: React.FC = () => {
       }
       routeIntentTimeoutRef.current = window.setTimeout(() => {
         setShowRouteIntentProgress(false);
+        routeIntentTimeoutRef.current = null;
       }, 1600);
     };
 
@@ -233,6 +246,7 @@ const RootLayout: React.FC = () => {
       document.removeEventListener('pointerdown', handlePointerDown, true);
       if (routeIntentTimeoutRef.current !== null) {
         window.clearTimeout(routeIntentTimeoutRef.current);
+        routeIntentTimeoutRef.current = null;
       }
     };
   }, []);
@@ -243,7 +257,7 @@ const RootLayout: React.FC = () => {
       window.clearTimeout(routeIntentTimeoutRef.current);
       routeIntentTimeoutRef.current = null;
     }
-  }, [location.pathname, location.search]);
+  }, [location.pathname]);
 
   return (
     <>
@@ -282,13 +296,13 @@ const LegacyBuyerCustomOrdersRedirect: React.FC = () => {
 };
 
 const profileChildren = [
-  { index: true, element: <Profile /> },
+  { index: true, element: withRouteFallback(<Profile />) },
   {
     path: 'collections',
     element: <RequireBrand />,
     children: [
-      { path: 'create', element: <CreateDesignPage /> },
-      { path: 'edit/:id', element: <CreateDesignPage /> },
+      { path: 'create', element: withRouteFallback(<CreateDesignPage />) },
+      { path: 'edit/:id', element: withRouteFallback(<CreateDesignPage />) },
     ],
   },
   { path: 'success', element: <Success /> },
@@ -306,15 +320,15 @@ const router = createBrowserRouter([
         path: '/',
         element: <Layout />,
         children: [
-          { index: true, element: <Market /> },
-          { path: 'market', element: <Market /> },
-          { path: 'market-place', element: <MarketPlace /> },
-          { path: 'search', element: <SearchResultsPage /> },
+          { index: true, element: withRouteFallback(<Market />) },
+          { path: 'market', element: withRouteFallback(<Market />) },
+          { path: 'market-place', element: withRouteFallback(<MarketPlace />) },
+          { path: 'search', element: withRouteFallback(<SearchResultsPage />) },
           { path: 'subscriptions', element: <SubscriptionsPlaceholder /> },
           { path: 'history', element: <HistoryPlaceholder /> },
           { path: 'watch-later', element: <WatchLaterPlaceholder /> },
           { path: 'trending', element: <TrendingPlaceholder /> },
-          { path: 'size-charts', element: <SizeChartsPage /> },
+          { path: 'size-charts', element: withRouteFallback(<SizeChartsPage />) },
           { path: 'help/verified-badge', element: <VerifiedBadgeMeaningPage /> },
           { path: 'settings', element: <SettingsHome /> },
           { path: 'settings/collections', element: <CollectionsSettings /> },
@@ -325,7 +339,7 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <RequireStoreSetup>
-              <StudioHome />
+              {withStudioRouteFallback('overview', <StudioHome />)}
             </RequireStoreSetup>
           </RequireBrand>
         ),
@@ -335,8 +349,8 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <RequireStoreSetup>
-              <StudioScaffold active="store" onSelect={() => {}}>
-                <StoreManagement />
+              <StudioScaffold active="store" onSelect={noopStudioSelect}>
+                {withRouteFallback(<StoreManagement />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -347,8 +361,8 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <RequireStoreSetup>
-              <StudioScaffold active="store" onSelect={() => {}}>
-                <StoreVerificationPage />
+              <StudioScaffold active="store" onSelect={noopStudioSelect}>
+                {withRouteFallback(<StoreVerificationPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -359,8 +373,8 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <RequireStoreSetup>
-              <StudioScaffold active="store" onSelect={() => {}}>
-                <VerificationWizardPage />
+              <StudioScaffold active="store" onSelect={noopStudioSelect}>
+                {withRouteFallback(<VerificationWizardPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -371,8 +385,8 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <RequireStoreSetup>
-              <StudioScaffold active="store" onSelect={() => {}}>
-                <VerificationSubmittedPage />
+              <StudioScaffold active="store" onSelect={noopStudioSelect}>
+                {withRouteFallback(<VerificationSubmittedPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -391,8 +405,8 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <RequireStoreSetup>
-              <StudioScaffold active="store" onSelect={() => {}}>
-                <StoreCollectionCreate />
+              <StudioScaffold active="store" onSelect={noopStudioSelect}>
+                {withRouteFallback(<StoreCollectionCreate />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -403,8 +417,8 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <RequireStoreSetup>
-              <StudioScaffold active="store" onSelect={() => {}}>
-                <EditProduct />
+              <StudioScaffold active="store" onSelect={noopStudioSelect}>
+                {withRouteFallback(<EditProduct />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -415,8 +429,8 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <RequireStoreSetup>
-              <StudioScaffold active="store" onSelect={() => {}}>
-                <EditProduct />
+              <StudioScaffold active="store" onSelect={noopStudioSelect}>
+                {withRouteFallback(<EditProduct />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -427,8 +441,8 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <RequireStoreSetup>
-              <StudioScaffold active="store" onSelect={() => {}}>
-                <ProductDetailsPage />
+              <StudioScaffold active="store" onSelect={noopStudioSelect}>
+                {withRouteFallback(<ProductDetailsPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -439,8 +453,8 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <RequireStoreSetup>
-              <StudioScaffold active="orders" onSelect={() => {}}>
-                <StudioCustomOrdersPage />
+              <StudioScaffold active="orders" onSelect={noopStudioSelect}>
+                {withRouteFallback(<StudioCustomOrdersPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -451,8 +465,8 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <RequireStoreSetup>
-              <StudioScaffold active="orders" onSelect={() => {}}>
-                <StudioCustomOrderDetailPage />
+              <StudioScaffold active="orders" onSelect={noopStudioSelect}>
+                {withRouteFallback(<StudioCustomOrderDetailPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -463,8 +477,8 @@ const router = createBrowserRouter([
         element: (
           <RequireBrand>
             <RequireStoreSetup>
-              <StudioScaffold active="messages" onSelect={() => {}}>
-                <MessagingManagementPage />
+              <StudioScaffold active="messages" onSelect={noopStudioSelect}>
+                {withRouteFallback(<MessagingManagementPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </RequireBrand>
@@ -692,8 +706,10 @@ const router = createBrowserRouter([
 const App: React.FC = () => (
   <AuthProvider>
     <DropdownManagerProvider>
-      <Toaster position="top-center" richColors closeButton />
-      <RouterProvider router={router} />
+      <BrandPatchProvider>
+        <Toaster position="top-center" richColors closeButton />
+        <RouterProvider router={router} />
+      </BrandPatchProvider>
     </DropdownManagerProvider>
   </AuthProvider>
 );

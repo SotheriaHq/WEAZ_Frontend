@@ -38,6 +38,13 @@ import { generateUserUid } from '@/utils/userUid';
 import { resolveProfileImageSource } from '@/utils/profileImage';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import { COMPANY_NAME } from '@/lib/brand';
+import {
+  Dropdown as SharedDropdown,
+  DropdownDivider,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
+} from '@/components/ui/Dropdown';
 
 interface NavbarProps {
   minimal?: boolean;
@@ -48,7 +55,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const notificationsAnchorRef = useRef<HTMLElement | null>(null);
   const { theme, setTheme } = useTheme();
   const { setLanguage, translate } = useLanguage();
@@ -105,20 +111,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   }, [user]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        profileMenuRef.current &&
-        event.target instanceof HTMLElement &&
-        !profileMenuRef.current.contains(event.target)
-      ) {
-        setShowProfileMenu(false);
-        setShowLanguageDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    if (!showProfileMenu) {
+      setShowLanguageDropdown(false);
+    }
+  }, [showProfileMenu]);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -143,132 +139,204 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const savedRoute = user?.type === 'BRAND' ? '/profile?tab=Content' : profileHomeRoute;
   const helpRoute = '/help/verified-badge';
 
-  const MenuButton = ({
-    icon,
-    label,
-    onClick,
-    danger = false,
-  }: {
-    icon: string;
-    label: string;
-    onClick?: () => void | Promise<void>;
-    danger?: boolean;
-  }) => (
-    <button
-      onClick={onClick}
-      className={`flex w-full items-center gap-3 px-4 py-2 text-left transition ${
-        danger
-          ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
-          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-      }`}
-    >
-      <span aria-hidden="true">{icon}</span>
-      <span>{label}</span>
-    </button>
-  );
-
   const ProfileMenu = () => {
-    if (!showProfileMenu) return null;
+    if (!user) return null;
 
     return (
-      <div
-        ref={profileMenuRef}
-        className="threadly-chrome-surface absolute right-0 mt-2 z-50 max-h-[calc(100vh-80px)] w-64 overflow-y-auto rounded-lg py-2 scrollbar-hide"
-        style={{ WebkitOverflowScrolling: 'touch', minHeight: '320px' }}
+      <SharedDropdown
+        open={showProfileMenu}
+        onOpenChange={(nextOpen) => {
+          setShowProfileMenu(nextOpen);
+          if (nextOpen) {
+            setShowNotifications(false);
+          }
+          if (!nextOpen) {
+            setShowLanguageDropdown(false);
+          }
+        }}
+        placement="bottom-end"
+        offset={1}
+        className="relative"
       >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(244,114,182,0.14),_transparent_42%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.12),_transparent_38%)] opacity-90" />
-        <div className="relative z-10">
-          {user ? (
-            <>
-              <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                <div className="flex items-start gap-3">
-                  <ImageWithFallback
-                    src={userAvatar.src}
-                    fileId={userAvatar.fileId}
-                    alt={`${user.firstName} ${user.lastName}`}
-                    fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
-                    fit="cover"
-                    className="h-10 w-10"
-                    containerClassName="h-10 w-10"
-                    rounded="xl"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      {user.firstName} {user.lastName}
-                    </p>
-                    <p className="break-words text-sm font-medium text-gray-600 dark:text-gray-300">{user.email}</p>
-                    <p className="mt-0.5 text-[11px] font-semibold tracking-wide text-gray-700 dark:text-gray-200">UID: {userUid}</p>
-                  </div>
-                </div>
-              </div>
+          <DropdownTrigger
+            type="button"
+            className="flex h-10 w-10 !border-0 !bg-transparent !p-0 items-center justify-center overflow-hidden rounded-xl !shadow-none transition-colors hover:ring-2 hover:ring-[color:var(--brand-primary)]/20"
+            aria-label="Profile menu"
+          >
+          <ImageWithFallback
+            src={userAvatar.src}
+            fileId={userAvatar.fileId}
+            alt={`${user.firstName} ${user.lastName}`}
+            fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
+            fit="cover"
+            className="h-full w-full object-cover"
+            containerClassName="h-full w-full"
+            rounded="xl"
+          />
+        </DropdownTrigger>
 
-              <div className="py-2">
-                {user.type === 'BRAND' ? (
-                  <MenuButton icon="🧵" label="Dashboard" onClick={() => { navigate('/studio'); setShowProfileMenu(false); }} />
-                ) : null}
-                <MenuButton icon="👤" label={translate('profile')} onClick={() => { navigate(profileHomeRoute); setShowProfileMenu(false); }} />
-                <MenuButton icon={themeActionEmoji} label={themeMenuLabel} onClick={handleThemeToggle} />
-                <MenuButton icon="⚙️" label={translate('settings')} onClick={() => { navigate('/settings'); setShowProfileMenu(false); }} />
+        <DropdownMenu
+          maxHeight="min(72vh, 29rem)"
+          className="w-[min(13.5rem,calc(100vw-1rem))] sm:w-[15.5rem] before:pointer-events-none before:absolute before:-top-1 before:right-5 before:h-3 before:w-3 before:rotate-45 before:rounded-[3px] before:border-l before:border-t before:border-white/20 before:bg-white/90 dark:before:border-white/10 dark:before:bg-[#09090b]"
+        >
+          <div className="flex items-center gap-3 px-3.5 pb-3 pt-3.5">
+            <div className="h-12 w-12 overflow-hidden rounded-xl border border-black/5 dark:border-white/10">
+              <ImageWithFallback
+                src={userAvatar.src}
+                fileId={userAvatar.fileId}
+                alt={`${user.firstName} ${user.lastName}`}
+                fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
+                fit="cover"
+                className="h-full w-full object-cover"
+                containerClassName="h-full w-full"
+                rounded="xl"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-base font-semibold text-[color:var(--text-primary)]">
+                {user.firstName} {user.lastName}
               </div>
+              <div className="mt-0.5 break-words text-[11px] leading-4 text-[color:var(--text-secondary)]">
+                {user.email}
+                {userUid ? ` · UID ${userUid}` : ''}
+              </div>
+            </div>
+          </div>
 
-              <div className="border-t border-gray-200 py-2 dark:border-gray-700">
-                <button
-                  onClick={() => {
-                    setShowNotifications(false);
-                    setShowLanguageDropdown((prev) => !prev);
-                  }}
-                  className="flex w-full items-center justify-between px-4 py-2 text-left text-gray-700 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                >
-                  <div className="flex items-center gap-3">
-                    <span aria-hidden="true">🌍</span>
-                    <span>{translate('language')}</span>
-                  </div>
-                  <span aria-hidden="true" className={`transition-transform duration-200 ${showLanguageDropdown ? 'rotate-180' : ''}`}>⌄</span>
-                </button>
-                {showLanguageDropdown ? (
-                  <div className="space-y-1 py-1 pl-8">
-                    <button onClick={() => setLanguage('en')} className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">English</button>
-                    <button onClick={() => setLanguage('zh')} className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">中文</button>
-                    <button onClick={() => setLanguage('ar')} className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">العربية</button>
-                    <button onClick={() => setLanguage('hi')} className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">हिन्दी</button>
-                  </div>
-                ) : null}
-                <MenuButton icon="📍" label={translate('location')} onClick={handleLocationShare} />
-                <MenuButton icon="🆘" label="Help" onClick={() => { navigate(helpRoute); setShowProfileMenu(false); }} />
-              </div>
+          <DropdownDivider />
 
-              <div className="border-t border-gray-200 py-2 dark:border-gray-700">
-                <MenuButton icon="📦" label="My Orders" onClick={() => { navigate(ordersRoute); setShowProfileMenu(false); }} />
-                <MenuButton icon="🤍" label="Saved" onClick={() => { navigate(savedRoute); setShowProfileMenu(false); }} />
-              </div>
-
-              <div className="border-t border-gray-200 py-2 dark:border-gray-700">
-                <MenuButton
-                  icon="↩️"
-                  label={translate('signOut')}
-                  danger
-                  onClick={async () => {
-                    try {
-                      await apiClient.post('/auth/logout');
-                    } catch (error) {
-                      void error;
-                    }
-                    dispatch(addLocalNotification({ message: 'Signed out successfully.' }));
-                    dropStoredAccessToken();
-                    localStorage.removeItem(env.userStorageKey);
-                    dispatch(clearUser());
-                    dispatch(resetCartState());
-                    dispatch(resetWishlistState());
-                    dispatch(resetUnreadCount());
-                    setShowProfileMenu(false);
-                    navigate('/', { replace: true });
-                  }}
-                />
-              </div>
-            </>
+          {user.type === 'BRAND' ? (
+            <DropdownItem
+              leftIcon="🧵"
+              onClick={() => {
+                navigate('/studio');
+                setShowProfileMenu(false);
+              }}
+            >
+              Dashboard
+            </DropdownItem>
           ) : null}
-        </div>
-      </div>
+
+          <DropdownItem
+            leftIcon="👤"
+            onClick={() => {
+              navigate(profileHomeRoute);
+              setShowProfileMenu(false);
+            }}
+          >
+            {translate('profile')}
+          </DropdownItem>
+
+          <DropdownItem
+            leftIcon={themeActionEmoji}
+            description={`Switch to ${themeMenuLabel}`}
+            onClick={() => {
+              handleThemeToggle();
+              setShowProfileMenu(false);
+            }}
+          >
+            Theme
+          </DropdownItem>
+
+          <DropdownItem
+            leftIcon="⚙️"
+            onClick={() => {
+              navigate('/settings');
+              setShowProfileMenu(false);
+            }}
+          >
+            {translate('settings')}
+          </DropdownItem>
+
+          <DropdownDivider />
+
+          <DropdownItem
+            leftIcon="🌍"
+            rightIcon={<span aria-hidden="true" className={`transition-transform duration-200 ${showLanguageDropdown ? 'rotate-180' : ''}`}>⌄</span>}
+            onClick={() => {
+              setShowLanguageDropdown((prev) => !prev);
+            }}
+          >
+            {translate('language')}
+          </DropdownItem>
+
+          {showLanguageDropdown ? (
+            <div className="space-y-1 px-1 pt-1">
+              <button onClick={() => { setLanguage('en'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">English</button>
+              <button onClick={() => { setLanguage('zh'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">中文</button>
+              <button onClick={() => { setLanguage('ar'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">العربية</button>
+              <button onClick={() => { setLanguage('hi'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">हिन्दी</button>
+            </div>
+          ) : null}
+
+          <DropdownItem
+            leftIcon="📍"
+            onClick={() => {
+              handleLocationShare();
+              setShowProfileMenu(false);
+            }}
+          >
+            {translate('location')}
+          </DropdownItem>
+
+          <DropdownItem
+            leftIcon="🆘"
+            onClick={() => {
+              navigate(helpRoute);
+              setShowProfileMenu(false);
+            }}
+          >
+            Help
+          </DropdownItem>
+
+          <DropdownDivider />
+
+          <DropdownItem
+            leftIcon="📦"
+            onClick={() => {
+              navigate(ordersRoute);
+              setShowProfileMenu(false);
+            }}
+          >
+            My Orders
+          </DropdownItem>
+
+          <DropdownItem
+            leftIcon="🤍"
+            onClick={() => {
+              navigate(savedRoute);
+              setShowProfileMenu(false);
+            }}
+          >
+            Saved
+          </DropdownItem>
+
+          <DropdownDivider />
+
+          <DropdownItem
+            leftIcon="↩️"
+            tone="danger"
+            onClick={async () => {
+              try {
+                await apiClient.post('/auth/logout');
+              } catch (error) {
+                void error;
+              }
+              dispatch(addLocalNotification({ message: 'Signed out successfully.' }));
+              dropStoredAccessToken();
+              localStorage.removeItem(env.userStorageKey);
+              dispatch(clearUser());
+              dispatch(resetCartState());
+              dispatch(resetWishlistState());
+              dispatch(resetUnreadCount());
+              setShowProfileMenu(false);
+              navigate('/', { replace: true });
+            }}
+          >
+            {translate('signOut')}
+          </DropdownItem>
+        </DropdownMenu>
+      </SharedDropdown>
     );
   };
 
@@ -406,33 +474,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
             </FrostedButton>
           ) : null}
 
-          {user ? (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.preventDefault();
-                  setShowNotifications(false);
-                  setShowLanguageDropdown(false);
-                  setShowProfileMenu((prev) => !prev);
-                }}
-                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl transition-all duration-200 hover:ring-2 hover:ring-primary/20"
-                aria-label="Profile menu"
-              >
-                <ImageWithFallback
-                  src={userAvatar.src}
-                  fileId={userAvatar.fileId}
-                  alt={`${user.firstName} ${user.lastName}`}
-                  fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
-                  fit="cover"
-                  className="h-full w-full object-cover"
-                  containerClassName="h-full w-full"
-                  rounded="xl"
-                />
-              </button>
-              <ProfileMenu />
-            </div>
-          ) : null}
+          {user ? <ProfileMenu /> : null}
         </div>
       </div>
     </nav>

@@ -422,13 +422,18 @@ export interface AdminCategory {
   updatedAt?: string;
 }
 
+export type AdminTagStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
 export interface AdminTagItem {
   name: string;
   usageCount: number;
   displayName?: string;
+  status?: AdminTagStatus;
   isBanned?: boolean;
   aliasOfTagName?: string | null;
   lifecycleStage?: 'LIVE' | 'REJECTED' | 'ALIAS' | 'DORMANT';
+  createdById?: string | null;
+  createdBy?: AdminIdentitySnapshot | null;
   createdAt?: string;
   lastUsedAt?: string | null;
   updatedAt?: string;
@@ -469,8 +474,11 @@ export interface AdminTagLifecycleDetails {
   name: string;
   displayName: string | null;
   usageCount: number;
+  status?: AdminTagStatus;
   isBanned: boolean;
   lifecycleStage: 'LIVE' | 'REJECTED' | 'ALIAS' | 'DORMANT';
+  createdById?: string | null;
+  createdBy?: AdminIdentitySnapshot | null;
   lastUsedAt: string | null;
   aliasOf: {
     name: string;

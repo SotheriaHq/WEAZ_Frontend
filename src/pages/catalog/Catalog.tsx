@@ -20,7 +20,7 @@ import CollectionCard from '../../components/profile/CollectionCard';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { setUser } from '../../features/userSlice';
 import { brandApi } from '../../api/BrandApi';
-import { apiClient } from '@/api/httpClient';
+import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { finalizeCollectionUploads } from '@/api/collectionUploads';
 import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQuickEditModal';
 import type { BrandProfileDto, CollectionDto } from '../../types/profile';
@@ -28,6 +28,7 @@ import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedF
 import { getStoreStatus, type StoreStatusResponse } from '../../api/StoreApi';
 import FrostedButton from '@/components/ui/FrostedButton';
 import CatalogShopTab from '@/components/catalog/CatalogShopTab';
+import { resolveBannerImageSource } from '@/utils/profileImage';
 import {
   type PublishTask,
   readPublishTasks,
@@ -496,10 +497,16 @@ const ProfilePage: React.FC = () => {
   const [visitorCollections, setVisitorCollections] = useState<CollectionDto[]>([]);
   const [visitorLoading, setVisitorLoading] = useState<boolean>(() => Boolean(isVisitorView));
   const [visitorError, setVisitorError] = useState<string | null>(null);
-  const [isPatched, setIsPatched] = useState(false);
-  const [patchLoading, setPatchLoading] = useState(false);
+  const {
+    getPatched,
+    isLoading: isPatchLoading,
+    ensureStatus,
+    toggleStatus,
+  } = useBrandPatchState();
 
   const showPatchAction = Boolean(isVisitorView && user?.type === 'REGULAR' && routeBrandId);
+  const isPatched = showPatchAction ? getPatched(routeBrandId) : false;
+  const patchLoading = showPatchAction ? isPatchLoading(routeBrandId) : false;
 
   useEffect(() => {
     let mounted = true;
@@ -526,28 +533,9 @@ const ProfilePage: React.FC = () => {
   }, [isVisitorView, routeBrandId]);
 
   useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      if (!showPatchAction || !routeBrandId) return;
-      try {
-        setPatchLoading(true);
-        const res = await apiClient.get(`/brands/${routeBrandId}/patches/check`);
-        if (mounted) {
-          setIsPatched(Boolean(res.data?.isPatched));
-        }
-      } catch {
-        if (mounted) {
-          setIsPatched(false);
-        }
-      } finally {
-        if (mounted) {
-          setPatchLoading(false);
-        }
-      }
-    };
-    void run();
-    return () => { mounted = false; };
-  }, [showPatchAction, routeBrandId]);
+    if (!showPatchAction || !routeBrandId) return;
+    void ensureStatus(routeBrandId);
+  }, [ensureStatus, routeBrandId, showPatchAction]);
 
   const handleTogglePatch = useCallback(async () => {
     if (!routeBrandId) return;
@@ -556,14 +544,7 @@ const ProfilePage: React.FC = () => {
       return;
     }
     try {
-      setPatchLoading(true);
-      const nextPatchedState = !isPatched;
-      if (isPatched) {
-        await apiClient.delete(`/brands/${routeBrandId}/patches`);
-      } else {
-        await apiClient.post(`/brands/${routeBrandId}/patches`);
-      }
-      setIsPatched(nextPatchedState);
+      const nextPatchedState = await toggleStatus(routeBrandId);
       toast.success(
         nextPatchedState
           ? 'Patched successfully. You will now receive brand updates.'
@@ -571,10 +552,8 @@ const ProfilePage: React.FC = () => {
       );
     } catch {
       toast.error('Failed to update patch status.');
-    } finally {
-      setPatchLoading(false);
     }
-  }, [isPatched, navigate, routeBrandId, user]);
+  }, [navigate, routeBrandId, toggleStatus, user]);
 
   const viewIsStoreOpen = useMemo(() => {
     if (isVisitorView) return Boolean(visitorProfile?.isStoreOpen);
@@ -1142,9 +1121,17 @@ const ProfilePage: React.FC = () => {
   }, [isOwner, isVisitorView, activeTab, visibilityFilter, activeCollections, displayCollections.length, searchAndVisibilityFiltered.length]);
 
   // Resolve signed URLs for visitor profile assets if necessary
-  const visitorBannerInitial = visitorProfile?.bannerImage ?? visitorProfile?.bannerImageMeta?.url ?? null;
+  const visitorBannerAsset = useMemo(
+    () =>
+      resolveBannerImageSource({
+        bannerImage: visitorProfile?.bannerImage ?? null,
+        bannerImageMeta: visitorProfile?.bannerImageMeta ?? null,
+      }),
+    [visitorProfile?.bannerImage, visitorProfile?.bannerImageMeta],
+  );
+  const visitorBannerInitial = visitorBannerAsset.src;
   const visitorLogoInitial = visitorProfile?.logoImage ?? visitorProfile?.logoImageMeta?.url ?? null;
-  const { url: visitorBannerUrl } = useSignedFileUrlHook(visitorProfile?.bannerImageMeta?.fileId ?? null, visitorBannerInitial);
+  const { url: visitorBannerUrl } = useSignedFileUrlHook(visitorBannerAsset.fileId, visitorBannerInitial);
   const { url: visitorLogoUrl } = useSignedFileUrlHook(visitorProfile?.logoImageMeta?.fileId ?? null, visitorLogoInitial);
 
   const viewDisplayData = useMemo(() => {
@@ -1820,7 +1807,9 @@ const ProfilePage: React.FC = () => {
               toast.info(`Try again after ${label}`);
               return;
             }
-            setPrivateStates(prev => prev.map(p => p.collectionId === collectionId ? { ...p, state: res.state } : p));
+            setPrivateStates((prev) =>
+              prev.map((entry) => ({ ...entry, state: res.state })),
+            );
             if (res.state === 'PENDING') {
               toast.success('Access requested');
             }

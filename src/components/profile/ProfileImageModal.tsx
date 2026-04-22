@@ -1,5 +1,5 @@
 import React from 'react';
-import MediaRenderer from '@/components/media/MediaRenderer';
+import ImageWithFallback from '@/components/ImageWithFallback';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
@@ -47,7 +47,7 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({ open, src, alt = 
             aria-modal="true"
             aria-label="Image preview"
             tabIndex={-1}
-            className="relative w-full max-w-3xl max-h-[90vh] neu-modal-surface overflow-hidden rounded-3xl shadow-2xl outline-none"
+            className="relative w-full max-w-[min(92vw,36rem)] max-h-[88vh] neu-modal-surface overflow-hidden rounded-3xl shadow-2xl outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -61,19 +61,18 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({ open, src, alt = 
             </button>
 
             <figure className="relative h-full w-full">
-              <div className="h-full w-full overflow-auto">
-                <MediaRenderer
-                  kind="image"
+              <div className="flex max-h-[88vh] w-full items-center justify-center p-2 sm:p-3">
+                <ImageWithFallback
                   src={src}
                   alt={alt}
-                  maxHeightClassName="max-h-[90vh]"
-                  className="rounded-3xl"
-                  mediaClassName="rounded-3xl"
+                  fit="contain"
+                  rounded="xl"
+                  containerClassName="max-h-[82vh] w-full"
+                  className="w-full max-h-[82vh] object-contain"
+                  maxHeightClassName="max-h-[82vh]"
+                  fallbackName={alt}
                 />
               </div>
-              <figcaption className="absolute inset-x-0 bottom-0 bg-black/60 px-4 py-2 text-center text-sm font-medium text-white">
-                {alt}
-              </figcaption>
             </figure>
           </div>
         </div>

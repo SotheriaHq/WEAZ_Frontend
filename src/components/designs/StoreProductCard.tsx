@@ -5,7 +5,6 @@ import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { brandApi } from '@/api/BrandApi';
 import { toast } from 'sonner';
-import MediaRenderer from '@/components/media/MediaRenderer';
 import type { SizingMode } from '@/types/sizing';
 import {
   getProductStockState,
@@ -87,8 +86,6 @@ type ResolvedGalleryImage = {
 };
 
 const MAX_GALLERY_ITEMS = 6;
-const MEDIA_MAX_HEIGHT_CLASS = 'max-h-[320px]';
-
 const normalizeGalleryUrl = (value?: string | null) => {
   const raw = String(value ?? '').trim();
   if (!raw) return null;
@@ -481,15 +478,11 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         ) : null}
 
         {!imgError && activeImage?.url ? (
-          <MediaRenderer
-            kind="image"
+          <img
             src={activeImage.url}
             alt={product.name}
-            fit="contain"
-            className={`block w-full transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
-            mediaClassName="block h-auto w-full object-contain"
-            maxHeightClassName={MEDIA_MAX_HEIGHT_CLASS}
-            maxWidthClassName="max-w-full"
+            className={`block max-h-[440px] w-full max-w-full h-auto transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
+            loading="eager"
             onError={() => {
               setFailedGalleryKeys((prev) => (
                 activeImage?.key && !prev.includes(activeImage.key)

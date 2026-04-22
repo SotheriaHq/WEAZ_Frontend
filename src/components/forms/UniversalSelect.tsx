@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
 
 export interface UniversalSelectOption {
   value: string;
@@ -106,7 +105,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           onClick={() => !disabled && setIsOpen(!isOpen)}
           disabled={disabled}
           className={`
-            relative w-full cursor-pointer rounded-2xl border text-left shadow-sm transition-all duration-200
+            relative w-full cursor-pointer rounded-2xl border text-left shadow-sm transition-colors duration-200
             flex items-center justify-between px-4 py-3.5 ${selectedAllowWrap ? 'items-start' : 'items-center'}
             ${disabled ? 'cursor-not-allowed opacity-60 bg-gray-100 dark:bg-gray-800' : 'bg-white/75 dark:bg-white/5 backdrop-blur-xl hover:bg-white dark:hover:bg-white/10'}
             ${error 
@@ -126,17 +125,14 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
             )}
           </span>
           <span className="pointer-events-none flex items-center pr-2">
-            <ChevronDown
-              className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-              aria-hidden="true"
-            />
+            <span aria-hidden="true" className={`text-base leading-none text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>⌄</span>
           </span>
         </button>
 
         {isOpen && (
-          <div className="absolute z-50 mt-2 max-h-60 w-full overflow-auto rounded-2xl glass-menu p-1 animate-slideDown focus:outline-none scrollbar-hide">
+          <div className="absolute z-50 mt-1.5 max-h-60 w-full max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl glass-menu p-1.5 shadow-2xl animate-slideDown focus:outline-none scrollbar-hide">
             {searchable && (
-              <div className="sticky top-0 z-10 border-b border-white/10 bg-white/80 px-2 py-2 backdrop-blur-xl dark:border-white/10 dark:bg-black/20">
+              <div className="sticky top-0 z-10 rounded-xl border border-white/10 bg-white/85 px-2 py-2 backdrop-blur-xl dark:border-white/10 dark:bg-black/25">
                 <input
                   type="text"
                   value={searchTerm}
@@ -194,8 +190,8 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                     </div>
 
                     {isSelected && (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-purple-600 dark:text-purple-400">
-                        <Check className="h-4 w-4" aria-hidden="true" />
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-purple-600 dark:text-purple-400" aria-hidden="true">
+                        ✓
                       </span>
                     )}
                   </div>

@@ -38,20 +38,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error('Invalid profile response');
     }
 
-    // Merge persisted user fields (profileImage, profileImageFile, etc.) to avoid
-    // overwriting locally persisted values with empty/undefined values from the server.
+    // Keep auth/profile as the canonical server snapshot.
     try {
       const raw = typeof window !== 'undefined' ? localStorage.getItem(env.userStorageKey) : null;
       if (raw) {
         const persisted = JSON.parse(raw) as AuthUserDto;
         // Only overwrite server values when server doesn't provide them and persisted has them
         const merged = { ...user } as AuthUserDto;
-        if (!merged.profileImage && persisted.profileImage) merged.profileImage = persisted.profileImage;
-        if (!merged.profileImageId && persisted.profileImageId) merged.profileImageId = persisted.profileImageId;
-        if (!merged.profileImageFile && persisted.profileImageFile) merged.profileImageFile = persisted.profileImageFile;
-        if (!merged.bannerImage && persisted.bannerImage) merged.bannerImage = persisted.bannerImage;
-        if (!merged.bannerImageId && persisted.bannerImageId) merged.bannerImageId = persisted.bannerImageId;
-        if (!merged.bannerImageFile && persisted.bannerImageFile) merged.bannerImageFile = persisted.bannerImageFile;
+        if (!merged.phoneNumber && persisted.phoneNumber) merged.phoneNumber = persisted.phoneNumber;
+        if (!merged.address && persisted.address) merged.address = persisted.address;
 
         dispatch(setUser(merged));
         return merged;

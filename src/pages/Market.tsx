@@ -19,6 +19,7 @@ import type { RootState } from '@/store';
 import FeaturedSection from '@/components/FeaturedSection';
 import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 import { resolveProfileImageSource } from '@/utils/profileImage';
+import { useBrandPatchState } from '@/context/BrandPatchContext';
 
 // Error type detection
 type ErrorType = 'network' | 'timeout' | 'server' | 'empty' | 'category_empty' | 'unknown';
@@ -247,12 +248,15 @@ const Market: React.FC = () => {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [isPending, startTransition] = useTransition();
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
-  const user = useSelector((s: RootState) => s.user.profile);
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
-  const [patchMap, setPatchMap] = useState<Record<string, boolean>>({});
-  const [patchingIds, setPatchingIds] = useState<Set<string>>(new Set());
-  const isRegular = user?.type === 'REGULAR';
+  const {
+    isPatchCapable,
+    getPatched,
+    isLoading: isPatchLoading,
+    prefetchStatuses,
+    toggleStatus,
+  } = useBrandPatchState();
   const openDesignId = searchParams.get('openDesign');
   const openMediaId = searchParams.get('openMedia');
   const openCommentId = searchParams.get('commentId');
@@ -260,8 +264,6 @@ const Market: React.FC = () => {
   const dismissedRouteOpenKeyRef = useRef<string | null>(null);
   const savedBatchInFlightRef = useRef<string | null>(null);
   const savedBatchLastRunRef = useRef<Record<string, number>>({});
-  const patchBatchInFlightRef = useRef<string | null>(null);
-  const patchBatchLastRunRef = useRef<Record<string, number>>({});
 
   const closeViewModal = useCallback(() => {
     if (openDesignId || openMediaId || openCommentId) {
@@ -435,11 +437,6 @@ const Market: React.FC = () => {
     [items],
   );
 
-  const patchBrandTargetIdsKey = useMemo(
-    () => patchBrandTargetIds.join('|'),
-    [patchBrandTargetIds],
-  );
-
   useEffect(() => {
     let mounted = true;
     const loadSaved = async () => {
@@ -490,52 +487,9 @@ const Market: React.FC = () => {
   }, [isAuth, mediaTargetIds, mediaTargetIdsKey]);
 
   useEffect(() => {
-    let mounted = true;
-    const loadPatches = async () => {
-      if (!isAuth || !isRegular || patchBrandTargetIds.length === 0) {
-        if (mounted) setPatchMap({});
-        return;
-      }
-
-      const requestKey = `BRAND_PATCH:${patchBrandTargetIdsKey}`;
-      const now = Date.now();
-      const lastRunAt = patchBatchLastRunRef.current[requestKey] ?? 0;
-      if (patchBatchInFlightRef.current === requestKey || now - lastRunAt < 1500) {
-        return;
-      }
-      patchBatchInFlightRef.current = requestKey;
-
-      try {
-        const res = await apiClient.post('/brands/patches/check/batch', {
-          targetIds: patchBrandTargetIds,
-        });
-        const list = res.data?.items ?? [];
-        if (mounted) {
-          const next: Record<string, boolean> = {};
-          for (const entry of list) {
-            if (entry?.targetId) next[entry.targetId] = Boolean(entry.isPatched);
-          }
-          setPatchMap((prev) => {
-            const prevKeys = Object.keys(prev);
-            const nextKeys = Object.keys(next);
-            if (prevKeys.length === nextKeys.length && prevKeys.every((k) => prev[k] === next[k])) {
-              return prev;
-            }
-            return next;
-          });
-        }
-      } catch {
-        if (mounted) setPatchMap({});
-      } finally {
-        if (patchBatchInFlightRef.current === requestKey) {
-          patchBatchInFlightRef.current = null;
-        }
-        patchBatchLastRunRef.current[requestKey] = Date.now();
-      }
-    };
-    void loadPatches();
-    return () => { mounted = false; };
-  }, [isAuth, isRegular, patchBrandTargetIds, patchBrandTargetIdsKey]);
+    if (!isAuth || !isPatchCapable || patchBrandTargetIds.length === 0) return;
+    void prefetchStatuses(patchBrandTargetIds);
+  }, [isAuth, isPatchCapable, patchBrandTargetIds, prefetchStatuses]);
   
   // Force reload when navigating back to this page (fixes image loading issue after route changes)
   useEffect(() => {
@@ -655,26 +609,12 @@ const Market: React.FC = () => {
       toast.info('Please sign in to patch brands.');
       return;
     }
-    if (!isRegular) return;
-    if (patchingIds.has(brandId)) return;
+    if (!isPatchCapable) return;
     try {
-      setPatchingIds((prev) => new Set(prev).add(brandId));
-      const isPatched = Boolean(patchMap[brandId]);
-      if (isPatched) {
-        await apiClient.delete(`/brands/${brandId}/patches`);
-      } else {
-        await apiClient.post(`/brands/${brandId}/patches`);
-      }
-      setPatchMap((prev) => ({ ...prev, [brandId]: !isPatched }));
-      toast.success(isPatched ? 'Brand unpatched.' : 'Brand patched.');
+      const nextPatched = await toggleStatus(brandId);
+      toast.success(nextPatched ? 'Brand patched.' : 'Brand unpatched.');
     } catch {
       toast.error('Unable to update patch.');
-    } finally {
-      setPatchingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(brandId);
-        return next;
-      });
     }
   };
 
@@ -766,9 +706,9 @@ const Market: React.FC = () => {
                 isSaved={savedMap[item.id] ?? false}
                 onToggleSave={handleToggleSave}
                 saveBusy={savingIds.has(item.id)}
-                isPatched={item.brandId ? patchMap[item.brandId] ?? false : false}
+                isPatched={item.brandId ? getPatched(item.brandId) : false}
                 onTogglePatch={handleTogglePatch}
-                patchBusy={item.brandId ? patchingIds.has(item.brandId) : false}
+                patchBusy={item.brandId ? isPatchLoading(item.brandId) : false}
               />
             </div>
           ))}

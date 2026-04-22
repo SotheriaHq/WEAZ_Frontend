@@ -27,9 +27,9 @@ import { toast } from 'sonner';
 const Profile = lazy(() => import('../../pages/catalog/Catalog'));
 
 const computeSidebarMode = (pathname: string, isMobile: boolean) => {
+  if (isMobile) return 'HIDDEN' as const;
   const isProfileRoute = pathname === '/profile' || pathname.startsWith('/profile/');
   if (isProfileRoute && !pathname.startsWith('/profile/settings')) return 'RAIL' as const;
-  if (isMobile) return 'HIDDEN' as const;
   if (pathname.startsWith('/settings') || pathname.startsWith('/profile/settings')) return 'HIDDEN' as const;
   if (pathname.startsWith('/studio')) return 'HIDDEN' as const;
   return 'RAIL' as const;

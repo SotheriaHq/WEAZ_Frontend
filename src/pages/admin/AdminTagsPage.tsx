@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { adminTagsApi } from '@/api/AdminApi';
-import type { AdminTagItem, AdminTagLifecycleDetails } from '@/types/admin';
+import type {
+  AdminTagItem,
+  AdminTagLifecycleDetails,
+  AdminTagStatus,
+} from '@/types/admin';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { unwrapApiResponse } from '@/types/auth';
 import useDebounce from '@/hooks/useDebounce';
@@ -11,7 +15,7 @@ import Modal from '@/components/ui/Modal';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 
 type TagSortMode = 'recent' | 'popular' | 'last-used' | 'name-asc';
-type TagStateFilter = 'all' | 'live' | 'rejected' | 'alias' | 'dormant';
+type TagStateFilter = 'all' | 'pending' | 'approved' | 'rejected';
 
 const TAG_SORT_OPTIONS = [
   { value: 'recent', label: 'Sort: Newest first' },
@@ -21,37 +25,34 @@ const TAG_SORT_OPTIONS = [
 ];
 
 const TAG_STATE_OPTIONS = [
-  { value: 'all', label: 'Stage: All lifecycle states' },
-  { value: 'live', label: 'Stage: Live' },
-  { value: 'rejected', label: 'Stage: Rejected' },
-  { value: 'alias', label: 'Stage: Alias' },
-  { value: 'dormant', label: 'Stage: Dormant' },
+  { value: 'all', label: 'Status: All' },
+  { value: 'pending', label: 'Status: Pending' },
+  { value: 'approved', label: 'Status: Approved' },
+  { value: 'rejected', label: 'Status: Rejected' },
 ];
 
-const getLifecycleStage = (tag: AdminTagItem): 'LIVE' | 'REJECTED' | 'ALIAS' | 'DORMANT' => {
-  if (tag.lifecycleStage) return tag.lifecycleStage;
-  if (tag.isBanned) return 'REJECTED';
-  if (tag.aliasOfTagName) return 'ALIAS';
-  if (tag.usageCount > 0) return 'LIVE';
-  return 'DORMANT';
-};
-
-const lifecycleStageLabel = (stage: 'LIVE' | 'REJECTED' | 'ALIAS' | 'DORMANT') => {
-  if (stage === 'REJECTED') return '🚫 Rejected';
-  if (stage === 'ALIAS') return '↪️ Alias';
-  if (stage === 'DORMANT') return '🌙 Dormant';
-  return '✅ Live';
-};
-
-const lifecycleStageClass = (stage: 'LIVE' | 'REJECTED' | 'ALIAS' | 'DORMANT') => {
-  if (stage === 'REJECTED') {
-    return 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200';
+const getTagStatus = (tag: Pick<AdminTagItem, 'status' | 'isBanned'>): AdminTagStatus => {
+  if (tag.status === 'PENDING' || tag.status === 'REJECTED') {
+    return tag.status;
   }
-  if (stage === 'ALIAS') {
+  if (tag.isBanned) {
+    return 'REJECTED';
+  }
+  return 'APPROVED';
+};
+
+const tagStatusLabel = (status: AdminTagStatus) => {
+  if (status === 'PENDING') return '⏳ Pending';
+  if (status === 'REJECTED') return '❌ Rejected';
+  return '✅ Approved';
+};
+
+const tagStatusClass = (status: AdminTagStatus) => {
+  if (status === 'PENDING') {
     return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200';
   }
-  if (stage === 'DORMANT') {
-    return 'bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-200';
+  if (status === 'REJECTED') {
+    return 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200';
   }
   return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200';
 };
@@ -63,6 +64,9 @@ const AdminTagsPage: React.FC = () => {
   const [stateFilter, setStateFilter] = useState<TagStateFilter>('all');
   const { isSuperAdmin } = useAdminPermissions();
   const [updatingTag, setUpdatingTag] = useState<string | null>(null);
+  const [localTagOverrides, setLocalTagOverrides] = useState<
+    Record<string, Partial<AdminTagItem>>
+  >({});
   const [selectedTagName, setSelectedTagName] = useState<string | null>(null);
   const [selectedTagLifecycle, setSelectedTagLifecycle] =
     useState<AdminTagLifecycleDetails | null>(null);
@@ -101,7 +105,31 @@ const AdminTagsPage: React.FC = () => {
   const { items: tags, isLoading: loading, isLoadingMore, hasMore, error, sentinelRef, reset } =
     useInfiniteScroll<AdminTagItem>(fetchPage, { limit: 50 });
 
+  const applyLocalTagUpdate = useCallback((tagName: string, patch: Partial<AdminTagItem>) => {
+    setLocalTagOverrides((current) => ({
+      ...current,
+      [tagName]: {
+        ...current[tagName],
+        ...patch,
+      },
+    }));
+  }, []);
+
+  const visibleTags = useMemo(() => {
+    const merged = tags.map((tag) => {
+      const override = localTagOverrides[tag.name] ?? null;
+      return override ? { ...tag, ...override } : tag;
+    });
+
+    if (stateFilter === 'all') {
+      return merged;
+    }
+
+    return merged.filter((tag) => getTagStatus(tag).toLowerCase() === stateFilter);
+  }, [localTagOverrides, stateFilter, tags]);
+
   useEffect(() => {
+    setLocalTagOverrides({});
     reset();
   }, [debouncedQuery, sortMode, stateFilter, reset]);
 
@@ -160,68 +188,94 @@ const AdminTagsPage: React.FC = () => {
     setSelectedTagBusy(false);
   }, []);
 
-  const handleToggleTagBan = useCallback(
-    async (tag: AdminTagItem) => {
+  const handleSetTagStatus = useCallback(
+    async (tagName: string, nextStatus: AdminTagStatus) => {
       if (!isSuperAdmin || updatingTag) return;
 
-      setUpdatingTag(tag.name);
+      const actionKey = `${tagName}:${nextStatus}`;
+      setUpdatingTag(actionKey);
       try {
-        await adminTagsApi.ban(tag.name, !tag.isBanned);
-        toast.success(
-          tag.isBanned
-            ? `#${tag.name} allowed globally.`
-            : `#${tag.name} rejected from global use.`,
-        );
-        if (selectedTagLifecycle?.name === tag.name) {
-          await loadTagLifecycle(tag.name);
+        const response = await adminTagsApi.updateStatus(tagName, nextStatus);
+        const updated = unwrapApiResponse<AdminTagItem>(response.data as any);
+
+        const patch: Partial<AdminTagItem> = {
+          status: updated?.status ?? nextStatus,
+          isBanned: updated?.isBanned ?? nextStatus === 'REJECTED',
+          updatedAt: updated?.updatedAt ?? new Date().toISOString(),
+        };
+        if (typeof updated?.displayName === 'string') {
+          patch.displayName = updated.displayName;
         }
-        reset();
+        if ('aliasOfTagName' in (updated || {})) {
+          patch.aliasOfTagName = updated.aliasOfTagName ?? null;
+        }
+
+        applyLocalTagUpdate(tagName, patch);
+        toast.success(`#${tagName} marked ${nextStatus.toLowerCase()}.`);
+
+        if (selectedTagLifecycle?.name === tagName) {
+          await loadTagLifecycle(tagName);
+        }
       } catch (error: any) {
         toast.error(error?.response?.data?.message || 'Failed to update tag status');
       } finally {
         setUpdatingTag(null);
       }
     },
-    [isSuperAdmin, loadTagLifecycle, reset, selectedTagLifecycle?.name, updatingTag],
+    [
+      applyLocalTagUpdate,
+      isSuperAdmin,
+      loadTagLifecycle,
+      selectedTagLifecycle?.name,
+      updatingTag,
+    ],
   );
 
   const handleSaveDisplayName = useCallback(async () => {
     if (!isSuperAdmin || !selectedTagName) return;
     setSelectedTagBusy(true);
     try {
-      await adminTagsApi.updateMetadata(selectedTagName, {
+      const response = await adminTagsApi.updateMetadata(selectedTagName, {
         displayName: displayNameDraft,
+      });
+      const updated = unwrapApiResponse<AdminTagItem>(response.data as any);
+      applyLocalTagUpdate(selectedTagName, {
+        displayName:
+          typeof updated?.displayName === 'string'
+            ? updated.displayName
+            : displayNameDraft,
+        updatedAt: updated?.updatedAt ?? new Date().toISOString(),
       });
       toast.success('Tag display name saved.');
       await loadTagLifecycle(selectedTagName);
-      reset();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to save display name');
     } finally {
       setSelectedTagBusy(false);
     }
-  }, [displayNameDraft, isSuperAdmin, loadTagLifecycle, reset, selectedTagName]);
+  }, [
+    applyLocalTagUpdate,
+    displayNameDraft,
+    isSuperAdmin,
+    loadTagLifecycle,
+    selectedTagName,
+  ]);
 
-  const handleLifecycleStatusToggle = useCallback(async () => {
+  const handleLifecycleStatusChange = useCallback(async (nextStatus: AdminTagStatus) => {
     if (!isSuperAdmin || !selectedTagLifecycle) return;
     setSelectedTagBusy(true);
     try {
-      await adminTagsApi.ban(selectedTagLifecycle.name, !selectedTagLifecycle.isBanned);
-      toast.success(
-        selectedTagLifecycle.isBanned
-          ? `#${selectedTagLifecycle.name} allowed globally.`
-          : `#${selectedTagLifecycle.name} rejected from global use.`,
-      );
-      await loadTagLifecycle(selectedTagLifecycle.name);
-      reset();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to update tag status');
+      await handleSetTagStatus(selectedTagLifecycle.name, nextStatus);
     } finally {
       setSelectedTagBusy(false);
     }
-  }, [isSuperAdmin, loadTagLifecycle, reset, selectedTagLifecycle]);
+  }, [handleSetTagStatus, isSuperAdmin, selectedTagLifecycle]);
 
   const canModerate = isSuperAdmin;
+
+  const selectedLifecycleStatus = selectedTagLifecycle
+    ? getTagStatus(selectedTagLifecycle)
+    : 'APPROVED';
 
   const lifecycleSummary = useMemo(() => {
     if (!selectedTagLifecycle) return null;
@@ -291,7 +345,7 @@ const AdminTagsPage: React.FC = () => {
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-gray-500 dark:text-gray-400">
                 <th className="w-[24%] px-2 py-2.5">Tag</th>
-                <th className="w-[17%] px-2 py-2.5">Lifecycle</th>
+                <th className="w-[17%] px-2 py-2.5">Status</th>
                 <th className="w-[10%] px-2 py-2.5">Usage</th>
                 <th className="w-[13%] px-2 py-2.5">Last Used</th>
                 <th className="w-[13%] px-2 py-2.5">Created</th>
@@ -299,81 +353,103 @@ const AdminTagsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {tags.map((tag) => (
-                <tr key={tag.name} className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="px-2 py-2 align-top">
-                    <button
-                      type="button"
-                      onClick={() => openTagLifecycle(tag.name)}
-                      className="block truncate font-mono text-sm font-semibold text-indigo-700 hover:text-indigo-600 dark:text-indigo-300 dark:hover:text-indigo-200"
-                      title={`#${tag.name}`}
-                    >
-                      #{tag.name}
-                    </button>
-                    {tag.displayName && tag.displayName !== tag.name ? (
-                      <div
-                        className="mt-0.5 truncate text-[11px] leading-4 text-gray-500 dark:text-gray-400"
-                        title={`Display: ${tag.displayName}`}
-                      >
-                        Display: {tag.displayName}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="px-2 py-2 align-top">
-                    {(() => {
-                      const stage = getLifecycleStage(tag);
-                      return (
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${lifecycleStageClass(stage)}`}
-                        >
-                          {lifecycleStageLabel(stage)}
-                        </span>
-                      );
-                    })()}
-                    {tag.aliasOfTagName ? (
-                      <div
-                        className="mt-1 truncate text-[11px] leading-4 text-gray-500 dark:text-gray-400"
-                        title={`Alias of #${tag.aliasOfTagName}`}
-                      >
-                        Alias of #{tag.aliasOfTagName}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="px-2 py-2 align-top text-gray-600 dark:text-gray-400">{tag.usageCount}</td>
-                  <td className="px-2 py-2 align-top text-[11px] text-gray-600 dark:text-gray-400 sm:text-xs">
-                    <span className="whitespace-nowrap">{formatDate(tag.lastUsedAt)}</span>
-                  </td>
-                  <td className="px-2 py-2 align-top text-[11px] text-gray-600 dark:text-gray-400 sm:text-xs">
-                    <span className="whitespace-nowrap">{formatDate(tag.createdAt)}</span>
-                  </td>
-                  <td className="px-2 py-2 align-top">
-                    <div className="flex flex-wrap items-center gap-1.5">
+              {visibleTags.map((tag) => {
+                const status = getTagStatus(tag);
+                const creatorLabel =
+                  tag.createdBy?.brandFullName || tag.createdBy?.username || null;
+
+                return (
+                  <tr key={tag.name} className="border-b border-gray-100 dark:border-gray-800">
+                    <td className="px-2 py-2 align-top">
                       <button
                         type="button"
                         onClick={() => openTagLifecycle(tag.name)}
-                        className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15"
+                        className="block truncate font-mono text-sm font-semibold text-indigo-700 hover:text-indigo-600 dark:text-indigo-300 dark:hover:text-indigo-200"
+                        title={`#${tag.name}`}
                       >
-                        Open lifecycle
+                        #{tag.name}
                       </button>
-                      {canModerate ? (
+                      {tag.displayName && tag.displayName !== tag.name ? (
+                        <div
+                          className="mt-0.5 truncate text-[11px] leading-4 text-gray-500 dark:text-gray-400"
+                          title={`Display: ${tag.displayName}`}
+                        >
+                          Display: {tag.displayName}
+                        </div>
+                      ) : null}
+                      <div className="mt-0.5 truncate text-[11px] leading-4 text-gray-500 dark:text-gray-400">
+                        Created by {creatorLabel ? creatorLabel : 'Unknown creator'}
+                      </div>
+                    </td>
+                    <td className="px-2 py-2 align-top">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${tagStatusClass(status)}`}
+                      >
+                        {tagStatusLabel(status)}
+                      </span>
+                      {tag.aliasOfTagName ? (
+                        <div
+                          className="mt-1 truncate text-[11px] leading-4 text-gray-500 dark:text-gray-400"
+                          title={`Alias of #${tag.aliasOfTagName}`}
+                        >
+                          Alias of #{tag.aliasOfTagName}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="px-2 py-2 align-top text-gray-600 dark:text-gray-400">
+                      {tag.usageCount}
+                    </td>
+                    <td className="px-2 py-2 align-top text-[11px] text-gray-600 dark:text-gray-400 sm:text-xs">
+                      <span className="whitespace-nowrap">{formatDate(tag.lastUsedAt)}</span>
+                    </td>
+                    <td className="px-2 py-2 align-top text-[11px] text-gray-600 dark:text-gray-400 sm:text-xs">
+                      <span className="whitespace-nowrap">{formatDate(tag.createdAt)}</span>
+                    </td>
+                    <td className="px-2 py-2 align-top">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => void handleToggleTagBan(tag)}
-                          disabled={updatingTag === tag.name}
-                          className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${tag.isBanned ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-rose-600 text-white hover:bg-rose-500'} disabled:cursor-not-allowed disabled:opacity-60`}
+                          onClick={() => openTagLifecycle(tag.name)}
+                          className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15"
                         >
-                          {updatingTag === tag.name
-                            ? 'Working...'
-                            : tag.isBanned
-                              ? '✅ Allow'
-                              : '🚫 Reject'}
+                          Open lifecycle
                         </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {tags.length === 0 && (
+                        {canModerate && status !== 'APPROVED' ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleSetTagStatus(tag.name, 'APPROVED')}
+                            disabled={Boolean(updatingTag)}
+                            className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {updatingTag === `${tag.name}:APPROVED` ? 'Working...' : '✅ Approve'}
+                          </button>
+                        ) : null}
+                        {canModerate && status !== 'PENDING' ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleSetTagStatus(tag.name, 'PENDING')}
+                            disabled={Boolean(updatingTag)}
+                            className="rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {updatingTag === `${tag.name}:PENDING` ? 'Working...' : '⏳ Pending'}
+                          </button>
+                        ) : null}
+                        {canModerate && status !== 'REJECTED' ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleSetTagStatus(tag.name, 'REJECTED')}
+                            disabled={Boolean(updatingTag)}
+                            className="rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {updatingTag === `${tag.name}:REJECTED` ? 'Working...' : '❌ Reject'}
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {visibleTags.length === 0 && (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-gray-500">No tags found</td>
                 </tr>
@@ -382,7 +458,7 @@ const AdminTagsPage: React.FC = () => {
           </table>
           {isLoadingMore && <div className="text-center text-gray-500 text-sm py-4">Loading more...</div>}
           {hasMore && <div ref={sentinelRef} />}
-          {!hasMore && tags.length > 0 && <div className="text-center text-gray-400 text-xs py-4">End of list</div>}
+          {!hasMore && visibleTags.length > 0 && <div className="text-center text-gray-400 text-xs py-4">End of list</div>}
         </div>
       )}
 
@@ -419,9 +495,9 @@ const AdminTagsPage: React.FC = () => {
                   </div>
                 </div>
                 <span
-                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${lifecycleStageClass(selectedTagLifecycle.lifecycleStage)}`}
+                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${tagStatusClass(selectedLifecycleStatus)}`}
                 >
-                  {lifecycleStageLabel(selectedTagLifecycle.lifecycleStage)}
+                  {tagStatusLabel(selectedLifecycleStatus)}
                 </span>
               </div>
 
@@ -441,6 +517,13 @@ const AdminTagsPage: React.FC = () => {
                 <div className="text-xs text-slate-600 dark:text-slate-300">
                   <div>
                     Created: {formatDateTime(selectedTagLifecycle.createdAt)}
+                  </div>
+                  <div className="mt-1">
+                    Creator:{' '}
+                    {selectedTagLifecycle.createdBy?.brandFullName ||
+                      selectedTagLifecycle.createdBy?.username ||
+                      selectedTagLifecycle.createdById ||
+                      'Unknown'}
                   </div>
                   <div className="mt-1">
                     Last used: {formatDateTime(selectedTagLifecycle.lastUsedAt)}
@@ -463,11 +546,27 @@ const AdminTagsPage: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void handleLifecycleStatusToggle()}
+                    onClick={() => void handleLifecycleStatusChange('PENDING')}
                     disabled={selectedTagBusy}
-                    className={`rounded-xl px-3 py-2 text-xs font-semibold text-white disabled:opacity-60 ${selectedTagLifecycle.isBanned ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'}`}
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold text-white disabled:opacity-60 ${selectedLifecycleStatus === 'PENDING' ? 'bg-amber-700' : 'bg-amber-600 hover:bg-amber-500'}`}
                   >
-                    {selectedTagLifecycle.isBanned ? 'Allow globally' : 'Reject globally'}
+                    Set pending
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleLifecycleStatusChange('APPROVED')}
+                    disabled={selectedTagBusy}
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold text-white disabled:opacity-60 ${selectedLifecycleStatus === 'APPROVED' ? 'bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-500'}`}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleLifecycleStatusChange('REJECTED')}
+                    disabled={selectedTagBusy}
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold text-white disabled:opacity-60 ${selectedLifecycleStatus === 'REJECTED' ? 'bg-rose-700' : 'bg-rose-600 hover:bg-rose-500'}`}
+                  >
+                    Reject
                   </button>
                 </div>
               ) : null}

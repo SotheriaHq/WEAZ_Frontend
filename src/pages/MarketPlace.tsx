@@ -464,8 +464,8 @@ const MarketPlace: React.FC = () => {
     <div className="mx-auto w-full max-w-[1440px] px-4 py-4 sm:px-6 lg:px-8">
       <div className="space-y-6">
         <section className="rounded-3xl border border-gray-200/70 bg-white/40 p-4 backdrop-blur-[2px] dark:border-white/10 dark:bg-white/[0.03] sm:p-6">
-          <div className="grid grid-cols-1 gap-4 lg:min-h-[420px] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <div className="min-h-[330px] sm:min-h-[420px] lg:h-full lg:min-h-0">
+          <div className="grid grid-cols-1 gap-4 lg:min-h-[210px] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div className="min-h-[165px] sm:min-h-[210px] lg:h-full lg:min-h-0">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeHero?.id ?? 'hero-empty'}
@@ -481,7 +481,7 @@ const MarketPlace: React.FC = () => {
                         <ImageWithFallback
                           src={activeHero.thumbnail || activeHero.images[0] || null}
                           alt={activeHero.name}
-                          fit="cover"
+                          fit="contain"
                           rounded="none"
                           containerClassName="h-full w-full"
                           className="h-full w-full"
@@ -490,7 +490,7 @@ const MarketPlace: React.FC = () => {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                       </div>
-                      <div className="relative flex h-full min-h-[330px] flex-col justify-end p-6 text-white sm:min-h-[420px] lg:min-h-0">
+                      <div className="relative flex h-full min-h-[165px] flex-col justify-end p-6 text-white sm:min-h-[210px] lg:min-h-0">
                         <span className="mb-3 inline-flex w-fit items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold backdrop-blur">
                           🔥 Trending now
                         </span>
@@ -519,7 +519,7 @@ const MarketPlace: React.FC = () => {
                       </div>
                     </>
                   ) : (
-                    <div className="flex h-full min-h-[330px] items-center justify-center rounded-2xl bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-300 sm:min-h-[420px] lg:min-h-0">
+                    <div className="flex h-full min-h-[165px] items-center justify-center rounded-2xl bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-300 sm:min-h-[210px] lg:min-h-0">
                       No featured products yet.
                     </div>
                   )}
@@ -533,12 +533,12 @@ const MarketPlace: React.FC = () => {
                   key={product.id}
                   type="button"
                   onClick={() => setSelectedProduct(product)}
-                  className="group relative h-[190px] overflow-hidden rounded-2xl border border-gray-200 bg-gray-100 text-left dark:border-white/10 dark:bg-white/5 sm:h-[220px] lg:h-full"
+                  className="group relative h-[118px] overflow-hidden rounded-2xl border border-gray-200 bg-gray-100 text-left dark:border-white/10 dark:bg-white/5 sm:h-[160px] lg:h-full"
                 >
                   <ImageWithFallback
                     src={product.thumbnail || product.images[0] || null}
                     alt={product.name}
-                    fit="cover"
+                    fit="contain"
                     rounded="none"
                     containerClassName="absolute inset-0 h-full w-full"
                     className="h-full w-full transition-transform duration-500 group-hover:scale-105"

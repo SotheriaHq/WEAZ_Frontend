@@ -9,6 +9,7 @@ import { useSignedFileUrl } from '@/hooks/useSignedFileUrl';
 import ProfileHeader from './ProfileHeader';
 import ImageCropModal from '@/components/upload/ImageCropModal';
 import ProfileImageModal from '@/components/profile/ProfileImageModal';
+import ProfileSettingsEntry from '@/components/profile/ProfileSettingsEntry';
 
 type OwnerHeaderProfileBase = {
   id: string;
@@ -322,6 +323,13 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
         patchLoading={patchLoading}
         onTogglePatch={onTogglePatch}
       />
+
+      <div className="mt-4 px-4 sm:px-6">
+        <ProfileSettingsEntry
+          to="/settings"
+          description="Store, payments, team & notifications"
+        />
+      </div>
 
       <ProfileImageModal
         open={isAvatarModalOpen && Boolean(localAvatarPreview ?? resolvedAvatarUrl)}

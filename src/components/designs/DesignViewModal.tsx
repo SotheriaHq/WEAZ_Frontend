@@ -24,6 +24,7 @@ import {
   CONTENT_DISPLAY_MEDIA_CLASS,
   CONTENT_DISPLAY_RENDERER_CLASS,
 } from '@/components/media/contentDisplayPresets';
+import { useBrandPatchState } from '@/context/BrandPatchContext';
 
 type Props = {
   open: boolean;
@@ -45,8 +46,6 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const [postingComment, setPostingComment] = React.useState(false);
   const [externalComment, setExternalComment] = React.useState<CommentV2Dto | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
-  const [isPatched, setIsPatched] = React.useState(false);
-  const [patchBusy, setPatchBusy] = React.useState(false);
   const [isSaved, setIsSaved] = React.useState(false);
   const [saveBusy, setSaveBusy] = React.useState(false);
   const [mediaItems, setMediaItems] = React.useState<ModalMedia[]>([]);
@@ -77,8 +76,17 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
   const isRegularViewer = authProfile?.type === 'REGULAR';
   const brandId = item?.brandId ?? null;
+  const {
+    isPatchCapable,
+    getPatched,
+    isLoading: isPatchLoading,
+    ensureStatus,
+    toggleStatus,
+  } = useBrandPatchState();
+  const isPatched = brandId ? getPatched(brandId) : false;
+  const patchBusy = brandId ? isPatchLoading(brandId) : false;
   const isOwnBrandContent = Boolean(currentUserId && item?.brandId && currentUserId === item.brandId);
-  const canPatchBrand = Boolean(isAuth && isRegularViewer && item?.brandId && !isOwnBrandContent);
+  const canPatchBrand = Boolean(isAuth && isPatchCapable && isRegularViewer && item?.brandId && !isOwnBrandContent);
 
   useFocusTrap({
     containerRef: dialogRef,
@@ -244,32 +252,21 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     const loadViewerState = async () => {
       if (!open || !activeMediaId || !isAuth) {
         if (mounted) {
-          setIsPatched(false);
           setIsSaved(false);
         }
         return;
       }
 
       try {
-        const savedPromise = apiClient.get('/saved/check', {
+        const savedRes = await apiClient.get('/saved/check', {
           params: { targetType: 'COLLECTION_MEDIA', targetId: activeMediaId },
         });
-        const patchPromise = canPatchBrand && brandId
-          ? apiClient.get(`/brands/${brandId}/patches/check`)
-          : Promise.resolve({ data: { isPatched: false } });
-        const [savedRes, patchRes] = await Promise.all([savedPromise, patchPromise]);
-        const patchedValue =
-          (patchRes as any)?.data?.isPatched ??
-          (patchRes as any)?.data?.data?.isPatched ??
-          false;
 
         if (!mounted) return;
         setIsSaved(Boolean(savedRes.data?.isSaved));
-        setIsPatched(Boolean(patchedValue));
       } catch {
         if (!mounted) return;
         setIsSaved(false);
-        setIsPatched(false);
       }
     };
 
@@ -277,7 +274,12 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     return () => {
       mounted = false;
     };
-  }, [open, activeMediaId, brandId, isAuth, canPatchBrand]);
+  }, [open, activeMediaId, isAuth]);
+
+  React.useEffect(() => {
+    if (!open || !canPatchBrand || !brandId) return;
+    void ensureStatus(brandId);
+  }, [brandId, canPatchBrand, ensureStatus, open]);
 
   if (!open || !item) return null;
 
@@ -389,22 +391,12 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
       toast.info('Only regular users can patch brands.');
       return;
     }
-    if (patchBusy) return;
 
     try {
-      setPatchBusy(true);
-      const next = !isPatched;
-      if (isPatched) {
-        await apiClient.delete(`/brands/${item.brandId}/patches`);
-      } else {
-        await apiClient.post(`/brands/${item.brandId}/patches`);
-      }
-      setIsPatched(next);
+      const next = await toggleStatus(item.brandId);
       toast.success(next ? 'Patched successfully.' : 'Unpatched successfully.');
     } catch {
       toast.error('Unable to update patch status right now.');
-    } finally {
-      setPatchBusy(false);
     }
   };
 

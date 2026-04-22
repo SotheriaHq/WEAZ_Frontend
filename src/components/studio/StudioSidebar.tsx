@@ -32,7 +32,7 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
 
   return (
     <>
-      <aside className="hidden xl:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[220px] z-20 overflow-y-auto scrollbar-hide border-r border-purple-200/20 dark:border-white/10 bg-transparent">
+      <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[220px] z-20 overflow-y-auto scrollbar-hide border-r border-purple-200/20 dark:border-white/10 bg-transparent">
         <div className="py-4 px-2">
           <div className="px-3 mb-4">
             <h2 className="text-sm font-bold text-black dark:text-white uppercase tracking-wider">Studio</h2>
@@ -77,7 +77,7 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
         </div>
       </aside>
 
-      <nav className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-gray-200/70 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-black/85">
+      <nav className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-gray-200/70 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-black/85">
         <div className="mx-auto flex max-w-4xl items-stretch gap-1 overflow-x-auto scrollbar-hide">
           {flatItems.map(({ key, label, path, emoji }) => {
             const isActive = active === key;

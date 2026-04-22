@@ -155,8 +155,8 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     if (fileId) return getCachedUrl(fileId) ?? null;
     if (src && isRawStorageKey(src)) return getCachedUrl(`key:${src}`) ?? src;
     // S3-like URLs may be expired signed URLs — check session cache first,
-    // never use the raw URL directly (prevents loading expired/private URLs)
-    if (src && isS3LikeUrl(src)) return getCachedUrl(src) ?? null;
+    // but keep raw as an immediate visual fallback while refresh resolves.
+    if (src && isS3LikeUrl(src)) return getCachedUrl(src) ?? src;
     // Non-S3 absolute URLs and raw storage keys can be used directly
     return src ?? null;
   });
@@ -164,7 +164,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const [loaded, setLoaded] = useState(() => {
     if (fileId) return !!(getCachedUrl(fileId));
     if (src && isRawStorageKey(src)) return !!(getCachedUrl(`key:${src}`));
-    if (src && isS3LikeUrl(src)) return !!(getCachedUrl(src));
+    if (src && isS3LikeUrl(src)) return !!(getCachedUrl(src) ?? src);
     return !!src;
   });
   const retryCountRef = React.useRef(0);
@@ -176,7 +176,6 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     const run = async () => {
       // If src/fileId changed, reset error
       setHadError(false);
-      setLoaded(false);
 
       // When fileId exists, prefer resolving by fileId to avoid stale signed URLs.
       if (!fileId && src && isS3LikeUrl(src)) {

@@ -74,7 +74,7 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
       return getCachedUrl(`key:${initial}`) ?? initial;
     }
     if (initial && isS3LikeUrl(initial)) {
-      return getCachedUrl(initial) ?? null;
+      return getCachedUrl(initial) ?? initial;
     }
     return initial ?? null;
   });

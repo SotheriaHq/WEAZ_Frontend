@@ -2,6 +2,7 @@ import React from 'react';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { buildSearchHref } from '@/lib/searchRouting';
 import type { SearchItem, SearchSuggestionResponse } from '@/types/search';
+import { DROPDOWN_SECTION_TITLE_CLASS } from '@/components/ui/Dropdown';
 
 export interface SearchSuggestionEntry {
   id: string;
@@ -24,8 +25,6 @@ interface SearchSuggestionDropdownProps {
   dropdownId: string;
   error?: string | null;
 }
-
-const sectionTitleClass = 'px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400';
 
 function buildEntries(
   suggestions: SearchSuggestionResponse | null,
@@ -133,9 +132,9 @@ const SearchSuggestionDropdown: React.FC<SearchSuggestionDropdownProps> = ({
     <div
       id={dropdownId}
       role="listbox"
-      className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[120] overflow-hidden rounded-3xl border border-gray-200 bg-white/95 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#090909]/95"
+      className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-[120] w-full max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl glass-menu shadow-2xl backdrop-blur-xl"
     >
-      <div className="max-h-[28rem] overflow-y-auto py-2">
+      <div className="max-h-[min(28rem,calc(100vh-8rem))] overflow-y-auto py-1">
         {error ? (
           <div className="px-4 py-6 text-sm text-red-500 dark:text-red-400">Search unavailable — try again later.</div>
         ) : isLoading && entries.length === 0 ? (
@@ -150,7 +149,7 @@ const SearchSuggestionDropdown: React.FC<SearchSuggestionDropdownProps> = ({
 
           return (
             <React.Fragment key={entry.id}>
-              {showHeader ? <div className={sectionTitleClass}>{entry.section}</div> : null}
+              {showHeader ? <div className={DROPDOWN_SECTION_TITLE_CLASS}>{entry.section}</div> : null}
               <button
                 id={`${dropdownId}-option-${index}`}
                 role="option"
@@ -162,8 +161,8 @@ const SearchSuggestionDropdown: React.FC<SearchSuggestionDropdownProps> = ({
                 }}
                 className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${
                   index === activeIndex
-                    ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-950'
-                    : 'text-gray-800 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-white/8'
+                    ? 'bg-[color:var(--brand-primary)]/10 text-[color:var(--text-primary)] dark:bg-[color:var(--brand-primary)]/15'
+                    : 'text-[color:var(--text-primary)] hover:bg-black/5 dark:text-gray-100 dark:hover:bg-white/10'
                 }`}
               >
                 {entry.item?.imageUrl ? (
@@ -176,7 +175,7 @@ const SearchSuggestionDropdown: React.FC<SearchSuggestionDropdownProps> = ({
                     rounded="xl"
                   />
                 ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-lg dark:bg-white/8">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-lg dark:bg-white/8">
                     {entry.kind === 'search'
                       ? '🔎'
                       : entry.kind === 'recent'
@@ -190,14 +189,14 @@ const SearchSuggestionDropdown: React.FC<SearchSuggestionDropdownProps> = ({
                 )}
 
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{entry.label}</div>
+                  <div className="truncate text-sm font-medium leading-5">{entry.label}</div>
                   {entry.item?.subtitle ? (
-                    <div className="truncate text-xs opacity-70">{entry.item.subtitle}</div>
+                    <div className="truncate text-xs text-[color:var(--text-secondary)]">{entry.item.subtitle}</div>
                   ) : null}
                 </div>
 
                 {entry.item?.price != null ? (
-                  <div className="text-xs font-semibold opacity-80">
+                  <div className="text-xs font-semibold text-[color:var(--text-secondary)]">
                     {entry.item.currency || 'NGN'} {entry.item.salePrice ?? entry.item.price}
                   </div>
                 ) : null}

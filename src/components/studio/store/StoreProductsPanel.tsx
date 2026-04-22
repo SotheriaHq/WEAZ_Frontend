@@ -393,8 +393,24 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     return items;
   }, [filterCollection, filterStatus, filterStock, products, searchQuery]);
 
+  const storeDraftCollections = useMemo(() => {
+    return (Array.isArray(draftCollections) ? draftCollections : []).filter(
+      (draft: any) => {
+        const status = String(draft?.status || '').toUpperCase();
+        const domain = String(draft?.domain || '').toUpperCase();
+        return (
+          status === 'DRAFT' &&
+          (draft?.isAvailableInStore === true || domain === 'STORE')
+        );
+      },
+    );
+  }, [draftCollections]);
+
   const showDraftCollectionsInProductArea =
-    !loading && filterStatus === 'draft' && filteredProducts.length === 0 && draftCollections.length > 0;
+    !loading &&
+    filterStatus === 'draft' &&
+    filteredProducts.length === 0 &&
+    storeDraftCollections.length > 0;
   const primaryProductActionLabel = products.length === 0 ? 'Create Product' : 'Add Product';
 
   const visibleCollections = useMemo(
@@ -2002,7 +2018,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           </div>
 
           {/* ─── Draft Collections: inline scroll-out ─── */}
-          {(draftCollections.length > 0 || draftCollectionsLoading) && (
+          {(storeDraftCollections.length > 0 || draftCollectionsLoading) && (
             <>
               <div className="h-5 w-px bg-gray-200 dark:bg-white/10 mx-1" />
               <button
@@ -2016,7 +2032,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 aria-label={showDrafts ? 'Hide draft collections' : 'Show draft collections'}
               >
                 <span className="text-sm">📝</span>
-                <span className="text-[10px] font-bold tabular-nums">{draftCollections.length}</span>
+                <span className="text-[10px] font-bold tabular-nums">{storeDraftCollections.length}</span>
               </button>
               <div
                 className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ease-out ${
@@ -2026,7 +2042,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 {draftCollectionsLoading ? (
                   <div className="h-9 w-32 rounded-lg bg-gray-100 dark:bg-white/5 animate-pulse" />
                 ) : (
-                  draftCollections.map((draft: any) => (
+                  storeDraftCollections.map((draft: any) => (
                     <button
                       key={draft.id}
                       type="button"
@@ -2870,14 +2886,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     Collection drafts found
                   </p>
                   <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
-                    {draftCollections.length}
+                    {storeDraftCollections.length}
                   </span>
                 </div>
                 <p className="mb-3 text-xs text-amber-700/90 dark:text-amber-200/80">
                   The Draft filter above is for product drafts. These are collection drafts.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {draftCollections.map((draft: any) => (
+                  {storeDraftCollections.map((draft: any) => (
                     <button
                       key={draft.id}
                       type="button"

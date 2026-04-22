@@ -1,5 +1,4 @@
 import React, { forwardRef, useMemo, useState } from "react";
-import { ChevronDown, Check } from "lucide-react";
 import {
   Dropdown,
   DropdownMenu,
@@ -27,7 +26,7 @@ const variantStyles: Record<SelectVariant, string> = {
     text-gray-900 dark:text-white
     shadow-sm
     focus:outline-none focus:ring-0 focus:border-transparent
-    transition-all duration-200
+    transition-colors duration-200
     appearance-none pr-10 cursor-pointer
   `,
   filter: `
@@ -39,7 +38,7 @@ const variantStyles: Record<SelectVariant, string> = {
     shadow-sm
     hover:border-purple-300 dark:hover:border-purple-500/50
     focus:outline-none focus:ring-0 focus:border-transparent
-    transition-all duration-200
+    transition-colors duration-200
     cursor-pointer
     appearance-none
     pr-8
@@ -52,7 +51,7 @@ const variantStyles: Record<SelectVariant, string> = {
     text-gray-600 dark:text-gray-300
     hover:bg-gray-50 dark:hover:bg-white/5
     focus:outline-none focus:ring-0 focus:border-transparent
-    transition-all duration-150
+    transition-colors duration-150
     cursor-pointer
     appearance-none
     pr-6
@@ -179,11 +178,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               aria-label={label}
             >
               <span className="truncate">{selectedLabel}</span>
-              {showChevron && (
-                <ChevronDown
-                  className={`shrink-0 text-gray-400 ${variant === "compact" ? "w-3.5 h-3.5" : "w-4 h-4"}`}
-                />
-              )}
+              {showChevron ? <span aria-hidden="true" className={`shrink-0 text-gray-400 ${variant === "compact" ? 'text-xs' : 'text-base'}`}>{open ? '⌃' : '⌄'}</span> : null}
             </DropdownTrigger>
             <DropdownMenu className="min-w-[220px]">
               {options.map((opt) => {
@@ -196,11 +191,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                       !opt.disabled && handleSelect(`${opt.value}`)
                     }
                     className={`${isActive ? "bg-white/30 dark:bg-white/10" : ""} ${opt.disabled ? "opacity-60 cursor-not-allowed" : ""}`}
-                    rightIcon={
-                      isActive ? (
-                        <Check className="w-4 h-4 text-purple-500" />
-                      ) : null
-                    }
+                    selected={isActive}
                   >
                     {opt.label}
                   </DropdownItem>

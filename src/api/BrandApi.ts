@@ -145,6 +145,42 @@ export type FilterDimensionOption = {
   values: FilterValueOption[];
 };
 
+export type BrandPatchStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
+
+export type BrandPatchHistoryAction =
+  | 'REQUESTED'
+  | 'ACCEPTED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'REMOVED';
+
+export type BrandPatchPartner = {
+  id: string;
+  username: string;
+  brandFullName: string | null;
+  profileImage: string | null;
+};
+
+export type BrandPatchItem = {
+  id: string;
+  partner: BrandPatchPartner;
+  status: BrandPatchStatus;
+  isOutgoing: boolean;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+export type BrandPatchHistoryItem = {
+  id: string;
+  patchId: string | null;
+  partner: BrandPatchPartner;
+  action: BrandPatchHistoryAction;
+  status: BrandPatchStatus;
+  isOutgoing: boolean;
+  actorId: string | null;
+  createdAt: string;
+};
+
 // Brand Profile API
 // In‑memory cache for categories to improve perceived reliability and reduce re-fetch churn
 const categoriesCache: {
@@ -1547,20 +1583,37 @@ export const brandApi = {
   // BRAND PATCHES
   // ============================================
 
-  async getBrandPatches(brandId: string, status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'REVOKED' = 'ACCEPTED', page = 1, limit = 20) {
-    try {
-      const response = await apiClient.get(`/brands/${brandId}/patches`, {
-        params: { status, page, limit },
-      });
-      return unwrapApiResponse<{ items: any[]; total: number; page: number; totalPages: number }>(response.data);
-    } catch (error) {
-      console.error('Error fetching brand patches:', error);
-      return { items: [], total: 0, page: 1, totalPages: 1 };
-    }
+  async getBrandPatches(
+    brandId: string,
+    status: BrandPatchStatus = 'ACCEPTED',
+    page = 1,
+    limit = 20,
+  ) {
+    const response = await apiClient.get(`/brands/${brandId}/patches`, {
+      params: { status, page, limit },
+    });
+    return unwrapApiResponse<{
+      items: BrandPatchItem[];
+      total: number;
+      page: number;
+      totalPages: number;
+    }>(response.data);
+  },
+
+  async getBrandPatchHistory(brandId: string, page = 1, limit = 20) {
+    const response = await apiClient.get(`/brands/${brandId}/patches/history`, {
+      params: { page, limit },
+    });
+    return unwrapApiResponse<{
+      items: BrandPatchHistoryItem[];
+      total: number;
+      page: number;
+      totalPages: number;
+    }>(response.data);
   },
 
   async requestBrandPatch(targetBrandId: string) {
-    const response = await apiClient.post(`/brands/patches/request`, { targetBrandId });
+    const response = await apiClient.post(`/brands/${targetBrandId}/patches/request`);
     return unwrapApiResponse<{ status: string; message: string }>(response.data);
   },
 
@@ -1570,19 +1623,8 @@ export const brandApi = {
   },
 
   async cancelBrandPatch(patchId: string) {
-    // Assuming cancel is just a status update or delete. Using DELETE for now if API supports it, or PATCH to REVOKED/CANCELLED
-    // Based on backend service, there isn't a specific 'cancel' endpoint exposed in the snippet, 
-    // but usually it's a status update. If not implemented, we might need to add it to backend.
-    // For now, let's assume we can use respond with REJECTED or a specific cancel endpoint if it existed.
-    // Wait, the backend service `respondToBrandPatch` checks if `patch.receiverId === responderId`.
-    // The requester cannot use `respondToBrandPatch`.
-    // We need a `cancelPatchRequest` endpoint in backend? 
-    // The backend service snippet didn't show a `cancel` method for requester.
-    // I will add a placeholder here, but note that backend might need update if not present.
-    // Actually, let's check `brands.controller.ts` if I could... but I don't have it.
-    // I'll assume a DELETE endpoint for now as per REST conventions for cancelling pending resources.
     const response = await apiClient.delete(`/brands/patches/${patchId}`);
-    return unwrapApiResponse<{ message: string }>(response.data);
+    return unwrapApiResponse<{ status: 'CANCELLED' | 'REMOVED'; message: string }>(response.data);
   },
 
   // ============================================

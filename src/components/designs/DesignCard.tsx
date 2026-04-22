@@ -13,6 +13,7 @@ import { apiClient } from '@/api/httpClient';
 import { Link, Tag } from 'lucide-react';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
+import { useBrandPatchState } from '@/context/BrandPatchContext';
 
 interface DesignCardProps {
   item: MarketItem;
@@ -54,15 +55,24 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   const [showCustomLabel, setShowCustomLabel] = useState(false);
   const [isSavedLocal, setIsSavedLocal] = useState(false);
   const [saveBusyLocal, setSaveBusyLocal] = useState(false);
-  const [isPatchedLocal, setIsPatchedLocal] = useState(false);
-  const [patchBusyLocal, setPatchBusyLocal] = useState(false);
   const isRegular = user?.type === 'REGULAR';
+  const {
+    isPatchCapable,
+    getPatched,
+    isLoading: isPatchLoading,
+    ensureStatus,
+    toggleStatus,
+  } = useBrandPatchState();
   const isSaveControlled = typeof isSavedProp === 'boolean' && typeof onToggleSave === 'function';
   const isPatchControlled = typeof isPatchedProp === 'boolean' && typeof onTogglePatch === 'function';
   const resolvedSaved = isSaveControlled ? (isSavedProp as boolean) : isSavedLocal;
   const resolvedSaveBusy = isSaveControlled ? Boolean(saveBusyProp) : saveBusyLocal;
-  const resolvedPatched = isPatchControlled ? (isPatchedProp as boolean) : isPatchedLocal;
-  const resolvedPatchBusy = isPatchControlled ? Boolean(patchBusyProp) : patchBusyLocal;
+  const resolvedPatched = isPatchControlled
+    ? (isPatchedProp as boolean)
+    : getPatched(item.brandId);
+  const resolvedPatchBusy = isPatchControlled
+    ? Boolean(patchBusyProp)
+    : isPatchLoading(item.brandId);
   
   // Check if item is hidden in local storage on mount
   useEffect(() => {
@@ -101,25 +111,10 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   }, [isAuth, item.id, isSaveControlled]);
 
   useEffect(() => {
-    let mounted = true;
-    const loadPatch = async () => {
-      if (isPatchControlled) return;
-      if (!isAuth || !isRegular || !item.brandId) {
-        if (mounted) setIsPatchedLocal(false);
-        return;
-      }
-      try {
-        const res = await apiClient.get(`/brands/${item.brandId}/patches/check`);
-        if (mounted) {
-          setIsPatchedLocal(Boolean(res.data?.isPatched));
-        }
-      } catch {
-        if (mounted) setIsPatchedLocal(false);
-      }
-    };
-    void loadPatch();
-    return () => { mounted = false; };
-  }, [isAuth, isRegular, item.brandId, isPatchControlled]);
+    if (isPatchControlled) return;
+    if (!isAuth || !isPatchCapable || !item.brandId) return;
+    void ensureStatus(item.brandId);
+  }, [ensureStatus, isAuth, isPatchCapable, item.brandId, isPatchControlled]);
 
   // Use Redux selector for real-time comment count synchronization
   const commentCount = useSelector((s: RootState) => 
@@ -182,25 +177,14 @@ export const DesignCard: React.FC<DesignCardProps> = ({
       return;
     }
     if (!isAuth) { toast.info('Please sign in to patch brands.'); return; }
-    if (!isRegular || !item.brandId) return;
-    if (patchBusyLocal) return;
+    if (!isPatchCapable || !item.brandId) return;
     try {
-      setPatchBusyLocal(true);
-      if (isPatchedLocal) {
-        await apiClient.delete(`/brands/${item.brandId}/patches`);
-        setIsPatchedLocal(false);
-        toast.success('Brand unpatched.');
-      } else {
-        await apiClient.post(`/brands/${item.brandId}/patches`);
-        setIsPatchedLocal(true);
-        toast.success('Brand patched.');
-      }
+      const nextPatched = await toggleStatus(item.brandId);
+      toast.success(nextPatched ? 'Brand patched.' : 'Brand unpatched.');
     } catch {
       toast.error('Unable to update patch.');
-    } finally {
-      setPatchBusyLocal(false);
-      setShowMenu(false);
     }
+    setShowMenu(false);
   };
 
   if (isHidden) return null;

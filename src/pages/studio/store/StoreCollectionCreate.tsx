@@ -15,7 +15,6 @@ import {
 import { unwrapApiResponse } from "@/types/auth";
 import {
   addProductsToCollection,
-  abandonStoreCollection,
   finalizeStoreCollection,
   initializeStoreCollection,
   removeProductsFromCollection,
@@ -30,6 +29,12 @@ import { OverlayPortal } from "@/components/ui/OverlayPortal";
 import Tag from "@/components/ui/Tag";
 import InfoTooltip from "@/components/ui/InfoTooltip";
 import { getTagColor } from "@/utils/tagColors";
+import {
+  getCollectionProductQueueItems,
+  removeCollectionProductQueueItem,
+  subscribeToCollectionProductQueue,
+  type CollectionProductQueueItem,
+} from "@/utils/collectionProductQueue";
 import FilterSelector, {
   type FilterSelection,
 } from "@/components/categories/FilterSelector";
@@ -37,6 +42,15 @@ import FilterSelector, {
 const MAX_PRODUCTS = 5;
 const MAX_TAGS = 20;
 const TAG_CHAR_LIMIT = 50;
+type CollectionProductStatus = "uploading" | "processing" | "ready" | "failed";
+type CollectionProductType = "draft" | "existing";
+type CollectionProductEntry = {
+  id: string;
+  type: CollectionProductType;
+  status: CollectionProductStatus;
+  product: StoreProduct | null;
+  queueItem: CollectionProductQueueItem | null;
+};
 type CategoryTypeOption = { id: string; name: string };
 type CategoryOption = {
   id: string;
@@ -45,6 +59,38 @@ type CategoryOption = {
 };
 
 const FILTER_SELECTION_STORAGE_PREFIX = "storeCollectionFilterSelection:";
+const COLLECTION_DRAFT_STORAGE_PREFIX = "storeCollectionDraftSnapshot:";
+const COLLECTION_DRAFT_ACTIVE_STORAGE_PREFIX =
+  "storeCollectionDraftActiveSession:";
+
+type CollectionDraftSnapshot = {
+  sessionId: string;
+  creationMode: "existing" | "new";
+  title: string;
+  description: string;
+  visibility: CollectionVisibility;
+  type: CollectionType;
+  categoryId: string;
+  categoryTypeId: string;
+  tags: string[];
+  filterSelection: FilterSelection;
+  selectedProductIds: string[];
+  primaryProductId: string | null;
+  sessionDraftProductIds: string[];
+  sessionFlowProductIds: string[];
+  existingLinkedProductIds: string[];
+  hasManualFilterEdits: boolean;
+  hasManualTagEdits: boolean;
+  hasManualCategoryEdit: boolean;
+  hasManualSubCategoryEdit: boolean;
+  updatedAt: number;
+};
+
+const getCollectionDraftStorageKey = (sessionId: string) =>
+  `${COLLECTION_DRAFT_STORAGE_PREFIX}${sessionId}`;
+
+const getActiveCollectionDraftKey = (userId?: string | null) =>
+  `${COLLECTION_DRAFT_ACTIVE_STORAGE_PREFIX}${userId ?? "anonymous"}`;
 
 const areFilterSelectionsEqual = (
   a: FilterSelection,
@@ -311,7 +357,7 @@ const normalizeLinkedProduct = (raw: any): StoreProduct | null => {
 
 const StoreCollectionCreate: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = useSelector((state: RootState) => state.user.profile);
 
   const [title, setTitle] = useState("");
@@ -371,6 +417,9 @@ const StoreCollectionCreate: React.FC = () => {
   const [existingLinkedProductIds, setExistingLinkedProductIds] = useState<
     string[]
   >([]);
+  const [queuedDraftProducts, setQueuedDraftProducts] = useState<
+    CollectionProductQueueItem[]
+  >([]);
   const hydratedSessionRef = useRef<string | null>(null);
   const submitLockRef = useRef(false);
   const hydratedSelectionMetaRef = useRef<Set<string>>(new Set());
@@ -378,7 +427,7 @@ const StoreCollectionCreate: React.FC = () => {
   const autoCleanupSessionRef = useRef(
     autoCleanupParam === "1" || returnMode === "new" || returnMode === "existing",
   );
-  const abandoningSessionRef = useRef(false);
+  const restoredDraftSnapshotRef = useRef(false);
 
   const clearSessionFilterCache = useCallback((sessionId?: string | null) => {
     if (!sessionId) return;
@@ -389,50 +438,65 @@ const StoreCollectionCreate: React.FC = () => {
     }
   }, []);
 
-  const abandonSessionIfNeeded = useCallback(
-    async (options?: { keepalive?: boolean }) => {
-      if (!collectionSessionId) return false;
-      if (!autoCleanupSessionRef.current) return false;
-      if (submitLockRef.current) return false;
-      if (abandoningSessionRef.current) return false;
-
-      abandoningSessionRef.current = true;
+  const clearCollectionDraftSnapshot = useCallback(
+    (sessionId?: string | null) => {
+      if (!sessionId) return;
       try {
-        // Clean up any products that were created during this session
-        // so they don't persist as orphaned DRAFT products.
-        if (sessionDraftProductIds.length > 0) {
-          await Promise.allSettled(
-            sessionDraftProductIds.map((productId) =>
-              productApi.deleteProduct(productId),
-            ),
-          );
-        }
-
-        await abandonStoreCollection(collectionSessionId, {
-          permanent: true,
-          keepalive: options?.keepalive,
-        });
-        clearSessionFilterCache(collectionSessionId);
-        return true;
+        localStorage.removeItem(getCollectionDraftStorageKey(sessionId));
       } catch {
-        return false;
-      } finally {
-        abandoningSessionRef.current = false;
+        // Ignore localStorage errors
+      }
+
+      try {
+        const activeSessionId = localStorage.getItem(
+          getActiveCollectionDraftKey(user?.id),
+        );
+        if (activeSessionId === sessionId) {
+          localStorage.removeItem(getActiveCollectionDraftKey(user?.id));
+        }
+      } catch {
+        // Ignore localStorage errors
       }
     },
-    [clearSessionFilterCache, collectionSessionId, sessionDraftProductIds],
+    [user?.id],
   );
 
   const navigateAway = useCallback(
     async (target: string | number) => {
-      await abandonSessionIfNeeded();
       if (typeof target === "number") {
         navigate(target);
         return;
       }
       navigate(target);
     },
-    [abandonSessionIfNeeded, navigate],
+    [
+      navigate,
+    ],
+  );
+
+  const resetInvalidCollectionSession = useCallback(
+    (invalidSessionId?: string | null) => {
+      const targetSessionId = (invalidSessionId || "").trim();
+      if (!targetSessionId) return;
+
+      setCollectionSessionId((prev) =>
+        prev === targetSessionId ? null : prev,
+      );
+      hydratedSessionRef.current = null;
+
+      const nextParams = new URLSearchParams(searchParams);
+      if (nextParams.get("collectionId") === targetSessionId) {
+        nextParams.delete("collectionId");
+      }
+      if (nextParams.get("mode") === "edit") {
+        nextParams.set("mode", "new");
+      }
+      nextParams.delete("autoclean");
+      if (nextParams.toString() !== searchParams.toString()) {
+        setSearchParams(nextParams, { replace: true });
+      }
+    },
+    [searchParams, setSearchParams],
   );
 
   useEffect(() => {
@@ -488,12 +552,185 @@ const StoreCollectionCreate: React.FC = () => {
   }, [autoCleanupParam, returnMode]);
 
   useEffect(() => {
+    if (
+      prefillCollectionId ||
+      collectionSessionId ||
+      !user?.id ||
+      restoredDraftSnapshotRef.current
+    ) {
+      return;
+    }
+
+    let snapshot: CollectionDraftSnapshot | null = null;
+    try {
+      const activeSessionId = localStorage.getItem(
+        getActiveCollectionDraftKey(user.id),
+      );
+      if (!activeSessionId) return;
+
+      const raw = localStorage.getItem(
+        getCollectionDraftStorageKey(activeSessionId),
+      );
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as Partial<CollectionDraftSnapshot>;
+      if (!parsed || typeof parsed !== "object") return;
+      if (parsed.sessionId !== activeSessionId) return;
+
+      snapshot = {
+        sessionId: activeSessionId,
+        creationMode: parsed.creationMode === "new" ? "new" : "existing",
+        title: typeof parsed.title === "string" ? parsed.title : "",
+        description:
+          typeof parsed.description === "string" ? parsed.description : "",
+        visibility:
+          parsed.visibility === "PRIVATE" ? "PRIVATE" : "PUBLIC",
+        type:
+          parsed.type === "MALE" ||
+          parsed.type === "FEMALE" ||
+          parsed.type === "EVERYBODY"
+            ? parsed.type
+            : "EVERYBODY",
+        categoryId:
+          typeof parsed.categoryId === "string" ? parsed.categoryId : "",
+        categoryTypeId:
+          typeof parsed.categoryTypeId === "string" ? parsed.categoryTypeId : "",
+        tags: Array.isArray(parsed.tags)
+          ? parsed.tags.filter((tag): tag is string => typeof tag === "string")
+          : [],
+        filterSelection:
+          parsed.filterSelection && typeof parsed.filterSelection === "object"
+            ? parsed.filterSelection
+            : {},
+        selectedProductIds: Array.isArray(parsed.selectedProductIds)
+          ? parsed.selectedProductIds.filter(
+              (id): id is string => typeof id === "string" && id.length > 0,
+            )
+          : [],
+        primaryProductId:
+          typeof parsed.primaryProductId === "string"
+            ? parsed.primaryProductId
+            : null,
+        sessionDraftProductIds: Array.isArray(parsed.sessionDraftProductIds)
+          ? parsed.sessionDraftProductIds.filter(
+              (id): id is string => typeof id === "string" && id.length > 0,
+            )
+          : [],
+        sessionFlowProductIds: Array.isArray(parsed.sessionFlowProductIds)
+          ? parsed.sessionFlowProductIds.filter(
+              (id): id is string => typeof id === "string" && id.length > 0,
+            )
+          : [],
+        existingLinkedProductIds: Array.isArray(parsed.existingLinkedProductIds)
+          ? parsed.existingLinkedProductIds.filter(
+              (id): id is string => typeof id === "string" && id.length > 0,
+            )
+          : [],
+        hasManualFilterEdits: parsed.hasManualFilterEdits === true,
+        hasManualTagEdits: parsed.hasManualTagEdits === true,
+        hasManualCategoryEdit: parsed.hasManualCategoryEdit === true,
+        hasManualSubCategoryEdit: parsed.hasManualSubCategoryEdit === true,
+        updatedAt:
+          typeof parsed.updatedAt === "number" ? parsed.updatedAt : Date.now(),
+      };
+    } catch {
+      return;
+    }
+
+    if (!snapshot) return;
+
+    restoredDraftSnapshotRef.current = true;
+    autoCleanupSessionRef.current = true;
+
+    setCollectionSessionId(snapshot.sessionId);
+    setCreationMode(snapshot.creationMode);
+    setTitle(snapshot.title);
+    setDescription(snapshot.description);
+    setVisibility(snapshot.visibility);
+    setType(snapshot.type);
+    setCategoryId(snapshot.categoryId);
+    setCategoryTypeId(snapshot.categoryTypeId);
+    setTags(snapshot.tags);
+    setFilterSelection(snapshot.filterSelection);
+    setSelectedProductIds(snapshot.selectedProductIds);
+    setPrimaryProductId(snapshot.primaryProductId);
+    setSessionDraftProductIds(snapshot.sessionDraftProductIds);
+    setSessionFlowProductIds(snapshot.sessionFlowProductIds);
+    setExistingLinkedProductIds(snapshot.existingLinkedProductIds);
+    setHasManualFilterEdits(snapshot.hasManualFilterEdits);
+    setHasManualTagEdits(snapshot.hasManualTagEdits);
+    setHasManualCategoryEdit(snapshot.hasManualCategoryEdit);
+    setHasManualSubCategoryEdit(snapshot.hasManualSubCategoryEdit);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("collectionId", snapshot.sessionId);
+    nextParams.set("mode", snapshot.creationMode);
+    nextParams.set("autoclean", "1");
+    setSearchParams(nextParams, { replace: true });
+
+    toast.info("Restored your in-progress collection draft.");
+  }, [
+    collectionSessionId,
+    prefillCollectionId,
+    searchParams,
+    setSearchParams,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    if (!collectionSessionId) return;
+
+    const expectedMode = creationMode === "new" ? "new" : "existing";
+    const currentCollectionId = searchParams.get("collectionId");
+    const currentMode = searchParams.get("mode");
+    const currentAutoclean = searchParams.get("autoclean");
+    const shouldAutoclean = autoCleanupSessionRef.current;
+
+    const isCollectionSynced = currentCollectionId === collectionSessionId;
+    const isModeSynced = currentMode === expectedMode;
+    const isAutocleanSynced =
+      (shouldAutoclean && currentAutoclean === "1") ||
+      (!shouldAutoclean && !currentAutoclean);
+
+    if (isCollectionSynced && isModeSynced && isAutocleanSynced) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("collectionId", collectionSessionId);
+    nextParams.set("mode", expectedMode);
+    if (shouldAutoclean) {
+      nextParams.set("autoclean", "1");
+    } else {
+      nextParams.delete("autoclean");
+    }
+    setSearchParams(nextParams, { replace: true });
+  }, [
+    collectionSessionId,
+    creationMode,
+    searchParams,
+    setSearchParams,
+  ]);
+
+  useEffect(() => {
     if (!collectionSessionId) {
       hydratedSessionRef.current = null;
       return;
     }
     if (hydratedSessionRef.current === collectionSessionId) return;
     hydratedSessionRef.current = null;
+  }, [collectionSessionId]);
+
+  useEffect(() => {
+    if (!collectionSessionId) {
+      setQueuedDraftProducts([]);
+      return;
+    }
+
+    setQueuedDraftProducts(getCollectionProductQueueItems(collectionSessionId));
+    return subscribeToCollectionProductQueue(collectionSessionId, (items) => {
+      setQueuedDraftProducts(items);
+    });
   }, [collectionSessionId]);
 
   useEffect(() => {
@@ -508,6 +745,16 @@ const StoreCollectionCreate: React.FC = () => {
         });
       } catch (error: any) {
         if (!mounted) return;
+        const statusCode = Number(error?.response?.status);
+        if (statusCode === 404 || statusCode === 410) {
+          clearCollectionDraftSnapshot(collectionSessionId);
+          restoredDraftSnapshotRef.current = false;
+          resetInvalidCollectionSession(collectionSessionId);
+          toast.warning(
+            "The selected collection draft is no longer available. Started a fresh collection session.",
+          );
+          return;
+        }
         toast.error(
           error?.response?.data?.message ?? "Unable to load draft collection.",
         );
@@ -628,7 +875,7 @@ const StoreCollectionCreate: React.FC = () => {
         }
       }
 
-      if (!preselectProductId) {
+      if (!preselectProductId && !restoredDraftSnapshotRef.current) {
         setTitle(typeof detail.title === "string" ? detail.title : "");
         setDescription(
           typeof detail.description === "string" ? detail.description : "",
@@ -686,8 +933,10 @@ const StoreCollectionCreate: React.FC = () => {
       mounted = false;
     };
   }, [
+    clearCollectionDraftSnapshot,
     collectionSessionId,
     preselectProductId,
+    resetInvalidCollectionSession,
     returnMode,
   ]);
 
@@ -720,9 +969,14 @@ const StoreCollectionCreate: React.FC = () => {
           : Array.isArray((res as any)?.data)
             ? (res as any).data
             : [];
-      setProducts(items);
+      setProducts((prev) => {
+        const merged = new Map(prev.map((product) => [product.id, product]));
+        items.forEach((product: StoreProduct) => {
+          merged.set(product.id, product);
+        });
+        return Array.from(merged.values());
+      });
     } catch (error: any) {
-      setProducts([]);
       setProductsError(
         error?.response?.data?.message ?? "Failed to load products.",
       );
@@ -770,23 +1024,65 @@ const StoreCollectionCreate: React.FC = () => {
   }, [returnMode]);
 
   useEffect(() => {
-    if (!collectionSessionId) return;
+    if (!collectionSessionId || !user?.id) return;
 
-    const handlePageExit = () => {
-      void abandonSessionIfNeeded({ keepalive: true });
+    const snapshot: CollectionDraftSnapshot = {
+      sessionId: collectionSessionId,
+      creationMode,
+      title,
+      description,
+      visibility,
+      type,
+      categoryId,
+      categoryTypeId,
+      tags,
+      filterSelection,
+      selectedProductIds,
+      primaryProductId,
+      sessionDraftProductIds,
+      sessionFlowProductIds,
+      existingLinkedProductIds,
+      hasManualFilterEdits,
+      hasManualTagEdits,
+      hasManualCategoryEdit,
+      hasManualSubCategoryEdit,
+      updatedAt: Date.now(),
     };
 
-    window.addEventListener("beforeunload", handlePageExit);
-    window.addEventListener("pagehide", handlePageExit);
-
-    return () => {
-      window.removeEventListener("beforeunload", handlePageExit);
-      window.removeEventListener("pagehide", handlePageExit);
-      // Do not auto-abandon on generic component unmount.
-      // In React StrictMode (development), effect cleanups run extra times and can
-      // otherwise delete in-progress session drafts unexpectedly.
-    };
-  }, [abandonSessionIfNeeded, collectionSessionId]);
+    try {
+      localStorage.setItem(
+        getCollectionDraftStorageKey(collectionSessionId),
+        JSON.stringify(snapshot),
+      );
+      localStorage.setItem(
+        getActiveCollectionDraftKey(user.id),
+        collectionSessionId,
+      );
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [
+    categoryId,
+    categoryTypeId,
+    collectionSessionId,
+    creationMode,
+    description,
+    existingLinkedProductIds,
+    filterSelection,
+    hasManualCategoryEdit,
+    hasManualFilterEdits,
+    hasManualSubCategoryEdit,
+    hasManualTagEdits,
+    primaryProductId,
+    selectedProductIds,
+    sessionDraftProductIds,
+    sessionFlowProductIds,
+    tags,
+    title,
+    type,
+    user?.id,
+    visibility,
+  ]);
 
   useEffect(() => {
     if (!categoryId) {
@@ -897,6 +1193,24 @@ const StoreCollectionCreate: React.FC = () => {
     [products, sessionFlowProductIds],
   );
 
+  const queuedSessionProducts = useMemo(
+    () =>
+      queuedDraftProducts.filter(
+        (item) => !item.productId || sessionFlowProductIds.includes(item.productId),
+      ),
+    [queuedDraftProducts, sessionFlowProductIds],
+  );
+
+  const queuedSessionProductsVisible = useMemo(
+    () =>
+      queuedSessionProducts.filter((item) => {
+        if (!item.productId) return true;
+        if (item.status !== "ready") return true;
+        return !sessionProducts.some((product) => product.id === item.productId);
+      }),
+    [queuedSessionProducts, sessionProducts],
+  );
+
   const visibleProducts = useMemo(() => {
     if (creationMode === "new") {
       return sessionProducts;
@@ -920,23 +1234,188 @@ const StoreCollectionCreate: React.FC = () => {
     });
   }, [existingLinkedProductIds, selectedProductIds, visibleProducts]);
 
+  const queuedDraftProductsByTempId = useMemo(
+    () => new Map(queuedDraftProducts.map((item) => [item.tempId, item])),
+    [queuedDraftProducts],
+  );
+
+  const queuedDraftProductsByProductId = useMemo(() => {
+    const byProductId = new Map<string, CollectionProductQueueItem>();
+    queuedDraftProducts.forEach((item) => {
+      if (item.productId) {
+        byProductId.set(item.productId, item);
+      }
+    });
+    return byProductId;
+  }, [queuedDraftProducts]);
+
+  useEffect(() => {
+    if (!collectionSessionId || queuedDraftProducts.length === 0) return;
+
+    const pendingTempIds = queuedDraftProducts
+      .filter((item) => !item.productId || item.status !== "ready")
+      .map((item) => item.tempId);
+
+    if (pendingTempIds.length > 0) {
+      setSelectedProductIds((prev) =>
+        Array.from(new Set([...prev, ...pendingTempIds])),
+      );
+    }
+
+    const readyItems = queuedDraftProducts.filter(
+      (item) => item.status === "ready" && typeof item.productId === "string",
+    );
+    if (readyItems.length === 0) return;
+
+    let replacedTempIds = false;
+    setSelectedProductIds((prev) => {
+      let next = [...prev];
+      readyItems.forEach((item) => {
+        if (!item.productId) return;
+        if (next.includes(item.tempId)) {
+          replacedTempIds = true;
+        }
+        next = next.map((id) => (id === item.tempId ? item.productId! : id));
+      });
+      return Array.from(new Set(next));
+    });
+
+    setSessionFlowProductIds((prev) => {
+      let next = [...prev];
+      readyItems.forEach((item) => {
+        if (!item.productId) return;
+        next = next.filter((id) => id !== item.tempId);
+        if (!next.includes(item.productId)) {
+          next.push(item.productId);
+        }
+      });
+      return next;
+    });
+
+    setSessionDraftProductIds((prev) => {
+      let next = [...prev];
+      readyItems.forEach((item) => {
+        if (!item.productId) return;
+        next = next.filter((id) => id !== item.tempId);
+        if (!next.includes(item.productId)) {
+          next.push(item.productId);
+        }
+      });
+      return next;
+    });
+
+    if (replacedTempIds) {
+      void loadProducts();
+    }
+
+    readyItems.forEach((item) => {
+      removeCollectionProductQueueItem(collectionSessionId, item.tempId);
+    });
+  }, [collectionSessionId, loadProducts, queuedDraftProducts]);
+
+  const collectionProducts = useMemo(
+    () =>
+      selectedProductIds.map((selectedId): CollectionProductEntry => {
+        const product = products.find((candidate) => candidate.id === selectedId) ?? null;
+        const queuedByTempId = queuedDraftProductsByTempId.get(selectedId) ?? null;
+        const queuedByProductId = queuedDraftProductsByProductId.get(selectedId) ?? null;
+        const queueItem = queuedByTempId ?? queuedByProductId;
+
+        if (queueItem) {
+          return {
+            id: selectedId,
+            type: queueItem.type,
+            status: queueItem.status,
+            product,
+            queueItem,
+          };
+        }
+
+        return {
+          id: selectedId,
+          type: sessionDraftProductIds.includes(selectedId) ? "draft" : "existing",
+          status: product ? "ready" : "processing",
+          product,
+          queueItem: null,
+        };
+      }),
+    [
+      products,
+      queuedDraftProductsByProductId,
+      queuedDraftProductsByTempId,
+      selectedProductIds,
+      sessionDraftProductIds,
+    ],
+  );
+
   const selectedProducts = useMemo(
-    () => products.filter((p) => selectedProductIds.includes(p.id)),
-    [products, selectedProductIds],
+    () =>
+      collectionProducts
+        .map((entry) => entry.product)
+        .filter((product): product is StoreProduct => product !== null),
+    [collectionProducts],
+  );
+
+  const nonReadyCollectionProducts = useMemo(
+    () => collectionProducts.filter((entry) => entry.status !== "ready"),
+    [collectionProducts],
+  );
+
+  const readySelectedProductIds = useMemo(
+    () =>
+      collectionProducts
+        .filter((entry) => entry.status === "ready" && entry.product)
+        .map((entry) => entry.product!.id),
+    [collectionProducts],
   );
 
   useEffect(() => {
     const selectedProductMap = new Map(products.map((product) => [product.id, product]));
+    const hasRenderableMedia = (product: StoreProduct) => {
+      if (typeof (product as any)?.coverImage === "string" && (product as any).coverImage.trim()) {
+        return true;
+      }
+      if (typeof (product as any)?.coverUrl === "string" && (product as any).coverUrl.trim()) {
+        return true;
+      }
+      if (typeof product.thumbnail === "string" && product.thumbnail.trim()) {
+        return true;
+      }
+      if (Array.isArray(product.images) && product.images.some((value) => typeof value === "string" && value.trim().length > 0)) {
+        return true;
+      }
+      const media = (product as any)?.media;
+      if (
+        Array.isArray(media) &&
+        media.some(
+          (item: any) =>
+            (typeof item?.url === "string" && item.url.trim().length > 0) ||
+            (typeof item?.id === "string" && item.id.trim().length > 0),
+        )
+      ) {
+        return true;
+      }
+      const mediaIds = (product as any)?.mediaIds;
+      return (
+        Array.isArray(mediaIds) &&
+        mediaIds.some((value: unknown) => typeof value === "string" && value.trim().length > 0)
+      );
+    };
+
     const missingMetadataIds = selectedProductIds.filter((productId) => {
       if (hydratedSelectionMetaRef.current.has(productId)) return false;
+      if (queuedDraftProductsByTempId.has(productId)) return false;
+      const queuedProduct = queuedDraftProductsByProductId.get(productId);
+      if (queuedProduct && queuedProduct.status !== "ready") return false;
       const product = selectedProductMap.get(productId);
-      if (!product) return false;
+      if (!product) return true;
       const filterSelection = normalizeFilterSelectionFromProduct(product);
       const hasFilterSelection = Object.keys(filterSelection).length > 0;
       const hasFilterRows = Array.isArray(product.filters) && product.filters.length > 0;
       const hasFilterValueIds =
         Array.isArray(product.filterValueIds) && product.filterValueIds.length > 0;
-      return !(hasFilterSelection || hasFilterRows || hasFilterValueIds);
+      const hasHydratedMedia = hasRenderableMedia(product);
+      return !(hasFilterSelection || hasFilterRows || hasFilterValueIds) || !hasHydratedMedia;
     });
 
     if (missingMetadataIds.length === 0) return;
@@ -972,7 +1451,12 @@ const StoreCollectionCreate: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [products, selectedProductIds]);
+  }, [
+    products,
+    queuedDraftProductsByProductId,
+    queuedDraftProductsByTempId,
+    selectedProductIds,
+  ]);
 
   useEffect(() => {
     // When all products are deselected, clear auto-derived fields
@@ -1122,18 +1606,23 @@ const StoreCollectionCreate: React.FC = () => {
   }, [selectedProducts, hasManualTagEdits, hasManualFilterEdits, hasManualCategoryEdit, hasManualSubCategoryEdit]);
 
   const orderedSelectedProductIds = useMemo(() => {
-    if (!primaryProductId || !selectedProductIds.includes(primaryProductId)) {
-      return selectedProductIds;
+    if (
+      !primaryProductId ||
+      !readySelectedProductIds.includes(primaryProductId)
+    ) {
+      return readySelectedProductIds;
     }
     return [
       primaryProductId,
-      ...selectedProductIds.filter((id) => id !== primaryProductId),
+      ...readySelectedProductIds.filter((id) => id !== primaryProductId),
     ];
-  }, [primaryProductId, selectedProductIds]);
+  }, [primaryProductId, readySelectedProductIds]);
 
   const hasPrimarySelection = Boolean(
-    primaryProductId && selectedProductIds.includes(primaryProductId),
+    primaryProductId && readySelectedProductIds.includes(primaryProductId),
   );
+
+  const hasPendingSelectedProducts = nonReadyCollectionProducts.length > 0;
 
   const isExistingCollectionEditMode = useMemo(
     () =>
@@ -1175,24 +1664,24 @@ const StoreCollectionCreate: React.FC = () => {
 
   const handleSetPrimary = useCallback(
     (productId: string) => {
-      if (!selectedProductIds.includes(productId)) {
+      if (!readySelectedProductIds.includes(productId)) {
         toast.error("Select this product first before setting it as primary.");
         return;
       }
       setPrimaryProductId(productId);
     },
-    [selectedProductIds],
+    [readySelectedProductIds],
   );
 
   useEffect(() => {
     if (
-      selectedProductIds.length === 0 ||
+      readySelectedProductIds.length === 0 ||
       !primaryProductId ||
-      !selectedProductIds.includes(primaryProductId)
+      !readySelectedProductIds.includes(primaryProductId)
     ) {
       if (primaryProductId !== null) setPrimaryProductId(null);
     }
-  }, [primaryProductId, selectedProductIds]);
+  }, [primaryProductId, readySelectedProductIds]);
 
   const ensureCollectionSession = useCallback(async () => {
     if (collectionSessionId) {
@@ -1285,7 +1774,14 @@ const StoreCollectionCreate: React.FC = () => {
       return;
     }
 
-    if (selectedProductIds.length > 0 && !hasPrimarySelection) {
+    if (hasPendingSelectedProducts) {
+      toast.error(
+        "Wait for all selected products to finish processing before continuing.",
+      );
+      return;
+    }
+
+    if (readySelectedProductIds.length > 0 && !hasPrimarySelection) {
       toast.error("Please choose a primary product before continuing.");
       return;
     }
@@ -1303,7 +1799,7 @@ const StoreCollectionCreate: React.FC = () => {
         toast.error("Please add at least one tag to publish.");
         return;
       }
-      if (selectedProductIds.length === 0) {
+      if (readySelectedProductIds.length === 0) {
         toast.error("Select at least one product to publish.");
         return;
       }
@@ -1378,6 +1874,7 @@ const StoreCollectionCreate: React.FC = () => {
         setExistingLinkedProductIds(nextIds);
         autoCleanupSessionRef.current = false;
         clearSessionFilterCache(sessionId);
+        clearCollectionDraftSnapshot(sessionId);
         toast.success("Collection updated.");
         navigate("/studio/store?view=collections");
         return;
@@ -1431,6 +1928,7 @@ const StoreCollectionCreate: React.FC = () => {
 
       autoCleanupSessionRef.current = false;
       clearSessionFilterCache(sessionId);
+      clearCollectionDraftSnapshot(sessionId);
       toast.success(
         action === "publish" ? "Collection published." : "Draft saved.",
       );
@@ -1485,6 +1983,22 @@ const StoreCollectionCreate: React.FC = () => {
     !value!.startsWith("/") &&
     !value!.includes("/");
 
+  const resolveImageCandidate = (value?: string | null) => {
+    if (typeof value !== "string") {
+      return { src: null as string | null, fileId: null as string | null };
+    }
+    const normalized = value.trim();
+    if (!normalized) {
+      return { src: null as string | null, fileId: null as string | null };
+    }
+    if (isLikelyFileId(normalized)) {
+      return { src: null as string | null, fileId: normalized };
+    }
+    // Keep remote URLs and raw storage keys as src so ImageWithFallback can
+    // resolve signed URLs for keys containing path segments.
+    return { src: normalized, fileId: null as string | null };
+  };
+
   const getProductImage = (product: StoreProduct) => {
     const cover =
       typeof (product as any)?.coverImage === "string"
@@ -1507,7 +2021,9 @@ const StoreCollectionCreate: React.FC = () => {
       | undefined;
     const primaryMedia = media?.find((m) => m.isPrimary) ?? media?.[0];
     const fallbackImage = getProductImage(product);
-    const image = primaryMedia?.url ?? fallbackImage ?? null;
+    const resolvedImage = resolveImageCandidate(
+      primaryMedia?.url ?? fallbackImage ?? null,
+    );
 
     const mediaIds = Array.isArray((product as any)?.mediaIds)
       ? ((product as any).mediaIds as string[])
@@ -1520,24 +2036,16 @@ const StoreCollectionCreate: React.FC = () => {
     const fallbackId = mediaIds.find((id) => isLikelyFileId(id)) ?? null;
     const resolvedFileId = primaryId ?? fallbackId ?? null;
 
-    if (!image) {
+    if (resolvedImage.src) {
       return {
-        src: null,
-        fileId: resolvedFileId,
+        src: resolvedImage.src,
+        fileId: null,
       };
     }
 
-    const isRemote =
-      image.startsWith("http") ||
-      image.startsWith("/") ||
-      image.startsWith("data:") ||
-      image.includes("://") ||
-      image.includes("?");
-
     return {
-      src: isRemote ? image : null,
-      fileId:
-        resolvedFileId ?? (!isRemote && isLikelyFileId(image) ? image : null),
+      src: null,
+      fileId: resolvedImage.fileId ?? resolvedFileId,
     };
   };
 
@@ -1595,15 +2103,10 @@ const StoreCollectionCreate: React.FC = () => {
           ? item.id
           : null;
       if (rawUrl) {
-        const isRemote =
-          rawUrl.startsWith("http") ||
-          rawUrl.startsWith("/") ||
-          rawUrl.startsWith("data:") ||
-          rawUrl.includes("://") ||
-          rawUrl.includes("?");
+        const resolved = resolveImageCandidate(rawUrl);
         pushEntry(
-          isRemote ? rawUrl : null,
-          mediaId ?? (!isRemote && isLikelyFileId(rawUrl) ? rawUrl : null),
+          resolved.src,
+          resolved.src ? null : (resolved.fileId ?? mediaId),
           `media-${index}`,
         );
         return;
@@ -1617,15 +2120,10 @@ const StoreCollectionCreate: React.FC = () => {
     // displayed image count.
     if (entries.length === 0) {
       imageValues.forEach((value, index) => {
-        const isRemote =
-          value.startsWith("http") ||
-          value.startsWith("/") ||
-          value.startsWith("data:") ||
-          value.includes("://") ||
-          value.includes("?");
+        const resolved = resolveImageCandidate(value);
         pushEntry(
-          isRemote ? value : null,
-          !isRemote && isLikelyFileId(value) ? value : null,
+          resolved.src,
+          resolved.fileId,
           `fallback-${index}`,
         );
       });
@@ -1934,10 +2432,15 @@ const StoreCollectionCreate: React.FC = () => {
                   below.
                 </div>
               )}
-            {selectedProductIds.length > 0 && !hasPrimarySelection && (
+            {readySelectedProductIds.length > 0 && !hasPrimarySelection && (
               <div className="mb-4 rounded-xl border border-amber-200/70 bg-amber-50/80 px-3 py-2 text-xs font-semibold text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300">
                 Choose one selected product as the primary product before you
                 can save or publish.
+              </div>
+            )}
+            {hasPendingSelectedProducts && (
+              <div className="mb-4 rounded-xl border border-sky-200/70 bg-sky-50/80 px-3 py-2 text-xs font-semibold text-sky-700 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-300">
+                Collection save is disabled until all selected products are ready.
               </div>
             )}
 
@@ -2010,7 +2513,8 @@ const StoreCollectionCreate: React.FC = () => {
 
             {creationMode === "new" && (
               <>
-                {sessionProducts.length === 0 ? (
+                {sessionProducts.length === 0 &&
+                queuedSessionProductsVisible.length === 0 ? (
                   <div className="mt-4 rounded-xl border border-dashed border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/5 p-6 text-sm text-gray-600 dark:text-gray-300">
                     No new products added yet. Use "Create a Product" to add
                     items to this collection.
@@ -2023,6 +2527,39 @@ const StoreCollectionCreate: React.FC = () => {
                         showSessionBadge: true,
                       }),
                     )}
+                    {queuedSessionProductsVisible.map((queuedItem) => (
+                      <div
+                        key={queuedItem.tempId}
+                        className="rounded-xl border border-sky-200/70 dark:border-sky-400/30 bg-sky-50/70 dark:bg-sky-500/10 p-3 text-xs"
+                      >
+                        <p className="font-semibold text-sky-700 dark:text-sky-300 line-clamp-1">
+                          {queuedItem.name || "New Product"}
+                        </p>
+                        <p className="mt-1 text-sky-600/90 dark:text-sky-200/90 capitalize">
+                          {queuedItem.status === "uploading"
+                            ? "Uploading media..."
+                            : queuedItem.status === "processing"
+                              ? "Processing draft..."
+                              : queuedItem.status === "failed"
+                                ? "Failed to add"
+                                : "Ready"}
+                        </p>
+                        {queuedItem.error && (
+                          <p className="mt-2 text-[11px] text-red-600 dark:text-red-300 line-clamp-2">
+                            {queuedItem.error}
+                          </p>
+                        )}
+                        <div className="mt-3 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => toggleProduct(queuedItem.tempId)}
+                            className="text-[11px] font-semibold text-purple-600 hover:text-purple-700"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </>
@@ -2275,28 +2812,47 @@ const StoreCollectionCreate: React.FC = () => {
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
               Selected Products
             </h3>
-            {selectedProducts.length > 0 && !hasPrimarySelection && (
+            {readySelectedProductIds.length > 0 && !hasPrimarySelection && (
               <p className="mb-3 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
                 Primary product is required.
               </p>
             )}
-            {selectedProducts.length === 0 ? (
+            {hasPendingSelectedProducts && (
+              <p className="mb-3 text-[11px] font-semibold text-sky-700 dark:text-sky-300">
+                Waiting for queued products to finish before collection can be saved.
+              </p>
+            )}
+            {collectionProducts.length === 0 ? (
               <p className="text-xs text-gray-500">No products selected yet.</p>
             ) : (
               <div className="space-y-2">
                 <div className="space-y-2">
-                  {selectedProducts.map((product) => {
+                  {collectionProducts.map((entry) => {
+                    const product = entry.product;
+                    const displayName =
+                      product?.name || entry.queueItem?.name || "New Product";
                     const isDraft =
-                      product.isActive === false ||
-                      sessionDraftProductIds.includes(product.id);
-                    const isPrimary = primaryProductId === product.id;
+                      entry.type === "draft" ||
+                      product?.isActive === false ||
+                      (product ? sessionDraftProductIds.includes(product.id) : false);
+                    const isPrimary = product ? primaryProductId === product.id : false;
+                    const canSetPrimary = Boolean(product && entry.status === "ready");
+                    const canEdit = Boolean(product?.id);
+                    const statusLabel =
+                      entry.status === "uploading"
+                        ? "Uploading"
+                        : entry.status === "processing"
+                          ? "Processing"
+                          : entry.status === "failed"
+                            ? "Failed"
+                            : "Ready";
                     return (
                       <div
-                        key={product.id}
+                        key={entry.id}
                         className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300"
                       >
                         <span className="line-clamp-1 flex items-center gap-2">
-                          {product.name}
+                          {displayName}
                           {isPrimary && (
                             <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
                               Primary
@@ -2307,28 +2863,46 @@ const StoreCollectionCreate: React.FC = () => {
                               Draft
                             </span>
                           )}
+                          {entry.status !== "ready" && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                entry.status === "failed"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-sky-100 text-sky-700"
+                              }`}
+                            >
+                              {statusLabel}
+                            </span>
+                          )}
                         </span>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => handleSetPrimary(product.id)}
-                            className="text-indigo-600 hover:text-indigo-700"
+                            onClick={() => {
+                              if (product?.id) {
+                                handleSetPrimary(product.id);
+                              }
+                            }}
+                            disabled={!canSetPrimary}
+                            className="text-indigo-600 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {isPrimary ? "Primary" : "Set Primary"}
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
-                              void openCollectionProductEditor(product.id)
-                            }
-                            disabled={openingProductEditor}
+                            onClick={() => {
+                              if (product?.id) {
+                                void openCollectionProductEditor(product.id);
+                              }
+                            }}
+                            disabled={openingProductEditor || !canEdit}
                             className="text-indigo-600 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             Edit
                           </button>
                           <button
                             type="button"
-                            onClick={() => toggleProduct(product.id)}
+                            onClick={() => toggleProduct(entry.id)}
                             className="text-purple-600 hover:text-purple-700"
                           >
                             Remove
@@ -2362,7 +2936,7 @@ const StoreCollectionCreate: React.FC = () => {
           <button
             type="button"
             onClick={() => handleSubmit("publish")}
-            disabled={submitting}
+            disabled={submitting || hasPendingSelectedProducts}
             className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60 inline-flex items-center gap-2"
           >
             {submitting && (
@@ -2375,7 +2949,7 @@ const StoreCollectionCreate: React.FC = () => {
             <button
               type="button"
               onClick={() => handleSubmit("draft")}
-              disabled={submitting}
+              disabled={submitting || hasPendingSelectedProducts}
               className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 inline-flex items-center gap-2"
             >
               {submitting && submitAction === "draft" && (
@@ -2388,7 +2962,7 @@ const StoreCollectionCreate: React.FC = () => {
             <button
               type="button"
               onClick={() => handleSubmit("publish")}
-              disabled={submitting}
+              disabled={submitting || hasPendingSelectedProducts}
               className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60 inline-flex items-center gap-2"
             >
               {submitting && submitAction === "publish" && (

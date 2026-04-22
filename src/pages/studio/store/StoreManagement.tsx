@@ -301,7 +301,14 @@ export default function StoreManagement() {
       if (!user?.id) return;
       setDraftCollectionsLoading(true);
       try {
-        const drafts = await brandApi.getMyDraftCollections();
+        const collections = await brandApi.getCollections(user.id, {
+          visibility: 'all',
+          scope: 'store',
+        });
+        const drafts = (collections || []).filter((collection: any) => {
+          const status = String(collection?.status || '').toUpperCase();
+          return status === 'DRAFT' && collection?.isSystemGenerated !== true;
+        });
         if (!mounted) return;
         setDraftCollections(drafts || []);
       } catch {

@@ -234,12 +234,26 @@ export const adminTaxonomyApi = {
 
 // ── Tags ──
 export const adminTagsApi = {
-  list: (params?: Record<string, string | number>) => apiClient.get<AdminTagItem[] | Paginated<AdminTagItem>>('/tags', { params: { limit: 100, ...params } }),
-  search: (q: string, limit = 20, params?: Record<string, string | number>) => apiClient.get<{ items: AdminTagItem[] }>('/tags/search', { params: { q, limit, ...params } }),
+  list: (params?: Record<string, string | number>) =>
+    apiClient.get<AdminTagItem[] | Paginated<AdminTagItem>>('/tags/admin', {
+      params: { limit: 100, ...params },
+    }),
+  search: (q: string, limit = 20, params?: Record<string, string | number>) =>
+    apiClient.get<{ items: AdminTagItem[] }>('/tags/admin/search', {
+      params: { q, limit, ...params },
+    }),
   getLifecycle: (normalizedName: string) =>
     apiClient.get<AdminTagLifecycleDetails>(`/tags/${encodeURIComponent(normalizedName)}/lifecycle`),
   updateMetadata: (normalizedName: string, data: { displayName?: string }) =>
     apiClient.patch<AdminTagItem>(`/tags/admin/meta/${encodeURIComponent(normalizedName)}`, data),
+  updateStatus: (
+    normalizedName: string,
+    status: 'PENDING' | 'APPROVED' | 'REJECTED',
+  ) =>
+    apiClient.patch<AdminTagItem>(
+      `/tags/admin/status/${encodeURIComponent(normalizedName)}`,
+      { status },
+    ),
   ban: (normalizedName: string, banned = true) =>
     apiClient.post(`/tags/admin/ban/${encodeURIComponent(normalizedName)}`, null, {
       params: { banned: banned ? 'true' : 'false' },

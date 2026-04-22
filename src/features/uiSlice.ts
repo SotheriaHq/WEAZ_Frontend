@@ -3,7 +3,8 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 
 export type SidebarMode = 'RAIL' | 'DRAWER' | 'OVERLAY' | 'HIDDEN';
 
-// Breakpoint constant - single source of truth
+// Breakpoint constant - single source of truth.
+// Mobile-only docks should only activate on genuinely small screens.
 export const MOBILE_BREAKPOINT = 768;
 
 interface UiState {

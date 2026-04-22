@@ -430,7 +430,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
               <DropdownTrigger className="btn-tight-xs">
                 <MoreVertical className="w-4 h-4" />
               </DropdownTrigger>
-              <DropdownMenu className="glass-menu-soft">
+              <DropdownMenu className="w-[min(13rem,calc(100vw-1rem))]">
                 {isDeleted ? (
                   <>
                     {onRestore && (

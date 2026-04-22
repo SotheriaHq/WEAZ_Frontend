@@ -1,6 +1,11 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
-import Button from './Button';
+import React, { useId, useState } from 'react';
 import { useDropdownManagerOptional } from '@/context/DropdownManagerContext';
+import {
+  Dropdown as CompactDropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
+} from '@/components/ui/Dropdown';
 
 type DropdownOption = { label: string; onClick: () => void };
 
@@ -15,25 +20,9 @@ interface DropdownProps {
 
 const Dropdown: React.FC<DropdownProps> = ({ buttonLabel, options, variant = 'primary', className = '', hideCaret = false, buttonClassName = '' }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const ref = useRef<HTMLDivElement | null>(null);
   const dropdownId = useId();
   const dropdownManager = useDropdownManagerOptional();
   const open = dropdownManager ? dropdownManager.openId === dropdownId : isOpen;
-
-  useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        if (dropdownManager) {
-          dropdownManager.setOpenId(null);
-        } else {
-          setIsOpen(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, []);
 
   const toggle = (e?: React.MouseEvent) => {
     e?.preventDefault();
@@ -57,39 +46,55 @@ const Dropdown: React.FC<DropdownProps> = ({ buttonLabel, options, variant = 'pr
   };
 
   return (
-    <div ref={ref} className={`relative inline-block text-left ${className}`}>
-      <Button
-        variant={variant}
-        onClick={toggle}
-        aria-haspopup="true"
+    <CompactDropdown
+      open={open}
+      onOpenChange={(next) => {
+        if (dropdownManager) {
+          dropdownManager.setOpenId(next ? dropdownId : null);
+        } else {
+          setIsOpen(next);
+        }
+      }}
+      placement="bottom-end"
+      menuId={dropdownId}
+      className={className}
+      offset={4}
+    >
+      <DropdownTrigger
+        className={[
+          variant === 'primary'
+            ? 'btn-frost-primary btn-tight-sm'
+            : variant === 'secondary'
+              ? 'btn-frost-outline btn-tight-sm'
+              : variant === 'outline'
+                ? 'btn-frost-outline btn-tight-sm'
+                : 'btn-frost-ghost btn-tight-sm',
+          buttonClassName,
+        ].filter(Boolean).join(' ')}
+        aria-haspopup="menu"
         aria-expanded={open}
-        className={buttonClassName}
+        onClick={(event) => {
+          event.preventDefault();
+          toggle(event);
+        }}
       >
         {buttonLabel}
-        {!hideCaret && (
-          <svg className="-mr-1 ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
-        )}
-      </Button>
+        {!hideCaret ? <span aria-hidden="true" className="ml-2 text-base leading-none">⌄</span> : null}
+      </DropdownTrigger>
 
-      {open && (
-        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-50">
-          <div className="py-1">
-            {options.map((opt, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleOption(opt.onClick)}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+      {open ? (
+        <DropdownMenu className="w-[min(16rem,calc(100vw-1rem))]">
+          {options.map((opt, idx) => (
+            <DropdownItem
+              key={`${idx}-${typeof opt.label === 'string' ? opt.label : 'option'}`}
+              onClick={() => handleOption(opt.onClick)}
+            >
+              {opt.label}
+            </DropdownItem>
+          ))}
+        </DropdownMenu>
+      ) : null}
+    </CompactDropdown>
   );
 };
 
