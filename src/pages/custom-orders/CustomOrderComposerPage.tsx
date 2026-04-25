@@ -31,13 +31,38 @@ interface CustomOrderComposerPageProps {
   onOrderCreated?: (orderId: string) => void;
 }
 
-const fieldLabel = (key: string) => formatMeasurementLabel(key);
+type RequiredMeasurementPoint = NonNullable<CustomOrderConfiguration['requiredMeasurementPoints']>[number];
+
+const fieldLabel = (key: string) =>
+  formatMeasurementLabel(key)
+    .toLowerCase()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 
 const isWeightKey = (key: string) => key.toUpperCase().includes('WEIGHT');
 const toInches = (cm: number) => cm / 2.54;
 const toCentimeters = (inch: number) => inch * 2.54;
 const round = (value: number) => Math.round(value * 100) / 100;
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+
+const normalizeMeasurementKey = (key: string) => String(key ?? '').trim().toUpperCase();
+
+const normalizeMeasurementKeyList = (keys: string[] | null | undefined) =>
+  Array.from(new Set((keys ?? []).map(normalizeMeasurementKey).filter(Boolean)));
+
+const resolveBuyerRequiredMeasurementKeys = (
+  configuration: CustomOrderConfiguration | null,
+) => {
+  if (!configuration) return [];
+
+  return normalizeMeasurementKeyList(
+    configuration.resolvedRequiredMeasurementKeys?.length
+      ? configuration.resolvedRequiredMeasurementKeys
+      : [
+          ...(configuration.requiredMeasurementKeys ?? []),
+          ...(configuration.requiredMeasurementPoints ?? []).map((point) => point.key),
+        ],
+  );
+};
 
 const convertDisplayToCm = (key: string, rawValue: string, unit: 'CM' | 'IN') => {
   const parsed = Number(rawValue);
@@ -46,10 +71,15 @@ const convertDisplayToCm = (key: string, rawValue: string, unit: 'CM' | 'IN') =>
   return parsed;
 };
 
-const measurementGuidance = (key: string) => ({
-  description: `${fieldLabel(key)} measurement. Measure close to the body without pulling too tight.`,
-  min: 1,
-  max: 300,
+const measurementGuidance = (
+  key: string,
+  point?: RequiredMeasurementPoint,
+) => ({
+  description:
+    point?.description ||
+    `${point?.label || fieldLabel(key)} measurement. Measure close to the body without pulling too tight.`,
+  min: point?.minValueCm ?? 1,
+  max: point?.maxValueCm ?? 300,
 });
 
 const formatCurrency = (value: number | undefined, currency = 'NGN') =>
@@ -167,14 +197,16 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
           // Keep default preference.
         }
 
-        if (resolvedConfiguration?.requiredMeasurementKeys.length) {
+        const buyerRequiredKeys = resolveBuyerRequiredMeasurementKeys(resolvedConfiguration);
+
+        if (buyerRequiredKeys.length) {
           try {
             const sizeFit = await SizeFitApi.getMyProfile();
             if (!active) return;
             setSizeFitProfile(sizeFit);
             setLengthUnit(sizeFit.preferredLengthUnit ?? 'CM');
 
-            const nextValues = resolvedConfiguration.requiredMeasurementKeys.reduce<Record<string, string>>(
+            const nextValues = buyerRequiredKeys.reduce<Record<string, string>>(
               (accumulator, key) => {
                 const normalized = parseStoredMeasurement(
                   (sizeFit.measurements as Record<string, unknown> | undefined)?.[key],
@@ -191,7 +223,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
 
             setMeasurementValues(nextValues);
             setMeasurementConfirmed(
-              !resolvedConfiguration.requiredMeasurementKeys.some((key) => {
+              !buyerRequiredKeys.some((key) => {
                 const value = Number(nextValues[key]);
                 return !(Number.isFinite(value) && value > 0);
               }),
@@ -229,8 +261,33 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   }, [configurationId]);
 
   const requiredMeasurementKeys = useMemo(
-    () => configuration?.requiredMeasurementKeys ?? [],
-    [configuration?.requiredMeasurementKeys],
+    () => resolveBuyerRequiredMeasurementKeys(configuration),
+    [
+      configuration?.requiredMeasurementKeys,
+      configuration?.requiredMeasurementPoints,
+      configuration?.resolvedRequiredMeasurementKeys,
+    ],
+  );
+
+  const measurementPointByKey = useMemo(
+    () =>
+      new Map(
+        (configuration?.requiredMeasurementPoints ?? []).map((point) => [
+          normalizeMeasurementKey(point.key),
+          point,
+        ]),
+      ),
+    [configuration?.requiredMeasurementPoints],
+  );
+
+  const getMeasurementLabel = useCallback(
+    (key: string) => measurementPointByKey.get(normalizeMeasurementKey(key))?.label || fieldLabel(key),
+    [measurementPointByKey],
+  );
+
+  const getMeasurementGuidance = useCallback(
+    (key: string) => measurementGuidance(key, measurementPointByKey.get(normalizeMeasurementKey(key))),
+    [measurementPointByKey],
   );
 
   const missingMeasurements = useMemo(
@@ -247,10 +304,10 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       requiredMeasurementKeys.filter((key) => {
         const value = convertDisplayToCm(key, measurementValues[key] ?? '', lengthUnit);
         if (!Number.isFinite(value) || value <= 0) return false;
-        const range = measurementGuidance(key);
+        const range = getMeasurementGuidance(key);
         return value < range.min || value > range.max;
       }),
-    [lengthUnit, measurementValues, requiredMeasurementKeys],
+    [getMeasurementGuidance, lengthUnit, measurementValues, requiredMeasurementKeys],
   );
 
   const shippingAddress = useMemo(
@@ -740,10 +797,10 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               {requiredMeasurementKeys.map((key) => (
                 <label key={key} className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{fieldLabel(key)}</span>
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{getMeasurementLabel(key)}</span>
                   <span className="mb-2 inline-flex rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-600 dark:bg-indigo-400/10 dark:text-indigo-300">Required by brand</span>
                   <span className="mb-2 block text-xs text-slate-500 dark:text-slate-400">
-                    {measurementGuidance(key).description} Expected range {lengthUnit === 'IN' && !isWeightKey(key) ? round(toInches(measurementGuidance(key).min)) : measurementGuidance(key).min} to {lengthUnit === 'IN' && !isWeightKey(key) ? round(toInches(measurementGuidance(key).max)) : measurementGuidance(key).max} {lengthUnit === 'IN' && !isWeightKey(key) ? 'in' : 'cm'}.
+                    {getMeasurementGuidance(key).description} Expected range {lengthUnit === 'IN' && !isWeightKey(key) ? round(toInches(getMeasurementGuidance(key).min)) : getMeasurementGuidance(key).min} to {lengthUnit === 'IN' && !isWeightKey(key) ? round(toInches(getMeasurementGuidance(key).max)) : getMeasurementGuidance(key).max} {lengthUnit === 'IN' && !isWeightKey(key) ? 'in' : 'cm'}.
                   </span>
                   <input
                     value={measurementValues[key] ?? ''}

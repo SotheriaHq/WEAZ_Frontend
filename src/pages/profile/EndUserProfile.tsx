@@ -17,7 +17,6 @@ import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type { SizeFitProfile, SizeFitSharesPayload } from '@/types/sizeFit';
 import ProfileActionsBar, { type ProfileAction } from '@/components/profile/ProfileActionsBar';
-import ProfileSettingsEntry from '@/components/profile/ProfileSettingsEntry';
 import { buildProfileUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
 import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS } from '@/lib/sizeCharts';
@@ -659,12 +658,14 @@ export const EndUserProfile: React.FC = () => {
       icon: '✏️',
       label: 'Edit',
       onClick: () => setIsQuickEditOpen(true),
+      hidden: true,
     },
     {
       key: 'share',
       icon: '🔗',
       label: 'Share',
       onClick: handleShareProfile,
+      hidden: true,
     },
     {
       key: 'fits',
@@ -698,9 +699,6 @@ export const EndUserProfile: React.FC = () => {
 
   return (
     <div className="relative min-h-screen">
-      {/* Ambient gradient — top of page */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px] bg-gradient-to-b from-fuchsia-500/10 via-purple-500/5 to-transparent dark:from-fuchsia-400/8 dark:via-purple-500/8" />
-
       <div className="mx-auto w-full max-w-[1280px] px-3 pb-28 pt-4 sm:px-5 sm:pt-6 xl:pb-10">
 
         {/* ── PROFILE HEADER ── */}
@@ -866,15 +864,6 @@ export const EndUserProfile: React.FC = () => {
           {isOwner ? (
             <div className="mt-4">
               <ProfileActionsBar actions={profileActions} />
-            </div>
-          ) : null}
-
-          {isOwner ? (
-            <div className="mt-4">
-              <ProfileSettingsEntry
-                to="/settings"
-                description="Account, privacy, notifications & size fits"
-              />
             </div>
           ) : null}
 

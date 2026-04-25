@@ -93,17 +93,17 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
               maxHeightClassName="max-h-64"
             />
           ) : (
-            <div className="h-64 rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex items-center justify-center p-6">
-                <div className="max-w-3xl w-full rounded-3xl border border-white/15 bg-white/10 backdrop-blur-md shadow-2xl px-6 py-4 text-center">
-                  <div className="text-white/80 text-sm sm:text-base font-semibold tracking-wide">
-                    {bannerLabel}
-                  </div>
-                  <div className="mt-1 text-white/60 text-xs sm:text-sm">
-                    {profile.isOwner
-                      ? 'Personalize your profile with a banner'
-                      : 'This user has not set a banner'}
-                  </div>
+            <div className="flex h-64 items-center justify-center overflow-hidden rounded-3xl bg-slate-900 px-6 text-center">
+              <div>
+                <div className="text-sm font-semibold tracking-wide text-white/80 sm:text-base">
+                  {bannerLabel}
                 </div>
+                <div className="mt-1 text-xs text-white/55 sm:text-sm">
+                  {profile.isOwner
+                    ? 'Add a banner from profile actions'
+                    : 'No banner added'}
+                </div>
+              </div>
             </div>
           )}
 

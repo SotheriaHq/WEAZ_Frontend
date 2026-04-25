@@ -2519,7 +2519,7 @@ const EditProduct: React.FC = () => {
   return (
     <div className="flex flex-col min-h-full bg-transparent text-gray-900 dark:text-[#e5e5e5] font-sans">
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-4 sm:px-6 sm:py-6">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-3 sm:px-5 sm:py-5">
         <div className="mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:mb-6">
           <div className="flex flex-col gap-1">
             <div className="flex items-center text-xs text-gray-600 dark:text-gray-400 gap-2">
@@ -2600,13 +2600,13 @@ const EditProduct: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           {/* LEFT COLUMN: Media (42% approx -> 5 cols) */}
-          <div className="lg:col-span-5 space-y-6">
+          <div className="space-y-4 lg:col-span-4">
             {/* Media Gallery */}
             <div
               id="product-media-section"
-              className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4 sm:p-5 scroll-mt-24"
+              className="rounded-xl bg-white/45 p-4 ring-1 ring-gray-200/60 dark:bg-white/[0.03] dark:ring-white/10 sm:p-5 scroll-mt-24"
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-white">
@@ -2821,7 +2821,7 @@ const EditProduct: React.FC = () => {
             </div>
 
             {/* Video Section */}
-            <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4 sm:p-5">
+            <div className="rounded-xl bg-white/45 p-4 ring-1 ring-gray-200/60 dark:bg-white/[0.03] dark:ring-white/10 sm:p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-white">
                   Product Video
@@ -2842,14 +2842,14 @@ const EditProduct: React.FC = () => {
           </div>
 
           {/* RIGHT COLUMN: Details (58% approx -> 7 cols) */}
-          <div className="lg:col-span-7 space-y-6">
+          <div className="space-y-4 lg:col-span-8">
             {/* Basic Info */}
-            <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4 sm:p-5">
+            <div className="rounded-xl bg-white/45 p-4 ring-1 ring-gray-200/60 dark:bg-white/[0.03] dark:ring-white/10 sm:p-5">
               <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-6">
                 Basic Information
               </h2>
 
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <Input
                   label="Product Title"
                   required
@@ -2860,7 +2860,7 @@ const EditProduct: React.FC = () => {
                   data-testid="product-title-input"
                 />
 
-                <div className="rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/40 dark:bg-white/[0.02] p-3 sm:p-4">
+                <div className="rounded-xl bg-white/35 p-3 dark:bg-white/[0.02] sm:p-4">
                   <div className="mb-3 flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       Product Metadata
@@ -2870,7 +2870,7 @@ const EditProduct: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="lg:h-[360px] lg:overflow-y-auto scrollbar-threadly-strong lg:pr-1">
+                  <div className="lg:max-h-[300px] lg:overflow-y-auto scrollbar-threadly-strong lg:pr-1">
                     <div className="space-y-4">
                       <div className="space-y-3" id="product-category-section">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -2959,7 +2959,7 @@ const EditProduct: React.FC = () => {
                             />
                           </div>
 
-                          <div className="md:col-span-4 flex items-start justify-between gap-3 rounded-lg border border-gray-200/70 dark:border-white/10 px-3 py-2.5">
+                          <div className="md:col-span-4 flex items-start justify-between gap-3 rounded-lg bg-gray-50/75 px-3 py-2.5 dark:bg-white/[0.04]">
                             <p className="text-[11px] text-gray-500">
                               {categoriesLoading
                                 ? 'Loading collections…'
@@ -3036,7 +3036,7 @@ const EditProduct: React.FC = () => {
                             </div>
                           </div>
                         )}
-                        <div className="bg-white dark:bg-zinc-900/60 border border-gray-300/80 dark:border-zinc-700/60 rounded-xl px-3 py-2 min-h-[44px] flex items-center gap-2 shadow-sm">
+                        <div className="flex min-h-[44px] items-center gap-2 rounded-xl bg-white/75 px-3 py-2 shadow-sm ring-1 ring-gray-200/70 dark:bg-zinc-900/60 dark:ring-white/10">
                           <input
                             type="text"
                             value={tagInput}
@@ -3092,7 +3092,7 @@ const EditProduct: React.FC = () => {
               </div>
             </div>
 
-            <div className="rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/30 dark:bg-white/[0.02] overflow-hidden">
+            <div className="overflow-hidden rounded-xl bg-white/45 ring-1 ring-gray-200/60 dark:bg-white/[0.03] dark:ring-white/10">
               <div className="px-4 py-3 border-b border-gray-200/70 dark:border-white/10 flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   Product Operations
@@ -3101,11 +3101,11 @@ const EditProduct: React.FC = () => {
                   Scroll inside panel
                 </span>
               </div>
-              <div className="space-y-4 p-4 lg:h-[520px] lg:overflow-y-auto scrollbar-threadly-strong lg:pr-1">
+              <div className="space-y-4 p-4 lg:max-h-[440px] lg:overflow-y-auto scrollbar-threadly-strong lg:pr-1">
                 {/* Pricing */}
                 <div
                   id="product-pricing-section"
-                  className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4 scroll-mt-24"
+                  className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02] scroll-mt-24"
                 >
                   <div className="flex items-center justify-between gap-4">
                     <button
@@ -3206,7 +3206,7 @@ const EditProduct: React.FC = () => {
                 </div>
 
                 {/* Variants */}
-                <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl overflow-hidden">
+                <div className="overflow-hidden rounded-xl bg-white/35 dark:bg-white/[0.02]">
                   <div
                     className={`p-4 ${collapsedSections.variants ? "" : "border-b border-gray-200 dark:border-white/5"}`}
                   >
@@ -3485,7 +3485,7 @@ const EditProduct: React.FC = () => {
                 />
 
                 {/* Custom order toggle — keeps form hidden until brand opts in */}
-                <div className="rounded-xl border border-gray-200/70 dark:border-white/10 p-4">
+                <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-base font-medium text-gray-900 dark:text-white">
@@ -3533,7 +3533,7 @@ const EditProduct: React.FC = () => {
                   )}
                 </div>
 
-                <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
+                <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
                   <button
                     type="button"
                     onClick={() => toggleSection("fulfillment")}
@@ -3552,7 +3552,7 @@ const EditProduct: React.FC = () => {
                   {!collapsedSections.fulfillment && (
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Inventory */}
-                      <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
+                      <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
                         <div className="flex items-center justify-between mb-4">
                           <h2 className="text-base font-medium text-gray-900 dark:text-white">
                             Inventory
@@ -3632,7 +3632,7 @@ const EditProduct: React.FC = () => {
                       </div>
 
                       {/* Shipping */}
-                      <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
+                      <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
                         <h2 className="text-base font-medium text-gray-900 dark:text-white mb-4">
                           Shipping
                         </h2>
@@ -3727,7 +3727,7 @@ const EditProduct: React.FC = () => {
                 </div>
 
                 {/* Additional Details */}
-                <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4">
+                <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
                   <button
                     type="button"
                     onClick={() => toggleSection("additional")}
@@ -3826,8 +3826,8 @@ const EditProduct: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-gray-200 dark:border-white/10 bg-transparent py-6 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <footer className="sticky bottom-0 z-20 w-full border-t border-gray-200/70 bg-white/85 px-4 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/80 sm:px-6">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-gray-500">
             {hasChanges ? (
               <span className="text-orange-400">Unsaved changes</span>
@@ -3848,7 +3848,7 @@ const EditProduct: React.FC = () => {
                   })
                 }
                 disabled={saving || submitLocked}
-                className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
               >
                 {(saving || submitLocked) && saveAction === "draft" && (
                   <VLoader size={16} phase="loading" showLabel={false} />
@@ -3865,7 +3865,7 @@ const EditProduct: React.FC = () => {
                   })
                 }
                 disabled={saving || submitLocked}
-                className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
               >
                 {(saving || submitLocked) && saveAction === "draft" && (
                   <VLoader size={16} phase="loading" showLabel={false} />
@@ -3875,7 +3875,7 @@ const EditProduct: React.FC = () => {
             )}
             <button
               onClick={handleDiscard}
-              className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
             >
               {hasChanges
                 ? "Discard Changes"
@@ -3897,7 +3897,7 @@ const EditProduct: React.FC = () => {
                 })
               }
                 disabled={saving || submitLocked}
-              className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 text-white text-sm font-semibold rounded-lg shadow-lg shadow-purple-500/20 transition-all flex items-center gap-2"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-purple-600 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:bg-purple-600/50"
             >
                 {(saving || submitLocked) && saveAction === "publish" && (
                 <VLoader size={16} phase="loading" showLabel={false} />

@@ -659,7 +659,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 </div>
 
                 {/* Size Chart Card - Collapsible */}
-                <div className="rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 p-6 space-y-4">
+                <div className="hidden">
                   <button
                     type="button"
                     onClick={() => toggleSection('sizeChart')}
@@ -1034,7 +1034,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                   </div>
                   )}
                 </div>{/* Size Chart Card - Collapsible */}
-                <div className="rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 p-6 space-y-4">
+                <div className="hidden">
                   <button
                     type="button"
                     onClick={() => toggleSection('sizeChart')}

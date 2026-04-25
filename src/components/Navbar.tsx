@@ -176,7 +176,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
         </DropdownTrigger>
 
         <DropdownMenu
-          maxHeight="min(72vh, 29rem)"
+          maxHeight="min(80dvh, 30rem)"
           className="w-[min(13.5rem,calc(100vw-1rem))] sm:w-[15.5rem] before:pointer-events-none before:absolute before:-top-1 before:right-5 before:h-3 before:w-3 before:rotate-45 before:rounded-[3px] before:border-l before:border-t before:border-white/20 before:bg-white/90 dark:before:border-white/10 dark:before:bg-[#09090b]"
         >
           <div className="flex items-center gap-3 px-3.5 pb-3 pt-3.5">

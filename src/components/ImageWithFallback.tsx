@@ -176,6 +176,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     const run = async () => {
       // If src/fileId changed, reset error
       setHadError(false);
+      setLoaded(false);
 
       // When fileId exists, prefer resolving by fileId to avoid stale signed URLs.
       if (!fileId && src && isS3LikeUrl(src)) {
