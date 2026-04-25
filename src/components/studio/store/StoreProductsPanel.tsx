@@ -155,6 +155,22 @@ const resolveProductStatus = (product: BackendProduct): StudioStatus => {
   return product.isActive ? 'ACTIVE' : 'DRAFT';
 };
 
+const hasRenderableProductMedia = (product: BackendProduct | null | undefined): boolean => {
+  if (!product) return false;
+  if (typeof product.thumbnail === 'string' && product.thumbnail.trim().length > 0) return true;
+  if (Array.isArray(product.images) && product.images.some((value) => String(value || '').trim().length > 0)) {
+    return true;
+  }
+  if (Array.isArray(product.media)) {
+    return product.media.some(
+      (entry) =>
+        Boolean(String(entry?.url || '').trim()) ||
+        Boolean(String(entry?.id || '').trim()),
+    );
+  }
+  return false;
+};
+
 const isSystemStoreCollection = (collection: Pick<CollectionOption, 'name' | 'description' | 'isSystemGenerated'>): boolean => {
   if (collection.isSystemGenerated) return true;
   const normalizedName = String(collection.name || '').trim().toLowerCase();
@@ -285,6 +301,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   
   const listRef = useRef<HTMLDivElement | null>(null);
   const [listMinHeight, setListMinHeight] = useState<number | undefined>(undefined);
+  const createdProductHydrationAttemptsRef = useRef(0);
   const galleryTouchRef = useRef({ startX: 0, startY: 0 });
   const productMenuTriggerRefs = useRef<
     Record<string, HTMLButtonElement | null>
@@ -332,6 +349,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const [hoveredCollectionId, setHoveredCollectionId] = useState<string | null>(null);
   const [hoverPreviewFrame, setHoverPreviewFrame] = useState<Record<string, number>>({});
   const [inlineProduct, setInlineProduct] = useState<StoreProduct | null>(null);
+  const recentCreatedProductId = useMemo(() => {
+    const raw = new URLSearchParams(location.search).get('createdProductId');
+    const normalized = String(raw ?? '').trim();
+    return normalized.length > 0 ? normalized : null;
+  }, [location.search]);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -1032,6 +1054,42 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       );
     };
   }, [outletView, refresh]);
+
+  useEffect(() => {
+    if (outletView !== 'products' || !recentCreatedProductId) {
+      createdProductHydrationAttemptsRef.current = 0;
+      return;
+    }
+
+    const createdProduct =
+      products.find((product) => product.id === recentCreatedProductId) ?? null;
+
+    const clearCreatedProductQuery = () => {
+      const params = new URLSearchParams(location.search);
+      if (!params.has('createdProductId')) return;
+      params.delete('createdProductId');
+      const next = params.toString();
+      navigate(next ? `/studio/store?${next}` : '/studio/store', { replace: true });
+    };
+
+    if (hasRenderableProductMedia(createdProduct)) {
+      createdProductHydrationAttemptsRef.current = 0;
+      clearCreatedProductQuery();
+      return;
+    }
+
+    if (createdProductHydrationAttemptsRef.current >= 12) {
+      clearCreatedProductQuery();
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      createdProductHydrationAttemptsRef.current += 1;
+      void refresh().catch(() => undefined);
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [location.search, navigate, outletView, products, recentCreatedProductId, refresh]);
 
   const handleDuplicate = async (productId: string) => {
     try {

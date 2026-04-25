@@ -15,6 +15,16 @@ let cachedIsStoreOpen: boolean | null = null;
 let cacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+export function invalidateStoreSetupStatusCache(): void {
+  cachedIsStoreOpen = null;
+  cacheTime = 0;
+}
+
+export function primeStoreSetupStatusCache(isStoreOpen: boolean): void {
+  cachedIsStoreOpen = isStoreOpen;
+  cacheTime = Date.now();
+}
+
 export function useStoreSetupStatus(): boolean | null {
   const user = useSelector((s: RootState) => s.user.profile);
   const isBrand = user?.type === 'BRAND';

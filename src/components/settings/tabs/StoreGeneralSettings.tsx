@@ -20,6 +20,7 @@ import {
   updateStoreProfile,
   type StoreGeneralSettingsResponse,
 } from '@/api/StoreApi';
+import { primeStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
 
 const MAX_CATEGORIES = 3;
 const RESPONSE_TIME_OPTIONS = ['12h', '24h', '48h'];
@@ -207,6 +208,7 @@ const StoreGeneralSettings: React.FC = () => {
       } else {
         await closeStore();
       }
+      primeStoreSetupStatusCache(nextLiveState);
       setIsLive(nextLiveState);
       toast.success(nextLiveState ? 'Store is now live.' : 'Store is now paused.');
     } catch (error: any) {

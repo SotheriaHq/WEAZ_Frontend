@@ -82,7 +82,7 @@ export interface ThreadSummaryByContextResponse {
 
 export interface InboxItem {
   threadId: string;
-  contextType: 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
+  contextType: 'DIRECT' | 'INQUIRY' | 'STANDARD_ORDER' | 'CUSTOM_ORDER';
   orderId?: string | null;
   customOrderId?: string | null;
   inquiryId?: string | null;
@@ -115,12 +115,27 @@ export interface InboxResponse {
 
 export interface ResolvedThreadRoute {
   threadId: string;
-  contextType: 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
+  contextType: 'DIRECT' | 'INQUIRY' | 'STANDARD_ORDER' | 'CUSTOM_ORDER';
   orderId?: string | null;
   customOrderId?: string | null;
   inquiryType?: string;
   targetUrl: string;
   orderDetailUrl?: string | null;
+}
+
+export interface ThreadOrderItem {
+  id: string;
+  type: 'STANDARD_ORDER' | 'CUSTOM_ORDER';
+  status: string;
+  state: 'active' | 'closed' | 'cancelled' | 'disputed';
+  title: string;
+  totalAmount: number;
+  currency: string;
+  createdAt: string;
+  orderDetailUrl?: string | null;
+  canView: boolean;
+  canDispute: boolean;
+  canCancel: boolean;
 }
 
 const parseMessageList = (data: unknown): MessageListResponse => {
@@ -174,7 +189,7 @@ export const messagingApi = {
     cursorThreadId?: string;
     limit?: number;
     filter?: 'all' | 'unread' | 'archived';
-    contextType?: 'all' | 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
+    contextType?: 'all' | 'DIRECT' | 'INQUIRY' | 'STANDARD_ORDER' | 'CUSTOM_ORDER';
     q?: string;
   }) {
     const response = await apiClient.get('/admin/messaging/inbox', { params });
@@ -504,6 +519,20 @@ export const messagingApi = {
   async listThreadMessages(threadId: string, params?: { cursorCreatedAt?: string; cursorId?: string; limit?: number }) {
     const response = await apiClient.get(`/messaging/threads/${threadId}/messages`, { params });
     return parseMessageList(response.data);
+  },
+
+  async listThreadOrders(threadId: string, params?: { filter?: 'all' | 'active' | 'closed' | 'cancelled' | 'disputed' }) {
+    const response = await apiClient.get(`/messaging/threads/${threadId}/orders`, { params });
+    return unwrapApiResponse<{ items: ThreadOrderItem[] }>(response.data);
+  },
+
+  async sendBrandMessage(brandId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[] }) {
+    const response = await apiClient.post(
+      `/messaging/brands/${brandId}/messages`,
+      payload,
+      { headers: { 'Idempotency-Key': payload.clientMessageId } },
+    );
+    return unwrapApiResponse<any>(response.data);
   },
 
   async sendThreadMessage(threadId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[] }) {

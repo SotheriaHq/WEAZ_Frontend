@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import type { ThreadMessage } from '@/api/MessagingApi';
 
-type ConversationContext = 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
+type ConversationContext = 'DIRECT' | 'INQUIRY' | 'STANDARD_ORDER' | 'CUSTOM_ORDER';
 
 interface ChatContactSidebarProps {
   participant: {
@@ -30,6 +30,7 @@ interface ChatContactSidebarProps {
 
 const contextLabel = (ct: ConversationContext) => {
   switch (ct) {
+    case 'DIRECT': return 'Direct';
     case 'STANDARD_ORDER': return 'Standard Order';
     case 'CUSTOM_ORDER': return 'Custom Order';
     case 'INQUIRY': return 'Inquiry';
@@ -38,6 +39,7 @@ const contextLabel = (ct: ConversationContext) => {
 
 const contextColor = (ct: ConversationContext) => {
   switch (ct) {
+    case 'DIRECT': return 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400';
     case 'STANDARD_ORDER': return 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400';
     case 'CUSTOM_ORDER': return 'bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400';
     case 'INQUIRY': return 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400';

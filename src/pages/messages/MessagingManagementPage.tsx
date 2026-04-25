@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
-import { messagingApi, type InboxItem, type ThreadMessage } from '@/api/MessagingApi';
+import { messagingApi, type InboxItem, type ThreadMessage, type ThreadOrderItem } from '@/api/MessagingApi';
 import { customOrdersBuyerApi, customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
 import { useRealtime } from '@/realtime/RealtimeProvider';
@@ -16,7 +16,7 @@ import ChatContactSidebar from '@/components/messaging/ChatContactSidebar';
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-type ConversationContext = 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
+type ConversationContext = 'DIRECT' | 'INQUIRY' | 'STANDARD_ORDER' | 'CUSTOM_ORDER';
 type Surface = 'BRAND' | 'BUYER';
 type ActiveAction = null | 'extension-request' | 'dispute';
 
@@ -375,6 +375,9 @@ const MessagingManagementPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<ActiveAction>(null);
   const [showContactDetails, setShowContactDetails] = useState(false);
+  const [orderFilter, setOrderFilter] = useState<'all' | 'active' | 'closed' | 'cancelled' | 'disputed'>('all');
+  const [threadOrders, setThreadOrders] = useState<ThreadOrderItem[]>([]);
+  const [selectedOrderKey, setSelectedOrderKey] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -448,7 +451,12 @@ const MessagingManagementPage: React.FC = () => {
     return item.threadId;
   }, []);
 
-  const useThreadTransport = surface === 'BRAND' && Boolean(activeConversation?.threadId);
+  const useThreadTransport = Boolean(activeConversation?.threadId);
+  const selectedOrder = useMemo(
+    () => threadOrders.find((order) => `${order.type}:${order.id}` === selectedOrderKey) ?? null,
+    [selectedOrderKey, threadOrders],
+  );
+  const showOrderActions = threadOrders.length > 0 && Boolean(selectedOrder);
 
   const visibleConversations = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -612,6 +620,29 @@ const MessagingManagementPage: React.FC = () => {
     }
   }, [activeConversation, brandId, getContextId, surface]);
 
+  const fetchThreadOrders = useCallback(async () => {
+    if (!activeConversation?.threadId) {
+      setThreadOrders([]);
+      setSelectedOrderKey('');
+      return;
+    }
+
+    try {
+      const response = await messagingApi.listThreadOrders(activeConversation.threadId, { filter: orderFilter });
+      const nextOrders = response.items || [];
+      setThreadOrders(nextOrders);
+      setSelectedOrderKey((current) => {
+        if (current && nextOrders.some((order) => `${order.type}:${order.id}` === current)) {
+          return current;
+        }
+        return nextOrders.length === 1 ? `${nextOrders[0].type}:${nextOrders[0].id}` : '';
+      });
+    } catch {
+      setThreadOrders([]);
+      setSelectedOrderKey('');
+    }
+  }, [activeConversation?.threadId, orderFilter]);
+
   const refresh = useCallback(async () => {
     if (
       activeConversation &&
@@ -624,20 +655,27 @@ const MessagingManagementPage: React.FC = () => {
     }
     setMessagesLoading(true);
     try {
-      await Promise.all([fetchMessages(), fetchCustomOrderDetail()]);
+      await Promise.all([fetchMessages(), fetchCustomOrderDetail(), fetchThreadOrders()]);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to load messages');
     } finally {
       setMessagesLoading(false);
       scrollToBottom();
     }
-  }, [fetchMessages, fetchCustomOrderDetail, scrollToBottom]);
+  }, [fetchMessages, fetchCustomOrderDetail, fetchThreadOrders, scrollToBottom]);
 
   useEffect(() => {
     if (!activeConversation) { setMessages([]); return; }
     setActiveAction(null);
+    setOrderFilter('all');
+    setSelectedOrderKey('');
     void refresh();
   }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!activeConversation) return;
+    void fetchThreadOrders();
+  }, [orderFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---- Polling ---- */
   useEffect(() => {
@@ -781,11 +819,11 @@ const MessagingManagementPage: React.FC = () => {
   }, [activeConversation, activeId, brandId, getContextId, refresh, surface, useThreadTransport]);
 
   const handleRequestExtension = useCallback(async (days: number, reason: string) => {
-    if (!activeConversation || surface !== 'BRAND' || !brandId) return;
-    const contextId = getContextId(activeConversation);
+    if (!activeConversation || !selectedOrder || surface !== 'BRAND' || !brandId) return;
+    const contextId = selectedOrder.id;
     setActionLoading(true);
     try {
-      if (activeConversation.contextType === 'CUSTOM_ORDER') {
+      if (selectedOrder.type === 'CUSTOM_ORDER') {
         await messagingApi.requestCustomOrderExtensionForBrand(brandId, contextId, { targetType: 'PRODUCTION', requestedExtraDays: days, reason });
       } else {
         await messagingApi.requestOrderExtensionForBrand(brandId, contextId, { requestedExtraDays: days, reason });
@@ -798,7 +836,7 @@ const MessagingManagementPage: React.FC = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [activeConversation, brandId, getContextId, refresh, surface]);
+  }, [activeConversation, brandId, refresh, selectedOrder, surface]);
 
   const handleRespondToExtension = useCallback(async (response: 'ACCEPTED' | 'REJECTED' | 'COUNTERED', counterDays?: number) => {
     if (!activeConversation || !latestOpenExtensionRequest || surface !== 'BUYER') return;
@@ -820,11 +858,11 @@ const MessagingManagementPage: React.FC = () => {
   }, [activeConversation, getContextId, latestOpenExtensionRequest, refresh, surface]);
 
   const handleOpenDispute = useCallback(async (issueType: string, description: string) => {
-    if (!activeConversation) return;
-    const contextId = getContextId(activeConversation);
+    if (!activeConversation || !selectedOrder) return;
+    const contextId = selectedOrder.id;
     setActionLoading(true);
     try {
-      if (activeConversation.contextType === 'CUSTOM_ORDER') {
+      if (selectedOrder.type === 'CUSTOM_ORDER') {
         if (surface === 'BRAND' && brandId) {
           await messagingApi.openCustomOrderDisputeForBrand(brandId, contextId, { issueType: issueType as any, description });
         } else {
@@ -843,7 +881,7 @@ const MessagingManagementPage: React.FC = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [activeConversation, brandId, getContextId, refresh, surface]);
+  }, [activeConversation, brandId, refresh, selectedOrder, surface]);
 
   /* ---- Message grouping by date ---- */
   const groupedMessages = useMemo(() => {
@@ -864,6 +902,7 @@ const MessagingManagementPage: React.FC = () => {
   /* ---- Context badge color ---- */
   const contextDotColor = (ct: ConversationContext) => {
     switch (ct) {
+      case 'DIRECT': return 'bg-emerald-500';
       case 'STANDARD_ORDER': return 'bg-blue-500';
       case 'CUSTOM_ORDER': return 'bg-purple-500';
       case 'INQUIRY': return 'bg-amber-500';
@@ -1051,8 +1090,38 @@ const MessagingManagementPage: React.FC = () => {
 
               {/* Action buttons */}
               <div className="flex items-center gap-1.5 shrink-0">
+                {threadOrders.length > 0 && (
+                  <>
+                    <select
+                      value={orderFilter}
+                      onChange={(event) => setOrderFilter(event.target.value as typeof orderFilter)}
+                      className="hidden sm:block rounded-lg border border-gray-200/70 bg-white px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+                      aria-label="Filter orders"
+                    >
+                      <option value="all">All</option>
+                      <option value="active">Active</option>
+                      <option value="closed">Closed</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="disputed">Disputed</option>
+                    </select>
+                    <select
+                      value={selectedOrderKey}
+                      onChange={(event) => setSelectedOrderKey(event.target.value)}
+                      className="max-w-[180px] rounded-lg border border-gray-200/70 bg-white px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+                      aria-label="Select order"
+                    >
+                      <option value="">Select order</option>
+                      {threadOrders.map((order) => (
+                        <option key={`${order.type}:${order.id}`} value={`${order.type}:${order.id}`}>
+                          {order.title}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+
                 {/* Extension request (brand) */}
-                {surface === 'BRAND' && activeConversation.contextType !== 'INQUIRY' && (
+                {surface === 'BRAND' && showOrderActions && selectedOrder?.state === 'active' && (
                   <button
                     type="button"
                     onClick={() => setActiveAction(activeAction === 'extension-request' ? null : 'extension-request')}
@@ -1068,7 +1137,7 @@ const MessagingManagementPage: React.FC = () => {
                 )}
 
                 {/* Dispute (brand or buyer, not inquiry) */}
-                {activeConversation.contextType !== 'INQUIRY' && (
+                {showOrderActions && selectedOrder?.canDispute && (
                   <button
                     type="button"
                     onClick={() => setActiveAction(activeAction === 'dispute' ? null : 'dispute')}
@@ -1084,10 +1153,10 @@ const MessagingManagementPage: React.FC = () => {
                 )}
 
                 {/* View Order (not inquiry) — uses orderDetailUrl for canonical order page */}
-                {activeConversation.contextType !== 'INQUIRY' && activeConversation.orderDetailUrl && (
+                {showOrderActions && selectedOrder?.orderDetailUrl && (
                   <button
                     type="button"
-                    onClick={() => navigate(activeConversation.orderDetailUrl as string)}
+                    onClick={() => navigate(selectedOrder.orderDetailUrl as string)}
                     className="rounded-lg px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
                     title="View Order"
                   >

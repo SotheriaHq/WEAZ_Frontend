@@ -74,6 +74,7 @@ import {
   isBrandProfileComplete,
   resolveBrandProfileSetupDestination,
 } from "@/utils/storeSetup";
+import { preprocessImageFile } from "@/utils/imagePreprocess";
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -1668,6 +1669,8 @@ const EditProduct: React.FC = () => {
           variants: normalizedVariants,
         };
 
+        let createdProductId: string | null = null;
+
         if (isEditMode && productId) {
           if (form.customOrderEnabled) {
             let saved = false;
@@ -1708,16 +1711,9 @@ const EditProduct: React.FC = () => {
               ? { ...payload, status: "DRAFT" }
               : payload,
           );
+          createdProductId = created.id;
 
           try {
-            if (pendingCustomOrderDraft) {
-              await createCustomOrderConfigurationWithBasis(
-                pendingCustomOrderDraft,
-                created.id,
-                form.title,
-              );
-            }
-
             // Build media upload list after product creation.
             let pendingUploads: Array<{ file: File; isPrimary: boolean }> = [];
             if (pendingMediaFiles.length > 0) {
@@ -1741,16 +1737,37 @@ const EditProduct: React.FC = () => {
               pendingUploads = normalizePrimary(orderedPending);
             }
 
+            const [customOrderSaveResult, mediaUploadResult] =
+              await Promise.allSettled([
+                pendingCustomOrderDraft
+                  ? createCustomOrderConfigurationWithBasis(
+                      pendingCustomOrderDraft,
+                      created.id,
+                      form.title,
+                    )
+                  : Promise.resolve(),
+                pendingUploads.length > 0
+                  ? Promise.all(
+                      pendingUploads.map((upload) =>
+                        productApi.uploadProductMedia(
+                          created.id,
+                          upload.file,
+                          upload.isPrimary,
+                        ),
+                      ),
+                    )
+                  : Promise.resolve([]),
+              ]);
+
+            if (customOrderSaveResult.status === "rejected") {
+              throw customOrderSaveResult.reason;
+            }
+
+            if (mediaUploadResult.status === "rejected") {
+              throw mediaUploadResult.reason;
+            }
+
             if (pendingUploads.length > 0) {
-              await Promise.all(
-                pendingUploads.map((upload) =>
-                  productApi.uploadProductMedia(
-                    created.id,
-                    upload.file,
-                    upload.isPrimary,
-                  ),
-                ),
-              );
               notifyProductStudioSync("product-media-uploaded", created.id);
             }
 
@@ -1784,6 +1801,10 @@ const EditProduct: React.FC = () => {
         }
 
         setHasChanges(false);
+        if (!isEditMode && createdProductId) {
+          navigate(`/studio/store?createdProductId=${createdProductId}`);
+          return;
+        }
         navigate("/studio/store");
       } catch (error: any) {
         if (error?.message === "MISSING_SHIPPING_REGION") {
@@ -2146,19 +2167,59 @@ const EditProduct: React.FC = () => {
     [mediaUrls.length, normalizePending],
   );
 
+  const preprocessProductMediaFiles = useCallback(async (files: File[]) => {
+    const prepResults = await Promise.all(
+      files.map(async (file) => {
+        try {
+          const processed = await preprocessImageFile(file, "detail");
+          return { ok: true as const, file: processed.file, optimized: !processed.skipped };
+        } catch {
+          return { ok: false as const, file };
+        }
+      }),
+    );
+
+    const validFiles = prepResults
+      .filter((result) => result.ok)
+      .map((result) => result.file);
+    const optimizedCount = prepResults.filter((result) => result.ok && result.optimized).length;
+    const failedCount = prepResults.length - validFiles.length;
+
+    if (optimizedCount > 0) {
+      toast.message(
+        optimizedCount === 1
+          ? "Optimized 1 image for faster upload"
+          : `Optimized ${optimizedCount} images for faster upload`,
+      );
+    }
+
+    if (failedCount > 0) {
+      toast.error(
+        failedCount === 1
+          ? "1 image could not be prepared"
+          : `${failedCount} images could not be prepared`,
+      );
+    }
+
+    return validFiles;
+  }, []);
+
   const handleMediaFilesSelected: React.ChangeEventHandler<
     HTMLInputElement
   > = async (e) => {
-    const files = Array.from(e.target.files ?? []).filter((f) =>
+    const selectedFiles = Array.from(e.target.files ?? []).filter((f) =>
       f.type.startsWith("image/"),
     );
     e.target.value = "";
-    if (!files.length) return;
+    if (!selectedFiles.length) return;
 
     if (!canAddMoreMedia) {
       toast.error(`You can upload up to ${maxMediaCount} images`);
       return;
     }
+
+    const files = await preprocessProductMediaFiles(selectedFiles);
+    if (!files.length) return;
 
     if (isEditMode && productId) {
       const uploadQueue = files.slice(0, maxMediaCount - mediaUrls.length);
@@ -3841,15 +3902,21 @@ const EditProduct: React.FC = () => {
                 {(saving || submitLocked) && saveAction === "publish" && (
                 <VLoader size={16} phase="loading" showLabel={false} />
               )}
-              {isDraftEditMode
-                ? "Publish Product"
-                : isCollectionContext && isEditMode
-                  ? "Save to Collection"
+              {(saving || submitLocked) && saveAction === "publish"
+                ? !isEditMode && pendingMediaFiles.length > 0
+                  ? "Creating and uploading images..."
                   : isEditMode
-                    ? "Save Changes"
-                    : isCollectionFlow
-                      ? "Add to Collection"
-                      : "Create Product"}
+                    ? "Saving changes..."
+                    : "Creating product..."
+                : isDraftEditMode
+                  ? "Publish Product"
+                  : isCollectionContext && isEditMode
+                    ? "Save to Collection"
+                    : isEditMode
+                      ? "Save Changes"
+                      : isCollectionFlow
+                        ? "Add to Collection"
+                        : "Create Product"}
             </button>
           </div>
         </div>

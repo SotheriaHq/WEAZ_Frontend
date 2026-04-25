@@ -372,7 +372,7 @@ export default function AdminBrandVerificationReviewPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
         <div className="min-w-0 space-y-6">
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="rounded-[1.5rem] border border-gray-200 bg-white p-5 shadow-sm">
@@ -467,8 +467,8 @@ export default function AdminBrandVerificationReviewPage() {
               ) : null}
             </div>
 
-            <div className="mt-5 grid gap-5 2xl:grid-cols-[240px_minmax(0,1fr)]">
-              <div className="min-w-0 space-y-3">
+            <div className="mt-5 grid gap-5 xl:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
+              <div className="min-w-0 space-y-3 xl:max-w-[240px]">
                 {(details.documents ?? []).map((document) => (
                   <button
                     key={document.key}
@@ -510,7 +510,7 @@ export default function AdminBrandVerificationReviewPage() {
                     <iframe
                       title={selectedDocument.label}
                       src={selectedDocument.signedUrl}
-                      className="h-[62vh] min-h-[420px] w-full bg-white"
+                      className="h-[50vh] min-h-[320px] w-full bg-white sm:h-[56vh] sm:min-h-[380px] xl:h-[62vh] xl:min-h-[420px]"
                     />
                   ) : (
                     <div className="flex min-h-[420px] items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_36%),linear-gradient(180deg,_#ffffff,_#f8fafc)] p-4">

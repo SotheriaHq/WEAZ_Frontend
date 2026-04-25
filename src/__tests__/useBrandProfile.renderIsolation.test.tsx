@@ -3,8 +3,10 @@ import { configureStore } from '@reduxjs/toolkit';
 import { act, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import userReducer, { setUser } from '@/features/userSlice';
+import { brandApi } from '@/api/BrandApi';
 import { useBrandProfile } from '@/hooks/UseBrandHook';
 import type { AuthUserDto } from '@/types/auth';
+import type { BrandProfileDto } from '@/types/profile';
 
 vi.mock('@/api/BrandApi', () => ({
   brandApi: {
@@ -147,5 +149,117 @@ describe('useBrandProfile render isolation', () => {
     });
 
     expect(renderCount).toBe(settledRenderCount);
+  });
+
+  it('immediately syncs stale brand profile fields from the updated auth user', async () => {
+    const staleProfile: BrandProfileDto = {
+      id: baseUser.id,
+      brandFullName: baseUser.brandFullName ?? '',
+      description: 'Old story still cached in hook state.',
+      country: 'Nigeria',
+      state: 'Lagos',
+      city: 'Lagos',
+      location: 'Lagos, Nigeria',
+      bannerImage: baseUser.bannerImage,
+      bannerImageMeta: {
+        fileId: 'banner-1',
+        url: 'https://cdn.example.com/old-banner.jpg',
+        originalName: 'old-banner.jpg',
+        fileName: 'old-banner.jpg',
+        createdAt: '2026-04-17T00:00:00.000Z',
+        updatedAt: '2026-04-17T00:00:00.000Z',
+      },
+      logoImage: baseUser.profileImage,
+      logoImageMeta: {
+        fileId: 'avatar-1',
+        url: 'https://cdn.example.com/old-avatar.jpg',
+        originalName: 'old-avatar.jpg',
+        fileName: 'old-avatar.jpg',
+        createdAt: '2026-04-17T00:00:00.000Z',
+        updatedAt: '2026-04-17T00:00:00.000Z',
+      },
+      socialLinks: {},
+      contactInfo: {
+        email: baseUser.email,
+        phone: null,
+        businessType: null,
+      },
+      tags: ['OldTag'],
+      hashtags: ['OldTag'],
+      verified: true,
+      verificationStatus: 'APPROVED',
+      verificationBadgeVisible: true,
+      verifiedExplanationUrl: null,
+      createdAt: baseUser.createdAt,
+      updatedAt: baseUser.updatedAt,
+    };
+
+    const getBrandProfileMock = vi.mocked(brandApi.getBrandProfile);
+    getBrandProfileMock.mockReset();
+    getBrandProfileMock
+      .mockResolvedValueOnce(staleProfile)
+      .mockImplementation(() => new Promise<BrandProfileDto | null>(() => {}));
+
+    const store = configureStore({
+      reducer: {
+        user: userReducer,
+      },
+    });
+
+    store.dispatch(setUser(baseUser));
+
+    type BrandProfileHookState = ReturnType<typeof useBrandProfile>;
+    let latestHook: BrandProfileHookState | null = null;
+
+    const Probe = () => {
+      latestHook = useBrandProfile();
+      return null;
+    };
+
+    render(
+      <Provider store={store}>
+        <Probe />
+      </Provider>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(latestHook).not.toBeNull();
+    if (!latestHook) {
+      throw new Error('Hook state was not captured after initial render.');
+    }
+    const initialHook: BrandProfileHookState = latestHook;
+    expect(initialHook.displayData.description).toBe('Old story still cached in hook state.');
+    expect(initialHook.displayData.hashtags).toEqual(['OldTag']);
+
+    await act(async () => {
+      store.dispatch(
+        setUser({
+          ...baseUser,
+          brandDescription: 'Fresh profile story from the save response.',
+          brandCountry: 'Ghana',
+          brandState: 'Greater Accra',
+          brandCity: 'Accra',
+          brandTags: ['Minimalist', 'Resort'],
+          updatedAt: '2026-04-18T00:00:00.000Z',
+        }),
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(latestHook).not.toBeNull();
+    if (!latestHook) {
+      throw new Error('Hook state was not captured after profile update.');
+    }
+    const updatedHook: BrandProfileHookState = latestHook;
+    expect(updatedHook.displayData.description).toBe('Fresh profile story from the save response.');
+    expect(updatedHook.displayData.hashtags).toEqual(['Minimalist', 'Resort']);
+    expect(updatedHook.displayData.country).toBe('Ghana');
+    expect(updatedHook.displayData.state).toBe('Greater Accra');
+    expect(updatedHook.displayData.city).toBe('Accra');
   });
 });

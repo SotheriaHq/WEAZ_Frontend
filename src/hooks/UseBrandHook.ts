@@ -69,6 +69,131 @@ const areStableUserFieldsEqual = (previous: AuthUserDto | null, next: AuthUserDt
   );
 };
 
+const buildBrandLocationFromUser = (user: AuthUserDto) =>
+  [user.brandCity, user.brandState, user.brandCountry]
+    .filter((segment): segment is string => Boolean(segment && segment.length > 0))
+    .join(', ');
+
+const mapAuthFileToBrandMediaAsset = (
+  file: AuthUserDto['profileImageFile'] | AuthUserDto['bannerImageFile'],
+) => {
+  if (!file?.id || !file.s3Url) {
+    return null;
+  }
+
+  return {
+    fileId: file.id,
+    url: file.s3Url,
+    originalName: file.originalName,
+    fileName: file.fileName,
+    createdAt: file.createdAt,
+    updatedAt: file.updatedAt,
+  };
+};
+
+const areBrandProfileTagsEqual = (
+  previous: string[] | null | undefined,
+  next: string[] | null | undefined,
+) => areStringArraysEqual(previous, next);
+
+const areBrandProfileSnapshotsEqual = (
+  previous: BrandProfileDto | null,
+  next: BrandProfileDto | null,
+) => {
+  if (previous === next) return true;
+  if (!previous || !next) return previous === next;
+
+  return (
+    previous.id === next.id &&
+    previous.brandFullName === next.brandFullName &&
+    previous.description === next.description &&
+    previous.country === next.country &&
+    previous.state === next.state &&
+    previous.city === next.city &&
+    previous.location === next.location &&
+    previous.bannerImage === next.bannerImage &&
+    previous.bannerImageMeta?.fileId === next.bannerImageMeta?.fileId &&
+    previous.logoImage === next.logoImage &&
+    previous.logoImageMeta?.fileId === next.logoImageMeta?.fileId &&
+    previous.socialLinks.instagram === next.socialLinks.instagram &&
+    previous.socialLinks.facebook === next.socialLinks.facebook &&
+    previous.socialLinks.twitter === next.socialLinks.twitter &&
+    previous.socialLinks.website === next.socialLinks.website &&
+    previous.contactInfo.email === next.contactInfo.email &&
+    previous.contactInfo.phone === next.contactInfo.phone &&
+    previous.contactInfo.businessType === next.contactInfo.businessType &&
+    areBrandProfileTagsEqual(previous.tags, next.tags) &&
+    areBrandProfileTagsEqual(previous.hashtags, next.hashtags) &&
+    previous.cacNumber === next.cacNumber &&
+    previous.tin === next.tin &&
+    previous.verified === next.verified &&
+    previous.verificationStatus === next.verificationStatus &&
+    previous.verificationBadgeVisible === next.verificationBadgeVisible &&
+    previous.verifiedExplanationUrl === next.verifiedExplanationUrl &&
+    previous.averageRating === next.averageRating &&
+    previous.totalReviews === next.totalReviews &&
+    previous.collectionsCount === next.collectionsCount &&
+    previous.patchesCount === next.patchesCount &&
+    previous.createdAt === next.createdAt &&
+    previous.updatedAt === next.updatedAt
+  );
+};
+
+const syncBrandProfileWithUser = (
+  current: BrandProfileDto | null,
+  user: AuthUserDto | null,
+): BrandProfileDto | null => {
+  if (!user || user.type !== 'BRAND') {
+    return current;
+  }
+
+  const locationFromUser = buildBrandLocationFromUser(user);
+  const next: BrandProfileDto = {
+    id: current?.id ?? user.id,
+    brandFullName:
+      user.brandFullName ||
+      `${user.firstName} ${user.lastName}`.trim() ||
+      user.username,
+    description: user.brandDescription,
+    isStoreOpen: current?.isStoreOpen,
+    country: user.brandCountry,
+    state: user.brandState,
+    city: user.brandCity,
+    location: locationFromUser || current?.location || null,
+    bannerImage: user.bannerImage,
+    bannerImageMeta: mapAuthFileToBrandMediaAsset(user.bannerImageFile),
+    logoImage: user.profileImage,
+    logoImageMeta: mapAuthFileToBrandMediaAsset(user.profileImageFile),
+    socialLinks: {
+      instagram: user.socialInstagram,
+      facebook: user.socialFacebook,
+      twitter: user.socialTwitter,
+      website: user.socialWebsite,
+    },
+    contactInfo: {
+      email: user.email,
+      phone: user.phoneNumber,
+      businessType: user.brandBusinessType,
+    },
+    tags: user.brandTags ?? [],
+    hashtags: user.brandTags ?? [],
+    cacNumber: user.cacNumber,
+    tin: user.tin,
+    verified: user.isVerifiedBrand,
+    verificationStatus: user.verificationStatus ?? undefined,
+    verificationBadgeVisible: user.verificationBadgeVisible,
+    verifiedExplanationUrl: user.verifiedExplanationUrl ?? null,
+    averageRating: current?.averageRating,
+    totalReviews: current?.totalReviews,
+    collectionsCount: current?.collectionsCount,
+    patchesCount: current?.patchesCount,
+    createdAt: current?.createdAt ?? user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+
+  return areBrandProfileSnapshotsEqual(current, next) ? current : next;
+};
+
 export const useBrandProfile = () => {
   const user = useSelector(
     (state: RootState) => state.user.profile,
@@ -115,6 +240,10 @@ export const useBrandProfile = () => {
       setBrandProfileLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    setBrandProfile((current) => syncBrandProfileWithUser(current, user));
+  }, [user]);
 
   // Fetch collections
   const fetchCollections = useCallback(async (ownerId: string) => {
@@ -216,6 +345,14 @@ export const useBrandProfile = () => {
     return success;
   }, []);
 
+  useEffect(() => {
+    if (!user?.id || user.type !== 'BRAND') {
+      setBrandProfile(null);
+      setBrandProfileError(null);
+      setBrandProfileLoading(false);
+    }
+  }, [user?.id, user?.type]);
+
   // Initial data fetch
   useEffect(() => {
     if (!user?.id) {
@@ -226,14 +363,23 @@ export const useBrandProfile = () => {
     // Fetch collections for all users
     void fetchCollections(user.id);
 
-    // Fetch brand-specific data only for BRAND users
-    if (user.type === 'BRAND' && brandDetailEndpointsEnabled) {
-      void fetchBrandProfile(user.id);
-      if (!reviewFlagsLoading && reviewFlags.readEnabled) {
-        void fetchReviews(user.id);
-      }
+  }, [user?.id, fetchCollections]);
+
+  useEffect(() => {
+    if (!user?.id || user.type !== 'BRAND' || !brandDetailEndpointsEnabled) {
+      return;
     }
-  }, [user?.id, user?.type, fetchCollections, fetchBrandProfile, fetchReviews, brandDetailEndpointsEnabled, reviewFlags.readEnabled, reviewFlagsLoading]);
+
+    void fetchBrandProfile(user.id);
+  }, [user?.id, user?.type, user?.updatedAt, brandDetailEndpointsEnabled, fetchBrandProfile]);
+
+  useEffect(() => {
+    if (!user?.id || user.type !== 'BRAND' || reviewFlagsLoading || !reviewFlags.readEnabled) {
+      return;
+    }
+
+    void fetchReviews(user.id);
+  }, [user?.id, user?.type, fetchReviews, reviewFlags.readEnabled, reviewFlagsLoading]);
 
   // Get display values with fallbacks
   const defaultFallbackTags =

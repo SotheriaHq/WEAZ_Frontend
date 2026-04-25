@@ -6,6 +6,7 @@ import type { RootState } from '@/store';
 import { setUser } from '@/features/userSlice';
 import { brandApi } from '@/api/BrandApi';
 import type { BrandProfileDto } from '@/types/profile';
+import { invalidateStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
 
 import EditProfileModal from '@/components/profile/EditProfileModal';
 
@@ -113,6 +114,7 @@ export const GlobalModalRouter: React.FC = () => {
         onClose={() => closeModal({ dismissPrompt: true })}
         onSaved={async (updatedUser) => {
           dispatch(setUser(updatedUser));
+          invalidateStoreSetupStatusCache();
           localStorage.removeItem(BRAND_SETUP_DISMISS_KEY);
           closeModal();
           if (nextPath) {

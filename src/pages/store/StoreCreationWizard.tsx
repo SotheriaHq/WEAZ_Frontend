@@ -30,6 +30,7 @@ import {
   readStoreProgressLocally,
   saveStoreProgressLocally,
 } from '@/utils/storeSetup';
+import { primeStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
 
 // Initial empty state for the wizard
 const initialData: StoreWizardData = {
@@ -532,6 +533,7 @@ const StoreCreationWizard: React.FC = () => {
       
       // Call openStore API to mark setup as complete
       await openStore();
+      primeStoreSetupStatusCache(true);
       markStoreOpenPending(user?.id);
       
       // Clear the localStorage draft since setup is complete

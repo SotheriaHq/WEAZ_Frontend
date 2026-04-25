@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
 import type { MarketItem } from '@/types/market';
-import { CommentsApi } from '@/api/CommentsApi';
+import { messagingApi } from '@/api/MessagingApi';
 import { apiClient } from '@/api/httpClient';
 import { brandApi } from '@/api/BrandApi';
 import DesignCommentsPanel from '@/components/designs/DesignCommentsPanel';
@@ -310,24 +310,31 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
   const handleCommentSubmit = async () => {
     if (!isAuth) {
-      toast.info('Please sign in to comment.');
+      toast.info('Please sign in to message.');
       return;
     }
-    if (!activeMediaId) return;
+    if (!item?.brandId) {
+      toast.error('Brand is unavailable for this design.');
+      return;
+    }
 
     const content = commentText.trim();
-    if (!content || content.length > 500) {
-      toast.error('Comment must be 1-500 characters.');
+    if (!content || content.length > 4000) {
+      toast.error('Message must be 1-4000 characters.');
       return;
     }
     setPostingComment(true);
     try {
-      const created = await CommentsApi.create('COLLECTION_MEDIA', activeMediaId, content);
-      setExternalComment(created);
-      setCommentCount((current) => current + 1);
+      await messagingApi.sendBrandMessage(item.brandId, {
+        bodyText: content,
+        clientMessageId: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      });
       setCommentText('');
+      toast.success('Message sent');
     } catch (e: any) {
-      toast.error(e?.response?.data?.message ?? 'Failed to post comment');
+      toast.error(e?.response?.data?.message ?? 'Failed to send message');
     } finally {
       setPostingComment(false);
     }
@@ -683,7 +690,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       }
                     }}
                     disabled={postingComment}
-                    placeholder="Share your thoughts..."
+                    placeholder="Message brand..."
+                    maxLength={4000}
                     className="flex-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40"
                   />
                   <button

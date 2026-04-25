@@ -166,6 +166,7 @@ const AdminSettingsPage: React.FC = () => {
 
   /* ---- Messaging auto-hide rules (derived from systemConfig) ---- */
   const MESSAGING_RULES: { key: string; label: string; hint: string; type: 'toggle' | 'hours' }[] = [
+    { key: 'messaging.brandToBrand.enabled', label: 'Brand-to-brand messaging', hint: 'Allow brand accounts to initiate direct conversations with other brands', type: 'toggle' },
     { key: 'messaging.autoHide.unverifiedUsers', label: 'Hide messages from unverified users', hint: 'Automatically hide messages sent by users who have not verified their account', type: 'toggle' },
     { key: 'messaging.autoHide.unverifiedUsersDelayHours', label: 'Delay before hiding (hours)', hint: 'Hide messages from unverified users after this many hours', type: 'hours' },
     { key: 'messaging.autoHide.incompleteStoreSetup', label: 'Hide messages from brands without store setup', hint: 'Automatically hide messages from brands that have not completed their store setup', type: 'toggle' },

@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import { CommentsApi } from '@/api/CommentsApi';
+import { messagingApi } from '@/api/MessagingApi';
 import { toast } from 'sonner';
 import ThreadButton from '@/components/ui/ThreadButton';
 import CommentInput from '@/components/ui/CommentInput';
 import type { MarketItem } from '@/types/market';
-import { selectCommentCount } from '@/features/engagementSlice';
-import { useRealtime } from '@/realtime/RealtimeProvider';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { apiClient } from '@/api/httpClient';
 import { Link, Tag } from 'lucide-react';
@@ -47,7 +45,6 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const [commentText, setCommentText] = useState('');
   const [commentBusy, setCommentBusy] = useState(false);
-  const realtime = useRealtime();
   const user = useSelector((s: RootState) => s.user.profile);
   const [isHidden, setIsHidden] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -82,11 +79,6 @@ export const DesignCard: React.FC<DesignCardProps> = ({
     }
   }, [item.id]);
 
-  // Join WebSocket room for real-time comment/thread updates
-  useEffect(() => {
-    realtime.joinCollectionMedia(item.id);
-  }, [item.id, realtime]);
-
   useEffect(() => {
     let mounted = true;
     const loadSaved = async () => {
@@ -117,10 +109,6 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   }, [ensureStatus, isAuth, isPatchCapable, item.brandId, isPatchControlled]);
 
   // Use Redux selector for real-time comment count synchronization
-  const commentCount = useSelector((s: RootState) => 
-    selectCommentCount(s, 'COLLECTION_MEDIA', item.id) ?? item.commentsCount ?? 0
-  );
-  
   const handleHideContent = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isAuth) { toast.info('Please sign in to manage content preferences.'); return; }
@@ -457,25 +445,32 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                 value={commentText}
                 onChange={setCommentText}
                 onSubmit={async () => {
-                  if (!isAuth) { toast.info('Please sign in to comment.'); return; }
+                  if (!isAuth) { toast.info('Please sign in to message.'); return; }
                   const content = commentText.trim();
-                  if (!content || content.length > 500) { toast.error('Comment must be 1-500 characters.'); return; }
+                  if (!content || content.length > 4000) { toast.error('Message must be 1-4000 characters.'); return; }
+                  if (!item.brandId) { toast.error('Brand is unavailable for this design.'); return; }
                   setCommentBusy(true);
                   try {
-                    await CommentsApi.create('COLLECTION_MEDIA', item.id, content);
+                    await messagingApi.sendBrandMessage(item.brandId, {
+                      bodyText: content,
+                      clientMessageId: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+                        ? crypto.randomUUID()
+                        : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                    });
                     setCommentText('');
-                    // Comment count will be updated via WebSocket real-time event (comment.created)
+                    toast.success('Message sent');
                   } catch (err: any) {
-                    toast.error(err?.response?.data?.message ?? 'Failed to post comment');
+                    toast.error(err?.response?.data?.message ?? 'Failed to send message');
                   } finally { setCommentBusy(false); }
                 }}
+                placeholder="Message brand..."
+                maxLength={4000}
                 disabled={commentBusy}
                 busy={commentBusy}
                 className="w-full"
                 variant="overlay"
               />
             </div>
-            <span className="shrink-0 text-xs font-medium text-white/80 drop-shadow">{commentCount}</span>
           </div>
         </div>
       </div>
