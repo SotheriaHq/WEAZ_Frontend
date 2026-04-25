@@ -4,8 +4,9 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 export type SidebarMode = 'RAIL' | 'DRAWER' | 'OVERLAY' | 'HIDDEN';
 
 // Breakpoint constant - single source of truth.
-// Mobile-only docks should only activate on genuinely small screens.
-export const MOBILE_BREAKPOINT = 768;
+// Keep JS layout decisions aligned with the Tailwind `md` breakpoint so the
+// shell does not switch to mobile while CSS is already rendering tablet/desktop.
+export const MOBILE_BREAKPOINT = 640;
 
 interface UiState {
     sidebarMode: SidebarMode;

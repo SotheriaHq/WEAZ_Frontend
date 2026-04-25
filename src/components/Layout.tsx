@@ -71,7 +71,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
        
       {/* Main Content Area */}
       <main
-        className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
+        className="min-h-screen pt-16 pb-20 transition-[margin] duration-300 ease-out md:pb-8"
         style={{ marginLeft: mainMarginLeft }}
       >
         {/* will-change removed from main — it was promoting the entire page to

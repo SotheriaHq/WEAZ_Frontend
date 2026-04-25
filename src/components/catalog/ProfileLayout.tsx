@@ -309,7 +309,7 @@ export const ProfileLayout: React.FC = () => {
             {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
             <Navbar />
             <main
-              className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
+              className="min-h-screen pt-16 pb-20 transition-[margin] duration-300 ease-out md:pb-8"
               style={{ marginLeft: mainMarginLeft }}
             >
               <div className="p-4 sm:p-6">
@@ -343,7 +343,7 @@ export const ProfileLayout: React.FC = () => {
         {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
         <Navbar />
         <main
-          className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
+          className="min-h-screen pt-16 pb-20 transition-[margin] duration-300 ease-out md:pb-8"
           style={{ marginLeft: mainMarginLeft }}
         >
           <div className="p-4 sm:p-6">
@@ -369,7 +369,7 @@ export const ProfileLayout: React.FC = () => {
         {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
         <Navbar />
         <main
-          className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
+          className="min-h-screen pt-16 pb-20 transition-[margin] duration-300 ease-out md:pb-8"
           style={{ marginLeft: mainMarginLeft }}
         >
           {showEmailVerificationPrompt ? (
