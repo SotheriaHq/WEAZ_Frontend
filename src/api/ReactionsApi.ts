@@ -1,41 +1,46 @@
 import { apiClient } from './httpClient';
 
 export const ReactionsApi = {
-  // Collection-level likes
-  async toggleCollectionLike(collectionId: string) {
+  // Collection-level threads
+  async toggleCollectionThread(collectionId: string) {
     const clientEventId = (globalThis.crypto && 'randomUUID' in globalThis.crypto)
       ? (globalThis.crypto as any).randomUUID()
       : undefined;
-    const { data } = await apiClient.post(`/collections/${collectionId}/reactions/like`, {}, {
+    const { data } = await apiClient.post(`/collections/${collectionId}/reactions/thread`, {}, {
       headers: clientEventId ? { 'x-client-event-id': clientEventId } : undefined,
     });
-    return data as { likes: number; dislikes: number };
+    return data as { threads: number; dislikes: number; threaded: boolean };
   },
   async getCollectionReactions(collectionId: string, limit = 20) {
     const { data } = await apiClient.get(`/collections/${collectionId}/reactions`, { params: { limit } });
-    return data as { users: Array<{ id: string; username?: string; firstName?: string; lastName?: string; profileImage?: string }>; totalLikes: number; totalDislikes: number };
+    return data as { users: Array<{ id: string; username?: string; firstName?: string; lastName?: string; profileImage?: string }>; totalThreads: number; totalDislikes: number };
   },
-  async getCollectionIsLiked(collectionId: string) {
-    const { data } = await apiClient.get(`/collections/${collectionId}/is-liked`);
-    return data as { liked: boolean };
+  async getCollectionIsThreaded(collectionId: string) {
+    const { data } = await apiClient.get(`/collections/${collectionId}/is-threaded`);
+    return data as { threaded: boolean };
   },
 
-  // Media-level likes
-  async toggleCollectionMediaLike(mediaId: string) {
+  // Media-level threads
+  async toggleCollectionMediaThread(mediaId: string) {
     const clientEventId = (globalThis.crypto && 'randomUUID' in globalThis.crypto)
       ? (globalThis.crypto as any).randomUUID()
       : undefined;
-    const { data } = await apiClient.post(`/collections/media/${mediaId}/reaction/like`, {}, {
+    const { data } = await apiClient.post(`/collections/media/${mediaId}/reaction/thread`, {}, {
       headers: clientEventId ? { 'x-client-event-id': clientEventId } : undefined,
     });
-    return data as { likes: number };
+    return data as { threads: number; threaded: boolean };
   },
   async getCollectionMediaReactions(mediaId: string, limit = 20) {
     const { data } = await apiClient.get(`/collections/media/${mediaId}/reactions`, { params: { limit } });
-    return data as { users: Array<{ id: string; username?: string; firstName?: string; lastName?: string; profileImage?: string }>; totalLikes: number };
+    return data as { users: Array<{ id: string; username?: string; firstName?: string; lastName?: string; profileImage?: string }>; totalThreads: number };
   },
-  async getCollectionMediaIsLiked(mediaId: string) {
-    const { data } = await apiClient.get(`/collections/media/${mediaId}/is-liked`);
-    return data as { liked: boolean };
+  async getCollectionMediaIsThreaded(mediaId: string) {
+    const { data } = await apiClient.get(`/collections/media/${mediaId}/is-threaded`);
+    return data as { threaded: boolean };
   },
+
+  async getContentOwner(contentType: 'COLLECTION' | 'COLLECTION_MEDIA', contentId: string) {
+    const { data } = await apiClient.get(`/v1/reactions/owner/${contentType}/${contentId}`);
+    return data as { ownerId: string };
+  }
 };

@@ -43,13 +43,21 @@ export interface AuthUserDto {
   bannerImageId: string | null;
   bannerImageFile: AuthProfileImageFileDto | null;
   isEmailVerified: boolean;
+  storeId: string | null;
+  verificationStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'IN_REVIEW' | 'ADDITIONAL_INFO_REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | null;
+  isVerifiedBrand?: boolean;
+  verificationBadgeVisible?: boolean;
+  verifiedExplanationUrl?: string | null;
   isActive: string;
+  status?: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED' | null;
+  mustResetPassword?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 export interface AuthTokensResponse {
   user: AuthUserDto;
   accessToken?: string | null;
+  refreshToken?: string | null;
   message?: string;
 }
 
@@ -65,6 +73,7 @@ export interface AuthJwtClaims {
   email: string;
   firstName: string;
   lastName: string;
+  permissions?: string[];
 }
 export type ApiSuccessPayload<T> =
   | (T & { statusCode: number; message: string })

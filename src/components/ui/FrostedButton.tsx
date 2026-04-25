@@ -1,5 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
+import VLoader from '@/components/loaders/VLoader';
 
 type Variant = 'primary' | 'ghost' | 'outline';
 type Size = 'xs' | 'sm' | 'md' | 'lg';
@@ -25,6 +26,7 @@ export const FrostedButton: React.FC<FrostedButtonProps> = ({
 }) => (
   <button
     className={clsx(
+      'relative',
       variant === 'primary' && 'btn-frost-primary',
       variant === 'ghost' && 'btn-frost-ghost',
       variant === 'outline' && 'btn-frost-outline',
@@ -35,11 +37,19 @@ export const FrostedButton: React.FC<FrostedButtonProps> = ({
       className,
     )}
     disabled={disabled || loading}
+    aria-busy={loading ? true : undefined}
     {...props}
   >
-    {leftIcon}
-    {children}
-    {rightIcon}
+    <span className={clsx('inline-flex items-center gap-2', loading && 'invisible')}>
+      {leftIcon ? <span className="shrink-0">{leftIcon}</span> : null}
+      <span>{children}</span>
+      {rightIcon ? <span className="shrink-0">{rightIcon}</span> : null}
+    </span>
+    {loading ? (
+      <span className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
+        <VLoader size={16} phase="loading" showLabel={false} className="text-current" />
+      </span>
+    ) : null}
   </button>
 );
 

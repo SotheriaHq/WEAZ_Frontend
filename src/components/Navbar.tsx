@@ -1,480 +1,482 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Filter, Bell, User, Tag as TagIcon, Settings, LogOut, ChevronDown, Globe, MapPin, Sun, Moon, Monitor, Heart } from 'lucide-react';
-// Button variants available: FrostedButton (primary|ghost|outline) and IconButton
-// Sizes: xs|sm|md|lg via btn-tight-* classes
-import { FrostedButton } from '@/components/ui/FrostedButton';
-import { ImageWithFallback } from '@/components/ImageWithFallback';
-import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearUser, setUser } from '../features/userSlice';
-import type { RootState } from '../store';
+import { addLocalNotification, resetUnreadCount } from '../features/notificationsSlice';
+import { closeSidebar, toggleSidebar } from '../features/uiSlice';
+import {
+  openCartDrawer,
+  closeCartDrawer,
+  selectCartCombinedQuantity,
+  selectCartIsDrawerOpen,
+  fetchCart,
+  fetchCustomBagCount,
+  resetCartState,
+} from '../features/cartSlice';
+import {
+  openWishlistDrawer,
+  closeWishlistDrawer,
+  fetchWishlist,
+  selectWishlistTotal,
+  selectWishlistIsDrawerOpen,
+  resetWishlistState,
+} from '../features/wishlistSlice';
+import type { RootState, AppDispatch } from '../store';
 import type { AuthUserDto } from '../types/auth';
 import '../styles/scrollbar-hide.css';
-import TagChip from '@/components/ui/Tag';
-import SearchField from '@/components/SearchField';
+import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 import { apiClient, dropStoredAccessToken } from '../api/httpClient';
 import { env } from '../config/env';
 import getProfileOrHomeUrl from '../lib/navigation';
-import { getTagColor } from '../utils/tagColors';
-
-
+import { useEffect, useRef, useState } from 'react';
+import { useTheme } from '@/context/ThemeContext';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import ImageWithFallback from './ImageWithFallback';
+import FrostedButton from './ui/FrostedButton';
+import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
+import { generateUserUid } from '@/utils/userUid';
+import { resolveProfileImageSource } from '@/utils/profileImage';
+import BrandWordmark from '@/components/brand/BrandWordmark';
+import { COMPANY_NAME } from '@/lib/brand';
+import {
+  Dropdown as SharedDropdown,
+  DropdownDivider,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
+} from '@/components/ui/Dropdown';
 
 interface NavbarProps {
-  isCollapsed: boolean;
-  minimal?: boolean; // profile pages: hide center controls
+  minimal?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, minimal = false }) => {
+export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showThemeDropdown, setShowThemeDropdown] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-  // search focus handled inside SearchField
-  const [showTags, setShowTags] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const profileMenuRef = useRef(null);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const notificationsAnchorRef = useRef<HTMLElement | null>(null);
   const { theme, setTheme } = useTheme();
   const { setLanguage, translate } = useLanguage();
   const { profile: userProfile, isAuthenticated } = useSelector((state: RootState) => state.user);
+  const isSidebarOpen = useSelector((state: RootState) => state.ui.isSidebarOpen);
+  const { unreadCount } = useSelector((state: RootState) => state.notifications);
+  const cartQuantity = useSelector(selectCartCombinedQuantity);
+  const isCartOpen = useSelector(selectCartIsDrawerOpen);
+  const wishlistTotal = useSelector(selectWishlistTotal);
+  const isWishlistOpen = useSelector(selectWishlistIsDrawerOpen);
   const user = isAuthenticated ? userProfile : null;
-  const dispatch = useDispatch();
+  const userAvatar = React.useMemo(
+    () => resolveProfileImageSource(user),
+    [user],
+  );
+  const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
+  const userUid = user ? generateUserUid(user.id, user.firstName) : null;
+  const resolvedIsDark =
+    theme === 'dark' ||
+    (theme === 'system' &&
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const themeActionEmoji = resolvedIsDark ? '🌞' : '🌙';
+  const themeMenuLabel = resolvedIsDark ? 'Light theme' : 'Dark theme';
 
-  // Hydrate Redux user state from localStorage if missing
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      dispatch(fetchCart());
+      dispatch(fetchCustomBagCount());
+      dispatch(fetchWishlist({ page: 1, limit: 200 }));
+    }
+  }, [dispatch, isAuthenticated]);
+
   React.useEffect(() => {
     if (!user && typeof window !== 'undefined') {
       const persisted = localStorage.getItem(env.userStorageKey);
       if (persisted) {
         try {
           const parsed = JSON.parse(persisted) as AuthUserDto;
-          if (parsed && parsed.id) {
-            dispatch(setUser(parsed));
-          }
-        } catch (e) { void e; }
-      }
-    }
-  }, [user, dispatch]);
-
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const navTags = [
-    'Ankara', 'Luxury', 'Streetwear', 'Spring2025', 'Summer', 'Under50k', 'Dresses', 'Accessories'
-  ];
-
-  // Location sharing handler
-  const handleLocationShare = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          void position;
-          // location obtained but not persisted in this component
-        },
-        (error) => {
+          if (parsed?.id) dispatch(setUser(parsed));
+        } catch (error) {
           void error;
         }
-      );
-    }
-  };
-
-  // Click outside handler
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        profileMenuRef.current &&
-        event.target instanceof HTMLElement &&
-        !(profileMenuRef.current as HTMLDivElement).contains(event.target)
-      ) {
-        setShowProfileMenu(false);
-        setShowThemeDropdown(false);
-        setShowLanguageDropdown(false);
       }
-    };
+    }
+  }, [dispatch, user]);
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+  useEffect(() => {
+    if (!user) {
+      setShowProfileMenu(false);
+      setShowLanguageDropdown(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!showProfileMenu) {
+      setShowLanguageDropdown(false);
+    }
+  }, [showProfileMenu]);
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Toggle frosted vs transparent on scroll
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 0);
-    onScroll();
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [location.pathname, theme]);
+  const handleThemeToggle = () => {
+    setTheme(resolvedIsDark ? 'light' : 'dark');
+  };
 
-  // Profile Menu Component
+  const handleLocationShare = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => void position,
+      (error) => void error,
+    );
+  };
+  const profileHomeRoute = user ? getProfileOrHomeUrl(user) : '/profile';
+  const ordersRoute = user?.type === 'BRAND' ? '/studio?tab=orders' : '/profile?tab=orders';
+  const savedRoute = user?.type === 'BRAND' ? '/profile?tab=Content' : profileHomeRoute;
+  const helpRoute = '/help/verified-badge';
+
   const ProfileMenu = () => {
-    if (!showProfileMenu) return null;
+    if (!user) return null;
 
     return (
-      <div
-        ref={profileMenuRef}
-        className="absolute right-0 mt-2 w-64 max-h-[calc(100vh-80px)] overflow-y-auto scrollbar-hide glass-panel bg-white/95 dark:bg-gray-950 backdrop-blur-xl rounded-lg shadow-xl border border-white/30 dark:border-white/10 py-2 z-50"
-        style={{ WebkitOverflowScrolling: 'touch', height: 'auto', minHeight: '400px' }}
+      <SharedDropdown
+        open={showProfileMenu}
+        onOpenChange={(nextOpen) => {
+          setShowProfileMenu(nextOpen);
+          if (nextOpen) {
+            setShowNotifications(false);
+          }
+          if (!nextOpen) {
+            setShowLanguageDropdown(false);
+          }
+        }}
+        placement="bottom-end"
+        offset={1}
+        className="relative"
       >
-        {/* Gradient Background Overlay - Same as Market Header */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-purple-400/10 to-transparent opacity-50 blur-2xl pointer-events-none" />
-        
-        <div className="relative z-10">
-          {isAuthenticated && user ? (
-          <>
-            {/* User Info */}
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center space-x-3">
-                <ImageWithFallback
-                  src={user.profileImage ?? null}
-                  alt={`${user.firstName} ${user.lastName}`}
-                  fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
-                  className="w-10 h-10"
-                  containerClassName="w-10 h-10"
-                  rounded="full"
-                />
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-white">{user.firstName} {user.lastName}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
-                </div>
+          <DropdownTrigger
+            type="button"
+            className="flex h-10 w-10 !border-0 !bg-transparent !p-0 items-center justify-center overflow-hidden rounded-xl !shadow-none transition-colors hover:ring-2 hover:ring-[color:var(--brand-primary)]/20"
+            aria-label="Profile menu"
+          >
+          <ImageWithFallback
+            src={userAvatar.src}
+            fileId={userAvatar.fileId}
+            alt={`${user.firstName} ${user.lastName}`}
+            fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
+            fit="cover"
+            className="h-full w-full object-cover"
+            containerClassName="h-full w-full"
+            rounded="xl"
+          />
+        </DropdownTrigger>
+
+        <DropdownMenu
+          maxHeight="min(72vh, 29rem)"
+          className="w-[min(13.5rem,calc(100vw-1rem))] sm:w-[15.5rem] before:pointer-events-none before:absolute before:-top-1 before:right-5 before:h-3 before:w-3 before:rotate-45 before:rounded-[3px] before:border-l before:border-t before:border-white/20 before:bg-white/90 dark:before:border-white/10 dark:before:bg-[#09090b]"
+        >
+          <div className="flex items-center gap-3 px-3.5 pb-3 pt-3.5">
+            <div className="h-12 w-12 overflow-hidden rounded-xl border border-black/5 dark:border-white/10">
+              <ImageWithFallback
+                src={userAvatar.src}
+                fileId={userAvatar.fileId}
+                alt={`${user.firstName} ${user.lastName}`}
+                fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
+                fit="cover"
+                className="h-full w-full object-cover"
+                containerClassName="h-full w-full"
+                rounded="xl"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-base font-semibold text-[color:var(--text-primary)]">
+                {user.firstName} {user.lastName}
+              </div>
+              <div className="mt-0.5 break-words text-[11px] leading-4 text-[color:var(--text-secondary)]">
+                {user.email}
+                {userUid ? ` · UID ${userUid}` : ''}
               </div>
             </div>
+          </div>
 
-            {/* Main Links */}
-            <div className="py-2">
-              <button
-                onClick={() => {
-                  if (user) {
-                    navigate(getProfileOrHomeUrl(user));
-                    setShowProfileMenu(false);
-                  } else {
-                    navigate('/login');
-                  }
-                }}
-                className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3"
-              >
-                <User className="w-4 h-4" />
-                <span>{translate('profile')}</span>
-              </button>
-              <button className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
-                <Settings className="w-4 h-4" />
-                <span>{translate('settings')}</span>
-              </button>
+          <DropdownDivider />
+
+          {user.type === 'BRAND' ? (
+            <DropdownItem
+              leftIcon="🧵"
+              onClick={() => {
+                navigate('/studio');
+                setShowProfileMenu(false);
+              }}
+            >
+              Dashboard
+            </DropdownItem>
+          ) : null}
+
+          <DropdownItem
+            leftIcon="👤"
+            onClick={() => {
+              navigate(profileHomeRoute);
+              setShowProfileMenu(false);
+            }}
+          >
+            {translate('profile')}
+          </DropdownItem>
+
+          <DropdownItem
+            leftIcon={themeActionEmoji}
+            description={`Switch to ${themeMenuLabel}`}
+            onClick={() => {
+              handleThemeToggle();
+              setShowProfileMenu(false);
+            }}
+          >
+            Theme
+          </DropdownItem>
+
+          <DropdownItem
+            leftIcon="⚙️"
+            onClick={() => {
+              navigate('/settings');
+              setShowProfileMenu(false);
+            }}
+          >
+            {translate('settings')}
+          </DropdownItem>
+
+          <DropdownDivider />
+
+          <DropdownItem
+            leftIcon="🌍"
+            rightIcon={<span aria-hidden="true" className={`transition-transform duration-200 ${showLanguageDropdown ? 'rotate-180' : ''}`}>⌄</span>}
+            onClick={() => {
+              setShowLanguageDropdown((prev) => !prev);
+            }}
+          >
+            {translate('language')}
+          </DropdownItem>
+
+          {showLanguageDropdown ? (
+            <div className="space-y-1 px-1 pt-1">
+              <button onClick={() => { setLanguage('en'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">English</button>
+              <button onClick={() => { setLanguage('zh'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">中文</button>
+              <button onClick={() => { setLanguage('ar'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">العربية</button>
+              <button onClick={() => { setLanguage('hi'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">हिन्दी</button>
             </div>
+          ) : null}
 
-            {/* User Actions */}
-            <div className="py-2 border-t border-gray-200 dark:border-gray-700">
-              <button className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
-                <TagIcon className="w-4 h-4" />
-                <span>My Orders</span>
-              </button>
-              <button className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
-                <Heart className="w-4 h-4" />
-                <span>Saved</span>
-              </button>
-            </div>
+          <DropdownItem
+            leftIcon="📍"
+            onClick={() => {
+              handleLocationShare();
+              setShowProfileMenu(false);
+            }}
+          >
+            {translate('location')}
+          </DropdownItem>
 
-            {/* Theme & Language */}
-            <div className="py-2 border-t border-gray-200 dark:border-gray-700">
-              <div className="relative">
-                <button
-                  onClick={() => setShowThemeDropdown(!showThemeDropdown)}
-                  className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-3">
-                    <Sun className="w-4 h-4" />
-                    <span>{translate('theme')}</span>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showThemeDropdown ? 'rotate-180' : ''}`} />
-                </button>
-                {showThemeDropdown && (
-                  <div className="pl-8 space-y-1 py-1">
-                    <button onClick={() => setTheme('light')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center space-x-2">
-                      <Sun className="w-4 h-4" />
-                      <span>Light</span>
-                    </button>
-                    <button onClick={() => setTheme('dark')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center space-x-2">
-                      <Moon className="w-4 h-4" />
-                      <span>Dark</span>
-                    </button>
-                    <button onClick={() => setTheme('system')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center space-x-2">
-                      <Monitor className="w-4 h-4" />
-                      <span>System</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+          <DropdownItem
+            leftIcon="🆘"
+            onClick={() => {
+              navigate(helpRoute);
+              setShowProfileMenu(false);
+            }}
+          >
+            Help
+          </DropdownItem>
 
-              <div className="relative">
-                <button
-                  onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                  className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-3">
-                    <Globe className="w-4 h-4" />
-                    <span>{translate('language')}</span>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showLanguageDropdown ? 'rotate-180' : ''}`} />
-                </button>
-                {showLanguageDropdown && (
-                  <div className="pl-8 space-y-1 py-1">
-                    <button onClick={() => setLanguage('en')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">English</button>
-                    <button onClick={() => setLanguage('zh')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">中文</button>
-                    <button onClick={() => setLanguage('ar')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">العربية</button>
-                    <button onClick={() => setLanguage('hi')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">हिन्दी</button>
-                  </div>
-                )}
-              </div>
+          <DropdownDivider />
 
-              <button onClick={handleLocationShare} className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
-                <MapPin className="w-4 h-4" />
-                <span>{translate('location')}</span>
-              </button>
-            </div>
+          <DropdownItem
+            leftIcon="📦"
+            onClick={() => {
+              navigate(ordersRoute);
+              setShowProfileMenu(false);
+            }}
+          >
+            My Orders
+          </DropdownItem>
 
-            {/* Help & Sign Out */}
-            <div className="py-2 border-t border-gray-200 dark:border-gray-700">
-              <button className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
-                <TagIcon className="w-4 h-4" />
-                <span>Help</span>
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    await apiClient.post('/auth/logout');
-                  } catch (e) { void e; }
-                  localStorage.removeItem(env.tokenStorageKey);
-                  localStorage.removeItem('access_token');
-                  localStorage.removeItem('accessToken');
-                  dropStoredAccessToken();
-                  localStorage.removeItem(env.userStorageKey);
-                  dispatch(clearUser());
-                  setShowProfileMenu(false);
-                  navigate('/login', { replace: true });
-                }}
-                className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-3"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>{translate('signOut')}</span>
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Not authenticated menu */}
-            <div className="py-2 border-t border-gray-200 dark:border-gray-700">
-              <button className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
-                <Settings className="w-4 h-4" />
-                <span>{translate('settings')}</span>
-              </button>
-            </div>
+          <DropdownItem
+            leftIcon="🤍"
+            onClick={() => {
+              navigate(savedRoute);
+              setShowProfileMenu(false);
+            }}
+          >
+            Saved
+          </DropdownItem>
 
-            <div className="py-2 border-t border-gray-200 dark:border-gray-700">
-              <div className="relative">
-                <button
-                  onClick={() => setShowThemeDropdown(!showThemeDropdown)}
-                  className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-3">
-                    <Sun className="w-4 h-4" />
-                    <span>{translate('theme')}</span>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showThemeDropdown ? 'rotate-180' : ''}`} />
-                </button>
-                {showThemeDropdown && (
-                  <div className="pl-8 space-y-1 py-1">
-                    <button onClick={() => setTheme('light')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center space-x-2">
-                      <Sun className="w-4 h-4" />
-                      <span>Light</span>
-                    </button>
-                    <button onClick={() => setTheme('dark')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center space-x-2">
-                      <Moon className="w-4 h-4" />
-                      <span>Dark</span>
-                    </button>
-                    <button onClick={() => setTheme('system')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center space-x-2">
-                      <Monitor className="w-4 h-4" />
-                      <span>System</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+          <DropdownDivider />
 
-              <div className="relative">
-                <button
-                  onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                  className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-3">
-                    <Globe className="w-4 h-4" />
-                    <span>{translate('language')}</span>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showLanguageDropdown ? 'rotate-180' : ''}`} />
-                </button>
-                {showLanguageDropdown && (
-                  <div className="pl-8 space-y-1 py-1">
-                    <button onClick={() => setLanguage('en')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">English</button>
-                    <button onClick={() => setLanguage('zh')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">中文</button>
-                    <button onClick={() => setLanguage('ar')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">العربية</button>
-                    <button onClick={() => setLanguage('hi')} className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">हिन्दी</button>
-                  </div>
-                )}
-              </div>
-
-              <button className="w-full px-4 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-3">
-                <TagIcon className="w-4 h-4" />
-                <span>Help</span>
-              </button>
-            </div>
-          </>
-        )}
-        </div>
-      </div>
+          <DropdownItem
+            leftIcon="↩️"
+            tone="danger"
+            onClick={async () => {
+              try {
+                await apiClient.post('/auth/logout');
+              } catch (error) {
+                void error;
+              }
+              dispatch(addLocalNotification({ message: 'Signed out successfully.' }));
+              dropStoredAccessToken();
+              localStorage.removeItem(env.userStorageKey);
+              dispatch(clearUser());
+              dispatch(resetCartState());
+              dispatch(resetWishlistState());
+              dispatch(resetUnreadCount());
+              setShowProfileMenu(false);
+              navigate('/', { replace: true });
+            }}
+          >
+            {translate('signOut')}
+          </DropdownItem>
+        </DropdownMenu>
+      </SharedDropdown>
     );
   };
 
-  // Threadly Logo SVG Component
-  const ThreadlyLogo = () => (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="32" height="32" rx="8" fill="url(#threadly-gradient)" />
-      <path
-        d="M8 20C8 16.5 13 16.5 13 13C13 9.5 8 9.5 8 13"
-        stroke="white"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M24 12C24 15.5 19 15.5 19 19C19 22.5 24 22.5 24 19"
-        stroke="white"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="16" cy="16" r="2" fill="white" />
-      <defs>
-        <linearGradient id="threadly-gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#6366F1" />
-          <stop offset="0.5" stopColor="#8B5CF6" />
-          <stop offset="1" stopColor="#A21CAF" />
-        </linearGradient>
-      </defs>
-    </svg>
-  );
-
   return (
     <nav
-      className={`fixed top-0 right-0 px-4 sm:px-6 py-2 z-40 transition-all duration-300
-      ${isCollapsed ? 'left-[64px]' : 'left-[192px]'}
-      ${minimal
-        ? 'bg-transparent border-b border-transparent'
-        : scrolled
-          ? (theme === 'dark'
-              ? 'bg-black/30 backdrop-blur-sm border-b border-transparent'
-              : 'bg-transparent border-b border-transparent')
-          : 'bg-white/95 dark:bg-[#0f0f0f]/98 backdrop-blur-md border-b border-gray-200 dark:border-white/10'}`}
+      className={`fixed top-0 left-0 z-layer-nav h-16 w-full px-4 transition-all duration-500 ease-out sm:px-5 ${
+        minimal
+          ? 'border-b border-transparent bg-transparent'
+          : isScrolled
+            ? 'threadly-nav-surface-muted'
+            : 'threadly-nav-surface'
+      }`}
+      style={
+        isScrolled && !minimal
+          ? {
+              backdropFilter: 'blur(18px) saturate(140%)',
+              WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+            }
+          : undefined
+      }
     >
-     
-      {/* Main Navbar Content */}
-      <div className={`flex items-center min-h-[48px] ${minimal ? 'justify-between lg:justify-end' : 'justify-between'}`}>
-
-        {/* Mobile Logo - Only visible on mobile/tablet */}
-        <div className="flex items-center lg:hidden">
-          <ThreadlyLogo />
-          <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white tracking-tight">
-            Threadly
-          </span>
-        </div>
-
-        {/* Search Section - hidden in minimal mode */}
-        {!minimal && (
-          <div className="flex-1 flex justify-start mx-2">
-            <div className="relative flex items-center w-full min-w-0">
-              <SearchField placeholder={translate('searchPlaceholder') || 'Search...'} showFilter={false} className="!flex-none !max-w-none" />
-              <button
-                type="button"
-                className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                aria-label="Filter"
-              >
-                <Filter className="w-5 h-5 text-primary" />
-              </button>
-              <button
-                type="button"
-                className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                aria-label="Toggle tags"
-                onClick={() => setShowTags(prev => !prev)}
-              >
-                <TagIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-              </button>
-              {showTags && (
-                <div className="ml-2 flex-1 min-w-0 overflow-hidden max-w-[calc(100%-12rem)] sm:max-w-[calc(100%-16rem)]">
-                  <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide whitespace-nowrap py-1">
-                    {navTags.map((tag, idx) => {
-                      const color = getTagColor(tag);
-                      return (
-                        <TagChip key={tag} label={`#${tag}`} size="sm" color={color} />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Right Side Actions */}
-        <div className="flex items-center space-x-3 shrink-0">
-          {/* Notifications - Hidden on mobile */}
-          <button type="button" className="hidden sm:flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative">
-            <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-          </button>
-
-          {/* Auth Buttons - Only when not logged in */}
-          {!user && (
-            <>
-              {/* You can switch to btn-frost-primary/ghost/outline and sizes via btn-tight-*. */}
-              <FrostedButton className="btn-frost-outline btn-tight-xs hidden sm:flex flex-none" onClick={() => navigate('/login')}>
-                Sign In
-              </FrostedButton>
-              <FrostedButton className="btn-frost-primary btn-tight-xs hidden md:flex flex-none" onClick={() => navigate('/signup')}>
-                Sign Up
-              </FrostedButton>
-            </>
-          )}
-
-          {/* Profile Menu */}
-          <div className="relative">
+      <div className="flex h-full items-center justify-between gap-4">
+        <div className="flex shrink-0 items-center">
+          {!minimal ? (
             <button
               type="button"
-              onClick={(e) => { e.preventDefault(); setShowProfileMenu((prev) => !prev); }}
-              className="w-7 h-7 rounded-full flex items-center justify-center hover:ring-2 hover:ring-primary/20 transition-all duration-200 overflow-hidden"
-              aria-label="Profile menu"
+              onClick={() => dispatch(toggleSidebar())}
+              className="mr-1 inline-flex items-center justify-center rounded-full p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+              aria-label="Toggle sidebar"
             >
-              {user ? (
-                <ImageWithFallback
-                  src={user.profileImage ?? user.profileImageFile?.s3Url ?? null}
-                  fileId={user.type === 'BRAND' ? (user.profileImageId ?? user.profileImageFile?.id ?? null) : null}
-                  alt={`${user.firstName} ${user.lastName}`}
-                  fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
-                  className="w-full h-full object-cover"
-                  containerClassName="w-full h-full"
-                  rounded="full"
-                />
-              ) : (
-                <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                  <User className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                </div>
-              )}
+              <span className="text-xl">🍔</span>
             </button>
-            <ProfileMenu />
+          ) : null}
+
+          {!isSidebarOpen && (
+            <div
+              className="flex cursor-pointer items-center"
+              onClick={() => {
+                dispatch(closeSidebar());
+                navigate('/');
+              }}
+            >
+              <BrandWordmark
+                logoSize={32}
+                textClassName="max-w-[200px] truncate text-lg font-bold tracking-tight text-gray-900 dark:text-white"
+              />
+              <span className="sr-only">{COMPANY_NAME}</span>
+            </div>
+          )}
+        </div>
+
+        {!minimal ? (
+          <div className="hidden flex-1 justify-center px-6 sm:flex">
+            <div className="flex w-full items-center gap-2">
+              <SearchBarWithSuggestions
+                placeholder={translate('searchPlaceholder') || 'Search products, brands, styles...'}
+                className="!flex-1"
+              />
+            </div>
           </div>
+        ) : null}
+
+        <div className="flex min-w-[100px] shrink-0 items-center justify-end space-x-2 sm:space-x-3">
+          {!minimal ? (
+            <button
+              type="button"
+              className="rounded-full p-2 hover:bg-gray-100 dark:hover:bg-gray-800 sm:hidden"
+              aria-label="Open search"
+              onClick={() => navigate('/search')}
+            >
+              <span aria-hidden="true" className="text-lg text-gray-700 dark:text-gray-200">🔎</span>
+            </button>
+          ) : null}
+
+          {user ? (
+            <button
+              type="button"
+              onClick={() => dispatch(isWishlistOpen ? closeWishlistDrawer() : openWishlistDrawer())}
+              className="relative hidden rounded-full p-2 text-xl transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 sm:flex"
+              aria-label="Wishlist"
+            >
+              <span role="img" aria-hidden="true" className="filter invert transition-all duration-300 dark:invert-0">🤍</span>
+              {wishlistTotal > 0 ? (
+                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
+                  {wishlistTotal > 99 ? '99+' : wishlistTotal}
+                </span>
+              ) : null}
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => dispatch(isCartOpen ? closeCartDrawer() : openCartDrawer())}
+            className="relative hidden rounded-full p-2 text-xl transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 sm:flex"
+            aria-label="Bag"
+          >
+            <span role="img" aria-hidden="true">🛍️</span>
+            {cartQuantity > 0 ? (
+              <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-xs font-bold text-white">
+                {cartQuantity > 99 ? '99+' : cartQuantity}
+              </span>
+            ) : null}
+          </button>
+
+          {user ? (
+            <div className="relative">
+              <button
+                type="button"
+                ref={(element) => {
+                  notificationsAnchorRef.current = element;
+                }}
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  setShowLanguageDropdown(false);
+                  setShowNotifications((prev) => !prev);
+                }}
+                className="relative rounded-full p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                aria-haspopup="dialog"
+                aria-expanded={showNotifications}
+              >
+                <span aria-hidden="true" className="text-lg">🔔</span>
+                {unreadCount > 0 ? (
+                  <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                ) : null}
+              </button>
+              <NotificationsDropdown open={showNotifications} onClose={() => setShowNotifications(false)} anchorRef={notificationsAnchorRef as any} />
+            </div>
+          ) : null}
+
+          {!user ? (
+            <FrostedButton className="btn-frost-outline btn-tight-xs hidden flex-none sm:flex" onClick={() => navigate('/login')}>
+              Sign In
+            </FrostedButton>
+          ) : null}
+
+          {user ? <ProfileMenu /> : null}
         </div>
       </div>
-
-      {/* Hashtags Row removed to reduce navbar height */}
     </nav>
   );
 };
-
-
-
-

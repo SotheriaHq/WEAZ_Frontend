@@ -1,11 +1,15 @@
 import { apiClient } from './httpClient';
 import { unwrapApiResponse } from '@/types/auth';
 import type { MarketFeedResponse, MarketItem, MarketMediaType } from '@/types/market';
+import { normalizeSizingMode } from '@/types/sizing';
 
 export interface GetMarketFeedParams {
   cursor?: string;
   limit?: number;
   tag?: string;
+  // Optional category filter; backend may ignore until supported
+  category?: string;
+  counts?: 'combined';
 }
 
 type RawMarketItem = Record<string, unknown>;
@@ -40,9 +44,21 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
 
   const mediaType = (raw.mediaType as MarketMediaType) ?? ((media.mediaType || media.type) as MarketMediaType) ?? 'POST_IMAGE';
 
-  return {
+  const num = (v: unknown): number | null => {
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v);
+    return null;
+  };
+
+  const mapped: MarketItem = {
     id: String(raw.id ?? mediaFileId ?? ''),
     collectionId: String(raw.collectionId ?? collection.id ?? ''),
+    coverMediaId:
+      typeof raw.coverMediaId === 'string'
+        ? (raw.coverMediaId as string)
+        : typeof (collection as { coverMediaId?: unknown }).coverMediaId === 'string'
+          ? ((collection as { coverMediaId?: string }).coverMediaId ?? null)
+          : null,
     collectionTitle: String(collection.title ?? raw.collectionTitle ?? ''),
     collectionDescription:
       typeof collection.description === 'string'
@@ -65,22 +81,29 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
       (raw.brandLogoFileId as string | undefined) ??
       null,
     minPrice:
-      typeof collection.minPrice === 'number'
-        ? (collection.minPrice as number)
-        : typeof raw.minPrice === 'number'
-          ? (raw.minPrice as number)
-          : null,
+      num(collection.minPrice) ?? num(raw.minPrice),
     maxPrice:
-      typeof collection.maxPrice === 'number'
-        ? (collection.maxPrice as number)
-        : typeof raw.maxPrice === 'number'
-          ? (raw.maxPrice as number)
+      num(collection.maxPrice) ?? num(raw.maxPrice),
+    // Include sale fields if provided by backend; accept number or numeric string
+    saleMinPrice: num((collection as any).saleMinPrice ?? (raw as any).saleMinPrice),
+    saleMaxPrice: num((collection as any).saleMaxPrice ?? (raw as any).saleMaxPrice),
+    saleStartAt:
+      (collection as any).saleStartAt && typeof (collection as any).saleStartAt === 'string'
+        ? ((collection as any).saleStartAt as string)
+        : typeof (raw as any).saleStartAt === 'string'
+          ? ((raw as any).saleStartAt as string)
           : null,
-    likesCount:
-      typeof raw.likesCount === 'number'
-        ? (raw.likesCount as number)
-        : typeof collection.likesCount === 'number'
-          ? (collection.likesCount as number)
+    saleEndAt:
+      (collection as any).saleEndAt && typeof (collection as any).saleEndAt === 'string'
+        ? ((collection as any).saleEndAt as string)
+        : typeof (raw as any).saleEndAt === 'string'
+          ? ((raw as any).saleEndAt as string)
+          : null,
+    threadsCount:
+      typeof raw.threadsCount === 'number'
+        ? (raw.threadsCount as number)
+        : typeof collection.threadsCount === 'number'
+          ? (collection.threadsCount as number)
           : null,
     commentsCount:
       typeof raw.commentsCount === 'number'
@@ -88,13 +111,32 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
         : typeof collection.commentsCount === 'number'
           ? (collection.commentsCount as number)
           : null,
-    patchesCount:
-      typeof collection.patchesCount === 'number'
-        ? (collection.patchesCount as number)
-        : typeof raw.patchesCount === 'number'
-          ? (raw.patchesCount as number)
+    collectionCollabCount:
+      typeof collection.collectionCollabCount === 'number'
+        ? (collection.collectionCollabCount as number)
+        : typeof raw.collectionCollabCount === 'number'
+          ? (raw.collectionCollabCount as number)
           : null,
+    sizingMode: normalizeSizingMode(
+      typeof (collection as any).sizingMode === 'string'
+        ? String((collection as any).sizingMode)
+        : typeof (raw as any).sizingMode === 'string'
+          ? String((raw as any).sizingMode)
+          : undefined,
+    ),
+    customMeasurementKeys: Array.isArray((collection as any).customMeasurementKeys)
+      ? ((collection as any).customMeasurementKeys as string[])
+      : Array.isArray((raw as any).customMeasurementKeys)
+        ? ((raw as any).customMeasurementKeys as string[])
+        : [],
+    customAvailable:
+      typeof (raw as any).customAvailable === 'boolean'
+        ? Boolean((raw as any).customAvailable)
+        : typeof (collection as any).customAvailable === 'boolean'
+          ? Boolean((collection as any).customAvailable)
+            : false,
     tags,
+    isThreaded: typeof raw.isThreaded === 'boolean' ? (raw.isThreaded as boolean) : false,
     media: {
       fileId: mediaFileId || '',
       url: mediaUrl,
@@ -119,6 +161,8 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
             : null,
     },
   };
+
+  return mapped;
 };
 
 export const marketApi = {
@@ -131,7 +175,34 @@ export const marketApi = {
       };
 
     const rawItems = (data as { items?: RawMarketItem[] }).items;
-    const items = Array.isArray(rawItems) ? rawItems.map((item) => toMarketItem(item)) : [];
+    const mappedItems = Array.isArray(rawItems) ? rawItems.map((item) => {
+      const mapped = toMarketItem(item);
+      if (typeof (item as any).combinedCommentsCount === 'number') {
+        mapped.commentsCount = (item as any).combinedCommentsCount as number;
+      }
+      return mapped;
+    }) : [];
+
+    // Safety net: collapse any duplicate media rows so every design collection
+    // renders as a single card using its cover media.
+    const byCollection = new Map<string, MarketItem>();
+    mappedItems.forEach((entry) => {
+      if (!entry.collectionId) return;
+      const existing = byCollection.get(entry.collectionId);
+      if (!existing) {
+        byCollection.set(entry.collectionId, entry);
+        return;
+      }
+
+      const preferredId = entry.coverMediaId ?? existing.coverMediaId ?? null;
+      const existingIsCover = preferredId ? existing.id === preferredId : false;
+      const entryIsCover = preferredId ? entry.id === preferredId : false;
+      if (!existingIsCover && entryIsCover) {
+        byCollection.set(entry.collectionId, entry);
+      }
+    });
+    const items = Array.from(byCollection.values());
+
     return {
       items,
       hasNextPage: Boolean((data as MarketFeedResponse)?.hasNextPage ?? items.length > 0),

@@ -1,9 +1,18 @@
 import React from 'react';
 import { clsx } from 'clsx';
+import VLoader from '@/components/loaders/VLoader';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'ghost' | 'link' | 'danger';
+  /**
+   * primary  — black fill, white text. The default action on any page.
+   * brand    — purple fill. Brand-owned CTAs only (follow, shop, subscribe).
+   * secondary — transparent with border. Supporting action alongside primary.
+   * ghost    — no border. Low-emphasis action in dense UI.
+   * link     — inline text action.
+   * danger   — destructive action.
+   */
+  variant?: 'primary' | 'brand' | 'secondary' | 'ghost' | 'link' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   fullWidth?: boolean;
@@ -21,14 +30,37 @@ const Button: React.FC<ButtonProps> = ({
   icon,
   ...props
 }) => {
-  const baseClasses = 'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+  const collectText = (node: React.ReactNode): string => {
+    if (typeof node === 'string' || typeof node === 'number') {
+      return String(node);
+    }
+    if (Array.isArray(node)) {
+      return node.map((item) => collectText(item)).join(' ');
+    }
+    if (React.isValidElement(node)) {
+      const element = node as React.ReactElement<{ children?: React.ReactNode }>;
+      return collectText(element.props?.children);
+    }
+    return '';
+  };
+
+  const inferredText = collectText(children).trim();
+  const inferredLoading = /\b(saving|loading|submitting|uploading|signing)\b/i.test(inferredText);
+  const showLoader = loading || Boolean(disabled && inferredLoading);
+
+  const baseClasses = 'relative inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-0 focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed';
 
   const variantClasses = {
-    primary: 'bg-purple-600 hover:bg-purple-700 text-white focus:ring-purple-500',
-    secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white focus:ring-gray-400',
-    ghost: 'bg-transparent hover:bg-gray-100 text-gray-700 dark:hover:bg-gray-800 dark:text-gray-200 focus:ring-gray-400',
-    link: 'bg-transparent hover:underline text-purple-600 dark:text-purple-400 focus:ring-transparent',
-    danger: 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500',
+    // Black fill — confident, editorial, fashion-native. Default for all actions.
+    primary:   'bg-[#0d0d0d] hover:bg-[#1a1a1a] text-white dark:bg-white dark:hover:bg-gray-100 dark:text-[#0d0d0d]',
+    // Purple fill — reserved for brand-owned CTAs (follow, shop, subscribe).
+    brand:     'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-strong)] text-white',
+    // Outline — transparent with border. Supporting action alongside primary.
+    secondary: 'bg-transparent border border-[#0d0d0d] text-[#0d0d0d] hover:bg-[#0d0d0d]/5 dark:border-white dark:text-white dark:hover:bg-white/10',
+    // Ghost — no border. Low-emphasis actions in dense UI.
+    ghost:     'bg-transparent hover:bg-gray-100 text-[var(--text-secondary)] hover:text-[var(--text-primary)] dark:hover:bg-white/8 dark:text-gray-400 dark:hover:text-white',
+    link:      'bg-transparent hover:underline text-[var(--text-primary)] underline-offset-2',
+    danger:    'bg-red-600 hover:bg-red-700 text-white',
   };
 
   const sizeClasses = {
@@ -49,32 +81,18 @@ const Button: React.FC<ButtonProps> = ({
         className
       )}
       disabled={disabled || loading}
+      aria-busy={showLoader ? true : undefined}
       {...props}
     >
-      {loading && (
-        <svg
-          className="animate-spin h-4 w-4"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-          />
-        </svg>
-      )}
-      {icon && !loading && icon}
-      {children}
+      <span className={clsx('inline-flex items-center gap-2', showLoader && 'invisible')}>
+        {icon && <span className="shrink-0">{icon}</span>}
+        <span>{children}</span>
+      </span>
+      {showLoader ? (
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
+          <VLoader size={16} phase="loading" showLabel={false} />
+        </span>
+      ) : null}
     </button>
   );
 };

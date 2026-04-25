@@ -1,19 +1,18 @@
-
-/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { disconnectSocket } from '../lib/ws';
 import type { ReactNode } from 'react';
 import { unwrapApiResponse } from '../types/auth';
 import type { AuthUserDto, AuthProfileResponse, AuthTokensResponse } from '../types/auth';
 import { useDispatch } from 'react-redux';
 import { env } from '../config/env';
-import { setUser, clearUser } from '../features/userSlice';
+import { setUser, setUserFromStorage, clearUser } from '../features/userSlice';
 import {
   apiClient,
   dropStoredAccessToken,
-  getStoredAccessToken,
   persistAccessToken,
 } from '../api/httpClient';
 import { isAxiosError } from 'axios';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
@@ -39,20 +38,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error('Invalid profile response');
     }
 
-    // Merge persisted user fields (profileImage, profileImageFile, etc.) to avoid
-    // overwriting locally persisted values with empty/undefined values from the server.
+    // Keep auth/profile as the canonical server snapshot.
     try {
       const raw = typeof window !== 'undefined' ? localStorage.getItem(env.userStorageKey) : null;
       if (raw) {
         const persisted = JSON.parse(raw) as AuthUserDto;
         // Only overwrite server values when server doesn't provide them and persisted has them
         const merged = { ...user } as AuthUserDto;
-        if (!merged.profileImage && persisted.profileImage) merged.profileImage = persisted.profileImage;
-        if (!merged.profileImageId && persisted.profileImageId) merged.profileImageId = persisted.profileImageId;
-        if (!merged.profileImageFile && persisted.profileImageFile) merged.profileImageFile = persisted.profileImageFile;
-        if (!merged.bannerImage && persisted.bannerImage) merged.bannerImage = persisted.bannerImage;
-        if (!merged.bannerImageId && persisted.bannerImageId) merged.bannerImageId = persisted.bannerImageId;
-        if (!merged.bannerImageFile && persisted.bannerImageFile) merged.bannerImageFile = persisted.bannerImageFile;
+        if (!merged.phoneNumber && persisted.phoneNumber) merged.phoneNumber = persisted.phoneNumber;
+        if (!merged.address && persisted.address) merged.address = persisted.address;
 
         dispatch(setUser(merged));
         return merged;
@@ -105,13 +99,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     let isMounted = true;
 
+    const onAuthExpired = () => {
+      dropStoredAccessToken();
+      dispatch(clearUser());
+      try { toast.info('Session expired. Please sign in again.'); } catch {}
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('auth:expired', onAuthExpired);
+    }
+
+    const onUserStorage = (event: StorageEvent) => {
+      if (event.storageArea !== localStorage) return;
+      if (event.key !== env.userStorageKey) return;
+
+      if (!event.newValue) {
+        dispatch(clearUser());
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(event.newValue) as AuthUserDto;
+        if (parsed?.id) {
+          dispatch(setUserFromStorage(parsed));
+        } else {
+          dispatch(clearUser());
+        }
+      } catch {
+        dispatch(clearUser());
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', onUserStorage);
+    }
+
     const initialize = async () => {
       try {
-        const storedToken = getStoredAccessToken();
-        if (!storedToken) {
-          dispatch(clearUser());
-          return;
-        }
         await fetchUserProfile();
       } catch (error) {
         handleProfileError(error, { allowPersistedUser: true });
@@ -126,6 +149,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     return () => {
       isMounted = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('auth:expired', onAuthExpired);
+        window.removeEventListener('storage', onUserStorage);
+      }
     };
   }, [dispatch, fetchUserProfile, handleProfileError]);
 
@@ -156,11 +183,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (user && user.id) {
         dispatch(setUser(user));
-        try {
-          await fetchUserProfile();
-        } catch (profileError) {
+        void fetchUserProfile().catch((profileError) => {
           handleProfileError(profileError, { allowPersistedUser: true });
-        }
+        });
       } else {
         await fetchUserProfile();
       }
@@ -178,6 +203,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     void apiClient.post('/auth/logout').catch(() => undefined);
     dropStoredAccessToken();
     dispatch(clearUser());
+    disconnectSocket();
   };
 
   return (

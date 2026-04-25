@@ -3,8 +3,8 @@ import type { CommentTarget, CommentV2Dto } from '@/types/comments';
 import { CommentsApi } from '@/api/CommentsApi';
 import CommentComposer from './CommentComposer';
 import CommentItem from './CommentItem';
-import { getSocket, joinContentRoom } from '@/lib/ws';
-import { toast } from 'react-toastify';
+import { useRealtime } from '@/realtime';
+import { toast } from 'sonner';
 
 type Props = {
   targetType: CommentTarget;
@@ -37,24 +37,39 @@ const CommentThread: React.FC<Props> = ({ targetType, targetId, className }) => 
     }
   };
 
+  // Keep for potential per-user room routing; currently not used
+  // const me = useSelector((s: RootState) => s.user.profile?.id);
+
+  const { onComment, joinCollection, joinCollectionMedia } = useRealtime();
   React.useEffect(() => {
     setItems([]); setCursor(null); setHasNext(false);
     void load(true);
-    joinContentRoom(targetType, targetId);
-    const s = getSocket();
-    const onCreated = (p: any) => { if (p?.targetType === targetType && p?.targetId === targetId) void load(true); };
-    const onDeleted = onCreated;
-    s.on('comment.created', onCreated);
-    s.on('comment.deleted', onDeleted);
-    return () => { s.off('comment.created', onCreated); s.off('comment.deleted', onDeleted); };
+    // Join appropriate room via provider
+    if (targetType === 'COLLECTION') joinCollection(targetId);
+    else if (targetType === 'COLLECTION_MEDIA') joinCollectionMedia(targetId);
+    const unsubscribeCreated = onComment(`${targetType}:${targetId}`, (p) => {
+      if (p?.contentType === targetType && p?.contentId === targetId && p?.event !== 'comment.deleted') {
+        void load(true);
+      }
+    });
+    const unsubscribeDeleted = onComment(`${targetType}:${targetId}`, (p) => {
+      if (p?.contentType === targetType && p?.contentId === targetId && p?.event === 'comment.deleted') {
+        void load(true);
+      }
+    });
+    return () => {
+      unsubscribeCreated();
+      unsubscribeDeleted();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetType, targetId]);
 
   const applyCreated = (c: CommentV2Dto) => {
     setItems((prev) => [c, ...prev]);
   };
 
-  const handleLike = (commentId: string, likeCount: number) => {
-    setItems((prev) => prev.map((c) => c.id === commentId ? { ...c, likeCount } : { ...c, children: c.children?.map(r => r.id === commentId ? { ...r, likeCount } : r) }));
+  const handleThread = (commentId: string, threadCount: number) => {
+    setItems((prev) => prev.map((c) => c.id === commentId ? { ...c, threadCount } : { ...c, children: c.children?.map(r => r.id === commentId ? { ...r, threadCount } : r) }));
   };
 
   const handleDelete = (commentId: string) => {
@@ -74,12 +89,12 @@ const CommentThread: React.FC<Props> = ({ targetType, targetId, className }) => 
       <div className="divide-y divide-white/20">
         {items.map((c) => (
           <div key={c.id} className="py-3">
-            <CommentItem comment={c} onLike={handleLike} onReply={loadReplies} onDelete={handleDelete} />
+            <CommentItem comment={c} onThread={handleThread} onReply={loadReplies} onDelete={handleDelete} />
             {/* Children */}
             {c.children && c.children.length > 0 && (
               <div className="pl-10 mt-1 space-y-2">
                 {c.children.map((r) => (
-                  <CommentItem key={r.id} comment={r} onLike={handleLike} onReply={loadReplies} onDelete={handleDelete} />
+                  <CommentItem key={r.id} comment={r} onThread={handleThread} onReply={loadReplies} onDelete={handleDelete} />
                 ))}
               </div>
             )}
@@ -100,4 +115,7 @@ const CommentThread: React.FC<Props> = ({ targetType, targetId, className }) => 
 };
 
 export default CommentThread;
+
+
+
 

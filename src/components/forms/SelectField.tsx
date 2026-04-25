@@ -16,6 +16,10 @@ const variantClasses: Record<SelectVariant, string> = {
   inverted: 'bg-slate-900 text-white border-slate-700 focus:ring-2 focus:ring-purple-400 focus:border-purple-400',
 };
 
+/**
+ * @deprecated Use `<Select>` from `@/components/ui/Select` instead.
+ * This component wraps a native <select> and does not match the unified dropdown design.
+ */
 const SelectField = forwardRef<HTMLSelectElement, Props>(({ label, helperText, error, addon, className = '', variant = 'default', children, ...rest }, ref) => {
   const variantStyle = variantClasses[variant] ?? variantClasses.default;
   return (
@@ -24,7 +28,7 @@ const SelectField = forwardRef<HTMLSelectElement, Props>(({ label, helperText, e
       <div className="flex items-center">
         <select
           ref={ref}
-          className={`flex-1 block w-full rounded-md border px-3 py-2 focus:outline-none ${variantStyle} ${error ? 'border-red-500' : ''}`}
+          className={`select-threadly flex-1 block w-full rounded-md border px-3 py-2 focus:outline-none ${variantStyle} ${error ? 'border-red-500' : ''}`}
           {...rest}
         >
           {children}

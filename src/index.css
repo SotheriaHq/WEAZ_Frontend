@@ -2,101 +2,602 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Sharper typography rendering */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+}
+
+/* ─── Global thin blending scrollbars ─────────────────────────────────────── */
+/* Light mode: barely-there warm-gray thumb, transparent track */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 113, 108, 0.25) transparent;
+}
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(120, 113, 108, 0.25);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(120, 113, 108, 0.45);
+}
+/* Dark mode: white ghost thumb */
+.dark * {
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+.dark *::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
 /* Unified Dark Theme - YouTube-style consistency */
 @layer base {
   :root {
-    --dark-bg-primary: #0f0f0f;
-    --dark-bg-secondary: #1a1a1a;
-    --dark-bg-tertiary: #272727;
+    /* Brand Tokens */
+    --brand-primary: #9333ea;
+    --brand-primary-strong: #6b21a8;
+    --brand-primary-rgb: 147, 51, 234;
+    --brand-primary-strong-rgb: 107, 33, 168;
+    --brand-accent: #d4af37;
+    --brand-accent-strong: #b5952f;
+    --brand-accent-rgb: 212, 175, 55;
+
+    /* Surface + Typography - Clean Editorial Theme */
+    --surface-primary: #ffffff;
+    --surface-secondary: #f5f5f4;  /* warm gray — no purple cast */
+    --surface-muted: #e7e5e4;      /* warm mid-gray for dividers, disabled */
+    --text-primary: #0d0d0d;       /* true near-black, warmer than blue-black */
+    --text-secondary: #78716c;     /* warm stone-gray */
+    --border-default: #e5e5e5;     /* standard 1px card/input border */
+    --border-strong: #d4d4d4;      /* stronger border for emphasis */
+
+    /* Dark scheme helpers (kept for legacy selectors) */
+    --dark-bg-primary: #0a0a0a;
+    --dark-bg-secondary: #141414;
+    --dark-bg-tertiary: #1c1c1c;
     --dark-border: rgba(255, 255, 255, 0.1);
     --dark-glass-bg: rgba(255, 255, 255, 0.05);
     --dark-glass-light: rgba(255, 255, 255, 0.08);
+
+    /* Layout tokens */
+    --app-header-height: 64px;
+
+    /* Z-layer system (see fthreadly/docs/LAYOUT_ARCHITECTURE.md) */
+    --z-base: 0;
+    --z-nav: 100;
+    --z-sidebar: 200;
+    --z-overlay: 900;
+    --z-dropdown: 1000;
+    --z-drawer: 1100;
+    --z-modal: 1200;
+    --z-tooltip: 1300;
+    --z-toast: 1400;
+  }
+
+  .dark {
+    --surface-primary: #0a0a0a;    /* true near-black */
+    --surface-secondary: #141414;  /* slightly lifted dark surface */
+    --surface-muted: #1c1c1c;      /* raised dark surface */
+    --text-primary: #f5f5f5;
+    --text-secondary: #a3a3a3;     /* warm neutral gray, not cool blue */
+    --border-default: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --neu-surface: #161616;
+    --neu-surface-soft: #1c1c1c;
+    --neu-text: #f5f5f5;
+    --neu-text-muted: #a3a3a3;
+    --neu-border: rgba(255, 255, 255, 0.08);
+    --neu-shadow-dark: rgba(0, 0, 0, 0.5);
+    --neu-shadow-light: rgba(255, 255, 255, 0.03);
+  }
+
+  :root {
+    --neu-surface: #f0efee;           /* warm light surface — no lavender */
+    --neu-surface-soft: #e7e5e4;
+    --neu-text: #0d0d0d;
+    --neu-text-muted: #78716c;
+    --neu-border: rgba(163, 158, 153, 0.3);
+    --neu-shadow-dark: rgba(163, 158, 153, 0.32);
+    --neu-shadow-light: rgba(255, 255, 255, 0.9);
+  }
+}
+
+@layer utilities {
+  .z-layer-base {
+    z-index: var(--z-base);
+  }
+  .z-layer-nav {
+    z-index: var(--z-nav);
+  }
+  .z-layer-sidebar {
+    z-index: var(--z-sidebar);
+  }
+  .z-layer-overlay {
+    z-index: var(--z-overlay);
+  }
+  .z-layer-dropdown {
+    z-index: var(--z-dropdown);
+  }
+  .z-layer-drawer {
+    z-index: var(--z-drawer);
+  }
+  .z-layer-modal {
+    z-index: var(--z-modal);
+  }
+  .z-layer-tooltip {
+    z-index: var(--z-tooltip);
+  }
+  .z-layer-toast {
+    z-index: var(--z-toast);
+  }
+
+  /* Threadly styled scrollbars (uses theme tokens) */
+  .scrollbar-threadly {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--brand-primary-rgb), 0.35) transparent;
+  }
+
+  .scrollbar-threadly::-webkit-scrollbar {
+    height: 4px;
+    width: 4px;
+  }
+
+  .scrollbar-threadly::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-threadly::-webkit-scrollbar-thumb {
+    background-color: rgba(var(--brand-primary-rgb), 0.3);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .scrollbar-threadly::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(var(--brand-primary-rgb), 0.45);
+  }
+
+  /* Thicker, higher-contrast scrollbar for dense editor panels */
+  .scrollbar-threadly-strong {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--brand-primary-rgb), 0.65) transparent;
+  }
+
+  .scrollbar-threadly-strong::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-threadly-strong::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 999px;
+  }
+
+  .scrollbar-threadly-strong::-webkit-scrollbar-thumb {
+    background-color: rgba(var(--brand-primary-rgb), 0.5);
+    border-radius: 999px;
+    background-clip: content-box;
+    min-height: 36px;
+  }
+
+  .scrollbar-threadly-strong::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(var(--brand-primary-rgb), 0.85);
   }
 }
 
 /* Frosted-glass (glassmorphism) design tokens */
 @layer components {
+  /* Global focus reset — removes focus borders/rings across shared controls. */
+  :where(
+      input,
+      textarea,
+      select,
+      button,
+      a,
+      [role='button'],
+      [role='combobox'],
+      [tabindex]:not([tabindex='-1'])
+    ):focus,
+  :where(
+      input,
+      textarea,
+      select,
+      button,
+      a,
+      [role='button'],
+      [role='combobox'],
+      [tabindex]:not([tabindex='-1'])
+    ):focus-visible,
+  :where(*):focus-within {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    --tw-ring-color: transparent !important;
+  }
+
   .glass-panel {
-    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-xl rounded-2xl;
+    @apply bg-transparent border border-gray-200/70 dark:border-white/10 rounded-2xl;
   }
+
   .dark .glass-panel {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: var(--dark-border);
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.1);
   }
+
   .glass-menu {
-    /* lighter frosted with a hint of purple */
-    @apply backdrop-blur-xl rounded-xl border border-white/30 dark:border-white/10 shadow-2xl;
-    background: radial-gradient(120% 120% at 0% 0%, rgba(216, 180, 254, 0.14) 0%, rgba(255, 255, 255, 0.88) 35%, rgba(255,255,255,0.78) 100%);
-    box-shadow: 0 8px 30px rgba(147, 51, 234, 0.08), 0 2px 10px rgba(0,0,0,0.04);
+    @apply backdrop-blur-xl rounded-2xl border border-white/20 dark:border-white/10 shadow-2xl;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow:
+      0 18px 48px rgba(15, 23, 42, 0.14),
+      0 2px 8px rgba(15, 23, 42, 0.06);
   }
+
+  :is(.dark) .glass-menu {
+    background: rgba(9, 9, 11, 0.96);
+    box-shadow:
+      0 18px 48px rgba(0, 0, 0, 0.36),
+      0 2px 8px rgba(0, 0, 0, 0.16);
+  }
+
   .glass-menu-soft {
-    @apply backdrop-blur-xl rounded-xl border border-white/20 dark:border-white/10 shadow-xl;
-    background: radial-gradient(120% 120% at 0% 0%, rgba(216, 180, 254, 0.10) 0%, rgba(255, 255, 255, 0.70) 35%, rgba(255,255,255,0.60) 100%);
+    @apply backdrop-blur-xl rounded-2xl border border-white/20 dark:border-white/10 shadow-xl;
+    background: rgba(255, 255, 255, 0.78);
   }
+
+  :is(.dark) .glass-menu-soft {
+    background: rgba(12, 12, 12, 0.92);
+  }
+
   .glass-chip {
     @apply bg-white/70 dark:bg-white/10 backdrop-blur-md border border-white/30 dark:border-white/10 rounded-full;
   }
-  .elev-1 { @apply shadow; }
-  .elev-2 { @apply shadow-md; }
-  .elev-3 { @apply shadow-lg; }
-  .elev-4 { @apply shadow-xl; }
+
+  .threadly-shell-bg {
+    /* Clean white — images own the colour story, background defers completely.
+       background-attachment: fixed removed: it forced full GPU repaint on every
+       scroll tick, causing jank on mid-range mobile devices. */
+    background-color: var(--surface-primary);
+  }
+
+  :is(.dark) .threadly-shell-bg {
+    background-color: var(--surface-primary); /* resolves to #0a0a0a in dark */
+  }
+
+  .threadly-chrome-surface {
+    @apply border;
+    background-color: var(--surface-secondary);
+    border-color: var(--border-default);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  :is(.dark) .threadly-chrome-surface {
+    background-color: var(--surface-secondary);
+    border-color: var(--border-default);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+
+  .threadly-summary-surface {
+    @apply border;
+    color: var(--text-primary);
+    background-color: var(--surface-primary);
+    border-color: var(--border-strong);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.05),
+      0 4px 16px rgba(0, 0, 0, 0.04);
+  }
+
+  :is(.dark) .threadly-summary-surface {
+    color: var(--text-primary);
+    background-color: var(--surface-secondary);
+    border-color: var(--border-default);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.3),
+      0 4px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  .threadly-nav-surface {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .threadly-nav-surface-muted {
+    background-color: var(--surface-secondary);
+    border-bottom: 1px solid var(--border-default);
+    box-shadow: none;
+  }
+
+  :is(.dark) .threadly-nav-surface {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  :is(.dark) .threadly-nav-surface-muted {
+    background-color: var(--surface-secondary);
+    border-bottom: 1px solid var(--border-default);
+    box-shadow: none;
+  }
+
+  .elev-1 {
+    @apply shadow;
+  }
+
+  .elev-2 {
+    @apply shadow-md;
+  }
+
+  .elev-3 {
+    @apply shadow-lg;
+  }
+
+  .elev-4 {
+    @apply shadow-xl;
+  }
+
+  /* Modal surface system — neumorphic dual-shadows removed.
+     Dual-directional box-shadow required two GPU composite passes per modal.
+     color-mix(in srgb,...) also had limited browser coverage pre-2023.
+     Replaced with clean flat surfaces that read identically on all devices. */
+  .neu-modal-surface {
+    background-color: var(--neu-surface);
+    color: var(--neu-text);
+    border: 1px solid var(--neu-border);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  }
+
+  .neu-modal-inset {
+    background-color: var(--neu-surface-soft);
+    color: var(--neu-text);
+    border: 1px solid var(--neu-border);
+  }
+
+  .neu-text-muted {
+    color: var(--neu-text-muted);
+  }
+
+  .neu-modal-button-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+
+  .neu-modal-button-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl neu-modal-inset px-3 py-2.5 text-sm font-medium text-[color:var(--neu-text)] disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+
+  .neu-btn-press,
+  .neu-modal-surface button,
+  .neu-modal-surface [role="button"] {
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease,
+      filter 160ms ease;
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  .neu-btn-press:hover,
+  .neu-modal-surface button:hover,
+  .neu-modal-surface [role="button"]:hover {
+    filter: brightness(1.03);
+  }
+
+  .neu-btn-press:active,
+  .neu-modal-surface button:active,
+  .neu-modal-surface [role="button"]:active {
+    transform: scale(0.97);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .neu-btn-press,
+    .neu-modal-surface button,
+    .neu-modal-surface [role="button"] {
+      transition: none;
+      transform: none;
+      will-change: auto;
+    }
+
+    .neu-btn-press:active,
+    .neu-modal-surface button:active,
+    .neu-modal-surface [role="button"]:active {
+      transform: none;
+    }
+  }
 
   /* Frosted buttons: tight padding, purple accents */
   .btn-frost {
-    @apply inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-0;
+    @apply inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-0 focus:ring-offset-0;
   }
+
   .btn-frost-primary {
-    /* lighter purple gradient */
-    @apply btn-frost text-white bg-gradient-to-r from-purple-400 via-fuchsia-400 to-purple-500 hover:from-purple-500 hover:via-fuchsia-500 hover:to-purple-600 focus:ring-purple-300;
+    @apply btn-frost text-white bg-[#0d0d0d] hover:bg-[#1a1a1a]
+           dark:bg-white dark:text-[#0d0d0d] dark:hover:bg-gray-100;
   }
+
   .btn-frost-ghost {
-    @apply btn-frost text-gray-900 dark:text-gray-100 bg-white/0 hover:bg-white/10 border border-white/20 focus:ring-purple-300;
+    @apply btn-frost text-gray-900 dark:text-gray-100 bg-white/0 hover:bg-white/10 border border-white/20;
   }
+
   .btn-frost-outline {
-    @apply btn-frost text-purple-700 dark:text-purple-300 bg-white/0 border border-purple-300/60 hover:bg-purple-400/10 focus:ring-purple-300;
+    @apply btn-frost text-purple-700 dark:text-purple-300 bg-white/0 border border-purple-300/60 hover:bg-purple-400/10;
   }
-  .btn-tight-xs { @apply text-[11px] px-2.5 py-1; }
-  .btn-tight-sm { @apply text-[12px] px-3 py-1.5; }
-  .btn-tight-md { @apply text-[14px] px-3.5 py-2; }
-  .btn-tight-lg { @apply text-[15px] px-4 py-2.5; }
+
+  .btn-tight-xs {
+    @apply text-[11px] px-2.5 py-1;
+  }
+
+  .btn-tight-sm {
+    @apply text-[12px] px-3 py-1.5;
+  }
+
+  .btn-tight-md {
+    @apply text-[14px] px-3.5 py-2;
+  }
+
+  .btn-tight-lg {
+    @apply text-[15px] px-4 py-2.5;
+  }
+
+  /* Threadly select styling (native select enhancements) */
+  .select-threadly {
+    @apply appearance-none pr-10;
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(107,114,128,0.9)' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19 9-7 7-7-7'/%3E%3C/svg%3E");
+  }
+
+  .dark .select-threadly {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(229,231,235,0.85)' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19 9-7 7-7-7'/%3E%3C/svg%3E");
+  }
+
+  /* Native option styling for dark/light dropdowns */
+  .select-threadly option {
+    background-color: #ffffff;
+    color: #0f172a;
+  }
+
+  .dark .select-threadly option {
+    background-color: #0f1117;
+    color: #f8fafc;
+  }
 
   /* Tag sizes */
-  .chip-xs { @apply text-[11px] px-2 py-0.5; }
-  .chip-sm { @apply text-[12px] px-2.5 py-1; }
-  .chip-md { @apply text-[13px] px-3 py-1.5; }
+  .chip-xs {
+    @apply text-[11px] px-2 py-0.5;
+  }
+
+  .chip-sm {
+    @apply text-[12px] px-2.5 py-1;
+  }
+
+  .chip-md {
+    @apply text-[13px] px-3 py-1.5;
+  }
 
   /* Tag color accents */
-  .chip-purple { @apply text-purple-700 bg-purple-100/60 dark:text-purple-200 dark:bg-purple-400/15; }
-  .chip-blue { @apply text-blue-900 bg-blue-100/70 dark:text-blue-200 dark:bg-blue-500/15; }
-  .chip-green { @apply text-emerald-900 bg-emerald-100/70 dark:text-emerald-200 dark:bg-emerald-500/15; }
-  .chip-orange { @apply text-orange-900 bg-orange-100/70 dark:text-orange-200 dark:bg-orange-500/15; }
-  .chip-red { @apply text-rose-900 bg-rose-100/70 dark:text-rose-200 dark:bg-rose-500/15; }
-  .chip-gray { @apply text-gray-800 bg-gray-200/70 dark:text-gray-200 dark:bg-gray-600/20; }
+  .chip-purple {
+    @apply text-purple-700 bg-purple-100/60 dark:text-purple-200 dark:bg-purple-400/15;
+  }
+
+  .chip-blue {
+    @apply text-blue-900 bg-blue-100/70 dark:text-blue-200 dark:bg-blue-500/15;
+  }
+
+  .chip-green {
+    @apply text-emerald-900 bg-emerald-100/70 dark:text-emerald-200 dark:bg-emerald-500/15;
+  }
+
+  .chip-orange {
+    @apply text-orange-900 bg-orange-100/70 dark:text-orange-200 dark:bg-orange-500/15;
+  }
+
+  .chip-red {
+    @apply text-rose-900 bg-rose-100/70 dark:text-rose-200 dark:bg-rose-500/15;
+  }
+
+  .chip-gray {
+    @apply text-gray-800 bg-gray-200/70 dark:text-gray-200 dark:bg-gray-600/20;
+  }
+
+  /* Unified search input styling — uses system surface so it never clashes with page bg */
+  .threadly-search-input {
+    @apply w-full rounded-xl border border-transparent px-4 py-2.5 text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus:border-transparent;
+    background-color: var(--surface-secondary);
+    color: var(--text-primary);
+  }
+
+  .form-input {
+    @apply focus:outline-none focus:ring-0 focus:border-transparent;
+  }
+
+  /* Theme-aware background utilities */
+  .bg-theme {
+    background-color: var(--surface-primary);
+  }
+
+  .bg-theme-secondary {
+    background-color: var(--surface-secondary);
+  }
+
+  .bg-theme-muted {
+    background-color: var(--surface-muted);
+  }
+
+  /*
+    Global media rendering invariant
+    - Uploaded media must always be fully visible by default (no cropping).
+    - Use `MediaRenderer`/`ImageWithFallback` for rendering images/videos.
+    - Containers shrink-wrap the media; max-* classes cap size.
+    - NEVER use overflow-hidden on media frames as it clips content.
+    - Cropping is only allowed via explicit opt-in (e.g. `fit="cover"`) for avatar/banner-style UI.
+  */
+  .media-frame {
+    /* Shrink-wrap container: width fits content, maxes at full width */
+    @apply w-fit max-w-full;
+    /* NO overflow-hidden - media must be fully visible */
+  }
+
+  .media-frame-scroll {
+    @apply overflow-y-auto;
+  }
+
+  .media-frame-cap {
+    @apply max-h-[70vh];
+  }
+
+  .media-intrinsic {
+    /* Image/video fills container width; height scales proportionally */
+    @apply block w-full h-auto max-w-full;
+    /* height determined by max-h-* passed to MediaRenderer */
+  }
 }
 
-/* Smooth theme transitions for key elements */
-html,
-body,
-nav,
-aside,
-main,
-div,
-section,
-article,
-header,
-footer {
-  transition: background-color 0.3s ease, border-color 0.3s ease !important;
+/* Theme transition — universal approach using a brief class-based gate.
+   When the ThemeProvider flips the theme, it adds `theme-transitioning` to <html>
+   for ~300ms. During that window every element gets smooth, synchronized transitions.
+   Outside that window no elements carry a theme transition so there is zero perf cost. */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition:
+    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    fill 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    stroke 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    background 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    outline-color 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  /* !important overrides component-level transitions to ensure ALL elements switch together.
+     Zero delay forces every element to start at the same instant. */
+  transition-delay: 0s !important;
 }
 
-/* Text color transitions */
-h1, h2, h3, h4, h5, h6, p, span, a, button, label {
-  transition: color 0.3s ease !important;
+/* Interactive elements always need quick transitions for hover/focus states */
+a,
+button,
+label {
+  transition: color 0.2s ease;
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-input[type='password']::-ms-reveal,
-input[type='password']::-ms-clear,
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
 input::-ms-clear {
   display: none;
 }
@@ -106,40 +607,359 @@ input::-webkit-credentials-auto-fill-button {
   display: none !important;
 }
 
-html, body #root {
-    overflow-x: hidden;
-    padding: 0;
-    margin: 0;
-    width: 100%;
-    position: relative;
-    height: 100%;
-    @apply bg-[#FFFFFF] dark:bg-[#000000];
+html,
+body #root {
+  overflow-x: hidden;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  position: relative;
+  height: 100%;
+  background-color: var(--surface-primary);
+  color: var(--text-primary);
 }
 
+/* Prevent background page scroll when a modal is open */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* ─── Typography System ───────────────────────────────────────────────────── */
+
+/* Editorial tier — Playfair Display. For brand names, collection titles, heroes.
+   Font-weight 400 at large sizes IS the luxury signal — resist bolding it. */
+.type-editorial-hero {
+  font-family: 'Playfair Display', serif;
+  font-size: 3rem;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+.type-editorial-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.25rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+.type-editorial-label {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.75rem;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+/* Functional tier — Plus Jakarta Sans. For all UI chrome. */
+.type-ui-heading {
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--text-primary);
+}
+
+/* Spaced uppercase label — most immediate signal this is fashion, not SaaS */
+.type-ui-label {
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.type-ui-body {
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+.type-ui-meta {
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+/* title-text kept as alias — maps to Playfair now, not bold sans */
 .title-text {
-    @apply text-black dark:text-white font-bold;
+  font-family: 'Playfair Display', serif;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+/* title-gradient: gradient removed — solid editorial text.
+   bg-clip-text gradient is a paint operation on every visible frame. */
+.title-gradient {
+  font-family: 'Playfair Display', serif;
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+/* Brand accent title — purple used once per page maximum */
+.title-brand {
+  font-family: 'Playfair Display', serif;
+  font-weight: 400;
+  color: var(--brand-primary);
+}
+
+/* ─── Layout & Spacing Utilities ─────────────────────────────────────────── */
+
+/* Standard public page wrapper — caps width, centres, adds consistent padding */
+.page-container {
+  @apply w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Vertical section breathing room */
+.section-gap {
+  @apply py-12 sm:py-16;
+}
+
+.section-gap-md {
+  @apply py-8 sm:py-12;
+}
+
+/* Fashion feed grid — more air than data grids */
+.feed-grid {
+  @apply grid gap-4 sm:gap-6 lg:gap-8;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* Product carousel grid */
+.product-grid {
+  @apply grid gap-3 sm:gap-4;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #000000 transparent;
+  scrollbar-color: rgba(120, 113, 108, 0.2) transparent;
 }
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #000000;
-  border-radius: 2px;
+  background-color: rgba(120, 113, 108, 0.2);
+  border-radius: 999px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #000000;
+/* Modal scrollbar — same subtle blending */
+.glass-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 113, 108, 0.2) transparent;
+}
+.dark .glass-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+.glass-scrollbar::-webkit-scrollbar { width: 4px; }
+.glass-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.glass-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(120, 113, 108, 0.2);
+  border-radius: 999px;
+}
+.dark .glass-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Collection Creation Page - Design System Classes */
+.glass-panel-dark {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+}
+
+.gradient-primary {
+  background: linear-gradient(135deg, var(--brand-primary), #6366f1);
+}
+
+.gradient-primary:hover {
+  opacity: 0.9;
+}
+
+.title-gradient {
+  background: linear-gradient(to right, #a855f7, #818cf8, #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.thumbnail-selected {
+  box-shadow: 0 0 0 3px #9333ea;
+}
+
+.tag-badge {
+  background: rgba(147, 51, 234, 0.15);
+  color: #a855f7;
+  border: 1px solid rgba(147, 51, 234, 0.3);
+}
+
+.tag-badge-outline {
+  background: rgba(147, 51, 234, 0.06);
+  color: #6b7280;
+  border: 1.5px solid rgba(147, 51, 234, 0.18);
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+  letter-spacing: 0.01em;
+}
+
+:is(.dark) .tag-badge-outline {
+  background: rgba(168, 85, 247, 0.08);
+  color: #c4b5fd;
+  border-color: rgba(168, 85, 247, 0.25);
+}
+
+.tag-badge-outline:hover {
+  border-color: #9333ea;
+  color: #7c3aed;
+  background: rgba(147, 51, 234, 0.12);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(147, 51, 234, 0.15);
+}
+
+:is(.dark) .tag-badge-outline:hover {
+  color: #c084fc;
+  background: rgba(168, 85, 247, 0.18);
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.2);
+}
+
+/* Upload zone animations */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(147, 51, 234, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 40px rgba(147, 51, 234, 0.6);
+  }
+}
+
+.upload-zone-active {
+  border-color: #9333ea !important;
+  box-shadow: 0 0 30px rgba(147, 51, 234, 0.5);
+  transform: scale(1.02);
+}
+
+/* Pre-publish modal animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-dots {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes checkmark-draw {
+  0% {
+    transform: scale(0) rotate(-45deg);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1.2) rotate(0deg);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.15s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-checkmark {
+  animation: checkmark-draw 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)
+    forwards;
+}
+
+.pulse-dot {
+  animation: pulse-dots 1.4s ease-in-out infinite;
+}
+
+.pulse-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.pulse-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Circular progress ring */
+.progress-ring {
+  transform: rotate(-90deg);
+}
+
+.progress-ring-circle {
+  transition: stroke-dashoffset 0.35s;
+  transform-origin: 50% 50%;
 }
 
 /* Hide scrollbar for hashtag container */
@@ -156,11 +976,12 @@ html, body #root {
 @keyframes slideDown {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-6px) scale(0.985);
   }
+
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -170,48 +991,69 @@ html, body #root {
 
 .sidebar-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #000000 transparent;
+  scrollbar-color: rgba(120, 113, 108, 0.2) transparent;
+}
+.dark .sidebar-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+.sidebar-scrollbar::-webkit-scrollbar { width: 4px; }
+.sidebar-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(120, 113, 108, 0.2);
+  border-radius: 999px;
+}
+.dark .sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
-.sidebar-scrollbar::-webkit-scrollbar {
+/* Dropdown scrollbar — slightly more visible so it's discoverable */
+.brands-dropdown-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.brands-dropdown-scrollbar::-webkit-scrollbar { width: 4px; }
+.brands-dropdown-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.brands-dropdown-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+}
+.brands-dropdown-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Sleek scrollbar for notifications and other panels */
+.sleek-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.dark .sleek-scrollbar {
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
+
+.sleek-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
 
-.sidebar-scrollbar::-webkit-scrollbar-track {
+.sleek-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.sidebar-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #000000;
-  border-radius: 2px;
-}
-
-.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #4B5563;
-}
-
-/* Brands dropdown scrollbar - more visible for the specific dropdown */
-.brands-dropdown-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #6B7280 #1F2937;
-}
-
-.brands-dropdown-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.brands-dropdown-scrollbar::-webkit-scrollbar-track {
-  background: #1F2937;
+.sleek-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
   border-radius: 3px;
 }
 
-.brands-dropdown-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #6B7280;
-  border-radius: 3px;
+.dark .sleek-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.3);
 }
 
-.brands-dropdown-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #9CA3AF;
+.sleek-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.8);
+}
+
+.dark .sleek-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.5);
 }
 
 /* Hide scrollbar for hashtag container */
@@ -230,6 +1072,7 @@ html, body #root {
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -249,8 +1092,10 @@ html, body #root {
 /* Wrapper for the form to place it above the background */
 .form-wrapper {
   @apply w-full max-w-md p-8 rounded-xl shadow-2xl;
-  background-color: rgba(17, 17, 17, 0.8); /* Dark, semi-transparent background */
-  backdrop-filter: blur(10px); /* Frosted glass effect */
+  background-color: rgba(17, 17, 17, 0.8);
+  /* Dark, semi-transparent background */
+  backdrop-filter: blur(10px);
+  /* Frosted glass effect */
   border: 1px solid rgba(255, 255, 255, 0.1);
   position: relative;
   z-index: 10;
@@ -262,20 +1107,21 @@ html, body #root {
 
 .form-input {
   @apply w-full bg-gray-800/80 border border-gray-700 rounded-md p-3 text-white placeholder-gray-500;
-  @apply focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300;
+  @apply focus:ring-0 focus:border-transparent transition-all duration-300;
 }
 
 .form-link {
   @apply text-blue-500 hover:underline;
 }
 
-
 /* --- Background Doodle Styles --- */
 
 .doodle-text {
   position: absolute;
-  color: rgba(255, 255, 255, 0.04); /* Very faint text color */
-  font-weight: 800; /* Bold font for better shape */
+  color: rgba(255, 255, 255, 0.04);
+  /* Very faint text color */
+  font-weight: 800;
+  /* Bold font for better shape */
   white-space: nowrap;
   user-select: none;
   z-index: 1;
@@ -284,7 +1130,6 @@ html, body #root {
   animation-iteration-count: infinite;
 }
 
-
 /* --- Animations --- */
 
 /* Drifting animation for background doodles */
@@ -292,6 +1137,7 @@ html, body #root {
   from {
     transform: translateX(-150px) rotate(-10deg);
   }
+
   to {
     transform: translateX(150px) rotate(10deg);
   }
@@ -303,6 +1149,7 @@ html, body #root {
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -324,23 +1171,24 @@ html, body #root {
     transform: translateY(96px);
     opacity: 0.3;
   }
+
   50% {
     transform: translateY(0);
     opacity: 1;
   }
+
   100% {
     transform: translateY(96px);
     opacity: 0.3;
   }
 }
 
-
-
 @keyframes slideDown {
   from {
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -349,4 +1197,239 @@ html, body #root {
 
 .animate-slideDown {
   animation: slideDown 0.3s ease-out forwards;
+}
+
+/* Scrollbar for Modal Panels */
+/* Refined scrollbar for modal panes */
+.modal-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.modal-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(120, 113, 108, 0.25);
+  border-radius: 99px;
+  border: 0.5px solid transparent;
+  background-clip: content-box;
+}
+
+.modal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(120, 113, 108, 0.4);
+}
+.dark .modal-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.modal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 113, 108, 0.25) transparent;
+}
+.dark .modal-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+/* Custom styles for Glassmorphism Emoji Picker */
+.glass-emoji-picker {
+  /* Main container styling */
+  background-color: rgba(36, 35, 35, 0.7) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(192, 132, 252, 0.3) !important;
+  box-shadow: 0 0 20px rgba(192, 132, 252, 0.4) !important;
+  /* Neon glow */
+  border-radius: 0.5rem !important;
+}
+
+/* Reduce emoji picker header & search area footprint */
+.glass-emoji-picker .EmojiPickerReact-search {
+  padding: 4px 6px !important;
+  height: 38px !important;
+}
+
+.glass-emoji-picker .EmojiPickerReact-categories {
+  padding: 2px 6px !important;
+}
+
+.glass-emoji-picker .EmojiPickerReact-categoryButtons {
+  gap: 2px !important;
+}
+
+.glass-emoji-picker .EmojiPickerReact {
+  font-size: 14px !important;
+}
+
+.glass-emoji-picker .EmojiPickerReact-search {
+  /* Search input styling */
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(192, 132, 252, 0.3) !important;
+  color: white !important;
+}
+
+.glass-emoji-picker .EmojiPickerReact-categoryName {
+  /* Category name styling */
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* v4 emoji-picker-react specific class overrides */
+/* Reduce header/search and hide sticky category labels to gain more rows */
+.glass-emoji-picker .EmojiPickerReact {
+  /* Tighter grid spacing for more rows */
+  --epr-emoji-gap: 6px;
+  --epr-emoji-size: 24px;
+}
+
+.glass-emoji-picker .EmojiPickerReact .epr-search-container {
+  padding: 4px 6px !important;
+  min-height: 0 !important;
+}
+
+.glass-emoji-picker .EmojiPickerReact .epr-category-label {
+  display: none !important;
+}
+
+.glass-emoji-picker .EmojiPickerReact .epr-preview {
+  display: none !important;
+}
+
+/* Utility class to prevent body scrolling when a modal is open */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* PrimeReact Breadcrumb Custom Styling */
+.breadcrumb-wrapper .p-breadcrumb {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-bottom: 0.5rem;
+}
+
+.breadcrumb-wrapper .p-breadcrumb-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.breadcrumb-wrapper .p-menuitem-link {
+  @apply text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors;
+  text-decoration: none;
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+}
+
+.breadcrumb-wrapper .p-menuitem-link:hover {
+  @apply bg-gray-100 dark:bg-gray-800;
+}
+
+.breadcrumb-wrapper .p-menuitem-text {
+  font-weight: 500;
+}
+
+.breadcrumb-wrapper .p-breadcrumb-chevron {
+  @apply text-gray-400 dark:text-gray-600;
+  margin: 0 0.25rem;
+}
+
+.dark .breadcrumb-wrapper .p-breadcrumb {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.breadcrumb-wrapper .p-menuitem-icon {
+  @apply text-purple-600 dark:text-purple-400;
+  margin-right: 0.25rem;
+}
+
+/* Glassmorphism Redesign Utilities */
+
+/* Noise texture overlay */
+.bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+/* Glass input styles - Dark Mode Default */
+.input-glass {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  color: #fff;
+}
+
+.input-glass::placeholder {
+  color: #9ca3af;
+}
+
+.input-glass:focus {
+  background: rgba(0, 0, 0, 0.6);
+  border-color: #9333ea;
+  box-shadow:
+    0 0 15px rgba(147, 51, 234, 0.2),
+    inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  outline: none;
+}
+
+/* Glass input styles - Light Mode Variant */
+.dark .input-glass {
+  /* Re-assert dark mode styles if needed, or rely on base class if default is dark */
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* Light mode specific overrides */
+html:not(.dark) .input-glass {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+  color: #111827;
+}
+
+html:not(.dark) .input-glass::placeholder {
+  color: #6b7280;
+}
+
+html:not(.dark) .input-glass:focus {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: #9333ea;
+  box-shadow:
+    0 0 15px rgba(147, 51, 234, 0.15),
+    inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Neon Shadows */
+.shadow-neon {
+  box-shadow: 0 0 20px rgba(147, 51, 234, 0.3);
+}
+
+.hover\:shadow-neon-strong:hover {
+  box-shadow: 0 0 30px rgba(147, 51, 234, 0.5);
+}
+
+/* Inner shadow utility */
+.inner-shadow {
+  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* Animated gradient for headers */
+@keyframes gradient-x {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 3s ease infinite;
 }

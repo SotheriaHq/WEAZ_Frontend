@@ -1,43 +1,60 @@
 // Collection Types
 export interface CollectionDto {
   id: string;
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   name: string;
   description?: string;
   ownerId: string;
   title: string;
   isPublic: boolean;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+  type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
+  domain?: 'DESIGN' | 'STORE';
+  categoryId?: string;
+  subCategoryId?: string;
+  categoryTypeId?: string;
   coverImage?: string;
   coverFileId?: string;
+  previewImages?: Array<{ url?: string | null; fileId?: string | null }>;
+  deletedAt?: string | null;
+  deleteExpiresAt?: string | null;
   itemCount?: number;
   createdAt: string;
   updatedAt: string;
   postsCount?: number;
-  likesCount?: number;
+  threadsCount?: number;
   commentsCount?: number;
   minPrice?: number;
   maxPrice?: number;
+  saleMinPrice?: number | null;
+  saleMaxPrice?: number | null;
+  saleStartAt?: string | null;
+  saleEndAt?: string | null;
   brandName?: string;
   username?: string;
   brandLogo?: string;
   brandLogoFileId?: string;
   isAvailableInStore?: boolean;
+  isSystemGenerated?: boolean;
   tags?: string[];
+  isThreaded?: boolean; // Backend includes this for authenticated users
+  // Client-only status metadata for optimistic publish/progress states
+  clientStatus?: 'publishing' | 'publish-failed';
+  clientStatusMessage?: string;
+  clientStatusMeta?: {
+    startedAt?: number;
+    attempts?: number;
+    offline?: boolean;
+    progress?: number;
+    previewUrl?: string;
+    taskId?: string;
+  };
 }
 
-// Review Types
-export interface ReviewDto {
-  id: string;
-  userId: string;
-  userName: string;
-  userImage?: string;
-  brandId: string;
-  rating: number;
-  comment: string;
-  helpful: number;
-  images?: string[];
-  verified?: boolean;
-  createdAt: string;
-  updatedAt: string;
+export interface ReviewRatingDistributionItem {
+  stars: number;
+  count: number;
+  percentage: number;
 }
 
 // Brand Profile Types
@@ -54,6 +71,7 @@ export interface BrandProfileDto {
   id: string;
   brandFullName: string;
   description: string | null;
+  isStoreOpen?: boolean;
   country: string | null;
   state: string | null;
   city: string | null;
@@ -78,9 +96,13 @@ export interface BrandProfileDto {
   cacNumber?: string | null;
   tin?: string | null;
   verified?: boolean;
+  verificationStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'IN_REVIEW' | 'ADDITIONAL_INFO_REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  verificationBadgeVisible?: boolean;
+  verifiedExplanationUrl?: string | null;
   averageRating?: number;
   totalReviews?: number;
   collectionsCount?: number;
+  patchesCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,15 +114,4 @@ export type ProfileTabType = 'Collections' | 'About' | 'Reviews';
 export interface CollectionsResponse {
   collections: CollectionDto[];
   total: number;
-}
-
-export interface ReviewsResponse {
-  reviews: ReviewDto[];
-  averageRating: number;
-  totalReviews: number;
-  ratingDistribution: {
-    stars: number;
-    count: number;
-    percentage: number;
-  }[];
 }

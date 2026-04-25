@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, useEffect, useRef, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import type { MediaItem, MediaItemKind } from '../types/media';
@@ -76,7 +75,7 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     for (const k of Array.from(map.keys())) {
       if (!keep.has(k)) {
         const u = map.get(k);
-        if (u) URL.revokeObjectURL(u);
+        if (u && u.startsWith('blob:')) URL.revokeObjectURL(u);
         map.delete(k);
       }
     }
@@ -86,7 +85,9 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const map = urlRef.current;
     return () => {
       const urls = Array.from(map.values());
-      for (const u of urls) URL.revokeObjectURL(u);
+      for (const u of urls) {
+        if (u.startsWith('blob:')) URL.revokeObjectURL(u);
+      }
       map.clear();
     };
   }, []);

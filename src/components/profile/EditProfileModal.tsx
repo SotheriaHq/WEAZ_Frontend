@@ -1,108 +1,133 @@
 
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, type FieldErrors } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { X, MapPin } from 'lucide-react';
-import FrostedButton, { IconButton } from '@/components/ui/FrostedButton';
 import type { AuthUserDto } from '../../types/auth';
 import type { BrandProfileDto } from '../../types/profile';
 import { brandApi, type UpdateBrandProfilePayload } from '../../api/BrandApi';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
+import { locationService, type CountryOption, type StateOption } from '../../services/LocationService';
+import UniversalSelect from '../forms/UniversalSelect';
+import MediaRenderer from '@/components/media/MediaRenderer';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { BRAND_TAG_OPTIONS } from '../../data/brandTags';
-import {
-  DEFAULT_COUNTRY,
-  LOCATION_DATA,
-  getCitiesForState,
-  getStatesForCountry,
-} from '../../data/locations';
 
+// ----------------------------------------------------------------------------
+// Zod Schemas & Helpers
+// ----------------------------------------------------------------------------
 const urlRegex = /^https?:\/\//i;
+const socialHandleRegex = /^@?[A-Za-z0-9._-]{2,50}$/;
 
-const optionalUrlSchema = z
+const optionalSocialSchema = z
   .string()
   .trim()
   .optional()
   .refine(
-    (value) => !value || value.length === 0 || urlRegex.test(value),
-    { message: 'Enter a valid URL starting with http:// or https://' },
+    (value) =>
+      !value ||
+      value.length === 0 ||
+      urlRegex.test(value) ||
+      socialHandleRegex.test(value),
+    { message: 'Enter a valid URL or username/handle' },
   );
 
-const profileSchema = z.object({
-  brandFullName: z
-    .string()
-    .trim()
-    .min(2, { message: 'Brand name must be at least 2 characters' })
-    .max(120, { message: 'Brand name must be 120 characters or fewer' }),
-  brandDescription: z
-    .string()
-    .trim()
-    .min(20, { message: 'Tell us at least 20 characters about your brand' })
-    .max(2000, { message: 'Keep your description under 2000 characters' }),
-  brandCountry: z.string().optional(),
-  brandState: z.string().optional(),
-  brandCity: z.string().optional(),
-  brandTags: z
-    .array(z.string())
-    .min(1, { message: 'Select at least one tag' })
-    .max(6, { message: 'You can select up to six tags' }),
-  socialInstagram: optionalUrlSchema,
-  socialFacebook: optionalUrlSchema,
-  socialTwitter: optionalUrlSchema,
-  socialWebsite: optionalUrlSchema,
-  phoneNumber: z.string().trim().max(30, { message: 'Phone number is too long' }).optional(),
-  businessType: z.string().trim().max(120, { message: 'Business type is too long' }).optional(),
-});
+const profileSchema = z
+  .object({
+    brandFullName: z
+      .string()
+      .trim()
+      .min(2, { message: 'Brand name must be at least 2 characters' })
+      .max(120, { message: 'Brand name must be 120 characters or fewer' }),
+    brandDescription: z
+      .string()
+      .trim()
+      .min(20, { message: 'Tell us at least 20 characters about your brand' })
+      .max(2000, { message: 'Keep your description under 2000 characters' }),
+    brandCountry: z.string().optional(),
+    brandState: z.string().optional(),
+    brandCity: z.string().optional(),
+    brandTags: z.array(z.string()).optional(),
+    socialInstagram: optionalSocialSchema,
+    socialFacebook: optionalSocialSchema,
+    socialTwitter: optionalSocialSchema,
+    socialWebsite: optionalSocialSchema,
+    phoneNumber: z.string().trim().max(30, { message: 'Phone number is too long' }).optional(),
+    businessType: z.string().trim().max(120, { message: 'Business type is too long' }).optional(),
+  })
+  .refine(
+    (values) =>
+      Boolean((values.brandCountry ?? '').trim() || (values.brandState ?? '').trim()),
+    {
+      path: ['brandCountry'],
+      message: 'Add at least country or state to complete setup',
+    },
+  );
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
+const MAX_TAGS = 5;
+const BUSINESS_TYPE_OPTIONS = [
+  { value: 'Retailer', label: 'Retailer' },
+  { value: 'Designer', label: 'Designer' },
+  { value: 'Wholesaler', label: 'Wholesaler' },
+  { value: 'Boutique', label: 'Boutique' },
+];
 
 const getFirstErrorMessage = (errors: unknown): string | null => {
-  if (!errors) {
-    return null;
-  }
-
+  if (!errors) return null;
   if (Array.isArray(errors)) {
     for (const error of errors) {
       const message = getFirstErrorMessage(error);
-      if (message) {
-        return message;
-      }
+      if (message) return message;
     }
     return null;
   }
-
-  if (typeof errors !== 'object') {
-    return null;
-  }
-
+  if (typeof errors !== 'object') return null;
   const errorObject = errors as Record<string, unknown>;
-
-  if (typeof errorObject.message === 'string' && errorObject.message.length > 0) {
-    return errorObject.message;
-  }
-
+  if (typeof errorObject.message === 'string' && errorObject.message.length > 0) return errorObject.message;
   if (errorObject.types && typeof errorObject.types === 'object') {
     const firstTypeMessage = Object.values(errorObject.types as Record<string, unknown>)[0];
-    if (typeof firstTypeMessage === 'string' && firstTypeMessage.length > 0) {
-      return firstTypeMessage;
-    }
+    if (typeof firstTypeMessage === 'string' && firstTypeMessage.length > 0) return firstTypeMessage;
   }
-
   for (const value of Object.values(errorObject)) {
     const message = getFirstErrorMessage(value);
-    if (message) {
-      return message;
-    }
+    if (message) return message;
   }
-
   return null;
 };
 
-const scrubOptionalUrl = (value?: string | null): string | undefined => {
+const ensureHttps = (value?: string | null): string | undefined => {
   const trimmed = value?.trim() ?? '';
-  return trimmed.length > 0 ? trimmed : undefined;
+  if (!trimmed) return undefined;
+  if (urlRegex.test(trimmed)) return trimmed;
+  return `https://${trimmed.replace(/^https?:\/\//i, '')}`;
 };
 
+const normalizeSocialLink = (
+  platform: 'instagram' | 'facebook' | 'twitter' | 'website',
+  value?: string | null,
+): string | undefined => {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return undefined;
+  const asUrl = urlRegex.test(trimmed) ? ensureHttps(trimmed) : undefined;
+  if (asUrl) return asUrl;
+  const handle = socialHandleRegex.test(trimmed) ? trimmed.replace(/^@/, '') : trimmed;
+  if (!handle) return undefined;
+  const base =
+    platform === 'instagram'
+      ? 'https://instagram.com'
+      : platform === 'facebook'
+        ? 'https://facebook.com'
+        : platform === 'twitter'
+          ? 'https://x.com'
+          : '';
+  return base ? `${base}/${handle}` : ensureHttps(trimmed);
+};
+
+// ----------------------------------------------------------------------------
+// Component Props
+// ----------------------------------------------------------------------------
 interface EditProfileModalProps {
   isOpen: boolean;
   user: AuthUserDto;
@@ -113,64 +138,57 @@ interface EditProfileModalProps {
   onSaved: (user: AuthUserDto) => Promise<void> | void;
 }
 
+// ----------------------------------------------------------------------------
+// Main Component
+// ----------------------------------------------------------------------------
 const EditProfileModal: React.FC<EditProfileModalProps> = ({
   isOpen,
   user,
   brandProfile,
-  showSkip = false,
+  showSkip,
   onSkip,
   onClose,
   onSaved,
 }) => {
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
-  const tagSectionRef = useRef<HTMLDivElement | null>(null);
   const originalBodyOverflow = useRef<string | null>(null);
+  
+  // Location States
+  const [countries, setCountries] = useState<CountryOption[]>([]);
+  const [states, setStates] = useState<StateOption[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
 
-  const defaultCountry =
-    brandProfile?.country ||
-    user.brandCountry ||
-    (LOCATION_DATA.some((country) => country.name === DEFAULT_COUNTRY)
-      ? DEFAULT_COUNTRY
-      : '');
+  // Tags State
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [tagError, setTagError] = useState<string | null>(null);
 
+  // Initial Values
   const initialValues = useMemo<ProfileFormValues>(() => {
-    const tags =
-      brandProfile?.tags ||
-      brandProfile?.hashtags ||
-      user.brandTags ||
-      [];
-
     return {
       brandFullName:
         brandProfile?.brandFullName ||
         user.brandFullName ||
         `${user.firstName} ${user.lastName}`.trim() ||
         user.username,
-      brandDescription:
-        brandProfile?.description ||
-        user.brandDescription ||
-        '',
-      brandCountry: defaultCountry,
+      brandDescription: brandProfile?.description || user.brandDescription || '',
+      brandCountry: brandProfile?.country || user.brandCountry || '',
       brandState: brandProfile?.state || user.brandState || '',
       brandCity: brandProfile?.city || user.brandCity || '',
-      brandTags: Array.isArray(tags) ? tags.slice(0, 6) : [],
-      socialInstagram:
-        brandProfile?.socialLinks?.instagram || user.socialInstagram || '',
-      socialFacebook:
-        brandProfile?.socialLinks?.facebook || user.socialFacebook || '',
-      socialTwitter:
-        brandProfile?.socialLinks?.twitter || user.socialTwitter || '',
-      socialWebsite:
-        brandProfile?.socialLinks?.website || user.socialWebsite || '',
-      phoneNumber:
-        brandProfile?.contactInfo?.phone || user.phoneNumber || '',
-      businessType:
-        brandProfile?.contactInfo?.businessType ||
-        user.brandBusinessType ||
-        '',
+      brandTags:
+        brandProfile?.tags ||
+        user.brandTags ||
+        BRAND_TAG_OPTIONS.slice(0, 3).map((tag) => tag.value),
+      socialInstagram: brandProfile?.socialLinks?.instagram || user.socialInstagram || '',
+      socialFacebook: brandProfile?.socialLinks?.facebook || user.socialFacebook || '',
+      socialTwitter: brandProfile?.socialLinks?.twitter || user.socialTwitter || '',
+      socialWebsite: brandProfile?.socialLinks?.website || user.socialWebsite || '',
+      phoneNumber: brandProfile?.contactInfo?.phone || user.phoneNumber || '',
+      businessType: brandProfile?.contactInfo?.businessType || user.brandBusinessType || '',
     };
-  }, [brandProfile, user, defaultCountry]);
+  }, [brandProfile, user]);
 
+  // Hook Form
   const {
     register,
     handleSubmit,
@@ -186,481 +204,522 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   });
 
   const brandDescriptionField = register('brandDescription');
-
+  const descriptionValue = watch('brandDescription');
   const selectedCountry = watch('brandCountry');
   const selectedState = watch('brandState');
-  const selectedTags = watch('brandTags') || [];
-  const selectedCity = watch('brandCity');
 
-  const focusableFields = useMemo<ReadonlyArray<keyof ProfileFormValues>>(
-    () => [
-      'brandFullName',
-      'brandDescription',
-      'brandCountry',
-      'brandState',
-      'brandCity',
-      'socialInstagram',
-      'socialFacebook',
-      'socialTwitter',
-      'socialWebsite',
-      'phoneNumber',
-      'businessType',
-    ],
-    [],
-  );
-
-  const availableStates = useMemo(() => {
-    const states = getStatesForCountry(selectedCountry || '');
-
-    if (states.length === 0 && selectedCountry && selectedCountry.length > 0) {
-      return [
-        { name: selectedState || '', cities: [] },
-        ...states,
-      ];
-    }
-
-    return states;
-  }, [selectedCountry, selectedState]);
-
-  const availableCities = useMemo(
-    () => getCitiesForState(selectedCountry || '', selectedState || ''),
-    [selectedCountry, selectedState],
-  );
-
+  // Initialize selected tags from profile/user
   useEffect(() => {
+    setSelectedTags(initialValues.brandTags ?? []);
+    setTagError(null);
+  }, [initialValues]);
+
+  // Load Countries on Mount
+  useEffect(() => {
+    const loadCountries = async () => {
+        setLoadingLocations(true);
+        const data = await locationService.getCountries();
+        setCountries(data);
+        setLoadingLocations(false);
+    };
     if (isOpen) {
-      reset(initialValues);
-      window.setTimeout(() => {
-        descriptionRef.current?.focus();
-      }, 50);
+        void loadCountries();
+        reset(initialValues);
+        // Small timeout to allow render before focusing
+        setTimeout(() => descriptionRef.current?.focus(), 50);
     }
   }, [isOpen, initialValues, reset]);
 
+  // Cascade: Load States when Country changes
+  useEffect(() => {
+    const loadStates = async () => {
+        if (!selectedCountry) {
+            setStates([]);
+            return;
+        }
+        setLoadingLocations(true);
+        const data = await locationService.getStates(selectedCountry);
+        setStates(data);
+        setLoadingLocations(false);
+    };
+    void loadStates();
+  }, [selectedCountry]);
+
+  // Cascade: Load Cities when State changes
+  useEffect(() => {
+    const loadCities = async () => {
+        if (!selectedCountry || !selectedState) {
+            setCities([]);
+            return;
+        }
+        setLoadingLocations(true);
+        const data = await locationService.getCities(selectedCountry, selectedState);
+        setCities(data);
+        setLoadingLocations(false);
+    };
+    void loadCities();
+  }, [selectedCountry, selectedState]);
+
+  // Scroll Locking
   useEffect(() => {
     if (isOpen) {
       originalBodyOverflow.current = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
       return () => {
-        document.body.style.overflow =
-          originalBodyOverflow.current ?? '';
+        document.body.style.overflow = originalBodyOverflow.current ?? '';
+        document.documentElement.style.overflow = '';
       };
     }
     return undefined;
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!availableStates.some((state) => state.name === selectedState)) {
-      setValue('brandState', '');
-      setValue('brandCity', '');
-    }
-  }, [availableStates, selectedState, setValue]);
-
-  useEffect(() => {
-    if (!availableCities.includes(selectedCity || '')) {
-      setValue('brandCity', '');
-    }
-  }, [availableCities, selectedCity, setValue]);
-
-  const toggleTag = (tag: string) => {
-    const current = selectedTags || [];
-    if (current.includes(tag)) {
-      setValue(
-        'brandTags',
-        current.filter((item) => item !== tag),
-        { shouldValidate: true },
-      );
-      return;
-    }
-
-    if (current.length >= 6) {
-      toast.warning('You can select up to six tags');
-      return;
-    }
-
-    setValue('brandTags', [...current, tag], { shouldValidate: true });
-  };
-
-  const handleSkip = () => {
-    if (onSkip) {
-      onSkip();
-    } else {
-      onClose();
-    }
-  };
-
+  // Submit Handler
   const onSubmit = useCallback(
     async (values: ProfileFormValues) => {
       try {
+        if (selectedTags.length === 0) {
+          setTagError('Select at least one tag.');
+          toast.error('Select at least one tag.');
+          return;
+        }
+
+        const brandCountry = values.brandCountry?.trim() || undefined;
+        const brandState = values.brandState?.trim() || undefined;
+        const brandCity = values.brandCity?.trim() || undefined;
+        const phoneNumber = values.phoneNumber?.trim() || undefined;
+        const businessType = values.businessType?.trim() || undefined;
+
         const payload: UpdateBrandProfilePayload = {
           brandFullName: values.brandFullName.trim(),
           brandDescription: values.brandDescription.trim(),
-          brandCountry: values.brandCountry ?? '',
-          brandState: values.brandState ?? '',
-          brandCity: values.brandCity ?? '',
-          brandTags: values.brandTags,
-          socialInstagram: scrubOptionalUrl(values.socialInstagram),
-          socialFacebook: scrubOptionalUrl(values.socialFacebook),
-          socialTwitter: scrubOptionalUrl(values.socialTwitter),
-          socialWebsite: scrubOptionalUrl(values.socialWebsite),
-          phoneNumber: values.phoneNumber?.trim() ?? '',
-          businessType: values.businessType?.trim() ?? '',
+          brandCountry,
+          brandState,
+          brandCity,
+          brandTags: selectedTags,
+          socialInstagram: normalizeSocialLink('instagram', values.socialInstagram),
+          socialFacebook: normalizeSocialLink('facebook', values.socialFacebook),
+          socialTwitter: normalizeSocialLink('twitter', values.socialTwitter),
+          socialWebsite: normalizeSocialLink('website', values.socialWebsite),
+          phoneNumber,
+          businessType,
         };
 
         const updatedUser = await brandApi.updateBrandProfile(user.id, payload);
-        if (!updatedUser) {
-          throw new Error('Profile update failed. Please try again.');
-        }
+        if (!updatedUser) throw new Error('Profile update failed.');
 
         toast.success('Profile updated successfully');
         await onSaved(updatedUser);
       } catch (error) {
-        if (error instanceof Error) {
-          toast.error(error.message);
-        } else {
-          toast.error('Unable to update profile. Please try again.');
-        }
+        if (error instanceof Error) toast.error(error.message);
+        else toast.error('Unable to update profile.');
       }
     },
-    [onSaved, user.id],
+    [onSaved, user.id, selectedTags],
   );
 
   const onInvalid = useCallback(
     (formErrors: FieldErrors<ProfileFormValues>) => {
-      const [firstErrorKey] = Object.keys(formErrors) as Array<keyof ProfileFormValues>;
-
-      if (firstErrorKey === 'brandTags') {
-        tagSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const firstTagButton = tagSectionRef.current?.querySelector<HTMLButtonElement>('button');
-        firstTagButton?.focus();
-      } else if (firstErrorKey && focusableFields.includes(firstErrorKey)) {
-        setFocus(firstErrorKey);
-      }
-
       const message = getFirstErrorMessage(formErrors);
       toast.error(message ?? 'Please fix the highlighted fields before saving.');
+      const firstErrorKey = Object.keys(formErrors)[0] as keyof ProfileFormValues;
+      if (firstErrorKey) setFocus(firstErrorKey);
     },
-    [focusableFields, setFocus],
+    [setFocus],
   );
 
-  const submitForm = useMemo(
-    () => handleSubmit(onSubmit, onInvalid),
-    [handleSubmit, onSubmit, onInvalid],
-  );
+  // Country Options for Select
+  const countryOptions = useMemo(() => countries.map(c => ({
+    value: c.name,
+    label: c.name,
+    icon: (
+      <MediaRenderer
+        kind="image"
+        src={c.flagImage}
+        alt={c.name}
+        maxHeightClassName="max-h-5"
+        maxWidthClassName="max-w-8"
+        className="rounded-sm"
+        mediaClassName="rounded-sm"
+      />
+    ),
+  })), [countries]);
 
-  if (!isOpen) {
-    return null;
-  }
+  const stateOptions = useMemo(() => states.map(s => ({
+    value: s.name,
+    label: s.name
+  })), [states]);
+
+  const cityOptions = useMemo(() => cities.map(c => ({
+    value: c,
+    label: c
+  })), [cities]);
+
+  const tagOptions = useMemo(() => {
+    const base = BRAND_TAG_OPTIONS;
+    const baseValues = new Set(base.map((tag) => tag.value));
+    const extras = selectedTags
+      .filter((tag) => tag && !baseValues.has(tag))
+      .map((tag) => ({ label: tag, value: tag }));
+    return [...extras, ...base];
+  }, [selectedTags]);
+
+  const toggleTag = (value: string) => {
+    setSelectedTags((prev) => {
+      if (prev.includes(value)) {
+        const next = prev.filter((tag) => tag !== value);
+        if (tagError && next.length > 0) setTagError(null);
+        return next;
+      }
+      if (prev.length >= MAX_TAGS) {
+        setTagError(`Choose up to ${MAX_TAGS} tags.`);
+        return prev;
+      }
+      const next = [...prev, value];
+      if (tagError && next.length > 0) setTagError(null);
+      return next;
+    });
+  };
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap({
+    active: isOpen,
+    containerRef: dialogRef,
+    onEscape: onClose,
+  });
+
+  if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 py-8"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="edit-profile-title"
-      onClick={handleSkip}
-    >
-      <div
-        className="relative w-full max-w-5xl glass-panel rounded-2xl shadow-2xl overflow-hidden"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/20 bg-gradient-to-r from-purple-400/30 via-purple-300/20 to-indigo-400/30 text-gray-900 dark:text-white backdrop-blur-xl">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] opacity-70">Brand setup</p>
-            <h2 id="edit-profile-title" className="text-xl font-semibold">
-              Update your profile
-            </h2>
-          </div>
-          <IconButton
-            type="button"
-            onClick={handleSkip}
-            aria-label="Close profile editor"
-            variant="ghost"
-            size="sm"
-            icon={<X className="w-4 h-4" />}
-          />
+    <OverlayPortal>
+      <>
+        {/* Background Overlay */}
+        <div className="fixed inset-0 z-layer-overlay">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose} />
         </div>
 
-        <form onSubmit={submitForm} className="px-6 py-6 space-y-6 overflow-y-auto max-h-[80vh] text-gray-900 dark:text-gray-100">
-          <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1}>
-            Submit
-          </button>
-          <section className="grid gap-6 md:grid-cols-[1.2fr,1fr]">
-            <div className="space-y-5">
-              <div ref={tagSectionRef}>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Username
-                </label>
-                <input
-                  value={user.username}
-                  disabled
-                  className="mt-1 w-full rounded-lg bg-white/40 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 backdrop-blur-xl"
-                />
-              </div>
+        {/* Main Modal Container */}
+        <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-label="Brand setup">
+          <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-4xl neu-modal-surface bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in border border-gray-200 dark:border-gray-800">
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Email
-                </label>
-                <input
-                  value={user.email}
-                  disabled
-                  className="mt-1 w-full rounded-lg bg-white/40 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 backdrop-blur-xl"
-                />
-              </div>
+          {/* Scrollable Content */}
+          <form 
+            onSubmit={handleSubmit(onSubmit, onInvalid)}
+            className="overflow-y-auto custom-scrollbar p-8 space-y-10 overscroll-contain"
+          >
 
-              <div>
-                <label htmlFor="brand-full-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Brand name
-                </label>
-                <input
-                  id="brand-full-name"
-                  {...register('brandFullName')}
-                  className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                  placeholder="Enter your brand name"
-                />
-                {errors.brandFullName && (
-                  <p className="mt-1 text-xs text-red-500">{errors.brandFullName.message}</p>
+            {/* Modal Title + Close (inside body, no separate header) */}
+            <div className="flex items-start justify-between gap-6">
+              <div className="min-w-0">
+                <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Brand Setup</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Create your brand identity & story</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {showSkip && onSkip && (
+                  <button
+                    type="button"
+                    onClick={onSkip}
+                    disabled={isSubmitting}
+                    className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition"
+                  >
+                    Skip
+                  </button>
                 )}
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label htmlFor="brand-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    About your brand
-                  </label>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Minimum 20 characters
-                  </span>
-                </div>
-                <textarea
-                  id="brand-description"
-                  {...brandDescriptionField}
-                  ref={(element) => {
-                    brandDescriptionField.ref(element);
-                    descriptionRef.current = element;
-                  }}
-                  rows={5}
-                  className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                  placeholder="Share the story, inspiration, and mission behind your brand."
-                />
-                {errors.brandDescription && (
-                  <p className="mt-1 text-xs text-red-500">{errors.brandDescription.message}</p>
-                )}
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Brand tags
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Select up to 3 tags
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {BRAND_TAG_OPTIONS.map((tag) => {
-                    const isSelected = selectedTags.includes(tag.value);
-                    return (
-                      <button
-                        type="button"
-                        key={tag.value}
-                        onClick={() => toggleTag(tag.value)}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all backdrop-blur-xl ${
-                          isSelected
-                            ? 'bg-purple-500/30 text-purple-900 dark:text-purple-100 border border-purple-400/40 ring-1 ring-purple-400/30'
-                            : 'bg-white/40 dark:bg-white/5 text-gray-700 dark:text-gray-200 border border-white/30 dark:border-white/10 hover:bg-white/50'
-                        }`}
-                      >
-                        #{tag.label ?? tag.value}
-                      </button>
-                    );
-                  })}
-                </div>
-                {errors.brandTags && (
-                  <p className="mt-1 text-xs text-red-500">{errors.brandTags.message}</p>
-                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10 transition"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
               </div>
             </div>
-
-            <div className="space-y-5">
-              <div className="grid gap-4">
+            
+            {/* Section: Identity */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+              <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">
+                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <path d="M16 2v4M8 2v4M3 10h18"></path>
+                  </svg>
+                </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Country
-                  </label>
-                  <div className="relative mt-1">
-                    <select
-                      {...register('brandCountry')}
-                      className="w-full appearance-none rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                    >
-                      <option value="">Select country</option>
-                      {LOCATION_DATA.map((country) => (
-                        <option key={country.name} value={country.name}>
-                          {country.name}
-                        </option>
-                      ))}
-                    </select>
-                    <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Brand Identity</h3>
+                    <p className="text-xs text-gray-500">How you appear to customers</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Brand Name</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Threadly Couture" 
+                    className="w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" 
+                    {...register('brandFullName')}
+                  />
+                  {errors.brandFullName && <p className="text-xs text-red-500 font-medium">{errors.brandFullName.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Username</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">@</span>
+                    <input 
+                      type="text" 
+                      placeholder="username" 
+                      className="w-full h-12 pl-8 pr-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 cursor-not-allowed" 
+                      value={user.username}
+                      disabled
+                      title="Username cannot be changed here"
+                    />
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    State / Region
-                  </label>
-                  <select
-                    {...register('brandState')}
-                    className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 disabled:opacity-60 backdrop-blur-xl"
-                    disabled={!selectedCountry}
-                  >
-                    <option value="">Select state</option>
-                    {availableStates.map((state) => (
-                      state.name ? (
-                        <option key={state.name} value={state.name}>
-                          {state.name}
-                        </option>
-                      ) : null
-                    ))}
-                  </select>
+                
+                <div className="md:col-span-2">
+                   <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Email Address <span className="text-gray-400 font-normal text-xs ml-2">(Private)</span></label>
+                    <input 
+                        type="email" 
+                        placeholder="contact@brand.com" 
+                        className="w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 cursor-not-allowed" 
+                        value={user.email}
+                        disabled
+                    />
+                   </div>
                 </div>
+              </div>
+            </div>
 
+            {/* Section: Story & Tags */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+               <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">
+                <div className="w-10 h-10 rounded-full bg-pink-100 dark:bg-pink-900/40 flex items-center justify-center text-pink-600 dark:text-pink-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                  </svg>
+                </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    City / Area
-                  </label>
-                  <select
-                    {...register('brandCity')}
-                    className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 disabled:opacity-60 backdrop-blur-xl"
-                    disabled={!selectedCountry || !selectedState}
-                  >
-                    <option value="">Select city</option>
-                    {availableCities.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                  </select>
+                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">Story & Vision</h3>
+                   <p className="text-xs text-gray-500">What makes your brand unique?</p>
                 </div>
               </div>
 
-              <div className="grid gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Phone number
-                  </label>
-                  <input
-                    {...register('phoneNumber')}
-                    className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                    placeholder="+234 800 000 0000"
-                  />
-                  {errors.phoneNumber && (
-                    <p className="mt-1 text-xs text-red-500">{errors.phoneNumber.message}</p>
-                  )}
+              <div className="space-y-6">
+                <div className="space-y-2 relative">
+                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Brand Story</label>
+                    <textarea 
+                        className="w-full h-40 p-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none leading-relaxed" 
+                        placeholder="Tell the world about your vision, heritage, and what makes your fashion unique..."
+                        {...brandDescriptionField}
+                        ref={(e) => {
+                            brandDescriptionField.ref(e);
+                            descriptionRef.current = e;
+                        }}
+                    ></textarea>
+                     <div className="text-right">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                            (descriptionValue?.length || 0) < 20 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+                        }`}>
+                             Minimum 20 chars ({descriptionValue?.length || 0}/2000)
+                        </span>
+                    </div>
+                    {errors.brandDescription && <p className="text-xs text-red-500 mt-1 font-medium">{errors.brandDescription.message}</p>}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Business type
-                  </label>
-                  <input
-                    {...register('businessType')}
-                    className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                    placeholder="e.g. Luxury womenswear"
+                <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Brand Tags 
+                        <span className="ml-2 text-xs font-normal text-gray-500">(Select up to {MAX_TAGS})</span>
+                    </label>
+                    <div className="flex flex-wrap gap-2 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                      {tagOptions.map((tag) => {
+                        const isSelected = selectedTags.includes(tag.value);
+                        return (
+                          <button
+                            key={tag.value}
+                            type="button"
+                            onClick={() => toggleTag(tag.value)}
+                            disabled={isSubmitting}
+                            className={`px-4 py-2 rounded-full text-xs font-semibold transition ${
+                              isSelected
+                                ? 'bg-purple-600 text-white shadow-md'
+                                : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }`}
+                          >
+                            #{tag.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {tagError && <p className="text-xs text-red-500 mt-1 font-medium">{tagError}</p>}
+                    {!tagError && (
+                      <p className="text-xs text-gray-500">Add at least one tag to help users find you.</p>
+                    )}
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Contact & Biz */}
+             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+              <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">
+                <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                </div>
+                 <div>
+                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">Business Location</h3>
+                   <p className="text-xs text-gray-500">Where are you based?</p>
+                </div>
+              </div>
+
+              {/* Location Fields */}
+              <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <UniversalSelect
+                          label="Country"
+                          value={selectedCountry || ''}
+                          onChange={(val) => {
+                              setValue('brandCountry', val);
+                              setValue('brandState', '');
+                              setValue('brandCity', '');
+                          }}
+                          options={countryOptions}
+                          placeholder={loadingLocations ? "Loading..." : "Select Country"}
+                          searchable
+                          searchPlaceholder="Search countries..."
+                          emptyMessage="No matching country found"
+                          disabled={loadingLocations}
+                          className="w-full"
+                      />
+                       <UniversalSelect
+                          label="State / Province"
+                          value={selectedState || ''}
+                          onChange={(val) => {
+                              setValue('brandState', val);
+                              setValue('brandCity', '');
+                          }}
+                          options={stateOptions}
+                          placeholder={loadingLocations ? "Loading..." : "State/Province"}
+                          searchable
+                          searchPlaceholder="Search states or provinces..."
+                          emptyMessage="No matching state or province found"
+                          disabled={!selectedCountry || stateOptions.length === 0 || loadingLocations}
+                          className="w-full"
+                      />
+                       <UniversalSelect
+                          label="City"
+                          value={watch('brandCity') || ''}
+                          onChange={(val) => setValue('brandCity', val)}
+                          options={cityOptions}
+                          placeholder={loadingLocations ? "Loading..." : "City"}
+                          searchable
+                          searchPlaceholder="Search cities..."
+                          emptyMessage="No matching city found"
+                          disabled={!selectedState || cityOptions.length === 0 || loadingLocations}
+                          className="w-full"
+                      />
+                  </div>
+                  {errors.brandCountry && (
+                    <p className="text-xs text-red-500 font-medium">{errors.brandCountry.message}</p>
+                  )}
+              </div>
+
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2 z-10">
+                  <UniversalSelect
+                    label="Business Type"
+                    value={watch('businessType') || ''}
+                    onChange={(value) =>
+                      setValue('businessType', value, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                    options={BUSINESS_TYPE_OPTIONS}
+                    placeholder="Select Type"
+                    searchable
+                    searchPlaceholder="Search business types..."
+                    emptyMessage="No matching business type found"
+                    disabled={isSubmitting}
+                    className="w-full"
                   />
                   {errors.businessType && (
-                    <p className="mt-1 text-xs text-red-500">{errors.businessType.message}</p>
+                    <p className="text-xs text-red-500 font-medium">
+                      {errors.businessType.message}
+                    </p>
                   )}
                 </div>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Instagram
-                  </label>
-                  <input
-                    {...register('socialInstagram')}
-                    className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                    placeholder="https://instagram.com/yourbrand"
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Phone Number</label>
+                  <input 
+                    type="tel" 
+                    placeholder="+1 (555) 000-0000" 
+                    className="w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    {...register('phoneNumber')}
                   />
-                  {errors.socialInstagram && (
-                    <p className="mt-1 text-xs text-red-500">{errors.socialInstagram.message}</p>
-                  )}
+                  {errors.phoneNumber && <p className="text-xs text-red-500 font-medium">{errors.phoneNumber.message}</p>}
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Facebook
-                  </label>
-                  <input
-                    {...register('socialFacebook')}
-                    className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                    placeholder="https://facebook.com/yourbrand"
-                  />
-                  {errors.socialFacebook && (
-                    <p className="mt-1 text-xs text-red-500">{errors.socialFacebook.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Twitter / X
-                  </label>
-                  <input
-                    {...register('socialTwitter')}
-                    className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                    placeholder="https://twitter.com/yourbrand"
-                  />
-                  {errors.socialTwitter && (
-                    <p className="mt-1 text-xs text-red-500">{errors.socialTwitter.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Website
-                  </label>
-                  <input
-                    {...register('socialWebsite')}
-                    className="mt-1 w-full rounded-lg bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-0 backdrop-blur-xl"
-                    placeholder="https://yourbrand.com"
-                  />
-                  {errors.socialWebsite && (
-                    <p className="mt-1 text-xs text-red-500">{errors.socialWebsite.message}</p>
-                  )}
+                
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Instagram Handle</label>
+                  <div className="relative group">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-purple-600 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                        <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                      </svg>
+                    </div>
+                    <input 
+                      type="text" 
+                      placeholder="instagram.com/" 
+                      className="w-full h-12 pl-12 pr-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                      {...register('socialInstagram')}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </section>
 
-          <div className="flex flex-col-reverse items-center gap-3 border-t border-white/20 pt-4 sm:flex-row sm:justify-between">
-            <div className="text-xs text-gray-700 dark:text-gray-300 text-center sm:text-left">
-              Complete your profile to appear in curated brand searches and collections.
-            </div>
-            <div className="flex items-center gap-2">
-              {showSkip && (
-                <FrostedButton type="button" variant="ghost" size="sm" onClick={handleSkip}>
-                  Skip for now
-                </FrostedButton>
-              )}
-              <FrostedButton
+            {/* Hidden Submit for Enter Key */}
+            <button type="submit" className="hidden" />
+
+            {/* Actions (inside body, no separate footer) */}
+            <div className="flex justify-end gap-4 pt-2">
+              <button 
                 type="button"
-                variant="primary"
-                size="sm"
+                onClick={onClose}
                 disabled={isSubmitting}
-                onClick={() => {
-                  if (!isSubmitting) {
-                    void submitForm();
-                  }
-                }}
+                className="px-6 py-3 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition"
               >
-                {isSubmitting ? 'Saving…' : 'Save profile'}
-              </FrostedButton>
+                Cancel
+              </button>
+              <button 
+                type="button"
+                onClick={() => handleSubmit(onSubmit, onInvalid)()}
+                disabled={isSubmitting}
+                aria-busy={isSubmitting}
+                className="min-w-[12rem] px-8 py-3 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg shadow-purple-500/20 transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                <span className="inline-flex w-full items-center justify-center">
+                  {isSubmitting ? 'Saving profile...' : 'Save and Continue'}
+                </span>
+              </button>
             </div>
+            
+          </form>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </>
+    </OverlayPortal>
   );
 };
 

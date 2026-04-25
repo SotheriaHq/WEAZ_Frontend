@@ -1,19 +1,206 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSelector } from 'react-redux';
+import type { ProductReviewResponse } from '../api/ReviewsApi';
 import type { RootState } from '../store';
 import { brandApi } from '../api/BrandApi';
 import type {
   CollectionDto,
-  ReviewDto,
+  ReviewRatingDistributionItem,
   BrandProfileDto,
-  BrandMediaAssetDto,
 } from '../types/profile';
-import type { AuthProfileImageFileDto } from '../types/auth';
+import type { AuthUserDto } from '../types/auth';
 import { env } from '../config/env';
+import { useReviewRuntimeFlags } from './useReviewRuntimeFlags';
+
+const areStringArraysEqual = (left: string[] | null | undefined, right: string[] | null | undefined) => {
+  if (left === right) return true;
+  if (!left || !right) return left === right;
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const areStableUserFieldsEqual = (previous: AuthUserDto | null, next: AuthUserDto | null) => {
+  if (previous === next) return true;
+  if (!previous || !next) return previous === next;
+
+  return (
+    previous.id === next.id &&
+    previous.username === next.username &&
+    previous.email === next.email &&
+    previous.firstName === next.firstName &&
+    previous.lastName === next.lastName &&
+    previous.role === next.role &&
+    previous.type === next.type &&
+    previous.phoneNumber === next.phoneNumber &&
+    previous.address === next.address &&
+    previous.brandFullName === next.brandFullName &&
+    previous.brandDescription === next.brandDescription &&
+    previous.brandCountry === next.brandCountry &&
+    previous.brandState === next.brandState &&
+    previous.brandCity === next.brandCity &&
+    areStringArraysEqual(previous.brandTags, next.brandTags) &&
+    previous.brandBusinessType === next.brandBusinessType &&
+    previous.socialInstagram === next.socialInstagram &&
+    previous.socialFacebook === next.socialFacebook &&
+    previous.socialTwitter === next.socialTwitter &&
+    previous.socialWebsite === next.socialWebsite &&
+    previous.cacNumber === next.cacNumber &&
+    previous.tin === next.tin &&
+    previous.ceoNin === next.ceoNin &&
+    previous.ceoFirstName === next.ceoFirstName &&
+    previous.ceoLastName === next.ceoLastName &&
+    previous.companyLocation === next.companyLocation &&
+    previous.isEmailVerified === next.isEmailVerified &&
+    previous.storeId === next.storeId &&
+    previous.verificationStatus === next.verificationStatus &&
+    previous.isVerifiedBrand === next.isVerifiedBrand &&
+    previous.verificationBadgeVisible === next.verificationBadgeVisible &&
+    previous.verifiedExplanationUrl === next.verifiedExplanationUrl &&
+    previous.isActive === next.isActive &&
+    previous.status === next.status &&
+    previous.mustResetPassword === next.mustResetPassword &&
+    previous.createdAt === next.createdAt &&
+    previous.updatedAt === next.updatedAt
+  );
+};
+
+const buildBrandLocationFromUser = (user: AuthUserDto) =>
+  [user.brandCity, user.brandState, user.brandCountry]
+    .filter((segment): segment is string => Boolean(segment && segment.length > 0))
+    .join(', ');
+
+const mapAuthFileToBrandMediaAsset = (
+  file: AuthUserDto['profileImageFile'] | AuthUserDto['bannerImageFile'],
+) => {
+  if (!file?.id || !file.s3Url) {
+    return null;
+  }
+
+  return {
+    fileId: file.id,
+    url: file.s3Url,
+    originalName: file.originalName,
+    fileName: file.fileName,
+    createdAt: file.createdAt,
+    updatedAt: file.updatedAt,
+  };
+};
+
+const areBrandProfileTagsEqual = (
+  previous: string[] | null | undefined,
+  next: string[] | null | undefined,
+) => areStringArraysEqual(previous, next);
+
+const areBrandProfileSnapshotsEqual = (
+  previous: BrandProfileDto | null,
+  next: BrandProfileDto | null,
+) => {
+  if (previous === next) return true;
+  if (!previous || !next) return previous === next;
+
+  return (
+    previous.id === next.id &&
+    previous.brandFullName === next.brandFullName &&
+    previous.description === next.description &&
+    previous.country === next.country &&
+    previous.state === next.state &&
+    previous.city === next.city &&
+    previous.location === next.location &&
+    previous.bannerImage === next.bannerImage &&
+    previous.bannerImageMeta?.fileId === next.bannerImageMeta?.fileId &&
+    previous.logoImage === next.logoImage &&
+    previous.logoImageMeta?.fileId === next.logoImageMeta?.fileId &&
+    previous.socialLinks.instagram === next.socialLinks.instagram &&
+    previous.socialLinks.facebook === next.socialLinks.facebook &&
+    previous.socialLinks.twitter === next.socialLinks.twitter &&
+    previous.socialLinks.website === next.socialLinks.website &&
+    previous.contactInfo.email === next.contactInfo.email &&
+    previous.contactInfo.phone === next.contactInfo.phone &&
+    previous.contactInfo.businessType === next.contactInfo.businessType &&
+    areBrandProfileTagsEqual(previous.tags, next.tags) &&
+    areBrandProfileTagsEqual(previous.hashtags, next.hashtags) &&
+    previous.cacNumber === next.cacNumber &&
+    previous.tin === next.tin &&
+    previous.verified === next.verified &&
+    previous.verificationStatus === next.verificationStatus &&
+    previous.verificationBadgeVisible === next.verificationBadgeVisible &&
+    previous.verifiedExplanationUrl === next.verifiedExplanationUrl &&
+    previous.averageRating === next.averageRating &&
+    previous.totalReviews === next.totalReviews &&
+    previous.collectionsCount === next.collectionsCount &&
+    previous.patchesCount === next.patchesCount &&
+    previous.createdAt === next.createdAt &&
+    previous.updatedAt === next.updatedAt
+  );
+};
+
+const syncBrandProfileWithUser = (
+  current: BrandProfileDto | null,
+  user: AuthUserDto | null,
+): BrandProfileDto | null => {
+  if (!user || user.type !== 'BRAND') {
+    return current;
+  }
+
+  const locationFromUser = buildBrandLocationFromUser(user);
+  const next: BrandProfileDto = {
+    id: current?.id ?? user.id,
+    brandFullName:
+      user.brandFullName ||
+      `${user.firstName} ${user.lastName}`.trim() ||
+      user.username,
+    description: user.brandDescription,
+    isStoreOpen: current?.isStoreOpen,
+    country: user.brandCountry,
+    state: user.brandState,
+    city: user.brandCity,
+    location: locationFromUser || current?.location || null,
+    bannerImage: user.bannerImage,
+    bannerImageMeta: mapAuthFileToBrandMediaAsset(user.bannerImageFile),
+    logoImage: user.profileImage,
+    logoImageMeta: mapAuthFileToBrandMediaAsset(user.profileImageFile),
+    socialLinks: {
+      instagram: user.socialInstagram,
+      facebook: user.socialFacebook,
+      twitter: user.socialTwitter,
+      website: user.socialWebsite,
+    },
+    contactInfo: {
+      email: user.email,
+      phone: user.phoneNumber,
+      businessType: user.brandBusinessType,
+    },
+    tags: user.brandTags ?? [],
+    hashtags: user.brandTags ?? [],
+    cacNumber: user.cacNumber,
+    tin: user.tin,
+    verified: user.isVerifiedBrand,
+    verificationStatus: user.verificationStatus ?? undefined,
+    verificationBadgeVisible: user.verificationBadgeVisible,
+    verifiedExplanationUrl: user.verifiedExplanationUrl ?? null,
+    averageRating: current?.averageRating,
+    totalReviews: current?.totalReviews,
+    collectionsCount: current?.collectionsCount,
+    patchesCount: current?.patchesCount,
+    createdAt: current?.createdAt ?? user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+
+  return areBrandProfileSnapshotsEqual(current, next) ? current : next;
+};
 
 export const useBrandProfile = () => {
-  const { profile: user } = useSelector((state: RootState) => state.user);
+  const user = useSelector(
+    (state: RootState) => state.user.profile,
+    areStableUserFieldsEqual,
+  );
   const brandDetailEndpointsEnabled = env.featureFlags.brandDetailEndpoints;
+  const { flags: reviewFlags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
 
   // Brand profile state
   const [brandProfile, setBrandProfile] = useState<BrandProfileDto | null>(null);
@@ -22,15 +209,18 @@ export const useBrandProfile = () => {
 
   // Collections state
   const [collections, setCollections] = useState<CollectionDto[]>([]);
-  const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const [collectionsLoading, setCollectionsLoading] = useState(true);
   const [collectionsError, setCollectionsError] = useState<string | null>(null);
+  const collectionsFetchPromiseRef = useRef<Promise<void> | null>(null);
 
   // Reviews state
-  const [reviews, setReviews] = useState<ReviewDto[]>([]);
+  const [reviews, setReviews] = useState<ProductReviewResponse[]>([]);
   const [averageRating, setAverageRating] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
+  const [ratingDistribution, setRatingDistribution] = useState<ReviewRatingDistributionItem[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
+  const [loadedReviewsBrandId, setLoadedReviewsBrandId] = useState<string | null>(null);
 
   // Fetch brand profile
   const fetchBrandProfile = useCallback(async (brandId: string) => {
@@ -51,23 +241,65 @@ export const useBrandProfile = () => {
     }
   }, []);
 
+  useEffect(() => {
+    setBrandProfile((current) => syncBrandProfileWithUser(current, user));
+  }, [user]);
+
   // Fetch collections
   const fetchCollections = useCallback(async (ownerId: string) => {
+    if (collectionsFetchPromiseRef.current) {
+      return collectionsFetchPromiseRef.current;
+    }
+
     setCollectionsLoading(true);
     setCollectionsError(null);
-    try {
-      const data = await brandApi.getCollections(ownerId);
-      setCollections(data);
-    } catch (error) {
-      setCollectionsError('Failed to load collections');
-      console.error('Error fetching collections:', error);
-    } finally {
-      setCollectionsLoading(false);
-    }
+
+    const requestPromise = (async () => {
+      try {
+        console.debug('[useBrandProfile.fetchCollections] start', { ownerId });
+        // Request both public and approved-private collections by default
+        const data = await brandApi.getCollections(ownerId, { visibility: 'all' });
+        setCollections(data);
+        try {
+          const totals = data.reduce((acc, c) => {
+            acc.all += 1;
+            if (c.visibility === 'PRIVATE' || c.isPublic === false) acc.private += 1; else acc.public += 1;
+            return acc;
+          }, { all: 0, public: 0, private: 0 } as any);
+          console.debug('[useBrandProfile.fetchCollections] done', { count: data.length, ...totals });
+        } catch {}
+      } catch (error) {
+        setCollectionsError('Failed to load collections');
+        console.error('Error fetching collections:', error);
+      } finally {
+        setCollectionsLoading(false);
+      }
+    })();
+
+    const trackedPromise = requestPromise.finally(() => {
+      collectionsFetchPromiseRef.current = null;
+    });
+    collectionsFetchPromiseRef.current = trackedPromise;
+    return trackedPromise;
   }, []);
 
   // Fetch reviews
   const fetchReviews = useCallback(async (brandId: string) => {
+    if (reviewFlagsLoading) {
+      return;
+    }
+
+    if (!reviewFlags.readEnabled) {
+      setReviews([]);
+      setAverageRating(0);
+      setTotalReviews(0);
+      setRatingDistribution([]);
+      setReviewsError(null);
+      setReviewsLoading(false);
+      setLoadedReviewsBrandId(null);
+      return;
+    }
+
     setReviewsLoading(true);
     setReviewsError(null);
     try {
@@ -75,13 +307,16 @@ export const useBrandProfile = () => {
       setReviews(data.reviews);
       setAverageRating(data.averageRating);
       setTotalReviews(data.totalReviews);
+      setRatingDistribution(data.ratingDistribution);
+      setLoadedReviewsBrandId(brandId);
     } catch (error) {
       setReviewsError('Failed to load reviews');
+      setLoadedReviewsBrandId(null);
       console.error('Error fetching reviews:', error);
     } finally {
       setReviewsLoading(false);
     }
-  }, []);
+  }, [reviewFlags.readEnabled, reviewFlagsLoading]);
 
   // Create collection
   const createCollection = useCallback(async (data: { name: string; description?: string; isPublic?: boolean }) => {
@@ -110,19 +345,41 @@ export const useBrandProfile = () => {
     return success;
   }, []);
 
+  useEffect(() => {
+    if (!user?.id || user.type !== 'BRAND') {
+      setBrandProfile(null);
+      setBrandProfileError(null);
+      setBrandProfileLoading(false);
+    }
+  }, [user?.id, user?.type]);
+
   // Initial data fetch
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setCollectionsLoading(false);
+      return;
+    }
 
     // Fetch collections for all users
     void fetchCollections(user.id);
 
-    // Fetch brand-specific data only for BRAND users
-    if (user.type === 'BRAND' && brandDetailEndpointsEnabled) {
-      void fetchBrandProfile(user.id);
-      void fetchReviews(user.id);
+  }, [user?.id, fetchCollections]);
+
+  useEffect(() => {
+    if (!user?.id || user.type !== 'BRAND' || !brandDetailEndpointsEnabled) {
+      return;
     }
-  }, [user, fetchCollections, fetchBrandProfile, fetchReviews, brandDetailEndpointsEnabled]);
+
+    void fetchBrandProfile(user.id);
+  }, [user?.id, user?.type, user?.updatedAt, brandDetailEndpointsEnabled, fetchBrandProfile]);
+
+  useEffect(() => {
+    if (!user?.id || user.type !== 'BRAND' || reviewFlagsLoading || !reviewFlags.readEnabled) {
+      return;
+    }
+
+    void fetchReviews(user.id);
+  }, [user?.id, user?.type, fetchReviews, reviewFlags.readEnabled, reviewFlagsLoading]);
 
   // Get display values with fallbacks
   const defaultFallbackTags =
@@ -138,127 +395,6 @@ export const useBrandProfile = () => {
     twitter: user?.socialTwitter ?? 'https://twitter.com',
     website: user?.socialWebsite ?? 'https://example.com',
   };
-
-  const mapUserAsset = (
-    file: AuthProfileImageFileDto | null | undefined,
-  ): BrandMediaAssetDto | null => {
-    if (!file || !file.s3Url) {
-      return null;
-    }
-    return {
-      fileId: file.id,
-      url: file.s3Url,
-      originalName: file.originalName,
-      fileName: file.fileName,
-      createdAt: file.createdAt,
-      updatedAt: file.updatedAt,
-    };
-  };
-
-  const bannerAsset: BrandMediaAssetDto | null = useMemo(() => {
-    const primary = brandProfile?.bannerImageMeta ?? mapUserAsset(user?.bannerImageFile);
-    if (primary) return primary;
-    // Fallback to bannerImageId if metadata is absent
-    if (user?.bannerImageId) {
-      return {
-        fileId: user.bannerImageId,
-        url: user.bannerImage ?? '',
-        originalName: null,
-        fileName: null,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      };
-    }
-    return null;
-  }, [brandProfile?.bannerImageMeta, user?.bannerImageFile, user?.bannerImageId, user?.bannerImage, user?.createdAt, user?.updatedAt]);
-
-  const logoAsset: BrandMediaAssetDto | null = useMemo(() => {
-    const primary = brandProfile?.logoImageMeta ?? mapUserAsset(user?.profileImageFile);
-    if (primary) return primary;
-    // Fallback to profileImageId if metadata is absent
-    if (user?.profileImageId) {
-      return {
-        fileId: user.profileImageId,
-        url: user.profileImage ?? '',
-        originalName: null,
-        fileName: null,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      };
-    }
-    return null;
-  }, [brandProfile?.logoImageMeta, user?.profileImageFile, user?.profileImageId, user?.profileImage, user?.createdAt, user?.updatedAt]);
-
-  const [resolvedBannerUrl, setResolvedBannerUrl] = useState<string | null>(
-    user?.bannerImage ?? null,
-  );
-  const [resolvedLogoUrl, setResolvedLogoUrl] = useState<string | null>(user?.profileImage ?? null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fallback =
-      user?.bannerImage ??
-      brandProfile?.bannerImage ??
-      bannerAsset?.url ??
-      null;
-    setResolvedBannerUrl(fallback ?? null);
-
-    const load = async () => {
-      if (!bannerAsset?.fileId) {
-        return;
-      }
-      try {
-        const signed = await brandApi.getSignedFileUrl(bannerAsset.fileId);
-        if (!cancelled && signed) {
-          setResolvedBannerUrl(signed);
-        }
-      } catch (error) {
-        console.error('Unable to resolve banner image URL', error);
-      }
-    };
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    bannerAsset?.fileId,
-    bannerAsset?.url,
-    brandProfile?.bannerImage,
-    user?.bannerImage,
-  ]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fallback = user?.profileImage ?? brandProfile?.logoImage ?? logoAsset?.url ?? null;
-    setResolvedLogoUrl(fallback ?? null);
-
-    const load = async () => {
-      if (!logoAsset?.fileId) return;
-      try {
-        // log useful info but never break rendering
-        console.log('[avatar] resolving signed URL for', logoAsset.fileId);
-      } catch {
-        // ignore logging failures
-      }
-      try {
-        const signed = await brandApi.getSignedFileUrl(logoAsset.fileId);
-        if (!cancelled && signed) { setResolvedLogoUrl(signed); }
-      } catch (error) {
-        console.error('Unable to resolve logo image URL', error);
-      }
-    };
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    logoAsset?.fileId,
-    logoAsset?.url,
-    brandProfile?.logoImage,
-    user?.profileImage,
-  ]);
 
   const displayData = {
     brandName:
@@ -276,10 +412,10 @@ export const useBrandProfile = () => {
         .join(', ') ||
       user?.address ||
       'Lagos, Nigeria',
-  bannerImage: resolvedBannerUrl || resolvedLogoUrl,
-    bannerImageMeta: bannerAsset,
-    logoImage: resolvedLogoUrl,
-    logoImageMeta: logoAsset,
+    bannerImage: brandProfile?.bannerImage ?? null,
+    bannerImageMeta: brandProfile?.bannerImageMeta ?? null,
+    logoImage: brandProfile?.logoImage ?? null,
+    logoImageMeta: brandProfile?.logoImageMeta ?? null,
     hashtags: brandProfile?.tags ?? brandProfile?.hashtags ?? defaultFallbackTags,
     description: brandProfile?.description ?? user?.brandDescription ?? null,
     socialLinks: {
@@ -299,6 +435,16 @@ export const useBrandProfile = () => {
     country: brandProfile?.country ?? user?.brandCountry ?? null,
     state: brandProfile?.state ?? user?.brandState ?? null,
     city: brandProfile?.city ?? user?.brandCity ?? null,
+    verificationBadgeVisible:
+      Boolean(brandProfile?.verificationBadgeVisible) ||
+      Boolean(user?.verificationBadgeVisible),
+    isVerifiedBrand:
+      Boolean(brandProfile?.verified) ||
+      Boolean(user?.isVerifiedBrand),
+    verifiedExplanationUrl:
+      brandProfile?.verifiedExplanationUrl ??
+      user?.verifiedExplanationUrl ??
+      '/help/verified-badge',
   };
 
   return {
@@ -312,8 +458,12 @@ export const useBrandProfile = () => {
     reviews,
     averageRating,
     totalReviews,
+    ratingDistribution,
     reviewsLoading,
     reviewsError,
+    loadedReviewsBrandId,
+    reviewFlags,
+    reviewFlagsLoading,
     displayData,
     fetchBrandProfile,
     fetchCollections,

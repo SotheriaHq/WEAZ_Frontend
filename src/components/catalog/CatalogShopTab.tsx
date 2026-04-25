@@ -1,0 +1,1072 @@
+import { memo, useState, useEffect, useMemo, useTransition, useCallback, useRef } from 'react';
+import {
+  Bookmark,
+  Search,
+  PanelLeftClose,
+} from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { FilterDropdown } from '@/components/ui/FilterDropdown';
+import { apiClient } from '@/api/httpClient';
+import { toast } from 'sonner';
+import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
+import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
+import StoreEmptyState from '@/components/designs/StoreEmptyState';
+import { FilterDrawer } from './FilterDrawer';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { unwrapApiResponse } from '@/types/auth';
+import { brandApi } from '@/api/BrandApi';
+import type { CollectionDto } from '@/types/profile';
+import SearchField from '@/components/SearchField';
+import InlineProductDetail from './InlineProductDetail';
+import InlineStoreCollectionView from './InlineStoreCollectionView';
+import type { RootState } from '@/store';
+import ImageWithFallback from '@/components/ImageWithFallback';
+import useDebounce from '@/hooks/useDebounce';
+
+interface ProductsResponse {
+  items: StoreProduct[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  nextCursor?: string | null;
+}
+
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'price_asc', label: 'Price: Low to High' },
+  { value: 'price_desc', label: 'Price: High to Low' },
+  { value: 'popular', label: 'Most Popular' },
+];
+
+const COLOR_HEX_MAP: Record<string, string> = {
+  Black: '#000000', White: '#FFFFFF', Navy: '#1E3A5F', Red: '#DC2626',
+  Green: '#16A34A', Blue: '#2563EB', Pink: '#EC4899', Brown: '#92400E',
+  Gray: '#6B7280', Purple: '#9333EA', Yellow: '#EAB308', Orange: '#EA580C',
+};
+
+interface ProductCategory {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+}
+
+interface CatalogShopTabProps {
+  brandId: string;
+  isStoreOpen?: boolean;
+  isOwner?: boolean;
+  ownerHasStoreProfile?: boolean;
+}
+
+interface CollectionCardMiniProps {
+  collection: CollectionDto;
+  isSaved: boolean;
+  saveBusy: boolean;
+  onOpen: (collectionId: string) => void;
+  onToggleSave: (event: React.MouseEvent, collectionId: string, isSaved: boolean) => void;
+}
+
+const CollectionCardMini = memo(function CollectionCardMini({
+  collection,
+  isSaved,
+  saveBusy,
+  onOpen,
+  onToggleSave,
+}: CollectionCardMiniProps) {
+  const title = collection.title || collection.name || 'Collection';
+  const cover = collection.coverImage || undefined;
+  const itemCount = collection.itemCount ?? collection.postsCount ?? 0;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(collection.id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen(collection.id);
+        }
+      }}
+      className="group cursor-pointer text-left"
+    >
+      <div className="relative h-56 w-full overflow-hidden rounded-2xl border border-gray-200/70 bg-gray-100 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:border-white/10 dark:bg-white/5">
+        <ImageWithFallback
+          src={cover ?? null}
+          fileId={collection.coverFileId ?? null}
+          alt={title}
+          fit="cover"
+          rounded="none"
+          containerClassName="h-full w-full"
+          className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+          fallbackName={title}
+        />
+        <button
+          type="button"
+          onClick={(event) => onToggleSave(event, collection.id, isSaved)}
+          disabled={saveBusy}
+          className="absolute top-3 right-3 z-10 rounded-full bg-black/55 p-2 text-white shadow-md transition hover:bg-black/70 disabled:opacity-60"
+          aria-label={isSaved ? 'Unsave collection' : 'Save collection'}
+        >
+          <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-white' : ''}`} />
+        </button>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent p-4">
+          <div className="line-clamp-1 text-sm font-semibold text-white">{title}</div>
+          <div className="text-xs text-white/80">{itemCount} items</div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+export default function CatalogShopTab({
+  brandId,
+  isStoreOpen,
+  isOwner = false,
+  ownerHasStoreProfile,
+}: CatalogShopTabProps) {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [products, setProducts] = useState<StoreProduct[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search.trim(), 250);
+  const [sortBy, setSortBy] = useState('newest');
+  const [onSale, setOnSale] = useState(false);
+  const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
+  const [maxPrice, setMaxPrice] = useState<number | undefined>(undefined);
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [inStockOnly, setInStockOnly] = useState(false);
+
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const [chipsCollapsed, setChipsCollapsed] = useState(false);
+  const [searchCollapsed, setSearchCollapsed] = useState(true); // Collapsed by default
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [, startTransition] = useTransition();
+  const [collections, setCollections] = useState<CollectionDto[]>([]);
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const collectionTargetIds = useMemo(
+    () => collections.map((collection) => collection.id).filter(Boolean),
+    [collections],
+  );
+  const collectionTargetIdsKey = useMemo(
+    () => collectionTargetIds.join('|'),
+    [collectionTargetIds],
+  );
+  
+  // Inline product detail state - when set, shows product detail instead of grid
+  const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
+  // Inline collection view state — when set, shows collection detail instead of grid
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  // Track navigation context so the back button from product returns correctly
+  const [viewContext, setViewContext] = useState<'store' | 'collection'>('store');
+  const requestedProductId = searchParams.get('productId')?.trim() || null;
+  const requestedCollectionId = searchParams.get('collectionId')?.trim() || null;
+  const storeView = searchParams.get('storeView') === 'collections' ? 'collections' : 'products';
+
+  // Auto-collapse filters when entering product/collection view, expand when leaving
+  useEffect(() => {
+    if (selectedProduct || selectedCollectionId) {
+      setFiltersCollapsed(true);
+    } else {
+      setFiltersCollapsed(false);
+    }
+  }, [selectedProduct, selectedCollectionId]);
+
+  useEffect(() => {
+    if (!requestedProductId || selectedProduct || loading) return;
+    const match = products.find((product) => product.id === requestedProductId);
+    if (!match) {
+      navigate(`/products/${encodeURIComponent(requestedProductId)}`, { replace: true });
+      return;
+    }
+
+    setSelectedProduct(match);
+    setViewContext('store');
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('productId');
+    setSearchParams(next, { replace: true });
+  }, [loading, navigate, products, requestedProductId, searchParams, selectedProduct, setSearchParams]);
+
+  // Deep-link: ?collectionId=xxx opens the inline collection view
+  useEffect(() => {
+    if (!requestedCollectionId || selectedCollectionId) return;
+    setSelectedCollectionId(requestedCollectionId);
+    setViewContext('store');
+    const next = new URLSearchParams(searchParams);
+    next.delete('collectionId');
+    setSearchParams(next, { replace: true });
+  }, [requestedCollectionId, searchParams, selectedCollectionId, setSearchParams]);
+
+
+
+  // Fetch available categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await apiClient.get<ProductCategory[]>('/products/categories');
+        const cats = unwrapApiResponse(response.data) || [];
+        setCategories(cats);
+      } catch (err) {
+        console.error('Failed to fetch categories', err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchCollections = async () => {
+      if (!brandId) return;
+      setCollectionsLoading(true);
+      try {
+        const result = await brandApi.getCollections(brandId, { visibility: 'public', scope: 'store' });
+        if (mounted) {
+          setCollections(Array.isArray(result) ? result : []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch collections for store tab', err);
+        if (mounted) setCollections([]);
+      } finally {
+        if (mounted) setCollectionsLoading(false);
+      }
+    };
+    void fetchCollections();
+    return () => {
+      mounted = false;
+    };
+  }, [brandId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadSaved = async () => {
+      if (!isAuth || collectionTargetIds.length === 0) {
+        if (mounted) setSavedMap({});
+        return;
+      }
+      try {
+        const res = await apiClient.post('/saved/check/batch', {
+          targetType: 'COLLECTION',
+          targetIds: collectionTargetIds,
+        });
+        const items = res.data?.items ?? [];
+        if (mounted) {
+          const next: Record<string, boolean> = {};
+          for (const item of items) {
+            if (item?.targetId) next[item.targetId] = Boolean(item.isSaved);
+          }
+          setSavedMap(next);
+        }
+      } catch {
+        if (mounted) setSavedMap({});
+      }
+    };
+    void loadSaved();
+    return () => {
+      mounted = false;
+    };
+  }, [isAuth, collectionTargetIds, collectionTargetIdsKey]);
+
+  // Click-outside handler for search field
+  useEffect(() => {
+    if (searchCollapsed) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        // Only collapse if search is empty
+        if (!search.trim()) {
+          setSearchCollapsed(true);
+        }
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [searchCollapsed, search]);
+
+  const normalizedMinPrice = useMemo(() => {
+    if (minPrice === undefined) return undefined;
+    return Number.isFinite(minPrice) ? minPrice : undefined;
+  }, [minPrice]);
+
+  const normalizedMaxPrice = useMemo(() => {
+    if (maxPrice === undefined) return undefined;
+    return Number.isFinite(maxPrice) ? maxPrice : undefined;
+  }, [maxPrice]);
+
+  const fetchProducts = useCallback(
+    async (opts?: { resetPage?: boolean; page?: number }) => {
+      if (!brandId) return;
+      if (isStoreOpen === false) return;
+      const resetPage = Boolean(opts?.resetPage);
+      const currentPage = resetPage ? 1 : opts?.page ?? page;
+      const cursor = resetPage ? undefined : nextCursor ?? undefined;
+
+      setLoading(true);
+      try {
+        const params: any = {
+          page: currentPage,
+          limit: 20,
+          sortBy,
+          status: 'PUBLISHED', // Only show live products in Store tab
+        };
+        if (cursor) params.cursor = cursor;
+        if (debouncedSearch) params.q = debouncedSearch;
+        if (normalizedMinPrice !== undefined) params.minPrice = normalizedMinPrice;
+        if (normalizedMaxPrice !== undefined) params.maxPrice = normalizedMaxPrice;
+        if (onSale) params.onSale = 'true';
+        if (selectedCategory && selectedCategory !== 'ALL') params.category = selectedCategory;
+
+        const response = await apiClient.get<Partial<ProductsResponse>>(`/brands/${brandId}/products`, { params });
+        const payload = unwrapApiResponse<Partial<ProductsResponse>>(response.data);
+        const items = Array.isArray(payload?.items) ? payload.items : [];
+        const totalCount = typeof payload?.total === 'number' ? payload.total : items.length;
+        const hasNextPage = Boolean(payload?.hasNextPage);
+        const responseNextCursor = payload?.nextCursor;
+        setProducts((prev) => (resetPage || currentPage === 1 ? items : [...prev, ...items]));
+        setTotal(totalCount);
+        setHasMore(hasNextPage);
+        setNextCursor(typeof responseNextCursor === 'string' && responseNextCursor.length > 0 ? responseNextCursor : null);
+        setError(null);
+        if (resetPage) {
+          setPage(1);
+        }
+      } catch (e) {
+        const message = (e as any)?.response?.data?.message ?? 'Failed to load products';
+        setProducts([]);
+        setTotal(0);
+        setHasMore(false);
+        setError(typeof message === 'string' ? message : 'Failed to load products');
+        toast.error(typeof message === 'string' ? message : 'Failed to load products');
+        setNextCursor(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      brandId,
+      debouncedSearch,
+      isStoreOpen,
+      nextCursor,
+      normalizedMaxPrice,
+      normalizedMinPrice,
+      onSale,
+      page,
+      selectedCategory,
+      sortBy,
+    ]
+  );
+
+  useEffect(() => {
+    if (isStoreOpen === false) {
+      setLoading(false);
+      setProducts([]);
+      setTotal(0);
+      setHasMore(false);
+      setError(null);
+      setNextCursor(null);
+      return;
+    }
+    void fetchProducts({ resetPage: true, page: 1 });
+  }, [fetchProducts, isStoreOpen]);
+
+  const handleLoadMore = () => {
+    setPage((prev) => {
+      const next = prev + 1;
+      void fetchProducts({ page: next });
+      return next;
+    });
+  };
+
+  // Combine hardcoded and dynamic categories
+  const displayCategories = useMemo(() => {
+    const staticCats = [
+      { slug: 'ALL', label: 'All Items' },
+      { slug: 'NEW', label: 'New Arrivals' },
+      // { slug: 'TRENDING', label: 'Trending' }, // Removed to follow improved design or keep if needed
+    ];
+    
+    // Map dynamic categories
+    const dynamicCats = categories.map(c => ({ slug: c.slug, label: c.name }));
+    
+    return [...staticCats, ...dynamicCats];
+  }, [categories]);
+
+  // Collect available colors and sizes from loaded products
+  const availableColors = useMemo(() => {
+    const colorSet = new Set<string>();
+    for (const p of products) {
+      if (Array.isArray(p.colors)) {
+        for (const c of p.colors) colorSet.add(c);
+      }
+    }
+    return Array.from(colorSet).sort();
+  }, [products]);
+
+  const availableSizes = useMemo(() => {
+    const sizeSet = new Set<string>();
+    for (const p of products) {
+      if (Array.isArray(p.sizes)) {
+        for (const s of p.sizes) sizeSet.add(s);
+      }
+    }
+    return Array.from(sizeSet);
+  }, [products]);
+
+  // Client-side filtering for color, size, and in-stock
+  const filteredProducts = useMemo(() => {
+    let result = products;
+    if (selectedColors.length > 0) {
+      result = result.filter((p) =>
+        Array.isArray(p.colors) && p.colors.some((c) => selectedColors.includes(c))
+      );
+    }
+    if (selectedSizes.length > 0) {
+      result = result.filter((p) =>
+        Array.isArray(p.sizes) && p.sizes.some((s) => selectedSizes.includes(s))
+      );
+    }
+    if (inStockOnly) {
+      result = result.filter((p) => !p.isOutOfStock);
+    }
+    return result;
+  }, [products, selectedColors, selectedSizes, inStockOnly]);
+
+  const isSystemStoreCollection = useCallback((collection: CollectionDto) => {
+    if (collection.isSystemGenerated) return true;
+    const title = String(collection.title || collection.name || '').trim().toLowerCase();
+    const description = String(collection.description || '').trim().toLowerCase();
+    return (
+      title === 'store products' &&
+      (description === '' || description === 'system bucket for standalone products.')
+    );
+  }, []);
+
+  const visibleCollections = useMemo(() => {
+    return collections.filter((c) => {
+      if (isSystemStoreCollection(c)) return false;
+      if (c.deletedAt) return false;
+      if (c.isAvailableInStore !== true) return false;
+      const status = String(c.status || '').toUpperCase();
+      if (status.length > 0 && status !== 'PUBLISHED') return false;
+      const itemCount = Number(c.itemCount ?? c.postsCount ?? 0);
+      return Number.isFinite(itemCount) && itemCount > 0;
+    });
+  }, [collections, isSystemStoreCollection]);
+
+  const featuredCollections = useMemo(() => {
+    return visibleCollections.slice(0, 3);
+  }, [visibleCollections]);
+
+  // Only show 'no-collections' empty state if both collections and products are empty
+  const showCollectionsEmpty = !collectionsLoading && visibleCollections.length === 0 && !loading && products.length === 0;
+
+  const handleSwitchStoreView = useCallback((nextView: 'products' | 'collections') => {
+    const next = new URLSearchParams(searchParams);
+    if (nextView === 'collections') {
+      next.set('storeView', 'collections');
+      next.delete('productId');
+    } else {
+      next.delete('storeView');
+    }
+    setSearchParams(next, { replace: false });
+  }, [searchParams, setSearchParams]);
+
+  const storeClosedPlaceholder = useMemo(() => {
+    if (isStoreOpen !== false) return null;
+    if (isOwner) {
+      if (ownerHasStoreProfile === false) {
+        return (
+          <StoreEmptyState
+            type="store-not-setup"
+            isOwner
+            onAction={() => navigate('/studio/store')}
+          />
+        );
+      }
+      return <StoreEmptyState type="store-not-setup" isOwner />;
+    }
+    return <StoreEmptyState type="store-not-open-yet" isOwner={false} />;
+  }, [isOwner, isStoreOpen, navigate, ownerHasStoreProfile]);
+
+  const clearFilters = () => {
+    setMinPrice(undefined);
+    setMaxPrice(undefined);
+    setOnSale(false);
+    setSelectedCategory('ALL');
+    setSortBy('newest');
+    setSelectedColors([]);
+    setSelectedSizes([]);
+    setInStockOnly(false);
+  };
+
+  const handleOpenCollection = useCallback(
+    (collectionId: string) => {
+      setSelectedProduct(null);
+      setSelectedCollectionId(collectionId);
+      setViewContext('store');
+    },
+    [],
+  );
+
+  const handleToggleSave = useCallback(
+    async (event: React.MouseEvent, collectionId: string, currentlySaved: boolean) => {
+      event.stopPropagation();
+      if (!isAuth) {
+        toast.info('Please sign in to save collections.');
+        return;
+      }
+
+      let shouldProceed = false;
+      setSavingIds((prev) => {
+        if (prev.has(collectionId)) return prev;
+        shouldProceed = true;
+        const next = new Set(prev);
+        next.add(collectionId);
+        return next;
+      });
+      if (!shouldProceed) return;
+
+      try {
+        if (currentlySaved) {
+          await apiClient.delete('/saved', { data: { targetType: 'COLLECTION', targetId: collectionId } });
+        } else {
+          await apiClient.post('/saved', { targetType: 'COLLECTION', targetId: collectionId });
+        }
+        setSavedMap((prev) => ({ ...prev, [collectionId]: !currentlySaved }));
+        toast.success(currentlySaved ? 'Removed from saved.' : 'Saved for later.');
+      } catch {
+        toast.error('Unable to update saved items.');
+      } finally {
+        setSavingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(collectionId);
+          return next;
+        });
+      }
+    },
+    [isAuth],
+  );
+
+  const showProductsEmpty = !error && !loading && filteredProducts.length === 0;
+
+  if (storeClosedPlaceholder) {
+    return <div className="w-full">{storeClosedPlaceholder}</div>;
+  }
+
+  if (storeView === 'collections') {
+    return (
+      <div className="w-full space-y-6">
+        <div className="rounded-2xl border border-gray-200/70 bg-white/80 p-5 dark:border-white/10 dark:bg-white/5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              <button
+                type="button"
+                onClick={() => handleSwitchStoreView('products')}
+                className="font-medium text-purple-600 hover:text-purple-700"
+              >
+                Store Products
+              </button>
+              <span className="text-gray-400">/</span>
+              <span className="font-semibold text-gray-900 dark:text-white">All Collections</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSwitchStoreView('products')}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/10"
+            >
+              Back to products
+            </button>
+          </div>
+        </div>
+
+        {collectionsLoading ? (
+          <section>
+            <div className="mb-4 h-7 w-56 animate-pulse rounded bg-gray-200/70 dark:bg-white/10" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="h-56 animate-pulse rounded-2xl bg-gray-200/70 dark:bg-white/10" />
+              ))}
+            </div>
+          </section>
+        ) : visibleCollections.length > 0 ? (
+          <section>
+            <h3 className="mb-4 text-xl font-semibold text-gray-900 dark:text-white">All Collections</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {visibleCollections.map((collection) => (
+                <CollectionCardMini
+                  key={collection.id}
+                  collection={collection}
+                  isSaved={Boolean(savedMap[collection.id])}
+                  saveBusy={savingIds.has(collection.id)}
+                  onOpen={handleOpenCollection}
+                  onToggleSave={handleToggleSave}
+                />
+              ))}
+            </div>
+          </section>
+        ) : (
+          <StoreEmptyState type="no-collections" isOwner={isOwner} />
+        )}
+      </div>
+    );
+  }
+
+  // Move selectedProduct check inside the specific content area
+  // instead of replacing the whole component return
+
+  return (
+    <div className="w-full">
+      {collectionsLoading ? (
+        <section className="mb-8">
+          <div className="mb-4">
+            <div className="h-7 w-56 animate-pulse rounded bg-gray-200/70 dark:bg-white/10" />
+            <div className="mt-2 h-4 w-64 animate-pulse rounded bg-gray-200/60 dark:bg-white/10" />
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <div key={idx} className="h-56 animate-pulse rounded-2xl bg-gray-200/70 dark:bg-white/10" />
+            ))}
+          </div>
+        </section>
+      ) : featuredCollections.length > 0 && (
+        /* Featured Collections - Only show if there are collections */
+        <section className="mb-8">
+          <div className="mb-4 flex items-end justify-between">
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Featured Collections</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Curated highlights from this store</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSwitchStoreView('collections')}
+              className="text-sm font-medium text-purple-600 hover:text-purple-700"
+            >
+              View all
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {featuredCollections.map((collection) => (
+              <CollectionCardMini
+                key={collection.id}
+                collection={collection}
+                isSaved={Boolean(savedMap[collection.id])}
+                saveBusy={savingIds.has(collection.id)}
+                onOpen={handleOpenCollection}
+                onToggleSave={handleToggleSave}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+      {showCollectionsEmpty ? (
+        <section className="mb-8">
+          <StoreEmptyState type="no-collections" isOwner={isOwner} />
+        </section>
+      ) : !collectionsLoading && featuredCollections.length === 0 && products.length > 0 && (
+        /* Show an exciting prompt to create collections when products exist */
+        <section className="mb-8">
+          <div className="relative overflow-hidden rounded-2xl border border-purple-200/50 dark:border-purple-500/20 bg-gradient-to-br from-purple-50 via-white to-fuchsia-50 dark:from-purple-950/30 dark:via-black dark:to-fuchsia-950/20 p-6">
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-400/20 to-transparent rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-fuchsia-400/20 to-transparent rounded-full blur-2xl" />
+            
+            <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
+                  <span className="text-2xl">✨</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    Featured Collections
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300">Coming Soon</span>
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                    {isOwner 
+                      ? 'Curate your products into themed collections to boost discoverability!' 
+                      : 'Check back soon for curated collections from this store.'}
+                  </p>
+                </div>
+              </div>
+              
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/studio/store/collections/new')}
+                  className="flex-shrink-0 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white text-sm font-semibold shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                >
+                  Create Collection
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Search and Filter Row - Premium Glass Header */}
+      <div className="sticky top-0 z-30 bg-transparent py-4 -mx-4 px-6 mb-8 space-y-3 transition-all duration-300">
+        <div className="flex gap-3 items-center">
+          {/* Search Input with click-outside detection */}
+          <div
+            ref={searchContainerRef}
+            className={`transition-all duration-300 ease-out ${searchCollapsed ? 'w-11' : 'flex-1 max-w-[520px]'}`}
+          >
+            {searchCollapsed ? (
+              <button
+                type="button"
+                onClick={() => setSearchCollapsed(false)}
+                className="h-11 w-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+                aria-label="Open search"
+              >
+                <Search size={16} />
+              </button>
+            ) : (
+              <SearchField
+                value={search}
+                onChange={setSearch}
+                placeholder="Search store..."
+                showFilter={false}
+                className="!max-w-none w-full shadow-sm border-gray-200 dark:border-white/10 animate-in fade-in slide-in-from-left-2 duration-200"
+              />
+            )}
+          </div>
+
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          {/* Category Chips Scroll */}
+          <div className={`flex-1 transition-all duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${chipsCollapsed ? 'max-h-0 opacity-0 overflow-hidden py-0' : 'max-h-[200px] opacity-100 py-1'}`}>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar items-center pb-1">
+              {displayCategories.map((cat) => {
+                const active = selectedCategory === cat.slug;
+                return (
+                  <button
+                    type="button"
+                    key={cat.slug}
+                    onClick={() => startTransition(() => {
+                      setSelectedCategory(cat.slug);
+                    })}
+                    className={`
+                      shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-200 border
+                      ${active
+                        ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white border-transparent shadow-lg translate-y-[-1px]'
+                        : 'bg-white/80 dark:bg-white/5 text-gray-600 dark:text-gray-300 border-gray-200/80 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-400/50 hover:text-gray-900 dark:hover:text-white hover:bg-purple-50/60 dark:hover:bg-purple-500/10'}
+                    `}
+                  >
+                    {cat.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Sort + count */}
+          <div className="flex-shrink-0 flex items-center gap-2 pl-2 border-l border-gray-200 dark:border-white/10">
+            <span className="text-xs text-gray-400 font-medium hidden sm:inline-block">
+               {loading ? '...' : total} items
+            </span>
+            <FilterDropdown
+              value={sortBy}
+              onChange={setSortBy}
+              options={SORT_OPTIONS}
+              placeholder="Sort"
+              className="border-none bg-transparent shadow-none px-0 min-w-[fit-content] text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-purple-600 dark:hover:text-purple-400"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-6 items-start">
+        {/* Desktop Filters Sidebar - Collapses horizontally to the side */}
+        <aside className={`hidden lg:block flex-shrink-0 transition-[width] duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${filtersCollapsed ? 'w-12' : 'w-72'}`}>
+          <div className={`sticky top-28 rounded-xl border border-gray-200/60 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] transition-all duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] overflow-hidden shadow-sm ${filtersCollapsed ? 'p-2' : 'p-5'}`}>
+            <div className="flex items-center justify-between">
+              <h4 className={`text-sm font-semibold text-gray-900 dark:text-white transition-all duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] whitespace-nowrap ${filtersCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>Filters</h4>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className={`text-xs font-medium text-purple-600 hover:text-purple-700 transition-all duration-300 whitespace-nowrap ${filtersCollapsed ? 'opacity-0 w-0 overflow-hidden pointer-events-none' : 'opacity-100'}`}
+                >
+                  Clear all
+                </button>
+                <div className="relative group">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextCollapsed = !filtersCollapsed;
+                      setFiltersCollapsed(nextCollapsed);
+                      setChipsCollapsed(nextCollapsed);
+                    }}
+                    className={`h-8 w-8 flex-shrink-0 rounded-full border transition-all flex items-center justify-center hover:scale-105 active:scale-95 ${
+                      filtersCollapsed
+                        ? 'border-purple-300 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                        : 'border-gray-200 dark:border-white/10 bg-white/70 dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10'
+                    }`}
+                    aria-label={filtersCollapsed ? 'Expand filters' : 'Collapse filters'}
+                  >
+                    {filtersCollapsed ? <span className="text-sm">🎛️</span> : <PanelLeftClose size={14} />}
+                  </button>
+                  <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                    {filtersCollapsed ? 'Show filters' : 'Hide filters'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className={`transition-all duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] overflow-hidden ${filtersCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1200px] opacity-100 mt-4'}`}>
+              <div className="space-y-6">
+                <div>
+                  <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">Category</h5>
+                  <div className="space-y-2">
+                    {displayCategories.map((cat) => (
+                      <label key={cat.slug} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input
+                          type="radio"
+                          name="category"
+                          checked={selectedCategory === cat.slug}
+                          onChange={() => setSelectedCategory(cat.slug)}
+                          className="h-4 w-4 border-gray-300 text-purple-600 focus:ring-0"
+                        />
+                        <span>{cat.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 dark:border-white/10 pt-4">
+                  <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">Price range</h5>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      value={minPrice ?? ''}
+                      onChange={(e) => setMinPrice(e.target.value ? Number(e.target.value) : undefined)}
+                      placeholder="Min"
+                      className="threadly-search-input px-3 py-2 text-sm"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      value={maxPrice ?? ''}
+                      onChange={(e) => setMaxPrice(e.target.value ? Number(e.target.value) : undefined)}
+                      placeholder="Max"
+                      className="threadly-search-input px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 dark:border-white/10 pt-4">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={onSale}
+                      onChange={(e) => setOnSale(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-0"
+                    />
+                    On sale only
+                  </label>
+                </div>
+
+                {/* In-Stock Only */}
+                <div className="border-t border-gray-200 dark:border-white/10 pt-4">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={inStockOnly}
+                      onChange={(e) => setInStockOnly(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-0"
+                    />
+                    In stock only
+                  </label>
+                </div>
+
+                {/* Color Filter */}
+                {availableColors.length > 0 && (
+                  <div className="border-t border-gray-200 dark:border-white/10 pt-4">
+                    <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">Color</h5>
+                    <div className="flex flex-wrap gap-2">
+                      {availableColors.map((color) => {
+                        const isSelected = selectedColors.includes(color);
+                        const hex = COLOR_HEX_MAP[color] ?? '#CBD5E1';
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() =>
+                              setSelectedColors((prev) =>
+                                isSelected ? prev.filter((c) => c !== color) : [...prev, color]
+                              )
+                            }
+                            className={`group relative h-8 w-8 rounded-full border-2 transition-all ${
+                              isSelected
+                                ? 'border-purple-600 ring-2 ring-purple-300 dark:ring-purple-500/40 scale-110'
+                                : 'border-gray-200 dark:border-white/20 hover:border-purple-400 hover:scale-105'
+                            }`}
+                            style={{ backgroundColor: hex }}
+                            aria-label={color}
+                            title={color}
+                          >
+                            {isSelected && (
+                              <span className="absolute inset-0 flex items-center justify-center">
+                                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke={hex === '#FFFFFF' || hex === '#EAB308' ? '#000' : '#fff'} strokeWidth="2.5"><path d="M3 8.5l3.5 3.5L13 4.5" /></svg>
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Size Filter */}
+                {availableSizes.length > 0 && (
+                  <div className="border-t border-gray-200 dark:border-white/10 pt-4">
+                    <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">Size</h5>
+                    <div className="flex flex-wrap gap-2">
+                      {availableSizes.map((size) => {
+                        const isSelected = selectedSizes.includes(size);
+                        return (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() =>
+                              setSelectedSizes((prev) =>
+                                isSelected ? prev.filter((s) => s !== size) : [...prev, size]
+                              )
+                            }
+                            className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                              isSelected
+                                ? 'bg-purple-600 border-purple-600 text-white shadow-md'
+                                : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-300'
+                            }`}
+                          >
+                            {size}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* Product Grid / Inline Collection / Inline Product Detail */}
+        <div className="flex-1 min-w-0">
+          {selectedProduct ? (
+            <div className="w-full">
+              <InlineProductDetail
+                product={selectedProduct}
+                onBack={() => {
+                  setSelectedProduct(null);
+                  // If the product was opened from a collection, return to collection view
+                  // Otherwise return to the product grid
+                  if (viewContext !== 'collection') {
+                    setViewContext('store');
+                  }
+                }}
+                brandName={selectedProduct.brand?.name}
+              />
+            </div>
+          ) : selectedCollectionId ? (
+            <div className="w-full">
+              <InlineStoreCollectionView
+                collectionId={selectedCollectionId}
+                onBack={() => {
+                  setSelectedCollectionId(null);
+                  setViewContext('store');
+                }}
+                onViewProduct={(product) => {
+                  setViewContext('collection');
+                  setSelectedProduct(product);
+                }}
+                brandName={undefined}
+                brandId={brandId}
+              />
+            </div>
+          ) : (
+            <>
+              {error ? (
+                <div className="rounded-2xl border border-red-200 dark:border-red-500/20 bg-white/70 dark:bg-white/5 p-6">
+                  <div className="text-red-600 dark:text-red-300 font-medium">{error}</div>
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(242px,1fr))] gap-4 sm:gap-5">
+                {showProductsEmpty ? (
+                  <div className="col-span-full">
+                    <StoreEmptyState type="no-products" isOwner={isOwner} />
+                  </div>
+                ) : loading ? (
+                  Array.from({ length: 8 }).map((_, idx) => <ProductCardSkeleton key={idx} />)
+                ) : (
+                  filteredProducts.map((p) => (
+                    <StoreProductCard
+                      key={p.id}
+                      product={p}
+                      isOwnerView={isOwner}
+                      onViewProduct={(product) => {
+                        setViewContext('store');
+                        setSelectedProduct(product);
+                      }}
+                    />
+                  ))
+                )}
+              </div>
+
+              {!loading && hasMore ? (
+                <div className="mt-8 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={handleLoadMore}
+                    className="px-6 py-3 rounded-full text-sm font-medium bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+                  >
+                    Load more
+                  </button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+
+      <FilterDrawer
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        filters={{
+          minPrice, maxPrice, onSale, category: selectedCategory, sortBy,
+          selectedColors, selectedSizes, inStockOnly,
+        }}
+        onApply={(newFilters) => {
+          if (newFilters.minPrice !== undefined) setMinPrice(newFilters.minPrice);
+          if (newFilters.maxPrice !== undefined) setMaxPrice(newFilters.maxPrice);
+          if (newFilters.onSale !== undefined) setOnSale(newFilters.onSale);
+          if (newFilters.category !== undefined) setSelectedCategory(newFilters.category);
+          if (newFilters.sortBy !== undefined) setSortBy(newFilters.sortBy);
+          if (newFilters.selectedColors !== undefined) setSelectedColors(newFilters.selectedColors);
+          if (newFilters.selectedSizes !== undefined) setSelectedSizes(newFilters.selectedSizes);
+          if (newFilters.inStockOnly !== undefined) setInStockOnly(newFilters.inStockOnly);
+        }}
+        categories={categories}
+        availableColors={availableColors}
+        availableSizes={availableSizes}
+      />
+    </div>
+  );
+}

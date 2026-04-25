@@ -1,4 +1,5 @@
 import { apiClient } from './httpClient';
+import { unwrapApiResponse } from '@/types/auth';
 import type { CommentTarget, CommentV2Dto, PageResult } from '@/types/comments';
 
 function pathForTarget(targetType: CommentTarget, targetId: string) {
@@ -10,36 +11,39 @@ function pathForTarget(targetType: CommentTarget, targetId: string) {
 export const CommentsApi = {
   async create(targetType: CommentTarget, targetId: string, content: string, parentId?: string) {
     const { data } = await apiClient.post(pathForTarget(targetType, targetId), { content, parentId });
-    return data as CommentV2Dto;
+    return unwrapApiResponse<CommentV2Dto>(data);
   },
   async list(targetType: CommentTarget, targetId: string, cursor?: string, limit = 20) {
     const { data } = await apiClient.get(pathForTarget(targetType, targetId), { params: { cursor, limit } });
-    return data as PageResult<CommentV2Dto>;
+    return unwrapApiResponse<PageResult<CommentV2Dto>>(data);
   },
   async replies(commentId: string, cursor?: string, limit = 20) {
     const { data } = await apiClient.get(`/api/v1/comments/${commentId}/replies`, { params: { cursor, limit } });
-    return data as PageResult<CommentV2Dto>;
+    return unwrapApiResponse<PageResult<CommentV2Dto>>(data);
   },
-  async toggleLike(commentId: string) {
+  async toggleThread(commentId: string) {
     const clientEventId = (globalThis.crypto && 'randomUUID' in globalThis.crypto)
       ? (globalThis.crypto as any).randomUUID()
       : undefined;
-    const { data } = await apiClient.post(`/api/v1/comments/${commentId}/like`, {}, {
+    const { data } = await apiClient.post(`/api/v1/comments/${commentId}/thread`, {}, {
       headers: clientEventId ? { 'x-client-event-id': clientEventId } : undefined,
     });
-    return data as { liked: boolean; likeCount: number };
+    return unwrapApiResponse<{ threaded: boolean; threadCount: number }>(data);
   },
-  async isLiked(commentId: string) {
-    const { data } = await apiClient.get(`/api/v1/comments/${commentId}/is-liked`);
-    return data as { liked: boolean };
+  async isThreaded(commentId: string) {
+    const { data } = await apiClient.get(`/api/v1/comments/${commentId}/is-threaded`);
+    return unwrapApiResponse<{ threaded: boolean }>(data);
   },
   async remove(commentId: string) {
     const { data } = await apiClient.delete(`/api/v1/comments/${commentId}`);
-    return data as { success: boolean };
+    return unwrapApiResponse<{ success: boolean }>(data);
   },
   async stats(commentId: string) {
     const { data } = await apiClient.get(`/api/v1/comments/${commentId}/stats`);
-    return data as { likeCount: number; replyCount: number };
+    return unwrapApiResponse<{ threadCount: number; replyCount: number }>(data);
+  },
+  async listUnifiedForCollection(collectionId: string, cursor?: string, limit = 20) {
+    const { data } = await apiClient.get(`/api/v1/collections/${collectionId}/comments-unified`, { params: { cursor, limit } });
+    return unwrapApiResponse<PageResult<CommentV2Dto>>(data);
   },
 };
-

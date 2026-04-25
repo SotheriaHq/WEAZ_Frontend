@@ -1,5 +1,7 @@
 import React from 'react';
-import { FiX } from 'react-icons/fi';
+import ImageWithFallback from '@/components/ImageWithFallback';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface ProfileImageModalProps {
   open: boolean;
@@ -9,25 +11,73 @@ interface ProfileImageModalProps {
 }
 
 const ProfileImageModal: React.FC<ProfileImageModalProps> = ({ open, src, alt = 'Profile image', onClose }) => {
+  const isVisible = Boolean(open && src);
+  const panelRef = React.useRef<HTMLDivElement | null>(null);
+
+  useFocusTrap({
+    active: isVisible,
+    containerRef: panelRef,
+    onEscape: onClose,
+    initialFocusSelector: '[data-initial-focus="true"]',
+  });
+
+  React.useEffect(() => {
+    if (!isVisible) return;
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+    };
+  }, [isVisible]);
+
   if (!open || !src) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-      <button
-        type="button"
-        className="absolute top-6 right-6 rounded-full bg-white/90 p-2 text-gray-900 shadow-lg transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 dark:bg-gray-900/80 dark:text-gray-100"
-        onClick={onClose}
-        aria-label="Close image preview"
-      >
-        <FiX className="h-5 w-5" />
-      </button>
-      <figure className="relative max-h-[90vh] max-w-3xl overflow-hidden rounded-3xl bg-black/20 shadow-2xl">
-        <img src={src} alt={alt} className="max-h-[90vh] w-full object-contain" />
-        <figcaption className="absolute inset-x-0 bottom-0 bg-black/60 px-4 py-2 text-center text-sm font-medium text-white">
-          {alt}
-        </figcaption>
-      </figure>
-    </div>
+    <OverlayPortal>
+      <div className="fixed inset-0 z-layer-modal" aria-hidden={false}>
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+
+        <div className="absolute inset-0 flex items-center justify-center px-4 py-6" onClick={onClose}>
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Image preview"
+            tabIndex={-1}
+            className="relative w-full max-w-[min(92vw,36rem)] max-h-[88vh] neu-modal-surface overflow-hidden rounded-3xl shadow-2xl outline-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              data-initial-focus="true"
+              className="absolute top-3 right-3 z-10 rounded-full bg-white/90 px-3 py-2 text-gray-900 shadow-lg transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 dark:bg-gray-900/80 dark:text-gray-100"
+              onClick={onClose}
+              aria-label="Close image preview"
+            >
+              ✖️
+            </button>
+
+            <figure className="relative h-full w-full">
+              <div className="flex max-h-[88vh] w-full items-center justify-center p-2 sm:p-3">
+                <ImageWithFallback
+                  src={src}
+                  alt={alt}
+                  fit="contain"
+                  rounded="xl"
+                  containerClassName="max-h-[82vh] w-full"
+                  className="w-full max-h-[82vh] object-contain"
+                  maxHeightClassName="max-h-[82vh]"
+                  fallbackName={alt}
+                />
+              </div>
+            </figure>
+          </div>
+        </div>
+      </div>
+    </OverlayPortal>
   );
 };
 

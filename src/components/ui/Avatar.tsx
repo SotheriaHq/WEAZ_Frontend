@@ -1,5 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
+import MediaRenderer from '../media/MediaRenderer';
 
 export interface AvatarProps {
   src?: string;
@@ -19,15 +20,15 @@ const Avatar: React.FC<AvatarProps> = ({
   onClick,
 }) => {
   const sizeClasses = {
-    xs: 'w-6 h-6 text-xs',
-    sm: 'w-8 h-8 text-sm',
-    md: 'w-10 h-10 text-base',
-    lg: 'w-12 h-12 text-lg',
-    xl: 'w-16 h-16 text-xl',
-    '2xl': 'w-24 h-24 text-2xl',
+    xs: 'max-w-6 max-h-6 text-xs',
+    sm: 'max-w-8 max-h-8 text-sm',
+    md: 'max-w-10 max-h-10 text-base',
+    lg: 'max-w-12 max-h-12 text-lg',
+    xl: 'max-w-16 max-h-16 text-xl',
+    '2xl': 'max-w-24 max-h-24 text-2xl',
   };
 
-  const baseClasses = 'rounded-full object-cover flex items-center justify-center font-medium bg-gradient-to-br from-purple-500 to-pink-500 text-white';
+  const baseClasses = 'flex items-center justify-center font-medium';
   const interactiveClasses = onClick ? 'cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all' : '';
 
   // Generate initials from alt text for fallback
@@ -52,13 +53,25 @@ const Avatar: React.FC<AvatarProps> = ({
       title={alt}
     >
       {src ? (
-        <img
+        <MediaRenderer
+          kind="image"
           src={src}
           alt={alt}
-          className={clsx('w-full h-full rounded-full object-cover')}
+          loading="eager"
+          maxHeightClassName={sizeClasses[size].split(' ').find((c) => c.startsWith('max-h-')) || 'max-h-10'}
+          maxWidthClassName={sizeClasses[size].split(' ').find((c) => c.startsWith('max-w-')) || 'max-w-10'}
+          className="rounded-full"
+          mediaClassName="rounded-full"
         />
       ) : (
-        <span>{fallback || getInitials(alt)}</span>
+        <div
+          className={clsx(
+            'rounded-full flex items-center justify-center text-white bg-gradient-to-br from-purple-500 to-pink-500',
+            sizeClasses[size]
+          )}
+        >
+          <span>{fallback || getInitials(alt)}</span>
+        </div>
       )}
     </div>
   );

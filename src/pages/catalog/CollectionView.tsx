@@ -1,29 +1,21 @@
 import React from 'react';
-import { useParams } from 'react-router-dom';
-import CommentThread from '@/components/comments/CommentThread';
+import { useParams, useNavigate } from 'react-router-dom';
+import InlineCollectionViewer from '@/components/collections/InlineCollectionViewer';
 
 const CollectionView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
+  if (!id) return null;
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Collection</h1>
-        <p className="text-gray-500">ID: {id}</p>
+    <div className="min-h-screen w-full bg-gray-50 dark:bg-black pt-20 pb-10">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6">
+        <InlineCollectionViewer
+          collectionId={id}
+          onBack={() => navigate(-1)}
+        />
       </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {/* TODO: Render collection items */}
-        <div className="col-span-full text-sm text-gray-500">Items will appear here.</div>
-      </div>
-
-      {/* Comments Thread */}
-      {id && (
-        <section className="mt-10">
-          <h2 className="text-xl font-semibold mb-3">Comments</h2>
-          <CommentThread targetType="COLLECTION" targetId={id} />
-        </section>
-      )}
     </div>
   );
 };

@@ -25,3 +25,7 @@
 .scrollbar-transparent {
   scrollbar-color: transparent transparent;
 }
+
+/* Hide scrollbars for emoji pickers rendered in custom containers */
+.glass-emoji-picker *::-webkit-scrollbar { display: none; }
+.glass-emoji-picker { -ms-overflow-style: none; scrollbar-width: none; }

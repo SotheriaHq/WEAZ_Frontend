@@ -1,0 +1,88 @@
+export type OrderNavigationContext = 'STANDARD_ORDER' | 'CUSTOM_ORDER' | 'INQUIRY';
+export type OrderNavigationSurface = 'BUYER' | 'BRAND' | 'ADMIN';
+
+interface BuildOrderRouteOptions {
+  surface: OrderNavigationSurface;
+  contextType: OrderNavigationContext;
+  orderId?: string | null;
+  customOrderId?: string | null;
+  openChat?: boolean;
+  messageId?: string | null;
+}
+
+export const buildOrderRoute = ({
+  surface,
+  contextType,
+  orderId,
+  customOrderId,
+  openChat = false,
+  messageId,
+}: BuildOrderRouteOptions): string | null => {
+  if (contextType === 'INQUIRY') {
+    return null;
+  }
+
+  if (contextType === 'CUSTOM_ORDER') {
+    if (!customOrderId) {
+      return null;
+    }
+
+    if (surface === 'BRAND') {
+      const params = new URLSearchParams();
+      if (messageId) {
+        params.set('messageId', messageId);
+      }
+
+      const query = params.toString();
+      const hash = openChat ? '#messages' : '';
+      return `/studio/custom-orders/${encodeURIComponent(customOrderId)}${query ? `?${query}` : ''}${hash}`;
+    }
+
+    if (surface === 'ADMIN') {
+      return `/admin/custom-orders/${encodeURIComponent(customOrderId)}`;
+    }
+
+    const params = new URLSearchParams({
+      tab: 'orders',
+      kind: 'custom',
+      orderId: customOrderId,
+    });
+
+    if (openChat) {
+      params.set('openChat', '1');
+    }
+
+    if (messageId) {
+      params.set('messageId', messageId);
+    }
+
+    return `/profile?${params.toString()}`;
+  }
+
+  if (!orderId) {
+    return null;
+  }
+
+  if (surface === 'BRAND') {
+    const params = new URLSearchParams({
+      tab: 'orders',
+      orderId,
+    });
+
+    if (openChat) {
+      params.set('openChat', '1');
+    }
+
+    if (messageId) {
+      params.set('messageId', messageId);
+    }
+
+    return `/studio?${params.toString()}`;
+  }
+
+  if (surface === 'ADMIN') {
+    return `/admin/orders/${encodeURIComponent(orderId)}`;
+  }
+
+  return `/orders/${encodeURIComponent(orderId)}`;
+};

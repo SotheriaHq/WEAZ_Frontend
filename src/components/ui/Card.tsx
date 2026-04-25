@@ -1,52 +1,56 @@
 import React from 'react';
-import { clsx } from 'clsx';
 
-export interface CardProps {
-  children: React.ReactNode;
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  hoverEffect?: boolean;
+  glass?: boolean;
   variant?: 'default' | 'bordered' | 'elevated';
   padding?: 'none' | 'sm' | 'md' | 'lg';
-  className?: string;
-  onClick?: () => void;
 }
 
-const Card: React.FC<CardProps> = ({
-  children,
-  variant = 'default',
-  padding = 'md',
-  className,
-  onClick,
-}) => {
-  const baseClasses = 'rounded-lg transition-all duration-200';
-  
-  const variantClasses = {
-    default: 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700',
-    bordered: 'bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600',
-    elevated: 'bg-white dark:bg-gray-900 shadow-lg hover:shadow-xl border border-gray-100 dark:border-gray-800',
-  };
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  ({
+    className = '',
+    hoverEffect = false,
+    glass = false,
+    variant = 'default',
+    padding = 'none',
+    children,
+    ...props
+  }, ref) => {
+    
+    const baseStyles = 'rounded-2xl border';
+    
+    // "Glass" style vs "Solid" style
+    const bgStyles = glass
+      ? 'bg-white/80 dark:bg-black/40 backdrop-blur-xl border-white/20 dark:border-white/10 shadow-glass'
+      : variant === 'bordered'
+        ? 'bg-white dark:bg-[#111] border-gray-200 dark:border-white/10 shadow-sm'
+        : variant === 'elevated'
+          ? 'bg-white dark:bg-[#111] border-gray-200 dark:border-white/5 shadow-md'
+          : 'bg-white dark:bg-[#111] border-gray-200 dark:border-white/5 shadow-sm';
 
-  const paddingClasses = {
-    none: '',
-    sm: 'p-3',
-    md: 'p-4',
-    lg: 'p-6',
-  };
+    const hoverStyles = hoverEffect
+      ? 'transition-all duration-300 hover:-translate-y-1 hover:shadow-glass-hover hover:border-brand-primary/30' 
+      : '';
 
-  const interactiveClasses = onClick ? 'cursor-pointer hover:shadow-md' : '';
+    const paddingStyles =
+      padding === 'sm' ? 'p-3' :
+      padding === 'md' ? 'p-4' :
+      padding === 'lg' ? 'p-6' :
+      '';
 
-  return (
-    <div
-      className={clsx(
-        baseClasses,
-        variantClasses[variant],
-        paddingClasses[padding],
-        interactiveClasses,
-        className
-      )}
-      onClick={onClick}
-    >
-      {children}
-    </div>
-  );
-};
+    return (
+      <div
+        ref={ref}
+        className={`${baseStyles} ${bgStyles} ${paddingStyles} ${hoverStyles} ${className}`}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
+);
+
+Card.displayName = 'Card';
 
 export default Card;

@@ -2,6 +2,7 @@ import React from 'react';
 import { Building2, MapPin, Tag, Mail, Phone, Instagram, Facebook, Twitter, Globe } from 'lucide-react';
 import Card from '../../ui/Card';
 import Badge from '../../ui/Badge';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface AboutTabProps {
   brandData: {
@@ -38,11 +39,14 @@ const AboutTab: React.FC<AboutTabProps> = ({ brandData }) => {
     <div className="space-y-8 max-w-6xl mx-auto">
       {/* Hero Section */}
       {brandData.bannerImage && (
-        <section className="relative h-80 rounded-2xl overflow-hidden shadow-lg">
-          <img 
-            src={brandData.bannerImage} 
+        <section className="relative rounded-2xl overflow-y-auto shadow-lg">
+          <MediaRenderer
+            kind="image"
+            src={brandData.bannerImage}
             alt={brandData.brandName}
-            className="w-full h-full object-cover"
+            maxHeightClassName="max-h-80"
+            className="rounded-2xl"
+            mediaClassName="rounded-2xl"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-end p-8">
             <div>

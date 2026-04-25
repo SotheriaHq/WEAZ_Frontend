@@ -134,7 +134,7 @@ afterEach(() => {
     expect(finalizeCollectionUploadsMock).toHaveBeenCalledWith('collection-1', [
       expect.objectContaining({ fileId: 'file-1', s3Key: 'key-1', actualSize: fileA.size }),
       expect.objectContaining({ fileId: 'file-2', s3Key: 'key-2', actualSize: fileB.size }),
-    ]);
+    ], true);
     expect(result.current.isUploading).toBe(false);
   });
 
@@ -195,7 +195,7 @@ afterEach(() => {
     expect(result.current.progress).toBe(100);
     expect(finalizeCollectionUploadsMock).toHaveBeenCalledWith('collection-retry', [
       expect.objectContaining({ fileId: 'retry-file', s3Key: 'retry-key' }),
-    ]);
+    ], true);
     expect(result.current.error).toBeNull();
     expect(result.current.perFileProgress).toEqual({});
     expect(result.current.isUploading).toBe(false);

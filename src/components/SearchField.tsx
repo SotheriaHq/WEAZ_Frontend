@@ -1,19 +1,67 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Search, SlidersHorizontal } from 'lucide-react';
-import { Dropdown, DropdownMenu, DropdownTrigger, DropdownItem } from '@/components/ui/Dropdown';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from '@/components/ui/Dropdown';
 
 interface SearchFieldProps {
   placeholder?: string;
   onSearch?: (value: string) => void;
-  showFilter?: boolean; // show the filter dropdown control
+  value?: string;
+  onChange?: (value: string) => void;
+  showFilter?: boolean;
   className?: string;
+  isLoading?: boolean;
+  onSubmit?: (value: string) => void;
+  onClear?: () => void;
+  ariaLabel?: string;
+  onFocus?: () => void;
+  onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  filterItems?: Array<{ label: string; value: string }>;
+  onFilterSelect?: (value: string) => void;
+  submitOnEnter?: boolean;
+  ariaControls?: string;
+  ariaActiveDescendant?: string;
+  ariaAutocomplete?: 'list' | 'none';
+  /** When true, the field starts collapsed as an emoji icon and expands on click. Default: true */
+  collapsible?: boolean;
 }
 
-const SearchField: React.FC<SearchFieldProps> = ({ placeholder = 'Search...', onSearch, showFilter = true, className }) => {
+const SearchField: React.FC<SearchFieldProps> = ({
+  placeholder = 'Search...',
+  onSearch,
+  value,
+  onChange,
+  showFilter = false,
+  className,
+  isLoading = false,
+  onSubmit,
+  onClear,
+  ariaLabel = 'Search',
+  onFocus,
+  onKeyDown,
+  inputRef,
+  filterItems,
+  onFilterSelect,
+  submitOnEnter = true,
+  ariaControls,
+  ariaActiveDescendant,
+  ariaAutocomplete = 'none',
+  collapsible = true,
+}) => {
   const [isFocused, setIsFocused] = useState(false);
-  const [value, setValue] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [internalValue, setInternalValue] = useState('');
+  const fallbackInputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputValue = value ?? internalValue;
+  const resolvedInputRef = inputRef ?? fallbackInputRef;
+  const hasFilterItems = Boolean(showFilter && filterItems && filterItems.length > 0);
+
+  // Field is expanded when focused, has a value, or collapsible is disabled
+  const isExpanded = !collapsible || isFocused || Boolean(inputValue);
+
+  const containerClassName = useMemo(
+    () => `relative z-[80] flex-1 min-w-0 max-w-2xl ${className ?? ''}`,
+    [className],
+  );
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -26,69 +74,111 @@ const SearchField: React.FC<SearchFieldProps> = ({ placeholder = 'Search...', on
   }, []);
 
   useEffect(() => {
-    if (isFocused && inputRef.current) {
-      inputRef.current.focus();
+    if (isFocused && resolvedInputRef.current) {
+      resolvedInputRef.current.focus();
     }
-  }, [isFocused]);
+  }, [isFocused, resolvedInputRef]);
 
+  const handleExpand = () => {
+    setIsFocused(true);
+    onFocus?.();
+    // Focus the input after a tick so the DOM is ready
+    requestAnimationFrame(() => {
+      resolvedInputRef.current?.focus();
+    });
+  };
+
+  // Collapsed state: just the emoji button
+  if (!isExpanded) {
+    return (
+      <div ref={wrapperRef} className={containerClassName} role="search">
+        <button
+          type="button"
+          onClick={handleExpand}
+          className="flex items-center justify-center rounded-full p-2 text-xl transition-all duration-200 hover:scale-110 hover:bg-black/5 dark:hover:bg-white/10"
+          aria-label={ariaLabel}
+        >
+          🔎
+        </button>
+      </div>
+    );
+  }
+
+  // Expanded state: full input field
   return (
-    <div ref={wrapperRef} className={`relative z-[80] flex-1 min-w-0 max-w-xl ${className ?? ''}`}>
-      {!isFocused && value.length === 0 ? (
-        <div className="flex items-center gap-2">
+    <div ref={wrapperRef} className={containerClassName} role="search">
+      <div className="relative flex items-center transition-all duration-200">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">🔎</span>
+        <input
+          ref={resolvedInputRef}
+          type="text"
+          value={inputValue}
+          aria-label={ariaLabel}
+          role="combobox"
+          aria-expanded={isFocused}
+          aria-controls={ariaControls}
+          aria-activedescendant={ariaActiveDescendant}
+          aria-autocomplete={ariaAutocomplete}
+          onFocus={() => {
+            setIsFocused(true);
+            onFocus?.();
+          }}
+          onBlur={() => setIsFocused(false)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              if (submitOnEnter) {
+                onSubmit?.(inputValue);
+              } else {
+                event.preventDefault();
+              }
+            }
+            onKeyDown?.(event);
+          }}
+          onChange={e => {
+            const next = e.target.value;
+            setInternalValue(next);
+            onSearch?.(next);
+            onChange?.(next);
+          }}
+          placeholder={placeholder}
+          className={`threadly-search-input pl-10 ${hasFilterItems || isLoading || inputValue ? 'pr-24' : 'pr-10'}`}
+        />
+        {inputValue ? (
           <button
             type="button"
-            className="btn-frost-ghost btn-tight-sm aspect-square p-0 min-w-[2rem]"
-            onClick={() => setIsFocused(true)}
-            aria-label="Open search"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              setInternalValue('');
+              onSearch?.('');
+              onChange?.('');
+              onClear?.();
+            }}
+            className="absolute right-14 rounded-full px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+            aria-label="Clear search"
           >
-            <Search className="w-4 h-4" />
+            ×
           </button>
-          {showFilter && (
-            <Dropdown placement="bottom-end">
-              <DropdownTrigger className="btn-frost-ghost btn-tight-sm aspect-square p-0 min-w-[2rem]">
-                <SlidersHorizontal className="w-4 h-4" />
-              </DropdownTrigger>
-              <DropdownMenu>
-                <DropdownItem>Brands</DropdownItem>
-                <DropdownItem>Collections</DropdownItem>
-                <DropdownItem>People</DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-          )}
-        </div>
-      ) : (
-        <div className="glass-panel px-3 py-2 rounded-xl flex items-center gap-2">
-          <Search className="w-4 h-4 text-gray-500" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={value}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => {
-              // collapse if empty
-              setIsFocused(false);
-            }}
-            onChange={e => {
-              setValue(e.target.value);
-              onSearch?.(e.target.value);
-            }}
-            placeholder={placeholder}
-            className="w-full bg-transparent outline-none border-0 focus:ring-0 text-sm placeholder:text-gray-500"
-          />
-          {showFilter && (
+        ) : null}
+        {isLoading ? (
+          <span className="absolute right-10 text-xs text-gray-400" aria-hidden="true">⏳</span>
+        ) : null}
+        {hasFilterItems ? (
+          <div className="absolute right-2">
             <Dropdown placement="bottom-end">
               <DropdownTrigger className="btn-frost-ghost btn-tight-xs aspect-square p-0 min-w-[2rem]">
-                <SlidersHorizontal className="w-4 h-4" />
+                <span aria-hidden="true">🎛️</span>
               </DropdownTrigger>
               <DropdownMenu>
-                <DropdownItem>Brands</DropdownItem>
-                <DropdownItem>Collections</DropdownItem>
-                <DropdownItem>People</DropdownItem>
+                {filterItems?.map((item) => (
+                  <DropdownItem key={item.value} onClick={() => onFilterSelect?.(item.value)}>
+                    {item.label}
+                  </DropdownItem>
+                ))}
               </DropdownMenu>
             </Dropdown>
-          )}
-        </div>
-      )}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 };

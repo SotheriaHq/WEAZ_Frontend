@@ -29,9 +29,9 @@ const WizardLayout: React.FC<WizardLayoutProps> = ({
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
 
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-      <div>{left}</div>
-      <div>{right}</div>
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start">
+      <div className="min-w-0">{left}</div>
+      <div className="min-w-0">{right}</div>
     </div>
   </div>
 );

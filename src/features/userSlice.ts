@@ -3,7 +3,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AuthUserDto } from '../types/auth';
 import { env } from '../config/env';
 
-interface UserState {
+export interface UserState {
   profile: AuthUserDto | null;
   isAuthenticated: boolean;
 }
@@ -27,6 +27,12 @@ const normalizeUser = (user: AuthUserDto): AuthUserDto => ({
   bannerImage: user.bannerImage ?? null,
   bannerImageId: user.bannerImageId ?? null,
   bannerImageFile: user.bannerImageFile ?? null,
+  verificationStatus: user.verificationStatus ?? null,
+  isVerifiedBrand: Boolean(user.isVerifiedBrand),
+  verificationBadgeVisible: Boolean(
+    user.verificationBadgeVisible ?? user.isVerifiedBrand,
+  ),
+  verifiedExplanationUrl: user.verifiedExplanationUrl ?? null,
 });
 
 const parsePersistedProfile = (raw: string | null): AuthUserDto | null => {
@@ -55,12 +61,28 @@ export const userSlice = createSlice({
   initialState,
   reducers: {
     setUser: (state, action: PayloadAction<AuthUserDto>) => {
-      const normalized = normalizeUser(action.payload);
+      // Some endpoints return partial user objects (e.g. profile update flows).
+      // Merge with existing profile first so we don't accidentally null-out or
+      // lose critical fields like `type` and `role`.
+      const merged = state.profile ? ({ ...state.profile, ...action.payload } as AuthUserDto) : action.payload;
+      const normalized = normalizeUser(merged);
       state.profile = normalized;
       state.isAuthenticated = true;
       if (typeof window !== 'undefined') {
         localStorage.setItem(env.userStorageKey, JSON.stringify(normalized));
       }
+    },
+    setUserFromStorage: (state, action: PayloadAction<AuthUserDto | null>) => {
+      if (!action.payload) {
+        state.profile = null;
+        state.isAuthenticated = false;
+        return;
+      }
+
+      const merged = state.profile ? ({ ...state.profile, ...action.payload } as AuthUserDto) : action.payload;
+      const normalized = normalizeUser(merged);
+      state.profile = normalized;
+      state.isAuthenticated = true;
     },
     clearUser: (state) => {
       state.profile = null;
@@ -72,5 +94,5 @@ export const userSlice = createSlice({
   },
 });
 
-export const { setUser, clearUser } = userSlice.actions;
+export const { setUser, setUserFromStorage, clearUser } = userSlice.actions;
 export default userSlice.reducer;

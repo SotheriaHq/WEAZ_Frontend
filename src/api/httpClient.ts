@@ -9,7 +9,9 @@ import { unwrapApiResponse } from '../types/auth';
 import type { AuthTokensResponse } from '../types/auth';
 import { env } from '../config/env';
 
-const TOKEN_STORAGE_KEY = env.tokenStorageKey;
+let consecutiveRefreshFailures = 0;
+let lastRefreshFailureAt = 0;
+let volatileAccessToken: string | null = null;
 
 const getHeaders = (config: AxiosRequestConfig): AxiosHeaders => {
   if (!config.headers) {
@@ -34,28 +36,19 @@ const getHeaders = (config: AxiosRequestConfig): AxiosHeaders => {
 };
 
 export const getStoredAccessToken = (): string | null => {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  try {
-    return window.localStorage.getItem(TOKEN_STORAGE_KEY);
-  } catch {
-    return null;
-  }
+  return volatileAccessToken;
 };
 
 export const persistAccessToken = (token: string) => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  consecutiveRefreshFailures = 0;
+  lastRefreshFailureAt = 0;
+  volatileAccessToken = token;
 };
 
 export const dropStoredAccessToken = () => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+  volatileAccessToken = null;
+  consecutiveRefreshFailures = 0;
+  lastRefreshFailureAt = 0;
 };
 
 export const apiClient: AxiosInstance = axios.create(env.api.defaultConfig);
@@ -64,6 +57,13 @@ const refreshClient: AxiosInstance = axios.create(env.api.defaultConfig);
 let refreshPromise: Promise<string | null> | null = null;
 
 export const refreshAccessToken = async (): Promise<string | null> => {
+  const now = Date.now();
+  if (
+    consecutiveRefreshFailures >= 3 &&
+    now - lastRefreshFailureAt < 30_000
+  ) {
+    return null;
+  }
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
@@ -77,7 +77,15 @@ export const refreshAccessToken = async (): Promise<string | null> => {
         }
         return token;
       } catch {
+        consecutiveRefreshFailures += 1;
+        lastRefreshFailureAt = Date.now();
         dropStoredAccessToken();
+        if (consecutiveRefreshFailures >= 3) {
+          try {
+            // Broadcast a global auth-expired signal for UI to react (toast, redirect, etc.)
+            window.dispatchEvent(new CustomEvent('auth:expired'));
+          } catch {}
+        }
         return null;
       } finally {
         refreshPromise = null;
@@ -89,7 +97,7 @@ export const refreshAccessToken = async (): Promise<string | null> => {
 };
 
 const attachAuthHeader = (config: InternalAxiosRequestConfig) => {
-  const token = getStoredAccessToken();
+  const token = volatileAccessToken;
   if (!token) {
     return config;
   }
@@ -113,7 +121,11 @@ apiClient.interceptors.response.use(
     const status = response.status;
     const originalRequest = config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/login')) {
+    if (
+      status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/login')
+    ) {
       originalRequest._retry = true;
 
       try {
@@ -129,6 +141,11 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest);
       } catch (refreshError) {
+        if (consecutiveRefreshFailures >= 3) {
+          try {
+            window.dispatchEvent(new CustomEvent('auth:expired'));
+          } catch {}
+        }
         return Promise.reject(refreshError);
       }
     }
