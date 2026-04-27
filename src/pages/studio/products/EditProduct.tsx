@@ -2606,7 +2606,7 @@ const EditProduct: React.FC = () => {
             {/* Media Gallery */}
             <div
               id="product-media-section"
-              className="rounded-xl bg-white/45 p-4 ring-1 ring-gray-200/60 dark:bg-white/[0.03] dark:ring-white/10 sm:p-5 scroll-mt-24"
+              className="rounded-xl bg-white/45 p-4 shadow-sm dark:bg-white/[0.03] sm:p-5 scroll-mt-24"
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-white">
@@ -2810,7 +2810,7 @@ const EditProduct: React.FC = () => {
                 </p>
               )}
 
-              <div className="pt-4 border-t border-gray-200 dark:border-white/10">
+              <div className="pt-4">
                 <p className="text-xs text-gray-500">
                   Up to 6 images • Cover required when images exist
                 </p>
@@ -2821,7 +2821,7 @@ const EditProduct: React.FC = () => {
             </div>
 
             {/* Video Section */}
-            <div className="rounded-xl bg-white/45 p-4 ring-1 ring-gray-200/60 dark:bg-white/[0.03] dark:ring-white/10 sm:p-5">
+            <div className="rounded-xl bg-white/45 p-4 shadow-sm dark:bg-white/[0.03] sm:p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-white">
                   Product Video
@@ -2844,7 +2844,7 @@ const EditProduct: React.FC = () => {
           {/* RIGHT COLUMN: Details (58% approx -> 7 cols) */}
           <div className="space-y-4 lg:col-span-8">
             {/* Basic Info */}
-            <div className="rounded-xl bg-white/45 p-4 ring-1 ring-gray-200/60 dark:bg-white/[0.03] dark:ring-white/10 sm:p-5">
+            <div className="rounded-xl bg-white/45 p-4 shadow-sm dark:bg-white/[0.03] sm:p-5">
               <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-6">
                 Basic Information
               </h2>
@@ -2870,7 +2870,7 @@ const EditProduct: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="lg:max-h-[300px] lg:overflow-y-auto scrollbar-threadly-strong lg:pr-1">
+                  <div className="lg:max-h-[300px] lg:overflow-y-auto lg:pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <div className="space-y-4">
                       <div className="space-y-3" id="product-category-section">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -3092,8 +3092,8 @@ const EditProduct: React.FC = () => {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-xl bg-white/45 ring-1 ring-gray-200/60 dark:bg-white/[0.03] dark:ring-white/10">
-              <div className="px-4 py-3 border-b border-gray-200/70 dark:border-white/10 flex items-center justify-between">
+            <div className="overflow-hidden rounded-xl bg-white/45 shadow-sm dark:bg-white/[0.03]">
+              <div className="px-4 py-3 flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   Product Operations
                 </p>
@@ -3101,7 +3101,7 @@ const EditProduct: React.FC = () => {
                   Scroll inside panel
                 </span>
               </div>
-              <div className="space-y-4 p-4 lg:max-h-[440px] lg:overflow-y-auto scrollbar-threadly-strong lg:pr-1">
+              <div className="space-y-4 p-4 lg:max-h-[440px] lg:overflow-y-auto lg:pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {/* Pricing */}
                 <div
                   id="product-pricing-section"
@@ -3141,7 +3141,7 @@ const EditProduct: React.FC = () => {
                   </div>
 
                   {!collapsedSections.pricing && (
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                       <Input
                         label="Price"
                         required
@@ -3157,6 +3157,15 @@ const EditProduct: React.FC = () => {
                           </span>
                         }
                         data-testid="product-price-input"
+                        inputSize="sm"
+                        className="[&_label]:text-xs [&_label]:mb-1"
+                      />
+                      <Input
+                        label="Currency"
+                        type="text"
+                        value={form.currency}
+                        onChange={() => {}}
+                        disabled
                         inputSize="sm"
                         className="[&_label]:text-xs [&_label]:mb-1"
                       />
@@ -3848,12 +3857,16 @@ const EditProduct: React.FC = () => {
                   })
                 }
                 disabled={saving || submitLocked}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
+                className="relative inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
               >
                 {(saving || submitLocked) && saveAction === "draft" && (
-                  <VLoader size={16} phase="loading" showLabel={false} />
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <VLoader size={16} phase="loading" showLabel={false} />
+                  </span>
                 )}
-                Save as Draft
+                <span className={(saving || submitLocked) && saveAction === "draft" ? "opacity-0" : ""}>
+                  Save as Draft
+                </span>
               </button>
             )}
             {isDraftEditMode && !isCollectionContext && (
@@ -3865,12 +3878,16 @@ const EditProduct: React.FC = () => {
                   })
                 }
                 disabled={saving || submitLocked}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
+                className="relative inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
               >
                 {(saving || submitLocked) && saveAction === "draft" && (
-                  <VLoader size={16} phase="loading" showLabel={false} />
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <VLoader size={16} phase="loading" showLabel={false} />
+                  </span>
                 )}
-                Save Changes
+                <span className={(saving || submitLocked) && saveAction === "draft" ? "opacity-0" : ""}>
+                  Save Changes
+                </span>
               </button>
             )}
             <button
@@ -3897,18 +3914,15 @@ const EditProduct: React.FC = () => {
                 })
               }
                 disabled={saving || submitLocked}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-purple-600 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:bg-purple-600/50"
+              className="relative inline-flex min-h-10 items-center justify-center rounded-lg bg-purple-600 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:bg-purple-600/50"
             >
                 {(saving || submitLocked) && saveAction === "publish" && (
-                <VLoader size={16} phase="loading" showLabel={false} />
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <VLoader size={16} phase="loading" showLabel={false} />
+                </span>
               )}
-              {(saving || submitLocked) && saveAction === "publish"
-                ? !isEditMode && pendingMediaFiles.length > 0
-                  ? "Creating and uploading images..."
-                  : isEditMode
-                    ? "Saving changes..."
-                    : "Creating product..."
-                : isDraftEditMode
+              <span className={(saving || submitLocked) && saveAction === "publish" ? "opacity-0" : ""}>
+                {isDraftEditMode
                   ? "Publish Product"
                   : isCollectionContext && isEditMode
                     ? "Save to Collection"
@@ -3917,6 +3931,7 @@ const EditProduct: React.FC = () => {
                       : isCollectionFlow
                         ? "Add to Collection"
                         : "Create Product"}
+              </span>
             </button>
           </div>
         </div>
