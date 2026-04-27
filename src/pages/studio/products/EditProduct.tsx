@@ -3568,18 +3568,18 @@ const EditProduct: React.FC = () => {
                           </h2>
                         </div>
                         <div className="space-y-4">
-                          <Input
-                            label="SKU (Stock Keeping Unit)"
-                            type="text"
-                            value={form.sku}
-                            onChange={() => {}}
-                            placeholder="Auto-generated"
-                            disabled
-                            helperText="A unique code to track inventory and sales (e.g., SHIRT-BLK-M)."
-                            inputSize="sm"
-                            className="[&_label]:text-xs [&_label]:mb-1"
-                          />
-                          <div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <Input
+                              label="SKU (Stock Keeping Unit)"
+                              type="text"
+                              value={form.sku}
+                              onChange={() => {}}
+                              placeholder="Auto-generated"
+                              disabled
+                              helperText="Auto-generated inventory code."
+                              inputSize="sm"
+                              className="[&_label]:text-xs [&_label]:mb-1"
+                            />
                             <Input
                               label="Stock Quantity"
                               type="number"
@@ -3596,13 +3596,12 @@ const EditProduct: React.FC = () => {
                               inputSize="sm"
                               className="[&_label]:text-xs [&_label]:mb-1"
                             />
-                            {form.variants.length > 0 && (
-                              <p className="text-[10px] text-gray-500 mt-1">
-                                Derived from variants. Edit stock per variant
-                                above.
-                              </p>
-                            )}
                           </div>
+                          {form.variants.length > 0 && (
+                            <p className="text-[10px] text-gray-500">
+                              Stock is derived from variants. Edit stock per variant above.
+                            </p>
+                          )}
                           <div className="flex items-center gap-3 pt-2">
                             <input
                               type="checkbox"

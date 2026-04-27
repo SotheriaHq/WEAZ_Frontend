@@ -538,7 +538,7 @@ const MarketPlace: React.FC = () => {
                   <ImageWithFallback
                     src={product.thumbnail || product.images[0] || null}
                     alt={product.name}
-                    fit="contain"
+                    fit="cover"
                     rounded="none"
                     containerClassName="absolute inset-0 h-full w-full"
                     className="h-full w-full transition-transform duration-500 group-hover:scale-105"

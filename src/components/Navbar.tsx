@@ -160,7 +160,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
       >
           <DropdownTrigger
             type="button"
-            className="flex h-10 w-10 !border-0 !bg-transparent !p-0 items-center justify-center overflow-hidden rounded-xl !shadow-none transition-colors hover:ring-2 hover:ring-[color:var(--brand-primary)]/20"
+            className="flex h-10 w-10 !border-0 !bg-transparent !p-0 items-center justify-center overflow-hidden rounded-xl !shadow-none !ring-0 transition-colors hover:!ring-0 focus:!ring-0 focus-visible:!ring-0"
             aria-label="Profile menu"
           >
           <ImageWithFallback
@@ -177,7 +177,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
 
         <DropdownMenu
           maxHeight="min(80dvh, 30rem)"
-          className="w-[min(13.5rem,calc(100vw-1rem))] sm:w-[15.5rem] before:pointer-events-none before:absolute before:-top-1 before:right-5 before:h-3 before:w-3 before:rotate-45 before:rounded-[3px] before:border-l before:border-t before:border-white/20 before:bg-white/90 dark:before:border-white/10 dark:before:bg-[#09090b]"
+          className="w-[min(13.5rem,calc(100vw-1rem))] !border-0 !border-transparent !bg-white !shadow-none !ring-0 outline-none dark:!bg-[#09090b] sm:w-[15.5rem]"
         >
           <div className="flex items-center gap-3 px-3.5 pb-3 pt-3.5">
             <div className="h-12 w-12 overflow-hidden rounded-xl border border-black/5 dark:border-white/10">
@@ -237,18 +237,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           >
             Theme
           </DropdownItem>
-
-          <DropdownItem
-            leftIcon="⚙️"
-            onClick={() => {
-              navigate('/settings');
-              setShowProfileMenu(false);
-            }}
-          >
-            {translate('settings')}
-          </DropdownItem>
-
-          <DropdownDivider />
 
           <DropdownItem
             leftIcon="🌍"

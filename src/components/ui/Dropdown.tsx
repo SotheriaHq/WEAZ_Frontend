@@ -246,7 +246,7 @@ export const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
             minWidth: pos.minWidth,
             maxWidth: 'calc(100vw - 1rem)',
             maxHeight: maxHeight ?? 'min(60vh, 24rem)',
-            overflowY: 'auto',
+            overflow: 'hidden',
             overscrollBehavior: 'contain',
             transformOrigin: pos.transformOrigin,
             visibility: isPositioned ? 'visible' : 'hidden',
@@ -257,7 +257,13 @@ export const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
         >
           <div
             className={DROPDOWN_CONTENT_CLASS}
-            style={{ WebkitOverflowScrolling: 'touch' }}
+            style={{
+              maxHeight: maxHeight ?? 'min(60vh, 24rem)',
+              width: '100%',
+              boxSizing: 'border-box',
+              scrollbarGutter: 'auto',
+              WebkitOverflowScrolling: 'touch',
+            }}
           >
             {children}
           </div>
