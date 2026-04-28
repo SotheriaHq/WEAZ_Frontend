@@ -588,23 +588,20 @@ const MarketPlace: React.FC = () => {
 
 
         <section className="space-y-5">
-          <div className="sticky top-16 z-20 rounded-2xl border border-gray-200/70 bg-white/55 px-3 py-3 backdrop-blur-[4px] sm:p-4 dark:border-white/10 dark:bg-[#0f0b13]/55">
+          <div className="sticky top-16 z-20 rounded-2xl border border-gray-200/70 bg-white/72 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-[#0f0b13]/78">
             {/* Heading + search row — on small screens header is compact, search hidden */}
-            <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
-                <h2 className="text-lg font-black text-gray-900 dark:text-white sm:text-2xl">Explore the Market</h2>
-                <p className="hidden text-sm text-gray-600 dark:text-gray-400 sm:block">
-                  Tap any product to preview, wishlist, or add to bag. Use global search for product, brand, design, and tag discovery.
-                </p>
+                <h2 className="text-base font-black text-gray-900 dark:text-white sm:text-xl">Explore the Market</h2>
               </div>
-              <div className="hidden w-full flex-col gap-3 sm:flex lg:w-auto lg:min-w-[520px] lg:flex-row">
+              <div className="hidden w-full flex-col gap-3 sm:flex lg:w-auto lg:min-w-[480px] lg:flex-row">
                 <SearchBarWithSuggestions
                   placeholder="Search products, brands, styles, or tags..."
                   className="w-full"
                 />
               </div>
             </div>
-            <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 sm:gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="mt-1.5 flex gap-5 overflow-x-auto border-b border-gray-200/80 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10">
               {availableFilters.map((filter) => {
                 const active = selectedFilter === filter;
                 return (
@@ -612,18 +609,25 @@ const MarketPlace: React.FC = () => {
                     key={filter}
                     type="button"
                     onClick={() => setSelectedFilter(filter)}
-                    className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition sm:px-4 sm:py-2 sm:text-sm ${
+                    aria-pressed={active}
+                    className={`relative whitespace-nowrap pb-3 pt-2 text-sm font-semibold transition-colors ${
                       active
-                        ? 'border-purple-500 bg-purple-600 text-white'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-white/15 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10'
+                        ? 'text-gray-900 dark:text-white'
+                        : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                     }`}
                   >
-                    {filter === 'FOR_YOU' && '✨ For You'}
-                    {filter === 'MENSWEAR' && '🧥 Menswear'}
-                    {filter === 'WOMENSWEAR' && '👗 Womenswear'}
-                    {filter === 'EVERYBODY' && '🌍 Everybody'}
-                    {filter === 'ON_SALE' && '🏷️ On Sale'}
-                    {filter === 'CUSTOM_FIT' && '✂️ Custom Fit'}
+                    {filter === 'FOR_YOU' && 'For You'}
+                    {filter === 'MENSWEAR' && 'Menswear'}
+                    {filter === 'WOMENSWEAR' && 'Womenswear'}
+                    {filter === 'EVERYBODY' && 'Everybody'}
+                    {filter === 'ON_SALE' && 'On Sale'}
+                    {filter === 'CUSTOM_FIT' && 'Custom Fit'}
+                    <span
+                      aria-hidden="true"
+                      className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-7 rounded-full transition-all ${
+                        active ? 'bg-gray-900 dark:bg-white' : 'bg-transparent'
+                      }`}
+                    />
                   </button>
                 );
               })}

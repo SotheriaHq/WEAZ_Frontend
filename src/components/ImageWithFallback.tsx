@@ -283,7 +283,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   // <img> is opacity-0 with no background behind it during that window.
   const showShimmer = isResolving || (hasSource && !hadError && !loaded);
   const showFallback = hadError;
-  const wrapperClassName = cn(roundClass(rounded), containerClassName);
+  const wrapperClassName = cn('overflow-hidden', roundClass(rounded), containerClassName);
 
   return (
     <div className={cn('relative', wrapperClassName)} onClick={onClick}>

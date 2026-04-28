@@ -25,8 +25,7 @@ const sidebarGroups: SidebarGroup[] = [
     id: 'personal',
     label: 'Personal',
     items: [
-      { key: 'account', label: 'Account', path: '/settings?tab=account', icon: '👤', description: 'Profile, name, email' },
-      { key: 'security', label: 'Security', path: '/settings?tab=security', icon: '🔐', description: 'Password, login' },
+      { key: 'account-security', label: 'Account & Security', path: '/settings?tab=account-security', icon: '👤', description: 'Email, password, devices' },
       { key: 'notifications', label: 'Notifications', path: '/settings?tab=notifications', icon: '🔔', description: 'Email & push alerts' },
       { key: 'email-preferences', label: 'Email Preferences', path: '/settings?tab=email-preferences', icon: '📧', description: 'Scenario-level email delivery' },
       { key: 'privacy', label: 'Privacy', path: '/settings?tab=privacy', icon: '🛡️', description: 'Data & visibility' },

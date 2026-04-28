@@ -20,6 +20,7 @@ interface ProfileHeaderProps {
     isVerifiedBrand?: boolean;
     verifiedExplanationUrl?: string;
     tags?: string[];
+    description?: string;
     isOwner: boolean;
     profileVisibility: 'UNLOCKED' | 'LOCKED';
   };
@@ -76,7 +77,6 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
   for (let i = 0; i < tags.length; i += 3) {
     tagRows.push(tags.slice(i, i + 3));
   }
-
   return (
     <div className="w-full">
       {showBanner ? (

@@ -178,6 +178,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   if (isHidden) return null;
 
   const isCustomAvailable = item.customAvailable === true;
+  const brandId = typeof item.brandId === 'string' ? item.brandId.trim() : '';
+  const canMessageBrand = Boolean(brandId);
 
   const brandAvatar = resolveProfileImageSource({
     brandLogo: item.brandLogo,
@@ -390,7 +392,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               e.stopPropagation();
               onViewBrand?.(item.brandId, item);
             }}
-            className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 w-fit rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 transition-all"
+            className="flex items-center gap-1 sm:gap-1.5 mb-1 w-fit rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 transition-all"
           >
             <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border-2 border-white/60 shadow-md">
               <ImageWithFallback
@@ -448,10 +450,10 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                   if (!isAuth) { toast.info('Please sign in to message.'); return; }
                   const content = commentText.trim();
                   if (!content || content.length > 4000) { toast.error('Message must be 1-4000 characters.'); return; }
-                  if (!item.brandId) { toast.error('Brand is unavailable for this design.'); return; }
+                  if (!brandId) { toast.error('Brand is unavailable for this design.'); return; }
                   setCommentBusy(true);
                   try {
-                    await messagingApi.sendBrandMessage(item.brandId, {
+                    await messagingApi.sendBrandMessage(brandId, {
                       bodyText: content,
                       clientMessageId: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
                         ? crypto.randomUUID()
@@ -463,9 +465,9 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                     toast.error(err?.response?.data?.message ?? 'Failed to send message');
                   } finally { setCommentBusy(false); }
                 }}
-                placeholder="Message brand..."
+                placeholder={canMessageBrand ? 'Message brand...' : 'Brand unavailable'}
                 maxLength={4000}
-                disabled={commentBusy}
+                disabled={commentBusy || !canMessageBrand}
                 busy={commentBusy}
                 className="w-full"
                 variant="overlay"

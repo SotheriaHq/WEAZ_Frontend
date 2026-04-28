@@ -1,7 +1,7 @@
-import { useLanguage } from '../context/LanguageContext';
+﻿import { useLanguage } from '../context/LanguageContext';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearUser, setUser } from '../features/userSlice';
-import { addLocalNotification, resetUnreadCount } from '../features/notificationsSlice';
+import { resetUnreadCount } from '../features/notificationsSlice';
 import { closeSidebar, toggleSidebar } from '../features/uiSlice';
 import {
   openCartDrawer,
@@ -27,17 +27,18 @@ import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestio
 import { apiClient, dropStoredAccessToken } from '../api/httpClient';
 import { env } from '../config/env';
 import getProfileOrHomeUrl from '../lib/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
-import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
 import { generateUserUid } from '@/utils/userUid';
 import { resolveProfileImageSource } from '@/utils/profileImage';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import { COMPANY_NAME } from '@/lib/brand';
+import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
+import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
 import {
   Dropdown as SharedDropdown,
   DropdownDivider,
@@ -52,10 +53,10 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const notificationsAnchorRef = useRef<HTMLElement | null>(null);
+  const notificationsButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const { theme, setTheme } = useTheme();
   const { setLanguage, translate } = useLanguage();
   const { profile: userProfile, isAuthenticated } = useSelector((state: RootState) => state.user);
@@ -70,6 +71,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
     () => resolveProfileImageSource(user),
     [user],
   );
+  const storeSetupComplete = useStoreSetupStatus();
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const userUid = user ? generateUserUid(user.id, user.firstName) : null;
@@ -78,7 +80,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
     (theme === 'system' &&
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-color-scheme: dark)').matches);
-  const themeActionEmoji = resolvedIsDark ? '🌞' : '🌙';
+  const themeActionEmoji = resolvedIsDark ? '☀️' : '🌙';
   const themeMenuLabel = resolvedIsDark ? 'Light theme' : 'Dark theme';
 
   React.useEffect(() => {
@@ -138,6 +140,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const ordersRoute = user?.type === 'BRAND' ? '/studio?tab=orders' : '/profile?tab=orders';
   const savedRoute = user?.type === 'BRAND' ? '/profile?tab=Content' : profileHomeRoute;
   const helpRoute = '/help/verified-badge';
+  const showStudioMenuEntry = user?.type === 'BRAND' && storeSetupComplete === true;
 
   const ProfileMenu = () => {
     if (!user) return null;
@@ -147,9 +150,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
         open={showProfileMenu}
         onOpenChange={(nextOpen) => {
           setShowProfileMenu(nextOpen);
-          if (nextOpen) {
-            setShowNotifications(false);
-          }
           if (!nextOpen) {
             setShowLanguageDropdown(false);
           }
@@ -160,19 +160,21 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
       >
           <DropdownTrigger
             type="button"
-            className="flex h-10 w-10 !border-0 !bg-transparent !p-0 items-center justify-center overflow-hidden rounded-xl !shadow-none !ring-0 transition-colors hover:!ring-0 focus:!ring-0 focus-visible:!ring-0"
+            className="relative flex h-10 w-10 !border-0 !bg-transparent !p-0 items-center justify-center overflow-visible rounded-xl !shadow-none !ring-0 transition-colors hover:!ring-0 focus:!ring-0 focus-visible:!ring-0"
             aria-label="Profile menu"
           >
-          <ImageWithFallback
-            src={userAvatar.src}
-            fileId={userAvatar.fileId}
-            alt={`${user.firstName} ${user.lastName}`}
-            fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
-            fit="cover"
-            className="h-full w-full object-cover"
-            containerClassName="h-full w-full"
-            rounded="xl"
-          />
+            <span className="block h-10 w-10 overflow-hidden rounded-xl">
+              <ImageWithFallback
+                src={userAvatar.src}
+                fileId={userAvatar.fileId}
+                alt={`${user.firstName} ${user.lastName}`}
+                fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
+                fit="cover"
+                className="h-full w-full object-cover"
+                containerClassName="h-full w-full"
+                rounded="xl"
+              />
+            </span>
         </DropdownTrigger>
 
         <DropdownMenu
@@ -193,8 +195,23 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
               />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-base font-semibold text-[color:var(--text-primary)]">
-                {user.firstName} {user.lastName}
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="min-w-0 flex-1 truncate text-base font-semibold text-[color:var(--text-primary)]">
+                  {user.firstName} {user.lastName}
+                </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleThemeToggle();
+                  }}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-base transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                  aria-label={`Switch to ${themeMenuLabel}`}
+                  title={`Switch to ${themeMenuLabel}`}
+                >
+                  <span aria-hidden="true">{themeActionEmoji}</span>
+                </button>
               </div>
               <div className="mt-0.5 break-words text-[11px] leading-4 text-[color:var(--text-secondary)]">
                 {user.email}
@@ -205,7 +222,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
 
           <DropdownDivider />
 
-          {user.type === 'BRAND' ? (
+          {showStudioMenuEntry ? (
             <DropdownItem
               leftIcon="🧵"
               onClick={() => {
@@ -213,7 +230,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                 setShowProfileMenu(false);
               }}
             >
-              Dashboard
+              Studio
             </DropdownItem>
           ) : null}
 
@@ -228,15 +245,15 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           </DropdownItem>
 
           <DropdownItem
-            leftIcon={themeActionEmoji}
-            description={`Switch to ${themeMenuLabel}`}
+            leftIcon="⚙️"
             onClick={() => {
-              handleThemeToggle();
+              navigate('/settings');
               setShowProfileMenu(false);
             }}
           >
-            Theme
+            Settings
           </DropdownItem>
+
 
           <DropdownItem
             leftIcon="🌍"
@@ -251,9 +268,9 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           {showLanguageDropdown ? (
             <div className="space-y-1 px-1 pt-1">
               <button onClick={() => { setLanguage('en'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">English</button>
-              <button onClick={() => { setLanguage('zh'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">中文</button>
-              <button onClick={() => { setLanguage('ar'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">العربية</button>
-              <button onClick={() => { setLanguage('hi'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">हिन्दी</button>
+              <button onClick={() => { setLanguage('zh'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">Chinese</button>
+              <button onClick={() => { setLanguage('ar'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">Arabic</button>
+              <button onClick={() => { setLanguage('hi'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">Hindi</button>
             </div>
           ) : null}
 
@@ -310,7 +327,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
               } catch (error) {
                 void error;
               }
-              dispatch(addLocalNotification({ message: 'Signed out successfully.' }));
               dropStoredAccessToken();
               localStorage.removeItem(env.userStorageKey);
               dispatch(clearUser());
@@ -406,7 +422,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
               className="relative hidden rounded-full p-2 text-xl transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 sm:flex"
               aria-label="Wishlist"
             >
-              <span role="img" aria-hidden="true" className="filter invert transition-all duration-300 dark:invert-0">🤍</span>
+              <span aria-hidden="true" className="text-xl">🤍</span>
               {wishlistTotal > 0 ? (
                 <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
                   {wishlistTotal > 99 ? '99+' : wishlistTotal}
@@ -421,7 +437,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
             className="relative hidden rounded-full p-2 text-xl transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 sm:flex"
             aria-label="Bag"
           >
-            <span role="img" aria-hidden="true">🛍️</span>
+            <span aria-hidden="true" className="text-xl">🛍️</span>
             {cartQuantity > 0 ? (
               <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-xs font-bold text-white">
                 {cartQuantity > 99 ? '99+' : cartQuantity}
@@ -432,27 +448,29 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           {user ? (
             <div className="relative">
               <button
+                ref={notificationsButtonRef}
                 type="button"
-                ref={(element) => {
-                  notificationsAnchorRef.current = element;
-                }}
                 onClick={() => {
                   setShowProfileMenu(false);
                   setShowLanguageDropdown(false);
-                  setShowNotifications((prev) => !prev);
+                  setShowNotificationsDropdown((value) => !value);
                 }}
-                className="relative rounded-full p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
-                aria-haspopup="dialog"
-                aria-expanded={showNotifications}
+                className="relative hidden rounded-full p-2 text-xl transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 sm:flex"
+                aria-label="Notifications"
+                aria-expanded={showNotificationsDropdown}
               >
-                <span aria-hidden="true" className="text-lg">🔔</span>
+                <span aria-hidden="true" className="text-xl">🔔</span>
                 {unreadCount > 0 ? (
                   <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 ) : null}
               </button>
-              <NotificationsDropdown open={showNotifications} onClose={() => setShowNotifications(false)} anchorRef={notificationsAnchorRef as any} />
+              <NotificationsDropdown
+                open={showNotificationsDropdown}
+                onClose={() => setShowNotificationsDropdown(false)}
+                anchorRef={notificationsButtonRef}
+              />
             </div>
           ) : null}
 

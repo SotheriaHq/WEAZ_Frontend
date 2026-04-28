@@ -21,6 +21,7 @@ type OwnerHeaderProfileBase = {
   isVerifiedBrand?: boolean;
   verifiedExplanationUrl?: string;
   tags?: string[];
+  description?: string;
   isOwner: true;
   profileVisibility: 'UNLOCKED' | 'LOCKED';
 };

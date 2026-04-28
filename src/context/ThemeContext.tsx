@@ -15,11 +15,13 @@ const resolveTheme = (candidate: unknown, fallback: Theme): Theme =>
 
 interface ThemeProviderState {
   theme: Theme;
+  systemScheme: 'light' | 'dark';
   setTheme: (theme: Theme) => void;
 }
 
 const initialState: ThemeProviderState = {
   theme: 'system',
+  systemScheme: 'light',
   setTheme: () => null,
 };
 
@@ -66,6 +68,13 @@ export function ThemeProvider({
       return defaultTheme;
     }
   });
+  const [systemScheme, setSystemScheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window === 'undefined') {
+      return 'light';
+    }
+
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
 
   useLayoutEffect(() => {
     const root = window.document.documentElement;
@@ -99,6 +108,8 @@ export function ThemeProvider({
     let transitionTimer: number | null = null;
 
     const handleMql = () => {
+      setSystemScheme(mql.matches ? 'dark' : 'light');
+
       if (theme === 'system') {
         const root = window.document.documentElement;
         root.classList.add('theme-transitioning');
@@ -135,6 +146,7 @@ export function ThemeProvider({
 
   const value = useMemo(() => ({
     theme,
+    systemScheme,
     setTheme: (newTheme: Theme) => {
       try {
         window.localStorage.setItem(storageKey, newTheme);
@@ -143,7 +155,7 @@ export function ThemeProvider({
       }
       setThemeState(newTheme);
     },
-  }), [theme, storageKey]);
+  }), [theme, storageKey, systemScheme]);
 
   return (
     <ThemeProviderContext.Provider value={value} {...props}>

@@ -629,12 +629,13 @@ const Market: React.FC = () => {
         onSeeAll={() => setGalleryOpen(true)}
       />
 
-           <div className="flex w-full gap-3 overflow-x-auto no-scrollbar mt-2 mb-3">
+      <div className="sticky top-16 z-20 -mx-1 mb-2 overflow-x-auto no-scrollbar px-1">
+        <div className="inline-flex min-w-full items-center gap-5 border-b border-slate-200/80 bg-white/80 px-2 pt-1 text-sm backdrop-blur-md dark:border-white/10 dark:bg-[#09090b]/78">
         {[
-          { slug: 'ALL', label: 'All', border: 'border-slate-300/80 dark:border-slate-400/60', bgActive: 'bg-slate-500/20 backdrop-blur-md', hoverBg: 'hover:bg-slate-500/10' },
-          { slug: 'AFRICAN_FASHION', label: 'African Fashion', border: 'border-fuchsia-300/80 dark:border-fuchsia-400/60', bgActive: 'bg-fuchsia-500/20 backdrop-blur-md', hoverBg: 'hover:bg-fuchsia-500/10' },
-          { slug: 'WESTERN_FASHION', label: 'Western Fashion', border: 'border-blue-300/80 dark:border-blue-400/60', bgActive: 'bg-blue-500/20 backdrop-blur-md', hoverBg: 'hover:bg-blue-500/10' },
-          { slug: 'DE_HOUSE', label: 'De House', border: 'border-emerald-300/80 dark:border-emerald-400/60', bgActive: 'bg-emerald-500/20 backdrop-blur-md', hoverBg: 'hover:bg-emerald-500/10' },
+          { slug: 'ALL', label: 'All' },
+          { slug: 'AFRICAN_FASHION', label: 'African Fashion' },
+          { slug: 'WESTERN_FASHION', label: 'Western Fashion' },
+          { slug: 'DE_HOUSE', label: 'De House' },
         ].map((cat) => {
           const active = selectedCategory === cat.slug;
           return (
@@ -642,19 +643,24 @@ const Market: React.FC = () => {
               type="button"
               key={cat.slug}
               onClick={() => startTransition(() => setSelectedCategory(cat.slug))}
-              className={
-                `shrink-0 inline-flex items-center rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 border-2 ` +
-                `${cat.border} text-gray-900 dark:text-white ` +
-                (active
-                  ? `${cat.bgActive} shadow-lg`
-                  : `bg-transparent ${cat.hoverBg} shadow-md backdrop-blur-sm`) +
-                (isPending ? ' opacity-60' : '')
-              }
+              aria-pressed={active}
+              className={`relative shrink-0 pb-3 pt-2 text-sm font-semibold transition-colors ${
+                active
+                  ? 'text-slate-900 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+              }${isPending ? ' opacity-60' : ''}`}
             >
               {cat.label}
+              <span
+                aria-hidden="true"
+                className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-7 rounded-full transition-all ${
+                  active ? 'bg-slate-900 dark:bg-white' : 'bg-transparent'
+                }`}
+              />
             </button>
           );
         })}
+        </div>
       </div>
 
       {/* Content + soft overlay wrapper for smooth transitions */}

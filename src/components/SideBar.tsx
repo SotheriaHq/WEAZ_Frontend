@@ -123,17 +123,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
       path: '/market-place',
       active: location.pathname === '/market-place',
     },
-    ...(user?.type === 'BRAND'
-      ? [
-          {
-            emoji: '🎬',
-            label: 'Studio',
-            path: '/studio',
-            active: location.pathname.startsWith('/studio'),
-            disabled: studioFeaturesLocked,
-          },
-        ]
-      : []),
     {
       emoji: '📺',
       label: 'Subscriptions',

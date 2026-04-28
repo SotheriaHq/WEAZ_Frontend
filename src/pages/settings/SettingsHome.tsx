@@ -5,10 +5,9 @@ import SettingsSidebar, {
   getGroupForKey,
   getItemForKey,
 } from '@/components/settings/SettingsSidebar';
-import SecuritySettings from '@/components/settings/tabs/SecuritySettings';
 import PatchesSettings from '@/components/settings/tabs/PatchesSettings';
 import SubscriptionsSettings from '@/components/settings/tabs/SubscriptionsSettings';
-import AccountSettings from '@/components/settings/tabs/AccountSettings';
+import AccountSecuritySettings from '@/components/settings/tabs/AccountSecuritySettings';
 import NotificationSettings from '@/components/settings/tabs/NotificationSettings';
 import EmailPreferencesSettings from '@/components/settings/tabs/EmailPreferencesSettings';
 import StoreGeneralSettings from '@/components/settings/tabs/StoreGeneralSettings';
@@ -86,8 +85,9 @@ const StoreDangerZone: React.FC = () => (
 /* ── Section map ─────────────────────────────────────────────────── */
 const sections: Record<string, React.ReactNode> = {
   // Personal
-  account: <AccountSettings />,
-  security: <SecuritySettings />,
+  account: <AccountSecuritySettings />,
+  security: <AccountSecuritySettings />,
+  'account-security': <AccountSecuritySettings />,
   notifications: <NotificationSettings />,
   'email-preferences': <EmailPreferencesSettings />,
   privacy: (
@@ -141,7 +141,7 @@ const Breadcrumbs: React.FC<{ activeKey: string; onNavigate: (key: string) => vo
   return (
     <nav className="flex items-center gap-1.5 text-sm mb-6 flex-wrap">
       <button
-        onClick={() => onNavigate('account')}
+        onClick={() => onNavigate('account-security')}
         className="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
       >
         Settings
@@ -172,8 +172,9 @@ const SettingsHome: React.FC = () => {
   const me = useSelector((s: RootState) => s.user.profile);
   const isBrandUser = me?.type === 'BRAND';
   const active = searchParams.get('tab') || 'account';
+  const normalizedAccountTab = active === 'account' || active === 'security' ? 'account-security' : active;
   const normalizedActive =
-    isBrandUser && active === 'store-payments' ? 'billing' : active;
+    isBrandUser && normalizedAccountTab === 'store-payments' ? 'billing' : normalizedAccountTab;
   const resolvedActive =
     !isBrandUser && normalizedActive.startsWith('store-')
       ? 'account'

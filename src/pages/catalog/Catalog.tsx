@@ -13,8 +13,8 @@ import CollectionsSkeleton from '../../components/profile/CollectionsSkeleton';
 import EmptyState from '../../components/EmptyState';
 import AddCollectionDropdown from '../../components/profile/AddCollectionDropdown';
 import ProfileHeaderSkeleton from '../../components/profile/ProfileHeaderSkeleton';
-import AboutTab from '../../components/profile/tabs/AboutTab';
 import ReviewsTab from '../../components/profile/tabs/ReviewsTab';
+import AboutTab from '../../components/profile/tabs/AboutTab';
 import InlineCollectionViewer from '../../components/collections/InlineCollectionViewer';
 import CollectionCard from '../../components/profile/CollectionCard';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -1194,6 +1194,7 @@ const ProfilePage: React.FC = () => {
       address: displayData.location ?? undefined,
       location: displayData.location ?? undefined,
       tags: displayData.hashtags ?? [],
+      description: displayData.description ?? '',
       verificationBadgeVisible: Boolean(displayData.verificationBadgeVisible),
       isVerifiedBrand: Boolean(displayData.isVerifiedBrand),
       verifiedExplanationUrl:
@@ -1204,6 +1205,7 @@ const ProfilePage: React.FC = () => {
     [
       displayData.brandName,
       displayData.hashtags,
+      displayData.description,
       displayData.isVerifiedBrand,
       displayData.location,
       displayData.username,
@@ -1224,6 +1226,7 @@ const ProfilePage: React.FC = () => {
       address: viewDisplayData.location ?? undefined,
       location: viewDisplayData.location ?? undefined,
       tags: viewDisplayData.hashtags ?? [],
+      description: viewDisplayData.description ?? '',
       verificationBadgeVisible: Boolean(viewDisplayData.verificationBadgeVisible),
       isVerifiedBrand: Boolean(viewDisplayData.isVerifiedBrand),
       verifiedExplanationUrl:
@@ -1236,6 +1239,7 @@ const ProfilePage: React.FC = () => {
       viewDisplayData.bannerImage,
       viewDisplayData.brandName,
       viewDisplayData.hashtags,
+      viewDisplayData.description,
       viewDisplayData.isVerifiedBrand,
       viewDisplayData.location,
       viewDisplayData.logoImage,
@@ -1400,9 +1404,7 @@ const ProfilePage: React.FC = () => {
       <div className="w-full px-4 sm:px-6 pb-12">
         <div className="mt-6">
           <Tabs
-            tabs={(() => {
-              return ['Content', 'Store', 'Reviews', 'About'];
-            })()}
+            tabs={['Content', 'Store', 'Reviews', 'About']}
             activeTab={activeTab}
             onTabChange={(tab) => {
                 setActiveTab(tab as TabType);

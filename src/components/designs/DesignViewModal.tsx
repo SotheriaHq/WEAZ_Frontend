@@ -1,11 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import EmojiPicker, { Theme, type EmojiClickData } from 'emoji-picker-react';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
 import type { MarketItem } from '@/types/market';
-import { messagingApi } from '@/api/MessagingApi';
+import { CommentsApi } from '@/api/CommentsApi';
 import { apiClient } from '@/api/httpClient';
 import { brandApi } from '@/api/BrandApi';
 import DesignCommentsPanel from '@/components/designs/DesignCommentsPanel';
@@ -45,7 +44,6 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const [commentText, setCommentText] = React.useState('');
   const [postingComment, setPostingComment] = React.useState(false);
   const [externalComment, setExternalComment] = React.useState<CommentV2Dto | null>(null);
-  const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const [isSaved, setIsSaved] = React.useState(false);
   const [saveBusy, setSaveBusy] = React.useState(false);
   const [mediaItems, setMediaItems] = React.useState<ModalMedia[]>([]);
@@ -93,11 +91,6 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     active: open,
     onEscape: onClose,
   });
-
-  const onEmojiClick = (emojiData: EmojiClickData) => {
-    setCommentText((prev) => prev + emojiData.emoji);
-    setShowEmojiPicker(false);
-  };
 
   React.useEffect(() => {
     if (!open || !item) return;
@@ -310,31 +303,27 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
   const handleCommentSubmit = async () => {
     if (!isAuth) {
-      toast.info('Please sign in to message.');
+      toast.info('Please sign in to comment.');
       return;
     }
-    if (!item?.brandId) {
-      toast.error('Brand is unavailable for this design.');
+    if (!activeMediaId) {
+      toast.error('Comment thread is unavailable for this design.');
       return;
     }
 
     const content = commentText.trim();
-    if (!content || content.length > 4000) {
-      toast.error('Message must be 1-4000 characters.');
+    if (!content || content.length > 500) {
+      toast.error('Comment must be 1-500 characters.');
       return;
     }
     setPostingComment(true);
     try {
-      await messagingApi.sendBrandMessage(item.brandId, {
-        bodyText: content,
-        clientMessageId: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      });
+      const created = await CommentsApi.create('COLLECTION_MEDIA', activeMediaId, content);
+      setExternalComment(created);
       setCommentText('');
-      toast.success('Message sent');
+      toast.success('Comment posted');
     } catch (e: any) {
-      toast.error(e?.response?.data?.message ?? 'Failed to send message');
+      toast.error(e?.response?.data?.message ?? 'Failed to post comment');
     } finally {
       setPostingComment(false);
     }
@@ -690,56 +679,23 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       }
                     }}
                     disabled={postingComment}
-                    placeholder="Message brand..."
-                    maxLength={4000}
+                    placeholder="Add a comment..."
+                    maxLength={500}
                     className="flex-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40"
                   />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowEmojiPicker((p) => !p);
-                    }}
-                    className="p-1 text-slate-400 hover:text-purple-600 dark:text-white/40 dark:hover:text-purple-400 transition"
-                    aria-label="Emoji"
-                    type="button"
-                  >
-                    <span aria-hidden="true" className="text-base">🙂</span>
-                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       void handleCommentSubmit();
                     }}
                     disabled={postingComment || !commentText.trim()}
-                    className="p-1.5 rounded-full bg-purple-600 text-white disabled:opacity-40 hover:bg-purple-700 transition"
-                    aria-label="Send"
+                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                    aria-label="Post comment"
+                    type="button"
                   >
-                    <span aria-hidden="true" className="text-sm">➤</span>
+                    {postingComment ? 'Posting...' : 'Post'}
                   </button>
                 </div>
-
-                {showEmojiPicker ? (
-                  <div className="absolute bottom-full right-0 mb-2 z-50">
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowEmojiPicker(false);
-                      }}
-                    />
-                    <div className="relative z-50 rounded-xl overflow-hidden shadow-2xl border border-white/10" onClick={(e) => e.stopPropagation()}>
-                      <EmojiPicker
-                        onEmojiClick={onEmojiClick}
-                        theme={Theme.DARK}
-                        height={320}
-                        width={280}
-                        searchDisabled
-                        skinTonesDisabled
-                        previewConfig={{ showPreview: false }}
-                      />
-                    </div>
-                  </div>
-                ) : null}
               </div>
             </div>
           </div>

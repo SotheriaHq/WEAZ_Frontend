@@ -47,6 +47,7 @@ const DesignCommentsPanel: React.FC<Props> = ({
   const [postedOk, setPostedOk] = React.useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const errorToastShown = React.useRef(false);
+  const { joinCollection, joinCollectionMedia, joinComment, onComment, degraded } = useRealtime();
 
   const mergeAndSort = (a: CommentV2Dto[], b: CommentV2Dto[]) => {
     const merged = [...a, ...b];
@@ -57,11 +58,21 @@ const DesignCommentsPanel: React.FC<Props> = ({
 
   React.useEffect(() => {
     if (!externalComment) return;
+    let inserted = false;
     setItems((prev) => {
       if (prev.some((comment) => comment.id === externalComment.id)) return prev;
+      inserted = true;
       return [externalComment, ...prev];
     });
-  }, [externalComment]);
+    if (!inserted) return;
+    onCommentAdded?.();
+    joinComment(externalComment.id);
+    dispatch(updateCommentCount({
+      contentType: 'COLLECTION_MEDIA',
+      contentId: mediaId,
+      commentCount: items.length + 1,
+    }));
+  }, [dispatch, externalComment, items.length, joinComment, mediaId, onCommentAdded]);
 
   const loadInitial = async () => {
     setBusy(true);
@@ -140,7 +151,6 @@ const DesignCommentsPanel: React.FC<Props> = ({
     finally { setBusy(false); }
   };
 
-  const { joinCollection, joinCollectionMedia, joinComment, onComment, degraded } = useRealtime();
   React.useEffect(() => {
     setItems([]); setMediaCursor(null); setCollCursor(null); setMediaHasNext(false); setCollHasNext(false);
     void loadInitial();
@@ -319,7 +329,11 @@ const DesignCommentsPanel: React.FC<Props> = ({
             </div>
           ))}
           {!items.length && (
-            <div className="py-6 text-sm text-gray-600 dark:text-gray-400">Be the first to comment.</div>
+            <div className="flex min-h-[180px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/70 px-5 text-center dark:border-white/10 dark:bg-white/5">
+              <div className="mb-3 text-2xl" aria-hidden="true">💬</div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-white">No comments yet</div>
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Start the conversation from the comment box below.</div>
+            </div>
           )}
         </div>
         {(mediaHasNext || collHasNext) && (
@@ -338,7 +352,7 @@ const DesignCommentsPanel: React.FC<Props> = ({
             onSubmit={submit}
             disabled={busy}
             busy={busy}
-            placeholder="Share your thoughts..."
+            placeholder="Add a comment..."
             className=""
           />
           <button
@@ -365,11 +379,6 @@ const DesignCommentsPanel: React.FC<Props> = ({
               <span aria-hidden="true" className="text-base">✅</span>
             </div>
           )}
-        </div>
-      )}
-      {degraded && (
-        <div className="mt-2 rounded bg-amber-100 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-          Real-time connection degraded. Changes may appear with delay.
         </div>
       )}
     </div>
