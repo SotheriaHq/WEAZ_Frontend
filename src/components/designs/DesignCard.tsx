@@ -12,6 +12,7 @@ import { Link, Tag } from 'lucide-react';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
+import { useNavigate } from 'react-router-dom';
 
 interface DesignCardProps {
   item: MarketItem;
@@ -40,6 +41,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   onTogglePatch,
   patchBusy: patchBusyProp,
 }) => {
+  const navigate = useNavigate();
   const [imgLoaded, setImgLoaded] = useState(false);
   const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
@@ -453,7 +455,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                   if (!brandId) { toast.error('Brand is unavailable for this design.'); return; }
                   setCommentBusy(true);
                   try {
-                    await messagingApi.sendBrandMessage(brandId, {
+                    const result = await messagingApi.sendBrandMessage(brandId, {
                       bodyText: content,
                       clientMessageId: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
                         ? crypto.randomUUID()
@@ -461,6 +463,10 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                     });
                     setCommentText('');
                     toast.success('Message sent');
+                    const threadId = result?.thread?.id;
+                    if (threadId) {
+                      navigate(`/messages?thread=${encodeURIComponent(threadId)}`);
+                    }
                   } catch (err: any) {
                     toast.error(err?.response?.data?.message ?? 'Failed to send message');
                   } finally { setCommentBusy(false); }
