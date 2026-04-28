@@ -392,21 +392,21 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               e.stopPropagation();
               onViewBrand?.(item.brandId, item);
             }}
-            className="flex items-center gap-1 sm:gap-1.5 mb-1 w-fit rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 transition-all"
+            className="flex items-center gap-2 mb-1 w-fit rounded-lg py-1 transition-all"
           >
-            <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border-2 border-white/60 shadow-md">
+            <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-xl border border-white/40 shadow-md">
               <ImageWithFallback
                 src={brandAvatar.src}
                 fileId={brandAvatar.fileId}
                 alt={item.brandName ?? item.username ?? 'Brand'}
                 fit="cover"
-                rounded="full"
+                rounded="xl"
                 fallbackName={brandAvatarFallback}
-                containerClassName="h-8 w-8 rounded-full"
+                containerClassName="h-8 w-8 rounded-xl"
                 className="h-8 w-8 object-cover"
               />
             </div>
-            <div className="flex-1 min-w-0 text-left">
+            <div className="min-w-0 text-left">
               {/* FIX #5: Responsive font sizing, removed truncate, allow wrapping with line-clamp */}
               <p 
                 className="font-bold leading-tight text-white drop-shadow line-clamp-2"
