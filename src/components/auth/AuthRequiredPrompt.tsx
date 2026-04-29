@@ -16,6 +16,8 @@ interface AuthRequiredPromptProps {
   description?: string;
   /** Feature that requires auth */
   feature?: 'cart' | 'wishlist' | 'checkout' | 'profile' | 'default';
+  /** Optional close behavior for login/signup navigation when the pending action must persist. */
+  onAuthNavigate?: () => void;
 }
 
 /**
@@ -30,6 +32,7 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
   title,
   description,
   feature = 'default',
+  onAuthNavigate,
 }) => {
   const navigate = useNavigate();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -79,12 +82,14 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
   const displayDescription = description || content.description;
 
   const handleSignIn = () => {
-    onClose();
+    if (onAuthNavigate) onAuthNavigate();
+    else onClose();
     navigate('/login');
   };
 
   const handleSignUp = () => {
-    onClose();
+    if (onAuthNavigate) onAuthNavigate();
+    else onClose();
     navigate('/signup');
   };
 

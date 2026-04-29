@@ -10,12 +10,13 @@ import React, {
 import { useDispatch, useSelector } from 'react-redux';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { useLocation } from 'react-router-dom';
 import type { AppDispatch, RootState } from '@/store';
-import { openCartDrawer } from '@/features/cartSlice';
+import { addToCart, fetchCart, fetchCustomBagCount, openCartDrawer } from '@/features/cartSlice';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
-import type { BagDefaultAction, BagStatus } from '@/api/StoreApi';
+import { getBagStatus, type BagDefaultAction, type BagStatus } from '@/api/StoreApi';
 import ProductBagSelectorModal from '@/components/bagging/ProductBagSelectorModal';
 import BagFittingsModal from '@/components/bagging/BagFittingsModal';
 
@@ -32,7 +33,50 @@ type BagFlowTarget = {
 type PendingAuthResume = {
   product: BagProductInput;
   action: BagDefaultAction;
+  returnPath: string;
   resume?: () => void | Promise<void>;
+};
+
+type PendingBagAction = {
+  productId: string;
+  productName?: string;
+  intendedAction: BagDefaultAction;
+  returnPath: string;
+};
+
+const PENDING_BAG_ACTION_KEY = 'threadly.pendingBagAction.v1';
+
+const canUseSessionStorage = () =>
+  typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
+
+const savePendingBagAction = (pending: PendingBagAction) => {
+  if (!canUseSessionStorage()) return;
+  try {
+    window.sessionStorage.setItem(PENDING_BAG_ACTION_KEY, JSON.stringify(pending));
+  } catch {
+    // Session storage can be unavailable in restricted browser contexts.
+  }
+};
+
+const readPendingBagAction = (): PendingBagAction | null => {
+  if (!canUseSessionStorage()) return null;
+  try {
+    const raw = window.sessionStorage.getItem(PENDING_BAG_ACTION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingBagAction;
+    return parsed?.productId ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const clearPendingBagAction = () => {
+  if (!canUseSessionStorage()) return;
+  try {
+    window.sessionStorage.removeItem(PENDING_BAG_ACTION_KEY);
+  } catch {
+    // Ignore storage cleanup failures.
+  }
 };
 
 type BagFlowContextValue = {
@@ -60,6 +104,7 @@ type BagFlowProviderProps = {
 
 export function BagFlowProvider({ children }: BagFlowProviderProps) {
   const dispatch = useDispatch<AppDispatch>();
+  const location = useLocation();
   const isAuthenticated = useSelector((state: RootState) => state.user.isAuthenticated);
 
   const [selectorTarget, setSelectorTarget] = useState<BagFlowTarget | null>(null);
@@ -73,22 +118,108 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
     pendingResumeRef.current = pendingAuth;
   }, [pendingAuth]);
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const resume = pendingResumeRef.current;
-    if (!resume?.resume) return;
-
-    pendingResumeRef.current = null;
-    setPendingAuth(null);
-    void Promise.resolve(resume.resume()).catch(() => undefined);
-  }, [isAuthenticated]);
-
   const closeActiveFlow = useCallback(() => {
     setSelectorTarget(null);
     setCustomTarget(null);
     setFittingsTarget(null);
     setPendingAuth(null);
+    pendingResumeRef.current = null;
+    clearPendingBagAction();
   }, []);
+
+  const routeResolvedStatus = useCallback(
+    async (
+      product: BagProductInput,
+      status: BagStatus,
+      intendedAction?: BagDefaultAction,
+    ) => {
+      setPendingAuth(null);
+      setSelectorTarget(null);
+      setCustomTarget(null);
+      setFittingsTarget(null);
+
+      if (status.standard.alreadyBagged || status.custom.alreadyBagged) {
+        dispatch(openCartDrawer());
+        return;
+      }
+
+      const action = intendedAction && intendedAction !== 'DISABLED'
+        ? intendedAction
+        : status.ui.defaultAction;
+
+      if (!status.canBag || action === 'DISABLED') {
+        toast.error(status.ui.disabledReason || 'This product cannot be bagged.');
+        return;
+      }
+
+      if (action === 'ADD_STANDARD') {
+        await dispatch(addToCart({ productId: product.id, quantity: 1 })).unwrap();
+        await Promise.allSettled([
+          dispatch(fetchCart()).unwrap(),
+          dispatch(fetchCustomBagCount()).unwrap(),
+        ]);
+        dispatch(openCartDrawer());
+        return;
+      }
+
+      if (action === 'OPEN_SELECTOR') {
+        setSelectorTarget({ product, status });
+        return;
+      }
+
+      if (action === 'OPEN_FITTINGS') {
+        setFittingsTarget({ product, status });
+        return;
+      }
+
+      if (action === 'OPEN_CUSTOM_FLOW') {
+        if (!status.custom.available || !status.custom.configurationId) {
+          toast.error(status.ui.disabledReason || 'This product is not configured for custom bagging yet.');
+          return;
+        }
+        if (status.custom.fittingState === 'MISSING' || status.custom.fittingState === 'PARTIAL') {
+          setFittingsTarget({ product, status });
+          return;
+        }
+        setCustomTarget({ product, status });
+      }
+    },
+    [dispatch],
+  );
+
+  const resumePersistedBagAction = useCallback(async () => {
+    const pending = readPendingBagAction();
+    if (!pending?.productId) {
+      clearPendingBagAction();
+      return false;
+    }
+
+    clearPendingBagAction();
+    const product = {
+      id: pending.productId,
+      name: pending.productName,
+    };
+    const status = await getBagStatus(pending.productId);
+    await routeResolvedStatus(product, status, pending.intendedAction);
+    return true;
+  }, [routeResolvedStatus]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const resume = pendingResumeRef.current;
+
+    pendingResumeRef.current = null;
+    setPendingAuth(null);
+
+    void resumePersistedBagAction()
+      .then((handled) => {
+        if (!handled && resume?.resume) {
+          return Promise.resolve(resume.resume());
+        }
+        return undefined;
+      })
+      .catch(() => undefined);
+  }, [isAuthenticated, resumePersistedBagAction]);
 
   const openSelector = useCallback((product: BagProductInput, status: BagStatus) => {
     setPendingAuth(null);
@@ -125,9 +256,18 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
       setSelectorTarget(null);
       setCustomTarget(null);
       setFittingsTarget(null);
-      setPendingAuth({ product, action, resume });
+      const returnPath = `${location.pathname}${location.search}${location.hash}`;
+      const nextPending = { product, action, returnPath, resume };
+      setPendingAuth(nextPending);
+      pendingResumeRef.current = nextPending;
+      savePendingBagAction({
+        productId: product.id,
+        productName: product.name,
+        intendedAction: action,
+        returnPath,
+      });
     },
-    [],
+    [location.hash, location.pathname, location.search],
   );
 
   const openExistingBag = useCallback(
@@ -162,6 +302,7 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
       <AuthRequiredPrompt
         isOpen={Boolean(pendingAuth)}
         onClose={closeActiveFlow}
+        onAuthNavigate={() => setPendingAuth(null)}
         feature="cart"
         title={pendingAuth ? 'Sign in to continue bagging' : undefined}
         description={
