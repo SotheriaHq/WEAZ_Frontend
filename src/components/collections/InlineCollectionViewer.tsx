@@ -22,6 +22,7 @@ import { buildCollectionUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useBagging } from '@/hooks/useBagging';
 
 interface InlineCollectionViewerProps {
   collectionId: string;
@@ -52,6 +53,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const me = useSelector((s: RootState) => s.user.profile);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const dispatch = useDispatch<AppDispatch>();
+  const { bagProduct } = useBagging();
   const [resolvedItems, setResolvedItems] = useState<CarouselMediaItem[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [requestingAccess, setRequestingAccess] = useState(false);
@@ -330,15 +332,8 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   };
 
   const handleAddProductToCart = async (productId: string) => {
-    if (!isAuth) {
-      const returnTo = `${window.location.pathname}${window.location.search}`;
-      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
-      return;
-    }
     try {
-      await dispatch(addToCart({ productId, quantity: 1 })).unwrap();
-      dispatch(openCartDrawer());
-      toast.success('Bagged!');
+      await bagProduct({ id: productId });
     } catch (e: any) {
       toast.error(e?.message || 'Failed to bag item');
     }

@@ -10,11 +10,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import type { AppDispatch, RootState } from '@/store';
-import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useBagging } from '@/hooks/useBagging';
 import {
   CONTENT_DISPLAY_FRAME_CLASS,
   CONTENT_DISPLAY_MEDIA_CLASS,
@@ -106,6 +106,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const currentUser = useSelector((s: RootState) => s.user.profile);
+  const { bagProduct } = useBagging();
 
   // Local state
   const [selectedImage, setSelectedImage] = useState(0);
@@ -242,36 +243,16 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   const handleAddToCart = async () => {
-    if (isOwnProduct) {
-      toast.info('Brands cannot bag their own product.');
-      return;
-    }
-    if (!isAuth) {
-      toast.info('Please sign in to bag items');
-      return;
-    }
-
-    if (product.sizes.length > 0 && !selectedSize) {
-      toast.warning('Please select a size');
-      return;
-    }
-
-    if (isOutOfStock) {
-      toast.error('This item is out of stock');
-      return;
-    }
-
     setIsAddingToCart(true);
     try {
-      await dispatch(addToCart({
-        productId: product.id,
-        quantity,
-        selectedSize: selectedSize || undefined,
-        selectedColor: selectedColor || undefined,
-      })).unwrap();
-      
-      toast.success('Bagged!');
-      dispatch(openCartDrawer());
+      await bagProduct(
+        { id: product.id, name: product.name },
+        {
+          size: selectedSize || undefined,
+          color: selectedColor || undefined,
+          quantity,
+        },
+      );
       onClose();
     } catch (error: any) {
       if (typeof error === 'string' && error.includes('__MEASUREMENTS_REQUIRED__')) {

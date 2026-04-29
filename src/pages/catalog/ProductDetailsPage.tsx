@@ -16,7 +16,6 @@ import VLoader from '@/components/loaders/VLoader';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToWishlist, checkWishlistStatus, removeFromWishlist } from '@/features/wishlistSlice';
-import { openCartDrawer } from '@/features/cartSlice';
 import { productApi } from '@/api/ProductApi';
 import type { ProductDto } from '@/api/ProductApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
@@ -163,7 +162,7 @@ export default function ProductDetailsPage() {
   const currentUser = useSelector((s: RootState) => s.user.profile);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
-  const { addStandard, bagProduct, getPulseStatus, loadingByProductId } = useBagging();
+  const { addStandard, bagProduct, beginCustomFlow, getPulseStatus, loadingByProductId } = useBagging();
   const [product, setProduct] = useState<ProductDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -413,13 +412,6 @@ export default function ProductDetailsPage() {
       {} as Record<string, { value: number; unit: 'CM' }>,
     );
 
-    if (requiresMeasurements && Object.keys(normalizedMeasurements).length !== requiredMeasurementKeys.length) {
-      // Open the measurement modal instead of navigating away
-      setModalMeasurementValues({ ...measurementValues });
-      setShowMeasurementModal(true);
-      return;
-    }
-
     const sizeFitData =
       Object.keys(normalizedMeasurements).length > 0
         ? { measurements: normalizedMeasurements }
@@ -434,23 +426,6 @@ export default function ProductDetailsPage() {
         sizingMode,
         requiredMeasurementKeys,
         sizeFitData,
-        onOpenSelector: () => {
-          toast.error('Please select your size and color first.');
-        },
-        onOpenCustomFlow: () => {
-          setCustomOrderComposerOpen(true);
-        },
-        onOpenFittings: () => {
-          setModalMeasurementValues({ ...measurementValues });
-          setShowMeasurementModal(true);
-        },
-        onOpenExistingBag: () => {
-          dispatch(openCartDrawer());
-        },
-        onRequireAuth: () => {
-          toast.info('Please sign in to bag items.');
-          navigate('/login');
-        },
       },
     );
 
@@ -507,21 +482,12 @@ export default function ProductDetailsPage() {
       toast.info('Custom-order checkout is hidden on your own product view.');
       return;
     }
-    if (!isAuth) {
-      toast.info('Please sign in to start a custom order.');
-      navigate('/login');
-      return;
-    }
     if (startingCustomOrder) {
-      return;
-    }
-    if (!customOrderAvailability.isAvailable || !customOrderAvailability.configurationId) {
-      toast.error(customOrderUnavailableReason || 'This product is not configured for custom orders yet. Ask the brand to complete custom-order setup.');
       return;
     }
     try {
       setStartingCustomOrder(true);
-      setCustomOrderComposerOpen(true);
+      await beginCustomFlow({ id: product.id, name: product.title });
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to open custom-order checkout.');
     } finally {

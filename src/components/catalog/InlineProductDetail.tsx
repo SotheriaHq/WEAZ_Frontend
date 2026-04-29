@@ -8,7 +8,6 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import ImageLightbox from './ImageLightbox';
 import type { AppDispatch, RootState } from '@/store';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
-import { openCartDrawer } from '@/features/cartSlice';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
@@ -86,7 +85,7 @@ export default function InlineProductDetail({
   const navigate = useNavigate();
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const currentUser = useSelector((s: RootState) => s.user.profile);
-  const { addStandard, bagProduct, getPulseStatus, loadingByProductId } = useBagging();
+  const { addStandard, bagProduct, beginCustomFlow, getPulseStatus, loadingByProductId } = useBagging();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -365,10 +364,6 @@ export default function InlineProductDetail({
       toast.info('You cannot bag your own product.');
       return;
     }
-    if (!isAuth) {
-      toast.info('Please sign in to bag items.');
-      return;
-    }
     if (isStrictlyOutOfStock) {
       toast.error('This product is out of stock.');
       return;
@@ -387,23 +382,6 @@ export default function InlineProductDetail({
           Object.keys(normalizedMeasurements).length > 0
             ? { measurements: normalizedMeasurements }
             : undefined,
-        onOpenSelector: () => {
-          toast.warning('Please select a size and color to continue.');
-        },
-        onOpenCustomFlow: () => {
-          setCustomOrderComposerOpen(true);
-        },
-        onOpenFittings: () => {
-          setModalMeasurementValues({ ...measurementValues });
-          setShowMeasurementModal(true);
-        },
-        onOpenExistingBag: () => {
-          dispatch(openCartDrawer());
-        },
-        onRequireAuth: () => {
-          toast.info('Please sign in to bag items.');
-          navigate('/login');
-        },
       },
     );
 
@@ -456,25 +434,13 @@ export default function InlineProductDetail({
       toast.info('You cannot start a custom order on your own product.');
       return;
     }
-    if (!isAuth) {
-      toast.info('Please sign in to start a custom order.');
-      navigate('/login');
-      return;
-    }
     if (startingCustomOrder) {
-      return;
-    }
-    if (!customOrderAvailability.isAvailable || !customOrderAvailability.configurationId) {
-      toast.error(
-        customOrderUnavailableReason ||
-          'This product is not configured for custom orders yet. Ask the brand to complete custom-order setup.',
-      );
       return;
     }
 
     try {
       setStartingCustomOrder(true);
-      setCustomOrderComposerOpen(true);
+      await beginCustomFlow({ id: product.id, name: product.name });
     } catch (error: any) {
       toast.error(
         error?.response?.data?.message ||

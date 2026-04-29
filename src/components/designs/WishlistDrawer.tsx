@@ -16,10 +16,10 @@ import {
   selectWishlistPriceChangeNotices,
   clearWishlistNotices,
 } from '@/features/wishlistSlice';
-import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useBagging } from '@/hooks/useBagging';
 
 const WishlistDrawer: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -33,6 +33,7 @@ const WishlistDrawer: React.FC = () => {
   const priceChangeNotices = useSelector(selectWishlistPriceChangeNotices);
   const user = useSelector((state: RootState) => state.user.profile);
   const isAuthenticated = !!user;
+  const { bagProduct } = useBagging();
 
   useEffect(() => {
     if (!isOpen) {
@@ -155,17 +156,9 @@ const WishlistDrawer: React.FC = () => {
       return;
     }
 
-    if (requiresOptionSelection(product)) {
-      dispatch(closeWishlistDrawer());
-      navigate(resolveStoreProductRoute(product));
-      return;
-    }
-
     try {
-      await dispatch(addToCart({ productId: product.id, quantity: 1 })).unwrap();
       dispatch(closeWishlistDrawer());
-      dispatch(openCartDrawer());
-      toast.success('Bagged!');
+      await bagProduct({ id: product.id, name: product.name });
     } catch (error: any) {
       toast.error(error || 'Failed to bag item');
     }

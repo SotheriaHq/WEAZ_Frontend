@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
-import { openCartDrawer } from '@/features/cartSlice';
 import { brandApi } from '@/api/BrandApi';
 import { toast } from 'sonner';
 import type { SizingMode } from '@/types/sizing';
@@ -209,22 +208,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     }
 
     try {
-      const result = await bagProduct(
-        { id: product.id, name: product.name },
-        {
-          onOpenSelector: () => onViewProduct?.(product),
-          onOpenCustomFlow: () => onViewProduct?.(product),
-          onOpenFittings: () => onViewProduct?.(product),
-          onOpenExistingBag: () => dispatch(openCartDrawer()),
-          onRequireAuth: () => {
-            toast.info('Please sign in to bag items.');
-          },
-        },
-      );
-
-      if (result && result.action !== 'ADD_STANDARD') {
-        onViewProduct?.(product);
-      }
+      await bagProduct({ id: product.id, name: product.name });
     } catch (error: any) {
       toast.error(error || 'Failed to bag item');
     }

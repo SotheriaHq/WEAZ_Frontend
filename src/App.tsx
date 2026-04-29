@@ -36,6 +36,7 @@ import ShopSetupWizardPage from './pages/studio/shop/ShopSetupWizardPage';
 import ShopSetupEssentialsPage from './pages/studio/shop/ShopSetupEssentialsPage';
 import StudioScaffold from './components/studio/StudioScaffold';
 import RequireStoreSetup from './components/store/RequireStoreSetup';
+import { BagFlowProvider } from './features/bagging/BagFlowProvider';
 import {
   ProductAliasRedirect,
   ProfileAliasRedirect,
@@ -260,20 +261,22 @@ const RootLayout: React.FC = () => {
   }, [location.pathname]);
 
   return (
-    <>
-      {showRouteIntentProgress && (
-        <div className="pointer-events-none fixed inset-x-0 top-0 z-[2147483646] h-0.5 overflow-hidden">
-          <div className="h-full w-full animate-pulse bg-gradient-to-r from-fuchsia-500 via-indigo-500 to-cyan-500" />
-        </div>
-      )}
-      <ViewportSync watchKey={location.pathname} />
-      <CartDrawer />
-      <WishlistDrawer />
-      <GlobalModalRouter />
-      <Suspense fallback={<AppRouteFallback />}>
-        <Outlet />
-      </Suspense>
-    </>
+    <BagFlowProvider>
+      <>
+        {showRouteIntentProgress && (
+          <div className="pointer-events-none fixed inset-x-0 top-0 z-[2147483646] h-0.5 overflow-hidden">
+            <div className="h-full w-full animate-pulse bg-gradient-to-r from-fuchsia-500 via-indigo-500 to-cyan-500" />
+          </div>
+        )}
+        <ViewportSync watchKey={location.pathname} />
+        <CartDrawer />
+        <WishlistDrawer />
+        <GlobalModalRouter />
+        <Suspense fallback={<AppRouteFallback />}>
+          <Outlet />
+        </Suspense>
+      </>
+    </BagFlowProvider>
   );
 };
 
