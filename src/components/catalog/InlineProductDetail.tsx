@@ -8,6 +8,7 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import ImageLightbox from './ImageLightbox';
 import type { AppDispatch, RootState } from '@/store';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
+import { openCartDrawer } from '@/features/cartSlice';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
@@ -85,7 +86,7 @@ export default function InlineProductDetail({
   const navigate = useNavigate();
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const currentUser = useSelector((s: RootState) => s.user.profile);
-  const { addStandard, getPulseStatus, loadingByProductId } = useBagging();
+  const { addStandard, bagProduct, getPulseStatus, loadingByProductId } = useBagging();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -135,10 +136,6 @@ export default function InlineProductDetail({
     return raw.filter((key): key is string => typeof key === 'string' && key.trim().length > 0);
   }, [customOrderMeasurementKeys, product.customMeasurementKeys]);
 
-  const requiresMeasurements = useMemo(() => {
-    if (requiredMeasurementKeys.length === 0) return false;
-    return sizingMode === 'RTW_PLUS_FITTINGS';
-  }, [requiredMeasurementKeys, sizingMode]);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
   const isWishlisted = wishlistedIds.has(product.id);
 
@@ -376,31 +373,11 @@ export default function InlineProductDetail({
       toast.error('This product is out of stock.');
       return;
     }
-    if (sizes.length > 0 && !selectedSize) {
-      toast.warning('Please select a size.');
-      return;
-    }
-    if (colors.length > 0 && !selectedColor) {
-      toast.warning('Please select a color.');
-      return;
-    }
-    if (hasVariants && !selectedVariant) {
-      toast.warning('Please choose an available size and color combination.');
-      return;
-    }
 
     const normalizedMeasurements = normalizeMeasurements(measurementValues);
-    if (
-      requiresMeasurements &&
-      Object.keys(normalizedMeasurements).length !== requiredMeasurementKeys.length
-    ) {
-      setModalMeasurementValues({ ...measurementValues });
-      setShowMeasurementModal(true);
-      return;
-    }
-
-    try {
-      await addStandard(product.id, {
+    const result = await bagProduct(
+      { id: product.id, name: product.name },
+      {
         quantity: 1,
         size: selectedSize || undefined,
         color: selectedColor || undefined,
@@ -410,15 +387,30 @@ export default function InlineProductDetail({
           Object.keys(normalizedMeasurements).length > 0
             ? { measurements: normalizedMeasurements }
             : undefined,
-      });
-      toast.success('Bagged!');
-    } catch (error: any) {
-      if (typeof error === 'string' && error.includes('__MEASUREMENTS_REQUIRED__')) {
-        setModalMeasurementValues({ ...measurementValues });
-        setShowMeasurementModal(true);
-        return;
-      }
-      toast.error(error || 'Failed to bag item');
+        onOpenSelector: () => {
+          toast.warning('Please select a size and color to continue.');
+        },
+        onOpenCustomFlow: () => {
+          setCustomOrderComposerOpen(true);
+        },
+        onOpenFittings: () => {
+          setModalMeasurementValues({ ...measurementValues });
+          setShowMeasurementModal(true);
+        },
+        onOpenExistingBag: () => {
+          dispatch(openCartDrawer());
+        },
+        onRequireAuth: () => {
+          toast.info('Please sign in to bag items.');
+          navigate('/login');
+        },
+      },
+    );
+
+    if (!result) return;
+
+    if (result.action === 'OPEN_CUSTOM_FLOW' || result.action === 'OPEN_FITTINGS' || result.action === 'OPEN_SELECTOR') {
+      return;
     }
   };
 

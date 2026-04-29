@@ -32,7 +32,7 @@ import { COMPANY_NAME } from '@/lib/brand';
 interface Props { 
   open: boolean; 
   onClose: () => void; 
-  anchorRef: React.RefObject<HTMLElement>; 
+  anchorRef: React.RefObject<HTMLElement | null>; 
 }
 
 // Set to track pending mark-read operations for idempotency

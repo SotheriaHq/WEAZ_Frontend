@@ -16,6 +16,7 @@ import VLoader from '@/components/loaders/VLoader';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToWishlist, checkWishlistStatus, removeFromWishlist } from '@/features/wishlistSlice';
+import { openCartDrawer } from '@/features/cartSlice';
 import { productApi } from '@/api/ProductApi';
 import type { ProductDto } from '@/api/ProductApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
@@ -29,7 +30,7 @@ import { useActiveCustomOrderConfiguration } from '@/hooks/useActiveCustomOrderC
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagging } from '@/hooks/useBagging';
 import ProductReviewSection from '@/components/reviews/ProductReviewSection';
-import { isRtwSizingMode, normalizeSizingMode } from '@/types/sizing';
+import { normalizeSizingMode } from '@/types/sizing';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
 import {
   isCustomOrderOnlyProduct,
@@ -162,7 +163,7 @@ export default function ProductDetailsPage() {
   const currentUser = useSelector((s: RootState) => s.user.profile);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
-  const { addStandard, getPulseStatus, loadingByProductId } = useBagging();
+  const { addStandard, bagProduct, getPulseStatus, loadingByProductId } = useBagging();
   const [product, setProduct] = useState<ProductDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -307,7 +308,6 @@ export default function ProductDetailsPage() {
     );
   }, [customOrderMeasurementKeys, product?.customMeasurementKeys]);
 
-  const requiresRtwSelection = isRtwSizingMode(sizingMode) && availableSizes.length > 0;
   const isCustomOrderOnly = isCustomOrderOnlyProduct(product);
   const requiresMeasurements =
     sizingMode === 'RTW_PLUS_FITTINGS' && requiredMeasurementKeys.length > 0;
@@ -397,22 +397,6 @@ export default function ProductDetailsPage() {
       toast.info('You cannot add your own product to bag.');
       return;
     }
-    
-    // Find selected variant object
-    const variant = variants.find(v => 
-      (!selectedColor || v.color === selectedColor) && 
-      (!selectedSize || v.size === selectedSize)
-    );
-    // If variants exist but none selected/found
-    if (variants.length > 0 && !variant) {
-       toast.error('Please select options');
-       return;
-    }
-
-    if (requiresRtwSelection && !selectedSize && !variant?.size) {
-      toast.error('Please select your size');
-      return;
-    }
 
     const normalizedMeasurements = requiredMeasurementKeys.reduce(
       (acc, key) => {
@@ -441,18 +425,39 @@ export default function ProductDetailsPage() {
         ? { measurements: normalizedMeasurements }
         : undefined;
 
-    try {
-      await addStandard(product.id, {
+    const result = await bagProduct(
+      { id: product.id, name: product.title },
+      {
         quantity: 1,
-        size: variant?.size || selectedSize,
-        color: variant?.color || selectedColor,
+        size: selectedSize || undefined,
+        color: selectedColor || undefined,
         sizingMode,
         requiredMeasurementKeys,
         sizeFitData,
-      });
-      toast.success('Bagged!');
-    } catch (error: any) {
-      toast.error(error || 'Failed to bag item');
+        onOpenSelector: () => {
+          toast.error('Please select your size and color first.');
+        },
+        onOpenCustomFlow: () => {
+          setCustomOrderComposerOpen(true);
+        },
+        onOpenFittings: () => {
+          setModalMeasurementValues({ ...measurementValues });
+          setShowMeasurementModal(true);
+        },
+        onOpenExistingBag: () => {
+          dispatch(openCartDrawer());
+        },
+        onRequireAuth: () => {
+          toast.info('Please sign in to bag items.');
+          navigate('/login');
+        },
+      },
+    );
+
+    if (!result) return;
+
+    if (result.action === 'OPEN_SELECTOR' || result.action === 'OPEN_CUSTOM_FLOW' || result.action === 'OPEN_FITTINGS') {
+      return;
     }
   };
 
