@@ -17,6 +17,7 @@ import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileIma
 import VLoader from '@/components/loaders/VLoader';
 import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
+import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import type { CommentV2Dto } from '@/types/comments';
 import {
   CONTENT_DISPLAY_FRAME_CLASS,
@@ -618,7 +619,18 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                           : 'Bag it from this design'
                     }
                   >
-                    <span aria-hidden="true">👜</span>
+                    <BagPulseIcon
+                      status={
+                        openingCustomComposer || resolvingCustomConfiguration
+                          ? 'bagging'
+                          : isOwnBrandContent || (!customConfigurationId && !resolvingCustomConfiguration)
+                            ? 'disabled'
+                            : 'not_bagged'
+                      }
+                      context="detail"
+                      size={28}
+                      disabled={openingCustomComposer || resolvingCustomConfiguration || isOwnBrandContent}
+                    />
                     {openingCustomComposer ? 'Loading...' : 'Bag It'}
                   </button>
                   <button

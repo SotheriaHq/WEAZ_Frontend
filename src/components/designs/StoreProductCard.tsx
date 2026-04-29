@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
-import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { brandApi } from '@/api/BrandApi';
 import { toast } from 'sonner';
 import type { SizingMode } from '@/types/sizing';
+import BagPulseIcon from '@/components/bagging/BagPulseIcon';
+import { useBagging } from '@/hooks/useBagging';
 import {
   getProductStockState,
   isCustomOrderOnlyProduct,
@@ -111,12 +112,12 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const currentUser = useSelector((s: RootState) => s.user.profile);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
+  const { bagProduct, getPulseStatus, loadingByProductId } = useBagging();
 
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showCustomLabel, setShowCustomLabel] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
-  const [cartLoading, setCartLoading] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [failedGalleryKeys, setFailedGalleryKeys] = useState<string[]>([]);
   const [resolvedGalleryImages, setResolvedGalleryImages] = useState<ResolvedGalleryImage[]>([]);
@@ -130,6 +131,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const isCustomOrderOnly = isCustomOrderOnlyProduct(product);
   const isStrictlyOutOfStock = isStrictlyOutOfStockProduct(product);
   const stockState = getProductStockState(product);
+  const cartLoading = Boolean(loadingByProductId[product.id]);
+  const pulseStatus = getPulseStatus(product.id, isStrictlyOutOfStock || isOwnProduct);
   const ownerStatus = (() => {
     if (!isOwnerView) return null;
     if (product.deletedAt) {
@@ -219,15 +222,13 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       return;
     }
 
-    setCartLoading(true);
     try {
-      await dispatch(addToCart({ productId: product.id, quantity: 1 })).unwrap();
-      dispatch(openCartDrawer());
-      toast.success('Bagged!');
+      const result = await bagProduct({ id: product.id, name: product.name });
+      if (result && result.action !== 'ADD_STANDARD') {
+        onViewProduct?.(product);
+      }
     } catch (error: any) {
       toast.error(error || 'Failed to bag item');
-    } finally {
-      setCartLoading(false);
     }
   };
 
@@ -715,7 +716,13 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                     ${cartLoading ? 'cursor-wait opacity-70' : ''}
                   `}
                 >
-                  <span role="img" aria-hidden="true" className="text-sm leading-none">
+                  <BagPulseIcon
+                    status={pulseStatus}
+                    context="multi_card"
+                    size={28}
+                    disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
+                  />
+                  <span hidden role="img" aria-hidden="true" className="text-sm leading-none">
                     🛍️
                   </span>
                 </button>

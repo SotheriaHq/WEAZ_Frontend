@@ -7,7 +7,6 @@ import type { StoreProduct } from '@/components/designs/StoreProductCard';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import ImageLightbox from './ImageLightbox';
 import type { AppDispatch, RootState } from '@/store';
-import { addToCart } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
@@ -17,6 +16,8 @@ import { CONTENT_DISPLAY_FRAME_CLASS, CONTENT_DISPLAY_MEDIA_CLASS } from '@/comp
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
 import { normalizeSizingMode } from '@/types/sizing';
 import { useActiveCustomOrderConfiguration } from '@/hooks/useActiveCustomOrderConfiguration';
+import BagPulseIcon from '@/components/bagging/BagPulseIcon';
+import { useBagging } from '@/hooks/useBagging';
 import {
   isCustomOrderOnlyProduct,
   isStrictlyOutOfStockProduct,
@@ -84,6 +85,7 @@ export default function InlineProductDetail({
   const navigate = useNavigate();
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const currentUser = useSelector((s: RootState) => s.user.profile);
+  const { addStandard, getPulseStatus, loadingByProductId } = useBagging();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -276,6 +278,8 @@ export default function InlineProductDetail({
     .map((value) => (typeof value === 'string' ? value.trim() : ''))
     .filter(Boolean);
   const isOwnProduct = viewerCandidates.some((viewerId) => ownerCandidates.includes(viewerId));
+  const bagButtonLoading = Boolean(loadingByProductId[product.id]);
+  const bagPulseStatus = getPulseStatus(product.id, isStrictlyOutOfStock || isOwnProduct);
   const customOrderUnavailableReason = customOrderAvailability.isAvailable
     ? null
     : customOrderAvailability.isLoading
@@ -396,21 +400,17 @@ export default function InlineProductDetail({
     }
 
     try {
-      await dispatch(
-        addToCart({
-          productId: product.id,
-          quantity: 1,
-          selectedSize: selectedSize || undefined,
-          selectedColor: selectedColor || undefined,
-          sizingMode,
-          requiredMeasurementKeys,
-          sizeFitData:
-            Object.keys(normalizedMeasurements).length > 0
-              ? { measurements: normalizedMeasurements }
-              : undefined,
-        }),
-      ).unwrap();
-      // Drawer opens automatically via addToCart.fulfilled in cartSlice
+      await addStandard(product.id, {
+        quantity: 1,
+        size: selectedSize || undefined,
+        color: selectedColor || undefined,
+        sizingMode,
+        requiredMeasurementKeys,
+        sizeFitData:
+          Object.keys(normalizedMeasurements).length > 0
+            ? { measurements: normalizedMeasurements }
+            : undefined,
+      });
       toast.success('Bagged!');
     } catch (error: any) {
       if (typeof error === 'string' && error.includes('__MEASUREMENTS_REQUIRED__')) {
@@ -513,17 +513,14 @@ export default function InlineProductDetail({
         ...modalMeasurementValues,
       }));
 
-      await dispatch(
-        addToCart({
-          productId: product.id,
-          quantity: 1,
-          selectedSize: selectedSize || undefined,
-          selectedColor: selectedColor || undefined,
-          sizingMode,
-          requiredMeasurementKeys,
-          sizeFitData: { measurements: normalized },
-        }),
-      ).unwrap();
+      await addStandard(product.id, {
+        quantity: 1,
+        size: selectedSize || undefined,
+        color: selectedColor || undefined,
+        sizingMode,
+        requiredMeasurementKeys,
+        sizeFitData: { measurements: normalized },
+      });
 
       setShowMeasurementModal(false);
       toast.success('Measurements saved and item bagged!');
@@ -804,11 +801,16 @@ export default function InlineProductDetail({
               {!isCustomOrderOnly ? (
                 <button
                   onClick={handleAddToBag}
-                  disabled={isStrictlyOutOfStock || startingCustomOrder}
+                  disabled={isStrictlyOutOfStock || startingCustomOrder || bagButtonLoading}
                   className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:scale-100"
                 >
-                  <span aria-hidden="true">🛍️</span>
-                  Bag it
+                  <BagPulseIcon
+                    status={bagPulseStatus}
+                    context="detail"
+                    size={32}
+                    disabled={isStrictlyOutOfStock || startingCustomOrder || bagButtonLoading}
+                  />
+                  {bagButtonLoading ? 'Bagging...' : 'Bag it'}
                 </button>
               ) : null}
             </div>

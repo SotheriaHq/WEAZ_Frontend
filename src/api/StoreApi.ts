@@ -76,6 +76,63 @@ export interface Product {
   };
 }
 
+export type BagMode = 'STANDARD' | 'CUSTOM' | 'STANDARD_OR_CUSTOM' | 'UNAVAILABLE';
+export type BagFittingState = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'NOT_REQUIRED';
+export type BagStockState = 'IN_STOCK' | 'OUT_OF_STOCK' | 'CUSTOM_ONLY' | 'UNAVAILABLE';
+export type BagPulseStatus =
+  | 'not_bagged'
+  | 'previously_bagged'
+  | 'currently_bagged'
+  | 'bagging'
+  | 'disabled';
+export type BagDefaultAction =
+  | 'ADD_STANDARD'
+  | 'OPEN_SELECTOR'
+  | 'OPEN_CUSTOM_FLOW'
+  | 'OPEN_FITTINGS'
+  | 'DISABLED';
+
+export interface BagStatus {
+  productId: string;
+  canBag: boolean;
+  bagMode: BagMode;
+  standard: {
+    available: boolean;
+    alreadyBagged: boolean;
+    cartItemId?: string | null;
+    requiresSize: boolean;
+    requiresColor: boolean;
+    selectedSize?: string | null;
+    selectedColor?: string | null;
+    sizes: string[];
+    colors: string[];
+    quantity: number;
+    stock: number;
+  };
+  custom: {
+    available: boolean;
+    alreadyBagged: boolean;
+    checkoutSessionId?: string | null;
+    checkoutIntentId?: string | null;
+    configurationId?: string | null;
+    requiredMeasurementKeys: string[];
+    requiredFreeformPointIds: string[];
+    fittingState: BagFittingState;
+    missingMeasurementKeys: string[];
+  };
+  stockState: BagStockState;
+  userState: {
+    authenticated: boolean;
+    isOwner: boolean;
+    hasPreviouslyBaggedOrOrdered: boolean;
+  };
+  ui: {
+    heartbeatState: BagPulseStatus;
+    defaultAction: BagDefaultAction;
+    disabledReason?: string | null;
+  };
+}
+
 export interface CartItem {
   id: string;
   userId: string;
@@ -420,6 +477,11 @@ export const getProducts = async (params: GetProductsParams): Promise<PaginatedR
 export const getProductById = async (productId: string): Promise<Product> => {
   const res = await apiClient.get(`/store/products/${productId}`);
   return extractData<Product>(res);
+};
+
+export const getBagStatus = async (productId: string): Promise<BagStatus> => {
+  const res = await apiClient.get(`/store/products/${productId}/bag-status`);
+  return extractData<BagStatus>(res);
 };
 
 // ============= Cart API =============
@@ -1028,6 +1090,7 @@ export const getProductPriceChangePreview = async (
 export default {
   getProducts,
   getProductById,
+  getBagStatus,
   getCart,
   addToCart,
   updateCartItem,
