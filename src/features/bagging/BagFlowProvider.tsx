@@ -98,8 +98,12 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
   }, []);
 
   const openCustomFlow = useCallback((product: BagProductInput, status: BagStatus) => {
-    if (!status.custom.configurationId) {
+    if (!status.custom.available || !status.custom.configurationId) {
       toast.error(status.ui.disabledReason || 'This product is not configured for custom bagging yet.');
+      return;
+    }
+    if (status.custom.fittingState === 'MISSING' || status.custom.fittingState === 'PARTIAL') {
+      setFittingsTarget({ product, status });
       return;
     }
 
@@ -179,9 +183,9 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
         product={fittingsTarget?.product ?? null}
         status={fittingsTarget?.status ?? null}
         onClose={closeActiveFlow}
-        onContinue={() => {
+        onResolved={(nextStatus) => {
           if (!fittingsTarget) return;
-          openCustomFlow(fittingsTarget.product, fittingsTarget.status);
+          openCustomFlow(fittingsTarget.product, nextStatus);
         }}
       />
 

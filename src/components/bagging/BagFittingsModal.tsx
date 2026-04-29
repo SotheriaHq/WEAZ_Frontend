@@ -1,8 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
-import type { BagStatus } from '@/api/StoreApi';
+import { getBagStatus, type BagStatus } from '@/api/StoreApi';
+import { SizeFitApi } from '@/api/SizeFitApi';
+import { formatMeasurementLabel } from '@/utils/measurementLabels';
 
 type BagProductInput = {
   id: string;
@@ -14,7 +17,7 @@ type BagFittingsModalProps = {
   product: BagProductInput | null;
   status: BagStatus | null;
   onClose: () => void;
-  onContinue?: () => void;
+  onResolved?: (status: BagStatus) => void;
 };
 
 const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
@@ -22,9 +25,13 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
   product,
   status,
   onClose,
-  onContinue,
+  onResolved,
 }) => {
   const dialogRef = React.useRef<HTMLDivElement>(null);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useFocusTrap({
     containerRef: dialogRef,
@@ -36,6 +43,87 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
     () => status?.custom.missingMeasurementKeys ?? [],
     [status?.custom.missingMeasurementKeys],
   );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    setError(null);
+    setLoading(true);
+
+    void SizeFitApi.getMyProfile()
+      .then((profile) => {
+        if (!active) return;
+        const measurements =
+          profile?.measurements && typeof profile.measurements === 'object'
+            ? (profile.measurements as Record<string, unknown>)
+            : {};
+        setValues(
+          missingMeasurements.reduce<Record<string, string>>((acc, key) => {
+            const parsed = Number(measurements[key]);
+            acc[key] = Number.isFinite(parsed) && parsed > 0 ? String(parsed) : '';
+            return acc;
+          }, {}),
+        );
+      })
+      .catch(() => {
+        if (active) setError('Unable to load your current fittings.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, missingMeasurements]);
+
+  const unresolvedMeasurements = useMemo(
+    () =>
+      missingMeasurements.filter((key) => {
+        const parsed = Number(values[key]);
+        return !(Number.isFinite(parsed) && parsed > 0);
+      }),
+    [missingMeasurements, values],
+  );
+
+  const handleSave = async () => {
+    if (!product || !status) return;
+    if (unresolvedMeasurements.length > 0) {
+      setError(`Add ${unresolvedMeasurements.length} missing measurement${unresolvedMeasurements.length === 1 ? '' : 's'} to continue.`);
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const profile = await SizeFitApi.getMyProfile().catch(() => null);
+      const currentMeasurements =
+        profile?.measurements && typeof profile.measurements === 'object'
+          ? (profile.measurements as Record<string, unknown>)
+          : {};
+      const normalised = {
+        ...currentMeasurements,
+        ...missingMeasurements.reduce<Record<string, { value: number; unit: 'CM' }>>((acc, key) => {
+          acc[key] = { value: Number(values[key]), unit: 'CM' };
+          return acc;
+        }, {}),
+      };
+
+      await SizeFitApi.updateProfile({ measurements: normalised });
+      const nextStatus = await getBagStatus(product.id);
+      toast.success('Fittings updated.');
+      onResolved?.(nextStatus);
+    } catch (nextError: any) {
+      const message =
+        nextError?.response?.data?.message ||
+        nextError?.message ||
+        'Unable to save fittings right now.';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -85,7 +173,7 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
                       Finish the measurements for {product.name || 'this item'}
                     </h2>
                     <p className="text-sm text-slate-600 dark:text-slate-400">
-                      We need a few measurements before this custom request can move forward.
+                      Add the missing measurements before this custom request can move forward.
                     </p>
                   </div>
 
@@ -93,23 +181,39 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                       Missing measurements
                     </p>
-                    {missingMeasurements.length > 0 ? (
-                      <ul className="mt-3 flex flex-wrap gap-2">
+                    {loading ? (
+                      <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">Loading fittings...</p>
+                    ) : missingMeasurements.length > 0 ? (
+                      <div className="mt-3 space-y-3">
                         {missingMeasurements.map((measurement) => (
-                          <li
-                            key={measurement}
-                            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200"
-                          >
-                            {measurement}
-                          </li>
+                          <label key={measurement} className="block space-y-1">
+                            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                              {formatMeasurementLabel(measurement)} (cm)
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={values[measurement] ?? ''}
+                              onChange={(event) => {
+                                setValues((current) => ({ ...current, [measurement]: event.target.value }));
+                              }}
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-emerald-500 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                              placeholder="0"
+                            />
+                          </label>
                         ))}
-                      </ul>
+                      </div>
                     ) : (
                       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
                         No measurements are missing, but this request still needs the custom order step.
                       </p>
                     )}
                   </div>
+
+                  {error ? (
+                    <p className="mt-4 text-sm font-medium text-rose-600 dark:text-rose-300">{error}</p>
+                  ) : null}
 
                   <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                     <button
@@ -121,10 +225,11 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={onContinue}
+                      onClick={() => void handleSave()}
+                      disabled={loading || saving || unresolvedMeasurements.length > 0}
                       className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
                     >
-                      Continue to custom order
+                      {saving ? 'Saving...' : 'Save fittings'}
                       <span aria-hidden="true">→</span>
                     </button>
                   </div>
