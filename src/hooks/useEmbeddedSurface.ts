@@ -31,14 +31,10 @@ function writeSessionEmbeddedSurface(surface: EmbeddedSurface): void {
   }
 }
 
-export function getEmbeddedSurfaceForLocation(pathname: string, search: string): EmbeddedSurface {
+export function getEmbeddedSurfaceForLocation(_pathname: string, search: string): EmbeddedSurface {
   const explicitSurface = getEmbeddedSurface(search);
   if (explicitSurface) {
     return explicitSurface;
-  }
-
-  if (!pathname.startsWith('/studio')) {
-    return null;
   }
 
   return readSessionEmbeddedSurface();
@@ -47,17 +43,12 @@ export function getEmbeddedSurfaceForLocation(pathname: string, search: string):
 export function useEmbeddedSurface(): EmbeddedSurface {
   const location = useLocation();
   const explicitSurface = useMemo(() => getEmbeddedSurface(location.search), [location.search]);
-  const isStudioPath = location.pathname.startsWith('/studio');
 
   useEffect(() => {
     if (explicitSurface) {
       writeSessionEmbeddedSurface(explicitSurface);
-      return;
     }
-    if (!isStudioPath) {
-      writeSessionEmbeddedSurface(null);
-    }
-  }, [explicitSurface, isStudioPath]);
+  }, [explicitSurface]);
 
   return useMemo(
     () => getEmbeddedSurfaceForLocation(location.pathname, location.search),

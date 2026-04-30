@@ -2674,7 +2674,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             }}
             className={`transition-opacity duration-300 ease-out ${loading ? 'opacity-50' : 'opacity-100'}`}
           >
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(252px,1fr))] gap-4 transition-all duration-300">
+            <div className="grid grid-cols-2 gap-2 transition-all duration-300 sm:grid-cols-[repeat(auto-fill,minmax(176px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(190px,1fr))]">
             {filteredProducts.map((product) => {
               const collectionLabel =
                 product.collection?.title ||
@@ -2688,7 +2688,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 <div
                   key={product.id}
                   className={[
-                    'group relative rounded-2xl overflow-hidden aspect-[4/5] shadow-sm transition-all duration-300 ease-out',
+                    'group relative overflow-hidden rounded-xl aspect-[4/5] shadow-sm transition-all duration-300 ease-out',
                     selectedProducts.includes(product.id)
                       ? 'ring-2 ring-purple-500 border-purple-300 dark:border-purple-500/30'
                       : 'hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30',
@@ -2709,11 +2709,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       toggleSelect(product.id);
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    className="absolute left-3 top-3 z-20 h-4 w-4 rounded border-gray-300 dark:border-zinc-600 bg-white/90 dark:bg-zinc-800/90 text-purple-600 focus:ring-purple-500/30 cursor-pointer"
+                    className="absolute left-2 top-2 z-20 h-4 w-4 rounded border-gray-300 bg-white/90 text-purple-600 focus:ring-purple-500/30 dark:border-zinc-600 dark:bg-zinc-800/90 cursor-pointer"
                   />
                   
                   {/* Actions menu button (replaces star) */}
-                  <div className="absolute right-3 top-3 z-20">
+                  <div className="absolute right-2 top-2 z-20">
                     <button
                       type="button"
                       ref={(el) => {
@@ -2760,7 +2760,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
                   {/* Quick action icons - always visible */}
                   {!product.deletedAt && (
-                    <div className="absolute bottom-3 right-3 z-30 flex items-center gap-2">
+                    <div className="absolute bottom-2 right-2 z-30 flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -2768,7 +2768,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           void handleProductAction('edit', product);
                         }}
                         title="Edit product"
-                        className="h-9 w-9 rounded-full bg-black/50 backdrop-blur-sm shadow-lg flex items-center justify-center text-white hover:bg-purple-600 hover:scale-110 transition-all duration-200"
+                        className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-purple-600"
                       >
                         <span className="text-sm">✏️</span>
                       </button>
@@ -2779,7 +2779,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           void handleProductAction('delete', product);
                         }}
                         title="Delete product"
-                        className="h-9 w-9 rounded-full bg-black/50 backdrop-blur-sm shadow-lg flex items-center justify-center text-white hover:bg-red-500 hover:scale-110 transition-all duration-200"
+                        className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-red-500"
                       >
                         <span className="text-sm">🗑️</span>
                       </button>
@@ -2839,8 +2839,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/20 to-transparent pointer-events-none z-[1]" />
 
                   {/* Status badge inside image area */}
-                  <div className="absolute bottom-[calc(theme(spacing.3)+8rem)] left-3 z-10">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold shadow-lg ${
+                  <div className="absolute bottom-24 left-2 z-10">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-lg ${
                       productStatus === 'DELETED'
                         ? 'bg-rose-500/90 text-white'
                         : productStatus === 'ARCHIVED'
@@ -2860,8 +2860,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   </div>
 
                   {/* Frosted Glass Info Overlay */}
-                  <div className="absolute inset-x-0 bottom-0 z-10 backdrop-blur-xl bg-black/30 border-t border-white/10 p-3">
-                    <div className="flex flex-col gap-1.5">
+                  <div className="absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black/35 p-2 backdrop-blur-xl">
+                    <div className="flex flex-col gap-1">
                       {/* Name and Collection */}
                       <h3 className="text-sm font-semibold text-white line-clamp-1 drop-shadow-sm">{product.name}</h3>
                       <p className="text-[11px] text-white/60 line-clamp-1">{collectionLabel}</p>

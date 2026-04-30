@@ -22,11 +22,15 @@ import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildStorefrontUrl } from '@/utils/publicLinks';
 import type { VerificationStatusResponse } from '@/types/verification';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
+import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
 export default function StoreManagement() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user.profile);
+  const embeddedSurface = useEmbeddedSurface();
+  const isEmbeddedMobile = embeddedSurface === 'mobile-app';
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<StoreStatusResponse | null>(null);
@@ -478,7 +482,13 @@ export default function StoreManagement() {
 
             <button
               type="button"
-              onClick={() => navigate('/profile')}
+              onClick={() => {
+                if (isEmbeddedMobile) {
+                  postStudioNativeEvent({ type: 'OPEN_NATIVE_ROUTE', path: '/profile?tab=Store' });
+                  return;
+                }
+                navigate('/profile');
+              }}
               className="group relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white/80 text-gray-600 shadow-sm transition-all hover:scale-105 hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-purple-400"
               aria-label="Preview as visitor"
             >

@@ -13,6 +13,7 @@ export type StudioNativeEvent =
   | { type: 'PROFILE_SETUP_REQUIRED'; path?: string }
   | { type: 'ACTION_COMPLETE'; action?: string; path?: string }
   | { type: 'OPEN_EXTERNAL'; url: string }
+  | { type: 'OPEN_NATIVE_ROUTE'; path: string }
   | { type: 'CLOSE' };
 
 declare global {
