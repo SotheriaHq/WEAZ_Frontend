@@ -2,7 +2,14 @@ export type StudioNativeEvent =
   | { type: 'READY' }
   | { type: 'ROUTE_CHANGED'; path: string }
   | { type: 'AUTH_REQUIRED'; reason?: string }
-  | { type: 'HANDOFF_FAILED'; reason?: string }
+  | {
+      type: 'HANDOFF_FAILED';
+      reason?: string;
+      stage?: string;
+      status?: number;
+      message?: string;
+      apiBaseUrl?: string;
+    }
   | { type: 'PROFILE_SETUP_REQUIRED'; path?: string }
   | { type: 'ACTION_COMPLETE'; action?: string; path?: string }
   | { type: 'OPEN_EXTERNAL'; url: string }

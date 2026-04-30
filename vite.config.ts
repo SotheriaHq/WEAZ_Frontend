@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
+      host: env.VITE_DEV_HOST || '0.0.0.0',
       port,
       https: resolveOptionalHttpsConfig(env),
     },
