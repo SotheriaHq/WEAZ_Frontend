@@ -35,6 +35,7 @@ import { GlobalModalRouter } from './components/modals/GlobalModalRouter';
 import ShopSetupWizardPage from './pages/studio/shop/ShopSetupWizardPage';
 import ShopSetupEssentialsPage from './pages/studio/shop/ShopSetupEssentialsPage';
 import StudioScaffold from './components/studio/StudioScaffold';
+import StudioHandoffGate from './components/studio/StudioHandoffGate';
 import RequireStoreSetup from './components/store/RequireStoreSetup';
 import { BagFlowProvider } from './features/bagging/BagFlowProvider';
 import {
@@ -121,6 +122,12 @@ const AppRouteFallback: React.FC = () => (
 );
 
 const noopStudioSelect = () => {};
+
+const StudioProtected: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <StudioHandoffGate>
+    <RequireBrand>{children}</RequireBrand>
+  </StudioHandoffGate>
+);
 
 const withRouteFallback = (element: React.ReactNode) => (
   <Suspense fallback={<AppRouteFallback />}>{element}</Suspense>
@@ -340,59 +347,59 @@ const router = createBrowserRouter([
       {
         path: '/studio',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               {withStudioRouteFallback('overview', <StudioHome />)}
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/store',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
                 {withRouteFallback(<StoreManagement />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/verification',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
                 {withRouteFallback(<StoreVerificationPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/verification/apply',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
                 {withRouteFallback(<VerificationWizardPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/verification/submitted',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
                 {withRouteFallback(<VerificationSubmittedPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
@@ -406,85 +413,85 @@ const router = createBrowserRouter([
       {
         path: '/studio/store/collections/new',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
                 {withRouteFallback(<StoreCollectionCreate />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/store/products/new',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
                 {withRouteFallback(<EditProduct />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/store/products/:id/edit',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
                 {withRouteFallback(<EditProduct />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/store/products/:id',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
                 {withRouteFallback(<ProductDetailsPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/custom-orders',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="orders" onSelect={noopStudioSelect}>
                 {withRouteFallback(<StudioCustomOrdersPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/custom-orders/:orderId',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="orders" onSelect={noopStudioSelect}>
                 {withRouteFallback(<StudioCustomOrderDetailPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/messages',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="messages" onSelect={noopStudioSelect}>
                 {withRouteFallback(<MessagingManagementPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
@@ -498,21 +505,21 @@ const router = createBrowserRouter([
       {
         path: '/studio/store/setup',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <ShopSetupWizardPage />
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/store/essentials',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <ShopSetupEssentialsPage />
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {

@@ -11,6 +11,8 @@ import {
   resolveStoreSetupDestination,
   sleep,
 } from '@/utils/storeSetup';
+import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
 const STATUS_RETRY_ATTEMPTS = 5;
 const STATUS_RETRY_DELAY_MS = 600;
@@ -113,6 +115,8 @@ const getCachedOrFetchStoreStatus = async (
 const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user.profile);
+  const embeddedSurface = useEmbeddedSurface();
+  const isEmbeddedMobile = embeddedSurface === 'mobile-app';
   const [status, setStatus] = useState<StoreStatusResponse | null>(() =>
     isCacheFresh(user?.id) ? storeStatusCache.status : null,
   );
@@ -204,10 +208,36 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
   }, [isSetupRoute, user?.id]);
 
   if (requiresEmailVerification) {
+    if (isEmbeddedMobile) {
+      postStudioNativeEvent({ type: 'PROFILE_SETUP_REQUIRED', path: verificationPromptDestination });
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-white px-5 text-slate-900 dark:bg-black dark:text-white">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-white/10 dark:bg-zinc-950">
+            <div className="text-base font-semibold">Email verification required</div>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Return to the app to complete verification before opening Studio.
+            </p>
+          </div>
+        </div>
+      );
+    }
     return <Navigate to={verificationPromptDestination} replace />;
   }
 
   if (requiresProfileCompletion) {
+    if (isEmbeddedMobile) {
+      postStudioNativeEvent({ type: 'PROFILE_SETUP_REQUIRED', path: brandProfileSetupDestination });
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-white px-5 text-slate-900 dark:bg-black dark:text-white">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-white/10 dark:bg-zinc-950">
+            <div className="text-base font-semibold">Profile setup required</div>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Return to the app to complete your brand profile before opening Studio.
+            </p>
+          </div>
+        </div>
+      );
+    }
     return <Navigate to={brandProfileSetupDestination} replace />;
   }
 
@@ -233,7 +263,16 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     return <>{children}</>;
   }
 
-  return status.isStoreOpen ? <>{children}</> : <Navigate to={destination} replace />;
+  if (status.isStoreOpen) {
+    return <>{children}</>;
+  }
+
+  if (isEmbeddedMobile) {
+    const embeddedDestination = `${destination}${destination.includes('?') ? '&' : '?'}surface=mobile-app`;
+    return <Navigate to={embeddedDestination} replace />;
+  }
+
+  return <Navigate to={destination} replace />;
 };
 
 export default RequireStoreSetup;
