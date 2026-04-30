@@ -6,6 +6,7 @@ import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { closeSidebar } from '@/features/uiSlice';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
 type StudioScaffoldProps = {
   active: string;
@@ -21,6 +22,11 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
   useEffect(() => {
     dispatch(closeSidebar());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (!isEmbeddedMobile) return;
+    postStudioNativeEvent({ type: 'READY' });
+  }, [isEmbeddedMobile]);
 
   return (
     <div className="min-h-screen threadly-shell-bg overflow-x-clip">

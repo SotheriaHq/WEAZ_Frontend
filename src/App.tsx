@@ -292,6 +292,21 @@ const LegacyProductEditRedirect: React.FC = () => {
   return <Navigate to={id ? `/studio/store/products/${id}/edit` : '/studio/store'} replace />;
 };
 
+const StudioRedirect: React.FC<{ to: string }> = ({ to }) => {
+  const location = useLocation();
+  const currentParams = new URLSearchParams(location.search);
+  if (currentParams.get('surface') !== 'mobile-app') {
+    return <Navigate to={to} replace />;
+  }
+
+  const [pathnameWithSearch, hash = ''] = to.split('#');
+  const [pathname, search = ''] = pathnameWithSearch.split('?');
+  const nextParams = new URLSearchParams(search);
+  nextParams.set('surface', 'mobile-app');
+  const query = nextParams.toString();
+  return <Navigate to={`${pathname}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`} replace />;
+};
+
 const LegacyBuyerCustomOrdersRedirect: React.FC = () => {
   const { orderId } = useParams<{ orderId?: string }>();
   if (orderId) {
@@ -404,11 +419,11 @@ const router = createBrowserRouter([
       },
       {
         path: '/studio/store/collections',
-        element: <Navigate to="/studio/store?view=collections" replace />,
+        element: <StudioRedirect to="/studio/store?view=collections" />,
       },
       {
         path: '/studio/store/custom-orders',
-        element: <Navigate to="/studio/custom-orders" replace />,
+        element: <StudioRedirect to="/studio/custom-orders" />,
       },
       {
         path: '/studio/store/collections/new',
@@ -496,11 +511,11 @@ const router = createBrowserRouter([
       },
       {
         path: '/studio/shop/setup',
-        element: <Navigate to="/studio/store/setup" replace />,
+        element: <StudioRedirect to="/studio/store/setup" />,
       },
       {
         path: '/studio/shop/essentials',
-        element: <Navigate to="/studio/store/essentials" replace />,
+        element: <StudioRedirect to="/studio/store/essentials" />,
       },
       {
         path: '/studio/store/setup',
@@ -524,11 +539,11 @@ const router = createBrowserRouter([
       },
       {
         path: '/studio/products',
-        element: <Navigate to="/studio/store" replace />,
+        element: <StudioRedirect to="/studio/store" />,
       },
       {
         path: '/studio/products/create',
-        element: <Navigate to="/studio/store/products/new" replace />,
+        element: <StudioRedirect to="/studio/store/products/new" />,
       },
       {
         path: '/studio/products/edit/:id',
