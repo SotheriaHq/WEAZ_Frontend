@@ -15,7 +15,7 @@ import type { AppDispatch, RootState } from '@/store';
 import { addToCart, fetchCart, fetchCustomBagCount, openCartDrawer } from '@/features/cartSlice';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
+import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import { getBagStatus, type BagDefaultAction, type BagStatus } from '@/api/StoreApi';
 import ProductBagSelectorModal from '@/components/bagging/ProductBagSelectorModal';
 import BagFittingsModal from '@/components/bagging/BagFittingsModal';
@@ -349,7 +349,7 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
                 onClick={(event) => event.stopPropagation()}
               >
                 <div className="h-full w-full overflow-y-auto">
-                  <CustomOrderComposerPage
+                  <LazyCustomOrderComposerPage
                     configurationIdOverride={customConfigurationId}
                     embedded
                     onClose={closeActiveFlow}

@@ -24,7 +24,7 @@ import {
 } from '@/lib/customOrderAddressBook';
 import { openCartDrawer } from '@/features/cartSlice';
 
-interface CustomOrderComposerPageProps {
+export interface CustomOrderComposerPageProps {
   configurationIdOverride?: string | null;
   embedded?: boolean;
   onClose?: () => void;

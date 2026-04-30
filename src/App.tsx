@@ -18,8 +18,6 @@ import { ProfileLayout } from './components/catalog/ProfileLayout';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
 import ErrorPage from './pages/ErrorPage';
-import CartDrawer from './components/designs/CartDrawer';
-import WishlistDrawer from './components/designs/WishlistDrawer';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
 import OrderConfirmation from './pages/checkout/OrderConfirmation';
 import PaymentReturnPage from './pages/checkout/PaymentReturnPage';
@@ -31,7 +29,6 @@ import {
   WatchLaterPlaceholder,
   TrendingPlaceholder,
 } from './pages/placeholders';
-import { GlobalModalRouter } from './components/modals/GlobalModalRouter';
 import ShopSetupWizardPage from './pages/studio/shop/ShopSetupWizardPage';
 import ShopSetupEssentialsPage from './pages/studio/shop/ShopSetupEssentialsPage';
 import StudioScaffold from './components/studio/StudioScaffold';
@@ -52,6 +49,13 @@ import RequireAdmin from './components/admin/RequireAdmin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 
 const Market = lazy(() => import('./pages/Market'));
+const CartDrawer = lazy(() => import('./components/designs/CartDrawer'));
+const WishlistDrawer = lazy(() => import('./components/designs/WishlistDrawer'));
+const GlobalModalRouter = lazy(() =>
+  import('./components/modals/GlobalModalRouter').then((module) => ({
+    default: module.GlobalModalRouter,
+  })),
+);
 const MarketPlace = lazy(() => import('./pages/MarketPlace'));
 const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
 const Profile = lazy(() => import('./pages/catalog/Catalog'));
@@ -276,9 +280,11 @@ const RootLayout: React.FC = () => {
           </div>
         )}
         <ViewportSync watchKey={location.pathname} />
-        <CartDrawer />
-        <WishlistDrawer />
-        <GlobalModalRouter />
+        <Suspense fallback={null}>
+          <CartDrawer />
+          <WishlistDrawer />
+          <GlobalModalRouter />
+        </Suspense>
         <Suspense fallback={<AppRouteFallback />}>
           <Outlet />
         </Suspense>

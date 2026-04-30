@@ -23,7 +23,7 @@ import { formatPrice } from '@/utils/helpers';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
+import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { useActiveCustomOrderConfiguration } from '@/hooks/useActiveCustomOrderConfiguration';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
@@ -1121,7 +1121,7 @@ export default function ProductDetailsPage() {
               >
                 <span aria-hidden="true" className="text-base">×</span>
               </button>
-              <CustomOrderComposerPage
+              <LazyCustomOrderComposerPage
                 embedded
                 configurationIdOverride={customOrderAvailability.configurationId}
                 onClose={() => setCustomOrderComposerOpen(false)}

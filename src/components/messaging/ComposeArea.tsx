@@ -1,8 +1,6 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { messagingApi } from '@/api/MessagingApi';
-import data from '@emoji-mart/data';
-import { Picker } from 'emoji-mart';
 
 interface PendingFile {
   fileId: string;
@@ -130,26 +128,42 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
   useEffect(() => {
     if (!showEmojiPicker || !emojiHostRef.current) return;
 
-    const picker = new Picker({
-      data,
-      onEmojiSelect: (emoji: any) => {
-        if (emoji?.native) {
-          appendText(String(emoji.native));
-        }
-        setShowEmojiPicker(false);
-      },
-      previewPosition: 'none',
-      skinTonePosition: 'none',
-      theme: 'light',
-    }) as unknown as HTMLElement;
+    let cancelled = false;
+    const host = emojiHostRef.current;
 
-    emojiHostRef.current.innerHTML = '';
-    emojiHostRef.current.appendChild(picker);
+    host.innerHTML = '';
+
+    void Promise.all([
+      import('@emoji-mart/data'),
+      import('emoji-mart'),
+    ]).then(([dataModule, pickerModule]) => {
+      if (cancelled || !host) return;
+
+      const picker = new pickerModule.Picker({
+        data: dataModule.default,
+        onEmojiSelect: (emoji: any) => {
+          if (emoji?.native) {
+            appendText(String(emoji.native));
+          }
+          setShowEmojiPicker(false);
+        },
+        previewPosition: 'none',
+        skinTonePosition: 'none',
+        theme: 'light',
+      }) as unknown as HTMLElement;
+
+      host.innerHTML = '';
+      host.appendChild(picker);
+    }).catch(() => {
+      if (!cancelled) {
+        toast.error('Emoji picker failed to load');
+        setShowEmojiPicker(false);
+      }
+    });
 
     return () => {
-      if (emojiHostRef.current) {
-        emojiHostRef.current.innerHTML = '';
-      }
+      cancelled = true;
+      host.innerHTML = '';
     };
   }, [appendText, showEmojiPicker]);
 

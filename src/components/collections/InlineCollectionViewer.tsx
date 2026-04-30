@@ -20,7 +20,7 @@ import { CollectionCartPreviewModal } from '@/components/collections/CollectionC
 import { getCollectionCartPreview, type CollectionCartPreviewResponse } from '@/api/collectionUploads';
 import { buildCollectionUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
-import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
+import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useBagging } from '@/hooks/useBagging';
 
@@ -873,7 +873,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               >
                 <span aria-hidden="true" className="text-base">×</span>
               </button>
-              <CustomOrderComposerPage
+              <LazyCustomOrderComposerPage
                 embedded
                 configurationIdOverride={customConfigurationId}
                 onClose={() => setCustomComposerOpen(false)}

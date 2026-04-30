@@ -10,7 +10,7 @@ import type { AppDispatch, RootState } from '@/store';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
+import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { CONTENT_DISPLAY_FRAME_CLASS, CONTENT_DISPLAY_MEDIA_CLASS } from '@/components/media/contentDisplayPresets';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
@@ -931,7 +931,7 @@ export default function InlineProductDetail({
               >
                 <span aria-hidden="true" className="text-base">×</span>
               </button>
-              <CustomOrderComposerPage
+              <LazyCustomOrderComposerPage
                 embedded
                 configurationIdOverride={customOrderAvailability.configurationId}
                 onClose={() => setCustomOrderComposerOpen(false)}

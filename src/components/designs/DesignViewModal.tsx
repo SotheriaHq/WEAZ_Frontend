@@ -16,7 +16,7 @@ import { formatPrice } from '@/utils/helpers';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import VLoader from '@/components/loaders/VLoader';
 import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
-import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
+import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import type { CommentV2Dto } from '@/types/comments';
 import {
@@ -750,7 +750,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               >
                 <span aria-hidden="true" className="text-base">×</span>
               </button>
-              <CustomOrderComposerPage
+              <LazyCustomOrderComposerPage
                 embedded
                 configurationIdOverride={customConfigurationId}
                 onClose={handleCustomOrderComposerDismiss}
