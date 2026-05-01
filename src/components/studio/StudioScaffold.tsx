@@ -30,7 +30,7 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
   }, [isEmbeddedMobile]);
 
   return (
-    <div className="min-h-screen threadly-shell-bg overflow-x-clip">
+    <div className="studio-shell min-h-screen threadly-shell-bg overflow-x-clip">
       {!isEmbeddedMobile ? <Navbar minimal={false} /> : null}
       {!isEmbeddedMobile ? <Sidebar overlayOnly /> : null}
       <StudioSidebar active={active} onSelect={onSelect} />
@@ -38,8 +38,8 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
       <div
         className={
           isEmbeddedMobile
-            ? 'min-h-screen px-3 pb-[calc(env(safe-area-inset-bottom)+92px)] pt-3 sm:px-4'
-            : 'min-h-screen px-3 pb-28 pt-20 sm:px-4 md:pb-10 md:pl-[236px]'
+            ? 'min-h-screen px-3 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-2 sm:px-4'
+            : 'min-h-screen px-3 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-20 sm:px-4 md:pb-10 md:pl-[236px]'
         }
       >
         <div className={isEmbeddedMobile ? 'mx-auto max-w-6xl min-w-0 embedded-studio-surface' : 'mx-auto max-w-6xl min-w-0'}>

@@ -7,6 +7,7 @@ import type { RootState, AppDispatch } from '@/store';
 import { useNotificationsBootstrap } from '@/hooks/useNotifications';
 import { setSidebarMode, closeSidebar, selectIsMobile } from '@/features/uiSlice';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { ISLAND_BOTTOM_NAV_CLEARANCE_CLASS } from '@/components/navigation/IslandBottomNav';
 
 interface LayoutProps {
   children?: React.ReactNode;
@@ -74,7 +75,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
        
       {/* Main Content Area */}
       <main
-        className={`min-h-screen transition-[margin] duration-300 ease-out ${isEmbeddedMobile ? 'pb-4 pt-0' : 'pb-20 pt-16 md:pb-8'}`}
+        className={`min-h-screen transition-[margin] duration-300 ease-out ${isEmbeddedMobile ? 'pb-4 pt-0' : `${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS} pt-16`}`}
         style={{ marginLeft: mainMarginLeft }}
       >
         {/* will-change removed from main — it was promoting the entire page to

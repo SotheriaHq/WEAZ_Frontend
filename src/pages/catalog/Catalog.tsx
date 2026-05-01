@@ -1479,7 +1479,7 @@ const ProfilePage: React.FC = () => {
 
                     {/* Visibility filter chips */}
                     <div className="mb-6">
-                      <div className="inline-flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                      <div className="flex gap-5 overflow-x-auto border-b border-gray-200/80 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10">
                         {([
                             'Public',
                             'Private',
@@ -1488,10 +1488,11 @@ const ProfilePage: React.FC = () => {
                           <button
                             key={opt}
                             onClick={() => setVisibilityFilter(opt as any)}
-                            className={`px-4 py-1.5 text-sm font-medium transition-colors flex items-center gap-2 ${
+                            aria-pressed={visibilityFilter === opt}
+                            className={`relative flex shrink-0 items-center gap-2 pb-3 pt-2 text-sm font-semibold transition-colors ${
                               visibilityFilter === opt
-                                ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white'
-                                : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                ? 'text-purple-700 dark:text-purple-300'
+                                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                             }`}
                           >
                             <span>
@@ -1504,6 +1505,12 @@ const ProfilePage: React.FC = () => {
                                     : '🗑️'}
                             </span>
                             {opt}
+                            <span
+                              aria-hidden="true"
+                              className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-7 rounded-full transition-all ${
+                                visibilityFilter === opt ? 'bg-purple-600 dark:bg-purple-300' : 'bg-transparent'
+                              }`}
+                            />
                           </button>
                         ))}
                       </div>

@@ -331,6 +331,20 @@ html {
     box-shadow: none;
   }
 
+  @media (max-width: 767px) {
+    .studio-shell .threadly-nav-surface-muted {
+      background-color: var(--surface-primary);
+      border-bottom-color: transparent;
+      box-shadow: none;
+    }
+
+    :is(.dark) .studio-shell .threadly-nav-surface-muted {
+      background-color: var(--surface-primary);
+      border-bottom-color: transparent;
+      box-shadow: none;
+    }
+  }
+
   .elev-1 {
     @apply shadow;
   }

@@ -19,8 +19,10 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
+import { ISLAND_BOTTOM_NAV_CLEARANCE_CLASS } from '@/components/navigation/IslandBottomNav';
 
 const Profile = lazy(() => import('../../pages/catalog/Catalog'));
+const PROFILE_MAIN_CLASS = `min-h-screen pt-16 transition-[margin] duration-300 ease-out ${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS}`;
 
 const computeSidebarMode = (pathname: string, isMobile: boolean) => {
   if (isMobile) return 'HIDDEN' as const;
@@ -269,7 +271,7 @@ export const ProfileLayout: React.FC = () => {
             {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
             <Navbar />
             <main
-              className="min-h-screen pt-16 pb-20 transition-[margin] duration-300 ease-out md:pb-8"
+              className={PROFILE_MAIN_CLASS}
               style={{ marginLeft: mainMarginLeft }}
             >
               <div className="p-4 sm:p-6">
@@ -303,7 +305,7 @@ export const ProfileLayout: React.FC = () => {
         {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
         <Navbar />
         <main
-          className="min-h-screen pt-16 pb-20 transition-[margin] duration-300 ease-out md:pb-8"
+          className={PROFILE_MAIN_CLASS}
           style={{ marginLeft: mainMarginLeft }}
         >
           <div className="p-4 sm:p-6">
@@ -329,7 +331,7 @@ export const ProfileLayout: React.FC = () => {
         {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
         <Navbar />
         <main
-          className="min-h-screen pt-16 pb-20 transition-[margin] duration-300 ease-out md:pb-8"
+          className={PROFILE_MAIN_CLASS}
           style={{ marginLeft: mainMarginLeft }}
         >
           {showEmailVerificationPrompt ? (

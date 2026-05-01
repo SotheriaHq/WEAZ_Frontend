@@ -750,7 +750,7 @@ export default function CatalogShopTab({
         <div className="flex items-center justify-between gap-4">
           {/* Category Chips Scroll */}
           <div className={`flex-1 transition-all duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${chipsCollapsed ? 'max-h-0 opacity-0 overflow-hidden py-0' : 'max-h-[200px] opacity-100 py-1'}`}>
-            <div className="flex gap-2 overflow-x-auto no-scrollbar items-center pb-1">
+            <div className="flex gap-5 overflow-x-auto no-scrollbar items-center border-b border-gray-200/80 pb-0.5 dark:border-white/10">
               {displayCategories.map((cat) => {
                 const active = selectedCategory === cat.slug;
                 return (
@@ -760,14 +760,20 @@ export default function CatalogShopTab({
                     onClick={() => startTransition(() => {
                       setSelectedCategory(cat.slug);
                     })}
-                    className={`
-                      shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-200 border
-                      ${active
-                        ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white border-transparent shadow-lg translate-y-[-1px]'
-                        : 'bg-white/80 dark:bg-white/5 text-gray-600 dark:text-gray-300 border-gray-200/80 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-400/50 hover:text-gray-900 dark:hover:text-white hover:bg-purple-50/60 dark:hover:bg-purple-500/10'}
-                    `}
+                    aria-pressed={active}
+                    className={`relative shrink-0 pb-3 pt-2 text-sm font-semibold transition-colors ${
+                      active
+                        ? 'text-purple-700 dark:text-purple-300'
+                        : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`}
                   >
                     {cat.label}
+                    <span
+                      aria-hidden="true"
+                      className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-7 rounded-full transition-all ${
+                        active ? 'bg-purple-600 dark:bg-purple-300' : 'bg-transparent'
+                      }`}
+                    />
                   </button>
                 );
               })}

@@ -5,6 +5,7 @@ import type { RootState, AppDispatch } from '../store';
 import { closeSidebar, toggleSidebar, MOBILE_BREAKPOINT } from '../features/uiSlice';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import BrandWordmark from '@/components/brand/BrandWordmark';
+import IslandBottomNav from '@/components/navigation/IslandBottomNav';
 
 interface SidebarLinkProps {
   emoji: string;
@@ -169,29 +170,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
 
   if (isMobile && !isSidebarOpen) {
     return (
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200/70 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-black/85">
-        <div className="mx-auto flex max-w-xl items-stretch justify-between gap-1">
-          {mobileDockLinks.map((link) => (
-            <button
-              key={link.path}
-              type="button"
-              disabled={link.disabled}
-              onClick={link.disabled ? undefined : () => navigate(link.path)}
-              className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium transition-colors ${
-                link.disabled
-                  ? 'cursor-not-allowed opacity-50'
-                  : link.active
-                  ? 'bg-purple-50 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10'
-              }`}
-              aria-label={link.label}
-            >
-              <span className="text-lg leading-none">{link.emoji}</span>
-              <span className="truncate">{link.label}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
+      <IslandBottomNav
+        items={mobileDockLinks.map((link) => ({
+          key: link.path,
+          label: link.label,
+          path: link.path,
+          emoji: link.emoji,
+          active: link.active,
+          disabled: link.disabled,
+        }))}
+        onSelect={(item) => navigate(item.path)}
+      />
     );
   }
 

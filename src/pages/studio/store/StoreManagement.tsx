@@ -377,7 +377,7 @@ export default function StoreManagement() {
       ) : null}
 
       <div className="sticky top-0 z-30">
-        <div className="rounded-2xl border border-gray-200/60 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/90">
+        <div className="rounded-none border-0 bg-transparent px-1 py-2 shadow-none backdrop-blur-none md:rounded-2xl md:border md:border-gray-200/60 md:bg-white/90 md:px-4 md:py-3 md:shadow-lg md:backdrop-blur-xl md:dark:border-white/10 md:dark:bg-[#111118]/90">
           <div className="flex items-center gap-4">
             <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl border-2 border-white shadow-md dark:border-white/10">
               {avatarUrl ? (

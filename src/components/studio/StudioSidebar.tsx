@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
+import IslandBottomNav from '@/components/navigation/IslandBottomNav';
 
 interface StudioSidebarProps {
   active: string;
@@ -77,38 +78,19 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
         </div>
       </aside>
 
-      <nav className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-gray-200/70 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-black/85">
-        <div className="mx-auto flex max-w-4xl items-stretch gap-1 overflow-x-auto scrollbar-hide">
-          {flatItems.map(({ key, label, path, emoji }) => {
-            const isActive = active === key;
-            const isLocked = isSetupLocked && ALL_ITEMS.find((item) => item.key === key)?.requiresSetup;
-            return (
-              <button
-                key={key}
-                type="button"
-                disabled={Boolean(isLocked)}
-                onClick={() => {
-                  if (!isLocked) {
-                    handleSelect(key, path);
-                  }
-                }}
-                className={`flex min-w-[74px] flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium transition-colors ${
-                  isLocked
-                    ? 'cursor-not-allowed opacity-50'
-                    : isActive
-                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300'
-                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10'
-                }`}
-                aria-label={label}
-                title={label}
-              >
-                <span className="text-lg leading-none" aria-hidden="true">{emoji}</span>
-                <span className="truncate">{label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      <IslandBottomNav
+        ariaLabel="Studio navigation"
+        maxWidthClassName="max-w-[560px]"
+        items={flatItems.map(({ key, label, path, emoji }) => ({
+          key,
+          label,
+          path,
+          emoji,
+          active: active === key,
+          disabled: Boolean(isSetupLocked && ALL_ITEMS.find((item) => item.key === key)?.requiresSetup),
+        }))}
+        onSelect={(item) => handleSelect(item.key, item.path)}
+      />
     </>
   );
 };

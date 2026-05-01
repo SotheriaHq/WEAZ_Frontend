@@ -4,6 +4,7 @@ import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { closeSidebar } from '@/features/uiSlice';
+import IslandBottomNav from '@/components/navigation/IslandBottomNav';
 
 interface NavItem {
   key: string;
@@ -89,30 +90,18 @@ const AdminSidebar: React.FC = () => {
         </div>
       </aside>
 
-      {/* Mobile Bottom Dock */}
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200/70 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-black/85 md:hidden">
-        <div className="flex w-full items-stretch gap-1 overflow-x-auto scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {visibleItems.map((item) => {
-            const isActive = getIsActive(item);
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => handleNavigate(item.path)}
-                className={`flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium transition-colors ${
-                  isActive
-                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300'
-                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10'
-                }`}
-                aria-label={item.label}
-              >
-                <span className="text-lg leading-none">{item.emoji}</span>
-                <span className="truncate w-full text-center">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      <IslandBottomNav
+        ariaLabel="Admin navigation"
+        maxWidthClassName="max-w-[560px]"
+        items={visibleItems.map((item) => ({
+          key: item.key,
+          label: item.label,
+          path: item.path,
+          emoji: item.emoji,
+          active: getIsActive(item),
+        }))}
+        onSelect={(item) => handleNavigate(item.path)}
+      />
     </>
   );
 };

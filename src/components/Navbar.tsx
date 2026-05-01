@@ -368,7 +368,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
             <button
               type="button"
               onClick={() => dispatch(toggleSidebar())}
-              className="mr-1 inline-flex items-center justify-center rounded-full p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="mr-1 inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none active:bg-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 dark:active:bg-gray-700"
               aria-label="Toggle sidebar"
             >
               <span className="text-xl">🍔</span>
@@ -407,7 +407,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           {!minimal ? (
             <button
               type="button"
-              className="rounded-full p-2 hover:bg-gray-100 dark:hover:bg-gray-800 sm:hidden"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none active:bg-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 dark:active:bg-gray-700 sm:hidden"
               aria-label="Open search"
               onClick={() => navigate('/search')}
             >
@@ -419,7 +419,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
             <button
               type="button"
               onClick={() => dispatch(isWishlistOpen ? closeWishlistDrawer() : openWishlistDrawer())}
-              className="relative hidden rounded-full p-2 text-xl transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 sm:flex"
+              className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl transition-colors hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none active:bg-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 dark:active:bg-gray-700 sm:flex"
               aria-label="Wishlist"
             >
               <span aria-hidden="true" className="text-xl">🤍</span>
@@ -434,7 +434,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           <button
             type="button"
             onClick={() => dispatch(isCartOpen ? closeCartDrawer() : openCartDrawer())}
-            className="relative hidden rounded-full p-2 text-xl transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 sm:flex"
+            className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl transition-colors hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none active:bg-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 dark:active:bg-gray-700 sm:flex"
             aria-label="Bag"
           >
             <span aria-hidden="true" className="text-xl">🛍️</span>
@@ -455,7 +455,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                   setShowLanguageDropdown(false);
                   setShowNotificationsDropdown((value) => !value);
                 }}
-                className="relative hidden rounded-full p-2 text-xl transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 sm:flex"
+                className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl transition-colors hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none active:bg-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 dark:active:bg-gray-700 sm:flex"
                 aria-label="Notifications"
                 aria-expanded={showNotificationsDropdown}
               >
