@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import type { ThreadMessage } from '@/api/MessagingApi';
+import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
 type ConversationContext = 'DIRECT' | 'INQUIRY' | 'STANDARD_ORDER' | 'CUSTOM_ORDER';
 
@@ -78,6 +80,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
   onToggleArchive,
 }) => {
   const navigate = useNavigate();
+  const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
   // orderDetailUrl is the canonical order page (e.g. /custom-orders/{id}).
   // targetUrl is the notification deep-link (messaging surface). We use
   // orderDetailUrl for the "View Order" button so the user lands on the order,
@@ -112,6 +115,14 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
 
   const referenceId = orderId || customOrderId;
   const participantAvatarSource = resolveAvatarMediaSource(participant?.profileImage);
+  const openRoute = (path: string) => {
+    if (isEmbeddedMobile) {
+      postStudioNativeEvent({ type: 'OPEN_NATIVE_ROUTE', path });
+      return;
+    }
+
+    navigate(path);
+  };
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
@@ -177,7 +188,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
         {participant?.id && (
           <button
             type="button"
-            onClick={() => navigate(`/profile/${participant.id}`)}
+            onClick={() => openRoute(`/profile/${participant.id}`)}
             className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
           >
             <span aria-hidden="true">👤</span>
@@ -189,7 +200,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
         {orderUrl && (
           <button
             type="button"
-            onClick={() => navigate(orderUrl)}
+            onClick={() => openRoute(orderUrl)}
             className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
           >
             <span className="text-sm" role="img" aria-label="order">📦</span>
@@ -228,14 +239,16 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
           </>
         )}
 
-        <button
-          type="button"
-          onClick={() => navigate('/settings?tab=notifications')}
-          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
-        >
-          <span aria-hidden="true">⚙️</span>
-          Notification Settings
-        </button>
+        {!isEmbeddedMobile ? (
+          <button
+            type="button"
+            onClick={() => navigate('/settings?tab=notifications')}
+            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+          >
+            <span aria-hidden="true">⚙️</span>
+            Notification Settings
+          </button>
+        ) : null}
       </div>
 
       {/* Shared Media */}

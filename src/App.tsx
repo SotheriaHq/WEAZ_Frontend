@@ -47,6 +47,7 @@ import type { AppDispatch, RootState } from '@/store';
 import { setViewportWidth } from '@/features/uiSlice';
 import RequireAdmin from './components/admin/RequireAdmin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 
 const Market = lazy(() => import('./pages/Market'));
 const CartDrawer = lazy(() => import('./components/designs/CartDrawer'));
@@ -214,6 +215,8 @@ const ViewportSync: React.FC<{ watchKey?: string }> = ({ watchKey }) => {
 
 const RootLayout: React.FC = () => {
   const location = useLocation();
+  const embeddedSurface = useEmbeddedSurface();
+  const isEmbeddedMobile = embeddedSurface === 'mobile-app';
   const [showRouteIntentProgress, setShowRouteIntentProgress] = useState(false);
   const routeIntentTimeoutRef = useRef<number | null>(null);
 
@@ -280,11 +283,13 @@ const RootLayout: React.FC = () => {
           </div>
         )}
         <ViewportSync watchKey={location.pathname} />
-        <Suspense fallback={null}>
-          <CartDrawer />
-          <WishlistDrawer />
-          <GlobalModalRouter />
-        </Suspense>
+        {!isEmbeddedMobile ? (
+          <Suspense fallback={null}>
+            <CartDrawer />
+            <WishlistDrawer />
+            <GlobalModalRouter />
+          </Suspense>
+        ) : null}
         <Suspense fallback={<AppRouteFallback />}>
           <Outlet />
         </Suspense>

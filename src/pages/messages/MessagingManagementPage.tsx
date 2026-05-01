@@ -11,6 +11,8 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble';
 import ComposeArea from '@/components/messaging/ComposeArea';
 import ChatContactSidebar from '@/components/messaging/ChatContactSidebar';
+import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -352,6 +354,7 @@ const DisputePanel: React.FC<{
 
 const MessagingManagementPage: React.FC = () => {
   const navigate = useNavigate();
+  const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
   const [params, setParams] = useSearchParams();
   const profile = useSelector((state: RootState) => state.user.profile);
   const surface: Surface = profile?.type === 'BRAND' ? 'BRAND' : 'BUYER';
@@ -450,6 +453,18 @@ const MessagingManagementPage: React.FC = () => {
     if (item.contextType === 'CUSTOM_ORDER') return item.customOrderId || item.contextId || item.threadId;
     return item.threadId;
   }, []);
+
+  const openRoute = useCallback(
+    (path: string) => {
+      if (isEmbeddedMobile) {
+        postStudioNativeEvent({ type: 'OPEN_NATIVE_ROUTE', path });
+        return;
+      }
+
+      navigate(path);
+    },
+    [isEmbeddedMobile, navigate],
+  );
 
   const useThreadTransport = Boolean(activeConversation?.threadId);
   const selectedOrder = useMemo(
@@ -1156,7 +1171,7 @@ const MessagingManagementPage: React.FC = () => {
                 {showOrderActions && selectedOrder?.orderDetailUrl && (
                   <button
                     type="button"
-                    onClick={() => navigate(selectedOrder.orderDetailUrl as string)}
+                    onClick={() => openRoute(selectedOrder.orderDetailUrl as string)}
                     className="rounded-lg px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
                     title="View Order"
                   >
