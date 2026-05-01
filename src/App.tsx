@@ -314,6 +314,10 @@ const StudioRedirect: React.FC<{ to: string }> = ({ to }) => {
   const [pathname, search = ''] = pathnameWithSearch.split('?');
   const nextParams = new URLSearchParams(search);
   nextParams.set('surface', 'mobile-app');
+  const currentTheme = currentParams.get('theme');
+  if (currentTheme === 'light' || currentTheme === 'dark') {
+    nextParams.set('theme', currentTheme);
+  }
   const query = nextParams.toString();
   return <Navigate to={`${pathname}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`} replace />;
 };

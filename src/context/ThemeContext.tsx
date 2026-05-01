@@ -6,9 +6,43 @@ type Theme = 'light' | 'dark' | 'system';
 const THEME_TRANSITION_DURATION_MS = 300;
 const LIGHT_THEME_COLOR = '#ffffff';
 const DARK_THEME_COLOR = '#0a0a0a';
+const EMBEDDED_SURFACE_SESSION_KEY = 'threadly.studio.embeddedSurface';
+const EMBEDDED_THEME_SESSION_KEY = 'threadly.studio.embeddedTheme';
 
 const isTheme = (value: unknown): value is Theme =>
   value === 'light' || value === 'dark' || value === 'system';
+
+const getEmbeddedTheme = (): Theme | null => {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  const explicitSurface = params.get('surface') === 'mobile-app';
+  const sessionSurface =
+    !explicitSurface &&
+    (() => {
+      try {
+        return window.sessionStorage.getItem(EMBEDDED_SURFACE_SESSION_KEY) === 'mobile-app';
+      } catch {
+        return false;
+      }
+    })();
+  if (!explicitSurface && !sessionSurface) return null;
+  const theme = params.get('theme');
+  if (theme === 'light' || theme === 'dark') {
+    try {
+      window.sessionStorage.setItem(EMBEDDED_THEME_SESSION_KEY, theme);
+    } catch {
+      // Storage can be unavailable in restricted WebViews.
+    }
+    return theme;
+  }
+
+  try {
+    const sessionTheme = window.sessionStorage.getItem(EMBEDDED_THEME_SESSION_KEY);
+    return sessionTheme === 'light' || sessionTheme === 'dark' ? sessionTheme : null;
+  } catch {
+    return null;
+  }
+};
 
 const resolveTheme = (candidate: unknown, fallback: Theme): Theme =>
   isTheme(candidate) ? candidate : fallback;
@@ -59,6 +93,9 @@ export function ThemeProvider({
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === 'undefined') return defaultTheme;
 
+    const embeddedTheme = getEmbeddedTheme();
+    if (embeddedTheme) return embeddedTheme;
+
     const preloadedPreference = window.document.documentElement.dataset.themePreference;
     if (isTheme(preloadedPreference)) return preloadedPreference;
 
@@ -68,6 +105,7 @@ export function ThemeProvider({
       return defaultTheme;
     }
   });
+  const [embeddedTheme] = useState<Theme | null>(() => getEmbeddedTheme());
   const [systemScheme, setSystemScheme] = useState<'light' | 'dark'>(() => {
     if (typeof window === 'undefined') {
       return 'light';
@@ -126,7 +164,7 @@ export function ThemeProvider({
     mql.addEventListener?.('change', handleMql);
 
     const onStorage = (e: StorageEvent) => {
-      if (e.key !== storageKey) return;
+      if (embeddedTheme || e.key !== storageKey) return;
 
       const incoming = resolveTheme(e.newValue, defaultTheme);
       if (incoming !== theme) {
@@ -142,12 +180,16 @@ export function ThemeProvider({
         window.clearTimeout(transitionTimer);
       }
     };
-  }, [defaultTheme, storageKey, theme]);
+  }, [defaultTheme, embeddedTheme, storageKey, theme]);
 
   const value = useMemo(() => ({
     theme,
     systemScheme,
     setTheme: (newTheme: Theme) => {
+      if (embeddedTheme) {
+        setThemeState(newTheme);
+        return;
+      }
       try {
         window.localStorage.setItem(storageKey, newTheme);
       } catch {

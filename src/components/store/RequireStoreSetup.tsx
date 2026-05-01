@@ -268,7 +268,14 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
   }
 
   if (isEmbeddedMobile) {
-    const embeddedDestination = `${destination}${destination.includes('?') ? '&' : '?'}surface=mobile-app`;
+    const params = new URLSearchParams(location.search);
+    const embeddedTheme = params.get('theme');
+    const embeddedDestinationParams = new URLSearchParams();
+    embeddedDestinationParams.set('surface', 'mobile-app');
+    if (embeddedTheme === 'light' || embeddedTheme === 'dark') {
+      embeddedDestinationParams.set('theme', embeddedTheme);
+    }
+    const embeddedDestination = `${destination}${destination.includes('?') ? '&' : '?'}${embeddedDestinationParams.toString()}`;
     return <Navigate to={embeddedDestination} replace />;
   }
 

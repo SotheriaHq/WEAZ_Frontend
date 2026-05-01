@@ -7,6 +7,7 @@ import { getDraftExpiryStats, type DraftExpiryStats } from '@/api/collectionUplo
 import { getStoreStatus } from '@/api/StoreApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { Select } from '@/components/ui/Select';
+import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { getAvatarFallback } from '@/utils/profileImage';
 import { DraftExpiryStats as DraftExpiryStatsComponent } from '@/components/collections/DraftExpiryComponents';
@@ -115,6 +116,7 @@ function getRelativeTime(value?: string | null) {
 
 const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
+  const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
   const user = useSelector((state: RootState) => state.user.profile);
   const notificationItems = useSelector((state: RootState) => state.notifications.items);
   const [overview, setOverview] = useState<any>(null);
@@ -294,11 +296,11 @@ const DashboardHome: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className={`${isEmbeddedMobile ? 'space-y-4' : 'space-y-5 sm:space-y-8'} animate-in fade-in duration-500`}>
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#1a1a1a]">
-        <div className="flex flex-col items-start justify-between gap-4 px-6 py-4 md:flex-row md:items-center">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+        <div className="flex flex-row items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-6 md:py-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 sm:h-12 sm:w-12">
               {resolvedLogoUrl ? (
                 <MediaRenderer
                   kind="image"
@@ -313,11 +315,11 @@ const DashboardHome: React.FC = () => {
                 </div>
               )}
             </div>
-            <div>
-              <h1 className="flex items-center gap-3 text-xl font-bold text-gray-900 dark:text-white">
-                {displayStoreName}
+            <div className="min-w-0">
+              <h1 className="flex min-w-0 flex-wrap items-center gap-2 text-base font-bold text-gray-900 dark:text-white sm:text-xl">
+                <span className="min-w-0 truncate">{displayStoreName}</span>
                 <span
-                  className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
+                  className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:px-2.5 sm:text-xs ${
                     resolvedIsLive
                       ? 'border-green-500/20 bg-green-500/20 text-green-600 dark:text-green-400'
                       : 'border-yellow-500/20 bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
@@ -331,7 +333,7 @@ const DashboardHome: React.FC = () => {
                   {resolvedIsLive ? 'LIVE' : 'DRAFT'}
                 </span>
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="truncate text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
                 threadly.com/{store.slug || user?.username || 'your-store'}
               </p>
             </div>
@@ -340,16 +342,16 @@ const DashboardHome: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/studio/store')}
-            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white/50 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 dark:border-white/10 dark:bg-white/10 dark:text-gray-300 dark:hover:text-white"
+            className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/50 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:text-gray-900 dark:border-white/10 dark:bg-white/10 dark:text-gray-300 dark:hover:text-white sm:gap-2 sm:px-4 sm:text-sm"
           >
             <span aria-hidden="true">🏪</span>
-            View Store
+            <span className="hidden min-[380px]:inline">View Store</span>
           </button>
         </div>
       </div>
 
       <section>
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Overview</h2>
           <Select
             variant="filter"
@@ -364,7 +366,7 @@ const DashboardHome: React.FC = () => {
           </Select>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4 lg:gap-4">
           <MetricCard
             title="Total Revenue"
             value={formatCurrency(kpis.totalRevenue || 0)}
@@ -429,8 +431,8 @@ const DashboardHome: React.FC = () => {
       </section>
 
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Quick Actions</h2>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <h2 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white sm:mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4 lg:gap-4">
           <QuickActionButton
             marker="➕"
             label="Add Product"
@@ -461,9 +463,9 @@ const DashboardHome: React.FC = () => {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="flex min-h-[620px] flex-col rounded-2xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-[#1a1a1a] lg:col-span-2">
-          <div className="mb-6 flex items-center justify-between">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
+        <div className="flex flex-col rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-[#1a1a1a] sm:p-4 lg:col-span-2 lg:min-h-[620px] lg:p-6">
+          <div className="mb-3 flex items-center justify-between sm:mb-4 lg:mb-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h2>
             <Link
               to="/studio?tab=orders"
@@ -474,7 +476,7 @@ const DashboardHome: React.FC = () => {
           </div>
 
           {recentActivity.length > 0 ? (
-            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="mb-3 grid grid-cols-4 gap-1.5 sm:gap-2 lg:mb-4">
               <ActivitySummaryPill label="All" value={activitySummary.total} />
               <ActivitySummaryPill label="Orders" value={activitySummary.orders + activitySummary.customOrders} />
               <ActivitySummaryPill label="Messages" value={activitySummary.messages} />
@@ -483,9 +485,9 @@ const DashboardHome: React.FC = () => {
           ) : null}
 
           {recentActivity.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center py-12 text-center">
+            <div className="flex flex-1 items-center justify-center py-6 text-center sm:py-8 lg:py-12">
               <div>
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-3xl dark:bg-gray-800">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-2xl dark:bg-gray-800 sm:h-16 sm:w-16 sm:text-3xl">
                   <span aria-hidden="true">🗂️</span>
                 </div>
                 <h3 className="mb-1 font-medium text-gray-900 dark:text-white">No activity yet</h3>
@@ -495,9 +497,9 @@ const DashboardHome: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden lg:max-h-[500px]">
               <div className="h-full overflow-y-auto pr-1 scrollbar-hide">
-                <div className="space-y-3 pr-1">
+                <div className="space-y-2 pr-1 sm:space-y-3">
                   {recentActivity.map((item) => (
                     <ActivityItem
                       key={item.id}
@@ -511,15 +513,15 @@ const DashboardHome: React.FC = () => {
           )}
         </div>
 
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-[#1a1a1a]">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+        <div className="space-y-4 lg:space-y-6">
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-[#1a1a1a] sm:p-4 lg:p-6">
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white lg:mb-4">
               <span aria-hidden="true">🔔</span>
               Action Required
             </h2>
 
             {normalizedActionRequired.length === 0 ? (
-              <div className="py-6 text-center">
+              <div className="py-3 text-center lg:py-6">
                 <p className="text-sm text-gray-500 dark:text-gray-400">No pending actions 🎉</p>
               </div>
             ) : (
@@ -531,8 +533,8 @@ const DashboardHome: React.FC = () => {
             )}
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-[#1a1a1a]">
-            <div className="mb-4 flex items-center justify-between">
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-[#1a1a1a] sm:p-4 lg:p-6">
+            <div className="mb-3 flex items-center justify-between lg:mb-4">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Store Health</h2>
               <a
                 href="#"
@@ -542,9 +544,9 @@ const DashboardHome: React.FC = () => {
               </a>
             </div>
 
-            <div className="flex items-center gap-6">
-              <div className="relative h-24 w-24 flex-shrink-0">
-                <svg className="h-full w-full -rotate-90 transform">
+            <div className="flex items-center gap-4 lg:gap-6">
+              <div className="relative h-20 w-20 flex-shrink-0 lg:h-24 lg:w-24">
+                <svg viewBox="0 0 96 96" className="h-full w-full -rotate-90 transform">
                   <circle cx="48" cy="48" r="40" stroke="rgba(128,128,128,0.1)" strokeWidth="8" fill="none" />
                   <circle
                     cx="48"
@@ -564,8 +566,8 @@ const DashboardHome: React.FC = () => {
                     strokeLinecap="round"
                   />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <span className="text-2xl font-bold text-gray-900 dark:text-white">{storeHealth.score || 0}</span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-xl font-bold text-gray-900 dark:text-white lg:text-2xl">{storeHealth.score || 0}</span>
                   <span className="text-[10px] uppercase text-gray-500 dark:text-gray-400">
                     {storeHealth.score >= 70 ? 'Good' : storeHealth.score >= 40 ? 'Fair' : 'Low'}
                   </span>
@@ -605,26 +607,26 @@ const MetricCard: React.FC<{
   trendUp?: boolean;
   subtitle?: string;
 }> = ({ title, value, marker, markerClassName, trend, trendUp, subtitle }) => (
-  <div className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-gray-300 dark:border-white/10 dark:bg-[#1a1a1a] dark:hover:border-white/20">
-    <div className="mb-2 flex items-start justify-between">
-      <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-      <div className={`flex h-8 w-8 items-center justify-center rounded-lg text-base ${markerClassName}`}>
+  <div className="cursor-pointer rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-gray-300 dark:border-white/10 dark:bg-[#1a1a1a] dark:hover:border-white/20 sm:p-4 lg:p-5">
+    <div className="mb-1.5 flex items-start justify-between gap-2 lg:mb-2">
+      <p className="min-w-0 text-xs font-medium leading-4 text-gray-500 dark:text-gray-400 sm:text-sm">{title}</p>
+      <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm sm:h-8 sm:w-8 sm:text-base ${markerClassName}`}>
         <span aria-hidden="true">{marker}</span>
       </div>
     </div>
-    <h3 className="mb-1 text-2xl font-bold text-gray-900 dark:text-white">{value}</h3>
+    <h3 className="mb-1 truncate text-lg font-bold leading-6 text-gray-900 dark:text-white sm:text-xl lg:text-2xl">{value}</h3>
     {trend ? (
       <p
-        className={`flex items-center gap-1 text-xs ${
+        className={`flex flex-wrap items-center gap-x-1 text-[11px] leading-4 sm:text-xs ${
           trendUp ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'
         }`}
       >
         <span aria-hidden="true">{trendUp ? '↗' : '↘'}</span>
         {trend}
-        <span className="ml-1 text-gray-400 dark:text-gray-500">vs last month</span>
+        <span className="text-gray-400 dark:text-gray-500 sm:ml-1">vs last month</span>
       </p>
     ) : null}
-    {subtitle ? <p className="text-xs text-gray-400 dark:text-gray-500">{subtitle}</p> : null}
+    {subtitle ? <p className="truncate text-[11px] leading-4 text-gray-400 dark:text-gray-500 sm:text-xs">{subtitle}</p> : null}
   </div>
 );
 
@@ -638,21 +640,21 @@ const QuickActionButton: React.FC<{
   <button
     type="button"
     onClick={onClick}
-    className={`group flex flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-4 transition-all hover:-translate-y-0.5 dark:border-white/10 dark:bg-[#1a1a1a] ${hoverClassName}`}
+    className={`group flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white p-3 transition-all hover:-translate-y-0.5 dark:border-white/10 dark:bg-[#1a1a1a] sm:min-h-[92px] sm:gap-3 sm:p-4 ${hoverClassName}`}
   >
-    <div className={`flex h-10 w-10 items-center justify-center rounded-full text-lg transition-colors group-hover:scale-110 ${accentClassName}`}>
+    <div className={`flex h-8 w-8 items-center justify-center rounded-full text-base transition-colors group-hover:scale-110 sm:h-10 sm:w-10 sm:text-lg ${accentClassName}`}>
       <span aria-hidden="true">{marker}</span>
     </div>
-    <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">
+    <span className="text-center text-xs font-medium leading-4 text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white sm:text-sm">
       {label}
     </span>
   </button>
 );
 
 const ActivitySummaryPill: React.FC<{ label: string; value: number }> = ({ label, value }) => (
-  <div className="rounded-2xl border border-gray-200 bg-gray-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
-    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">{label}</p>
-    <p className="mt-1 text-lg font-bold text-gray-900 dark:text-white">{value}</p>
+  <div className="rounded-xl border border-gray-200 bg-gray-50/80 px-2 py-1.5 text-center dark:border-white/10 dark:bg-white/[0.03] sm:px-3 sm:py-2">
+    <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 sm:tracking-[0.16em]">{label}</p>
+    <p className="mt-0.5 text-base font-bold leading-5 text-gray-900 dark:text-white sm:mt-1 sm:text-lg">{value}</p>
   </div>
 );
 
@@ -675,29 +677,29 @@ const ActivityItem: React.FC<ActivityItemViewModel & { onAction?: () => void }> 
   const { marker, bg, color } = iconMap[type] || iconMap.order;
 
   return (
-    <div className="rounded-2xl border border-gray-200/80 bg-gray-50/70 p-4 transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.025] dark:hover:bg-white/[0.05]">
-      <div className="flex items-start gap-4">
-        <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl text-lg ${bg} ${color}`}>
+    <div className="rounded-xl border border-gray-200/80 bg-gray-50/70 p-3 transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.025] dark:hover:bg-white/[0.05] sm:rounded-2xl sm:p-4">
+      <div className="flex items-start gap-3 sm:gap-4">
+        <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-base sm:h-11 sm:w-11 sm:rounded-2xl sm:text-lg ${bg} ${color}`}>
           <span aria-hidden="true">{marker}</span>
         </div>
         <div className="flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-400">
+                <span className="inline-flex rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-400 sm:px-2.5 sm:py-1 sm:tracking-[0.16em]">
                   {category}
                 </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500">{time}</span>
               </div>
-              <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{title}</p>
+              <p className="mt-1.5 line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white sm:mt-2">{title}</p>
             </div>
           </div>
-          <p className="mt-1.5 text-xs leading-5 text-gray-500 dark:text-gray-400">{description}</p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-500 dark:text-gray-400 sm:mt-1.5">{description}</p>
           {action ? (
             <button
               type="button"
               onClick={onAction}
-              className="mt-3 rounded-full bg-gray-100 px-3 py-1.5 text-xs text-gray-700 transition-colors hover:bg-gray-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+              className="mt-2 rounded-full bg-gray-100 px-3 py-1.5 text-xs text-gray-700 transition-colors hover:bg-gray-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 sm:mt-3"
             >
               {action}
             </button>
