@@ -126,6 +126,28 @@ const AppRouteFallback: React.FC = () => (
   </div>
 );
 
+const StudioRouteFallback: React.FC = () => {
+  const embeddedSurface = useEmbeddedSurface();
+  const isEmbeddedMobile = embeddedSurface === 'mobile-app';
+
+  return (
+    <div
+      className={`flex items-center justify-center bg-[color:var(--surface-primary)] px-5 text-center text-[color:var(--text-primary)] ${
+        isEmbeddedMobile ? 'min-h-[calc(100dvh-8rem)]' : 'min-h-[420px]'
+      }`}
+    >
+      <div className="w-full max-w-sm">
+        <div
+          className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[color:rgba(var(--brand-primary-rgb),0.22)] border-t-[color:var(--brand-primary)]"
+          aria-hidden="true"
+        />
+        <div className="text-base font-semibold">Studio</div>
+        <p className="mt-2 text-sm text-[color:var(--text-secondary)]">Loading workspace</p>
+      </div>
+    </div>
+  );
+};
+
 const noopStudioSelect = () => {};
 
 const StudioProtected: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -138,6 +160,10 @@ const withRouteFallback = (element: React.ReactNode) => (
   <Suspense fallback={<AppRouteFallback />}>{element}</Suspense>
 );
 
+const withStudioContentFallback = (element: React.ReactNode) => (
+  <Suspense fallback={<StudioRouteFallback />}>{element}</Suspense>
+);
+
 const withStudioRouteFallback = (
   active: string,
   element: React.ReactNode,
@@ -145,7 +171,7 @@ const withStudioRouteFallback = (
   <Suspense
     fallback={
       <StudioScaffold active={active} onSelect={noopStudioSelect}>
-        <AppRouteFallback />
+        <StudioRouteFallback />
       </StudioScaffold>
     }
   >
@@ -390,7 +416,7 @@ const router = createBrowserRouter([
           <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<StoreManagement />)}
+                {withStudioContentFallback(<StoreManagement />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </StudioProtected>
@@ -402,7 +428,7 @@ const router = createBrowserRouter([
           <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<StoreVerificationPage />)}
+                {withStudioContentFallback(<StoreVerificationPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </StudioProtected>
@@ -414,7 +440,7 @@ const router = createBrowserRouter([
           <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<VerificationWizardPage />)}
+                {withStudioContentFallback(<VerificationWizardPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </StudioProtected>
@@ -426,7 +452,7 @@ const router = createBrowserRouter([
           <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<VerificationSubmittedPage />)}
+                {withStudioContentFallback(<VerificationSubmittedPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </StudioProtected>
@@ -446,7 +472,7 @@ const router = createBrowserRouter([
           <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<StoreCollectionCreate />)}
+                {withStudioContentFallback(<StoreCollectionCreate />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </StudioProtected>
@@ -458,7 +484,7 @@ const router = createBrowserRouter([
           <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<EditProduct />)}
+                {withStudioContentFallback(<EditProduct />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </StudioProtected>
@@ -470,7 +496,7 @@ const router = createBrowserRouter([
           <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<EditProduct />)}
+                {withStudioContentFallback(<EditProduct />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </StudioProtected>
@@ -482,7 +508,7 @@ const router = createBrowserRouter([
           <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<ProductDetailsPage />)}
+                {withStudioContentFallback(<ProductDetailsPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </StudioProtected>
@@ -494,7 +520,7 @@ const router = createBrowserRouter([
           <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="orders" onSelect={noopStudioSelect}>
-                {withRouteFallback(<StudioCustomOrdersPage />)}
+                {withStudioContentFallback(<StudioCustomOrdersPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </StudioProtected>
@@ -506,7 +532,7 @@ const router = createBrowserRouter([
           <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="orders" onSelect={noopStudioSelect}>
-                {withRouteFallback(<StudioCustomOrderDetailPage />)}
+                {withStudioContentFallback(<StudioCustomOrderDetailPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </StudioProtected>
@@ -518,7 +544,7 @@ const router = createBrowserRouter([
           <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="messages" onSelect={noopStudioSelect}>
-                {withRouteFallback(<MessagingManagementPage />)}
+                {withStudioContentFallback(<MessagingManagementPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
           </StudioProtected>

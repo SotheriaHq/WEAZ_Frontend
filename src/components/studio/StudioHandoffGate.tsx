@@ -248,22 +248,19 @@ export const StudioHandoffGate: React.FC<StudioHandoffGateProps> = ({ children }
 
   return (
     <div
-      className={`flex min-h-dvh items-center justify-center bg-[color:var(--surface-primary)] px-5 text-slate-900 dark:text-white ${
+      className={`flex min-h-dvh items-center justify-center bg-[color:var(--surface-primary)] px-5 text-[color:var(--text-primary)] ${
         isEmbedded
           ? 'pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-[max(1rem,env(safe-area-inset-top))]'
           : 'py-8'
       }`}
     >
-      <div
-        className={`w-full max-w-sm text-center ${
-          isEmbedded
-            ? 'px-2'
-            : 'rounded-2xl bg-[color:var(--surface-primary)] p-5 shadow-sm'
-        }`}
-      >
-        <div className="mx-auto mb-4 h-12 w-12 animate-pulse rounded-xl bg-purple-100 dark:bg-purple-500/20" />
+      <div className="w-full max-w-sm px-2 text-center">
+        <div
+          className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[color:rgba(var(--brand-primary-rgb),0.22)] border-t-[color:var(--brand-primary)]"
+          aria-hidden="true"
+        />
         <div className="text-base font-semibold">{status === 'failed' ? 'Studio session failed' : 'Studio'}</div>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{message}</p>
+        <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{message}</p>
       </div>
     </div>
   );

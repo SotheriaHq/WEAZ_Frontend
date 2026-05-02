@@ -49,9 +49,10 @@ import {
 
 interface NavbarProps {
   minimal?: boolean;
+  profileMenuContext?: 'default' | 'studio';
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
+export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuContext = 'default' }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
@@ -140,7 +141,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const ordersRoute = user?.type === 'BRAND' ? '/studio?tab=orders' : '/profile?tab=orders';
   const savedRoute = user?.type === 'BRAND' ? '/profile?tab=Content' : profileHomeRoute;
   const helpRoute = '/help/verified-badge';
-  const showStudioMenuEntry = user?.type === 'BRAND' && storeSetupComplete === true;
+  const isStudioProfileMenu = profileMenuContext === 'studio';
+  const showStudioMenuEntry = !isStudioProfileMenu && user?.type === 'BRAND' && storeSetupComplete === true;
 
   const ProfileMenu = () => {
     if (!user) return null;
@@ -255,23 +257,27 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           </DropdownItem>
 
 
-          <DropdownItem
-            leftIcon="🌍"
-            rightIcon={<span aria-hidden="true" className={`transition-transform duration-200 ${showLanguageDropdown ? 'rotate-180' : ''}`}>⌄</span>}
-            onClick={() => {
-              setShowLanguageDropdown((prev) => !prev);
-            }}
-          >
-            {translate('language')}
-          </DropdownItem>
+          {!isStudioProfileMenu ? (
+            <>
+              <DropdownItem
+                leftIcon="🌍"
+                rightIcon={<span aria-hidden="true" className={`transition-transform duration-200 ${showLanguageDropdown ? 'rotate-180' : ''}`}>⌄</span>}
+                onClick={() => {
+                  setShowLanguageDropdown((prev) => !prev);
+                }}
+              >
+                {translate('language')}
+              </DropdownItem>
 
-          {showLanguageDropdown ? (
-            <div className="space-y-1 px-1 pt-1">
-              <button onClick={() => { setLanguage('en'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">English</button>
-              <button onClick={() => { setLanguage('zh'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">Chinese</button>
-              <button onClick={() => { setLanguage('ar'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">Arabic</button>
-              <button onClick={() => { setLanguage('hi'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">Hindi</button>
-            </div>
+              {showLanguageDropdown ? (
+                <div className="space-y-1 px-1 pt-1">
+                  <button onClick={() => { setLanguage('en'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">English</button>
+                  <button onClick={() => { setLanguage('zh'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">Chinese</button>
+                  <button onClick={() => { setLanguage('ar'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">Arabic</button>
+                  <button onClick={() => { setLanguage('hi'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">Hindi</button>
+                </div>
+              ) : null}
+            </>
           ) : null}
 
           <DropdownItem
@@ -306,15 +312,17 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
             My Orders
           </DropdownItem>
 
-          <DropdownItem
-            leftIcon="🤍"
-            onClick={() => {
-              navigate(savedRoute);
-              setShowProfileMenu(false);
-            }}
-          >
-            Saved
-          </DropdownItem>
+          {!isStudioProfileMenu ? (
+            <DropdownItem
+              leftIcon="🤍"
+              onClick={() => {
+                navigate(savedRoute);
+                setShowProfileMenu(false);
+              }}
+            >
+              Saved
+            </DropdownItem>
+          ) : null}
 
           <DropdownDivider />
 
