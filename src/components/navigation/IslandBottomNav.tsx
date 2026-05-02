@@ -44,7 +44,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
     >
       <div
         className={clsx(
-          'pointer-events-auto h-14 w-[calc(100vw-32px)] overflow-hidden rounded-full border border-gray-200/70 bg-white/95 p-1.5 shadow-[0_10px_30px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-black/85 dark:shadow-[0_12px_34px_rgba(0,0,0,0.42)]',
+          'pointer-events-auto h-14 w-[calc(100vw-32px)] overflow-hidden rounded-full border border-gray-200/70 bg-white/90 p-1.5 shadow-[0_10px_30px_rgba(15,23,42,0.18)] backdrop-blur-2xl dark:border-white/10 dark:bg-black/75 dark:shadow-[0_12px_34px_rgba(0,0,0,0.48)]',
           maxWidthClassName,
         )}
       >
