@@ -505,7 +505,7 @@ export default function StoreManagement() {
       {showVerificationPrompt ? (
         <section className="rounded-3xl border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-indigo-50 p-5 shadow-sm dark:border-sky-500/20 dark:from-sky-500/10 dark:via-white/5 dark:to-indigo-500/10">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-3xl">
+            <div className={isEmbeddedMobile ? 'max-w-none' : 'max-w-3xl'}>
               <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700 dark:text-sky-200">
                 {verificationPrompt.eyebrow}
               </div>

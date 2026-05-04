@@ -476,7 +476,7 @@ const DashboardHome: React.FC = () => {
           </div>
 
           {recentActivity.length > 0 ? (
-            <div className="mb-3 grid grid-cols-4 gap-1.5 sm:gap-2 lg:mb-4">
+            <div className="mb-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2 lg:mb-4">
               <ActivitySummaryPill label="All" value={activitySummary.total} />
               <ActivitySummaryPill label="Orders" value={activitySummary.orders + activitySummary.customOrders} />
               <ActivitySummaryPill label="Messages" value={activitySummary.messages} />

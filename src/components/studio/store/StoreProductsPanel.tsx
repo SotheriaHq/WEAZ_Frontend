@@ -2280,7 +2280,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   No collections match your current filters.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className={isEmbeddedMobile ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3'}>
                   {pagedManagedCollections.map((collection) => {
                     const status = String(collection.status || 'PUBLISHED').toUpperCase();
                     const isArchived = status === 'ARCHIVED';
@@ -2494,7 +2494,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 </div>
               )
             ) : activeCollectionProductsLoading ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className={isEmbeddedMobile ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'}>
                 {Array.from({ length: 4 }).map((_, idx) => (
                   <div key={idx} className="h-64 animate-pulse rounded-xl bg-gray-200/70 dark:bg-white/10" />
                 ))}
@@ -2504,7 +2504,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 No products currently linked to this collection.
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className={isEmbeddedMobile ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}>
                 {activeCollectionProducts.map((product) => (
                   <button
                     key={product.id}
