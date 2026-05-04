@@ -54,6 +54,15 @@ import { useBrandProfile } from "../../hooks/UseBrandHook";
 import { finalizeCollectionUploads } from "@/api/collectionUploads";
 import type { SizingMode } from '@/types/sizing';
 import {
+  DESIGN_FIT_PREFERENCE_OPTIONS,
+  DESIGN_MAX_MEDIA_COUNT,
+  DESIGN_MEDIA_SLOTS,
+  DESIGN_REQUIRED_MEDIA_COUNT,
+  DESIGN_TARGET_AGE_OPTIONS,
+  type DesignFitPreference,
+  type DesignTargetAgeGroup,
+} from '@/constants/designCreation';
+import {
   createPublishTask,
   updatePublishTask,
   removePublishTask,
@@ -71,9 +80,9 @@ type CategoryOption = {
 
 const DESIGN_SIZING_MODE_OPTIONS = [
   { value: 'NONE', label: 'No size specification' },
-  { value: 'RTW', label: 'Ready-to-Wear (standard sizes only)' },
-  { value: 'RTW_PLUS_FITTINGS', label: 'Ready-to-Wear + Fittings' },
-  { value: 'CUSTOM', label: 'Custom Only' },
+  { value: 'RTW', label: 'Ready-to-Wear only' },
+  { value: 'RTW_PLUS_FITTINGS', label: 'Ready-to-Wear + fittings' },
+  { value: 'CUSTOM', label: 'Custom only' },
 ] as const;
 type DesignSizingMode = Extract<SizingMode, (typeof DESIGN_SIZING_MODE_OPTIONS)[number]['value']>;
 
@@ -172,6 +181,8 @@ const CreateDesignInner: React.FC = () => {
   );
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
   const [sizingMode, setSizingMode] = useState<DesignSizingMode>('RTW_PLUS_FITTINGS');
+  const [fitPreference, setFitPreference] = useState<DesignFitPreference>('REGULAR');
+  const [targetAgeGroup, setTargetAgeGroup] = useState<DesignTargetAgeGroup>('ADULT');
   const [metadataEditedAt, setMetadataEditedAt] = useState<Date | null>(null);
   const [customMeasurementKeys, setCustomMeasurementKeys] = useState<string[]>(
     [],
@@ -263,8 +274,8 @@ const CreateDesignInner: React.FC = () => {
   }, [metadataEditedAt]);
   const picker = useFilePicker({
     accept: ["image/*", "video/*"],
-    maxFiles: 6,
-    onFiles: mediaStore.addFiles,
+    maxFiles: Math.max(0, DESIGN_MAX_MEDIA_COUNT - files.length),
+    onFiles: (incomingFiles) => mediaStore.addFiles(incomingFiles, DESIGN_MAX_MEDIA_COUNT),
     disabled,
   });
 
@@ -353,6 +364,14 @@ const CreateDesignInner: React.FC = () => {
             ? d.sizingMode
             : 'RTW_PLUS_FITTINGS',
         );
+        setFitPreference(
+          d.fitPreference === 'SLIM' ||
+            d.fitPreference === 'LOOSE' ||
+            d.fitPreference === 'OVERSIZED'
+            ? d.fitPreference
+            : 'REGULAR',
+        );
+        setTargetAgeGroup(d.targetAgeGroup === 'CHILD' ? 'CHILD' : 'ADULT');
         setCustomMeasurementKeys(
           Array.isArray(d.customMeasurementKeys) ? dedupeMeasurementKeysByLabel(d.customMeasurementKeys) : [],
         );
@@ -465,10 +484,10 @@ const CreateDesignInner: React.FC = () => {
   );
 
   // Validation
-  const MIN_PUBLISH_IMAGES = 4; // Front, Left, Right, Back
   const isValid =
     title.trim().length > 0 &&
-    files.length >= MIN_PUBLISH_IMAGES &&
+    files.length >= DESIGN_REQUIRED_MEDIA_COUNT &&
+    files.length <= DESIGN_MAX_MEDIA_COUNT &&
     selectedTags.length > 0 &&
     categoryId.trim().length > 0 &&
     categoryTypeId.trim().length > 0;
@@ -483,6 +502,8 @@ const CreateDesignInner: React.FC = () => {
     files.length > 0 ||
     isMadeToOrder ||
     sizingMode !== 'RTW_PLUS_FITTINGS' ||
+    fitPreference !== 'REGULAR' ||
+    targetAgeGroup !== 'ADULT' ||
     normalizedCustomMeasurementKeys.length > 0 ||
     type !== 'EVERYBODY' ||
     visibility !== 'PUBLIC' ||
@@ -756,8 +777,8 @@ const CreateDesignInner: React.FC = () => {
           rtwSizeSystem: null,
           customMeasurementKeys: normalizedCustomMeasurementKeys,
           customOrderEnabled: isMadeToOrder,
-          fitPreference: null,
-          targetAgeGroup: 'ADULT',
+          fitPreference,
+          targetAgeGroup,
         } as any);
       } else {
         const response = await uploadCollection(
@@ -780,8 +801,8 @@ const CreateDesignInner: React.FC = () => {
             rtwSizeSystem: undefined,
             customMeasurementKeys: normalizedCustomMeasurementKeys,
             customOrderEnabled: isMadeToOrder,
-            fitPreference: undefined,
-            targetAgeGroup: 'ADULT',
+            fitPreference,
+            targetAgeGroup,
           },
           undefined,
           false, // shouldPublish = false
@@ -825,8 +846,12 @@ const CreateDesignInner: React.FC = () => {
     if (!isValid) {
       const reasons: string[] = [];
       if (title.trim().length === 0) reasons.push("a title");
-      if (files.length < MIN_PUBLISH_IMAGES)
-        reasons.push(`at least ${MIN_PUBLISH_IMAGES} images (Front, Left, Right, Back)`);
+      if (files.length < DESIGN_REQUIRED_MEDIA_COUNT)
+        reasons.push(
+          `the required ${DESIGN_REQUIRED_MEDIA_COUNT} media slots (${DESIGN_MEDIA_SLOTS.slice(0, DESIGN_REQUIRED_MEDIA_COUNT).join(', ')})`,
+        );
+      if (files.length > DESIGN_MAX_MEDIA_COUNT)
+        reasons.push(`no more than ${DESIGN_MAX_MEDIA_COUNT} media assets`);
       if (selectedTags.length === 0) reasons.push("at least one tag");
       if (categoryId.trim().length === 0) reasons.push("a category");
       if (categoryTypeId.trim().length === 0)
@@ -925,8 +950,8 @@ const CreateDesignInner: React.FC = () => {
               rtwSizeSystem: null,
               customMeasurementKeys: normalizedCustomMeasurementKeys,
               customOrderEnabled: isMadeToOrder,
-              fitPreference: null,
-              targetAgeGroup: 'ADULT',
+              fitPreference,
+              targetAgeGroup,
             } as any);
 
             updatePublishTask(task.id, { progress: 40, message: 'Cleaning up items...' }, publishTaskScope);
@@ -964,8 +989,8 @@ const CreateDesignInner: React.FC = () => {
                   rtwSizeSystem: undefined,
                   customMeasurementKeys: normalizedCustomMeasurementKeys,
                   customOrderEnabled: isMadeToOrder,
-                  fitPreference: undefined,
-                  targetAgeGroup: 'ADULT',
+                  fitPreference,
+                  targetAgeGroup,
                 },
               },
             );
@@ -1058,8 +1083,8 @@ const CreateDesignInner: React.FC = () => {
                 rtwSizeSystem: undefined,
                 customMeasurementKeys: normalizedCustomMeasurementKeys,
                 customOrderEnabled: isMadeToOrder,
-                fitPreference: undefined,
-                targetAgeGroup: 'ADULT',
+                fitPreference,
+                targetAgeGroup,
               },
               (value: number) => {
                 const mappedProgress = Math.max(5, Math.min(90, Math.round(value * 0.9)));
@@ -1125,8 +1150,8 @@ const CreateDesignInner: React.FC = () => {
                   rtwSizeSystem: undefined,
                   customMeasurementKeys: normalizedCustomMeasurementKeys,
                   customOrderEnabled: isMadeToOrder,
-                  fitPreference: undefined,
-                  targetAgeGroup: 'ADULT',
+                  fitPreference,
+                  targetAgeGroup,
                 },
               },
             );
@@ -1214,6 +1239,8 @@ const CreateDesignInner: React.FC = () => {
     setTagSearch("");
     setType("EVERYBODY");
     setVisibility("PUBLIC");
+    setFitPreference('REGULAR');
+    setTargetAgeGroup('ADULT');
     setCustomMeasurementKeys([]);
     setCoverIndex(0);
     setSelectedIndex(0);
@@ -1424,31 +1451,24 @@ const CreateDesignInner: React.FC = () => {
                   onFilesUpload={mediaStore.addFiles}
                   picker={picker}
                   disabled={disabled}
-                  maxFiles={6}
+                  maxFiles={DESIGN_MAX_MEDIA_COUNT}
                 />
                 <div className="flex flex-wrap justify-center gap-1.5 px-2">
-                  {[
-                    { slot: 1, label: 'Front (Default Cover)', required: true },
-                    { slot: 2, label: 'Left Side', required: true },
-                    { slot: 3, label: 'Right Side', required: true },
-                    { slot: 4, label: 'Back Side', required: true },
-                    { slot: 5, label: 'Cover (if any)', required: false },
-                    { slot: 6, label: 'Extra (if any)', required: false },
-                  ].map(({ slot, label, required }) => (
+                  {DESIGN_MEDIA_SLOTS.map((label, index) => (
                     <span
-                      key={slot}
+                      key={label}
                       className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
-                        required
+                        index < DESIGN_REQUIRED_MEDIA_COUNT
                           ? 'bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400'
                           : 'bg-gray-50 text-gray-400 dark:bg-white/5 dark:text-gray-500'
                       }`}
                     >
-                      <span className="font-bold">{slot}.</span> {label}{required && ' *'}
+                      <span className="font-bold">{index + 1}.</span> {label}{index < DESIGN_REQUIRED_MEDIA_COUNT && ' *'}
                     </span>
                   ))}
                 </div>
                 <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 mt-1">
-                  * Required for publishing — upload at least 4 images
+                  * Required for publishing - fill Front, Back, Left, and Right
                 </p>
               </div>
             ) : (
@@ -1459,7 +1479,7 @@ const CreateDesignInner: React.FC = () => {
                   {selectedIndex < 6 && (
                     <div className="absolute top-3 left-3 z-10 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm">
                       <span className="text-[10px] font-bold text-white/90 uppercase tracking-wide">
-                        {['Front', 'Left Side', 'Right Side', 'Back Side', 'Cover', 'Extra'][selectedIndex]}
+                        {DESIGN_MEDIA_SLOTS[selectedIndex]}
                       </span>
                     </div>
                   )}
@@ -1537,6 +1557,7 @@ const CreateDesignInner: React.FC = () => {
                   onDelete={handleDelete}
                   onSetCover={handleSetCover}
                   onAddMore={picker.open}
+                  canAddMore={files.length < DESIGN_MAX_MEDIA_COUNT}
                   disabled={disabled}
                   progressById={perFileProgress}
                   showSlotLabels
@@ -1956,6 +1977,28 @@ const CreateDesignInner: React.FC = () => {
                 selectedAllowWrap
               />
 
+              <UniversalSelect
+                label="Fit Preference"
+                value={fitPreference}
+                onChange={(value) => setFitPreference(value as DesignFitPreference)}
+                options={DESIGN_FIT_PREFERENCE_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                disabled={disabled}
+              />
+
+              <UniversalSelect
+                label="Target Age Group"
+                value={targetAgeGroup}
+                onChange={(value) => setTargetAgeGroup(value as DesignTargetAgeGroup)}
+                options={DESIGN_TARGET_AGE_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                disabled={disabled}
+              />
+
               {/* Visibility */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">
@@ -1967,13 +2010,13 @@ const CreateDesignInner: React.FC = () => {
                       {
                         value: "PUBLIC",
                         emoji: "🌍",
-                        label: "Public",
+                        label: "Everyone",
                         desc: "Everyone can see this design",
                       },
                       {
                         value: "PRIVATE",
                         emoji: "🔒",
-                        label: "Private",
+                        label: "Only me",
                         desc: "Only you and collaborators can see",
                       },
                     ] as const
