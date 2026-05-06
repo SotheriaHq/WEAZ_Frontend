@@ -94,7 +94,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   return (
     <div className={`relative space-y-2 ${className}`} ref={containerRef}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="block text-sm font-medium text-[color:var(--text-secondary)]">
           {label}
         </label>
       )}
@@ -107,17 +107,17 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           className={`
             relative w-full cursor-pointer rounded-2xl border text-left shadow-sm transition-colors duration-200
             flex items-center justify-between px-4 py-3.5 ${selectedAllowWrap ? 'items-start' : 'items-center'}
-            ${disabled ? 'cursor-not-allowed opacity-60 bg-gray-100 dark:bg-gray-800' : 'bg-white/75 dark:bg-white/5 backdrop-blur-xl hover:bg-white dark:hover:bg-white/10'}
+            ${disabled ? 'cursor-not-allowed opacity-60 bg-[color:var(--surface-muted)]' : 'surface-menu backdrop-blur-xl hover:bg-[color:var(--surface-secondary)]'}
             ${error 
               ? 'border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.10)]' 
-              : 'border-gray-200/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
+              : 'border-[color:var(--border-default)] hover:border-[color:var(--border-strong)]'
             }
           `}
         >
-          <span className={`flex min-w-0 flex-1 ${selectedAllowWrap ? 'items-start' : 'items-center'} ${!selectedOption ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+          <span className={`flex min-w-0 flex-1 ${selectedAllowWrap ? 'items-start' : 'items-center'} ${!selectedOption ? 'text-[color:var(--text-secondary)]' : 'text-[color:var(--text-primary)]'}`}>
             {selectedOption ? (
               <span className={`flex min-w-0 gap-2 ${selectedAllowWrap ? 'items-start' : 'items-center'}`}>
-                {selectedOption.icon && <span className="flex-shrink-0 text-gray-500 dark:text-gray-400">{selectedOption.icon}</span>}
+                {selectedOption.icon && <span className="flex-shrink-0 text-[color:var(--text-secondary)]">{selectedOption.icon}</span>}
                 <span className={selectedAllowWrap ? 'whitespace-normal break-words text-sm leading-5' : 'truncate'}>{selectedOption.label}</span>
               </span>
             ) : (
@@ -125,14 +125,14 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
             )}
           </span>
           <span className="pointer-events-none flex items-center pr-2">
-            <span aria-hidden="true" className={`text-base leading-none text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>⌄</span>
+            <span aria-hidden="true" className={`text-base leading-none text-[color:var(--text-secondary)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>⌄</span>
           </span>
         </button>
 
         {isOpen && (
           <div className="absolute z-50 mt-1.5 max-h-60 w-full max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl glass-menu p-1.5 shadow-2xl animate-slideDown focus:outline-none scrollbar-hide">
             {searchable && (
-              <div className="sticky top-0 z-10 rounded-xl border border-white/10 bg-white/85 px-2 py-2 backdrop-blur-xl dark:border-white/10 dark:bg-black/25">
+              <div className="sticky top-0 z-10 rounded-xl border surface-menu px-2 py-2 backdrop-blur-xl">
                 <input
                   type="text"
                   value={searchTerm}
@@ -140,7 +140,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                   placeholder={searchPlaceholder}
                   autoComplete="off"
                   spellCheck={false}
-                  className="w-full rounded-xl border border-gray-200/80 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-transparent focus:ring-0 dark:border-white/10 dark:bg-black/40 dark:text-white"
+                  className="w-full rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-primary)] px-3 py-2 text-sm text-[color:var(--text-primary)] outline-none transition-colors focus:border-transparent focus:ring-0"
                 />
               </div>
             )}
@@ -155,13 +155,13 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                       relative cursor-pointer select-none rounded-xl ${optionCompact ? 'py-2 pl-2.5 pr-8' : 'py-2.5 pl-3 pr-9'} transition-colors
                       ${isSelected 
                         ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-900 dark:text-purple-100' 
-                        : 'text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-white/5'
+                        : 'text-[color:var(--text-primary)] surface-interactive-hover'
                       }
                     `}
                   >
                     <div className={`flex ${optionAllowWrap ? 'items-start' : 'items-center'}`}>
                       {option.icon && (
-                        <span className={`mr-3 mt-0.5 flex-shrink-0 ${isSelected ? 'text-purple-500' : 'text-gray-400'}`}>
+                        <span className={`mr-3 mt-0.5 flex-shrink-0 ${isSelected ? 'text-purple-500' : 'text-[color:var(--text-secondary)]'}`}>
                           {option.icon}
                         </span>
                       )}
@@ -181,7 +181,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                               optionAllowWrap
                                 ? 'text-[11px] leading-4 whitespace-normal break-words'
                                 : 'truncate text-xs'
-                            } ${isSelected ? 'text-purple-700 dark:text-purple-300' : 'text-gray-500 dark:text-gray-400'}`}
+                            } ${isSelected ? 'text-purple-700 dark:text-purple-300' : 'text-[color:var(--text-secondary)]'}`}
                           >
                             {option.description}
                           </span>
@@ -198,7 +198,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                 );
               })}
               {filteredOptions.length === 0 && (
-                <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
+                <div className="px-3 py-3 text-sm text-[color:var(--text-secondary)]">
                   {emptyMessage}
                 </div>
               )}

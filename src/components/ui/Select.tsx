@@ -21,9 +21,9 @@ export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElemen
 const variantStyles: Record<SelectVariant, string> = {
   default: `
     px-4 py-3 text-sm font-medium
-    bg-white dark:bg-zinc-900/60
+    bg-[color:var(--surface-primary)]
     border rounded-xl
-    text-gray-900 dark:text-white
+    text-[color:var(--text-primary)]
     shadow-sm
     focus:outline-none focus:ring-0 focus:border-transparent
     transition-colors duration-200
@@ -31,10 +31,10 @@ const variantStyles: Record<SelectVariant, string> = {
   `,
   filter: `
     px-3 py-2 text-sm font-medium
-    bg-white dark:bg-zinc-900/80
-    border border-gray-200 dark:border-white/10
+    bg-[color:var(--surface-primary)]
+    border border-[color:var(--border-default)]
     rounded-lg
-    text-gray-700 dark:text-gray-200
+    text-[color:var(--text-primary)]
     shadow-sm
     hover:border-purple-300 dark:hover:border-purple-500/50
     focus:outline-none focus:ring-0 focus:border-transparent
@@ -45,11 +45,11 @@ const variantStyles: Record<SelectVariant, string> = {
   `,
   compact: `
     px-2.5 py-1.5 text-xs font-medium
-    bg-white/80 dark:bg-zinc-900/60
-    border border-gray-200 dark:border-white/10
+    bg-[color:var(--surface-primary)]
+    border border-[color:var(--border-default)]
     rounded-md
-    text-gray-600 dark:text-gray-300
-    hover:bg-gray-50 dark:hover:bg-white/5
+    text-[color:var(--text-secondary)]
+    hover:bg-[color:var(--surface-muted)]
     focus:outline-none focus:ring-0 focus:border-transparent
     transition-colors duration-150
     cursor-pointer
@@ -138,7 +138,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           ? "border-red-500 dark:border-red-500"
           : ""
       }
-      ${disabled ? "opacity-60 cursor-not-allowed bg-gray-100 dark:bg-zinc-800/50" : ""}
+      ${disabled ? "opacity-60 cursor-not-allowed bg-[color:var(--surface-muted)]" : ""}
     `;
 
     const showChevron = true;
@@ -159,7 +159,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         className={`${fullWidth ? "w-full" : ""} ${variant !== "default" ? "relative inline-block" : ""} ${className}`}
       >
         {label && (
-          <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-300 mb-2">
+          <label className="block text-sm font-semibold text-[color:var(--text-secondary)] mb-2">
             {label}
             {required && <span className="text-purple-500 ml-1">*</span>}
           </label>
@@ -178,7 +178,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               aria-label={label}
             >
               <span className="truncate">{selectedLabel}</span>
-              {showChevron ? <span aria-hidden="true" className={`shrink-0 text-gray-400 ${variant === "compact" ? 'text-xs' : 'text-base'}`}>{open ? '⌃' : '⌄'}</span> : null}
+              {showChevron ? <span aria-hidden="true" className={`shrink-0 text-[color:var(--text-secondary)] ${variant === "compact" ? 'text-xs' : 'text-base'}`}>{open ? '⌃' : '⌄'}</span> : null}
             </DropdownTrigger>
             <DropdownMenu className="min-w-[220px]">
               {options.map((opt) => {
@@ -190,7 +190,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                     onClick={() =>
                       !opt.disabled && handleSelect(`${opt.value}`)
                     }
-                    className={`${isActive ? "bg-white/30 dark:bg-white/10" : ""} ${opt.disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+                    className={`${isActive ? "bg-[color:var(--brand-primary)]/10" : ""} ${opt.disabled ? "opacity-60 cursor-not-allowed" : ""}`}
                     selected={isActive}
                   >
                     {opt.label}
@@ -217,7 +217,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             {error ? (
               <p className="text-xs text-red-500">{error}</p>
             ) : helperText ? (
-              <p className="text-xs text-gray-500 dark:text-zinc-500">
+              <p className="text-xs text-[color:var(--text-secondary)]">
                 {helperText}
               </p>
             ) : null}

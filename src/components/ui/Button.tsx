@@ -52,13 +52,13 @@ const Button: React.FC<ButtonProps> = ({
 
   const variantClasses = {
     // Black fill — confident, editorial, fashion-native. Default for all actions.
-    primary:   'bg-[#0d0d0d] hover:bg-[#1a1a1a] text-white dark:bg-white dark:hover:bg-gray-100 dark:text-[#0d0d0d]',
+    primary:   'bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)]',
     // Purple fill — reserved for brand-owned CTAs (follow, shop, subscribe).
     brand:     'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-strong)] text-white',
     // Outline — transparent with border. Supporting action alongside primary.
-    secondary: 'bg-transparent border border-[#0d0d0d] text-[#0d0d0d] hover:bg-[#0d0d0d]/5 dark:border-white dark:text-white dark:hover:bg-white/10',
+    secondary: 'bg-transparent border border-[color:var(--border-strong)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-muted)]',
     // Ghost — no border. Low-emphasis actions in dense UI.
-    ghost:     'bg-transparent hover:bg-gray-100 text-[var(--text-secondary)] hover:text-[var(--text-primary)] dark:hover:bg-white/8 dark:text-gray-400 dark:hover:text-white',
+    ghost:     'bg-transparent surface-interactive-hover text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
     link:      'bg-transparent hover:underline text-[var(--text-primary)] underline-offset-2',
     danger:    'bg-red-600 hover:bg-red-700 text-white',
   };

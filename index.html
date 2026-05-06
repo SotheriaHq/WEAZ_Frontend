@@ -67,6 +67,7 @@
 
         root.classList.remove('light', 'dark');
         root.classList.add(className);
+        root.dataset.theme = className;
         root.dataset.themePreference = theme;
         root.style.colorScheme = className;
 

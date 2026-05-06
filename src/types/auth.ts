@@ -1,3 +1,5 @@
+import type { ThemePreference } from './theme';
+
 export type AuthRole = 'SuperAdmin' | 'Admin' | 'User';
 export type AuthUserType = 'BRAND' | 'REGULAR';
 
@@ -17,6 +19,7 @@ export interface AuthUserDto {
   lastName: string;
   role: AuthRole;
   type: AuthUserType;
+  themePreference: ThemePreference;
   phoneNumber: string | null;
   address: string | null;
   brandFullName: string | null;

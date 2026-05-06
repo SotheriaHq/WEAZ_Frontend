@@ -2,6 +2,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AuthUserDto } from '../types/auth';
 import { env } from '../config/env';
+import { normalizeThemePreference } from '@/types/theme';
 
 export interface UserState {
   profile: AuthUserDto | null;
@@ -10,6 +11,9 @@ export interface UserState {
 
 const normalizeUser = (user: AuthUserDto): AuthUserDto => ({
   ...user,
+  themePreference: normalizeThemePreference(
+    (user as { themePreference?: unknown }).themePreference,
+  ),
   brandFullName: user.brandFullName ?? null,
   brandDescription: user.brandDescription ?? null,
   brandCountry: user.brandCountry ?? null,

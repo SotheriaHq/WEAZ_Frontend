@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTheme } from '@/context/ThemeContext';
+import { useSyncedThemePreference } from '@/hooks/useSyncedThemePreference';
 
 const THEME_OPTIONS = [
   { value: 'light' as const, label: 'Light' },
@@ -8,21 +8,21 @@ const THEME_OPTIONS = [
 ];
 
 const AdminThemeSwitcher: React.FC = () => {
-  const { theme, setTheme } = useTheme();
+  const { themePreference, setThemePreference } = useSyncedThemePreference();
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-xl border border-gray-200/80 bg-white/80 p-1 shadow-sm dark:border-white/10 dark:bg-white/5">
+    <div className="inline-flex items-center gap-1 rounded-xl border surface-control p-1 shadow-sm">
       {THEME_OPTIONS.map((option) => {
-        const active = theme === option.value;
+        const active = themePreference === option.value;
         return (
           <button
             key={option.value}
             type="button"
-            onClick={() => setTheme(option.value)}
+            onClick={() => void setThemePreference(option.value)}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
               active
                 ? 'bg-purple-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10'
+                : 'text-[color:var(--text-secondary)] surface-interactive-hover'
             }`}
             aria-pressed={active}
           >

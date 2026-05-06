@@ -28,7 +28,7 @@ import { apiClient, dropStoredAccessToken } from '../api/httpClient';
 import { env } from '../config/env';
 import getProfileOrHomeUrl from '../lib/navigation';
 import { useEffect, useState } from 'react';
-import { useTheme } from '@/context/ThemeContext';
+import { useSyncedThemePreference } from '@/hooks/useSyncedThemePreference';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import ImageWithFallback from './ImageWithFallback';
@@ -52,13 +52,19 @@ interface NavbarProps {
   profileMenuContext?: 'default' | 'studio';
 }
 
+const THEME_MENU_OPTIONS = [
+  { value: 'light' as const, label: 'Light', icon: '☀️' },
+  { value: 'dark' as const, label: 'Dark', icon: '🌙' },
+  { value: 'system' as const, label: 'System', icon: '💻' },
+];
+
 export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuContext = 'default' }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const notificationsButtonRef = React.useRef<HTMLButtonElement | null>(null);
-  const { theme, setTheme } = useTheme();
+  const { themePreference, setThemePreference } = useSyncedThemePreference();
   const { setLanguage, translate } = useLanguage();
   const { profile: userProfile, isAuthenticated } = useSelector((state: RootState) => state.user);
   const isSidebarOpen = useSelector((state: RootState) => state.ui.isSidebarOpen);
@@ -76,13 +82,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const userUid = user ? generateUserUid(user.id, user.firstName) : null;
-  const resolvedIsDark =
-    theme === 'dark' ||
-    (theme === 'system' &&
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches);
-  const themeActionEmoji = resolvedIsDark ? '☀️' : '🌙';
-  const themeMenuLabel = resolvedIsDark ? 'Light theme' : 'Dark theme';
 
   React.useEffect(() => {
     if (isAuthenticated) {
@@ -125,10 +124,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  const handleThemeToggle = () => {
-    setTheme(resolvedIsDark ? 'light' : 'dark');
-  };
 
   const handleLocationShare = () => {
     if (!navigator.geolocation) return;
@@ -181,10 +176,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
 
         <DropdownMenu
           maxHeight="min(80dvh, 30rem)"
-          className="w-[min(13.5rem,calc(100vw-1rem))] !border-0 !border-transparent !bg-white !shadow-none !ring-0 outline-none dark:!bg-[#09090b] sm:w-[15.5rem]"
+          className="surface-menu w-[min(13.5rem,calc(100vw-1rem))] !shadow-none !ring-0 outline-none sm:w-[15.5rem]"
         >
           <div className="flex items-center gap-3 px-3.5 pb-3 pt-3.5">
-            <div className="h-12 w-12 overflow-hidden rounded-xl border border-black/5 dark:border-white/10">
+            <div className="h-12 w-12 overflow-hidden rounded-xl border border-theme">
               <ImageWithFallback
                 src={userAvatar.src}
                 fileId={userAvatar.fileId}
@@ -201,23 +196,36 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
                 <div className="min-w-0 flex-1 truncate text-base font-semibold text-[color:var(--text-primary)]">
                   {user.firstName} {user.lastName}
                 </div>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    handleThemeToggle();
-                  }}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-base transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-                  aria-label={`Switch to ${themeMenuLabel}`}
-                  title={`Switch to ${themeMenuLabel}`}
-                >
-                  <span aria-hidden="true">{themeActionEmoji}</span>
-                </button>
               </div>
               <div className="mt-0.5 break-words text-[11px] leading-4 text-[color:var(--text-secondary)]">
                 {user.email}
                 {userUid ? ` · UID ${userUid}` : ''}
+              </div>
+              <div className="mt-2 flex items-center gap-1 rounded-xl surface-control p-1">
+                {THEME_MENU_OPTIONS.map((option) => {
+                  const active = themePreference === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void setThemePreference(option.value);
+                      }}
+                      className={`inline-flex h-7 flex-1 items-center justify-center rounded-lg text-sm transition-colors ${
+                        active
+                          ? 'surface-card shadow-sm'
+                          : 'surface-interactive-hover'
+                      }`}
+                      aria-label={`Use ${option.label.toLowerCase()} theme`}
+                      aria-pressed={active}
+                      title={`${option.label} theme`}
+                    >
+                      <span aria-hidden="true">{option.icon}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -271,10 +279,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
 
               {showLanguageDropdown ? (
                 <div className="space-y-1 px-1 pt-1">
-                  <button onClick={() => { setLanguage('en'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">English</button>
-                  <button onClick={() => { setLanguage('zh'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">Chinese</button>
-                  <button onClick={() => { setLanguage('ar'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">Arabic</button>
-                  <button onClick={() => { setLanguage('hi'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition-colors hover:bg-black/5 dark:hover:bg-white/10">Hindi</button>
+                  <button onClick={() => { setLanguage('en'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] surface-interactive-hover">English</button>
+                  <button onClick={() => { setLanguage('zh'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] surface-interactive-hover">Chinese</button>
+                  <button onClick={() => { setLanguage('ar'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] surface-interactive-hover">Arabic</button>
+                  <button onClick={() => { setLanguage('hi'); setShowProfileMenu(false); }} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[color:var(--text-primary)] surface-interactive-hover">Hindi</button>
                 </div>
               ) : null}
             </>
@@ -376,7 +384,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
             <button
               type="button"
               onClick={() => dispatch(toggleSidebar())}
-              className="mr-1 inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none active:bg-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 dark:active:bg-gray-700"
+              className="mr-1 inline-flex h-10 w-10 items-center justify-center rounded-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)]"
               aria-label="Toggle sidebar"
             >
               <span className="text-xl">🍔</span>
@@ -393,7 +401,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
             >
               <BrandWordmark
                 logoSize={32}
-                textClassName="max-w-[200px] truncate text-lg font-bold tracking-tight text-gray-900 dark:text-white"
+                textClassName="max-w-[200px] truncate text-lg font-bold tracking-tight text-theme"
               />
               <span className="sr-only">{COMPANY_NAME}</span>
             </div>
@@ -415,11 +423,11 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
           {!minimal ? (
             <button
               type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none active:bg-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 dark:active:bg-gray-700 sm:hidden"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)] sm:hidden"
               aria-label="Open search"
               onClick={() => navigate('/search')}
             >
-              <span aria-hidden="true" className="text-lg text-gray-700 dark:text-gray-200">🔎</span>
+              <span aria-hidden="true" className="text-lg text-theme-secondary">🔎</span>
             </button>
           ) : null}
 
@@ -427,7 +435,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
             <button
               type="button"
               onClick={() => dispatch(isWishlistOpen ? closeWishlistDrawer() : openWishlistDrawer())}
-              className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl transition-colors hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none active:bg-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 dark:active:bg-gray-700 sm:flex"
+              className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)] sm:flex"
               aria-label="Wishlist"
             >
               <span aria-hidden="true" className="text-xl">🤍</span>
@@ -442,7 +450,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
           <button
             type="button"
             onClick={() => dispatch(isCartOpen ? closeCartDrawer() : openCartDrawer())}
-            className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl transition-colors hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none active:bg-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 dark:active:bg-gray-700 sm:flex"
+            className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)] sm:flex"
             aria-label="Bag"
           >
             <span aria-hidden="true" className="text-xl">🛍️</span>
@@ -463,7 +471,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
                   setShowLanguageDropdown(false);
                   setShowNotificationsDropdown((value) => !value);
                 }}
-                className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl transition-colors hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none active:bg-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 dark:active:bg-gray-700 sm:flex"
+                className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)] sm:flex"
                 aria-label="Notifications"
                 aria-expanded={showNotificationsDropdown}
               >

@@ -1,11 +1,8 @@
 import { useTheme } from '@/context/ThemeContext';
+import type { ResolvedTheme } from '@/types/theme';
 
-export const useCurrentTheme = (): 'light' | 'dark' => {
-  const { theme, systemScheme } = useTheme();
+export const useCurrentTheme = (): ResolvedTheme => {
+  const { resolvedTheme } = useTheme();
 
-  if (theme === 'light' || theme === 'dark') {
-    return theme;
-  }
-
-  return systemScheme;
+  return resolvedTheme;
 };

@@ -141,6 +141,60 @@ html {
     z-index: var(--z-toast);
   }
 
+  .text-theme {
+    color: var(--text-primary);
+  }
+
+  .text-theme-secondary {
+    color: var(--text-secondary);
+  }
+
+  .border-theme {
+    border-color: var(--border-default);
+  }
+
+  .border-theme-strong {
+    border-color: var(--border-strong);
+  }
+
+  .surface-card {
+    color: var(--text-primary);
+    background-color: var(--surface-primary);
+    border-color: var(--border-default);
+  }
+
+  .surface-menu {
+    color: var(--text-primary);
+    background-color: color-mix(in srgb, var(--surface-primary) 94%, transparent);
+    border-color: var(--border-default);
+  }
+
+  .surface-modal {
+    color: var(--text-primary);
+    background-color: color-mix(in srgb, var(--surface-primary) 96%, transparent);
+    border-color: var(--border-default);
+  }
+
+  .surface-control {
+    color: var(--text-primary);
+    background-color: var(--surface-secondary);
+    border-color: var(--border-default);
+  }
+
+  .surface-control-muted {
+    color: var(--text-secondary);
+    background-color: var(--surface-muted);
+    border-color: var(--border-default);
+  }
+
+  .surface-interactive-hover {
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+
+  .surface-interactive-hover:hover {
+    background-color: var(--surface-muted);
+  }
+
   /* Threadly styled scrollbars (uses theme tokens) */
   .scrollbar-threadly {
     scrollbar-width: thin;
@@ -228,36 +282,40 @@ html {
   }
 
   .glass-panel {
-    @apply bg-transparent border border-gray-200/70 dark:border-white/10 rounded-2xl;
+    @apply bg-transparent border rounded-2xl;
+    border-color: color-mix(in srgb, var(--border-default) 82%, transparent);
   }
 
   .dark .glass-panel {
     background: transparent;
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--border-default);
   }
 
   .glass-menu {
-    @apply backdrop-blur-xl rounded-2xl border border-white/20 dark:border-white/10 shadow-2xl;
-    background: rgba(255, 255, 255, 0.92);
+    @apply backdrop-blur-xl rounded-2xl border shadow-2xl;
+    color: var(--text-primary);
+    background-color: color-mix(in srgb, var(--surface-primary) 94%, transparent);
+    border-color: var(--border-default);
     box-shadow:
       0 18px 48px rgba(15, 23, 42, 0.14),
       0 2px 8px rgba(15, 23, 42, 0.06);
   }
 
   :is(.dark) .glass-menu {
-    background: rgba(9, 9, 11, 0.96);
     box-shadow:
       0 18px 48px rgba(0, 0, 0, 0.36),
       0 2px 8px rgba(0, 0, 0, 0.16);
   }
 
   .glass-menu-soft {
-    @apply backdrop-blur-xl rounded-2xl border border-white/20 dark:border-white/10 shadow-xl;
-    background: rgba(255, 255, 255, 0.78);
+    @apply backdrop-blur-xl rounded-2xl border shadow-xl;
+    color: var(--text-primary);
+    border-color: var(--border-default);
+    background-color: color-mix(in srgb, var(--surface-primary) 84%, transparent);
   }
 
   :is(.dark) .glass-menu-soft {
-    background: rgba(12, 12, 12, 0.92);
+    background-color: color-mix(in srgb, var(--surface-primary) 92%, transparent);
   }
 
   .glass-chip {
@@ -435,16 +493,29 @@ html {
   }
 
   .btn-frost-primary {
-    @apply btn-frost text-white bg-[#0d0d0d] hover:bg-[#1a1a1a]
-           dark:bg-white dark:text-[#0d0d0d] dark:hover:bg-gray-100;
+    @apply btn-frost;
+    color: var(--surface-primary);
+    background-color: var(--text-primary);
+  }
+
+  .btn-frost-primary:hover {
+    opacity: 0.9;
   }
 
   .btn-frost-ghost {
-    @apply btn-frost text-gray-900 dark:text-gray-100 bg-white/0 hover:bg-white/10 border border-white/20;
+    @apply btn-frost bg-transparent border;
+    color: var(--text-primary);
+    border-color: var(--border-default);
+  }
+
+  .btn-frost-ghost:hover {
+    background-color: var(--surface-muted);
   }
 
   .btn-frost-outline {
-    @apply btn-frost text-purple-700 dark:text-purple-300 bg-white/0 border border-purple-300/60 hover:bg-purple-400/10;
+    @apply btn-frost bg-transparent border hover:bg-purple-400/10;
+    color: var(--brand-primary);
+    border-color: color-mix(in srgb, var(--brand-primary) 34%, var(--border-default));
   }
 
   .btn-tight-xs {
