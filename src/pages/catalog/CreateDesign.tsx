@@ -229,10 +229,10 @@ const CreateDesignInner: React.FC = () => {
   );
   const tagStylePalette = useMemo(
     () => [
-      "bg-white/30 border border-white/40 text-purple-900 dark:text-white backdrop-blur-md shadow-sm",
+      "surface-control border border-theme text-theme backdrop-blur-md shadow-sm",
       "bg-gradient-to-r from-purple-500/60 to-blue-500/50 text-white shadow-md",
       "bg-gradient-to-r from-amber-400/70 to-pink-500/70 text-white shadow-md",
-      "bg-white/20 text-white border border-white/30 backdrop-blur",
+      "surface-control border border-theme text-theme backdrop-blur",
       "bg-gradient-to-r from-emerald-400/70 to-teal-500/70 text-white shadow-md",
       "bg-gradient-to-r from-indigo-500/70 to-cyan-500/70 text-white shadow-md",
     ],
@@ -1331,18 +1331,18 @@ const CreateDesignInner: React.FC = () => {
       {showSaveDraftConfirm && (
         <div className="fixed inset-0 z-layer-modal flex items-center justify-center">
           <div
-            className="absolute inset-0 bg-black/60"
+            className="absolute inset-0 surface-overlay-strong"
             onClick={() => setShowSaveDraftConfirm(false)}
           />
-          <div className="relative z-10 w-[min(92vw,420px)] max-h-[calc(100vh-2rem)] overflow-y-auto bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-5 sm:p-6">
+          <div className="surface-modal relative z-10 w-[min(92vw,420px)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border shadow-xl p-5 sm:p-6">
             <h3 className="text-lg font-semibold mb-2">Save as Draft?</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+            <p className="text-sm text-theme-secondary mb-4">
               Your media will be uploaded and saved as a draft. You can continue
               editing later.
             </p>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button
-                className="w-full rounded-lg border px-4 py-2 sm:w-auto"
+                className="surface-control surface-interactive-hover w-full rounded-lg border px-4 py-2 sm:w-auto"
                 onClick={() => setShowSaveDraftConfirm(false)}
                 disabled={isSubmitting}
               >
@@ -1362,15 +1362,15 @@ const CreateDesignInner: React.FC = () => {
 
       {showDraftSavedChoices && (
         <div className="fixed inset-0 z-layer-modal flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60" />
-          <div className="relative z-10 w-[min(92vw,460px)] max-h-[calc(100vh-2rem)] overflow-y-auto bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-5 sm:p-6">
+          <div className="absolute inset-0 surface-overlay-strong" />
+          <div className="surface-modal relative z-10 w-[min(92vw,460px)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border shadow-xl p-5 sm:p-6">
             <h3 className="text-lg font-semibold mb-2">Draft saved</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mb-5">
+            <p className="text-sm text-theme-secondary mb-5">
               Choose what you want to do next.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <button
-                className="w-full rounded-lg border px-4 py-2 sm:w-auto"
+                className="surface-control surface-interactive-hover w-full rounded-lg border px-4 py-2 sm:w-auto"
                 onClick={handleCreateNewDesign}
               >
                 Create New Design
@@ -1418,7 +1418,7 @@ const CreateDesignInner: React.FC = () => {
             >
               <div className="flex items-center gap-3 mb-2">
                 <VLoader size={32} phase="loading" showLabel={false} />
-                <span className="text-white font-medium">
+                <span className="text-theme font-medium">
                   Uploading files... {progress}%
                 </span>
                 <button
@@ -1427,7 +1427,7 @@ const CreateDesignInner: React.FC = () => {
                     cancelUploads();
                     toast.info("Upload cancelled");
                   }}
-                  className="ml-auto px-3 py-1 rounded-lg bg-white/10 text-white text-sm hover:bg-white/20"
+                  className="surface-control surface-interactive-hover ml-auto px-3 py-1 rounded-lg text-sm"
                 >
                   Cancel
                 </button>
@@ -1460,21 +1460,21 @@ const CreateDesignInner: React.FC = () => {
                       className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
                         index < DESIGN_REQUIRED_MEDIA_COUNT
                           ? 'bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400'
-                          : 'bg-gray-50 text-gray-400 dark:bg-white/5 dark:text-gray-500'
+                          : 'surface-control-muted'
                       }`}
                     >
                       <span className="font-bold">{index + 1}.</span> {label}{index < DESIGN_REQUIRED_MEDIA_COUNT && ' *'}
                     </span>
                   ))}
                 </div>
-                <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                <p className="text-center text-[10px] text-theme-secondary mt-1">
                   * Required for publishing - fill Front, Back, Left, and Right
                 </p>
               </div>
             ) : (
               <div className="space-y-4 h-full min-w-0">
                 {/* Main Preview - NO background; media defines layout */}
-                <div className="relative rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-sm">
+                <div className="relative rounded-2xl border border-theme shadow-sm">
                   {/* Slot label badge on the preview */}
                   {selectedIndex < 6 && (
                     <div className="absolute top-3 left-3 z-10 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm">
@@ -1575,7 +1575,7 @@ const CreateDesignInner: React.FC = () => {
                 />
 
                 {/* Image info */}
-                <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-center text-sm text-theme-secondary">
                   {selectedFile?.kind === "video" ? "Video" : "Image"}{" "}
                   {selectedIndex + 1} of {files.length}
                   {selectedFile?.file?.name && ` • ${selectedFile.file.name}`}
@@ -1609,16 +1609,16 @@ const CreateDesignInner: React.FC = () => {
                   required
                 />
 
-                <div className="rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/40 dark:bg-white/[0.02] p-3 sm:p-4">
+                <div className="surface-panel-subtle rounded-xl border p-3 sm:p-4">
                   <div className="mb-3 flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-theme-secondary">
                       Design Metadata
                     </p>
                   </div>
                   <div className="pr-1 sm:pr-2">
                     <div className="space-y-4">
                       <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center">
+                        <label className="text-sm font-medium text-theme flex items-center">
                           Tell Your Story
                           <InfoTooltip text="Describe the inspiration, mood, and story behind this design. This is visible to buyers browsing the catalog." />
                         </label>
@@ -1628,9 +1628,9 @@ const CreateDesignInner: React.FC = () => {
                           placeholder="Inspired by the warm coastal breeze of Lagos..."
                           rows={4}
                           disabled={disabled || titleDescriptionLocked}
-                          className="w-full px-4 py-3 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none"
+                          className="surface-control placeholder-theme w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none"
                         />
-                        <p className="text-right text-xs text-gray-600 dark:text-gray-400">
+                        <p className="text-right text-xs text-theme-secondary">
                           {description.length} / 500 characters
                         </p>
                       </div>
@@ -1701,12 +1701,12 @@ const CreateDesignInner: React.FC = () => {
 
                       {/* Tags Section */}
                       <div className="space-y-3">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center">
+                        <label className="text-sm font-medium text-theme flex items-center">
                           🏷️ Tags (up to 10)
                           <InfoTooltip text="Tags improve catalog discoverability. Add manually or use filter-driven suggestions. Up to 10 tags per design." />
                         </label>
 
-                        <div className="p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10">
+                        <div className="surface-panel-subtle p-4 rounded-xl border">
                           {/* Selected tags */}
                           {selectedTags.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 mb-3">
@@ -1733,7 +1733,7 @@ const CreateDesignInner: React.FC = () => {
 
                           {/* Search input */}
                           <div className="relative">
-                            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-secondary)]" />
                             <input
                               type="text"
                               value={tagSearch}
@@ -1770,7 +1770,7 @@ const CreateDesignInner: React.FC = () => {
                           {/* Popular tags */}
                           {filteredSuggestions.length > 0 && (
                             <div className="mt-3">
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                              <p className="text-xs text-theme-secondary mb-2">
                                 Popular Tags:
                               </p>
                               <div className="flex flex-wrap gap-1.5">
@@ -1819,13 +1819,13 @@ const CreateDesignInner: React.FC = () => {
           >
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 flex items-center">
+                <label className="text-sm font-medium text-theme mb-2 flex items-center">
                   Price Range
                   <InfoTooltip text="An indicative price range for this design. This is NOT a checkout price — it helps buyers understand the expected cost." />
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-secondary)]">
                       ₦
                     </span>
                     <input
@@ -1834,14 +1834,14 @@ const CreateDesignInner: React.FC = () => {
                       onChange={(e) => setMinPrice(e.target.value)}
                       placeholder="15,000"
                       disabled={disabled}
-                      className="w-full pl-8 pr-4 py-3 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      className="surface-control placeholder-theme w-full pl-8 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     />
-                    <span className="absolute -bottom-5 left-0 text-xs text-gray-600 dark:text-gray-400">
+                    <span className="absolute -bottom-5 left-0 text-xs text-theme-secondary">
                       Minimum Price
                     </span>
                   </div>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-secondary)]">
                       ₦
                     </span>
                     <input
@@ -1850,9 +1850,9 @@ const CreateDesignInner: React.FC = () => {
                       onChange={(e) => setMaxPrice(e.target.value)}
                       placeholder="45,000"
                       disabled={disabled}
-                      className="w-full pl-8 pr-4 py-3 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      className="surface-control placeholder-theme w-full pl-8 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     />
-                    <span className="absolute -bottom-5 left-0 text-xs text-gray-600 dark:text-gray-400">
+                    <span className="absolute -bottom-5 left-0 text-xs text-theme-secondary">
                       Maximum Price
                     </span>
                   </div>
@@ -1870,37 +1870,37 @@ const CreateDesignInner: React.FC = () => {
 
               {/* Checkboxes */}
               <div className="space-y-3 mt-4">
-                <label className="flex items-start gap-3 p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 cursor-pointer hover:border-purple-500/30 transition-colors">
+                <label className="surface-card flex items-start gap-3 p-4 rounded-xl border cursor-pointer hover:border-purple-500/30 transition-colors">
                   <input
                     type="checkbox"
                     checked={false}
                     onChange={() => {}}
                     disabled={true}
-                    className="w-5 h-5 mt-0.5 rounded border-gray-400 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-transparent"
+                    className="w-5 h-5 mt-0.5 rounded border-theme text-purple-600 focus:ring-purple-500 bg-theme"
                   />
                   <div>
-                    <span className="text-gray-900 dark:text-white font-medium">
+                    <span className="text-theme font-medium">
                       Store availability
                     </span>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-theme-secondary">
                       Store collections are created in Store Studio.
                     </p>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-3 p-4 rounded-xl glass-light bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 cursor-pointer transition-colors hover:border-purple-500/30">
+                <label className="surface-card flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors hover:border-purple-500/30">
                   <input
                     type="checkbox"
                     checked={isMadeToOrder}
                     onChange={(e) => setIsMadeToOrder(e.target.checked)}
                     disabled={disabled}
-                    className="w-5 h-5 mt-0.5 rounded border-gray-400 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-transparent"
+                    className="w-5 h-5 mt-0.5 rounded border-theme text-purple-600 focus:ring-purple-500 bg-theme"
                   />
                   <div>
-                    <span className="text-gray-900 dark:text-white font-medium">
+                    <span className="text-theme font-medium">
                       Custom Order
                     </span>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-theme-secondary">
                       Allow buyers to request this design with their own measurements.
                     </p>
                   </div>
@@ -1934,7 +1934,7 @@ const CreateDesignInner: React.FC = () => {
             <div className="space-y-6">
               {/* Target Audience */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">
+                <label className="block text-sm font-medium text-theme mb-3">
                   Target Audience
                 </label>
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -1949,7 +1949,7 @@ const CreateDesignInner: React.FC = () => {
                         ${
                           type === option
                             ? "border-purple-500 bg-purple-500/10 text-purple-600 dark:text-purple-400"
-                            : "border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-200 dark:hover:border-white/20"
+                            : "border-theme text-theme-secondary hover:border-purple-200 dark:hover:border-white/20"
                         }
                       `}
                     >
@@ -2001,7 +2001,7 @@ const CreateDesignInner: React.FC = () => {
 
               {/* Visibility */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">
+                <label className="block text-sm font-medium text-theme mb-3">
                   Who Can See This?
                 </label>
                 <div className="space-y-3">
@@ -2028,7 +2028,7 @@ const CreateDesignInner: React.FC = () => {
                         ${
                           visibility === option.value
                             ? "border-purple-500 bg-purple-500/10"
-                            : "border-gray-200 dark:border-white/10 glass-light hover:border-purple-200 dark:hover:border-white/20"
+                            : "border-theme surface-panel-subtle hover:border-purple-200 dark:hover:border-white/20"
                         }
                       `}
                     >
@@ -2044,11 +2044,11 @@ const CreateDesignInner: React.FC = () => {
                       <span className="text-2xl">{option.emoji}</span>
                       <div>
                         <span
-                          className={`font-medium ${visibility === option.value ? "text-purple-600 dark:text-purple-400" : "text-gray-900 dark:text-white"}`}
+                          className={`font-medium ${visibility === option.value ? "text-purple-600 dark:text-purple-400" : "text-theme"}`}
                         >
                           {option.label}
                         </span>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-theme-secondary">
                           {option.desc}
                         </p>
                       </div>
@@ -2064,7 +2064,7 @@ const CreateDesignInner: React.FC = () => {
       {/* Actions Footer - Integrated into flow */}
       <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 pb-12">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="text-sm text-theme-secondary">
             {lastSaved
               ? `Design saved locally • Last edit: ${formatTimeAgo(lastSaved)}`
               : "Unsaved changes"}
@@ -2074,7 +2074,7 @@ const CreateDesignInner: React.FC = () => {
               type="button"
               onClick={handleSaveDraft}
               disabled={disabled}
-              className="flex-1 sm:flex-none py-3 px-6 rounded-xl glass-light border border-gray-200/70 dark:border-white/15 text-gray-900 dark:text-white font-medium hover:bg-white/40 dark:hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-6 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <FiFile className="w-4 h-4" />
               Save Draft
@@ -2455,25 +2455,25 @@ const FormSection: React.FC<{
 }> = ({ title, icon, isOpen, onToggle, children, className, id }) => (
   <div
     id={id}
-    className={`rounded-2xl glass-panel border border-gray-200 dark:border-white/10 overflow-hidden bg-white/80 dark:bg-gray-900/60 backdrop-blur ${className ?? ""}`}
+    className={`surface-card rounded-2xl border overflow-hidden backdrop-blur ${className ?? ""}`}
   >
     <button
       type="button"
       onClick={onToggle}
-      className="w-full flex items-center justify-between p-3 text-left hover:bg-white/5 transition-colors sm:p-4"
+      className="surface-interactive-hover w-full flex items-center justify-between p-3 text-left transition-colors sm:p-4"
     >
       <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-primary text-base sm:h-10 sm:w-10 sm:text-lg">
           {icon}
         </span>
-        <span className="truncate text-base font-semibold text-gray-900 dark:text-white sm:text-lg">
+        <span className="truncate text-base font-semibold text-theme sm:text-lg">
           {title}
         </span>
       </div>
       {isOpen ? (
-        <FiChevronUp className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+        <FiChevronUp className="w-5 h-5 text-[color:var(--text-secondary)]" />
       ) : (
-        <FiChevronDown className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+        <FiChevronDown className="w-5 h-5 text-[color:var(--text-secondary)]" />
       )}
     </button>
     <AnimatePresence>
@@ -2507,9 +2507,9 @@ const ActionButton: React.FC<{
     onClick={onClick}
     disabled={disabled}
     className={`
-      flex items-center gap-2 px-4 py-2 rounded-xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-gray-200 dark:border-white/10
-      text-gray-900 dark:text-white text-sm font-medium transition-all
-      ${active ? "bg-purple-500/20 border-purple-500/50" : "hover:bg-white/10"}
+      surface-control surface-interactive-hover flex items-center gap-2 px-4 py-2 rounded-xl backdrop-blur-md border
+      text-sm font-medium transition-all
+      ${active ? "bg-purple-500/20 border-purple-500/50" : ""}
       ${disabled ? "opacity-50 cursor-not-allowed" : ""}
     `}
   >

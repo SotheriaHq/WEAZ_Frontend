@@ -195,6 +195,24 @@ html {
     background-color: var(--surface-muted);
   }
 
+  .surface-panel-subtle {
+    color: var(--text-primary);
+    background-color: color-mix(in srgb, var(--surface-secondary) 76%, transparent);
+    border-color: var(--border-default);
+  }
+
+  .surface-overlay-soft {
+    background-color: color-mix(in srgb, var(--surface-primary) 54%, transparent);
+  }
+
+  .surface-overlay-strong {
+    background-color: rgba(0, 0, 0, 0.62);
+  }
+
+  .placeholder-theme::placeholder {
+    color: var(--text-secondary);
+  }
+
   /* Threadly styled scrollbars (uses theme tokens) */
   .scrollbar-threadly {
     scrollbar-width: thin;

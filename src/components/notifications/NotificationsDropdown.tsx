@@ -386,7 +386,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     <OverlayPortal>
       <div
         ref={containerRef}
-        className="fixed glass-menu border border-white/25 dark:border-white/12 overflow-hidden z-layer-dropdown animate-slideDown flex flex-col outline-none"
+        className="fixed glass-menu border-theme overflow-hidden z-layer-dropdown animate-slideDown flex flex-col outline-none"
         style={{
           top: panelPos.top,
           left: panelPos.left,
@@ -401,7 +401,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
       <div className="px-3 pt-3 pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="inline-flex min-w-0 items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[color:var(--brand-primary)]/15 flex items-center justify-center border border-white/20 dark:border-white/10 text-sm" aria-hidden="true">🔔</div>
+            <div className="w-8 h-8 rounded-xl bg-[color:var(--brand-primary)]/15 flex items-center justify-center border border-theme text-sm" aria-hidden="true">🔔</div>
             <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">
               Notifications {unreadCount > 0 ? `(${unreadCount})` : ''}
             </p>
@@ -417,7 +417,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
             </button>
             <button
               onClick={handleSettings}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              className="surface-interactive-hover p-2 rounded-full transition-colors"
               aria-label="Notification settings"
               title="Notification settings"
             >
@@ -433,12 +433,12 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         {showLoading && (
           <div className="space-y-2">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="rounded-xl border border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 backdrop-blur p-2">
+              <div key={i} className="surface-card rounded-xl border backdrop-blur p-2">
                 <div className="flex items-start gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-white/50 dark:bg-white/10" />
+                  <div className="w-8 h-8 rounded-lg bg-theme-muted" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-2.5 w-4/5 rounded bg-black/10 dark:bg-white/10" />
-                    <div className="h-2.5 w-1/4 rounded bg-black/10 dark:bg-white/10" />
+                    <div className="h-2.5 w-4/5 rounded bg-theme-muted" />
+                    <div className="h-2.5 w-1/4 rounded bg-theme-muted" />
                   </div>
                 </div>
               </div>
@@ -448,7 +448,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
 
         {/* Empty State */}
         {showEmpty && (
-          <div className="rounded-2xl border border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 backdrop-blur p-8 text-center">
+          <div className="surface-card rounded-2xl border backdrop-blur p-8 text-center">
             <div className="mx-auto w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center text-white text-lg" aria-hidden="true">
               🔔
             </div>
@@ -459,7 +459,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
 
         {/* Error State */}
         {showError && (
-          <div className="rounded-2xl border border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 backdrop-blur p-6 text-center">
+          <div className="surface-card rounded-2xl border backdrop-blur p-6 text-center">
             <p className="text-sm font-medium text-[color:var(--text-primary)]">Failed to load notifications</p>
             <p className="mt-1 text-xs text-[color:var(--text-secondary)]">Please try again.</p>
             <button onClick={handleRetry} className="mt-3 btn-frost-outline btn-tight-sm">Try again</button>
@@ -503,7 +503,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                       'group rounded-xl border backdrop-blur p-2 cursor-pointer transition ' +
                       (isUnread
                         ? 'border-purple-300/50 dark:border-purple-500/20 bg-purple-50/40 dark:bg-purple-500/5'
-                        : 'border-white/20 dark:border-white/10 bg-white/55 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/8')
+                        : 'border-theme surface-card surface-interactive-hover')
                     }
                     onClick={() => {
                       handleMarkRead(n.id);
@@ -521,14 +521,14 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                     aria-label={`${isUnread ? 'Unread' : 'Read'} notification: ${actionText}. ${timeAgo(n.createdAt)}`}
                   >
                     <div className="flex gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-[color:var(--brand-primary)]/15 flex items-center justify-center shrink-0 border border-white/20 dark:border-white/10">
+                      <div className="w-8 h-8 rounded-lg bg-[color:var(--brand-primary)]/15 flex items-center justify-center shrink-0 border border-theme">
                         <NotificationIcon type={n.type} size="md" className="text-[color:var(--brand-primary)]" />
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="text-xs text-gray-800 dark:text-gray-200 line-clamp-2 leading-5">
+                            <p className="text-xs text-theme-secondary line-clamp-2 leading-5">
                               {hasActorLabel ? (
                                 hasActorLink ? (
                                   <button
@@ -555,13 +555,13 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                                 </span>
                               ) : null}
                             </p>
-                            <p className="mt-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">{timeAgo(n.createdAt)}</p>
+                            <p className="mt-1 text-[11px] font-medium text-theme-secondary">{timeAgo(n.createdAt)}</p>
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
                             <button
                               type="button"
-                              className="opacity-70 hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
+                              className="surface-interactive-hover opacity-70 hover:opacity-100 transition-opacity p-1 rounded-lg"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDelete(n.id);

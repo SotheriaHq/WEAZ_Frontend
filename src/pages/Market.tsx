@@ -149,7 +149,7 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="relative overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10 bg-gradient-to-br from-gray-100/80 to-white/80 dark:from-gray-900/50 dark:to-black/50 backdrop-blur-xl"
+      className="surface-card relative overflow-hidden rounded-3xl border backdrop-blur-xl"
     >
       {/* Animated gradient background */}
       <div className="absolute inset-0 overflow-hidden">
@@ -177,13 +177,13 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
         </motion.div>
 
         {/* Title */}
-        <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+        <h2 className="text-2xl md:text-3xl font-bold text-theme mb-2">
           {config.title}
         </h2>
         <p className={`text-lg ${config.iconColor} font-medium mb-3`}>
           {config.subtitle}
         </p>
-        <p className="text-gray-600 dark:text-gray-400 max-w-md mb-8 leading-relaxed">
+        <p className="text-theme-secondary max-w-md mb-8 leading-relaxed">
           {config.description}
         </p>
 
@@ -195,10 +195,10 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2 + index * 0.1 }}
-              className="flex items-center gap-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-full px-4 py-2 shadow-sm dark:shadow-none"
+              className="surface-control flex items-center gap-2 rounded-full border px-4 py-2 shadow-sm"
             >
               <span>{tip.icon}</span>
-              <span className="text-sm text-gray-700 dark:text-gray-300">{tip.text}</span>
+              <span className="text-sm text-theme-secondary">{tip.text}</span>
             </motion.div>
           ))}
         </div>
@@ -210,7 +210,7 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onRetry}
-              className="flex items-center gap-2 px-6 py-3 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-all shadow-lg"
+              className="flex items-center gap-2 px-6 py-3 rounded-full bg-[color:var(--text-primary)] text-[color:var(--surface-primary)] font-semibold opacity-95 transition-all hover:opacity-85 shadow-lg"
             >
               <RefreshCcw className="w-5 h-5" />
               Try Again
@@ -221,7 +221,7 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onViewAll}
-              className="flex items-center gap-2 px-6 py-3 rounded-full bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/20 text-gray-800 dark:text-white font-semibold hover:bg-gray-200 dark:hover:bg-white/20 transition-all"
+              className="surface-control surface-interactive-hover flex items-center gap-2 rounded-full border px-6 py-3 font-semibold transition-all"
             >
               <TrendingUp className="w-5 h-5" />
               View All Designs
@@ -630,7 +630,7 @@ const Market: React.FC = () => {
       />
 
       <div className="sticky top-16 z-20 -mx-1 mb-2 overflow-x-auto no-scrollbar px-1">
-        <div className="inline-flex min-w-full items-center gap-5 border-b border-slate-200/80 bg-white/80 px-2 pt-1 text-sm backdrop-blur-md dark:border-white/10 dark:bg-[#09090b]/78">
+        <div className="surface-menu inline-flex min-w-full items-center gap-5 border-b px-2 pt-1 text-sm backdrop-blur-md">
         {[
           { slug: 'ALL', label: 'All' },
           { slug: 'AFRICAN_FASHION', label: 'African Fashion' },
@@ -646,15 +646,15 @@ const Market: React.FC = () => {
               aria-pressed={active}
               className={`relative shrink-0 pb-3 pt-2 text-sm font-semibold transition-colors ${
                 active
-                  ? 'text-slate-900 dark:text-white'
-                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                  ? 'text-theme'
+                  : 'text-theme-secondary hover:text-theme'
               }${isPending ? ' opacity-60' : ''}`}
             >
               {cat.label}
               <span
                 aria-hidden="true"
                 className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-7 rounded-full transition-all ${
-                  active ? 'bg-slate-900 dark:bg-white' : 'bg-transparent'
+                  active ? 'bg-[color:var(--text-primary)]' : 'bg-transparent'
                 }`}
               />
             </button>
@@ -740,7 +740,7 @@ const Market: React.FC = () => {
       </div>
       {/* Soft overlay while refreshing/filtering (keeps layout stable) */}
       {(!loading && (refreshing || isPending)) && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/40 dark:bg-black/30 backdrop-blur-[2px] transition-opacity duration-300">
+        <div className="surface-overlay-soft pointer-events-none absolute inset-0 flex items-center justify-center backdrop-blur-[2px] transition-opacity duration-300">
           <VLoader size={24} phase="loading" showLabel={false} />
         </div>
       )}
