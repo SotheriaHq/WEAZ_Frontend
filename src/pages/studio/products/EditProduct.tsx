@@ -2490,16 +2490,16 @@ const EditProduct: React.FC = () => {
     return (
       <div className="min-h-[560px] animate-pulse">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
-          <div className="mb-6 h-8 w-64 rounded-xl bg-gray-200/70 dark:bg-white/10" />
+          <div className="mb-6 h-8 w-64 rounded-xl surface-control-muted" />
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="space-y-4 lg:col-span-2">
-              <div className="h-44 rounded-2xl bg-gray-200/70 dark:bg-white/10" />
-              <div className="h-44 rounded-2xl bg-gray-200/70 dark:bg-white/10" />
-              <div className="h-44 rounded-2xl bg-gray-200/70 dark:bg-white/10" />
+              <div className="h-44 rounded-2xl surface-control-muted" />
+              <div className="h-44 rounded-2xl surface-control-muted" />
+              <div className="h-44 rounded-2xl surface-control-muted" />
             </div>
             <div className="space-y-4">
-              <div className="h-36 rounded-2xl bg-gray-200/70 dark:bg-white/10" />
-              <div className="h-36 rounded-2xl bg-gray-200/70 dark:bg-white/10" />
+              <div className="h-36 rounded-2xl surface-control-muted" />
+              <div className="h-36 rounded-2xl surface-control-muted" />
             </div>
           </div>
         </div>
@@ -2570,7 +2570,7 @@ const EditProduct: React.FC = () => {
                       form.status === "ACTIVE"
                         ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 hover:bg-green-500/20"
                         : form.status === "DRAFT"
-                          ? "bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20 hover:bg-gray-500/20"
+                          ? "bg-gray-500/10 text-theme-secondary border-gray-500/20 hover:bg-gray-500/20"
                           : "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20 hover:bg-orange-500/20"
                     }`}
                   >
@@ -2728,7 +2728,7 @@ const EditProduct: React.FC = () => {
                         className={`w-2.5 h-2.5 rounded-full transition-all ${
                           idx === carouselIndex
                             ? "bg-purple-600 scale-110"
-                            : "bg-gray-300 dark:bg-gray-600 hover:bg-gray-400"
+                            : "surface-control-muted hover:bg-gray-400"
                         }`}
                         aria-label={`Go to image ${idx + 1}`}
                       />
@@ -2737,7 +2737,7 @@ const EditProduct: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => mediaFileInputRef.current?.click()}
-                        className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-400 hover:border-purple-400 hover:text-purple-500 transition-all"
+                        className="w-6 h-6 rounded-full border-2 border-dashed border-theme-strong flex items-center justify-center text-gray-400 hover:border-purple-400 hover:text-purple-500 transition-all"
                         aria-label="Add more images"
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -2759,7 +2759,7 @@ const EditProduct: React.FC = () => {
                         </span>
                         <div>
                           <p className="text-sm font-semibold">Add your first product images</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                          <p className="text-xs text-theme-secondary">
                             Clear photos help buyers trust the listing.
                           </p>
                         </div>
@@ -2771,7 +2771,7 @@ const EditProduct: React.FC = () => {
                           'One cover image so the product stands out',
                           'Up to 6 images total',
                         ].map((item) => (
-                          <div key={item} className="flex items-start gap-2 rounded-xl bg-white/70 dark:bg-white/5 px-3 py-2 text-sm text-slate-700 dark:text-slate-200">
+                          <div key={item} className="flex items-start gap-2 rounded-xl surface-subtle px-3 py-2 text-sm text-theme-secondary">
                             <span className="mt-0.5 text-sky-600">•</span>
                             <span>{item}</span>
                           </div>
@@ -2781,10 +2781,10 @@ const EditProduct: React.FC = () => {
 
                     <div className="surface-subtle mt-4 flex items-center justify-between rounded-xl px-3 py-2">
                       <div>
-                        <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                        <p className="text-xs font-medium text-theme-secondary">
                           Tap to upload
                         </p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        <p className="text-[11px] text-theme-secondary">
                           Start with images, then add a video if needed.
                         </p>
                       </div>
@@ -3135,7 +3135,7 @@ const EditProduct: React.FC = () => {
                           }
                           className="sr-only peer"
                         />
-                        <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
+                        <div className="w-9 h-5 surface-control peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
                       </label>
                     </div>
                   </div>
@@ -3152,7 +3152,7 @@ const EditProduct: React.FC = () => {
                         }
                         placeholder="0"
                         startIcon={
-                          <span className="text-gray-400 dark:text-zinc-500 text-sm">
+                          <span className="text-theme-secondary text-sm">
                             ₦
                           </span>
                         }
@@ -3179,7 +3179,7 @@ const EditProduct: React.FC = () => {
                         placeholder="0"
                         disabled={!form.onSale}
                         startIcon={
-                          <span className="text-gray-400 dark:text-zinc-500 text-sm">
+                          <span className="text-theme-secondary text-sm">
                             ₦
                           </span>
                         }
@@ -3196,7 +3196,7 @@ const EditProduct: React.FC = () => {
                           }
                           placeholder="0"
                           startIcon={
-                            <span className="text-gray-400 dark:text-zinc-500 text-sm">
+                            <span className="text-theme-secondary text-sm">
                               ₦
                             </span>
                           }
@@ -3336,7 +3336,7 @@ const EditProduct: React.FC = () => {
                               </div>
 
                               {/* Quick-add sizes */}
-                              <div className="px-3 py-1.5 border-b border-gray-200/50 dark:border-white/5 bg-gray-50/40 dark:bg-white/[0.02]">
+                              <div className="px-3 py-1.5 border-b border-theme bg-gray-50/40 dark:bg-white/[0.02]">
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] text-gray-500 shrink-0">
                                     Quick add:
@@ -3344,7 +3344,7 @@ const EditProduct: React.FC = () => {
                                   <input
                                     type="text"
                                     placeholder="e.g. XXS, XS, S, M, L, XL"
-                                    className="flex-1 text-xs bg-transparent border-none outline-none text-gray-700 dark:text-gray-300 placeholder:text-gray-400"
+                                    className="flex-1 text-xs bg-transparent border-none outline-none text-theme-secondary placeholder:text-gray-400"
                                     onKeyDown={(e) => {
                                       if (e.key === "Enter") {
                                         e.preventDefault();
@@ -3402,7 +3402,7 @@ const EditProduct: React.FC = () => {
                                         }
                                         placeholder={String(form.price || 0)}
                                         startIcon={
-                                          <span className="text-gray-400 dark:text-zinc-500 text-[10px]">
+                                          <span className="text-theme-secondary text-[10px]">
                                             ₦
                                           </span>
                                         }
@@ -3466,10 +3466,10 @@ const EditProduct: React.FC = () => {
                           <option value="XXXXL" />
                         </datalist>
 
-                        <div className="px-3 py-2 text-[11px] text-gray-500 dark:text-gray-400 flex items-center justify-between">
+                        <div className="px-3 py-2 text-[11px] text-theme-secondary flex items-center justify-between">
                           <span>
                             Total variant stock:{" "}
-                            <span className="text-gray-900 dark:text-gray-200">
+                            <span className="text-theme">
                               {variantTotalStock}
                             </span>
                           </span>
@@ -3497,10 +3497,10 @@ const EditProduct: React.FC = () => {
                 <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-base font-medium text-gray-900 dark:text-white">
+                      <h2 className="text-base font-medium text-theme">
                         Custom Order
                       </h2>
-                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      <p className="mt-0.5 text-xs text-theme-secondary">
                         Allow buyers to request this product with their own measurements. Custom order does not replace the required stocked size variants.
                       </p>
                     </div>
@@ -3548,7 +3548,7 @@ const EditProduct: React.FC = () => {
                     onClick={() => toggleSection("fulfillment")}
                     className="flex items-center gap-2 text-left"
                   >
-                    <h2 className="text-base font-medium text-gray-900 dark:text-white">
+                    <h2 className="text-base font-medium text-theme">
                       Inventory & Shipping
                     </h2>
                     {collapsedSections.fulfillment ? (
@@ -3563,7 +3563,7 @@ const EditProduct: React.FC = () => {
                       {/* Inventory */}
                       <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
                         <div className="flex items-center justify-between mb-4">
-                          <h2 className="text-base font-medium text-gray-900 dark:text-white">
+                          <h2 className="text-base font-medium text-theme">
                             Inventory
                           </h2>
                         </div>
@@ -3610,11 +3610,11 @@ const EditProduct: React.FC = () => {
                               onChange={(e) =>
                                 updateForm("trackInventory", e.target.checked)
                               }
-                              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500"
+                              className="w-4 h-4 rounded border-theme-strong bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500"
                             />
                             <label
                               htmlFor="track-qty"
-                              className="text-xs text-gray-700 dark:text-gray-300"
+                              className="text-xs text-theme-secondary"
                             >
                               Track quantity
                             </label>
@@ -3627,11 +3627,11 @@ const EditProduct: React.FC = () => {
                               onChange={(e) =>
                                 updateForm("allowBackorders", e.target.checked)
                               }
-                              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500"
+                              className="w-4 h-4 rounded border-theme-strong bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500"
                             />
                             <label
                               htmlFor="continue-selling"
-                              className="text-xs text-gray-700 dark:text-gray-300"
+                              className="text-xs text-theme-secondary"
                             >
                               Continue selling when out of stock
                             </label>
@@ -3641,7 +3641,7 @@ const EditProduct: React.FC = () => {
 
                       {/* Shipping */}
                       <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
-                        <h2 className="text-base font-medium text-gray-900 dark:text-white mb-4">
+                        <h2 className="text-base font-medium text-theme mb-4">
                           Shipping
                         </h2>
                         <div className="space-y-4">
@@ -3656,11 +3656,11 @@ const EditProduct: React.FC = () => {
                                   e.target.checked,
                                 )
                               }
-                              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500"
+                              className="w-4 h-4 rounded border-theme-strong bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500"
                             />
                             <label
                               htmlFor="physical-product"
-                              className="text-xs text-gray-700 dark:text-gray-300"
+                              className="text-xs text-theme-secondary"
                             >
                               This is a physical product
                             </label>
@@ -3677,7 +3677,7 @@ const EditProduct: React.FC = () => {
                                   }
                                   placeholder="0"
                                   endIcon={
-                                    <span className="text-gray-400 dark:text-zinc-500 text-xs">
+                                    <span className="text-theme-secondary text-xs">
                                       {form.weightUnit}
                                     </span>
                                   }
@@ -3687,10 +3687,10 @@ const EditProduct: React.FC = () => {
                               </div>
                             </div>
                             <div className="md:col-span-2">
-                              <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                              <p className="text-xs font-semibold text-theme-secondary mb-1">
                                 Ship To Countries
                               </p>
-                              <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
+                              <p className="text-[11px] text-theme-secondary mb-2">
                                 Prefilled from Store Setup. Changes here update
                                 your store shipping regions.
                               </p>
@@ -3703,8 +3703,8 @@ const EditProduct: React.FC = () => {
                                       key={opt.code}
                                       className={`flex items-center gap-2 rounded-md border px-2 py-2 text-xs transition-colors ${
                                         isSelected
-                                          ? "border-purple-500/60 bg-purple-500/10 text-gray-900 dark:text-white"
-                                          : "border-gray-300/70 dark:border-white/15 text-gray-700 dark:text-gray-300"
+                                          ? "border-purple-500/60 bg-purple-500/10 text-theme"
+                                          : "border-gray-300/70 dark:border-white/15 text-theme-secondary"
                                       } ${!form.isPhysicalProduct ? "opacity-60" : ""}`}
                                     >
                                       <input
@@ -3714,7 +3714,7 @@ const EditProduct: React.FC = () => {
                                           toggleShippingRegion(opt.code)
                                         }
                                         disabled={!form.isPhysicalProduct}
-                                        className="w-3.5 h-3.5 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500"
+                                        className="w-3.5 h-3.5 rounded border-theme-strong bg-white dark:bg-gray-700 text-purple-600 focus:ring-purple-500"
                                       />
                                       <span>{opt.label}</span>
                                     </label>
@@ -3741,7 +3741,7 @@ const EditProduct: React.FC = () => {
                     onClick={() => toggleSection("additional")}
                     className="flex items-center gap-2 text-left"
                   >
-                    <h2 className="text-base font-medium text-gray-900 dark:text-white">
+                    <h2 className="text-base font-medium text-theme">
                       Additional Details
                     </h2>
                     {collapsedSections.additional ? (
@@ -3780,7 +3780,7 @@ const EditProduct: React.FC = () => {
                       <div className="mt-4 pt-4 border-t border-gray-200/70 dark:border-white/5 space-y-3">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-xs text-gray-900 dark:text-white font-medium">
+                            <p className="text-xs text-theme font-medium">
                               Returns Eligible
                             </p>
                             <p className="text-xs text-gray-500">
@@ -3796,12 +3796,12 @@ const EditProduct: React.FC = () => {
                               }
                               className="sr-only peer"
                             />
-                            <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
+                            <div className="w-9 h-5 surface-control peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
                           </label>
                         </div>
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-xs text-gray-900 dark:text-white font-medium">
+                            <p className="text-xs text-theme font-medium">
                               Sustainability Claim
                             </p>
                             <p className="text-xs text-gray-500">
@@ -3820,7 +3820,7 @@ const EditProduct: React.FC = () => {
                               }
                               className="sr-only peer"
                             />
-                            <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
+                            <div className="w-9 h-5 surface-control peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600" />
                           </label>
                         </div>
                       </div>

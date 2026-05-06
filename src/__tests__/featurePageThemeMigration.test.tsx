@@ -5,6 +5,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Market from '@/pages/Market';
 import CreateDesignPage from '@/pages/catalog/CreateDesign';
+import EditProduct from '@/pages/studio/products/EditProduct';
+import StoreCollectionCreate from '@/pages/studio/store/StoreCollectionCreate';
 import { ThemeProvider } from '@/context/ThemeContext';
 import userReducer from '@/features/userSlice';
 
@@ -236,6 +238,42 @@ describe('feature page theme token migration', () => {
 
     expect(await screen.findByTestId('media-upload-zone')).toBeInTheDocument();
     expect(screen.getByText('Design Details')).toBeInTheDocument();
+    expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  it('renders the product edit page in dark mode', async () => {
+    localStorage.setItem('vite-ui-theme', 'dark');
+
+    render(
+      <Provider store={createStore()}>
+        <MemoryRouter initialEntries={['/studio/products/new']}>
+          <ThemeProvider>
+            <Routes>
+              <Route path="/studio/products/new" element={<EditProduct />} />
+            </Routes>
+          </ThemeProvider>
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  it('renders the store collection creation page in dark mode', async () => {
+    localStorage.setItem('vite-ui-theme', 'dark');
+
+    render(
+      <Provider store={createStore()}>
+        <MemoryRouter initialEntries={['/studio/store/collections/new']}>
+          <ThemeProvider>
+            <Routes>
+              <Route path="/studio/store/collections/new" element={<StoreCollectionCreate />} />
+            </Routes>
+          </ThemeProvider>
+        </MemoryRouter>
+      </Provider>,
+    );
+
     expect(document.documentElement.dataset.theme).toBe('dark');
   });
 });

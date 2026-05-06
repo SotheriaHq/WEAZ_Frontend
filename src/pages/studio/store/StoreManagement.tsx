@@ -337,8 +337,8 @@ export default function StoreManagement() {
   if (!status) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white/70 p-6 dark:border-white/10 dark:bg-white/5">
-        <div className="font-semibold text-gray-900 dark:text-white">Store</div>
-        <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        <div className="font-semibold text-theme">Store</div>
+        <div className="mt-1 text-sm text-theme-secondary">
           Unable to load store status.
         </div>
       </div>
@@ -349,10 +349,10 @@ export default function StoreManagement() {
     if (isStoreOpenPending(user?.id)) {
       return (
         <div className="rounded-2xl border border-gray-200 bg-white/70 p-6 dark:border-white/10 dark:bg-white/5">
-          <div className="font-semibold text-gray-900 dark:text-white">
+          <div className="font-semibold text-theme">
             Finalizing Store
           </div>
-          <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          <div className="mt-1 text-sm text-theme-secondary">
             Your store is being activated. This usually takes a few seconds.
           </div>
         </div>
@@ -397,10 +397,10 @@ export default function StoreManagement() {
             </div>
 
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-base font-bold leading-tight text-gray-900 dark:text-white">
+              <h1 className="truncate text-base font-bold leading-tight text-theme">
                 {brandName}
               </h1>
-              <p className="mt-0.5 truncate text-xs leading-tight text-gray-500 dark:text-gray-400">
+              <p className="mt-0.5 truncate text-xs leading-tight text-theme-secondary">
                 {brandDescription}
               </p>
             </div>
@@ -509,10 +509,10 @@ export default function StoreManagement() {
               <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700 dark:text-sky-200">
                 {verificationPrompt.eyebrow}
               </div>
-              <h2 className="mt-2 text-xl font-semibold text-slate-900 dark:text-white">
+              <h2 className="mt-2 text-xl font-semibold text-theme">
                 {verificationPrompt.title}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              <p className="mt-2 text-sm leading-6 text-theme-secondary">
                 {verificationPrompt.description}
               </p>
             </div>
@@ -585,7 +585,7 @@ export default function StoreManagement() {
         >
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <div>
-              <h3 className="text-base font-bold text-gray-900 dark:text-white">
+              <h3 className="text-base font-bold text-theme">
                 Analytics
               </h3>
               <p className="text-xs text-gray-500">Live store performance</p>
@@ -607,13 +607,13 @@ export default function StoreManagement() {
               <div className="text-xs font-semibold text-gray-500">
                 Store Views (7d)
               </div>
-              <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+              <div className="mt-2 text-3xl font-bold text-theme">
                 {formatNumber(kpis.storeViews)}
               </div>
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+              <h4 className="text-sm font-semibold text-theme">
                 Top Performing
               </h4>
               {Array.isArray(overview?.topProducts) &&
@@ -637,7 +637,7 @@ export default function StoreManagement() {
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                        <p className="truncate text-sm font-medium text-theme">
                           {item.name}
                         </p>
                         <p className="text-xs text-gray-500">
@@ -653,7 +653,7 @@ export default function StoreManagement() {
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+              <h4 className="text-sm font-semibold text-theme">
                 Recent Orders
               </h4>
               {recentOrders.length > 0 ? (
@@ -661,7 +661,7 @@ export default function StoreManagement() {
                   {recentOrders.slice(0, 3).map((order: any) => (
                     <div key={order.id} className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs font-semibold text-gray-900 dark:text-white">
+                        <p className="text-xs font-semibold text-theme">
                           #{order.id}
                         </p>
                         <p className="text-xs text-gray-500">
@@ -680,7 +680,7 @@ export default function StoreManagement() {
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+              <h4 className="text-sm font-semibold text-theme">
                 Revenue (7 days)
               </h4>
               <div className="mt-3 space-y-2">
@@ -690,7 +690,7 @@ export default function StoreManagement() {
                     className="flex items-center justify-between text-xs text-gray-500"
                   >
                     <span>{entry.date}</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">
+                    <span className="font-semibold text-theme">
                       {formatCurrency(entry.amount || 0)}
                     </span>
                   </div>

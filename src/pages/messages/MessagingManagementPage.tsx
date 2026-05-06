@@ -160,7 +160,7 @@ const ExtensionRequestPanel: React.FC<{
       </div>
       <div className="flex items-start gap-2">
         <div className="w-20 shrink-0">
-          <label className="text-[10px] font-medium text-gray-600 dark:text-gray-400">Days</label>
+          <label className="text-[10px] font-medium text-theme-secondary">Days</label>
           <input
             type="number"
             min={1}
@@ -171,7 +171,7 @@ const ExtensionRequestPanel: React.FC<{
           />
         </div>
         <div className="flex-1 min-w-0">
-          <label className="text-[10px] font-medium text-gray-600 dark:text-gray-400">Reason</label>
+          <label className="text-[10px] font-medium text-theme-secondary">Reason</label>
           <input
             type="text"
             value={reason}
@@ -182,7 +182,7 @@ const ExtensionRequestPanel: React.FC<{
         </div>
       </div>
       <div className="flex items-center justify-end gap-1.5 mt-2">
-        <button type="button" onClick={onCancel} disabled={loading} className="rounded-lg px-2.5 py-1 text-[11px] font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">Cancel</button>
+        <button type="button" onClick={onCancel} disabled={loading} className="rounded-lg px-2.5 py-1 text-[11px] font-medium text-theme-secondary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">Cancel</button>
         <button
           type="button"
           onClick={() => {
@@ -223,7 +223,7 @@ const ExtensionResponsePanel: React.FC<{
       {showCounter ? (
         <div className="space-y-2">
           <div>
-            <label className="text-[11px] font-medium text-gray-600 dark:text-gray-400">Counter with days</label>
+            <label className="text-[11px] font-medium text-theme-secondary">Counter with days</label>
             <input
               type="number"
               min={1}
@@ -234,7 +234,7 @@ const ExtensionResponsePanel: React.FC<{
             />
           </div>
           <div className="flex items-center justify-end gap-2">
-            <button type="button" onClick={() => setShowCounter(false)} disabled={loading} className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5">
+            <button type="button" onClick={() => setShowCounter(false)} disabled={loading} className="rounded-lg px-3 py-1.5 text-xs font-medium text-theme-secondary hover:bg-gray-100 dark:hover:bg-white/5">
               Back
             </button>
             <button
@@ -300,7 +300,7 @@ const DisputePanel: React.FC<{
       <div className="space-y-2">
         {contextType === 'CUSTOM_ORDER' && (
           <div>
-            <label className="text-[11px] font-medium text-gray-600 dark:text-gray-400">Issue Type</label>
+            <label className="text-[11px] font-medium text-theme-secondary">Issue Type</label>
             <select
               value={issueType}
               onChange={(e) => setIssueType(e.target.value)}
@@ -313,7 +313,7 @@ const DisputePanel: React.FC<{
           </div>
         )}
         <div>
-          <label className="text-[11px] font-medium text-gray-600 dark:text-gray-400">Description</label>
+          <label className="text-[11px] font-medium text-theme-secondary">Description</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -327,7 +327,7 @@ const DisputePanel: React.FC<{
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+            className="rounded-lg px-3 py-1.5 text-xs font-medium text-theme-secondary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
           >
             Cancel
           </button>
@@ -937,8 +937,8 @@ const MessagingManagementPage: React.FC = () => {
       <div className={`w-80 shrink-0 flex-col border-r border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02] ${activeId ? 'hidden lg:flex' : 'flex'}`}>
         {/* Header */}
         <div className="shrink-0 px-4 pt-4 pb-3">
-          <h1 className="text-base font-semibold text-gray-900 dark:text-white">Messages</h1>
-          <p className="text-[11px] text-gray-500 dark:text-gray-500 mt-0.5">
+          <h1 className="text-base font-semibold text-theme">Messages</h1>
+          <p className="text-[11px] text-theme-secondary mt-0.5">
             {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -966,7 +966,7 @@ const MessagingManagementPage: React.FC = () => {
               className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition-all ${
                 filter === tab.value
                   ? 'bg-purple-600 text-white shadow-sm shadow-purple-500/20'
-                  : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10'
+                  : 'surface-control-muted text-theme-secondary hover:bg-gray-200 dark:hover:bg-white/10'
               }`}
             >
               {tab.label}
@@ -988,7 +988,7 @@ const MessagingManagementPage: React.FC = () => {
           ) : visibleConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <span aria-hidden="true" className="mb-2 text-3xl text-gray-300 dark:text-gray-600">💬</span>
-              <p className="text-xs text-gray-500 dark:text-gray-400">No conversations found</p>
+              <p className="text-xs text-theme-secondary">No conversations found</p>
             </div>
           ) : (
             visibleConversations.map((item) => {
@@ -1031,15 +1031,15 @@ const MessagingManagementPage: React.FC = () => {
                   {/* Content */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1">
-                      <span className={`truncate text-[13px] ${isActive ? 'font-semibold text-purple-900 dark:text-purple-200' : item.hasUnread ? 'font-semibold text-gray-900 dark:text-white' : 'font-medium text-gray-700 dark:text-gray-300'}`}>
+                      <span className={`truncate text-[13px] ${isActive ? 'font-semibold text-purple-900 dark:text-purple-200' : item.hasUnread ? 'font-semibold text-theme' : 'font-medium text-theme-secondary'}`}>
                         {item.participantName}
                       </span>
-                      <span className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
+                      <span className="shrink-0 text-[10px] text-theme-secondary">
                         {formatRelative(item.lastMessageAt || item.createdAt)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
-                      <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">{item.subtitle || item.title}</p>
+                      <p className="truncate text-[11px] text-theme-secondary">{item.subtitle || item.title}</p>
                       {item.unreadCount > 0 && (
                         <span className="shrink-0 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-[9px] font-bold text-white">
                           {item.unreadCount > 99 ? '99+' : item.unreadCount}
@@ -1062,7 +1062,7 @@ const MessagingManagementPage: React.FC = () => {
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
               <span aria-hidden="true" className="mx-auto mb-3 block text-5xl text-gray-300 dark:text-gray-700">💬</span>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Select a conversation to start messaging</p>
+              <p className="text-sm text-theme-secondary">Select a conversation to start messaging</p>
             </div>
           </div>
         ) : (
@@ -1098,8 +1098,8 @@ const MessagingManagementPage: React.FC = () => {
                 </div>
 
                 <div className="min-w-0">
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white truncate">{activeConversation.participantName}</h2>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{activeConversation.title}</p>
+                  <h2 className="text-sm font-semibold text-theme truncate">{activeConversation.participantName}</h2>
+                  <p className="text-[11px] text-theme-secondary truncate">{activeConversation.title}</p>
                 </div>
               </div>
 
@@ -1143,7 +1143,7 @@ const MessagingManagementPage: React.FC = () => {
                     className={`rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
                       activeAction === 'extension-request'
                         ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
+                        : 'text-theme-secondary hover:bg-gray-100 dark:hover:bg-white/5'
                     }`}
                     title="Request extension"
                   >
@@ -1159,7 +1159,7 @@ const MessagingManagementPage: React.FC = () => {
                     className={`rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
                       activeAction === 'dispute'
                         ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
+                        : 'text-theme-secondary hover:bg-gray-100 dark:hover:bg-white/5'
                     }`}
                     title="Open dispute"
                   >
@@ -1172,7 +1172,7 @@ const MessagingManagementPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => openRoute(selectedOrder.orderDetailUrl as string)}
-                    className="rounded-lg px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                    className="rounded-lg px-2.5 py-1.5 text-theme-secondary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
                     title="View Order"
                   >
                     <span className="text-base" role="img" aria-label="order">📦</span>
@@ -1183,7 +1183,7 @@ const MessagingManagementPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => void refresh()}
-                  className="rounded-lg px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                  className="rounded-lg px-2.5 py-1.5 text-theme-secondary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
                   title="Refresh"
                 >
                   <span aria-hidden="true" className="text-base">↺</span>
@@ -1215,8 +1215,8 @@ const MessagingManagementPage: React.FC = () => {
               ) : messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <span aria-hidden="true" className="mb-2 text-4xl text-gray-300 dark:text-gray-700">💬</span>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No messages yet</p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Start the conversation</p>
+                  <p className="text-sm text-theme-secondary">No messages yet</p>
+                  <p className="text-xs text-theme-secondary mt-1">Start the conversation</p>
                 </div>
               ) : (
                 groupedMessages.map((group) => (
@@ -1224,7 +1224,7 @@ const MessagingManagementPage: React.FC = () => {
                     {/* Date separator */}
                     <div className="flex items-center gap-3 my-3">
                       <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/8" />
-                      <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">{group.date}</span>
+                      <span className="text-[10px] font-medium text-theme-secondary uppercase tracking-wider">{group.date}</span>
                       <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/8" />
                     </div>
                     {group.msgs.map((msg) => (
@@ -1292,7 +1292,7 @@ const MessagingManagementPage: React.FC = () => {
           />
           <div className="absolute inset-y-0 right-0 w-[min(88vw,360px)] border-l border-gray-200/60 bg-white shadow-2xl dark:border-white/[0.04] dark:bg-[#111017]">
             <div className="flex items-center justify-between border-b border-gray-200/60 px-4 py-3 dark:border-white/[0.04]">
-              <div className="text-sm font-semibold text-gray-900 dark:text-white">Conversation details</div>
+              <div className="text-sm font-semibold text-theme">Conversation details</div>
               <button
                 type="button"
                 onClick={() => setShowContactDetails(false)}
