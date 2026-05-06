@@ -195,7 +195,8 @@ html {
     background-color: var(--surface-muted);
   }
 
-  .surface-panel-subtle {
+  .surface-panel-subtle,
+  .surface-subtle {
     color: var(--text-primary);
     background-color: color-mix(in srgb, var(--surface-secondary) 76%, transparent);
     border-color: var(--border-default);
