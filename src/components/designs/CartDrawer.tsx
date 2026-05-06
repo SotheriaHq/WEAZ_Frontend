@@ -29,6 +29,7 @@ import {
   customOrdersBuyerApi,
   type CustomOrderCheckoutBagLine,
 } from '@/api/CustomOrderApi';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 // Promo code type
 interface PromoCode {
@@ -260,7 +261,7 @@ const CartDrawer: React.FC = () => {
 
   const resolveCustomLineRoute = useCallback(
     (line: CustomOrderCheckoutBagLine): string => {
-      const isBrandUser = user?.type === 'BRAND';
+      const isBrandUser = hasActiveBrandMembership(user);
 
       if (line.customOrderId) {
         return isBrandUser
@@ -298,7 +299,7 @@ const CartDrawer: React.FC = () => {
 
       return '/studio/custom-orders';
     },
-    [user?.type],
+    [user],
   );
 
   const handleOpenCustomLine = useCallback(

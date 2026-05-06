@@ -28,6 +28,7 @@ import { NotificationIcon } from '@/components/notifications/NotificationIcon';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { COMPANY_NAME } from '@/lib/brand';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 interface Props { 
   open: boolean; 
@@ -160,7 +161,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     const exactTargetUrl = payloadTargetUrl || explicitTargetUrl;
     const payloadOrderId = typeof payload.orderId === 'string' ? payload.orderId : null;
     const payloadCustomOrderId = typeof payload.customOrderId === 'string' ? payload.customOrderId : null;
-    const isBrand = currentUser?.type === 'BRAND';
+    const isBrand = hasActiveBrandMembership(currentUser);
     const isOrderNotification =
       notification.type === NotificationTypes.ORDER_PLACED ||
       notification.type === NotificationTypes.ORDER_STATUS_UPDATED;
@@ -186,7 +187,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     const resolvedRoute = isAdminConsoleUser && route.startsWith('/profile') ? '/admin' : route;
     navigate(resolvedRoute);
     onClose();
-  }, [currentUser?.type, isAdminConsoleUser, navigate, onClose]);
+  }, [currentUser, isAdminConsoleUser, navigate, onClose]);
 
   const handleMarkRead = useCallback((id: string) => {
     // Idempotency guard

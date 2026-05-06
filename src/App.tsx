@@ -75,6 +75,8 @@ const StoreCollectionCreate = lazy(() => import('./pages/studio/store/StoreColle
 const StudioCustomOrdersPage = lazy(() => import('./pages/studio/CustomOrdersPage'));
 const StudioCustomOrderDetailPage = lazy(() => import('./pages/studio/StudioCustomOrderDetailPage'));
 const BrandPayoutsPage = lazy(() => import('./pages/store/BrandPayoutsPage'));
+const BrandStaffPage = lazy(() => import('./pages/studio/BrandStaffPage'));
+const BrandStaffInvitePage = lazy(() => import('./pages/studio/BrandStaffInvitePage'));
 const MyOrders = lazy(() => import('./pages/orders/MyOrders'));
 const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
 const CustomOrderComposerPage = lazy(() => import('./pages/custom-orders/CustomOrderComposerPage'));
@@ -541,6 +543,18 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: '/studio/staff',
+        element: (
+          <StudioProtected>
+            <RequireStoreSetup>
+              <StudioScaffold active="staff" onSelect={noopStudioSelect}>
+                {withStudioContentFallback(<BrandStaffPage />)}
+              </StudioScaffold>
+            </RequireStoreSetup>
+          </StudioProtected>
+        ),
+      },
+      {
         path: '/studio/messages',
         element: (
           <StudioProtected>
@@ -625,6 +639,10 @@ const router = createBrowserRouter([
       {
         path: '/verify-email',
         element: <EmailVerifyPage />,
+      },
+      {
+        path: '/brand/staff/invite',
+        element: withRouteFallback(<BrandStaffInvitePage />),
       },
       {
         element: <GuestRoute />,

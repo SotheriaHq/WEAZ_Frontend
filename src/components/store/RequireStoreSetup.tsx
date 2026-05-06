@@ -12,6 +12,7 @@ import {
   sleep,
 } from '@/utils/storeSetup';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
 const STATUS_RETRY_ATTEMPTS = 5;
@@ -149,10 +150,11 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     status?.isEmailVerified ?? user?.isEmailVerified ?? true;
   const effectiveProfileComplete =
     status?.isProfileComplete ?? isBrandProfileComplete(user);
+  const hasBrandAccess = hasActiveBrandMembership(user);
   const requiresEmailVerification =
-    user?.type === 'BRAND' && effectiveEmailVerified === false;
+    hasBrandAccess && effectiveEmailVerified === false;
   const requiresProfileCompletion =
-    user?.type === 'BRAND' && effectiveProfileComplete === false;
+    hasBrandAccess && effectiveProfileComplete === false;
 
   useEffect(() => {
     if (!requiresEmailVerification) {

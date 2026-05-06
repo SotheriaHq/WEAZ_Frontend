@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../store';
 import { closeSidebar, toggleSidebar, MOBILE_BREAKPOINT } from '../features/uiSlice';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import IslandBottomNav from '@/components/navigation/IslandBottomNav';
 
@@ -108,7 +109,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
   };
 
   // Brands without complete store setup should keep the same nav shape.
-  const isBrandWithIncompleteSetup = user?.type === 'BRAND' && storeSetupComplete === false;
+  const hasBrandAccess = hasActiveBrandMembership(user);
+  const isBrandWithIncompleteSetup = hasBrandAccess && storeSetupComplete === false;
   const studioFeaturesLocked = Boolean(isBrandWithIncompleteSetup);
 
   const mainLinks = [
@@ -130,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
       path: '/subscriptions',
       active: location.pathname === '/subscriptions',
     },
-    ...(user?.type === 'BRAND'
+    ...(hasBrandAccess
       ? [
           {
             emoji: '💬',

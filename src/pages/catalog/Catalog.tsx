@@ -36,6 +36,7 @@ import {
   prunePublishTasks,
   removePublishTask,
 } from '@/utils/publishTracker';
+import { canManageCatalog, getActiveBrandId } from '@/lib/brandAccess';
 
 import ComingSoon from '../placeholders/ComingSoon';
 
@@ -98,10 +99,14 @@ const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const normalizedRouteBrandId = routeBrandId ? decodeURIComponent(routeBrandId) : undefined;
-  // Owner view when no route param or when the param matches the logged-in brand user's id
+  const activeBrandId = getActiveBrandId(user);
+  const ownerBrandId = activeBrandId ?? user?.storeId ?? user?.id;
+  // Owner/staff view when no route param or the param matches the active brand context.
   const isOwner = Boolean(
-    user?.type === 'BRAND' &&
-    (!normalizedRouteBrandId || normalizedRouteBrandId === user?.id),
+    canManageCatalog(user) &&
+    (!normalizedRouteBrandId ||
+      normalizedRouteBrandId === ownerBrandId ||
+      normalizedRouteBrandId === user?.id),
   );
   const isVisitorView = !isOwner && Boolean(normalizedRouteBrandId);
   
@@ -347,7 +352,7 @@ const ProfilePage: React.FC = () => {
 
   useEffect(() => {
     const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
-    if (!isOwner || user?.type !== 'BRAND') {
+    if (!isOwner) {
       setStoreStatus(null);
       setHasDismissedStoreSetup(false);
       return;
@@ -373,24 +378,24 @@ const ProfilePage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isOwner, user?.type]);
+  }, [isOwner]);
 
   const showStoreSetupNudge = useMemo(() => {
-    if (!isOwner || user?.type !== 'BRAND') return false;
+    if (!isOwner) return false;
     if (hasDismissedStoreSetup) return false;
     if (storeStatusLoading) return false;
     // Encourage setup until the store is marked live/open.
     if (!storeStatus) return false;
     return storeStatus.isStoreOpen === false;
-  }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading, user?.type]);
+  }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading]);
 
   const showStoreSetupChip = useMemo(() => {
-    if (!isOwner || user?.type !== 'BRAND') return false;
+    if (!isOwner) return false;
     if (!hasDismissedStoreSetup) return false;
     if (storeStatusLoading) return false;
     if (!storeStatus) return false;
     return storeStatus.isStoreOpen === false;
-  }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading, user?.type]);
+  }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading]);
 
   const dismissStoreSetupNudge = useCallback(() => {
     const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
@@ -560,7 +565,7 @@ const ProfilePage: React.FC = () => {
     return Boolean(storeStatus?.isStoreOpen);
   }, [isVisitorView, visitorProfile?.isStoreOpen, storeStatus?.isStoreOpen]);
 
-  const shopBrandId = routeBrandId ?? user?.id ?? '';
+  const shopBrandId = routeBrandId ?? ownerBrandId ?? '';
   
   const ownerHasStoreProfile = useMemo(() => {
     if (!isOwner) return undefined;

@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { useAuth } from '@/context/AuthContext';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
 interface RequireBrandProps {
@@ -36,7 +37,7 @@ const RequireBrand: React.FC<RequireBrandProps> = ({ children }) => {
 
   // If persisted user is stale/partial, wait for AuthProvider hydration
   // to avoid incorrect redirects.
-  if (user.type !== 'BRAND') {
+  if (!hasActiveBrandMembership(user)) {
     if (loading && (user.type as any) == null) {
       return (
         <div className="flex items-center justify-center min-h-[240px]">
@@ -50,16 +51,15 @@ const RequireBrand: React.FC<RequireBrandProps> = ({ children }) => {
       return (
         <div className="flex min-h-screen items-center justify-center bg-white px-5 text-slate-900 dark:bg-black dark:text-white">
           <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-white/10 dark:bg-zinc-950">
-            <div className="text-base font-semibold">Brand account required</div>
+            <div className="text-base font-semibold">Brand access required</div>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Studio is available only for brand accounts.
+              Ask the brand owner for access to this workspace.
             </p>
           </div>
         </div>
       );
     }
 
-    // If not a brand account, redirect to home
     return <Navigate to="/" replace />;
   }
 

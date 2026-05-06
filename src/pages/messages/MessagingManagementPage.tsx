@@ -13,6 +13,7 @@ import ComposeArea from '@/components/messaging/ComposeArea';
 import ChatContactSidebar from '@/components/messaging/ChatContactSidebar';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -357,7 +358,7 @@ const MessagingManagementPage: React.FC = () => {
   const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
   const [params, setParams] = useSearchParams();
   const profile = useSelector((state: RootState) => state.user.profile);
-  const surface: Surface = profile?.type === 'BRAND' ? 'BRAND' : 'BUYER';
+  const surface: Surface = hasActiveBrandMembership(profile) ? 'BRAND' : 'BUYER';
   const [brandId, setBrandId] = useState<string | null>(null);
   const actorId = profile?.id;
   const { onNotification } = useRealtime();
@@ -475,7 +476,7 @@ const MessagingManagementPage: React.FC = () => {
 
   const visibleConversations = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let rows = conversations.filter((item) => {
+    const rows = conversations.filter((item) => {
       if (filter === 'archived') return Boolean(item.archivedAt);
       if (item.archivedAt) return false;
       if (filter === 'unread' && !item.hasUnread && item.unreadCount <= 0) return false;

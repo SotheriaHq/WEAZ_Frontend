@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import SettingsSidebar, {
   getGroupForKey,
@@ -17,6 +17,7 @@ import ProfileVisibilitySettings from '@/components/settings/tabs/ProfileVisibil
 import SizeFitSettings from '@/components/settings/tabs/SizeFitSettings';
 import HiddenContentSettings from './HiddenContentSettings';
 import type { RootState } from '@/store';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 /* ── Coming Soon placeholder ─────────────────────────────────────── */
 const ComingSoon: React.FC<{ title: string; description: string }> = ({
@@ -120,12 +121,7 @@ const sections: Record<string, React.ReactNode> = {
   ),
   'store-policies': <StorePoliciesSettings />,
   'store-payments': <StorePaymentsSettings />,
-  'store-team': (
-    <ComingSoon
-      title="Team Members"
-      description="Invite team members and manage who has access to your store settings."
-    />
-  ),
+  'store-team': <Navigate to="/studio/staff" replace />,
   'store-notifications': <NotificationSettings />,
   'store-danger': <StoreDangerZone />,
 };
@@ -170,7 +166,7 @@ const Breadcrumbs: React.FC<{ activeKey: string; onNavigate: (key: string) => vo
 const SettingsHome: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const me = useSelector((s: RootState) => s.user.profile);
-  const isBrandUser = me?.type === 'BRAND';
+  const isBrandUser = hasActiveBrandMembership(me);
   const active = searchParams.get('tab') || 'account';
   const normalizedAccountTab = active === 'account' || active === 'security' ? 'account-security' : active;
   const normalizedActive =

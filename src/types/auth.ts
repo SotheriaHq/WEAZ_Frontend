@@ -2,6 +2,22 @@ import type { ThemePreference } from './theme';
 
 export type AuthRole = 'SuperAdmin' | 'Admin' | 'User';
 export type AuthUserType = 'BRAND' | 'REGULAR';
+export type BrandMemberRole =
+  | 'OWNER'
+  | 'MANAGER'
+  | 'CATALOG_MANAGER'
+  | 'ORDER_MANAGER'
+  | 'SUPPORT_AGENT'
+  | 'VIEWER';
+export type BrandMemberStatus = 'INVITED' | 'ACTIVE' | 'SUSPENDED' | 'REMOVED';
+
+export interface AuthBrandMembershipDto {
+  brandId: string;
+  brandName: string;
+  role: BrandMemberRole;
+  status: BrandMemberStatus;
+  isOwner: boolean;
+}
 
 export interface AuthProfileImageFileDto {
   id: string;
@@ -47,6 +63,8 @@ export interface AuthUserDto {
   bannerImageFile: AuthProfileImageFileDto | null;
   isEmailVerified: boolean;
   storeId: string | null;
+  brandMemberships?: AuthBrandMembershipDto[];
+  activeBrandId?: string | null;
   verificationStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'IN_REVIEW' | 'ADDITIONAL_INFO_REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | null;
   isVerifiedBrand?: boolean;
   verificationBadgeVisible?: boolean;

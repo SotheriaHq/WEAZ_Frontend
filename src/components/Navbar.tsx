@@ -37,6 +37,7 @@ import { generateUserUid } from '@/utils/userUid';
 import { resolveProfileImageSource } from '@/utils/profileImage';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import { COMPANY_NAME } from '@/lib/brand';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
 import {
@@ -133,11 +134,12 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
     );
   };
   const profileHomeRoute = user ? getProfileOrHomeUrl(user) : '/profile';
-  const ordersRoute = user?.type === 'BRAND' ? '/studio?tab=orders' : '/profile?tab=orders';
-  const savedRoute = user?.type === 'BRAND' ? '/profile?tab=Content' : profileHomeRoute;
+  const hasBrandAccess = hasActiveBrandMembership(user);
+  const ordersRoute = hasBrandAccess ? '/studio?tab=orders' : '/profile?tab=orders';
+  const savedRoute = hasBrandAccess ? '/profile?tab=Content' : profileHomeRoute;
   const helpRoute = '/help/verified-badge';
   const isStudioProfileMenu = profileMenuContext === 'studio';
-  const showStudioMenuEntry = !isStudioProfileMenu && user?.type === 'BRAND' && storeSetupComplete === true;
+  const showStudioMenuEntry = !isStudioProfileMenu && hasBrandAccess && storeSetupComplete === true;
 
   const ProfileMenu = () => {
     if (!user) return null;

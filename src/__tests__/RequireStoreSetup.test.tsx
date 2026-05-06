@@ -60,6 +60,16 @@ describe('RequireStoreSetup', () => {
             brandCity: null,
             brandBusinessType: null,
             storeId: null,
+            activeBrandId: 'brand-1',
+            brandMemberships: [
+              {
+                brandId: 'brand-1',
+                brandName: 'Ada Atelier',
+                role: 'OWNER' as const,
+                status: 'ACTIVE' as const,
+                isOwner: true,
+              },
+            ],
             socialInstagram: null,
             socialFacebook: null,
             socialTwitter: null,

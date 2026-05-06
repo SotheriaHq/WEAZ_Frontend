@@ -13,6 +13,7 @@ const ALL_ITEMS = [
   { key: 'store', label: 'Store', path: '/studio/store', emoji: '🛍️', requiresSetup: false },
   { key: 'orders', label: 'Orders', path: '/studio?tab=orders', emoji: '📦', requiresSetup: false },
   { key: 'messages', label: 'Messages', path: '/studio/messages', emoji: '💬', requiresSetup: true },
+  { key: 'staff', label: 'Staff', path: '/studio/staff', emoji: '👥', requiresSetup: false },
   { key: 'customers', label: 'Customers', path: '/studio?tab=customers', emoji: '👥', requiresSetup: false },
   { key: 'analytics', label: 'Analytics', path: '/studio?tab=analytics', emoji: '📈', requiresSetup: false },
   { key: 'finance', label: 'Finance', path: '/studio?tab=finance', emoji: '💰', requiresSetup: false },
@@ -61,8 +62,8 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
                           isLocked
                             ? 'cursor-not-allowed opacity-50'
                             : isActive
-                            ? 'font-medium text-primary border-l-4 border-primary bg-primary/10'
-                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                              ? 'font-medium text-primary border-l-4 border-primary bg-primary/10'
+                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                         }`}
                         title={isLocked ? 'Complete store setup to unlock this section' : label}
                       >

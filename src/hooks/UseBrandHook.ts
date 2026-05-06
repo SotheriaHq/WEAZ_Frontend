@@ -11,6 +11,7 @@ import type {
 import type { AuthUserDto } from '../types/auth';
 import { env } from '../config/env';
 import { useReviewRuntimeFlags } from './useReviewRuntimeFlags';
+import { getActiveBrandId, hasActiveBrandMembership } from '@/lib/brandAccess';
 
 const areStringArraysEqual = (left: string[] | null | undefined, right: string[] | null | undefined) => {
   if (left === right) return true;
@@ -199,6 +200,8 @@ export const useBrandProfile = () => {
     (state: RootState) => state.user.profile,
     areStableUserFieldsEqual,
   );
+  const activeBrandId = getActiveBrandId(user);
+  const ownerBrandId = activeBrandId ?? user?.id ?? null;
   const brandDetailEndpointsEnabled = env.featureFlags.brandDetailEndpoints;
   const { flags: reviewFlags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
 
@@ -321,20 +324,20 @@ export const useBrandProfile = () => {
   // Create collection
   const createCollection = useCallback(async (data: { name: string; description?: string; isPublic?: boolean }) => {
     const result = await brandApi.createCollection(data);
-    if (result && user?.id) {
-      await fetchCollections(user.id);
+    if (result && ownerBrandId) {
+      await fetchCollections(ownerBrandId);
     }
     return result;
-  }, [user, fetchCollections]);
+  }, [ownerBrandId, fetchCollections]);
 
   // Update collection
   const updateCollection = useCallback(async (collectionId: string, data: Partial<CollectionDto>) => {
     const result = await brandApi.updateCollection(collectionId, data);
-    if (result && user?.id) {
-      await fetchCollections(user.id);
+    if (result && ownerBrandId) {
+      await fetchCollections(ownerBrandId);
     }
     return result;
-  }, [user, fetchCollections]);
+  }, [ownerBrandId, fetchCollections]);
 
   // Delete collection
   const deleteCollection = useCallback(async (collectionId: string) => {
@@ -346,40 +349,40 @@ export const useBrandProfile = () => {
   }, []);
 
   useEffect(() => {
-    if (!user?.id || user.type !== 'BRAND') {
+    if (!user?.id || !hasActiveBrandMembership(user)) {
       setBrandProfile(null);
       setBrandProfileError(null);
       setBrandProfileLoading(false);
     }
-  }, [user?.id, user?.type]);
+  }, [user]);
 
   // Initial data fetch
   useEffect(() => {
-    if (!user?.id) {
+    if (!ownerBrandId) {
       setCollectionsLoading(false);
       return;
     }
 
     // Fetch collections for all users
-    void fetchCollections(user.id);
+    void fetchCollections(ownerBrandId);
 
-  }, [user?.id, fetchCollections]);
+  }, [ownerBrandId, fetchCollections]);
 
   useEffect(() => {
-    if (!user?.id || user.type !== 'BRAND' || !brandDetailEndpointsEnabled) {
+    if (!ownerBrandId || !hasActiveBrandMembership(user) || !brandDetailEndpointsEnabled) {
       return;
     }
 
-    void fetchBrandProfile(user.id);
-  }, [user?.id, user?.type, user?.updatedAt, brandDetailEndpointsEnabled, fetchBrandProfile]);
+    void fetchBrandProfile(ownerBrandId);
+  }, [ownerBrandId, user, user?.updatedAt, brandDetailEndpointsEnabled, fetchBrandProfile]);
 
   useEffect(() => {
-    if (!user?.id || user.type !== 'BRAND' || reviewFlagsLoading || !reviewFlags.readEnabled) {
+    if (!ownerBrandId || !hasActiveBrandMembership(user) || reviewFlagsLoading || !reviewFlags.readEnabled) {
       return;
     }
 
-    void fetchReviews(user.id);
-  }, [user?.id, user?.type, fetchReviews, reviewFlags.readEnabled, reviewFlagsLoading]);
+    void fetchReviews(ownerBrandId);
+  }, [ownerBrandId, user, fetchReviews, reviewFlags.readEnabled, reviewFlagsLoading]);
 
   // Get display values with fallbacks
   const defaultFallbackTags =

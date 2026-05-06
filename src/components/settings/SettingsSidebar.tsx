@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 interface SidebarItem {
   key: string;
@@ -80,7 +81,7 @@ export function getItemForKey(key: string): SidebarItem | undefined {
 export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSelect }) => {
   const navigate = useNavigate();
   const me = useSelector((state: RootState) => state.user.profile);
-  const isBrandUser = me?.type === 'BRAND';
+  const isBrandUser = hasActiveBrandMembership(me);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};

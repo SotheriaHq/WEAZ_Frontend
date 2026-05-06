@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import { ISLAND_BOTTOM_NAV_CLEARANCE_CLASS } from '@/components/navigation/IslandBottomNav';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 const Profile = lazy(() => import('../../pages/catalog/Catalog'));
 const PROFILE_MAIN_CLASS = `min-h-screen pt-16 transition-[margin] duration-300 ease-out ${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS}`;
@@ -353,7 +354,7 @@ export const ProfileLayout: React.FC = () => {
           ) : null}
           <div className="px-0 sm:px-2">
             {location.pathname === '/profile' ? (
-              user?.type === 'BRAND' ? <Profile /> : <EndUserProfile />
+              hasActiveBrandMembership(user) ? <Profile /> : <EndUserProfile />
             ) : isVisitorRoute && routeBrandId && location.pathname === `/profile/${routeBrandId}` ? (
               visitorType === 'BRAND' ? <Profile /> : <EndUserProfile />
             ) : (

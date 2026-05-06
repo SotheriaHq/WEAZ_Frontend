@@ -16,6 +16,7 @@ import '../styles/auth.css';
 import VLoader from '@/components/loaders/VLoader';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import { COMPANY_NAME } from '@/lib/brand';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 const CONFETTI_STORAGE_KEY = 'threadly-signup-confetti';
 
@@ -223,12 +224,13 @@ const SignUpPage = () => {
 
       await celebrateSignupOnce(user.id);
 
+      const hasBrandAccess = hasActiveBrandMembership(user);
       const nextRoute =
-        user.type === 'BRAND'
+        hasBrandAccess
           ? '/profile?modal=brand-setup&modalOrigin=prompt'
           : '/profile';
 
-      if (user.type === 'BRAND') {
+      if (hasBrandAccess) {
         // Ensure the post-signup prompt shows even if previously dismissed.
         localStorage.removeItem('threadly.brandProfileSetup.dismissedUntil');
       }

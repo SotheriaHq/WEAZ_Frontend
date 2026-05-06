@@ -32,6 +32,11 @@ const normalizeUser = (user: AuthUserDto): AuthUserDto => ({
   bannerImageId: user.bannerImageId ?? null,
   bannerImageFile: user.bannerImageFile ?? null,
   verificationStatus: user.verificationStatus ?? null,
+  storeId: user.storeId ?? null,
+  brandMemberships: Array.isArray(user.brandMemberships)
+    ? user.brandMemberships.filter((membership) => Boolean(membership?.brandId))
+    : [],
+  activeBrandId: user.activeBrandId ?? user.storeId ?? null,
   isVerifiedBrand: Boolean(user.isVerifiedBrand),
   verificationBadgeVisible: Boolean(
     user.verificationBadgeVisible ?? user.isVerifiedBrand,

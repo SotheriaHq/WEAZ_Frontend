@@ -7,6 +7,7 @@ import { setUser } from '@/features/userSlice';
 import { brandApi } from '@/api/BrandApi';
 import type { BrandProfileDto } from '@/types/profile';
 import { invalidateStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
+import { getActiveBrandId, hasActiveBrandMembership } from '@/lib/brandAccess';
 
 import EditProfileModal from '@/components/profile/EditProfileModal';
 
@@ -60,11 +61,11 @@ export const GlobalModalRouter: React.FC = () => {
   // Lazily fetch brand profile when the brand setup modal opens.
   useEffect(() => {
     if (!isBrandSetupOpen) return;
-    if (!user || user.type !== 'BRAND') return;
+    if (!user || !hasActiveBrandMembership(user)) return;
 
     let cancelled = false;
     brandApi
-      .getBrandProfile(user.id)
+      .getBrandProfile(getActiveBrandId(user) ?? user.id)
       .then((profile) => {
         if (!cancelled) setBrandProfile(profile);
       })
@@ -85,9 +86,9 @@ export const GlobalModalRouter: React.FC = () => {
 
   useEffect(() => {
     if (!modal) return;
-    if (modal === 'brand-setup' && user?.type === 'BRAND') return;
+    if (modal === 'brand-setup' && hasActiveBrandMembership(user)) return;
     clearCurrentModalParams();
-  }, [clearCurrentModalParams, modal, user?.type]);
+  }, [clearCurrentModalParams, modal, user]);
 
   const closeModal = useCallback((opts?: { dismissPrompt?: boolean }) => {
     if (opts?.dismissPrompt && showSkip) {
@@ -100,7 +101,7 @@ export const GlobalModalRouter: React.FC = () => {
   if (!modal) return null;
 
   if (modal === 'brand-setup') {
-    if (!user || user.type !== 'BRAND') {
+    if (!user || !hasActiveBrandMembership(user)) {
       return null;
     }
 
