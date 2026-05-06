@@ -45,6 +45,7 @@ describe('RequireStoreSetup', () => {
             lastName: 'Brand',
             role: 'User' as const,
             type: 'BRAND' as const,
+            themePreference: 'system' as const,
             isActive: 'Active',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),

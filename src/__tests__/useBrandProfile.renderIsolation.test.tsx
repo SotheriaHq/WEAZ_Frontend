@@ -36,6 +36,7 @@ const baseUser: AuthUserDto = {
   lastName: 'Brand',
   role: 'User',
   type: 'BRAND',
+  themePreference: 'system',
   phoneNumber: null,
   address: null,
   brandFullName: 'Atelier Brand',

@@ -92,6 +92,7 @@ const AdminContentManagementPage = lazy(() => import('./pages/admin/AdminContent
 const AdminTaxonomyPage = lazy(() => import('./pages/admin/AdminTaxonomyPage'));
 const AdminTagsPage = lazy(() => import('./pages/admin/AdminTagsPage'));
 const AdminFinancePage = lazy(() => import('./pages/admin/AdminFinancePage'));
+const AdminSettlementPoliciesPage = lazy(() => import('./pages/admin/AdminSettlementPoliciesPage'));
 const AdminPayoutsPage = lazy(() => import('./pages/admin/AdminPayoutsPage'));
 const AdminOrderDetailPage = lazy(() => import('./pages/admin/AdminOrderDetailPage'));
 const AdminOrdersPage = lazy(() => import('./pages/admin/AdminOrdersPage'));
@@ -751,6 +752,7 @@ const router = createBrowserRouter([
           { path: 'orders', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminOrdersPage /></RequireAdminPermission> },
           { path: 'finance', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminFinancePage /></RequireAdminPermission> },
           { path: 'finance/payments/:reference', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminFinancePage /></RequireAdminPermission> },
+          { path: 'finance/settlement-policies', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminSettlementPoliciesPage /></RequireAdminPermission> },
           { path: 'orders/:orderId', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminOrderDetailPage /></RequireAdminPermission> },
           { path: 'payouts', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminPayoutsPage /></RequireAdminPermission> },
           { path: 'disputes', element: <RequireAdminPermission permission="DISPUTES_READ"><AdminDisputesPage /></RequireAdminPermission> },

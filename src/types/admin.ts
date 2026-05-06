@@ -672,6 +672,102 @@ export interface AdminCommissionRule {
   updatedAt: string;
 }
 
+export interface AdminSettlementPolicy {
+  id: string;
+  orderType: 'STANDARD_ORDER' | 'CUSTOM_ORDER';
+  scope: 'PLATFORM' | 'BRAND';
+  brandId?: string | null;
+  currency?: string | null;
+  releaseMode: 'HOLD_UNTIL_DELIVERY' | 'SPLIT_RELEASE';
+  upfrontReleaseEnabled: boolean;
+  upfrontReleasePercent: string | number;
+  settlementDelayHours: number;
+  autoReleaseDays: number;
+  finalReleaseTrigger: string;
+  isDefault: boolean;
+  isActive: boolean;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  createdById?: string | null;
+  updatedById?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminSettlementResolvedPolicy {
+  id: string | null;
+  orderType: 'STANDARD_ORDER' | 'CUSTOM_ORDER';
+  scope: 'PLATFORM' | 'BRAND';
+  brandId?: string | null;
+  currency?: string | null;
+  releaseMode: 'HOLD_UNTIL_DELIVERY' | 'SPLIT_RELEASE';
+  upfrontReleaseEnabled: boolean;
+  upfrontReleasePercent: number;
+  settlementDelayHours: number;
+  autoReleaseDays: number;
+  finalReleaseTrigger: string;
+  isDefault: boolean;
+  isActive: boolean;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+}
+
+export interface AdminSettlementBreakdown {
+  orderType: 'STANDARD_ORDER' | 'CUSTOM_ORDER';
+  brandId: string;
+  orderId?: string | null;
+  customOrderId?: string | null;
+  grossAmount: number;
+  currency: string;
+  commissionRuleId: string | null;
+  commissionScope: string | null;
+  commissionSource: string | null;
+  commissionRate: number;
+  commissionAmount: number;
+  brandNetAmount: number;
+  settlementPolicyId: string | null;
+  releaseMode: 'HOLD_UNTIL_DELIVERY' | 'SPLIT_RELEASE';
+  upfrontReleaseEnabled: boolean;
+  upfrontReleasePercent: number;
+  upfrontReleaseGrossAmount: number;
+  upfrontReleaseCommissionAmount: number;
+  upfrontReleaseNetBrandAmount: number;
+  finalReleaseGrossAmount: number;
+  finalReleaseCommissionAmount: number;
+  finalReleaseNetBrandAmount: number;
+  settlementDelayHours: number;
+  autoReleaseDays: number;
+  finalReleaseTrigger: string;
+  calculatedAt: string;
+}
+
+export interface AdminSettlementPolicyPreview {
+  writesSnapshot: boolean;
+  writesLedger: boolean;
+  resolvedSettlementPolicy: AdminSettlementResolvedPolicy;
+  settlementBreakdown: AdminSettlementBreakdown;
+  commissionBreakdown: {
+    commissionRuleId: string | null;
+    commissionSource: string | null;
+    commissionScope: string | null;
+    commissionRate: number;
+    commissionAmount: number;
+  };
+}
+
+export interface AdminFinanceSettlementState {
+  currency: string;
+  totalHeldFunds: number;
+  upfrontReleasedFunds: number;
+  finalReleasePendingFunds: number;
+  finalReleaseEligibleFunds: number;
+  frozenFunds: number;
+  refundedFunds: number;
+  availableBrandWalletFunds: number;
+  payoutPendingFunds: number;
+  paidOutFunds: number;
+}
+
 export interface AdminReconciliationRun {
   id: string;
   scope: 'PAYMENTS' | 'PAYOUTS' | 'LEDGER_INTEGRITY';
@@ -747,8 +843,27 @@ export interface AdminFinanceOverview {
   unresolvedReconciliationItems: number;
   pendingPayouts?: number;
   activeEscrowHolds?: number;
+  settlementState?: AdminFinanceSettlementState | null;
   recentRuns: AdminReconciliationRun[];
   recentDocuments: AdminFinancialDocument[];
+}
+
+export interface AdminPaymentSettlementDetail {
+  orderType: 'STANDARD_ORDER' | 'CUSTOM_ORDER';
+  orderId?: string | null;
+  customOrderId?: string | null;
+  brand?: { id: string; name: string | null } | null;
+  grossAmount: number;
+  commissionAmount: number;
+  brandNetAmount: number;
+  releaseMode: string | null;
+  upfrontReleasePercent: number;
+  upfrontReleasedAmount: number;
+  finalHeldAmount: number;
+  snapshotId: string | null;
+  settlementPolicyId: string | null;
+  commissionRuleId: string | null;
+  releaseStatus: string;
 }
 
 export interface AdminFinancePaymentAttempt {
@@ -831,6 +946,7 @@ export interface AdminFinancePaymentDetail {
       username?: string | null;
     } | null;
   } | null;
+  settlementDetails?: AdminPaymentSettlementDetail[];
   events: Array<{
     id: string;
     type: string;

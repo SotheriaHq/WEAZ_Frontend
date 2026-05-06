@@ -24,6 +24,8 @@ import type {
   FeaturedSlotsSummary,
   EligibleEntity,
   AdminCommissionRule,
+  AdminSettlementPolicy,
+  AdminSettlementPolicyPreview,
   AdminReconciliationRun,
   AdminReconciliationItem,
   AdminFinancialDocument,
@@ -426,6 +428,56 @@ export const adminFinanceApi = {
       effectiveTo?: string | null;
     },
   ) => apiClient.patch<AdminCommissionRule>(`/admin/finance/commission-rules/${id}`, data),
+  listSettlementPolicies: (params?: Record<string, string>) =>
+    apiClient.get<AdminSettlementPolicy[]>('/admin/finance/settlement-policies', { params }),
+  getSettlementPolicy: (id: string) =>
+    apiClient.get<AdminSettlementPolicy>(`/admin/finance/settlement-policies/${id}`),
+  createSettlementPolicy: (data: {
+    orderType: 'STANDARD_ORDER' | 'CUSTOM_ORDER';
+    scope?: 'PLATFORM' | 'BRAND';
+    brandId?: string | null;
+    currency?: string | null;
+    releaseMode?: 'HOLD_UNTIL_DELIVERY' | 'SPLIT_RELEASE';
+    upfrontReleaseEnabled?: boolean;
+    upfrontReleasePercent?: number;
+    settlementDelayHours?: number;
+    autoReleaseDays?: number;
+    finalReleaseTrigger?: 'BUYER_DELIVERY_CONFIRMED' | 'AUTO_AFTER_DELIVERY' | 'ADMIN_APPROVED';
+    isDefault?: boolean;
+    isActive?: boolean;
+    effectiveFrom?: string;
+    effectiveTo?: string | null;
+  }) => apiClient.post<AdminSettlementPolicy>('/admin/finance/settlement-policies', data),
+  updateSettlementPolicy: (
+    id: string,
+    data: {
+      orderType?: 'STANDARD_ORDER' | 'CUSTOM_ORDER';
+      scope?: 'PLATFORM' | 'BRAND';
+      brandId?: string | null;
+      currency?: string | null;
+      releaseMode?: 'HOLD_UNTIL_DELIVERY' | 'SPLIT_RELEASE';
+      upfrontReleaseEnabled?: boolean;
+      upfrontReleasePercent?: number;
+      settlementDelayHours?: number;
+      autoReleaseDays?: number;
+      finalReleaseTrigger?: 'BUYER_DELIVERY_CONFIRMED' | 'AUTO_AFTER_DELIVERY' | 'ADMIN_APPROVED';
+      isDefault?: boolean;
+      isActive?: boolean;
+      effectiveFrom?: string;
+      effectiveTo?: string | null;
+    },
+  ) => apiClient.patch<AdminSettlementPolicy>(`/admin/finance/settlement-policies/${id}`, data),
+  activateSettlementPolicy: (id: string) =>
+    apiClient.post<AdminSettlementPolicy>(`/admin/finance/settlement-policies/${id}/activate`),
+  deactivateSettlementPolicy: (id: string) =>
+    apiClient.post<AdminSettlementPolicy>(`/admin/finance/settlement-policies/${id}/deactivate`),
+  previewSettlementPolicy: (data: {
+    orderType: 'STANDARD_ORDER' | 'CUSTOM_ORDER';
+    brandId: string;
+    currency: string;
+    amount: number;
+    effectiveAt?: string;
+  }) => apiClient.post<AdminSettlementPolicyPreview>('/admin/finance/settlement-policies/preview', data),
   createReconciliationRun: (data: { scope: 'PAYMENTS' | 'PAYOUTS' | 'LEDGER_INTEGRITY' }) =>
     apiClient.post<AdminReconciliationRun>('/admin/finance/reconciliation-runs', data),
   listReconciliationRuns: (params?: Record<string, string>) =>
