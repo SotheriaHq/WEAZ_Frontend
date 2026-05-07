@@ -8,6 +8,7 @@ import type { AppDispatch } from '@/store';
 import { closeSidebar } from '@/features/uiSlice';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
+import BrandSwitcher from '@/components/brand/BrandSwitcher';
 
 type StudioScaffoldProps = {
   active: string;
@@ -44,6 +45,11 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
       >
         <div className={isEmbeddedMobile ? 'mx-auto max-w-6xl min-w-0 embedded-studio-surface' : 'mx-auto max-w-6xl min-w-0'}>
           {isEmbeddedMobile ? <StudioEmbeddedSearchBridge /> : null}
+          {!isEmbeddedMobile ? (
+            <div className="mb-3 flex justify-end">
+              <BrandSwitcher />
+            </div>
+          ) : null}
           {children}
         </div>
       </div>

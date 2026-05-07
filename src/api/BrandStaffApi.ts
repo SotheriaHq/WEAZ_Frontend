@@ -32,6 +32,11 @@ export type BrandStaffInvite = {
   createdAt: string;
   updatedAt: string;
   inviteToken?: string;
+  emailDelivery?: {
+    dispatchStatus?: string;
+    outboxId?: string | null;
+    errorMessage?: string | null;
+  };
 };
 
 export type BrandStaffListResponse = {
