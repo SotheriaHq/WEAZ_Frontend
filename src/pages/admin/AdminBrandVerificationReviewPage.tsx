@@ -9,6 +9,7 @@ import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { unwrapApiResponse } from '@/types/auth';
+import MediaRenderer from '@/components/media/MediaRenderer';
 import type {
   AdminVerificationDetails,
   VerificationDocumentItem,
@@ -514,10 +515,12 @@ export default function AdminBrandVerificationReviewPage() {
                     />
                   ) : (
                     <div className="flex min-h-[420px] items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_36%),linear-gradient(180deg,_#ffffff,_#f8fafc)] p-4">
-                      <img
+                      <MediaRenderer
+                        kind="image"
                         src={selectedDocument.signedUrl}
                         alt={selectedDocument.label}
-                        className="block max-h-[85vh] max-w-full rounded-[1.25rem] shadow-lg"
+                        className="block rounded-[1.25rem] shadow-lg"
+                        maxHeightClassName="max-h-[85vh]"
                       />
                     </div>
                   )

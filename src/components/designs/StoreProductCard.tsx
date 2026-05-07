@@ -12,6 +12,7 @@ import {
   isCustomOrderOnlyProduct,
   isStrictlyOutOfStockProduct,
 } from '@/lib/productAvailability';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 export interface StoreProduct {
   id: string;
@@ -461,10 +462,13 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         ) : null}
 
         {!imgError && activeImage?.url ? (
-          <img
+          <MediaRenderer
+            kind="image"
             src={activeImage.url}
             alt={product.name}
-            className={`block max-h-[440px] w-full max-w-full h-auto transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
+            className="block w-full max-w-full"
+            mediaClassName={`block h-auto w-full transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
+            maxHeightClassName="max-h-[440px]"
             loading="eager"
             onError={() => {
               setFailedGalleryKeys((prev) => (

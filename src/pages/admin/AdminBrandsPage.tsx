@@ -109,11 +109,12 @@ const AdminBrandsPage: React.FC = () => {
           setQueueCursor(null);
         }
       } finally {
-        if (!active) return;
-        if (loadMore) {
-          setQueueLoadingMore(false);
-        } else {
-          setQueueLoading(false);
+        if (active) {
+          if (loadMore) {
+            setQueueLoadingMore(false);
+          } else {
+            setQueueLoading(false);
+          }
         }
       }
     };

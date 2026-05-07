@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import type { ThreadMessage } from '@/api/MessagingApi';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface MessageBubbleProps {
   message: ThreadMessage & { _optimistic?: 'sending' | 'failed' };
@@ -173,10 +174,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
                         rel="noreferrer"
                         className="block rounded-lg overflow-hidden max-w-[200px]"
                       >
-                        <img
+                        <MediaRenderer
+                          kind="image"
                           src={att.file.s3Url}
                           alt={att.file.originalName || 'Attachment'}
-                          className="w-full h-auto rounded-lg"
+                          className="w-full rounded-lg"
+                          mediaClassName="h-auto w-full rounded-lg"
+                          maxHeightClassName=""
                           loading="eager"
                         />
                       </a>

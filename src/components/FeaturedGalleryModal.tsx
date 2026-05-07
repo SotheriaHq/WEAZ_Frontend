@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import Modal from '@/components/ui/Modal';
 import { featuredApi, type PublicFeaturedItem } from '@/api/FeaturedApi';
 import { unwrapApiResponse } from '@/types/auth';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface FeaturedGalleryModalProps {
   open: boolean;
@@ -102,19 +103,24 @@ const FeaturedGalleryModal: React.FC<FeaturedGalleryModalProps> = ({ open, onClo
                     {hasMultiple ? (
                       <>
                         <div className="col-span-2 row-span-2 h-48 overflow-hidden">
-                          <img
+                          <MediaRenderer
+                            kind="image"
                             src={images[0]}
                             alt={item.entityName}
-                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            fit="cover"
+                            className="h-full w-full"
+                            mediaClassName="transition-transform duration-500 group-hover:scale-105"
                             loading="eager"
                           />
                         </div>
                         {images.slice(1, 3).map((url, i) => (
                           <div key={i} className="h-[calc(96px-1px)] overflow-hidden">
-                            <img
+                            <MediaRenderer
+                              kind="image"
                               src={url}
                               alt={`${item.entityName} ${i + 2}`}
-                              className="h-full w-full object-cover"
+                              fit="cover"
+                              className="h-full w-full"
                               loading="eager"
                             />
                           </div>
@@ -123,10 +129,13 @@ const FeaturedGalleryModal: React.FC<FeaturedGalleryModalProps> = ({ open, onClo
                     ) : (
                       <div className="h-48 w-full overflow-hidden">
                         {images[0] ? (
-                          <img
+                          <MediaRenderer
+                            kind="image"
                             src={images[0]}
                             alt={item.entityName}
-                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            fit="cover"
+                            className="h-full w-full"
+                            mediaClassName="transition-transform duration-500 group-hover:scale-105"
                             loading="eager"
                           />
                         ) : (

@@ -59,8 +59,8 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
 }) => {
   const location = useLocation();
   const hasBannerImage = showBanner && Boolean(profile.bannerImage);
-  const bannerLabel =
-    (profile.username ? `@${profile.username}` : `${profile.firstName} ${profile.lastName}` || '').trim() || 'Your Profile';
+  const profileName = `${profile.firstName} ${profile.lastName}`.trim();
+  const bannerLabel = (profile.username ? `@${profile.username}` : profileName).trim() || 'Your Profile';
 
   // Only show the external spinner for explicit upload operations — ImageWithFallback
   // handles the image-load shimmer internally (including signed URL resolution for S3).

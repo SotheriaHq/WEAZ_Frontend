@@ -23,6 +23,7 @@ import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useBagging } from '@/hooks/useBagging';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface InlineCollectionViewerProps {
   collectionId: string;
@@ -663,7 +664,14 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                       >
                         <div className="aspect-square bg-gray-100 dark:bg-zinc-800/50 flex items-center justify-center">
                           {image ? (
-                            <img src={image} alt={product.name} className="w-full h-full object-cover" loading="eager" />
+                            <MediaRenderer
+                              kind="image"
+                              src={image}
+                              alt={product.name}
+                              fit="cover"
+                              className="h-full w-full"
+                              loading="eager"
+                            />
                           ) : (
                             <span className="text-xs text-gray-400">No image</span>
                           )}

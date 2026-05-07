@@ -34,7 +34,7 @@ vi.mock('@/components/reviews/ReviewComposerModal', () => ({
 
 vi.mock('@/components/ImageWithFallback', () => ({
   __esModule: true,
-  default: ({ alt }: { alt: string }) => <img alt={alt} />,
+  default: ({ alt }: { alt: string }) => <div role="img" aria-label={alt} />,
 }));
 
 vi.mock('@/components/loaders/VLoader', () => ({

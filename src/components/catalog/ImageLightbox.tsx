@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface MediaItem {
   id: string;
@@ -29,10 +30,14 @@ function LightboxImage({ media, alt }: { media: MediaItem; alt: string }) {
   const { url: signedUrl } = useSignedFileUrl(fileId, media.url);
 
   return (
-    <img
+    <MediaRenderer
+      kind="image"
       src={signedUrl || ''}
       alt={alt}
-      className="max-w-full max-h-full object-contain pointer-events-none select-none"
+      className="pointer-events-none select-none"
+      mediaClassName="pointer-events-none select-none"
+      maxHeightClassName="max-h-full"
+      maxWidthClassName="max-w-full"
     />
   );
 }
@@ -67,10 +72,12 @@ function LightboxThumbnail({
           : 'border-transparent hover:border-white/30'}
       `}
     >
-      <img 
-        src={signedUrl || ''} 
-        alt={alt} 
-        className="w-full h-full object-cover" 
+      <MediaRenderer
+        kind="image"
+        src={signedUrl || ''}
+        alt={alt}
+        fit="cover"
+        className="h-full w-full"
       />
       {isActive && <div className="absolute inset-0 bg-purple-600/10" />}
     </button>

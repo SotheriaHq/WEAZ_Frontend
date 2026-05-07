@@ -236,8 +236,9 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
       });
       toast.error(error?.response?.data?.message || 'Unable to load order messages');
     } finally {
-      if (refreshSequenceRef.current !== refreshId) return;
-      setLoading(false);
+      if (refreshSequenceRef.current === refreshId) {
+        setLoading(false);
+      }
     }
   }, [listMessages, loadSummary]);
 

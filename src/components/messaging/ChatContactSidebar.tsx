@@ -4,6 +4,7 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import type { ThreadMessage } from '@/api/MessagingApi';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 type ConversationContext = 'DIRECT' | 'INQUIRY' | 'STANDARD_ORDER' | 'CUSTOM_ORDER';
 
@@ -268,7 +269,14 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
                   rel="noreferrer"
                   className="aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-white/5 hover:opacity-80 transition-opacity"
                 >
-                  <img src={img.url} alt={img.name} className="h-full w-full object-cover" loading="eager" />
+                  <MediaRenderer
+                    kind="image"
+                    src={img.url}
+                    alt={img.name}
+                    fit="cover"
+                    className="h-full w-full"
+                    loading="eager"
+                  />
                 </a>
               ))}
             </div>

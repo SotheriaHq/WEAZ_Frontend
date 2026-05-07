@@ -152,7 +152,7 @@ describe('useBrandProfile render isolation', () => {
     expect(renderCount).toBe(settledRenderCount);
   });
 
-  it('immediately syncs stale brand profile fields from the updated auth user', async () => {
+  it('keeps display fields synced with the latest auth user profile', async () => {
     const staleProfile: BrandProfileDto = {
       id: baseUser.id,
       brandFullName: baseUser.brandFullName ?? '',
@@ -233,8 +233,8 @@ describe('useBrandProfile render isolation', () => {
       throw new Error('Hook state was not captured after initial render.');
     }
     const initialHook: BrandProfileHookState = latestHook;
-    expect(initialHook.displayData.description).toBe('Old story still cached in hook state.');
-    expect(initialHook.displayData.hashtags).toEqual(['OldTag']);
+    expect(initialHook.displayData.description).toBe('A stable luxury catalog.');
+    expect(initialHook.displayData.hashtags).toEqual(['Luxury', 'Ready-to-wear']);
 
     await act(async () => {
       store.dispatch(

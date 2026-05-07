@@ -1,4 +1,4 @@
-const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\u0000-\u001f]+/g;
+const INVALID_FILENAME_CHARS = /[<>:"/\\|?*]+/g;
 const WHITESPACE = /\s+/g;
 const SEPARATOR = /-+/g;
 
@@ -10,6 +10,9 @@ export const sanitizeQrFilename = (
     .trim()
     .toLowerCase()
     .replace(INVALID_FILENAME_CHARS, '')
+    .split('')
+    .filter((character) => character.charCodeAt(0) > 31)
+    .join('')
     .replace(WHITESPACE, '-')
     .replace(SEPARATOR, '-')
     .replace(/^-+|-+$/g, '')

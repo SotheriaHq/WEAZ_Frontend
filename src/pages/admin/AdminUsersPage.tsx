@@ -12,6 +12,7 @@ import UserManageModal from './modals/UserManageModal';
 import CreateAdminModal from './modals/CreateAdminModal';
 import AdminCredentialsModal from './modals/AdminCredentialsModal';
 import useDebounce from '@/hooks/useDebounce';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 type UserRoleFilter = 'ALL' | 'User' | 'Admin';
 type UserStatusFilter = 'ALL' | 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
@@ -626,10 +627,13 @@ const AdminUsersPage: React.FC = () => {
           onClick={() => setPhotoPreview(null)}
         >
           <div className="relative max-h-[80vh] max-w-md overflow-hidden rounded-2xl shadow-2xl">
-            <img
+            <MediaRenderer
+              kind="image"
               src={photoPreview}
               alt="User photo"
-              className="max-h-[80vh] w-auto rounded-2xl object-contain"
+              className="rounded-2xl"
+              mediaClassName="w-auto rounded-2xl"
+              maxHeightClassName="max-h-[80vh]"
             />
             <button
               type="button"

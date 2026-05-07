@@ -27,7 +27,7 @@ export function convertUnit(
 export function formatMeasurement(value: number, unit: string, decimals = 1): string {
   if (unit.toLowerCase() === 'in') {
     const halfInch = Math.round(value * 2) / 2;
-    return `${halfInch}\"`;
+    return `${halfInch}"`;
   }
 
   if (unit.toLowerCase() === 'lb' || unit.toLowerCase() === 'lbs') {

@@ -325,8 +325,7 @@ export interface CreateCustomFabricRuleBasisInput {
   gender?: 'MEN' | 'WOMEN' | 'UNISEX';
 }
 
-export interface CreateAdminCustomFabricRuleBasisInput extends CreateCustomFabricRuleBasisInput {
-}
+export type CreateAdminCustomFabricRuleBasisInput = CreateCustomFabricRuleBasisInput;
 
 export interface UpdateAdminCustomFabricRuleBasisInput {
   label?: string;

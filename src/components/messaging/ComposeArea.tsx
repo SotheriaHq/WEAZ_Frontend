@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { messagingApi } from '@/api/MessagingApi';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface PendingFile {
   fileId: string;
@@ -203,7 +204,13 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
           {files.map(f => (
             <div key={f.fileId} className="flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-white/8 border border-gray-200/60 dark:border-white/10 px-2.5 py-1.5 text-xs">
               {f.previewUrl ? (
-                <img src={f.previewUrl} alt="" className="w-6 h-6 rounded object-cover" />
+                <MediaRenderer
+                  kind="image"
+                  src={f.previewUrl}
+                  alt=""
+                  fit="cover"
+                  className="h-6 w-6 rounded"
+                />
               ) : (
                 <span>📎</span>
               )}
