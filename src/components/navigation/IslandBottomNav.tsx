@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
+import { useLocation } from 'react-router-dom';
 
 export type IslandBottomNavItem = {
   key: string;
@@ -22,7 +23,7 @@ export const ISLAND_BOTTOM_NAV_MOBILE_CLEARANCE_CLASS =
   'pb-[calc(env(safe-area-inset-bottom)+6rem)]';
 
 export const ISLAND_BOTTOM_NAV_CLEARANCE_CLASS =
-  `${ISLAND_BOTTOM_NAV_MOBILE_CLEARANCE_CLASS} md:pb-8`;
+  `${ISLAND_BOTTOM_NAV_MOBILE_CLEARANCE_CLASS} lg:pb-8`;
 
 const ITEM_BASE_CLASS =
   'flex h-11 min-w-[64px] flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-2 text-[11px] font-semibold leading-none transition-colors';
@@ -33,6 +34,36 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
   ariaLabel = 'Primary navigation',
   maxWidthClassName = 'max-w-[420px]',
 }) => {
+  const location = useLocation();
+  const [optimisticActiveKey, setOptimisticActiveKey] = useState<string | null>(null);
+  const currentLocation = useMemo(
+    () => `${location.pathname}${location.search}`,
+    [location.pathname, location.search],
+  );
+
+  const itemMatchesLocation = useCallback(
+    (item: IslandBottomNavItem) => {
+      const [pathOnly, query = ''] = item.path.split('?');
+      const target = query ? `${pathOnly}?${query}` : pathOnly;
+      return query ? currentLocation === target : location.pathname === pathOnly;
+    },
+    [currentLocation, location.pathname],
+  );
+
+  useEffect(() => {
+    if (!optimisticActiveKey) return;
+    const pendingItem = items.find((item) => item.key === optimisticActiveKey);
+    if (pendingItem && itemMatchesLocation(pendingItem)) {
+      setOptimisticActiveKey(null);
+    }
+  }, [itemMatchesLocation, items, optimisticActiveKey]);
+
+  const markOptimisticActive = useCallback((item: IslandBottomNavItem) => {
+    if (!item.disabled) {
+      setOptimisticActiveKey(item.key);
+    }
+  }, []);
+
   if (items.length === 0) {
     return null;
   }
@@ -40,7 +71,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
   return (
     <nav
       aria-label={ariaLabel}
-      className="fixed inset-x-0 z-50 flex justify-center px-4 pointer-events-none bottom-[calc(env(safe-area-inset-bottom)+10px)] md:hidden"
+      className="fixed inset-x-0 z-50 flex justify-center px-4 pointer-events-none bottom-[calc(env(safe-area-inset-bottom)+10px)] lg:hidden"
     >
       <div
         className={clsx(
@@ -51,13 +82,19 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
         <div className="flex h-full items-center gap-1 overflow-x-auto scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {items.map((item) => {
             const visual = item.icon ?? item.emoji;
-            const isSelected = Boolean(item.active && !item.disabled);
+            const isSelected = Boolean(
+              !item.disabled &&
+              (optimisticActiveKey ? optimisticActiveKey === item.key : item.active),
+            );
 
             return (
               <button
                 key={item.key}
                 type="button"
                 disabled={item.disabled}
+                onPointerDown={item.disabled ? undefined : () => markOptimisticActive(item)}
+                onMouseDown={item.disabled ? undefined : () => markOptimisticActive(item)}
+                onTouchStart={item.disabled ? undefined : () => markOptimisticActive(item)}
                 onClick={item.disabled ? undefined : () => onSelect(item)}
                 aria-current={isSelected ? 'page' : undefined}
                 aria-label={item.label}

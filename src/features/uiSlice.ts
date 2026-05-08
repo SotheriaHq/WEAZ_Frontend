@@ -4,8 +4,8 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 export type SidebarMode = 'RAIL' | 'DRAWER' | 'OVERLAY' | 'HIDDEN';
 
 // Breakpoint constant - single source of truth.
-// Keep JS layout decisions aligned with Tailwind `md`: desktop rail from md up,
-// bottom navigation below md.
+// Keep JS layout decisions aligned with Tailwind `lg`: desktop rail from lg up,
+// bottom navigation below lg.
 export const MOBILE_BREAKPOINT = 768;
 
 interface UiState {

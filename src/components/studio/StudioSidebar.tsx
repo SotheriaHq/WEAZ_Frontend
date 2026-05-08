@@ -34,7 +34,7 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
 
   return (
     <>
-      <aside className="hidden md:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[220px] z-20 overflow-y-auto scrollbar-hide border-r border-purple-200/20 dark:border-white/10 bg-transparent">
+      <aside className="hidden lg:block fixed left-0 top-16 h-[calc(100vh-64px)] w-[220px] z-20 overflow-y-auto scrollbar-hide border-r border-purple-200/20 dark:border-white/10 bg-transparent">
         <div className="py-4 px-2">
           <div className="px-3 mb-4">
             <h2 className="text-sm font-bold text-black dark:text-white uppercase tracking-wider">Studio</h2>

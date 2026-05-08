@@ -61,7 +61,7 @@ const AdminSidebar: React.FC = () => {
 
   return (
     <>
-      <aside className="fixed left-0 top-16 z-20 hidden h-[calc(100vh-64px)] w-[200px] overflow-y-auto bg-transparent scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:block">
+      <aside className="fixed left-0 top-16 z-20 hidden h-[calc(100vh-64px)] w-[200px] overflow-y-auto bg-transparent scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:block">
         <div className="relative z-10 px-2 py-4">
           <div className="mb-4 px-3">
             <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
