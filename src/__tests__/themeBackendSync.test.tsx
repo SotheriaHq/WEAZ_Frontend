@@ -148,6 +148,14 @@ describe('web theme backend sync', () => {
     expect(indexHtml).toContain('meta[name="theme-color"]');
   });
 
+  it('disables component transitions during runtime theme flips', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
+
+    expect(css).toContain('html.theme-transitioning *::after');
+    expect(css).toMatch(/html\.theme-transitioning[\s\S]*transition:\s*none !important;/);
+    expect(css).not.toContain('background-color 0.2s cubic-bezier');
+  });
+
   it('boots from localStorage before backend hydration', () => {
     localStorage.setItem('vite-ui-theme', 'dark');
 

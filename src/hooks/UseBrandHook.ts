@@ -11,7 +11,7 @@ import type {
 import type { AuthUserDto } from '../types/auth';
 import { env } from '../config/env';
 import { useReviewRuntimeFlags } from './useReviewRuntimeFlags';
-import { getActiveBrandId, hasActiveBrandMembership } from '@/lib/brandAccess';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 const areStringArraysEqual = (left: string[] | null | undefined, right: string[] | null | undefined) => {
   if (left === right) return true;
@@ -200,8 +200,7 @@ export const useBrandProfile = () => {
     (state: RootState) => state.user.profile,
     areStableUserFieldsEqual,
   );
-  const activeBrandId = getActiveBrandId(user);
-  const ownerBrandId = activeBrandId ?? user?.id ?? null;
+  const ownerBrandId = user?.id ?? user?.id ?? null;
   const brandDetailEndpointsEnabled = env.featureFlags.brandDetailEndpoints;
   const { flags: reviewFlags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
 

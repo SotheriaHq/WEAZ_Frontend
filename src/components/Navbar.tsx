@@ -364,7 +364,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
 
   return (
     <nav
-      className={`fixed top-0 left-0 z-layer-nav h-16 w-full px-4 transition-all duration-500 ease-out sm:px-5 ${
+      className={`fixed top-0 left-0 z-layer-nav h-16 w-full px-4 sm:px-5 ${
         minimal
           ? 'border-b border-transparent bg-transparent'
           : isScrolled

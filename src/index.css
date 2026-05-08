@@ -670,25 +670,13 @@ html {
 
 /* Theme transition — universal approach using a brief class-based gate.
    When the ThemeProvider flips the theme, it adds `theme-transitioning` to <html>
-   for ~300ms. During that window every element gets smooth, synchronized transitions.
-   Outside that window no elements carry a theme transition so there is zero perf cost. */
+   for ~300ms. During that window existing component transitions are disabled so
+   chrome, open menus, and page content settle together in one paint. */
 html.theme-transitioning,
 html.theme-transitioning *,
 html.theme-transitioning *::before,
 html.theme-transitioning *::after {
-  transition:
-    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    fill 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    stroke 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    background 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    outline-color 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  /* !important overrides component-level transitions to ensure ALL elements switch together.
-     Zero delay forces every element to start at the same instant. */
-  transition-delay: 0s !important;
+  transition: none !important;
 }
 
 /* Interactive elements always need quick transitions for hover/focus states */

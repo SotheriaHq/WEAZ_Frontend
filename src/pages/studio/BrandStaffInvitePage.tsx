@@ -84,16 +84,16 @@ const BrandStaffInvitePage: React.FC = () => {
   }, [token]);
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-16 text-gray-900 dark:bg-black dark:text-white">
+    <main className="min-h-screen threadly-shell-bg px-4 py-16 text-theme">
       <section className="mx-auto max-w-lg space-y-6">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          <p className="text-sm font-semibold uppercase tracking-wide text-theme-secondary">
             Brand invite
           </p>
           <h1 className="mt-2 text-3xl font-semibold">
             Join a Threadly brand workspace
           </h1>
-          <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">
+          <p className="mt-3 text-sm text-theme-secondary">
             Accepting adds your account to the brand team. The brand owner controls your role and permissions.
           </p>
         </div>
@@ -117,7 +117,7 @@ const BrandStaffInvitePage: React.FC = () => {
         ) : null}
 
         {status === 'rejected' ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+          <div className="rounded-lg border border-theme surface-card p-4 text-sm">
             Invite rejected.
           </div>
         ) : null}
@@ -140,7 +140,7 @@ const BrandStaffInvitePage: React.FC = () => {
                 type="button"
                 onClick={() => completeInvite('reject')}
                 disabled={loading || !token || status === 'rejected'}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 disabled:opacity-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/10"
+                className="rounded-lg border border-theme px-4 py-2 text-sm font-semibold text-theme surface-interactive-hover disabled:opacity-50"
               >
                 Reject
               </button>
@@ -148,7 +148,7 @@ const BrandStaffInvitePage: React.FC = () => {
           )}
           <Link
             to="/studio"
-            className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10"
+            className="rounded-lg px-4 py-2 text-sm font-semibold text-theme-secondary surface-interactive-hover"
           >
             Go to studio
           </Link>
