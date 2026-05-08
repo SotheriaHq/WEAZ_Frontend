@@ -42,7 +42,6 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   patchBusy: patchBusyProp,
 }) => {
   const navigate = useNavigate();
-  const [imgLoaded, setImgLoaded] = useState(false);
   const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const [commentText, setCommentText] = useState('');
@@ -220,25 +219,17 @@ export const DesignCard: React.FC<DesignCardProps> = ({
             mediaClassName="w-full h-full object-contain"
           />
         ) : (
-          <>
-            {!imgLoaded && (
-              <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-purple-100/40 via-white/40 to-white/20 dark:from-purple-900/20 dark:via-purple-900/10 dark:to-gray-900/40" />
-            )}
-            <MediaRenderer
-              kind="image"
+          <ImageWithFallback
               src={item.media.url ?? ''}
+              fileId={item.media.fileId || null}
               alt={item.collectionTitle}
               fit="contain"
+              rounded="none"
+              containerClassName="h-full w-full"
               maxHeightClassName="max-h-none"
-              maxWidthClassName="max-w-full"
-              className={`w-full h-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-              mediaClassName="w-full h-full object-contain"
-              onLoad={() => setImgLoaded(true)}
-              onError={() => {
-                setImgLoaded(true);
-              }}
+              className="h-full w-full object-contain"
+              fallbackName={item.collectionTitle}
             />
-          </>
         )}
         
         {/* Gradient Overlay for Text Readability */}
