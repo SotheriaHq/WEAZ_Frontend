@@ -78,6 +78,7 @@ export interface Product {
 
 export type BagMode = 'STANDARD' | 'CUSTOM' | 'STANDARD_OR_CUSTOM' | 'UNAVAILABLE';
 export type BagFittingState = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'NOT_REQUIRED';
+export type BagFreshnessState = 'FRESH' | 'STALE' | 'MISSING' | 'PARTIAL' | 'NOT_REQUIRED';
 export type BagStockState = 'IN_STOCK' | 'OUT_OF_STOCK' | 'CUSTOM_ONLY' | 'UNAVAILABLE';
 export type BagPulseStatus =
   | 'not_bagged'
@@ -90,7 +91,16 @@ export type BagDefaultAction =
   | 'OPEN_SELECTOR'
   | 'OPEN_CUSTOM_FLOW'
   | 'OPEN_FITTINGS'
+  | 'CONFIRM_STALE_FITTINGS'
   | 'DISABLED';
+
+export type BagDuplicateClassification =
+  | 'IN_BAG'
+  | 'SUBMITTED_UNPAID'
+  | 'PAID_ACTIVE'
+  | 'COMPLETED_ALLOWED'
+  | 'COMPLETED_BLOCKED'
+  | 'UNKNOWN';
 
 export interface BagStatus {
   productId: string;
@@ -118,7 +128,36 @@ export interface BagStatus {
     requiredMeasurementKeys: string[];
     requiredFreeformPointIds: string[];
     fittingState: BagFittingState;
+    freshnessState?: BagFreshnessState;
     missingMeasurementKeys: string[];
+    measurementUpdatedAt?: string | null;
+    staleAfterDays?: number;
+    staleAt?: string | null;
+    requiresStaleConfirmation?: boolean;
+  };
+  customOrder?: {
+    enabled: boolean;
+    inBag: boolean;
+    sessionId?: string | null;
+    checkoutIntentId?: string | null;
+    configurationId?: string | null;
+    requiredMeasurementKeys: string[];
+    requiredFreeformPointIds: string[];
+    fittingsComplete: boolean;
+    freshnessState?: BagFreshnessState;
+    missingMeasurementKeys: string[];
+    measurementUpdatedAt?: string | null;
+    staleAfterDays?: number;
+    staleAt?: string | null;
+    requiresStaleConfirmation?: boolean;
+  };
+  duplicateState?: {
+    inBag: boolean;
+    submittedUnpaid: boolean;
+    paidActive: boolean;
+    completedPolicy: 'ALLOW_REPEAT' | 'BLOCK_REPEAT' | 'UNKNOWN';
+    reason?: string | null;
+    classifications: BagDuplicateClassification[];
   };
   stockState: BagStockState;
   userState: {

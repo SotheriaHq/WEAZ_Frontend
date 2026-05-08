@@ -294,7 +294,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       setCartPreviewData(preview);
       setShowCartPreview(true);
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to load cart preview');
+      toast.error(e?.message || 'Failed to load bag preview');
     } finally {
       setAddingAll(false);
     }
@@ -321,10 +321,10 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       const successCount = results.filter(Boolean).length;
       if (successCount > 0) {
         dispatch(openCartDrawer());
-        toast.success(`Added ${successCount} item${successCount === 1 ? '' : 's'} to cart`);
+        toast.success(`Added ${successCount} item${successCount === 1 ? '' : 's'} to your bag`);
       }
       if (successCount < selections.length) {
-        toast.error('Some items could not be added to cart');
+        toast.error('Some items could not be added to your bag');
       }
       setShowCartPreview(false);
     } finally {
@@ -631,7 +631,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                   disabled={addingAll}
                   className="text-xs px-3 py-1.5"
                 >
-                  {addingAll ? 'Adding…' : 'Add all to cart'}
+                  {addingAll ? 'Adding…' : 'Add all to Bag'}
                 </FrostedButton>
               ) : null}
             </div>

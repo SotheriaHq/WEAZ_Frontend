@@ -47,7 +47,7 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
   const featureContent: Record<string, { icon: React.ReactNode; title: string; description: string; emoji: string }> = {
     cart: {
       icon: <ShoppingBag className="w-8 h-8" />,
-      title: 'Sign in to view your cart',
+      title: 'Sign in to view your bag',
       description: 'Create an account or sign in to save items, track orders, and enjoy a personalized shopping experience.',
       emoji: '🛒',
     },

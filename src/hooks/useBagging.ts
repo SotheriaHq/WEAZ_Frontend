@@ -9,8 +9,8 @@ import {
   openCartDrawer,
 } from '@/features/cartSlice';
 import { useBagFlow } from '@/features/bagging/BagFlowProvider';
+import { BagApi } from '@/api/BagApi';
 import {
-  getBagStatus,
   type BagDefaultAction,
   type BagPulseStatus,
   type BagStatus,
@@ -26,8 +26,10 @@ type BagInteractionCallbacks = {
   onOpenSelector?: (status: BagStatus, product: BagProductInput) => void;
   onOpenCustomFlow?: (status: BagStatus, product: BagProductInput) => void;
   onOpenFittings?: (status: BagStatus, product: BagProductInput) => void;
+  onOpenStaleConfirmation?: (status: BagStatus, product: BagProductInput) => void;
   onRequireAuth?: (product: BagProductInput, action: BagDefaultAction) => void;
   onOpenExistingBag?: (status: BagStatus, product: BagProductInput) => void;
+  onResumeCheckout?: (status: BagStatus, product: BagProductInput) => void;
 };
 
 type StandardBagOptions = {
@@ -49,6 +51,15 @@ type BagActionResult = BagProductResult | null;
 
 const isFittingsIncomplete = (status: BagStatus) =>
   status.custom.fittingState === 'MISSING' || status.custom.fittingState === 'PARTIAL';
+
+const requiresStaleConfirmation = (status: BagStatus) =>
+  status.ui.defaultAction === 'CONFIRM_STALE_FITTINGS' ||
+  status.custom.freshnessState === 'STALE' ||
+  status.custom.requiresStaleConfirmation === true ||
+  status.customOrder?.freshnessState === 'STALE' ||
+  status.customOrder?.requiresStaleConfirmation === true;
+
+const duplicateClasses = (status: BagStatus) => status.duplicateState?.classifications ?? [];
 
 const readableError = (error: unknown, fallback: string) => {
   if (typeof error === 'string' && error.trim()) return error;
@@ -111,7 +122,7 @@ export function useBagging() {
       setLoading(productId, true);
       setErrorByProductId((prev) => ({ ...prev, [productId]: null }));
       try {
-        const status = await getBagStatus(productId);
+        const status = await BagApi.getProductBagStatus(productId);
         setStatusByProductId((prev) => ({ ...prev, [productId]: status }));
         return status;
       } catch (error) {
@@ -142,7 +153,7 @@ export function useBagging() {
           }),
         ).unwrap();
         await refreshBagCounts();
-        const status = await getBagStatus(productId);
+        const status = await BagApi.getProductBagStatus(productId);
         setStatusByProductId((prev) => ({ ...prev, [productId]: status }));
         setErrorByProductId((prev) => ({ ...prev, [productId]: null }));
         return status;
@@ -198,11 +209,30 @@ export function useBagging() {
         toast.error(status.ui.disabledReason || 'This product is not configured for custom bagging yet.');
         return status;
       }
+      const classes = duplicateClasses(status);
+      if (classes.includes('PAID_ACTIVE')) {
+        toast.error('You already have an active paid custom order for this item.');
+        return status;
+      }
+      if (classes.includes('SUBMITTED_UNPAID')) {
+        toast.info('You already started checkout for this custom request. Resume it from My Bag.');
+        dispatch(openCartDrawer());
+        options.onResumeCheckout?.(status, product);
+        return status;
+      }
       if (isFittingsIncomplete(status)) {
         if (bagFlow) {
           bagFlow.openFittings(product, status);
         } else {
           options.onOpenFittings?.(status, product);
+        }
+        return status;
+      }
+      if (requiresStaleConfirmation(status)) {
+        if (bagFlow) {
+          bagFlow.openStaleConfirmation(product, status);
+        } else {
+          options.onOpenStaleConfirmation?.(status, product);
         }
         return status;
       }
@@ -213,7 +243,7 @@ export function useBagging() {
       }
       return status;
     },
-    [bagFlow, isAuthenticated, prepareBag, statusByProductId],
+    [bagFlow, dispatch, isAuthenticated, prepareBag, statusByProductId],
   );
 
   const beginFittingsFlow = useCallback(
@@ -260,6 +290,26 @@ export function useBagging() {
       }
 
       const status = await prepareBag(product.id);
+      const classes = duplicateClasses(status);
+      if (classes.includes('PAID_ACTIVE')) {
+        toast.error('You already have an active paid custom order for this item.');
+        return { action: 'DISABLED', status };
+      }
+      if (classes.includes('COMPLETED_BLOCKED')) {
+        toast.error(status.duplicateState?.reason || 'This completed custom order cannot be repeated.');
+        return { action: 'DISABLED', status };
+      }
+      if (classes.includes('UNKNOWN') && status.duplicateState?.reason) {
+        toast.error('We could not confirm whether this item is already in your bag. Try again.');
+        return { action: 'DISABLED', status };
+      }
+      if (classes.includes('SUBMITTED_UNPAID')) {
+        dispatch(openCartDrawer());
+        options.onResumeCheckout?.(status, product);
+        toast.info('You already started checkout for this custom request. Resume it from My Bag.');
+        return { action: status.ui.defaultAction, status };
+      }
+
       if (!status.canBag || status.ui.defaultAction === 'DISABLED') {
         toast.error(status.ui.disabledReason || 'This product cannot be bagged.');
         if (bagFlow) {
@@ -309,6 +359,14 @@ export function useBagging() {
           }
           return { action: 'OPEN_FITTINGS', status };
         }
+        if (requiresStaleConfirmation(status)) {
+          if (bagFlow) {
+            bagFlow.openStaleConfirmation(product, status);
+          } else {
+            options.onOpenStaleConfirmation?.(status, product);
+          }
+          return { action: 'CONFIRM_STALE_FITTINGS', status };
+        }
         if (bagFlow) {
           bagFlow.openCustomFlow(product, status);
         } else {
@@ -326,6 +384,15 @@ export function useBagging() {
         return { action: 'OPEN_FITTINGS', status };
       }
 
+      if (status.ui.defaultAction === 'CONFIRM_STALE_FITTINGS') {
+        if (bagFlow) {
+          bagFlow.openStaleConfirmation(product, status);
+        } else {
+          options.onOpenStaleConfirmation?.(status, product);
+        }
+        return { action: 'CONFIRM_STALE_FITTINGS', status };
+      }
+
       if (bagFlow) {
         bagFlow.openExistingBag(product, status);
       } else {
@@ -333,7 +400,7 @@ export function useBagging() {
       }
       return { action: status.ui.defaultAction, status };
     },
-    [addStandard, bagFlow, isAuthenticated, prepareBag],
+    [addStandard, bagFlow, dispatch, isAuthenticated, prepareBag],
   );
 
   const getPulseStatus = useCallback(

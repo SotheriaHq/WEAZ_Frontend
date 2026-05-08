@@ -696,7 +696,7 @@ export const CollectionCartPreviewModal: React.FC<CollectionCartPreviewModalProp
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 id="cart-preview-title" className="text-lg font-semibold text-[color:var(--text-primary)]">
-                  Add Collection to Cart
+                  Add Collection to Bag
                 </h2>
                 <p className="mt-0.5 text-sm text-[color:var(--text-secondary)]">
                   {collection.title}
@@ -809,7 +809,7 @@ export const CollectionCartPreviewModal: React.FC<CollectionCartPreviewModalProp
             ) : (
               <div className="text-center py-8">
                 <AlertTriangle className="w-10 h-10 text-gray-300 dark:text-zinc-600 mx-auto mb-3" />
-                <p className="text-gray-500 dark:text-zinc-400">Failed to load cart preview</p>
+                <p className="text-gray-500 dark:text-zinc-400">Failed to load bag preview</p>
               </div>
             )}
           </div>
@@ -830,7 +830,7 @@ export const CollectionCartPreviewModal: React.FC<CollectionCartPreviewModalProp
             {missingSelectionCount > 0 && (
               <p className="mb-2 text-xs text-amber-700 dark:text-amber-300">
                 Select required size/color for {missingSelectionCount} item
-                {missingSelectionCount === 1 ? '' : 's'} before adding to cart.
+                {missingSelectionCount === 1 ? '' : 's'} before adding to bag.
               </p>
             )}
             
@@ -846,12 +846,12 @@ export const CollectionCartPreviewModal: React.FC<CollectionCartPreviewModalProp
               {isAdding ? (
                 <>
                   <VLoader size={16} phase="loading" showLabel={false} />
-                  Adding to Cart...
+                  Adding to Bag...
                 </>
               ) : (
                 <>
                   <ShoppingCart className="w-4 h-4" />
-                  Add {selectedIds.size} Items to Cart
+                  Add {selectedIds.size} Items to Bag
                 </>
               )}
             </button>

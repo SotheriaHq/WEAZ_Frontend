@@ -16,9 +16,11 @@ import { addToCart, fetchCart, fetchCustomBagCount, openCartDrawer } from '@/fea
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
-import { getBagStatus, type BagDefaultAction, type BagStatus } from '@/api/StoreApi';
+import { BagApi } from '@/api/BagApi';
+import type { BagDefaultAction, BagStatus } from '@/api/StoreApi';
 import ProductBagSelectorModal from '@/components/bagging/ProductBagSelectorModal';
 import BagFittingsModal from '@/components/bagging/BagFittingsModal';
+import StaleFittingConfirmationModal from '@/components/bagging/StaleFittingConfirmationModal';
 
 type BagProductInput = {
   id: string;
@@ -83,6 +85,7 @@ type BagFlowContextValue = {
   openSelector: (product: BagProductInput, status: BagStatus) => void;
   openCustomFlow: (product: BagProductInput, status: BagStatus) => void;
   openFittings: (product: BagProductInput, status: BagStatus) => void;
+  openStaleConfirmation: (product: BagProductInput, status: BagStatus) => void;
   openAuthPrompt: (
     product: BagProductInput,
     action: BagDefaultAction,
@@ -110,6 +113,7 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
   const [selectorTarget, setSelectorTarget] = useState<BagFlowTarget | null>(null);
   const [customTarget, setCustomTarget] = useState<BagFlowTarget | null>(null);
   const [fittingsTarget, setFittingsTarget] = useState<BagFlowTarget | null>(null);
+  const [staleTarget, setStaleTarget] = useState<BagFlowTarget | null>(null);
   const [pendingAuth, setPendingAuth] = useState<PendingAuthResume | null>(null);
 
   const pendingResumeRef = useRef<PendingAuthResume | null>(null);
@@ -122,6 +126,7 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
     setSelectorTarget(null);
     setCustomTarget(null);
     setFittingsTarget(null);
+    setStaleTarget(null);
     setPendingAuth(null);
     pendingResumeRef.current = null;
     clearPendingBagAction();
@@ -137,6 +142,7 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
       setSelectorTarget(null);
       setCustomTarget(null);
       setFittingsTarget(null);
+      setStaleTarget(null);
 
       if (status.standard.alreadyBagged || status.custom.alreadyBagged) {
         dispatch(openCartDrawer());
@@ -172,6 +178,11 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
         return;
       }
 
+      if (action === 'CONFIRM_STALE_FITTINGS') {
+        setStaleTarget({ product, status });
+        return;
+      }
+
       if (action === 'OPEN_CUSTOM_FLOW') {
         if (!status.custom.available || !status.custom.configurationId) {
           toast.error(status.ui.disabledReason || 'This product is not configured for custom bagging yet.');
@@ -179,6 +190,10 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
         }
         if (status.custom.fittingState === 'MISSING' || status.custom.fittingState === 'PARTIAL') {
           setFittingsTarget({ product, status });
+          return;
+        }
+        if (status.custom.requiresStaleConfirmation || status.custom.freshnessState === 'STALE') {
+          setStaleTarget({ product, status });
           return;
         }
         setCustomTarget({ product, status });
@@ -199,7 +214,7 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
       id: pending.productId,
       name: pending.productName,
     };
-    const status = await getBagStatus(pending.productId);
+    const status = await BagApi.getProductBagStatus(pending.productId);
     await routeResolvedStatus(product, status, pending.intendedAction);
     return true;
   }, [routeResolvedStatus]);
@@ -225,6 +240,7 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
     setPendingAuth(null);
     setCustomTarget(null);
     setFittingsTarget(null);
+    setStaleTarget(null);
     setSelectorTarget({ product, status });
   }, []);
 
@@ -237,10 +253,15 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
       setFittingsTarget({ product, status });
       return;
     }
+    if (status.custom.requiresStaleConfirmation || status.custom.freshnessState === 'STALE') {
+      setStaleTarget({ product, status });
+      return;
+    }
 
     setPendingAuth(null);
     setSelectorTarget(null);
     setFittingsTarget(null);
+    setStaleTarget(null);
     setCustomTarget({ product, status });
   }, []);
 
@@ -248,7 +269,16 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
     setPendingAuth(null);
     setSelectorTarget(null);
     setCustomTarget(null);
+    setStaleTarget(null);
     setFittingsTarget({ product, status });
+  }, []);
+
+  const openStaleConfirmation = useCallback((product: BagProductInput, status: BagStatus) => {
+    setPendingAuth(null);
+    setSelectorTarget(null);
+    setCustomTarget(null);
+    setFittingsTarget(null);
+    setStaleTarget({ product, status });
   }, []);
 
   const openAuthPrompt = useCallback(
@@ -256,6 +286,7 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
       setSelectorTarget(null);
       setCustomTarget(null);
       setFittingsTarget(null);
+      setStaleTarget(null);
       const returnPath = `${location.pathname}${location.search}${location.hash}`;
       const nextPending = { product, action, returnPath, resume };
       setPendingAuth(nextPending);
@@ -276,6 +307,7 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
       setSelectorTarget(null);
       setCustomTarget(null);
       setFittingsTarget(null);
+      setStaleTarget(null);
       dispatch(openCartDrawer());
     },
     [dispatch],
@@ -286,11 +318,12 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
       openSelector,
       openCustomFlow,
       openFittings,
+      openStaleConfirmation,
       openAuthPrompt,
       openExistingBag,
       closeActiveFlow,
     }),
-    [closeActiveFlow, openAuthPrompt, openCustomFlow, openExistingBag, openFittings, openSelector],
+    [closeActiveFlow, openAuthPrompt, openCustomFlow, openExistingBag, openFittings, openSelector, openStaleConfirmation],
   );
 
   const customConfigurationId = customTarget?.status.custom.configurationId ?? null;
@@ -327,6 +360,23 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
         onResolved={(nextStatus) => {
           if (!fittingsTarget) return;
           openCustomFlow(fittingsTarget.product, nextStatus);
+        }}
+      />
+
+      <StaleFittingConfirmationModal
+        isOpen={Boolean(staleTarget)}
+        product={staleTarget?.product ?? null}
+        status={staleTarget?.status ?? null}
+        onClose={closeActiveFlow}
+        onUpdateFittings={() => {
+          if (!staleTarget) return;
+          openFittings(staleTarget.product, staleTarget.status);
+        }}
+        onContinue={() => {
+          if (!staleTarget) return;
+          const target = staleTarget;
+          setStaleTarget(null);
+          setCustomTarget(target);
         }}
       />
 

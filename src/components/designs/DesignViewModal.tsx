@@ -16,8 +16,10 @@ import { formatPrice } from '@/utils/helpers';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import VLoader from '@/components/loaders/VLoader';
 import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
+import { BagApi } from '@/api/BagApi';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
+import { useBagFlow } from '@/features/bagging/BagFlowProvider';
 import type { CommentV2Dto } from '@/types/comments';
 import {
   CONTENT_DISPLAY_FRAME_CLASS,
@@ -60,6 +62,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const currentUserId = authProfile?.id;
   const dialogRef = React.useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const bagFlow = useBagFlow();
 
   const fallbackMedia = React.useMemo<ModalMedia | null>(() => {
     if (!item) return null;
@@ -353,7 +356,41 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
     setOpeningCustomComposer(true);
     try {
-      let resolvedConfigurationId = customConfigurationId;
+      const sourceStatus = await BagApi.getSourceBagStatus('DESIGN', item.collectionId);
+      const duplicateClasses = sourceStatus.duplicateState?.classifications ?? [];
+      const designName = item.collectionTitle || 'this design';
+      if (sourceStatus.custom.alreadyBagged || duplicateClasses.includes('IN_BAG')) {
+        bagFlow?.openExistingBag({ id: item.collectionId, name: designName }, sourceStatus);
+        toast.info('This custom request is already in your bag.');
+        return;
+      }
+      if (duplicateClasses.includes('SUBMITTED_UNPAID')) {
+        bagFlow?.openExistingBag({ id: item.collectionId, name: designName }, sourceStatus);
+        toast.info('Resume this custom request from My Bag.');
+        return;
+      }
+      if (duplicateClasses.includes('PAID_ACTIVE')) {
+        toast.error('You already have an active paid custom order for this design.');
+        return;
+      }
+      if (duplicateClasses.includes('COMPLETED_BLOCKED')) {
+        toast.error(sourceStatus.duplicateState?.reason || 'This completed custom order cannot be repeated.');
+        return;
+      }
+      if (sourceStatus.ui.defaultAction === 'OPEN_FITTINGS') {
+        bagFlow?.openFittings({ id: item.collectionId, name: designName }, sourceStatus);
+        return;
+      }
+      if (
+        sourceStatus.ui.defaultAction === 'CONFIRM_STALE_FITTINGS' ||
+        sourceStatus.custom.requiresStaleConfirmation ||
+        sourceStatus.custom.freshnessState === 'STALE'
+      ) {
+        bagFlow?.openStaleConfirmation({ id: item.collectionId, name: designName }, sourceStatus);
+        return;
+      }
+
+      let resolvedConfigurationId = sourceStatus.custom.configurationId || customConfigurationId;
       if (!resolvedConfigurationId) {
         const activeConfiguration = await customOrderConfigurationsApi.getActiveForDesign(item.collectionId);
         resolvedConfigurationId = activeConfiguration?.id ?? null;

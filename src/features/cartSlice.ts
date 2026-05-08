@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { apiClient } from '../api/httpClient';
+import { BagApi } from '@/api/BagApi';
 import type { SizingMode } from '@/types/sizing';
 
 // Types
@@ -198,13 +199,10 @@ export const fetchCustomBagCount = createAsyncThunk(
   'cart/fetchCustomBagCount',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await apiClient.get('/custom-orders/checkout-bag');
-      const payload = unwrapResponse(response.data);
-      const lines = Array.isArray(payload?.items) ? payload.items : [];
-      return lines.length;
+      return await BagApi.getBagCount();
     } catch (error: any) {
       return rejectWithValue(
-        error.response?.data?.message || 'Failed to fetch custom bag count',
+        error.response?.data?.message || 'Failed to fetch bag count',
       );
     }
   },
@@ -346,9 +344,12 @@ export const cartSlice = createSlice({
       })
 
       // Custom bag count
-      .addCase(fetchCustomBagCount.fulfilled, (state, action: PayloadAction<number>) => {
-        state.customBagCount = Number.isFinite(action.payload)
-          ? Math.max(0, Math.trunc(action.payload))
+      .addCase(fetchCustomBagCount.fulfilled, (state, action: PayloadAction<{ standardQuantity: number; customLineCount: number; combinedCount: number }>) => {
+        state.totalQuantity = Number.isFinite(action.payload.standardQuantity)
+          ? Math.max(0, Math.trunc(action.payload.standardQuantity))
+          : state.totalQuantity;
+        state.customBagCount = Number.isFinite(action.payload.customLineCount)
+          ? Math.max(0, Math.trunc(action.payload.customLineCount))
           : 0;
       })
       .addCase(fetchCustomBagCount.rejected, (state) => {
