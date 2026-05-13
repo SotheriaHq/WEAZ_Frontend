@@ -28,7 +28,9 @@ import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedF
 import { getStoreStatus, type StoreStatusResponse } from '../../api/StoreApi';
 import FrostedButton from '@/components/ui/FrostedButton';
 import CatalogShopTab from '@/components/catalog/CatalogShopTab';
+import BrandQrModal from '@/components/qr/BrandQrModal';
 import { resolveBannerImageSource } from '@/utils/profileImage';
+import { buildProfileUrl } from '@/utils/publicLinks';
 import {
   type PublishTask,
   readPublishTasks,
@@ -93,6 +95,7 @@ const ProfilePage: React.FC = () => {
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
+  const [isBrandQrOpen, setIsBrandQrOpen] = useState(false);
   const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; visibility?: 'PUBLIC' | 'PRIVATE' }>>({});
   const [publishTasks, setPublishTasks] = useState<PublishTask[]>([]);
 
@@ -1167,24 +1170,50 @@ const ProfilePage: React.FC = () => {
     return displayData;
   }, [displayData, isVisitorView, visitorBannerUrl, visitorLogoUrl, visitorProfile]);
 
+  const activeBrandProfile = isVisitorView ? visitorProfile : brandProfile;
+  const fallbackProfileUrl = useMemo(() => {
+    const profileId = isVisitorView ? routeBrandId : user?.id;
+    if (!profileId) return null;
+
+    return buildProfileUrl({
+      id: profileId,
+      username: viewDisplayData.username || undefined,
+    });
+  }, [isVisitorView, routeBrandId, user?.id, viewDisplayData.username]);
+  const profileShareUrl =
+    activeBrandProfile?.shareUrl ??
+    activeBrandProfile?.publicProfileUrl ??
+    activeBrandProfile?.qrTargetUrl ??
+    fallbackProfileUrl;
+  const profileQrTargetUrl =
+    activeBrandProfile?.qrTargetUrl ??
+    activeBrandProfile?.publicProfileUrl ??
+    activeBrandProfile?.shareUrl ??
+    fallbackProfileUrl;
+
   const handleShareProfile = useCallback(async () => {
     const shareBrandName = viewDisplayData.brandName || 'Threadly';
-    const url = window.location.href;
+    const url = profileShareUrl;
+    if (!url) {
+      toast.error('Profile link is not available yet.');
+      return;
+    }
+    const message = `Check out ${shareBrandName} on Threadly: ${url}`;
     try {
       if (navigator.share) {
         await navigator.share({
           title: shareBrandName,
-          text: `Check out ${shareBrandName} on Threadly`,
+          text: message,
           url,
         });
       } else {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(message);
         toast.success('Profile link copied to clipboard');
       }
     } catch {
       // Silently ignore cancellation
     }
-  }, [viewDisplayData.brandName]);
+  }, [profileShareUrl, viewDisplayData.brandName]);
 
   const handleOpenHeaderQuickEdit = useCallback(() => {
     setIsHeaderQuickEditOpen(true);
@@ -1336,6 +1365,15 @@ const ProfilePage: React.FC = () => {
           onOpenFullEditor={() => handleOpenEditModal(false)}
         />
       )}
+      <BrandQrModal
+        open={isBrandQrOpen}
+        onClose={() => setIsBrandQrOpen(false)}
+        brandName={viewDisplayData.brandName || 'Threadly Brand'}
+        qrTargetUrl={profileQrTargetUrl}
+        shareUrl={profileShareUrl}
+        logoUrl={viewDisplayData.logoImage ?? null}
+        username={viewDisplayData.username ?? null}
+      />
       {showStoreSetupNudge ? (
         <div className="fixed bottom-24 right-4 sm:right-6 z-[60] w-[min(92vw,380px)]">
           <div className="glass-menu-soft px-4 py-3">
@@ -1390,6 +1428,7 @@ const ProfilePage: React.FC = () => {
           profile={ownerHeaderProfile}
           onEditProfile={handleOpenHeaderQuickEdit}
           onShareProfile={handleShareProfile}
+          onShowQrCode={() => setIsBrandQrOpen(true)}
           showPatchAction={showPatchAction}
           isPatched={isPatched}
           patchLoading={patchLoading}
@@ -1399,6 +1438,7 @@ const ProfilePage: React.FC = () => {
         <ProfileHeader
           profile={visitorHeaderProfile}
           onShareProfile={handleShareProfile}
+          onShowQrCode={() => setIsBrandQrOpen(true)}
           showPatchAction={showPatchAction}
           isPatched={isPatched}
           patchLoading={patchLoading}

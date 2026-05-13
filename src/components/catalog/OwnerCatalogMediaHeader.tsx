@@ -30,6 +30,7 @@ interface OwnerCatalogMediaHeaderProps {
   profile: OwnerHeaderProfileBase;
   onEditProfile?: () => void;
   onShareProfile?: () => void;
+  onShowQrCode?: () => void;
   showPatchAction?: boolean;
   isPatched?: boolean;
   patchLoading?: boolean;
@@ -49,6 +50,7 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
   profile,
   onEditProfile,
   onShareProfile,
+  onShowQrCode,
   showPatchAction = false,
   isPatched = false,
   patchLoading = false,
@@ -312,6 +314,7 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
         canEdit
         onEditProfile={onEditProfile}
         onShareProfile={onShareProfile}
+        onShowQrCode={onShowQrCode}
         onEditAvatar={handleTriggerAvatarUpload}
         onEditBanner={handleTriggerBannerUpload}
         avatarLoading={avatarUploading}

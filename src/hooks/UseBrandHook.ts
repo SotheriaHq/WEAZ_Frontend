@@ -134,7 +134,17 @@ const areBrandProfileSnapshotsEqual = (
     previous.averageRating === next.averageRating &&
     previous.totalReviews === next.totalReviews &&
     previous.collectionsCount === next.collectionsCount &&
+    previous.designsCount === next.designsCount &&
+    previous.productsCount === next.productsCount &&
     previous.patchesCount === next.patchesCount &&
+    previous.followersCount === next.followersCount &&
+    previous.totalThreads === next.totalThreads &&
+    previous.totalLikes === next.totalLikes &&
+    previous.totalShares === next.totalShares &&
+    previous.storeStatus === next.storeStatus &&
+    previous.publicProfileUrl === next.publicProfileUrl &&
+    previous.qrTargetUrl === next.qrTargetUrl &&
+    previous.shareUrl === next.shareUrl &&
     previous.createdAt === next.createdAt &&
     previous.updatedAt === next.updatedAt
   );
@@ -187,7 +197,17 @@ const syncBrandProfileWithUser = (
     averageRating: current?.averageRating,
     totalReviews: current?.totalReviews,
     collectionsCount: current?.collectionsCount,
+    designsCount: current?.designsCount,
+    productsCount: current?.productsCount,
     patchesCount: current?.patchesCount,
+    followersCount: current?.followersCount,
+    totalThreads: current?.totalThreads,
+    totalLikes: current?.totalLikes,
+    totalShares: current?.totalShares,
+    storeStatus: current?.storeStatus,
+    publicProfileUrl: current?.publicProfileUrl,
+    qrTargetUrl: current?.qrTargetUrl,
+    shareUrl: current?.shareUrl,
     createdAt: current?.createdAt ?? user.createdAt,
     updatedAt: user.updatedAt,
   };

@@ -38,6 +38,7 @@ interface ProfileHeaderProps {
   canEdit?: boolean;
   onEditProfile?: () => void;
   onShareProfile?: () => void;
+  onShowQrCode?: () => void;
 }
 
 const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
@@ -56,6 +57,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
   canEdit = false,
   onEditProfile,
   onShareProfile,
+  onShowQrCode,
 }) => {
   const location = useLocation();
   const hasBannerImage = showBanner && Boolean(profile.bannerImage);
@@ -265,6 +267,17 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                 title="Share profile"
               >
                 <span aria-hidden="true">🔗</span>
+              </button>
+            ) : null}
+            {onShowQrCode ? (
+              <button
+                type="button"
+                onClick={onShowQrCode}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-lg text-gray-900 shadow-lg transition hover:scale-105 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 dark:bg-gray-900/85 dark:text-gray-100"
+                aria-label="Show brand QR code"
+                title="Show QR code"
+              >
+                <span aria-hidden="true">▦</span>
               </button>
             ) : null}
             {showPatchAction && onTogglePatch ? (
