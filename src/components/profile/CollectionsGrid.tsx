@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Masonry from 'react-masonry-css';
 import type { CollectionDto } from '../../types/profile';
-import CollectionCard from './CollectionCard';
+import CatalogEntityCard from './CatalogEntityCard';
 import { useSelector } from 'react-redux';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
@@ -119,7 +119,7 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
     >
       {collections.map((collection) => (
         <div key={collection.id} className="w-full">
-          <CollectionCard 
+          <CatalogEntityCard
             collection={collection}
             onClick={() => onCollectionClick?.(collection.id)}
             onEdit={onEdit} 

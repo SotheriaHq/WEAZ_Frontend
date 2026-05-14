@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MessageCircle, Share2, MoreVertical, Store, AlertTriangle, Bookmark } from 'lucide-react';
+import { MessageCircle, Share2, MoreVertical, AlertTriangle, Bookmark } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import ThreadButton from '@/components/ui/ThreadButton';
 import type { CollectionDto } from '../../types/profile';
@@ -13,9 +13,11 @@ import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
 import VLoader from '@/components/loaders/VLoader';
+import { getCatalogEntityCardCopy, resolveCatalogEntityCardBranch } from './catalogEntityCardModel';
 
-interface CollectionCardProps {
+export interface CollectionCardProps {
   collection: CollectionDto;
+  cardKind?: 'design' | 'collection';
   onClick?: () => void;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
@@ -32,6 +34,7 @@ interface CollectionCardProps {
 
 const CollectionCardComponent: React.FC<CollectionCardProps> = ({
   collection, 
+  cardKind,
   onClick,
   onEdit, 
   onDelete,
@@ -65,7 +68,14 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     brandLogo,
     isAvailableInStore = false,
   } = collection;
-  const entityType = collection.entityType ?? (isAvailableInStore ? 'COLLECTION' : 'DESIGN');
+  const inferredBranch = resolveCatalogEntityCardBranch(
+    collection,
+    isAvailableInStore ? 'COLLECTION' : 'DESIGN',
+  );
+  const cardBranch = cardKind ?? (inferredBranch === 'collection' ? 'collection' : 'design');
+  const entityType = cardBranch === 'collection' ? 'COLLECTION' : 'DESIGN';
+  const copy = getCatalogEntityCardCopy(cardBranch);
+  const displayTitle = title?.trim() || copy.titleFallback;
 
   const clientStatus = collection.clientStatus;
   const isPublishing = clientStatus === 'publishing';
@@ -257,7 +267,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
       return;
     }
     if (!isAuth) {
-      toast.info('Please sign in to save collections.');
+      toast.info(copy.signInSaveMessage);
       return;
     }
     if (saveBusyLocal) return;
@@ -283,6 +293,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     <>
     <div 
       data-entity-type={entityType}
+      data-card-branch={cardBranch}
       className={`relative group w-full overflow-hidden shadow-md transition-transform duration-200 rounded-xl ${
         isDeleted ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'
       }`}
@@ -370,7 +381,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                 <MediaRenderer
                   kind="image"
                   src={resolvedDisplaySrc}
-                  alt={title}
+                  alt={displayTitle}
                   fit="contain"
                   maxHeightClassName="max-h-none"
                   maxWidthClassName="max-w-full"
@@ -403,7 +414,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         ) : (
             <div className="relative flex min-h-[320px] items-center justify-center bg-black/15 dark:bg-black/40 glass-panel">
               <span className="text-white text-3xl font-bold opacity-70">
-                {title.charAt(0)}
+                {displayTitle.charAt(0)}
               </span>
               {/* Resolving signed URL skeleton shimmer */}
               {coverFileId && (
@@ -415,15 +426,12 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         {/* Always-visible gradient overlay for text readability - lighter for more image visibility */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent" />
         
-        {/* Available in Store badge (top left) */}
-        {isAvailableInStore && (
-          <div className="absolute top-3 left-3 z-20">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-500/80 backdrop-blur-sm text-white text-xs font-medium rounded-full">
-              <Store className="w-3.5 h-3.5" />
-              <span>In Store</span>
-            </div>
+        {/* Entity badge (top left) */}
+        <div className="absolute top-3 left-3 z-20">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-500/80 backdrop-blur-sm text-white text-xs font-medium rounded-full">
+            <span>{copy.badgeLabel}</span>
           </div>
-        )}
+        </div>
         
         {/* Three-dot menu for owners (top right) */}
         {showActions && (onEdit || onDelete || onRestore || onPermanentDelete) && (
@@ -446,10 +454,10 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                   <>
                 {/* For drafts: only show Delete. For published: show Edit, Delete, Manage Access */}
                 {!isDraft && onEdit && (
-                  <DropdownItem onClick={() => onEdit(collection.id)}>Edit</DropdownItem>
+                  <DropdownItem onClick={() => onEdit(collection.id)}>{copy.editLabel}</DropdownItem>
                 )}
                 {onDelete && (
-                  <DropdownItem onClick={() => onDelete(collection.id)}>Delete</DropdownItem>
+                  <DropdownItem onClick={() => onDelete(collection.id)}>{copy.deleteLabel}</DropdownItem>
                 )}
                 {!isDraft && (
                   <DropdownItem onClick={() => setAccessOpen(true)}>Manage Access</DropdownItem>
@@ -464,13 +472,14 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         {/* Vertical Action Bar (like in Reels) - Right side */}
         {!isDraft && !isDeleted && (
         <div className="absolute bottom-28 right-2 z-10 flex flex-col items-center gap-3">
+          {/* Legacy thread targets are still collection-backed for design rows. */}
           <ThreadButton contentType="COLLECTION" contentId={collection.id} initialCount={threadsCount} ownerId={collection.ownerId} />
           <button
             type="button"
             className="flex flex-col items-center text-white hover:scale-110 transition-transform"
             onClick={handleToggleSave}
             disabled={resolvedSaveBusy}
-            aria-label={resolvedSaved ? 'Unsave collection' : 'Save collection'}
+            aria-label={resolvedSaved ? copy.unsaveLabel : copy.saveLabel}
           >
             <Bookmark className={`w-5 h-5 ${resolvedSaved ? 'fill-white' : ''}`} />
           </button>
@@ -510,11 +519,11 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
           </div>
 
           {/* Collection Title */}
-          <h3 className="text-base font-bold mb-1 line-clamp-2 leading-tight">{title}</h3>
+          <h3 className="text-base font-bold mb-1 line-clamp-2 leading-tight">{displayTitle}</h3>
           
           {/* Collection Stats */}
           <div className="flex items-center gap-1.5 text-[11px] text-white/90 mb-2">
-            <span>{displayItemCount} pieces</span>
+            <span>{displayItemCount} {displayItemCount === 1 ? copy.countSingular : copy.countPlural}</span>
           </div>
           {/* Sale / Price Container */}
           {(baseBand || saleBand) && (
@@ -569,23 +578,23 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-500/20 border border-amber-400/30 backdrop-blur-sm">
                     <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                    <span className="text-[10px] font-medium text-amber-200">Draft • {displayItemCount} media uploaded</span>
+                    <span className="text-[10px] font-medium text-amber-200">Draft - {displayItemCount} {copy.draftCountLabel}</span>
                   </div>
                 </div>
                 <button
                   className="shrink-0 px-3 py-1.5 rounded-md bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[11px] font-medium hover:from-purple-600 hover:to-indigo-600 transition-all shadow-md"
                   onClick={(e) => { e.stopPropagation(); onClick?.(); }}
                 >
-                  Continue Creation
+                  {copy.continueLabel}
                 </button>
               </>
             ) : (
-              /* Normal collection footer with comment input */
+              /* Normal entity footer with comment input */
               <>
                 <div className="flex-1 min-w-0">
                   <input
                     type="text"
-                    placeholder="Add a comment..."
+                    placeholder={copy.commentPlaceholder}
                     className="w-full rounded-md bg-white/10 text-white placeholder-white/60 border border-white/20 backdrop-blur-sm px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-white/40"
                     onClick={(e) => e.stopPropagation()}
                     readOnly
@@ -595,7 +604,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                   className="shrink-0 px-3 py-1 rounded-md bg-white/10 border border-white/20 text-white text-[11px] font-medium backdrop-blur-sm hover:bg-white/15 transition"
                   onClick={(e) => { e.stopPropagation(); onClick?.(); }}
                 >
-                  View
+                  {copy.viewLabel}
                 </button>
               </>
             )}

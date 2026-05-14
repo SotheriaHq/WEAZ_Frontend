@@ -16,7 +16,7 @@ import ProfileHeaderSkeleton from '../../components/profile/ProfileHeaderSkeleto
 import ReviewsTab from '../../components/profile/tabs/ReviewsTab';
 import AboutTab from '../../components/profile/tabs/AboutTab';
 import InlineCollectionViewer from '../../components/collections/InlineCollectionViewer';
-import CollectionCard from '../../components/profile/CollectionCard';
+import CatalogEntityCard from '../../components/profile/CatalogEntityCard';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { setUser } from '../../features/userSlice';
 import { brandApi } from '../../api/BrandApi';
@@ -1581,7 +1581,7 @@ const ProfilePage: React.FC = () => {
                             <div className="space-y-6">
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                                 {approvedCollectionData.map((collection) => (
-                                  <CollectionCard
+                                  <CatalogEntityCard
                                     key={collection.id}
                                     collection={collection}
                                     onClick={() => {

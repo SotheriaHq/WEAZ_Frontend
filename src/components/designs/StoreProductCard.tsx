@@ -441,6 +441,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
   return (
     <article
+      data-entity-type={product.entityType ?? 'PRODUCT'}
+      data-card-branch="product"
       className={`
         group relative cursor-pointer overflow-hidden rounded-2xl
         bg-transparent shadow-sm transition-all duration-300 ease-out hover:shadow-lg
