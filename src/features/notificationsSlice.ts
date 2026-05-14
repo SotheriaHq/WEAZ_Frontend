@@ -19,7 +19,7 @@ export interface RemoteNotification {
   isRead: boolean;
   actor?: RemoteNotificationActor | null;
   target?: {
-    type: 'POST' | 'COLLECTION' | 'COLLECTION_MEDIA' | 'PRODUCT' | 'USER' | 'SYSTEM';
+    type: 'DESIGN' | 'POST' | 'COLLECTION' | 'COLLECTION_MEDIA' | 'PRODUCT' | 'USER' | 'SYSTEM';
     id: string;
     preview?: string;
   } | null;
@@ -245,7 +245,7 @@ export const notificationsSlice = createSlice({
         isRead: boolean;
         actor?: RemoteNotificationActor | null;
         target?: {
-          type: 'POST' | 'COLLECTION' | 'COLLECTION_MEDIA' | 'PRODUCT' | 'USER' | 'SYSTEM';
+          type: 'DESIGN' | 'POST' | 'COLLECTION' | 'COLLECTION_MEDIA' | 'PRODUCT' | 'USER' | 'SYSTEM';
           id: string;
           preview?: string;
         } | null;

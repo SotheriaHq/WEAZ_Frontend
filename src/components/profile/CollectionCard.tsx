@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import type { RootState } from '@/store';
 import VLoader from '@/components/loaders/VLoader';
 import { getCatalogEntityCardCopy, resolveCatalogEntityCardBranch } from './catalogEntityCardModel';
+import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
 
 export interface CollectionCardProps {
   collection: CollectionDto;
@@ -74,6 +75,16 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
   );
   const cardBranch = cardKind ?? (inferredBranch === 'collection' ? 'collection' : 'design');
   const entityType = cardBranch === 'collection' ? 'COLLECTION' : 'DESIGN';
+  const savedTarget = useMemo(
+    () => mapCatalogTargetForLegacyApi({
+      targetType: entityType,
+      targetId: collection.id,
+      designId: entityType === 'DESIGN' ? collection.id : undefined,
+      collectionId: collection.id,
+      legacyCollectionId: entityType === 'DESIGN' ? collection.id : undefined,
+    }),
+    [collection.id, entityType],
+  );
   const copy = getCatalogEntityCardCopy(cardBranch);
   const displayTitle = title?.trim() || copy.titleFallback;
 
@@ -247,7 +258,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
       }
       try {
         const res = await apiClient.get('/saved/check', {
-          params: { targetType: 'COLLECTION', targetId: collection.id },
+          params: savedTarget,
         });
         if (mounted) {
           setIsSavedLocal(Boolean(res.data?.isSaved));
@@ -258,7 +269,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     };
     void loadSaved();
     return () => { mounted = false; };
-  }, [collection.id, isAuth, isControlled]);
+  }, [collection.id, isAuth, isControlled, savedTarget]);
 
   const handleToggleSave = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -274,11 +285,11 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     try {
       setSaveBusyLocal(true);
       if (isSavedLocal) {
-        await apiClient.delete('/saved', { data: { targetType: 'COLLECTION', targetId: collection.id } });
+        await apiClient.delete('/saved', { data: savedTarget });
         setIsSavedLocal(false);
         toast.success('Removed from saved.');
       } else {
-        await apiClient.post('/saved', { targetType: 'COLLECTION', targetId: collection.id });
+        await apiClient.post('/saved', savedTarget);
         setIsSavedLocal(true);
         toast.success('Saved for later.');
       }

@@ -6,6 +6,7 @@
  */
 
 import type { TargetType } from '@/types/notificationTypes';
+import { normalizeCatalogTarget } from './catalogTarget';
 
 // Version constants for schema evolution
 export const NOTIFICATION_VERSION = {
@@ -120,6 +121,19 @@ function extractTarget(
     // Try from payload
     const payloadTarget = payload?.target as Record<string, unknown> | undefined;
     if (payloadTarget?.type && payloadTarget?.id) {
+        const catalogTarget = normalizeCatalogTarget({
+            targetType: String(payloadTarget.type),
+            targetId: String(payloadTarget.id),
+            legacyCollectionId: typeof payloadTarget.legacyCollectionId === 'string' ? payloadTarget.legacyCollectionId : null,
+            collectionId: typeof payloadTarget.collectionId === 'string' ? payloadTarget.collectionId : null,
+        });
+        if (catalogTarget) {
+            return {
+                type: catalogTarget.targetType,
+                id: catalogTarget.targetId,
+                preview: payloadTarget.preview as string | undefined,
+            };
+        }
         return {
             type: payloadTarget.type as TargetType,
             id: payloadTarget.id as string,
@@ -142,6 +156,21 @@ function deriveTarget(
     if (target) return target;
 
     // Derive from legacy payload fields
+    const explicitCatalogTarget = normalizeCatalogTarget({
+        targetType: typeof payload?.targetType === 'string' ? payload.targetType : typeof payload?.entityType === 'string' ? payload.entityType : null,
+        targetId: typeof payload?.targetId === 'string' ? payload.targetId : null,
+        designId: typeof payload?.designId === 'string' ? payload.designId : null,
+        productId: typeof payload?.productId === 'string' ? payload.productId : null,
+        collectionId: typeof payload?.collectionId === 'string' ? payload.collectionId : null,
+        legacyCollectionId: typeof payload?.legacyCollectionId === 'string' ? payload.legacyCollectionId : null,
+    });
+    if (explicitCatalogTarget) {
+        return {
+            type: explicitCatalogTarget.targetType,
+            id: explicitCatalogTarget.targetId,
+        };
+    }
+
     if (payload?.collectionId) {
         return { type: 'COLLECTION', id: payload.collectionId as string };
     }
@@ -164,21 +193,19 @@ function deriveTarget(
 
             const openDesignId = parsed.searchParams.get('openDesign');
             if (openDesignId) {
-                return { type: 'COLLECTION', id: openDesignId };
+                return { type: 'DESIGN', id: openDesignId };
             }
         } catch {
             // Ignore URL parsing errors and continue with regex fallbacks.
         }
 
+        const designMatch = url.match(/\/designs\/([a-f0-9-]+)/);
+        if (designMatch) {
+            return { type: 'DESIGN', id: designMatch[1] };
+        }
         const collectionMatch = url.match(/\/collections\/([a-f0-9-]+)/);
         if (collectionMatch) {
             return { type: 'COLLECTION', id: collectionMatch[1] };
-        }
-        const designMatch = url.match(/\/designs\/([a-f0-9-]+)/);
-        if (designMatch) {
-            // Compatibility: backend/web notification target types do not yet
-            // expose DESIGN, so design links continue through COLLECTION.
-            return { type: 'COLLECTION', id: designMatch[1] };
         }
         const productMatch = url.match(/\/products\/([a-f0-9-]+)/);
         if (productMatch) {
