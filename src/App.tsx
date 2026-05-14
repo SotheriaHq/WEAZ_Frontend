@@ -333,16 +333,31 @@ const LegacyProductEditRedirect: React.FC = () => {
   return <Navigate to={id ? `/studio/store/products/${id}/edit` : '/studio/store'} replace />;
 };
 
-const StudioRedirect: React.FC<{ to: string }> = ({ to }) => {
+const StudioRedirect: React.FC<{ to: string; preserveCurrentQuery?: boolean }> = ({ to, preserveCurrentQuery = false }) => {
   const location = useLocation();
   const currentParams = new URLSearchParams(location.search);
   if (currentParams.get('surface') !== 'mobile-app') {
-    return <Navigate to={to} replace />;
+    if (!preserveCurrentQuery) {
+      return <Navigate to={to} replace />;
+    }
+    const [pathnameWithSearch, hash = ''] = to.split('#');
+    const [pathname, search = ''] = pathnameWithSearch.split('?');
+    const nextParams = new URLSearchParams(search);
+    currentParams.forEach((value, key) => {
+      if (!nextParams.has(key)) nextParams.set(key, value);
+    });
+    const query = nextParams.toString();
+    return <Navigate to={`${pathname}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`} replace />;
   }
 
   const [pathnameWithSearch, hash = ''] = to.split('#');
   const [pathname, search = ''] = pathnameWithSearch.split('?');
   const nextParams = new URLSearchParams(search);
+  if (preserveCurrentQuery) {
+    currentParams.forEach((value, key) => {
+      if (!nextParams.has(key)) nextParams.set(key, value);
+    });
+  }
   nextParams.set('surface', 'mobile-app');
   const currentTheme = currentParams.get('theme');
   if (currentTheme === 'light' || currentTheme === 'dark') {
@@ -350,6 +365,46 @@ const StudioRedirect: React.FC<{ to: string }> = ({ to }) => {
   }
   const query = nextParams.toString();
   return <Navigate to={`${pathname}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`} replace />;
+};
+
+const DesignCreateAliasRedirect: React.FC = () => {
+  const location = useLocation();
+  return <Navigate to={`/profile/collections/create${location.search}${location.hash}`} replace />;
+};
+
+const DesignEditAliasRedirect: React.FC = () => {
+  const { id } = useParams<{ id?: string }>();
+  const location = useLocation();
+  return (
+    <Navigate
+      to={id ? `/profile/collections/edit/${encodeURIComponent(id)}${location.search}${location.hash}` : '/profile/collections/create'}
+      replace
+    />
+  );
+};
+
+const DesignViewAliasRedirect: React.FC = () => {
+  const { id } = useParams<{ id?: string }>();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  if (id && !params.has('openDesign')) {
+    params.set('openDesign', id);
+  }
+  const query = params.toString();
+  return <Navigate to={`/market${query ? `?${query}` : ''}${location.hash}`} replace />;
+};
+
+const ProductEditAliasRedirect: React.FC = () => {
+  const { id } = useParams<{ id?: string }>();
+  return <StudioRedirect to={id ? `/studio/store/products/${encodeURIComponent(id)}/edit` : '/studio/store/products/new'} preserveCurrentQuery />;
+};
+
+const CollectionEditAliasRedirect: React.FC = () => {
+  const { id } = useParams<{ id?: string }>();
+  const target = id
+    ? `/studio/store/collections/new?collectionId=${encodeURIComponent(id)}&mode=edit`
+    : '/studio/store/collections/new';
+  return <StudioRedirect to={target} preserveCurrentQuery />;
 };
 
 const LegacyBuyerCustomOrdersRedirect: React.FC = () => {
@@ -403,6 +458,34 @@ const router = createBrowserRouter([
           { path: 'settings', element: <SettingsHome /> },
           { path: 'settings/collections', element: <CollectionsSettings /> },
         ],
+      },
+      {
+        path: '/designs/create',
+        element: <DesignCreateAliasRedirect />,
+      },
+      {
+        path: '/designs/:id/edit',
+        element: <DesignEditAliasRedirect />,
+      },
+      {
+        path: '/designs/:id',
+        element: <DesignViewAliasRedirect />,
+      },
+      {
+        path: '/products/create',
+        element: <StudioRedirect to="/studio/store/products/new" preserveCurrentQuery />,
+      },
+      {
+        path: '/products/:id/edit',
+        element: <ProductEditAliasRedirect />,
+      },
+      {
+        path: '/collections/create',
+        element: <StudioRedirect to="/studio/store/collections/new" preserveCurrentQuery />,
+      },
+      {
+        path: '/collections/:id/edit',
+        element: <CollectionEditAliasRedirect />,
       },
       {
         path: '/studio',

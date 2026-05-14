@@ -20,6 +20,7 @@ import FeaturedSection from '@/components/FeaturedSection';
 import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 import { resolveProfileImageSource } from '@/utils/profileImage';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
+import { buildDesignRoute } from '@/utils/catalogRoutes';
 
 // Error type detection
 type ErrorType = 'network' | 'timeout' | 'server' | 'empty' | 'category_empty' | 'unknown';
@@ -535,8 +536,8 @@ const Market: React.FC = () => {
     return result;
   }, [items, selectedTag, selectedCategory]);
 
-  const handleViewCollection = (collectionId: string) => {
-    navigate(`/collections/${collectionId}`);
+  const handleViewCollection = (designId: string) => {
+    navigate(buildDesignRoute({ designId, legacyCollectionId: designId }));
   };
 
   const handleViewBrand = (brandId: string, item: MarketItem) => {

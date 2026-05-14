@@ -14,6 +14,7 @@ import { DraftExpiryStats as DraftExpiryStatsComponent } from '@/components/coll
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 import { normalizeNotification } from '@/utils/notificationAdapter';
 import { determineNotificationRoute } from '@/utils/notificationRouting';
+import { buildDesignRoute } from '@/utils/catalogRoutes';
 
 type ActivityTone = 'order' | 'patch' | 'stock' | 'review';
 
@@ -452,7 +453,7 @@ const DashboardHome: React.FC = () => {
             label="Style a Look"
             accentClassName="bg-pink-500/20 text-pink-500"
             hoverClassName="hover:bg-pink-500/10 hover:border-pink-500/30"
-            onClick={() => navigate('/profile/collections/create')}
+            onClick={() => navigate(buildDesignRoute({ mode: 'create' }))}
           />
           <QuickActionButton
             marker="🎟️"

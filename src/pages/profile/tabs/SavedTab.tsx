@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ArrowRight, Bookmark } from 'lucide-react';
 import { apiClient } from '@/api/httpClient';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { buildCollectionRoute, buildDesignRoute } from '@/utils/catalogRoutes';
 
 interface SavedItem {
   id: string;
@@ -175,9 +176,15 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
             key={item.id}
             type="button"
             onClick={() => {
-              const collectionId = item.targetType === 'COLLECTION' ? item.targetId : item.collectionId;
-              if (collectionId) {
-                navigate(`/collections/${collectionId}`);
+              if (item.targetType === 'COLLECTION_MEDIA') {
+                const designId = item.collectionId;
+                if (designId) {
+                  navigate(buildDesignRoute({ designId, legacyCollectionId: designId }));
+                }
+                return;
+              }
+              if (item.targetId) {
+                navigate(buildCollectionRoute({ collectionId: item.targetId }));
               }
             }}
             className="group overflow-hidden rounded-3xl border border-gray-200/70 bg-white/70 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"

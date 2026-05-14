@@ -174,6 +174,12 @@ function deriveTarget(
         if (collectionMatch) {
             return { type: 'COLLECTION', id: collectionMatch[1] };
         }
+        const designMatch = url.match(/\/designs\/([a-f0-9-]+)/);
+        if (designMatch) {
+            // Compatibility: backend/web notification target types do not yet
+            // expose DESIGN, so design links continue through COLLECTION.
+            return { type: 'COLLECTION', id: designMatch[1] };
+        }
         const productMatch = url.match(/\/products\/([a-f0-9-]+)/);
         if (productMatch) {
             return { type: 'PRODUCT', id: productMatch[1] };

@@ -25,6 +25,11 @@ export type PublicUrlTarget =
       username?: string | null;
     }
   | {
+      entityType: 'design';
+      id: string;
+      legacyCollectionId?: string | null;
+    }
+  | {
       entityType: 'product';
       id?: string | null;
       slug?: string | null;
@@ -86,6 +91,21 @@ export const buildProductUrl = (product: {
   return toAbsoluteUrl(`/products/${encodeURIComponent(product.id?.trim() || '')}`);
 };
 
+export const buildDesignUrl = (design: {
+  id?: string | null;
+  legacyCollectionId?: string | null;
+}): string => {
+  const designId = design.id?.trim() || design.legacyCollectionId?.trim() || '';
+  const params = new URLSearchParams();
+  const legacyCollectionId = design.legacyCollectionId?.trim();
+  if (legacyCollectionId && legacyCollectionId !== designId) {
+    params.set('legacyCollectionId', legacyCollectionId);
+  }
+
+  const query = params.toString();
+  return toAbsoluteUrl(`/designs/${encodeURIComponent(designId)}${query ? `?${query}` : ''}`);
+};
+
 export const buildCollectionUrl = (collectionId: string): string => {
   return toAbsoluteUrl(`/collections/${encodeURIComponent(collectionId)}`);
 };
@@ -100,6 +120,8 @@ export const buildPublicUrl = (target: PublicUrlTarget): string => {
       return buildProfileUrl(target);
     case 'storefront':
       return buildStorefrontUrl(target);
+    case 'design':
+      return buildDesignUrl(target);
     case 'product':
       return buildProductUrl(target);
     case 'collection':

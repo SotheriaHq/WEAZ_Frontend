@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@/components/ui/Dropdown';
+import { buildDesignRoute } from '@/utils/catalogRoutes';
 
 interface AddCollectionDropdownProps {
   openModal: (type: 'BASIC' | 'INSTORE') => void;
@@ -29,7 +30,7 @@ const AddCollectionDropdown: React.FC<AddCollectionDropdownProps> = ({ openModal
         {asLink ? 'Create design' : '+ Add Design'}
       </DropdownTrigger>
       <DropdownMenu>
-        <DropdownItem onClick={() => navigate('/profile/collections/create')}>Design (Lookbook)</DropdownItem>
+        <DropdownItem onClick={() => navigate(buildDesignRoute({ mode: 'create' }))}>Design (Lookbook)</DropdownItem>
         <DropdownItem onClick={() => navigate('/studio/store/collections/new')}>
           Store Collection (Products)
         </DropdownItem>

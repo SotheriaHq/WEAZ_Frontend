@@ -67,6 +67,7 @@ import {
   updatePublishTask,
   removePublishTask,
 } from '@/utils/publishTracker';
+import { buildDesignRoute } from '@/utils/catalogRoutes';
 import { TourOverlay, type TourStep } from '@/components/ui/TourOverlay';
 // ============================================================================
 
@@ -907,6 +908,8 @@ const CreateDesignInner: React.FC = () => {
           title,
           visibility,
           coverPreviewUrl: editPreviewUrl,
+          designId: id,
+          legacyCollectionId: id,
           collectionId: id,
           message: 'Updating design...',
         });
@@ -993,6 +996,8 @@ const CreateDesignInner: React.FC = () => {
             updatePublishTask(task.id, {
               status: 'published',
               progress: 100,
+              designId: id,
+              legacyCollectionId: id,
               collectionId: id,
               coverPreviewUrl: undefined,
               message: 'Published',
@@ -1101,6 +1106,8 @@ const CreateDesignInner: React.FC = () => {
               updatePublishTask(task.id, {
                 status: 'finalizing',
                 progress: 94,
+                designId: uploadedDesignId,
+                legacyCollectionId: uploadedDesignId,
                 collectionId: uploadedDesignId,
                 message: 'Saving custom-order setup...',
               }, publishTaskScope);
@@ -1120,6 +1127,8 @@ const CreateDesignInner: React.FC = () => {
             updatePublishTask(task.id, {
               status: 'finalizing',
               progress: 97,
+              designId: uploadedDesignId,
+              legacyCollectionId: uploadedDesignId,
               collectionId: uploadedDesignId,
               message: 'Publishing design...',
             }, publishTaskScope);
@@ -1154,6 +1163,8 @@ const CreateDesignInner: React.FC = () => {
             updatePublishTask(task.id, {
               status: 'published',
               progress: 100,
+              designId: uploadedDesignId,
+              legacyCollectionId: uploadedDesignId,
               collectionId: uploadedDesignId,
               coverPreviewUrl: undefined,
               message: 'Published',
@@ -1175,6 +1186,8 @@ const CreateDesignInner: React.FC = () => {
             updatePublishTask(task.id, {
               status: 'failed',
               progress: 100,
+              designId: uploadedDesignId,
+              legacyCollectionId: uploadedDesignId,
               collectionId: uploadedDesignId,
               message: uploadedDesignId
                 ? 'Uploaded with setup issue. Open editor to complete and republish.'
@@ -1240,7 +1253,7 @@ const CreateDesignInner: React.FC = () => {
     setCoverIndex(0);
     setSelectedIndex(0);
     mediaStore.clear();
-    navigate("/profile/collections/create");
+    navigate(buildDesignRoute({ mode: 'create' }));
   };
 
   const handleModalCloseRequest = () => {

@@ -27,6 +27,7 @@ import {
   CONTENT_DISPLAY_RENDERER_CLASS,
 } from '@/components/media/contentDisplayPresets';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
+import { buildDesignUrl } from '@/utils/publicUrlBuilder';
 
 type Props = {
   open: boolean;
@@ -466,7 +467,10 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/collections/${item.collectionId}`;
+    const shareUrl = buildDesignUrl({
+      id: item.collectionId,
+      legacyCollectionId: item.collectionId,
+    });
     try {
       await navigator.clipboard.writeText(shareUrl);
       toast.success('Link copied to clipboard.');

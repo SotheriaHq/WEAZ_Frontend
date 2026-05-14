@@ -5,6 +5,7 @@ import Modal from '@/components/ui/Modal';
 import { featuredApi, type PublicFeaturedItem } from '@/api/FeaturedApi';
 import { unwrapApiResponse } from '@/types/auth';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { buildCollectionRoute, buildDesignRoute, buildProductRoute } from '@/utils/catalogRoutes';
 
 interface FeaturedGalleryModalProps {
   open: boolean;
@@ -57,10 +58,13 @@ const FeaturedGalleryModal: React.FC<FeaturedGalleryModalProps> = ({ open, onClo
 
   const handleViewItem = (item: PublicFeaturedItem) => {
     onClose();
-    if (item.entityType === 'PRODUCT') {
-      navigate(`/products/${item.entityId}`);
+    const entityType = String(item.entityType).toUpperCase();
+    if (entityType === 'PRODUCT') {
+      navigate(buildProductRoute({ productId: item.entityId }));
+    } else if (entityType === 'COLLECTION') {
+      navigate(buildCollectionRoute({ collectionId: item.entityId }));
     } else {
-      navigate(`/collections/${item.entityId}`);
+      navigate(buildDesignRoute({ designId: item.entityId, legacyCollectionId: item.entityId }));
     }
   };
 
