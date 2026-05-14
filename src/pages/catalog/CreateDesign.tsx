@@ -49,9 +49,9 @@ import FilterSelector, {
 import InfoTooltip from "@/components/ui/InfoTooltip";
 import type { MediaItem } from "@/types/media";
 import { MediaProvider, useMediaStore } from "../../hooks/useMediaStore";
-import useCollectionUpload from "../../hooks/useCollectionUpload";
+import useDesignUpload from "../../hooks/useDesignUpload";
 import { useBrandProfile } from "../../hooks/UseBrandHook";
-import { finalizeCollectionUploads } from "@/api/collectionUploads";
+import { DesignApi, finalizeDesignUploads, resolveDesignId } from "@/api/DesignApi";
 import type { SizingMode } from '@/types/sizing';
 import {
   DESIGN_FIT_PREFERENCE_OPTIONS,
@@ -61,7 +61,7 @@ import {
   DESIGN_TARGET_AGE_OPTIONS,
   type DesignFitPreference,
   type DesignTargetAgeGroup,
-} from '@/constants/designCreation';
+} from '@/features/designs/designCreationRules';
 import {
   createPublishTask,
   updatePublishTask,
@@ -128,26 +128,21 @@ const dedupeMeasurementKeysByLabel = (keys: string[]) => {
   return deduped;
 };
 
-const extractCollectionId = (response: unknown): string | undefined => {
+const extractDesignId = (response: unknown): string | undefined => {
   if (!response || typeof response !== 'object') {
     return undefined;
   }
 
   const record = response as Record<string, unknown>;
-  if (typeof record.collectionId === 'string') {
-    return record.collectionId;
-  }
-  if (typeof record.id === 'string') {
-    return record.id;
-  }
+  const directDesignId = resolveDesignId(record);
+  if (directDesignId) return directDesignId;
 
   const nestedData =
     record.data && typeof record.data === 'object'
       ? (record.data as Record<string, unknown>)
       : null;
-  if (nestedData && typeof nestedData.id === 'string') {
-    return nestedData.id;
-  }
+  const nestedDesignId = resolveDesignId(nestedData);
+  if (nestedDesignId) return nestedDesignId;
 
   return undefined;
 };
@@ -244,12 +239,12 @@ const CreateDesignInner: React.FC = () => {
   const transientObjectUrlsRef = useRef<Map<string, string>>(new Map());
 
   const {
-    uploadCollection,
+    uploadDesign,
     isUploading,
     progress,
     perFileProgress,
     cancelUploads,
-  } = useCollectionUpload();
+  } = useDesignUpload();
   const { user, fetchCollections } = useBrandProfile();
   const publishTaskScope = useMemo(
     () => ({ ownerId: user?.id ?? undefined }),
@@ -290,7 +285,7 @@ const CreateDesignInner: React.FC = () => {
   }, [filterSelection]);
 
   // Load initial data
-  // Load initial data (tags, categories, and collection when editing)
+  // Load initial data (tags, categories, and design when editing)
   // Note: do not include `mediaStore` (unstable) or setters in deps to avoid rerunning
   // this effect and spamming APIs; run only on mount or when edit id changes.
   useEffect(() => {
@@ -345,10 +340,10 @@ const CreateDesignInner: React.FC = () => {
       }
     };
 
-    const loadCollectionDetail = async () => {
+    const loadDesignDetail = async () => {
       if (!isEditMode || !id) return;
       try {
-        const d = await brandApi.getCollectionDetail(id);
+        const d = (await DesignApi.getDesignDetail(id)) as any;
         if (!mounted || !d) return;
         setTitle(d.title || "");
         setDescription(d.description || "");
@@ -431,7 +426,7 @@ const CreateDesignInner: React.FC = () => {
     void Promise.all([
       loadTagSuggestions(),
       loadCategories(),
-      loadCollectionDetail(),
+      loadDesignDetail(),
     ]);
 
     return () => {
@@ -761,14 +756,14 @@ const CreateDesignInner: React.FC = () => {
       );
 
       if (isEditMode && id) {
-        await brandApi.updateCollection(id, {
+        await DesignApi.updateDesign(id, {
           title: draftTitle,
           description,
           minPrice: parsedMinPrice,
           maxPrice: parsedMaxPrice,
-          isAvailableInStore: false,
           tags: finalTags,
           categoryId,
+          subCategoryId: categoryTypeId,
           categoryTypeId,
           type,
           visibility,
@@ -781,7 +776,7 @@ const CreateDesignInner: React.FC = () => {
           targetAgeGroup,
         } as any);
       } else {
-        const response = await uploadCollection(
+        const response = await uploadDesign(
           files,
           draftTitle,
           description,
@@ -808,8 +803,8 @@ const CreateDesignInner: React.FC = () => {
           false, // shouldPublish = false
         );
 
-        const newCollectionId = extractCollectionId(response);
-        if (pendingCustomOrderDraft && newCollectionId) {
+        const newDesignId = extractDesignId(response);
+        if (pendingCustomOrderDraft && newDesignId) {
           await customOrderConfigurationsApi.create({
             ...pendingCustomOrderDraft,
             fabricRuleBasisId: String(pendingCustomOrderDraft.fabricRuleBasisId ?? '').trim() || (
@@ -819,7 +814,7 @@ const CreateDesignInner: React.FC = () => {
                 gender: measurementGender,
               })
             ).id,
-            sourceId: newCollectionId,
+            sourceId: newDesignId,
           });
         }
       }
@@ -933,14 +928,14 @@ const CreateDesignInner: React.FC = () => {
           try {
             updatePublishTask(task.id, { progress: 10, message: 'Updating metadata...' }, publishTaskScope);
 
-            await brandApi.updateCollection(id, {
+            await DesignApi.updateDesign(id, {
               title,
               description,
               minPrice: parsedMinPrice,
               maxPrice: parsedMaxPrice,
-              isAvailableInStore: false,
               tags: finalTags,
               categoryId,
+              subCategoryId: categoryTypeId,
               categoryTypeId,
               type,
               visibility,
@@ -962,20 +957,20 @@ const CreateDesignInner: React.FC = () => {
             );
             if (toDelete.length > 0) {
               await Promise.all(
-                toDelete.map((itemId) => brandApi.deleteCollectionItem(id, itemId)),
+                toDelete.map((itemId) => DesignApi.deleteDesignMedia(id, itemId)),
               );
             }
 
             updatePublishTask(task.id, { status: 'finalizing', progress: 70, message: 'Finalizing...' }, publishTaskScope);
 
-            await finalizeCollectionUploads(
+            await finalizeDesignUploads(
               id,
               [],
               true,
               {
                 action: "publish",
                 coverIndex,
-                collectionMetadata: {
+                designMetadata: {
                   title,
                   description,
                   visibility,
@@ -1061,9 +1056,9 @@ const CreateDesignInner: React.FC = () => {
         toast.info('Publishing in background. You can keep browsing your profile.');
 
         void (async () => {
-          let uploadedCollectionId: string | undefined;
+          let uploadedDesignId: string | undefined;
           try {
-            const response = await uploadCollection(
+            const response = await uploadDesign(
               files,
               title,
               description,
@@ -1097,8 +1092,8 @@ const CreateDesignInner: React.FC = () => {
               false,
             );
 
-            uploadedCollectionId = extractCollectionId(response);
-            if (!uploadedCollectionId) {
+            uploadedDesignId = extractDesignId(response);
+            if (!uploadedDesignId) {
               throw new Error('Upload completed but no design id was returned. Please retry publish.');
             }
 
@@ -1106,7 +1101,7 @@ const CreateDesignInner: React.FC = () => {
               updatePublishTask(task.id, {
                 status: 'finalizing',
                 progress: 94,
-                collectionId: uploadedCollectionId,
+                collectionId: uploadedDesignId,
                 message: 'Saving custom-order setup...',
               }, publishTaskScope);
               await customOrderConfigurationsApi.create({
@@ -1118,25 +1113,25 @@ const CreateDesignInner: React.FC = () => {
                     gender: measurementGender,
                   })
                 ).id,
-                sourceId: uploadedCollectionId,
+                sourceId: uploadedDesignId,
               });
             }
 
             updatePublishTask(task.id, {
               status: 'finalizing',
               progress: 97,
-              collectionId: uploadedCollectionId,
+              collectionId: uploadedDesignId,
               message: 'Publishing design...',
             }, publishTaskScope);
 
-            await finalizeCollectionUploads(
-              uploadedCollectionId,
+            await finalizeDesignUploads(
+              uploadedDesignId,
               [],
               true,
               {
                 action: 'publish',
                 coverIndex,
-                collectionMetadata: {
+                designMetadata: {
                   title,
                   description,
                   visibility,
@@ -1159,7 +1154,7 @@ const CreateDesignInner: React.FC = () => {
             updatePublishTask(task.id, {
               status: 'published',
               progress: 100,
-              collectionId: uploadedCollectionId,
+              collectionId: uploadedDesignId,
               coverPreviewUrl: undefined,
               message: 'Published',
             }, publishTaskScope);
@@ -1180,14 +1175,14 @@ const CreateDesignInner: React.FC = () => {
             updatePublishTask(task.id, {
               status: 'failed',
               progress: 100,
-              collectionId: uploadedCollectionId,
-              message: uploadedCollectionId
+              collectionId: uploadedDesignId,
+              message: uploadedDesignId
                 ? 'Uploaded with setup issue. Open editor to complete and republish.'
                 : 'Publish failed',
               error: errMsg,
             }, publishTaskScope);
             toast.error(
-              uploadedCollectionId
+              uploadedDesignId
                 ? `${errMsg}. Your media was uploaded; open the design editor to finish setup.`
                 : errMsg,
             );
@@ -1261,7 +1256,7 @@ const CreateDesignInner: React.FC = () => {
   };
 
   // Build summary for modal
-  const collectionSummary = {
+  const designSummary = {
     title,
     description,
     category: selectedCategory?.name,
@@ -1694,7 +1689,7 @@ const CreateDesignInner: React.FC = () => {
                       <FilterSelector
                         value={filterSelection}
                         onChange={setFilterSelection}
-                        entityType="COLLECTION"
+                        entityType="DESIGN"
                         disabled={disabled}
                         onTagSuggestions={handleFilterTagSuggestions}
                       />
@@ -2115,7 +2110,7 @@ const CreateDesignInner: React.FC = () => {
         onClose={handleModalCloseRequest}
         onConfirm={handlePublishConfirm}
         onEdit={() => setShowPublishModal(false)}
-        summary={collectionSummary}
+        summary={designSummary}
         entityLabel="Design"
         onViewPublished={handleViewPublishedDesign}
         loadingProgress={isUploading ? progress : null}

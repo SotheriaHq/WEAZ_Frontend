@@ -19,7 +19,7 @@ interface FilterSelectorProps {
   /** Called when selections change */
   onChange: (selection: FilterSelection) => void;
   /** Entity type context (used to filter which dimensions apply) */
-  entityType?: "COLLECTION" | "PRODUCT";
+  entityType?: "DESIGN" | "COLLECTION" | "PRODUCT";
   /** Whether the selector is disabled */
   disabled?: boolean;
   /** Optional callback with suggested tags based on selected filters */
@@ -53,10 +53,11 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
       try {
         const fetched = await brandApi.getFilterDimensions();
         if (!mounted) return;
-        // Only show dimensions that apply to this entity type
+        // Design filters are still legacy-tagged as COLLECTION in older backend rows.
         const applicable = fetched.filter(
           (d) =>
-            d.appliesTo.includes(entityType) &&
+            (d.appliesTo.includes(entityType) ||
+              (entityType === "DESIGN" && d.appliesTo.includes("COLLECTION"))) &&
             d.name !== "Designer Location" &&
             d.name !== "Price Range" &&
             d.name !== "Color Family" &&
