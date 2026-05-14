@@ -19,6 +19,7 @@ import {
   getRenderableProductMediaSources,
   isRemoteMediaValue,
 } from '../utils/renderableMedia';
+import { resolveCatalogEntityType } from '../utils/catalogEntity';
 
 export interface UpdateBrandProfilePayload {
   brandFullName?: string;
@@ -936,6 +937,11 @@ export const brandApi = {
 
         const out = {
           id: backendItem.id as string,
+          entityType:
+            resolveCatalogEntityType(
+              backendItem,
+              isAvailableInStore ? 'COLLECTION' : 'DESIGN',
+            ) ?? (isAvailableInStore ? 'COLLECTION' : 'DESIGN'),
           status,
           name: (backendItem.title as string) || '',
           title: (backendItem.title as string) || '',

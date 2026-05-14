@@ -65,6 +65,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     brandLogo,
     isAvailableInStore = false,
   } = collection;
+  const entityType = collection.entityType ?? (isAvailableInStore ? 'COLLECTION' : 'DESIGN');
 
   const clientStatus = collection.clientStatus;
   const isPublishing = clientStatus === 'publishing';
@@ -281,6 +282,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
   return (
     <>
     <div 
+      data-entity-type={entityType}
       className={`relative group w-full overflow-hidden shadow-md transition-transform duration-200 rounded-xl ${
         isDeleted ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'
       }`}

@@ -351,6 +351,7 @@ const Market: React.FC = () => {
 
       return {
         id: String(selectedMedia.id),
+        entityType: 'DESIGN',
         collectionId: String(detail.id),
         coverMediaId: detail.coverMediaId ?? null,
         collectionTitle: String(detail.title ?? 'Design'),

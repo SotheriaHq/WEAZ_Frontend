@@ -15,6 +15,7 @@ import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { normalizeSizingMode } from '@/types/sizing';
+import { resolveCatalogEntityType } from '@/utils/catalogEntity';
 
 interface RawProductsPayload {
   items?: any[];
@@ -223,6 +224,7 @@ const normalizeProduct = (raw: any): MarketplaceProduct | null => {
 
   return {
     id,
+    entityType: resolveCatalogEntityType(raw, 'PRODUCT') ?? 'PRODUCT',
     collectionId: String(raw?.collectionId ?? raw?.collection?.id ?? ''),
     brandId: String(raw?.brandId ?? brand?.id ?? ''),
     name: String(raw?.name ?? 'Product'),
