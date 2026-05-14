@@ -1112,29 +1112,38 @@ export const brandApi = {
   // Create collection
   async createCollection(data: { name: string; description?: string; isPublic?: boolean; categoryId?: string; subCategoryId?: string; categoryTypeId?: string; type?: 'MALE' | 'FEMALE' | 'EVERYBODY' }): Promise<CollectionDto | null> {
     try {
-      const init = await apiClient.post('/designs/initialize', {
+      const visibility = data.isPublic === false ? 'PRIVATE' : 'PUBLIC';
+      const subCategoryId = data.subCategoryId ?? data.categoryTypeId;
+      const init = await apiClient.post('/store-collections/initialize', {
         mode: 'existing',
         title: data.name,
         description: data.description,
-        visibility: data.isPublic === false ? 'PRIVATE' : 'PUBLIC',
+        visibility,
         categoryId: data.categoryId,
-        subCategoryId: data.subCategoryId ?? data.categoryTypeId,
-        categoryTypeId: data.subCategoryId ?? data.categoryTypeId,
+        subCategoryId,
+        categoryTypeId: data.categoryTypeId ?? subCategoryId,
         type: data.type ?? 'EVERYBODY',
+        isAvailableInStore: true,
       });
-      const sessionId = (init.data as any)?.sessionId ?? (init.data as any)?.collectionId ?? (init.data as any)?.id;
+      const initData = unwrapApiResponse<any>(init.data as any) ?? (init.data as any);
+      const sessionId =
+        initData?.sessionId ??
+        initData?.collectionId ??
+        initData?.legacyCollectionId ??
+        initData?.id;
       if (!sessionId) return null;
 
-      const finalized = await apiClient.post(`/designs/${sessionId}/finalize`, {
+      const finalized = await apiClient.post(`/store-collections/${sessionId}/finalize`, {
         action: 'draft',
         collectionMetadata: {
           title: data.name,
           description: data.description,
-          visibility: data.isPublic === false ? 'PRIVATE' : 'PUBLIC',
+          visibility,
           categoryId: data.categoryId,
-          subCategoryId: data.subCategoryId ?? data.categoryTypeId,
-          categoryTypeId: data.subCategoryId ?? data.categoryTypeId,
+          subCategoryId,
+          categoryTypeId: data.categoryTypeId ?? subCategoryId,
           type: data.type ?? 'EVERYBODY',
+          isAvailableInStore: true,
         },
       });
       return unwrapApiResponse<CollectionDto>(finalized.data as any);

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import {
   finalizeDesignUploads,
   initializeDesignUploads,
@@ -98,5 +100,14 @@ describe('DesignApi', () => {
     ).toBe('design-primary');
     expect(resolveDesignId({ legacyCollectionId: 'legacy-1' })).toBe('legacy-1');
     expect(resolveDesignId({ collectionId: 'collection-1' })).toBe('collection-1');
+  });
+
+  it('keeps CreateDesign on DesignApi/useDesignUpload instead of collection upload naming', () => {
+    const source = readFileSync(join(process.cwd(), 'src/pages/catalog/CreateDesign.tsx'), 'utf8');
+
+    expect(source).toContain('useDesignUpload');
+    expect(source).toContain('DesignApi');
+    expect(source).not.toMatch(/useCollectionUpload/);
+    expect(source).toContain('designMetadata');
   });
 });
