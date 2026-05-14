@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { COMPANY_LOGO_PATH, COMPANY_NAME } from '@/lib/brand';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 type ThreadlyLogoProps = {
   size?: number;
@@ -14,15 +15,21 @@ const ThreadlyLogo: React.FC<ThreadlyLogoProps> = ({
   decorative = true,
 }) => {
   return (
-    <img
+    <MediaRenderer
+      kind="image"
       src={COMPANY_LOGO_PATH}
       alt={decorative ? '' : `${COMPANY_NAME} logo`}
-      aria-hidden={decorative ? true : undefined}
-      width={size}
-      height={size}
       className={`block shrink-0 ${className}`.trim()}
+      mediaClassName="h-full w-full"
+      maxHeightClassName=""
+      maxWidthClassName=""
       loading="eager"
-      decoding="async"
+      imgRef={(node) => {
+        if (node) {
+          node.width = size;
+          node.height = size;
+        }
+      }}
     />
   );
 };

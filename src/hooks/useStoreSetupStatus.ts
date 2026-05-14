@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { getStoreStatus } from '@/api/StoreApi';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 /**
  * Lightweight hook that tells the caller whether the current BRAND user
@@ -27,7 +28,7 @@ export function primeStoreSetupStatusCache(isStoreOpen: boolean): void {
 
 export function useStoreSetupStatus(): boolean | null {
   const user = useSelector((s: RootState) => s.user.profile);
-  const isBrand = user?.type === 'BRAND';
+  const isBrand = hasActiveBrandMembership(user);
 
   const [isStoreOpen, setIsStoreOpen] = useState<boolean | null>(() => {
     if (!isBrand) return true;

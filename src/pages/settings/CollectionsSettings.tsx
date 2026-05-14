@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import SettingsSidebar from '@/components/settings/SettingsSidebar';
 import { ImageWithFallback } from '@/components/ImageWithFallback';
 import { Select } from '@/components/ui/Select';
+import { getActiveBrandId, hasActiveBrandMembership } from '@/lib/brandAccess';
 
 interface AccessItem {
   id?: string;
@@ -35,8 +36,8 @@ interface AccessItem {
 
 const CollectionsSettings: React.FC = () => {
   const me = useSelector((s: RootState) => s.user.profile);
-  const brandId = me?.id;
-  const isBrand = me?.type === 'BRAND';
+  const brandId = getActiveBrandId(me) ?? me?.id;
+  const isBrand = hasActiveBrandMembership(me);
   
   // Brand tabs: requests (pending) | approved
   // User tabs: myRequests (all statuses) | myAccess (granted)

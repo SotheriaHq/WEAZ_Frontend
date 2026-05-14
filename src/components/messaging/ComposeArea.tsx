@@ -1,8 +1,7 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { messagingApi } from '@/api/MessagingApi';
-import data from '@emoji-mart/data';
-import { Picker } from 'emoji-mart';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface PendingFile {
   fileId: string;
@@ -130,26 +129,42 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
   useEffect(() => {
     if (!showEmojiPicker || !emojiHostRef.current) return;
 
-    const picker = new Picker({
-      data,
-      onEmojiSelect: (emoji: any) => {
-        if (emoji?.native) {
-          appendText(String(emoji.native));
-        }
-        setShowEmojiPicker(false);
-      },
-      previewPosition: 'none',
-      skinTonePosition: 'none',
-      theme: 'light',
-    }) as unknown as HTMLElement;
+    let cancelled = false;
+    const host = emojiHostRef.current;
 
-    emojiHostRef.current.innerHTML = '';
-    emojiHostRef.current.appendChild(picker);
+    host.innerHTML = '';
+
+    void Promise.all([
+      import('@emoji-mart/data'),
+      import('emoji-mart'),
+    ]).then(([dataModule, pickerModule]) => {
+      if (cancelled || !host) return;
+
+      const picker = new pickerModule.Picker({
+        data: dataModule.default,
+        onEmojiSelect: (emoji: any) => {
+          if (emoji?.native) {
+            appendText(String(emoji.native));
+          }
+          setShowEmojiPicker(false);
+        },
+        previewPosition: 'none',
+        skinTonePosition: 'none',
+        theme: 'light',
+      }) as unknown as HTMLElement;
+
+      host.innerHTML = '';
+      host.appendChild(picker);
+    }).catch(() => {
+      if (!cancelled) {
+        toast.error('Emoji picker failed to load');
+        setShowEmojiPicker(false);
+      }
+    });
 
     return () => {
-      if (emojiHostRef.current) {
-        emojiHostRef.current.innerHTML = '';
-      }
+      cancelled = true;
+      host.innerHTML = '';
     };
   }, [appendText, showEmojiPicker]);
 
@@ -189,7 +204,13 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
           {files.map(f => (
             <div key={f.fileId} className="flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-white/8 border border-gray-200/60 dark:border-white/10 px-2.5 py-1.5 text-xs">
               {f.previewUrl ? (
-                <img src={f.previewUrl} alt="" className="w-6 h-6 rounded object-cover" />
+                <MediaRenderer
+                  kind="image"
+                  src={f.previewUrl}
+                  alt=""
+                  fit="cover"
+                  className="h-6 w-6 rounded"
+                />
               ) : (
                 <span>📎</span>
               )}

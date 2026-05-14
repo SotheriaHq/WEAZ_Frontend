@@ -387,10 +387,7 @@ const ThreadButton: React.FC<Props> = ({
         const latestThreaded = currentThreadedRef.current;
         if (typeof queuedDesired === 'boolean' && queuedDesired !== latestThreaded) {
           void runToggle(queuedDesired);
-          return;
-        }
-
-        if (visualState !== 'revert_error') {
+        } else if (visualState !== 'revert_error') {
           setVisualState(latestThreaded ? 'idle_threaded' : 'idle_unthreaded');
         }
       }
@@ -453,7 +450,7 @@ const ThreadButton: React.FC<Props> = ({
   const sizeStyle = {
     width: size,
     height: size,
-    ['--thread-size' as '--thread-size']: `${size}px`,
+    ['--thread-size' as const]: `${size}px`,
   } as React.CSSProperties;
 
   return (

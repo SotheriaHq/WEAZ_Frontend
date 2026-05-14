@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
+      host: env.VITE_DEV_HOST || '0.0.0.0',
       port,
       https: resolveOptionalHttpsConfig(env),
     },
@@ -86,8 +87,10 @@ export default defineConfig(({ mode }) => {
                 return 'feature-vendor';
               }
             }
-            if (id.includes('/pages/admin/') || id.includes('/components/admin/')) {
-              return 'admin';
+            if (id.includes('/pages/admin/')) {
+              const normalized = id.split(path.sep).join('/');
+              const fileName = normalized.slice(normalized.lastIndexOf('/') + 1);
+              return `admin-${fileName.replace(/\.[cm]?[jt]sx?$/, '')}`;
             }
             return undefined;
           },

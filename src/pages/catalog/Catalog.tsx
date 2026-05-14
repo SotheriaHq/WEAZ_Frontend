@@ -13,8 +13,8 @@ import CollectionsSkeleton from '../../components/profile/CollectionsSkeleton';
 import EmptyState from '../../components/EmptyState';
 import AddCollectionDropdown from '../../components/profile/AddCollectionDropdown';
 import ProfileHeaderSkeleton from '../../components/profile/ProfileHeaderSkeleton';
-import AboutTab from '../../components/profile/tabs/AboutTab';
 import ReviewsTab from '../../components/profile/tabs/ReviewsTab';
+import AboutTab from '../../components/profile/tabs/AboutTab';
 import InlineCollectionViewer from '../../components/collections/InlineCollectionViewer';
 import CollectionCard from '../../components/profile/CollectionCard';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -28,7 +28,9 @@ import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedF
 import { getStoreStatus, type StoreStatusResponse } from '../../api/StoreApi';
 import FrostedButton from '@/components/ui/FrostedButton';
 import CatalogShopTab from '@/components/catalog/CatalogShopTab';
+import BrandQrModal from '@/components/qr/BrandQrModal';
 import { resolveBannerImageSource } from '@/utils/profileImage';
+import { buildProfileUrl } from '@/utils/publicLinks';
 import {
   type PublishTask,
   readPublishTasks,
@@ -36,6 +38,7 @@ import {
   prunePublishTasks,
   removePublishTask,
 } from '@/utils/publishTracker';
+import { canManageCatalog, getActiveBrandId } from '@/lib/brandAccess';
 
 import ComingSoon from '../placeholders/ComingSoon';
 
@@ -92,16 +95,21 @@ const ProfilePage: React.FC = () => {
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
+  const [isBrandQrOpen, setIsBrandQrOpen] = useState(false);
   const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; visibility?: 'PUBLIC' | 'PRIVATE' }>>({});
   const [publishTasks, setPublishTasks] = useState<PublishTask[]>([]);
 
   const navigate = useNavigate();
   const location = useLocation();
   const normalizedRouteBrandId = routeBrandId ? decodeURIComponent(routeBrandId) : undefined;
-  // Owner view when no route param or when the param matches the logged-in brand user's id
+  const activeBrandId = getActiveBrandId(user);
+  const ownerBrandId = activeBrandId ?? user?.storeId ?? user?.id;
+  // Owner/staff view when no route param or the param matches the active brand context.
   const isOwner = Boolean(
-    user?.type === 'BRAND' &&
-    (!normalizedRouteBrandId || normalizedRouteBrandId === user?.id),
+    canManageCatalog(user) &&
+    (!normalizedRouteBrandId ||
+      normalizedRouteBrandId === ownerBrandId ||
+      normalizedRouteBrandId === user?.id),
   );
   const isVisitorView = !isOwner && Boolean(normalizedRouteBrandId);
   
@@ -347,7 +355,7 @@ const ProfilePage: React.FC = () => {
 
   useEffect(() => {
     const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
-    if (!isOwner || user?.type !== 'BRAND') {
+    if (!isOwner) {
       setStoreStatus(null);
       setHasDismissedStoreSetup(false);
       return;
@@ -373,24 +381,24 @@ const ProfilePage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isOwner, user?.type]);
+  }, [isOwner]);
 
   const showStoreSetupNudge = useMemo(() => {
-    if (!isOwner || user?.type !== 'BRAND') return false;
+    if (!isOwner) return false;
     if (hasDismissedStoreSetup) return false;
     if (storeStatusLoading) return false;
     // Encourage setup until the store is marked live/open.
     if (!storeStatus) return false;
     return storeStatus.isStoreOpen === false;
-  }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading, user?.type]);
+  }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading]);
 
   const showStoreSetupChip = useMemo(() => {
-    if (!isOwner || user?.type !== 'BRAND') return false;
+    if (!isOwner) return false;
     if (!hasDismissedStoreSetup) return false;
     if (storeStatusLoading) return false;
     if (!storeStatus) return false;
     return storeStatus.isStoreOpen === false;
-  }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading, user?.type]);
+  }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading]);
 
   const dismissStoreSetupNudge = useCallback(() => {
     const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
@@ -560,7 +568,7 @@ const ProfilePage: React.FC = () => {
     return Boolean(storeStatus?.isStoreOpen);
   }, [isVisitorView, visitorProfile?.isStoreOpen, storeStatus?.isStoreOpen]);
 
-  const shopBrandId = routeBrandId ?? user?.id ?? '';
+  const shopBrandId = routeBrandId ?? ownerBrandId ?? '';
   
   const ownerHasStoreProfile = useMemo(() => {
     if (!isOwner) return undefined;
@@ -1162,24 +1170,50 @@ const ProfilePage: React.FC = () => {
     return displayData;
   }, [displayData, isVisitorView, visitorBannerUrl, visitorLogoUrl, visitorProfile]);
 
+  const activeBrandProfile = isVisitorView ? visitorProfile : brandProfile;
+  const fallbackProfileUrl = useMemo(() => {
+    const profileId = isVisitorView ? routeBrandId : user?.id;
+    if (!profileId) return null;
+
+    return buildProfileUrl({
+      id: profileId,
+      username: viewDisplayData.username || undefined,
+    });
+  }, [isVisitorView, routeBrandId, user?.id, viewDisplayData.username]);
+  const profileShareUrl =
+    activeBrandProfile?.shareUrl ??
+    activeBrandProfile?.publicProfileUrl ??
+    activeBrandProfile?.qrTargetUrl ??
+    fallbackProfileUrl;
+  const profileQrTargetUrl =
+    activeBrandProfile?.qrTargetUrl ??
+    activeBrandProfile?.publicProfileUrl ??
+    activeBrandProfile?.shareUrl ??
+    fallbackProfileUrl;
+
   const handleShareProfile = useCallback(async () => {
     const shareBrandName = viewDisplayData.brandName || 'Threadly';
-    const url = window.location.href;
+    const url = profileShareUrl;
+    if (!url) {
+      toast.error('Profile link is not available yet.');
+      return;
+    }
+    const message = `Check out ${shareBrandName} on Threadly: ${url}`;
     try {
       if (navigator.share) {
         await navigator.share({
           title: shareBrandName,
-          text: `Check out ${shareBrandName} on Threadly`,
+          text: message,
           url,
         });
       } else {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(message);
         toast.success('Profile link copied to clipboard');
       }
     } catch {
       // Silently ignore cancellation
     }
-  }, [viewDisplayData.brandName]);
+  }, [profileShareUrl, viewDisplayData.brandName]);
 
   const handleOpenHeaderQuickEdit = useCallback(() => {
     setIsHeaderQuickEditOpen(true);
@@ -1194,6 +1228,7 @@ const ProfilePage: React.FC = () => {
       address: displayData.location ?? undefined,
       location: displayData.location ?? undefined,
       tags: displayData.hashtags ?? [],
+      description: displayData.description ?? '',
       verificationBadgeVisible: Boolean(displayData.verificationBadgeVisible),
       isVerifiedBrand: Boolean(displayData.isVerifiedBrand),
       verifiedExplanationUrl:
@@ -1204,6 +1239,7 @@ const ProfilePage: React.FC = () => {
     [
       displayData.brandName,
       displayData.hashtags,
+      displayData.description,
       displayData.isVerifiedBrand,
       displayData.location,
       displayData.username,
@@ -1224,6 +1260,7 @@ const ProfilePage: React.FC = () => {
       address: viewDisplayData.location ?? undefined,
       location: viewDisplayData.location ?? undefined,
       tags: viewDisplayData.hashtags ?? [],
+      description: viewDisplayData.description ?? '',
       verificationBadgeVisible: Boolean(viewDisplayData.verificationBadgeVisible),
       isVerifiedBrand: Boolean(viewDisplayData.isVerifiedBrand),
       verifiedExplanationUrl:
@@ -1236,6 +1273,7 @@ const ProfilePage: React.FC = () => {
       viewDisplayData.bannerImage,
       viewDisplayData.brandName,
       viewDisplayData.hashtags,
+      viewDisplayData.description,
       viewDisplayData.isVerifiedBrand,
       viewDisplayData.location,
       viewDisplayData.logoImage,
@@ -1327,6 +1365,15 @@ const ProfilePage: React.FC = () => {
           onOpenFullEditor={() => handleOpenEditModal(false)}
         />
       )}
+      <BrandQrModal
+        open={isBrandQrOpen}
+        onClose={() => setIsBrandQrOpen(false)}
+        brandName={viewDisplayData.brandName || 'Threadly Brand'}
+        qrTargetUrl={profileQrTargetUrl}
+        shareUrl={profileShareUrl}
+        logoUrl={viewDisplayData.logoImage ?? null}
+        username={viewDisplayData.username ?? null}
+      />
       {showStoreSetupNudge ? (
         <div className="fixed bottom-24 right-4 sm:right-6 z-[60] w-[min(92vw,380px)]">
           <div className="glass-menu-soft px-4 py-3">
@@ -1381,6 +1428,7 @@ const ProfilePage: React.FC = () => {
           profile={ownerHeaderProfile}
           onEditProfile={handleOpenHeaderQuickEdit}
           onShareProfile={handleShareProfile}
+          onShowQrCode={() => setIsBrandQrOpen(true)}
           showPatchAction={showPatchAction}
           isPatched={isPatched}
           patchLoading={patchLoading}
@@ -1390,6 +1438,7 @@ const ProfilePage: React.FC = () => {
         <ProfileHeader
           profile={visitorHeaderProfile}
           onShareProfile={handleShareProfile}
+          onShowQrCode={() => setIsBrandQrOpen(true)}
           showPatchAction={showPatchAction}
           isPatched={isPatched}
           patchLoading={patchLoading}
@@ -1400,9 +1449,7 @@ const ProfilePage: React.FC = () => {
       <div className="w-full px-4 sm:px-6 pb-12">
         <div className="mt-6">
           <Tabs
-            tabs={(() => {
-              return ['Content', 'Store', 'Reviews', 'About'];
-            })()}
+            tabs={['Content', 'Store', 'Reviews', 'About']}
             activeTab={activeTab}
             onTabChange={(tab) => {
                 setActiveTab(tab as TabType);
@@ -1477,7 +1524,7 @@ const ProfilePage: React.FC = () => {
 
                     {/* Visibility filter chips */}
                     <div className="mb-6">
-                      <div className="inline-flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                      <div className="flex gap-5 overflow-x-auto border-b border-gray-200/80 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10">
                         {([
                             'Public',
                             'Private',
@@ -1486,10 +1533,11 @@ const ProfilePage: React.FC = () => {
                           <button
                             key={opt}
                             onClick={() => setVisibilityFilter(opt as any)}
-                            className={`px-4 py-1.5 text-sm font-medium transition-colors flex items-center gap-2 ${
+                            aria-pressed={visibilityFilter === opt}
+                            className={`relative flex shrink-0 items-center gap-2 pb-3 pt-2 text-sm font-semibold transition-colors ${
                               visibilityFilter === opt
-                                ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white'
-                                : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                ? 'text-purple-700 dark:text-purple-300'
+                                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                             }`}
                           >
                             <span>
@@ -1502,6 +1550,12 @@ const ProfilePage: React.FC = () => {
                                     : '🗑️'}
                             </span>
                             {opt}
+                            <span
+                              aria-hidden="true"
+                              className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-7 rounded-full transition-all ${
+                                visibilityFilter === opt ? 'bg-purple-600 dark:bg-purple-300' : 'bg-transparent'
+                              }`}
+                            />
                           </button>
                         ))}
                       </div>

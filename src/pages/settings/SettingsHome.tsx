@@ -1,14 +1,13 @@
 import React, { useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import SettingsSidebar, {
   getGroupForKey,
   getItemForKey,
 } from '@/components/settings/SettingsSidebar';
-import SecuritySettings from '@/components/settings/tabs/SecuritySettings';
 import PatchesSettings from '@/components/settings/tabs/PatchesSettings';
 import SubscriptionsSettings from '@/components/settings/tabs/SubscriptionsSettings';
-import AccountSettings from '@/components/settings/tabs/AccountSettings';
+import AccountSecuritySettings from '@/components/settings/tabs/AccountSecuritySettings';
 import NotificationSettings from '@/components/settings/tabs/NotificationSettings';
 import EmailPreferencesSettings from '@/components/settings/tabs/EmailPreferencesSettings';
 import StoreGeneralSettings from '@/components/settings/tabs/StoreGeneralSettings';
@@ -18,6 +17,7 @@ import ProfileVisibilitySettings from '@/components/settings/tabs/ProfileVisibil
 import SizeFitSettings from '@/components/settings/tabs/SizeFitSettings';
 import HiddenContentSettings from './HiddenContentSettings';
 import type { RootState } from '@/store';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 /* ── Coming Soon placeholder ─────────────────────────────────────── */
 const ComingSoon: React.FC<{ title: string; description: string }> = ({
@@ -86,8 +86,9 @@ const StoreDangerZone: React.FC = () => (
 /* ── Section map ─────────────────────────────────────────────────── */
 const sections: Record<string, React.ReactNode> = {
   // Personal
-  account: <AccountSettings />,
-  security: <SecuritySettings />,
+  account: <AccountSecuritySettings />,
+  security: <AccountSecuritySettings />,
+  'account-security': <AccountSecuritySettings />,
   notifications: <NotificationSettings />,
   'email-preferences': <EmailPreferencesSettings />,
   privacy: (
@@ -120,12 +121,7 @@ const sections: Record<string, React.ReactNode> = {
   ),
   'store-policies': <StorePoliciesSettings />,
   'store-payments': <StorePaymentsSettings />,
-  'store-team': (
-    <ComingSoon
-      title="Team Members"
-      description="Invite team members and manage who has access to your store settings."
-    />
-  ),
+  'store-team': <Navigate to="/studio/staff" replace />,
   'store-notifications': <NotificationSettings />,
   'store-danger': <StoreDangerZone />,
 };
@@ -141,7 +137,7 @@ const Breadcrumbs: React.FC<{ activeKey: string; onNavigate: (key: string) => vo
   return (
     <nav className="flex items-center gap-1.5 text-sm mb-6 flex-wrap">
       <button
-        onClick={() => onNavigate('account')}
+        onClick={() => onNavigate('account-security')}
         className="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
       >
         Settings
@@ -170,10 +166,11 @@ const Breadcrumbs: React.FC<{ activeKey: string; onNavigate: (key: string) => vo
 const SettingsHome: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const me = useSelector((s: RootState) => s.user.profile);
-  const isBrandUser = me?.type === 'BRAND';
+  const isBrandUser = hasActiveBrandMembership(me);
   const active = searchParams.get('tab') || 'account';
+  const normalizedAccountTab = active === 'account' || active === 'security' ? 'account-security' : active;
   const normalizedActive =
-    isBrandUser && active === 'store-payments' ? 'billing' : active;
+    isBrandUser && normalizedAccountTab === 'store-payments' ? 'billing' : normalizedAccountTab;
   const resolvedActive =
     !isBrandUser && normalizedActive.startsWith('store-')
       ? 'account'

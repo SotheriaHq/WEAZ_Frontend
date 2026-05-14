@@ -137,6 +137,15 @@ export interface CustomOrderConfiguration {
   buyerInstructionText?: string | null;
   requiredMeasurementKeys: string[];
   requiredFreeformPointIds: string[];
+  resolvedRequiredMeasurementKeys?: string[];
+  requiredMeasurementPoints?: Array<{
+    id: string;
+    key: string;
+    label: string;
+    description?: string | null;
+    minValueCm?: number | null;
+    maxValueCm?: number | null;
+  }>;
   baseProductionCharge: string;
   fabricCostPerYard: string;
   rushEnabled: boolean;
@@ -316,8 +325,7 @@ export interface CreateCustomFabricRuleBasisInput {
   gender?: 'MEN' | 'WOMEN' | 'UNISEX';
 }
 
-export interface CreateAdminCustomFabricRuleBasisInput extends CreateCustomFabricRuleBasisInput {
-}
+export type CreateAdminCustomFabricRuleBasisInput = CreateCustomFabricRuleBasisInput;
 
 export interface UpdateAdminCustomFabricRuleBasisInput {
   label?: string;

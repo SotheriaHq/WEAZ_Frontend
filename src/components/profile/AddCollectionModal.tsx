@@ -111,15 +111,15 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
   return (
     <div className="fixed inset-0 z-layer-modal flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="glass-panel neu-modal-surface w-full max-w-md p-6">
-        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Create New Design</h2>
+        <h2 className="text-xl font-bold mb-4 text-theme">Create New Design</h2>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-theme-secondary mb-1">
               Title <span className="text-red-500">*</span>
             </label>
             <input 
-              className="w-full px-3 py-2 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-0 border-0" 
+              className="w-full px-3 py-2 rounded-lg bg-transparent text-theme focus:outline-none focus:ring-0 border-0" 
               placeholder="e.g., Summer Lookbook 2025"
               value={title} 
               onChange={(e) => setTitle(e.target.value)}
@@ -128,11 +128,11 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-theme-secondary mb-1">
               Description
             </label>
             <textarea 
-              className="w-full px-3 py-2 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-0 border-0 resize-none" 
+              className="w-full px-3 py-2 rounded-lg bg-transparent text-theme focus:outline-none focus:ring-0 border-0 resize-none" 
               placeholder="Describe your design..."
               rows={3}
               value={description} 
@@ -142,17 +142,17 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-theme-secondary mb-1">
               Tags <span className="text-red-500">*</span>
             </label>
             <input
-              className="w-full px-3 py-2 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-0 border-0"
+              className="w-full px-3 py-2 rounded-lg bg-transparent text-theme focus:outline-none focus:ring-0 border-0"
               placeholder="e.g., summer, lookbook, runway"
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
               disabled={isSubmitting}
             />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-xs text-theme-secondary">
               Separate tags with commas.
             </p>
           </div>
@@ -161,7 +161,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
           <div className="grid grid-cols-2 gap-3">
             {/* Type Dropdown */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-theme-secondary mb-1">
                 Type
               </label>
               <Select
@@ -177,7 +177,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
 
             {/* Visibility Dropdown */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-theme-secondary mb-1">
                 Visibility
               </label>
               <Select
@@ -195,7 +195,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-theme-secondary mb-1">Category <span className="text-red-500">*</span></label>
             <Select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
@@ -221,7 +221,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
 
           {/* Collaborators Search Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-theme-secondary mb-1">
               Collaborators
             </label>
             <input
@@ -233,7 +233,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Media Files <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-theme-secondary mb-1">Media Files <span className="text-red-500">*</span></label>
             <input
               type="file"
               multiple

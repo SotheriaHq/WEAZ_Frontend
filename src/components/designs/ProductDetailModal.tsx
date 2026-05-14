@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  X, ShoppingBag, Minus, Plus, Star, ChevronRight, AlertTriangle, Check, Share2,
+  X, Minus, Plus, Star, ChevronRight, AlertTriangle, Check, Share2,
   ChevronDown, Truck, Ruler, Package, Sparkles, Copy
 } from 'lucide-react';
 import { FaInstagram, FaWhatsapp } from 'react-icons/fa';
@@ -10,16 +10,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import type { AppDispatch, RootState } from '@/store';
-import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useBagging } from '@/hooks/useBagging';
 import {
   CONTENT_DISPLAY_FRAME_CLASS,
   CONTENT_DISPLAY_MEDIA_CLASS,
   CONTENT_DISPLAY_RENDERER_CLASS,
 } from '@/components/media/contentDisplayPresets';
+import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 
 // Types
 export interface ProductDetailData {
@@ -105,6 +106,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const currentUser = useSelector((s: RootState) => s.user.profile);
+  const { bagProduct } = useBagging();
 
   // Local state
   const [selectedImage, setSelectedImage] = useState(0);
@@ -241,36 +243,16 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   const handleAddToCart = async () => {
-    if (isOwnProduct) {
-      toast.info('Brands cannot bag their own product.');
-      return;
-    }
-    if (!isAuth) {
-      toast.info('Please sign in to bag items');
-      return;
-    }
-
-    if (product.sizes.length > 0 && !selectedSize) {
-      toast.warning('Please select a size');
-      return;
-    }
-
-    if (isOutOfStock) {
-      toast.error('This item is out of stock');
-      return;
-    }
-
     setIsAddingToCart(true);
     try {
-      await dispatch(addToCart({
-        productId: product.id,
-        quantity,
-        selectedSize: selectedSize || undefined,
-        selectedColor: selectedColor || undefined,
-      })).unwrap();
-      
-      toast.success('Bagged!');
-      dispatch(openCartDrawer());
+      await bagProduct(
+        { id: product.id, name: product.name },
+        {
+          size: selectedSize || undefined,
+          color: selectedColor || undefined,
+          quantity,
+        },
+      );
       onClose();
     } catch (error: any) {
       if (typeof error === 'string' && error.includes('__MEASUREMENTS_REQUIRED__')) {
@@ -633,7 +615,12 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           title="Bag it"
                           className="w-full h-14 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                         >
-                          <ShoppingBag size={20} />
+                          <BagPulseIcon
+                            status={isAddingToCart ? 'bagging' : isOutOfStock ? 'disabled' : 'not_bagged'}
+                            context="detail"
+                            size={32}
+                            disabled={isAddingToCart || isOutOfStock}
+                          />
                           {isAddingToCart ? 'Bagging...' : '🛍️ Bag it'}
                         </button>
                       ) : (
@@ -949,7 +936,12 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       title="Bag it"
                       className="flex-1 h-12 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                     >
-                      <ShoppingBag size={18} />
+                      <BagPulseIcon
+                        status={isAddingToCart ? 'bagging' : isOutOfStock ? 'disabled' : 'not_bagged'}
+                        context="detail"
+                        size={30}
+                        disabled={isAddingToCart || isOutOfStock}
+                      />
                       {isAddingToCart ? 'Bagging...' : isOutOfStock ? 'Out of Stock' : '🛍️ Bag it'}
                     </button>
                   ) : (

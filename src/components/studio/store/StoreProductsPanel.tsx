@@ -34,6 +34,7 @@ import {
   getProductStockState,
   isCustomOrderOnlyProduct,
 } from '@/lib/productAvailability';
+import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 
 type StudioStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'DELETED';
 type OutletView = 'products' | 'collections';
@@ -268,6 +269,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user.profile);
   const dropdownManager = useDropdownManager();
+  const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
 
   const [filterStatus, setFilterStatus] = useState<ProductStatusFilter>('all');
   const [filterCollection, setFilterCollection] = useState<'all' | string>('all');
@@ -1720,14 +1722,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className={isEmbeddedMobile ? 'space-y-3' : 'space-y-4 sm:space-y-6'}>
       {outletView === 'products' && !inlineProduct && (
-      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
-        <div className="p-4 sm:p-6 space-y-4">
+      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden sm:rounded-2xl">
+        <div className="space-y-3 p-3 sm:p-4 lg:p-6 lg:space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Collections Quick Access</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white sm:text-lg">Collections Quick Access</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
                 Slow carousel preview with cover images always visible.
               </p>
             </div>
@@ -1735,14 +1737,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => navigate('/studio/store/collections/new')}
-                className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+                className="rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
               >
                 Create collection
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/studio/store?view=collections')}
-                className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+                className="rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
               >
                 Manage collections
               </button>
@@ -1750,9 +1752,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           </div>
 
           {collectionsLoading ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
               {Array.from({ length: 4 }).map((_, idx) => (
-                <div key={idx} className="h-44 animate-pulse rounded-xl bg-gray-200/70 dark:bg-white/10" />
+                <div key={idx} className="h-28 animate-pulse rounded-xl bg-gray-200/70 dark:bg-white/10 sm:h-36 lg:h-44" />
               ))}
             </div>
           ) : quickAccessCollections.length > 0 ? (
@@ -1760,7 +1762,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               ref={quickCollectionsRef}
               className="overflow-x-hidden rounded-xl border border-gray-200/80 bg-gray-50/60 dark:border-white/10 dark:bg-white/5"
             >
-              <div className="flex min-w-max gap-3 p-3">
+              <div className="flex min-w-max gap-2 p-2 sm:gap-3 sm:p-3">
                 {quickAccessCarouselItems.map((collection, idx) => (
                     (() => {
                       const previewSources = previewSourcesByCollectionId.get(collection.id) ?? getCollectionPreviewSources(collection);
@@ -1785,7 +1787,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         setHoveredCollectionId((prev) => (prev === collection.id ? null : prev));
                         setHoverPreviewFrame((prev) => ({ ...prev, [collection.id]: 0 }));
                       }}
-                      className="group relative w-64 h-44 shrink-0 snap-start overflow-hidden rounded-xl border border-gray-200 shadow-sm dark:border-white/10 text-left transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/20 bg-gray-100 dark:bg-zinc-900/80"
+                      className="group relative h-28 w-40 shrink-0 snap-start overflow-hidden rounded-xl border border-gray-200 bg-gray-100 text-left shadow-sm transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-zinc-900/80 sm:h-36 sm:w-52 lg:h-44 lg:w-64"
                     >
                       {/* Opacity-based crossfade stack — fills entire card */}
                       {previewSources.length > 0 ? (
@@ -1811,8 +1813,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           ))}
                           {/* Product name badge - Top Left to avoid bottom text overlap */}
                           {previewSources.length > 1 && activePreview.productName && (
-                            <div className="absolute top-2.5 left-2.5 z-30 max-w-[calc(100%-3rem)]">
-                              <span className="inline-block rounded-full bg-white/20 dark:bg-black/30 backdrop-blur-md border border-white/20 dark:border-white/10 px-2.5 py-0.5 text-[10px] font-medium text-white truncate shadow-sm transition-opacity duration-300">
+                            <div className="absolute left-2 top-2 z-30 max-w-[calc(100%-3rem)] sm:left-2.5 sm:top-2.5">
+                              <span className="inline-block max-w-full truncate rounded-full border border-white/20 bg-white/20 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-md transition-opacity duration-300 dark:border-white/10 dark:bg-black/30 sm:px-2.5">
                                 {activePreview.productName}
                               </span>
                             </div>
@@ -1845,11 +1847,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       )}
 
                       {/* Frosted Glass Text Component - Bottom Overlay */}
-                      <div className="absolute bottom-0 left-0 right-0 z-30 p-3 bg-white/60 dark:bg-black/60 backdrop-blur-md border-t border-white/20 dark:border-white/10 transition-transform duration-300">
-                        <p className="line-clamp-1 text-sm font-bold text-gray-900 dark:text-white drop-shadow-sm">
+                      <div className="absolute bottom-0 left-0 right-0 z-30 border-t border-white/20 bg-white/60 p-2 backdrop-blur-md transition-transform duration-300 dark:border-white/10 dark:bg-black/60 sm:p-3">
+                        <p className="line-clamp-1 text-xs font-bold text-gray-900 drop-shadow-sm dark:text-white sm:text-sm">
                           {collection.name}
                         </p>
-                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5">
+                        <p className="mt-0.5 text-[10px] font-medium text-gray-700 dark:text-gray-300 sm:text-xs">
                           {collection.itemCount ?? 0} items
                         </p>
                       </div>
@@ -1878,26 +1880,26 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
       {/* ═══ UNIFIED COMMAND CENTER ═══ */}
       {outletView === 'products' && !inlineProduct && (
-      <div className="mb-6 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/95 dark:bg-[#111118]/95 backdrop-blur-xl shadow-lg overflow-hidden lg:overflow-visible">
+      <div className="mb-4 overflow-hidden rounded-xl border border-gray-200/80 bg-white/95 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 sm:mb-6 sm:rounded-2xl lg:overflow-visible">
 
         {/* Header Row */}
-        <div className="relative p-5 pb-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Your Catalog</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage catalog, collections, and drafts in one place.</p>
+        <div className="relative p-3 pb-3 sm:p-4 lg:p-5 lg:pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white sm:text-xl lg:text-2xl">Your Catalog</h2>
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">Manage catalog, collections, and drafts in one place.</p>
             </div>
             <div className="flex items-center gap-2">
               {/* Expandable emoji search */}
               <div
                 ref={searchContainerRef}
-                className={`transition-all duration-300 ease-out ${searchCollapsed ? 'w-11' : 'w-full sm:flex-1 sm:min-w-[220px] sm:max-w-[320px]'}`}
+                className={`transition-all duration-300 ease-out ${searchCollapsed ? 'w-9 sm:w-11' : 'w-full sm:flex-1 sm:min-w-[220px] sm:max-w-[320px]'}`}
               >
                 {searchCollapsed ? (
                   <button
                     type="button"
                     onClick={() => setSearchCollapsed(false)}
-                    className="h-11 w-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center shadow-sm"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white/80 text-gray-700 shadow-sm transition-all hover:scale-105 hover:bg-purple-50 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10 sm:h-11 sm:w-11"
                     aria-label="Open search"
                   >
                     <span className="text-base">🔎</span>
@@ -1915,17 +1917,17 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => navigate('/studio/store/products/new')}
-                className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-500/40 active:scale-95"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-500/40 active:scale-95 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
                 aria-label={primaryProductActionLabel}
                 title={primaryProductActionLabel}
               >
                 <span aria-hidden="true">➕</span>
-                <span>{primaryProductActionLabel}</span>
+                <span className="hidden min-[380px]:inline">{primaryProductActionLabel}</span>
               </button>
               <button
                 type="button"
                 onClick={() => setShowFiltersMenu((v) => !v)}
-                className={`h-11 w-11 rounded-xl border transition-all shadow-sm flex items-center justify-center lg:hidden ${
+                className={`flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-all sm:h-11 sm:w-11 lg:hidden ${
                   showFiltersMenu
                     ? 'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300'
                     : 'border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10'
@@ -1941,9 +1943,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           {showFiltersMenu && (
             <div
               ref={filtersMenuRef}
-              className="absolute right-5 top-[72px] z-40 w-[min(92vw,520px)] rounded-xl border border-gray-200/90 dark:border-white/10 bg-white/98 dark:bg-[#12121a]/98 p-3 shadow-2xl backdrop-blur-xl lg:hidden"
+              className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4.25rem)] z-50 max-h-[min(70vh,26rem)] overflow-y-auto rounded-xl border border-gray-200/90 bg-white/98 p-2.5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/98 sm:absolute sm:inset-x-auto sm:right-4 sm:top-[64px] sm:w-[min(92vw,520px)] sm:p-3 lg:hidden"
             >
-              <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div className="mb-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
                 {(
                   [
                     { value: 'all', label: 'All', icon: '📦' },
@@ -1958,19 +1960,19 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     key={opt.value}
                     type="button"
                     onClick={() => setFilterStatus(opt.value)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
+                    className={`flex min-h-8 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium transition-all duration-200 sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs ${
                       filterStatus === opt.value
                         ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md shadow-purple-500/30'
                         : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/10'
                     }`}
                   >
                     <span>{opt.icon}</span>
-                    {opt.label}
+                    <span className="max-w-[7rem] truncate">{opt.label}</span>
                   </button>
                 ))}
               </div>
 
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
                 <FilterDropdown
                   value={filterCollection}
                   onChange={setFilterCollection}
@@ -2278,7 +2280,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   No collections match your current filters.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className={isEmbeddedMobile ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3'}>
                   {pagedManagedCollections.map((collection) => {
                     const status = String(collection.status || 'PUBLISHED').toUpperCase();
                     const isArchived = status === 'ARCHIVED';
@@ -2492,7 +2494,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 </div>
               )
             ) : activeCollectionProductsLoading ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className={isEmbeddedMobile ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'}>
                 {Array.from({ length: 4 }).map((_, idx) => (
                   <div key={idx} className="h-64 animate-pulse rounded-xl bg-gray-200/70 dark:bg-white/10" />
                 ))}
@@ -2502,7 +2504,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 No products currently linked to this collection.
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className={isEmbeddedMobile ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}>
                 {activeCollectionProducts.map((product) => (
                   <button
                     key={product.id}
@@ -2636,7 +2638,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
       {/* Products - with CSS containment for smooth tab transitions */}
       {outletView === 'products' && !inlineProduct && (
-      <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg">
+      <div className="rounded-xl border border-gray-200 bg-white/90 shadow-lg dark:border-white/10 dark:bg-white/5 sm:rounded-2xl">
         {/* Inline filter dropdowns */}
         <div className="hidden lg:flex items-center gap-3 px-4 pt-4 sm:px-6 sm:pt-5">
           <FilterDropdown
@@ -2664,7 +2666,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             options={PRODUCT_SORT_OPTIONS}
           />
         </div>
-        <div className="p-4 sm:p-6">
+        <div className="p-2.5 sm:p-4 lg:p-6">
           <div
             ref={listRef}
             style={{
@@ -2674,7 +2676,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             }}
             className={`transition-opacity duration-300 ease-out ${loading ? 'opacity-50' : 'opacity-100'}`}
           >
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(252px,1fr))] gap-4 transition-all duration-300">
+            <div className="grid grid-cols-2 gap-2 transition-all duration-300 min-[520px]:grid-cols-3 lg:grid-cols-4">
             {filteredProducts.map((product) => {
               const collectionLabel =
                 product.collection?.title ||
@@ -2688,7 +2690,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 <div
                   key={product.id}
                   className={[
-                    'group relative rounded-2xl overflow-hidden aspect-[4/5] shadow-sm transition-all duration-300 ease-out',
+                    'group relative aspect-[5/6] overflow-hidden rounded-xl shadow-sm transition-all duration-300 ease-out',
                     selectedProducts.includes(product.id)
                       ? 'ring-2 ring-purple-500 border-purple-300 dark:border-purple-500/30'
                       : 'hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30',
@@ -2709,11 +2711,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       toggleSelect(product.id);
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    className="absolute left-3 top-3 z-20 h-4 w-4 rounded border-gray-300 dark:border-zinc-600 bg-white/90 dark:bg-zinc-800/90 text-purple-600 focus:ring-purple-500/30 cursor-pointer"
+                    className="absolute left-2 top-2 z-20 h-4 w-4 rounded border-gray-300 bg-white/90 text-purple-600 focus:ring-purple-500/30 dark:border-zinc-600 dark:bg-zinc-800/90 cursor-pointer"
                   />
                   
                   {/* Actions menu button (replaces star) */}
-                  <div className="absolute right-3 top-3 z-20">
+                  <div className="absolute right-2 top-2 z-20">
                     <button
                       type="button"
                       ref={(el) => {
@@ -2760,7 +2762,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
                   {/* Quick action icons - always visible */}
                   {!product.deletedAt && (
-                    <div className="absolute bottom-3 right-3 z-30 flex items-center gap-2">
+                    <div className="absolute bottom-[5.25rem] right-2 z-30 flex items-center gap-1 sm:bottom-[5.75rem] sm:gap-1.5">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -2768,7 +2770,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           void handleProductAction('edit', product);
                         }}
                         title="Edit product"
-                        className="h-9 w-9 rounded-full bg-black/50 backdrop-blur-sm shadow-lg flex items-center justify-center text-white hover:bg-purple-600 hover:scale-110 transition-all duration-200"
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-purple-600 sm:h-8 sm:w-8"
                       >
                         <span className="text-sm">✏️</span>
                       </button>
@@ -2779,7 +2781,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           void handleProductAction('delete', product);
                         }}
                         title="Delete product"
-                        className="h-9 w-9 rounded-full bg-black/50 backdrop-blur-sm shadow-lg flex items-center justify-center text-white hover:bg-red-500 hover:scale-110 transition-all duration-200"
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-red-500 sm:h-8 sm:w-8"
                       >
                         <span className="text-sm">🗑️</span>
                       </button>
@@ -2839,8 +2841,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/20 to-transparent pointer-events-none z-[1]" />
 
                   {/* Status badge inside image area */}
-                  <div className="absolute bottom-[calc(theme(spacing.3)+8rem)] left-3 z-10">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold shadow-lg ${
+                  <div className="absolute bottom-[5.25rem] left-2 z-10 sm:bottom-[5.75rem]">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-lg ${
                       productStatus === 'DELETED'
                         ? 'bg-rose-500/90 text-white'
                         : productStatus === 'ARCHIVED'
@@ -2860,28 +2862,28 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   </div>
 
                   {/* Frosted Glass Info Overlay */}
-                  <div className="absolute inset-x-0 bottom-0 z-10 backdrop-blur-xl bg-black/30 border-t border-white/10 p-3">
-                    <div className="flex flex-col gap-1.5">
+                  <div className="absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black/35 p-1.5 backdrop-blur-xl sm:p-2">
+                    <div className="flex flex-col gap-0.5 sm:gap-1">
                       {/* Name and Collection */}
-                      <h3 className="text-sm font-semibold text-white line-clamp-1 drop-shadow-sm">{product.name}</h3>
-                      <p className="text-[11px] text-white/60 line-clamp-1">{collectionLabel}</p>
+                      <h3 className="line-clamp-1 text-xs font-semibold text-white drop-shadow-sm sm:text-sm">{product.name}</h3>
+                      <p className="line-clamp-1 text-[10px] text-white/60 sm:text-[11px]">{collectionLabel}</p>
                       
                       {/* Price Section */}
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-sm font-bold text-white drop-shadow-sm">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-xs font-bold text-white drop-shadow-sm sm:text-sm">
                           ₦{product.price.toLocaleString()}
                         </span>
                         {typeof product.salePrice === 'number' && product.salePrice > 0 && (
-                          <span className="text-xs text-rose-300 font-medium">
+                          <span className="truncate text-[10px] font-medium text-rose-300 sm:text-xs">
                             🏷️ ₦{product.salePrice.toLocaleString()}
                           </span>
                         )}
                       </div>
                       
                       {/* Stock info row */}
-                      <div className="flex items-center justify-between mt-0.5">
+                      <div className="mt-0.5 flex items-center justify-between gap-2">
                         <span
-                          className={`text-[10px] font-medium cursor-help ${
+                          className={`min-w-0 truncate text-[10px] font-medium cursor-help ${
                             getProductStockState(product) === 'CUSTOM_ORDER_ONLY'
                               ? 'text-violet-300'
                               : getProductStockState(product) === 'OUT_OF_STOCK'
@@ -2912,7 +2914,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         {/* Creation time */}
                         {product.createdAt && (
                           <span 
-                            className="text-[10px] text-white/50"
+                            className="hidden shrink-0 text-[10px] text-white/50 min-[420px]:inline"
                             title={new Date(product.createdAt).toLocaleString()}
                           >
                             {(() => {

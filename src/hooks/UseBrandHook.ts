@@ -11,6 +11,7 @@ import type {
 import type { AuthUserDto } from '../types/auth';
 import { env } from '../config/env';
 import { useReviewRuntimeFlags } from './useReviewRuntimeFlags';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 const areStringArraysEqual = (left: string[] | null | undefined, right: string[] | null | undefined) => {
   if (left === right) return true;
@@ -133,7 +134,17 @@ const areBrandProfileSnapshotsEqual = (
     previous.averageRating === next.averageRating &&
     previous.totalReviews === next.totalReviews &&
     previous.collectionsCount === next.collectionsCount &&
+    previous.designsCount === next.designsCount &&
+    previous.productsCount === next.productsCount &&
     previous.patchesCount === next.patchesCount &&
+    previous.followersCount === next.followersCount &&
+    previous.totalThreads === next.totalThreads &&
+    previous.totalLikes === next.totalLikes &&
+    previous.totalShares === next.totalShares &&
+    previous.storeStatus === next.storeStatus &&
+    previous.publicProfileUrl === next.publicProfileUrl &&
+    previous.qrTargetUrl === next.qrTargetUrl &&
+    previous.shareUrl === next.shareUrl &&
     previous.createdAt === next.createdAt &&
     previous.updatedAt === next.updatedAt
   );
@@ -186,7 +197,17 @@ const syncBrandProfileWithUser = (
     averageRating: current?.averageRating,
     totalReviews: current?.totalReviews,
     collectionsCount: current?.collectionsCount,
+    designsCount: current?.designsCount,
+    productsCount: current?.productsCount,
     patchesCount: current?.patchesCount,
+    followersCount: current?.followersCount,
+    totalThreads: current?.totalThreads,
+    totalLikes: current?.totalLikes,
+    totalShares: current?.totalShares,
+    storeStatus: current?.storeStatus,
+    publicProfileUrl: current?.publicProfileUrl,
+    qrTargetUrl: current?.qrTargetUrl,
+    shareUrl: current?.shareUrl,
     createdAt: current?.createdAt ?? user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -199,6 +220,7 @@ export const useBrandProfile = () => {
     (state: RootState) => state.user.profile,
     areStableUserFieldsEqual,
   );
+  const ownerBrandId = user?.id ?? user?.id ?? null;
   const brandDetailEndpointsEnabled = env.featureFlags.brandDetailEndpoints;
   const { flags: reviewFlags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
 
@@ -321,20 +343,20 @@ export const useBrandProfile = () => {
   // Create collection
   const createCollection = useCallback(async (data: { name: string; description?: string; isPublic?: boolean }) => {
     const result = await brandApi.createCollection(data);
-    if (result && user?.id) {
-      await fetchCollections(user.id);
+    if (result && ownerBrandId) {
+      await fetchCollections(ownerBrandId);
     }
     return result;
-  }, [user, fetchCollections]);
+  }, [ownerBrandId, fetchCollections]);
 
   // Update collection
   const updateCollection = useCallback(async (collectionId: string, data: Partial<CollectionDto>) => {
     const result = await brandApi.updateCollection(collectionId, data);
-    if (result && user?.id) {
-      await fetchCollections(user.id);
+    if (result && ownerBrandId) {
+      await fetchCollections(ownerBrandId);
     }
     return result;
-  }, [user, fetchCollections]);
+  }, [ownerBrandId, fetchCollections]);
 
   // Delete collection
   const deleteCollection = useCallback(async (collectionId: string) => {
@@ -346,40 +368,40 @@ export const useBrandProfile = () => {
   }, []);
 
   useEffect(() => {
-    if (!user?.id || user.type !== 'BRAND') {
+    if (!user?.id || !hasActiveBrandMembership(user)) {
       setBrandProfile(null);
       setBrandProfileError(null);
       setBrandProfileLoading(false);
     }
-  }, [user?.id, user?.type]);
+  }, [user]);
 
   // Initial data fetch
   useEffect(() => {
-    if (!user?.id) {
+    if (!ownerBrandId) {
       setCollectionsLoading(false);
       return;
     }
 
     // Fetch collections for all users
-    void fetchCollections(user.id);
+    void fetchCollections(ownerBrandId);
 
-  }, [user?.id, fetchCollections]);
+  }, [ownerBrandId, fetchCollections]);
 
   useEffect(() => {
-    if (!user?.id || user.type !== 'BRAND' || !brandDetailEndpointsEnabled) {
+    if (!ownerBrandId || !hasActiveBrandMembership(user) || !brandDetailEndpointsEnabled) {
       return;
     }
 
-    void fetchBrandProfile(user.id);
-  }, [user?.id, user?.type, user?.updatedAt, brandDetailEndpointsEnabled, fetchBrandProfile]);
+    void fetchBrandProfile(ownerBrandId);
+  }, [ownerBrandId, user, user?.updatedAt, brandDetailEndpointsEnabled, fetchBrandProfile]);
 
   useEffect(() => {
-    if (!user?.id || user.type !== 'BRAND' || reviewFlagsLoading || !reviewFlags.readEnabled) {
+    if (!ownerBrandId || !hasActiveBrandMembership(user) || reviewFlagsLoading || !reviewFlags.readEnabled) {
       return;
     }
 
-    void fetchReviews(user.id);
-  }, [user?.id, user?.type, fetchReviews, reviewFlags.readEnabled, reviewFlagsLoading]);
+    void fetchReviews(ownerBrandId);
+  }, [ownerBrandId, user, fetchReviews, reviewFlags.readEnabled, reviewFlagsLoading]);
 
   // Get display values with fallbacks
   const defaultFallbackTags =

@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Heart, 
-  ShoppingBag, 
   ChevronDown, 
   Truck, 
   ShieldCheck,
@@ -16,7 +15,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import VLoader from '@/components/loaders/VLoader';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
-import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, checkWishlistStatus, removeFromWishlist } from '@/features/wishlistSlice';
 import { productApi } from '@/api/ProductApi';
 import type { ProductDto } from '@/api/ProductApi';
@@ -25,11 +23,13 @@ import { formatPrice } from '@/utils/helpers';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
+import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { useActiveCustomOrderConfiguration } from '@/hooks/useActiveCustomOrderConfiguration';
+import BagPulseIcon from '@/components/bagging/BagPulseIcon';
+import { useBagging } from '@/hooks/useBagging';
 import ProductReviewSection from '@/components/reviews/ProductReviewSection';
-import { isRtwSizingMode, normalizeSizingMode } from '@/types/sizing';
+import { normalizeSizingMode } from '@/types/sizing';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
 import {
   isCustomOrderOnlyProduct,
@@ -162,6 +162,7 @@ export default function ProductDetailsPage() {
   const currentUser = useSelector((s: RootState) => s.user.profile);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
+  const { addStandard, bagProduct, beginCustomFlow, getPulseStatus, loadingByProductId } = useBagging();
   const [product, setProduct] = useState<ProductDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -306,7 +307,6 @@ export default function ProductDetailsPage() {
     );
   }, [customOrderMeasurementKeys, product?.customMeasurementKeys]);
 
-  const requiresRtwSelection = isRtwSizingMode(sizingMode) && availableSizes.length > 0;
   const isCustomOrderOnly = isCustomOrderOnlyProduct(product);
   const requiresMeasurements =
     sizingMode === 'RTW_PLUS_FITTINGS' && requiredMeasurementKeys.length > 0;
@@ -396,22 +396,6 @@ export default function ProductDetailsPage() {
       toast.info('You cannot add your own product to bag.');
       return;
     }
-    
-    // Find selected variant object
-    const variant = variants.find(v => 
-      (!selectedColor || v.color === selectedColor) && 
-      (!selectedSize || v.size === selectedSize)
-    );
-    // If variants exist but none selected/found
-    if (variants.length > 0 && !variant) {
-       toast.error('Please select options');
-       return;
-    }
-
-    if (requiresRtwSelection && !selectedSize && !variant?.size) {
-      toast.error('Please select your size');
-      return;
-    }
 
     const normalizedMeasurements = requiredMeasurementKeys.reduce(
       (acc, key) => {
@@ -428,34 +412,27 @@ export default function ProductDetailsPage() {
       {} as Record<string, { value: number; unit: 'CM' }>,
     );
 
-    if (requiresMeasurements && Object.keys(normalizedMeasurements).length !== requiredMeasurementKeys.length) {
-      // Open the measurement modal instead of navigating away
-      setModalMeasurementValues({ ...measurementValues });
-      setShowMeasurementModal(true);
-      return;
-    }
-
     const sizeFitData =
       Object.keys(normalizedMeasurements).length > 0
         ? { measurements: normalizedMeasurements }
         : undefined;
 
-    try {
-      await dispatch(
-        addToCart({
-          productId: product.id,
-          quantity: 1,
-          selectedSize: variant?.size || selectedSize,
-          selectedColor: variant?.color || selectedColor,
-          sizingMode,
-          requiredMeasurementKeys,
-          sizeFitData,
-        }),
-      ).unwrap();
-      dispatch(openCartDrawer());
-      toast.success('Bagged!');
-    } catch (error: any) {
-      toast.error(error || 'Failed to bag item');
+    const result = await bagProduct(
+      { id: product.id, name: product.title },
+      {
+        quantity: 1,
+        size: selectedSize || undefined,
+        color: selectedColor || undefined,
+        sizingMode,
+        requiredMeasurementKeys,
+        sizeFitData,
+      },
+    );
+
+    if (!result) return;
+
+    if (result.action === 'OPEN_SELECTOR' || result.action === 'OPEN_CUSTOM_FLOW' || result.action === 'OPEN_FITTINGS') {
+      return;
     }
   };
 
@@ -505,21 +482,12 @@ export default function ProductDetailsPage() {
       toast.info('Custom-order checkout is hidden on your own product view.');
       return;
     }
-    if (!isAuth) {
-      toast.info('Please sign in to start a custom order.');
-      navigate('/login');
-      return;
-    }
     if (startingCustomOrder) {
-      return;
-    }
-    if (!customOrderAvailability.isAvailable || !customOrderAvailability.configurationId) {
-      toast.error(customOrderUnavailableReason || 'This product is not configured for custom orders yet. Ask the brand to complete custom-order setup.');
       return;
     }
     try {
       setStartingCustomOrder(true);
-      setCustomOrderComposerOpen(true);
+      await beginCustomFlow({ id: product.id, name: product.title });
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to open custom-order checkout.');
     } finally {
@@ -552,6 +520,8 @@ export default function ProductDetailsPage() {
     .filter(Boolean);
   const isOwnProduct = viewerCandidates.some((viewerId) => ownerCandidates.includes(viewerId));
   const showAddToBag = !isStudioStoreView && !isOwnProduct;
+  const bagButtonLoading = Boolean(loadingByProductId[product.id]);
+  const bagPulseStatus = getPulseStatus(product.id, isOutOfStock || !showAddToBag);
   const compareAt = typeof product.compareAtPrice === 'number' && product.compareAtPrice > currentPrice
     ? product.compareAtPrice
     : null;
@@ -597,23 +567,19 @@ export default function ProductDetailsPage() {
       }));
       setShowMeasurementModal(false);
 
-      // Now add to cart with the updated measurements
+      // Now add to bag with the updated measurements
       const variant = variants.find(v =>
         (!selectedColor || v.color === selectedColor) &&
         (!selectedSize || v.size === selectedSize),
       );
-      await dispatch(
-        addToCart({
-          productId: product.id,
-          quantity: 1,
-          selectedSize: variant?.size || selectedSize,
-          selectedColor: variant?.color || selectedColor,
-          sizingMode,
-          requiredMeasurementKeys,
-          sizeFitData: { measurements: normalised },
-        }),
-      ).unwrap();
-      dispatch(openCartDrawer());
+      await addStandard(product.id, {
+        quantity: 1,
+        size: variant?.size || selectedSize,
+        color: variant?.color || selectedColor,
+        sizingMode,
+        requiredMeasurementKeys,
+        sizeFitData: { measurements: normalised },
+      });
       toast.success('Measurements saved & bagged!');
     } catch (err: any) {
       toast.error(err || 'Failed to bag item');
@@ -717,7 +683,7 @@ export default function ProductDetailsPage() {
                       </>
                     ) : (
                       <>
-                        <ShoppingBag size={16} />
+                        <span aria-hidden="true">🛍️</span>
                         Save Measurements & Bag it
                       </>
                     )}
@@ -1029,14 +995,19 @@ export default function ProductDetailsPage() {
                       {!isCustomOrderOnly ? (
                         <button
                           onClick={handleAddToCart}
-                          disabled={isOutOfStock}
+                          disabled={isOutOfStock || bagButtonLoading}
                           className={`w-full font-bold py-3.5 rounded-full transition-all flex items-center justify-center gap-2 ${
                             isOutOfStock
                               ? 'bg-slate-300 dark:bg-white/15 text-slate-500 dark:text-slate-400 cursor-not-allowed'
                               : 'bg-emerald-500 hover:bg-emerald-400 text-black'
                           }`}
                         >
-                          <ShoppingBag size={18} />
+                          <BagPulseIcon
+                            status={bagPulseStatus}
+                            context="detail"
+                            size={32}
+                            disabled={isOutOfStock || bagButtonLoading}
+                          />
                           {isOutOfStock ? 'Sold Out' : '🛍️ Bag it'}
                         </button>
                       ) : null}
@@ -1150,7 +1121,7 @@ export default function ProductDetailsPage() {
               >
                 <span aria-hidden="true" className="text-base">×</span>
               </button>
-              <CustomOrderComposerPage
+              <LazyCustomOrderComposerPage
                 embedded
                 configurationIdOverride={customOrderAvailability.configurationId}
                 onClose={() => setCustomOrderComposerOpen(false)}

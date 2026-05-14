@@ -15,7 +15,7 @@ const AdminBreadcrumb: React.FC<AdminBreadcrumbProps> = ({ segments }) => {
   const all: BreadcrumbSegment[] = [{ label: 'Dashboard', path: '/admin' }, ...segments];
 
   return (
-    <nav className="flex items-center gap-1.5 text-[12px] text-gray-400 dark:text-gray-500 mb-4">
+    <nav className="mb-4 flex items-center gap-1.5 text-[12px] text-theme-secondary">
       {all.map((seg, i) => {
         const isLast = i === all.length - 1;
         return (
@@ -26,14 +26,14 @@ const AdminBreadcrumb: React.FC<AdminBreadcrumbProps> = ({ segments }) => {
               </svg>
             )}
             {isLast || !seg.path ? (
-              <span className={isLast ? 'text-gray-700 dark:text-gray-200 font-semibold' : ''}>
+              <span className={isLast ? 'font-semibold text-theme' : ''}>
                 {seg.label}
               </span>
             ) : (
               <button
                 type="button"
                 onClick={() => navigate(seg.path!)}
-                className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors font-medium"
+                className="font-medium transition-colors hover:text-theme"
               >
                 {seg.label}
               </button>

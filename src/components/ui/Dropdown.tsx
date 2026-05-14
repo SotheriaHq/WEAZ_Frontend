@@ -10,10 +10,10 @@ export const DROPDOWN_SECTION_TITLE_CLASS =
 export const DROPDOWN_HEADER_CLASS = 'px-3.5 pb-2 pt-3';
 export const DROPDOWN_TITLE_CLASS = 'text-sm font-semibold text-[color:var(--text-primary)]';
 export const DROPDOWN_META_CLASS = 'mt-0.5 text-[11px] leading-4 text-[color:var(--text-secondary)]';
-export const DROPDOWN_DIVIDER_CLASS = 'mx-2 my-1 h-px bg-black/5 dark:bg-white/10';
+export const DROPDOWN_DIVIDER_CLASS = 'mx-2 my-1 h-px bg-[color:var(--border-default)]';
 export const DROPDOWN_SURFACE_CLASS = 'glass-menu overflow-hidden';
 export const DROPDOWN_CONTENT_CLASS =
-  'flex h-full touch-pan-y flex-col overflow-x-hidden overflow-y-auto overscroll-contain p-1 no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
+  'flex min-h-0 h-full touch-pan-y flex-col overflow-x-hidden overflow-y-auto overscroll-contain p-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden';
 export const DROPDOWN_ITEM_BASE_CLASS =
   'group flex w-full min-w-0 items-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors duration-150 focus:outline-none focus-visible:ring-0';
 export const DROPDOWN_ITEM_DESCRIPTION_CLASS =
@@ -246,15 +246,24 @@ export const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
             minWidth: pos.minWidth,
             maxWidth: 'calc(100vw - 1rem)',
             maxHeight: maxHeight ?? 'min(60vh, 24rem)',
+            overflow: 'hidden',
+            overscrollBehavior: 'contain',
             transformOrigin: pos.transformOrigin,
             visibility: isPositioned ? 'visible' : 'hidden',
+            WebkitOverflowScrolling: 'touch',
           }}
           role="menu"
           aria-orientation="vertical"
         >
           <div
             className={DROPDOWN_CONTENT_CLASS}
-            style={{ WebkitOverflowScrolling: 'touch' }}
+            style={{
+              maxHeight: maxHeight ?? 'min(60vh, 24rem)',
+              width: '100%',
+              boxSizing: 'border-box',
+              scrollbarGutter: 'auto',
+              WebkitOverflowScrolling: 'touch',
+            }}
           >
             {children}
           </div>
@@ -275,7 +284,7 @@ interface DropdownItemProps extends React.ButtonHTMLAttributes<HTMLButtonElement
 }
 
 const toneClasses: Record<NonNullable<DropdownItemProps['tone']>, string> = {
-  default: 'text-[color:var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10',
+  default: 'text-[color:var(--text-primary)] surface-interactive-hover',
   danger: 'text-rose-600 dark:text-rose-300 hover:bg-rose-500/10 dark:hover:bg-rose-500/15',
   success: 'text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15',
   warning: 'text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 dark:hover:bg-amber-500/15',

@@ -1,21 +1,8 @@
-import { useMemo } from 'react';
 import { useTheme } from '@/context/ThemeContext';
+import type { ResolvedTheme } from '@/types/theme';
 
-export const useCurrentTheme = (): 'light' | 'dark' => {
-  const { theme } = useTheme();
+export const useCurrentTheme = (): ResolvedTheme => {
+  const { resolvedTheme } = useTheme();
 
-  return useMemo(() => {
-    if (theme === 'light' || theme === 'dark') {
-      return theme;
-    }
-
-    if (
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches
-    ) {
-      return 'dark';
-    }
-
-    return 'light';
-  }, [theme]);
+  return resolvedTheme;
 };

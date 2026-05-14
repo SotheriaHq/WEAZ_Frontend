@@ -50,8 +50,7 @@ export const openPaystackInline = async (
     }
   }
 
-  let transaction: PaystackPopupTransaction;
-  transaction = instance.resumeTransaction(accessCode, {
+  const transaction = instance.resumeTransaction(accessCode, {
     onLoad: (response) => {
       activeTransaction = transaction?.id ?? response.id;
       callbacks.onLoad?.(response);

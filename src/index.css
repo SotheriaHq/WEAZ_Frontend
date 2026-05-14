@@ -141,6 +141,79 @@ html {
     z-index: var(--z-toast);
   }
 
+  .text-theme {
+    color: var(--text-primary);
+  }
+
+  .text-theme-secondary {
+    color: var(--text-secondary);
+  }
+
+  .border-theme {
+    border-color: var(--border-default);
+  }
+
+  .border-theme-strong {
+    border-color: var(--border-strong);
+  }
+
+  .surface-card {
+    color: var(--text-primary);
+    background-color: var(--surface-primary);
+    border-color: var(--border-default);
+  }
+
+  .surface-menu {
+    color: var(--text-primary);
+    background-color: color-mix(in srgb, var(--surface-primary) 94%, transparent);
+    border-color: var(--border-default);
+  }
+
+  .surface-modal {
+    color: var(--text-primary);
+    background-color: color-mix(in srgb, var(--surface-primary) 96%, transparent);
+    border-color: var(--border-default);
+  }
+
+  .surface-control {
+    color: var(--text-primary);
+    background-color: var(--surface-secondary);
+    border-color: var(--border-default);
+  }
+
+  .surface-control-muted {
+    color: var(--text-secondary);
+    background-color: var(--surface-muted);
+    border-color: var(--border-default);
+  }
+
+  .surface-interactive-hover {
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+
+  .surface-interactive-hover:hover {
+    background-color: var(--surface-muted);
+  }
+
+  .surface-panel-subtle,
+  .surface-subtle {
+    color: var(--text-primary);
+    background-color: color-mix(in srgb, var(--surface-secondary) 76%, transparent);
+    border-color: var(--border-default);
+  }
+
+  .surface-overlay-soft {
+    background-color: color-mix(in srgb, var(--surface-primary) 54%, transparent);
+  }
+
+  .surface-overlay-strong {
+    background-color: rgba(0, 0, 0, 0.62);
+  }
+
+  .placeholder-theme::placeholder {
+    color: var(--text-secondary);
+  }
+
   /* Threadly styled scrollbars (uses theme tokens) */
   .scrollbar-threadly {
     scrollbar-width: thin;
@@ -228,36 +301,40 @@ html {
   }
 
   .glass-panel {
-    @apply bg-transparent border border-gray-200/70 dark:border-white/10 rounded-2xl;
+    @apply bg-transparent border rounded-2xl;
+    border-color: color-mix(in srgb, var(--border-default) 82%, transparent);
   }
 
   .dark .glass-panel {
     background: transparent;
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--border-default);
   }
 
   .glass-menu {
-    @apply backdrop-blur-xl rounded-2xl border border-white/20 dark:border-white/10 shadow-2xl;
-    background: rgba(255, 255, 255, 0.92);
+    @apply backdrop-blur-xl rounded-2xl border shadow-2xl;
+    color: var(--text-primary);
+    background-color: color-mix(in srgb, var(--surface-primary) 94%, transparent);
+    border-color: var(--border-default);
     box-shadow:
       0 18px 48px rgba(15, 23, 42, 0.14),
       0 2px 8px rgba(15, 23, 42, 0.06);
   }
 
   :is(.dark) .glass-menu {
-    background: rgba(9, 9, 11, 0.96);
     box-shadow:
       0 18px 48px rgba(0, 0, 0, 0.36),
       0 2px 8px rgba(0, 0, 0, 0.16);
   }
 
   .glass-menu-soft {
-    @apply backdrop-blur-xl rounded-2xl border border-white/20 dark:border-white/10 shadow-xl;
-    background: rgba(255, 255, 255, 0.78);
+    @apply backdrop-blur-xl rounded-2xl border shadow-xl;
+    color: var(--text-primary);
+    border-color: var(--border-default);
+    background-color: color-mix(in srgb, var(--surface-primary) 84%, transparent);
   }
 
   :is(.dark) .glass-menu-soft {
-    background: rgba(12, 12, 12, 0.92);
+    background-color: color-mix(in srgb, var(--surface-primary) 92%, transparent);
   }
 
   .glass-chip {
@@ -329,6 +406,20 @@ html {
     background-color: var(--surface-secondary);
     border-bottom: 1px solid var(--border-default);
     box-shadow: none;
+  }
+
+  @media (max-width: 767px) {
+    .studio-shell .threadly-nav-surface-muted {
+      background-color: var(--surface-primary);
+      border-bottom-color: transparent;
+      box-shadow: none;
+    }
+
+    :is(.dark) .studio-shell .threadly-nav-surface-muted {
+      background-color: var(--surface-primary);
+      border-bottom-color: transparent;
+      box-shadow: none;
+    }
   }
 
   .elev-1 {
@@ -421,16 +512,29 @@ html {
   }
 
   .btn-frost-primary {
-    @apply btn-frost text-white bg-[#0d0d0d] hover:bg-[#1a1a1a]
-           dark:bg-white dark:text-[#0d0d0d] dark:hover:bg-gray-100;
+    @apply btn-frost;
+    color: var(--surface-primary);
+    background-color: var(--text-primary);
+  }
+
+  .btn-frost-primary:hover {
+    opacity: 0.9;
   }
 
   .btn-frost-ghost {
-    @apply btn-frost text-gray-900 dark:text-gray-100 bg-white/0 hover:bg-white/10 border border-white/20;
+    @apply btn-frost bg-transparent border;
+    color: var(--text-primary);
+    border-color: var(--border-default);
+  }
+
+  .btn-frost-ghost:hover {
+    background-color: var(--surface-muted);
   }
 
   .btn-frost-outline {
-    @apply btn-frost text-purple-700 dark:text-purple-300 bg-white/0 border border-purple-300/60 hover:bg-purple-400/10;
+    @apply btn-frost bg-transparent border hover:bg-purple-400/10;
+    color: var(--brand-primary);
+    border-color: color-mix(in srgb, var(--brand-primary) 34%, var(--border-default));
   }
 
   .btn-tight-xs {
@@ -566,25 +670,13 @@ html {
 
 /* Theme transition — universal approach using a brief class-based gate.
    When the ThemeProvider flips the theme, it adds `theme-transitioning` to <html>
-   for ~300ms. During that window every element gets smooth, synchronized transitions.
-   Outside that window no elements carry a theme transition so there is zero perf cost. */
+   for ~300ms. During that window existing component transitions are disabled so
+   chrome, open menus, and page content settle together in one paint. */
 html.theme-transitioning,
 html.theme-transitioning *,
 html.theme-transitioning *::before,
 html.theme-transitioning *::after {
-  transition:
-    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    fill 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    stroke 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    background 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    outline-color 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  /* !important overrides component-level transitions to ensure ALL elements switch together.
-     Zero delay forces every element to start at the same instant. */
-  transition-delay: 0s !important;
+  transition: none !important;
 }
 
 /* Interactive elements always need quick transitions for hover/focus states */
@@ -1298,10 +1390,342 @@ body.modal-open {
   overflow: hidden;
 }
 
+/* PrimeReact and third-party portal theme alignment.
+   PrimeReact still uses the static Lara light theme as its structural base.
+   These unlayered overrides intentionally load after vendor CSS from main.tsx
+   and bind Prime/Sonner surfaces to Threadly's root theme tokens, including
+   overlays appended directly to document.body. */
+html,
+body {
+  --p-primary-color: var(--brand-primary);
+  --p-primary-contrast-color: #ffffff;
+  --p-focus-ring-color: rgba(var(--brand-primary-rgb), 0.32);
+  --p-highlight-bg: rgba(var(--brand-primary-rgb), 0.14);
+  --p-highlight-color: var(--brand-primary);
+  --p-overlay-bg: color-mix(in srgb, var(--surface-primary) 96%, transparent);
+  --p-hover-bg: var(--surface-muted);
+  --p-selected-bg: rgba(var(--brand-primary-rgb), 0.16);
+  --p-surface-ground: var(--surface-primary);
+  --p-surface-section: var(--surface-primary);
+  --p-surface-card: var(--surface-primary);
+  --p-surface-overlay: var(--surface-primary);
+  --p-surface-border: var(--border-default);
+  --p-text-color: var(--text-primary);
+  --p-text-muted-color: var(--text-secondary);
+  --surface-a: var(--surface-primary);
+  --surface-b: var(--surface-secondary);
+  --surface-c: var(--surface-muted);
+  --surface-d: var(--border-default);
+  --surface-e: var(--surface-primary);
+  --surface-f: var(--surface-primary);
+  --surface-ground: var(--surface-primary);
+  --surface-section: var(--surface-primary);
+  --surface-card: var(--surface-primary);
+  --surface-overlay: var(--surface-primary);
+  --surface-border: var(--border-default);
+  --text-color: var(--text-primary);
+  --text-color-secondary: var(--text-secondary);
+  --primary-color: var(--brand-primary);
+  --primary-color-text: #ffffff;
+  --highlight-bg: rgba(var(--brand-primary-rgb), 0.14);
+  --highlight-text-color: var(--brand-primary);
+  --focus-ring: 0 0 0 2px rgba(var(--brand-primary-rgb), 0.25);
+  --maskbg: rgba(0, 0, 0, 0.42);
+  --normal-bg: var(--surface-primary);
+  --normal-border: var(--border-default);
+  --normal-text: var(--text-primary);
+}
+
+html[data-theme='dark'],
+html.dark {
+  --maskbg: rgba(0, 0, 0, 0.68);
+  --normal-bg: var(--surface-secondary);
+}
+
+.p-component,
+.p-component *,
+.p-link,
+.p-menuitem-text,
+.p-dropdown-label,
+.p-multiselect-label,
+.p-inputtext,
+.p-inputtextarea {
+  color: var(--text-primary);
+}
+
+.p-component,
+.p-inputtext,
+.p-inputtextarea,
+.p-dropdown,
+.p-multiselect,
+.p-autocomplete,
+.p-calendar,
+.p-password,
+.p-inputnumber,
+.p-inputgroup,
+.p-listbox,
+.p-tree,
+.p-treeselect,
+.p-cascadeselect {
+  font-family: inherit;
+}
+
+.p-inputtext,
+.p-inputtextarea,
+.p-dropdown,
+.p-multiselect,
+.p-autocomplete .p-autocomplete-input,
+.p-calendar .p-inputtext,
+.p-inputnumber .p-inputtext,
+.p-password .p-password-input,
+.p-listbox,
+.p-treeselect,
+.p-cascadeselect {
+  background-color: var(--surface-secondary) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-primary) !important;
+}
+
+.p-inputtext::placeholder,
+.p-inputtextarea::placeholder {
+  color: var(--text-secondary) !important;
+}
+
+.p-inputtext:enabled:hover,
+.p-inputtextarea:enabled:hover,
+.p-dropdown:not(.p-disabled):hover,
+.p-multiselect:not(.p-disabled):hover,
+.p-treeselect:not(.p-disabled):hover,
+.p-cascadeselect:not(.p-disabled):hover {
+  border-color: var(--border-strong) !important;
+}
+
+.p-inputtext:enabled:focus,
+.p-inputtextarea:enabled:focus,
+.p-dropdown:not(.p-disabled).p-focus,
+.p-multiselect:not(.p-disabled).p-focus,
+.p-treeselect:not(.p-disabled).p-focus,
+.p-cascadeselect:not(.p-disabled).p-focus {
+  border-color: var(--brand-primary) !important;
+  box-shadow: 0 0 0 2px rgba(var(--brand-primary-rgb), 0.22) !important;
+}
+
+.p-dropdown-panel,
+.p-multiselect-panel,
+.p-autocomplete-panel,
+.p-cascadeselect-panel,
+.p-treeselect-panel,
+.p-datepicker,
+.p-datepicker-header,
+.p-menu,
+.p-menubar,
+.p-tieredmenu,
+.p-contextmenu,
+.p-slidemenu,
+.p-overlaypanel,
+.p-dialog,
+.p-sidebar,
+.p-confirm-dialog,
+.p-popover,
+.p-tooltip .p-tooltip-text,
+.p-toast .p-toast-message {
+  background-color: var(--p-overlay-bg) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-primary) !important;
+}
+
+.p-dropdown-panel,
+.p-multiselect-panel,
+.p-autocomplete-panel,
+.p-cascadeselect-panel,
+.p-treeselect-panel,
+.p-datepicker,
+.p-menu,
+.p-tieredmenu,
+.p-contextmenu,
+.p-slidemenu,
+.p-overlaypanel,
+.p-dialog,
+.p-sidebar,
+.p-toast .p-toast-message {
+  box-shadow:
+    0 18px 48px rgba(15, 23, 42, 0.14),
+    0 2px 8px rgba(15, 23, 42, 0.06) !important;
+}
+
+html[data-theme='dark'] .p-dropdown-panel,
+html[data-theme='dark'] .p-multiselect-panel,
+html[data-theme='dark'] .p-autocomplete-panel,
+html[data-theme='dark'] .p-cascadeselect-panel,
+html[data-theme='dark'] .p-treeselect-panel,
+html[data-theme='dark'] .p-datepicker,
+html[data-theme='dark'] .p-menu,
+html[data-theme='dark'] .p-tieredmenu,
+html[data-theme='dark'] .p-contextmenu,
+html[data-theme='dark'] .p-slidemenu,
+html[data-theme='dark'] .p-overlaypanel,
+html[data-theme='dark'] .p-dialog,
+html[data-theme='dark'] .p-sidebar,
+html[data-theme='dark'] .p-toast .p-toast-message,
+html.dark .p-dropdown-panel,
+html.dark .p-multiselect-panel,
+html.dark .p-autocomplete-panel,
+html.dark .p-cascadeselect-panel,
+html.dark .p-treeselect-panel,
+html.dark .p-datepicker,
+html.dark .p-menu,
+html.dark .p-tieredmenu,
+html.dark .p-contextmenu,
+html.dark .p-slidemenu,
+html.dark .p-overlaypanel,
+html.dark .p-dialog,
+html.dark .p-sidebar,
+html.dark .p-toast .p-toast-message {
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.36),
+    0 2px 8px rgba(0, 0, 0, 0.16) !important;
+}
+
+.p-dialog .p-dialog-header,
+.p-dialog .p-dialog-content,
+.p-dialog .p-dialog-footer,
+.p-sidebar .p-sidebar-header,
+.p-sidebar .p-sidebar-content,
+.p-overlaypanel .p-overlaypanel-content,
+.p-datepicker .p-datepicker-header,
+.p-toast .p-toast-message-content {
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-default) !important;
+}
+
+.p-dialog .p-dialog-title,
+.p-datepicker-title,
+.p-datepicker .p-datepicker-header .p-datepicker-title,
+.p-toast .p-toast-summary {
+  color: var(--text-primary) !important;
+}
+
+.p-dialog .p-dialog-header-icon,
+.p-datepicker .p-datepicker-header .p-datepicker-prev,
+.p-datepicker .p-datepicker-header .p-datepicker-next,
+.p-dropdown-trigger,
+.p-multiselect-trigger,
+.p-cascadeselect-trigger,
+.p-treeselect-trigger,
+.p-toast .p-toast-icon-close {
+  color: var(--text-secondary) !important;
+}
+
+.p-dialog .p-dialog-header-icon:hover,
+.p-datepicker .p-datepicker-header .p-datepicker-prev:hover,
+.p-datepicker .p-datepicker-header .p-datepicker-next:hover,
+.p-dropdown-trigger:hover,
+.p-multiselect-trigger:hover,
+.p-cascadeselect-trigger:hover,
+.p-treeselect-trigger:hover,
+.p-toast .p-toast-icon-close:hover {
+  background-color: var(--surface-muted) !important;
+  color: var(--text-primary) !important;
+}
+
+.p-dropdown-panel .p-dropdown-items .p-dropdown-item,
+.p-multiselect-panel .p-multiselect-items .p-multiselect-item,
+.p-autocomplete-panel .p-autocomplete-items .p-autocomplete-item,
+.p-cascadeselect-panel .p-cascadeselect-items .p-cascadeselect-item,
+.p-treeselect-panel .p-treeselect-items-wrapper .p-treenode-content,
+.p-menu .p-menuitem-link,
+.p-tieredmenu .p-menuitem-link,
+.p-contextmenu .p-menuitem-link,
+.p-slidemenu .p-menuitem-link,
+.p-datepicker table td > span {
+  color: var(--text-primary) !important;
+}
+
+.p-dropdown-panel .p-dropdown-items .p-dropdown-item:not(.p-highlight):not(.p-disabled):hover,
+.p-multiselect-panel .p-multiselect-items .p-multiselect-item:not(.p-highlight):not(.p-disabled):hover,
+.p-autocomplete-panel .p-autocomplete-items .p-autocomplete-item:not(.p-highlight):not(.p-disabled):hover,
+.p-cascadeselect-panel .p-cascadeselect-items .p-cascadeselect-item:not(.p-highlight):not(.p-disabled):hover,
+.p-treeselect-panel .p-treeselect-items-wrapper .p-treenode-content:not(.p-highlight):hover,
+.p-menu .p-menuitem-link:not(.p-disabled):hover,
+.p-tieredmenu .p-menuitem-link:not(.p-disabled):hover,
+.p-contextmenu .p-menuitem-link:not(.p-disabled):hover,
+.p-slidemenu .p-menuitem-link:not(.p-disabled):hover,
+.p-datepicker table td > span:not(.p-highlight):not(.p-disabled):hover {
+  background-color: var(--surface-muted) !important;
+  color: var(--text-primary) !important;
+}
+
+.p-dropdown-panel .p-dropdown-items .p-dropdown-item.p-highlight,
+.p-multiselect-panel .p-multiselect-items .p-multiselect-item.p-highlight,
+.p-autocomplete-panel .p-autocomplete-items .p-autocomplete-item.p-highlight,
+.p-cascadeselect-panel .p-cascadeselect-items .p-cascadeselect-item.p-highlight,
+.p-treeselect-panel .p-treeselect-items-wrapper .p-treenode-content.p-highlight,
+.p-datepicker table td > span.p-highlight {
+  background-color: rgba(var(--brand-primary-rgb), 0.16) !important;
+  color: var(--brand-primary) !important;
+}
+
+.p-checkbox .p-checkbox-box,
+.p-radiobutton .p-radiobutton-box,
+.p-chip,
+.p-tag,
+.p-paginator {
+  background-color: var(--surface-secondary) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-primary) !important;
+}
+
+.p-checkbox .p-checkbox-box.p-highlight,
+.p-radiobutton .p-radiobutton-box.p-highlight,
+.p-button,
+.p-button.p-highlight {
+  background-color: var(--brand-primary) !important;
+  border-color: var(--brand-primary) !important;
+  color: #ffffff !important;
+}
+
+.p-button.p-button-text,
+.p-button.p-button-outlined {
+  background-color: transparent !important;
+  color: var(--brand-primary) !important;
+}
+
+.p-datatable,
+.p-datatable .p-datatable-header,
+.p-datatable .p-datatable-footer,
+.p-datatable .p-datatable-thead > tr > th,
+.p-datatable .p-datatable-tbody > tr,
+.p-datatable .p-datatable-tbody > tr > td {
+  background-color: var(--surface-primary) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-primary) !important;
+}
+
+.p-component-overlay,
+.p-dialog-mask,
+.p-sidebar-mask,
+.p-overlay-mask {
+  background-color: var(--maskbg) !important;
+}
+
+[data-sonner-toaster] {
+  --normal-bg: var(--surface-primary);
+  --normal-border: var(--border-default);
+  --normal-text: var(--text-primary);
+}
+
+[data-sonner-toast] {
+  background-color: var(--surface-primary) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-primary) !important;
+}
+
 /* PrimeReact Breadcrumb Custom Styling */
 .breadcrumb-wrapper .p-breadcrumb {
-  background: transparent;
-  border: none;
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-primary);
   padding: 0;
   margin-bottom: 0.5rem;
 }
@@ -1314,15 +1738,17 @@ body.modal-open {
 }
 
 .breadcrumb-wrapper .p-menuitem-link {
-  @apply text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors;
+  color: var(--text-secondary) !important;
   text-decoration: none;
   font-size: 0.875rem;
   padding: 0.25rem 0.5rem;
   border-radius: 0.375rem;
+  transition: color 150ms ease, background-color 150ms ease;
 }
 
 .breadcrumb-wrapper .p-menuitem-link:hover {
-  @apply bg-gray-100 dark:bg-gray-800;
+  background-color: var(--surface-muted) !important;
+  color: var(--brand-primary) !important;
 }
 
 .breadcrumb-wrapper .p-menuitem-text {
@@ -1330,16 +1756,16 @@ body.modal-open {
 }
 
 .breadcrumb-wrapper .p-breadcrumb-chevron {
-  @apply text-gray-400 dark:text-gray-600;
+  color: var(--text-secondary) !important;
   margin: 0 0.25rem;
 }
 
 .dark .breadcrumb-wrapper .p-breadcrumb {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-primary);
 }
 
 .breadcrumb-wrapper .p-menuitem-icon {
-  @apply text-purple-600 dark:text-purple-400;
+  color: var(--brand-primary) !important;
   margin-right: 0.25rem;
 }
 
@@ -1432,4 +1858,128 @@ html:not(.dark) .input-glass:focus {
 .animate-gradient-x {
   background-size: 200% 200%;
   animation: gradient-x 3s ease infinite;
+}
+
+.bag-pulse-icon {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.bag-pulse-core {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid rgba(124, 58, 237, 0.28);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+  transform-origin: center;
+  animation: bag-breathe var(--bag-pulse-duration, 1500ms) ease-in-out infinite;
+}
+
+.dark .bag-pulse-core {
+  border-color: rgba(167, 139, 250, 0.32);
+  background: rgba(15, 15, 18, 0.74);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.bag-pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.16);
+  animation: bag-ring var(--bag-pulse-duration, 1500ms) ease-out infinite;
+}
+
+.bag-pulse-count {
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  z-index: 2;
+  min-width: 16px;
+  border-radius: 999px;
+  background: #111827;
+  padding: 1px 4px;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.bag-pulse-single,
+.bag-pulse-detail,
+.bag-pulse-rail {
+  --bag-pulse-scale: 1.14;
+  --bag-ring-scale: 1.45;
+  --bag-pulse-duration: 1420ms;
+}
+
+.bag-pulse-multi {
+  --bag-pulse-scale: 1.045;
+  --bag-ring-scale: 1.18;
+  --bag-pulse-duration: 2400ms;
+}
+
+.bag-pulse-previously-bagged {
+  --bag-pulse-scale: 1.08;
+  --bag-ring-scale: 1.28;
+}
+
+.bag-pulse-currently-bagged {
+  --bag-pulse-scale: 1.025;
+  --bag-ring-scale: 1.12;
+  --bag-pulse-duration: 2600ms;
+}
+
+.bag-pulse-bagging {
+  --bag-pulse-scale: 1.1;
+  --bag-ring-scale: 1.3;
+  --bag-pulse-duration: 820ms;
+}
+
+.bag-pulse-disabled .bag-pulse-core {
+  animation: none;
+  opacity: 0.48;
+  filter: grayscale(0.7);
+}
+
+.bag-pulse-disabled .bag-pulse-ring {
+  display: none;
+}
+
+@keyframes bag-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(var(--bag-pulse-scale));
+  }
+}
+
+@keyframes bag-ring {
+  0% {
+    opacity: 0.18;
+    transform: scale(0.92);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(var(--bag-ring-scale));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bag-pulse-core,
+  .bag-pulse-ring {
+    animation: none;
+  }
 }

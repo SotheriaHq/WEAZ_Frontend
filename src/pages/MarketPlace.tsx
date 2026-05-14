@@ -463,9 +463,9 @@ const MarketPlace: React.FC = () => {
   return (
     <div className="mx-auto w-full max-w-[1440px] px-4 py-4 sm:px-6 lg:px-8">
       <div className="space-y-6">
-        <section className="rounded-3xl border border-gray-200/70 bg-white/40 p-4 backdrop-blur-[2px] dark:border-white/10 dark:bg-white/[0.03] sm:p-6">
-          <div className="grid grid-cols-1 gap-4 lg:min-h-[210px] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <div className="min-h-[165px] sm:min-h-[210px] lg:h-full lg:min-h-0">
+        <section className="rounded-2xl bg-white/35 p-3 backdrop-blur-[2px] ring-1 ring-gray-200/55 dark:bg-white/[0.03] dark:ring-white/10 sm:p-4">
+          <div className="grid grid-cols-1 gap-3 lg:min-h-[54px] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div className="min-h-[46px] sm:min-h-[54px] lg:h-full lg:min-h-0">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeHero?.id ?? 'hero-empty'}
@@ -481,7 +481,7 @@ const MarketPlace: React.FC = () => {
                         <ImageWithFallback
                           src={activeHero.thumbnail || activeHero.images[0] || null}
                           alt={activeHero.name}
-                          fit="contain"
+                          fit="cover"
                           rounded="none"
                           containerClassName="h-full w-full"
                           className="h-full w-full"
@@ -490,25 +490,25 @@ const MarketPlace: React.FC = () => {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                       </div>
-                      <div className="relative flex h-full min-h-[165px] flex-col justify-end p-6 text-white sm:min-h-[210px] lg:min-h-0">
-                        <span className="mb-3 inline-flex w-fit items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold backdrop-blur">
+                      <div className="relative flex h-full min-h-[46px] flex-col justify-end p-3 text-white sm:min-h-[54px] lg:min-h-0">
+                        <span className="mb-2 inline-flex w-fit items-center gap-2 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold backdrop-blur">
                           🔥 Trending now
                         </span>
-                        <h1 className="max-w-xl text-2xl font-black leading-tight sm:text-4xl">
+                        <h1 className="max-w-xl text-lg font-black leading-tight sm:text-2xl">
                           {activeHero.name}
                         </h1>
-                        <p className="mt-2 text-sm text-white/80 sm:text-base">
+                        <p className="mt-1 text-xs text-white/80 sm:text-sm">
                           {activeHero.brand?.name || 'Threadly Brand'} · Smooth picks from recent brand drops.
                         </p>
-                        <div className="mt-5 flex flex-wrap items-center gap-3">
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => setSelectedProduct(activeHero)}
-                            className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-gray-900 transition-transform hover:scale-[1.02]"
+                            className="rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-gray-900 transition-transform hover:scale-[1.02]"
                           >
                             👀 View product
                           </button>
-                          <span className="rounded-full bg-black/40 px-4 py-2 text-sm font-semibold">
+                          <span className="rounded-full bg-black/40 px-3 py-1.5 text-xs font-semibold">
                             {new Intl.NumberFormat('en-NG', {
                               style: 'currency',
                               currency: 'NGN',
@@ -519,7 +519,7 @@ const MarketPlace: React.FC = () => {
                       </div>
                     </>
                   ) : (
-                    <div className="flex h-full min-h-[165px] items-center justify-center rounded-2xl bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-300 sm:min-h-[210px] lg:min-h-0">
+                    <div className="flex h-full min-h-[46px] items-center justify-center rounded-2xl bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-300 sm:min-h-[54px] lg:min-h-0">
                       No featured products yet.
                     </div>
                   )}
@@ -527,18 +527,18 @@ const MarketPlace: React.FC = () => {
               </AnimatePresence>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:h-full lg:grid-cols-1 lg:grid-rows-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:h-full lg:grid-cols-1 lg:grid-rows-2">
               {heroProducts.slice(0, 2).map((product) => (
                 <button
                   key={product.id}
                   type="button"
                   onClick={() => setSelectedProduct(product)}
-                  className="group relative h-[118px] overflow-hidden rounded-2xl border border-gray-200 bg-gray-100 text-left dark:border-white/10 dark:bg-white/5 sm:h-[160px] lg:h-full"
+                  className="group relative h-[37px] overflow-hidden rounded-xl bg-gray-100 text-left ring-1 ring-gray-200/70 dark:bg-white/5 dark:ring-white/10 sm:h-[42px] lg:h-full"
                 >
                   <ImageWithFallback
                     src={product.thumbnail || product.images[0] || null}
                     alt={product.name}
-                    fit="contain"
+                    fit="cover"
                     rounded="none"
                     containerClassName="absolute inset-0 h-full w-full"
                     className="h-full w-full transition-transform duration-500 group-hover:scale-105"
@@ -588,23 +588,20 @@ const MarketPlace: React.FC = () => {
 
 
         <section className="space-y-5">
-          <div className="sticky top-16 z-20 rounded-2xl border border-gray-200/70 bg-white/55 px-3 py-3 backdrop-blur-[4px] sm:p-4 dark:border-white/10 dark:bg-[#0f0b13]/55">
+          <div className="sticky top-16 z-20 rounded-2xl border border-gray-200/70 bg-white/72 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-[#0f0b13]/78">
             {/* Heading + search row — on small screens header is compact, search hidden */}
-            <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
-                <h2 className="text-lg font-black text-gray-900 dark:text-white sm:text-2xl">Explore the Market</h2>
-                <p className="hidden text-sm text-gray-600 dark:text-gray-400 sm:block">
-                  Tap any product to preview, wishlist, or add to bag. Use global search for product, brand, design, and tag discovery.
-                </p>
+                <h2 className="text-base font-black text-gray-900 dark:text-white sm:text-xl">Explore the Market</h2>
               </div>
-              <div className="hidden w-full flex-col gap-3 sm:flex lg:w-auto lg:min-w-[520px] lg:flex-row">
+              <div className="hidden w-full flex-col gap-3 sm:flex lg:w-auto lg:min-w-[480px] lg:flex-row">
                 <SearchBarWithSuggestions
                   placeholder="Search products, brands, styles, or tags..."
                   className="w-full"
                 />
               </div>
             </div>
-            <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 sm:gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="mt-1.5 flex gap-5 overflow-x-auto border-b border-gray-200/80 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10">
               {availableFilters.map((filter) => {
                 const active = selectedFilter === filter;
                 return (
@@ -612,18 +609,25 @@ const MarketPlace: React.FC = () => {
                     key={filter}
                     type="button"
                     onClick={() => setSelectedFilter(filter)}
-                    className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition sm:px-4 sm:py-2 sm:text-sm ${
+                    aria-pressed={active}
+                    className={`relative whitespace-nowrap pb-3 pt-2 text-sm font-semibold transition-colors ${
                       active
-                        ? 'border-purple-500 bg-purple-600 text-white'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-white/15 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10'
+                        ? 'text-gray-900 dark:text-white'
+                        : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                     }`}
                   >
-                    {filter === 'FOR_YOU' && '✨ For You'}
-                    {filter === 'MENSWEAR' && '🧥 Menswear'}
-                    {filter === 'WOMENSWEAR' && '👗 Womenswear'}
-                    {filter === 'EVERYBODY' && '🌍 Everybody'}
-                    {filter === 'ON_SALE' && '🏷️ On Sale'}
-                    {filter === 'CUSTOM_FIT' && '✂️ Custom Fit'}
+                    {filter === 'FOR_YOU' && 'For You'}
+                    {filter === 'MENSWEAR' && 'Menswear'}
+                    {filter === 'WOMENSWEAR' && 'Womenswear'}
+                    {filter === 'EVERYBODY' && 'Everybody'}
+                    {filter === 'ON_SALE' && 'On Sale'}
+                    {filter === 'CUSTOM_FIT' && 'Custom Fit'}
+                    <span
+                      aria-hidden="true"
+                      className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-7 rounded-full transition-all ${
+                        active ? 'bg-gray-900 dark:bg-white' : 'bg-transparent'
+                      }`}
+                    />
                   </button>
                 );
               })}

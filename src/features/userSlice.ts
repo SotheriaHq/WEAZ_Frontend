@@ -2,6 +2,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AuthUserDto } from '../types/auth';
 import { env } from '../config/env';
+import { normalizeThemePreference } from '@/types/theme';
 
 export interface UserState {
   profile: AuthUserDto | null;
@@ -10,6 +11,9 @@ export interface UserState {
 
 const normalizeUser = (user: AuthUserDto): AuthUserDto => ({
   ...user,
+  themePreference: normalizeThemePreference(
+    (user as { themePreference?: unknown }).themePreference,
+  ),
   brandFullName: user.brandFullName ?? null,
   brandDescription: user.brandDescription ?? null,
   brandCountry: user.brandCountry ?? null,
@@ -28,6 +32,11 @@ const normalizeUser = (user: AuthUserDto): AuthUserDto => ({
   bannerImageId: user.bannerImageId ?? null,
   bannerImageFile: user.bannerImageFile ?? null,
   verificationStatus: user.verificationStatus ?? null,
+  storeId: user.storeId ?? null,
+  brandMemberships: Array.isArray(user.brandMemberships)
+    ? user.brandMemberships.filter((membership) => Boolean(membership?.brandId))
+    : [],
+  activeBrandId: user.activeBrandId ?? user.storeId ?? null,
   isVerifiedBrand: Boolean(user.isVerifiedBrand),
   verificationBadgeVisible: Boolean(
     user.verificationBadgeVisible ?? user.isVerifiedBrand,

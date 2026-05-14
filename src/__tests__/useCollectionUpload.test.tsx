@@ -89,7 +89,16 @@ afterEach(() => {
 
     let uploadPromise: Promise<unknown> | undefined;
     await act(async () => {
-      uploadPromise = result.current.uploadCollection(items, 'New Collection', 'Desc', undefined, undefined, false, ['evening']);
+      uploadPromise = result.current.uploadCollection(
+        items,
+        'New Collection',
+        'Desc',
+        undefined,
+        undefined,
+        false,
+        ['evening'],
+        { categoryId: 'category-1', subCategoryId: 'subcategory-1' },
+      );
       await flushPromises();
     });
 
@@ -97,6 +106,8 @@ afterEach(() => {
       expect.objectContaining({
         title: 'New Collection',
         tags: ['evening'],
+        categoryId: 'category-1',
+        subCategoryId: 'subcategory-1',
       }),
     );
 
@@ -131,10 +142,22 @@ afterEach(() => {
     expect(result.current.progress).toBe(100);
     expect(result.current.perFileProgress).toEqual({});
     expect(finalizeCollectionUploadsMock).toHaveBeenCalledOnce();
-    expect(finalizeCollectionUploadsMock).toHaveBeenCalledWith('collection-1', [
-      expect.objectContaining({ fileId: 'file-1', s3Key: 'key-1', actualSize: fileA.size }),
-      expect.objectContaining({ fileId: 'file-2', s3Key: 'key-2', actualSize: fileB.size }),
-    ], true);
+    expect(finalizeCollectionUploadsMock).toHaveBeenCalledWith(
+      'collection-1',
+      [
+        expect.objectContaining({ fileId: 'file-1', s3Key: 'key-1', actualSize: fileA.size }),
+        expect.objectContaining({ fileId: 'file-2', s3Key: 'key-2', actualSize: fileB.size }),
+      ],
+      true,
+      expect.objectContaining({
+        action: 'publish',
+        collectionMetadata: expect.objectContaining({
+          categoryId: 'category-1',
+          subCategoryId: 'subcategory-1',
+          categoryTypeId: 'subcategory-1',
+        }),
+      }),
+    );
     expect(result.current.isUploading).toBe(false);
   });
 
@@ -154,7 +177,16 @@ afterEach(() => {
 
     let uploadPromise: Promise<unknown> | undefined;
     await act(async () => {
-      uploadPromise = result.current.uploadCollection(items, 'Retry Collection', undefined, undefined, undefined, false, ['resort']);
+      uploadPromise = result.current.uploadCollection(
+        items,
+        'Retry Collection',
+        undefined,
+        undefined,
+        undefined,
+        false,
+        ['resort'],
+        { categoryId: 'category-1', subCategoryId: 'subcategory-1' },
+      );
       await flushPromises();
     });
 
@@ -162,6 +194,8 @@ afterEach(() => {
       expect.objectContaining({
         title: 'Retry Collection',
         tags: ['resort'],
+        categoryId: 'category-1',
+        subCategoryId: 'subcategory-1',
       }),
     );
 
@@ -193,9 +227,21 @@ afterEach(() => {
       await uploadPromise;
     });
     expect(result.current.progress).toBe(100);
-    expect(finalizeCollectionUploadsMock).toHaveBeenCalledWith('collection-retry', [
-      expect.objectContaining({ fileId: 'retry-file', s3Key: 'retry-key' }),
-    ], true);
+    expect(finalizeCollectionUploadsMock).toHaveBeenCalledWith(
+      'collection-retry',
+      [
+        expect.objectContaining({ fileId: 'retry-file', s3Key: 'retry-key' }),
+      ],
+      true,
+      expect.objectContaining({
+        action: 'publish',
+        collectionMetadata: expect.objectContaining({
+          categoryId: 'category-1',
+          subCategoryId: 'subcategory-1',
+          categoryTypeId: 'subcategory-1',
+        }),
+      }),
+    );
     expect(result.current.error).toBeNull();
     expect(result.current.perFileProgress).toEqual({});
     expect(result.current.isUploading).toBe(false);

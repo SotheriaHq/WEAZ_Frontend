@@ -1,16 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
-import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { brandApi } from '@/api/BrandApi';
 import { toast } from 'sonner';
 import type { SizingMode } from '@/types/sizing';
+import BagPulseIcon from '@/components/bagging/BagPulseIcon';
+import { useBagging } from '@/hooks/useBagging';
 import {
   getProductStockState,
   isCustomOrderOnlyProduct,
   isStrictlyOutOfStockProduct,
 } from '@/lib/productAvailability';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 export interface StoreProduct {
   id: string;
@@ -111,12 +113,12 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const currentUser = useSelector((s: RootState) => s.user.profile);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
+  const { bagProduct, getPulseStatus, loadingByProductId } = useBagging();
 
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showCustomLabel, setShowCustomLabel] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
-  const [cartLoading, setCartLoading] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [failedGalleryKeys, setFailedGalleryKeys] = useState<string[]>([]);
   const [resolvedGalleryImages, setResolvedGalleryImages] = useState<ResolvedGalleryImage[]>([]);
@@ -130,6 +132,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const isCustomOrderOnly = isCustomOrderOnlyProduct(product);
   const isStrictlyOutOfStock = isStrictlyOutOfStockProduct(product);
   const stockState = getProductStockState(product);
+  const cartLoading = Boolean(loadingByProductId[product.id]);
+  const pulseStatus = getPulseStatus(product.id, isStrictlyOutOfStock || isOwnProduct);
   const ownerStatus = (() => {
     if (!isOwnerView) return null;
     if (product.deletedAt) {
@@ -204,30 +208,10 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       return;
     }
 
-    const requiresMeasuredBagFlow =
-      product.sizingMode === 'RTW_PLUS_FITTINGS' &&
-      Array.isArray(product.customMeasurementKeys) &&
-      product.customMeasurementKeys.length > 0;
-
-    if (
-      product.sizes.length > 0 ||
-      product.colors.length > 0 ||
-      requiresMeasuredBagFlow ||
-      isCustomAvailable
-    ) {
-      onViewProduct?.(product);
-      return;
-    }
-
-    setCartLoading(true);
     try {
-      await dispatch(addToCart({ productId: product.id, quantity: 1 })).unwrap();
-      dispatch(openCartDrawer());
-      toast.success('Bagged!');
+      await bagProduct({ id: product.id, name: product.name });
     } catch (error: any) {
       toast.error(error || 'Failed to bag item');
-    } finally {
-      setCartLoading(false);
     }
   };
 
@@ -478,10 +462,13 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         ) : null}
 
         {!imgError && activeImage?.url ? (
-          <img
+          <MediaRenderer
+            kind="image"
             src={activeImage.url}
             alt={product.name}
-            className={`block max-h-[440px] w-full max-w-full h-auto transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
+            className="block w-full max-w-full"
+            mediaClassName={`block h-auto w-full transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
+            maxHeightClassName="max-h-[440px]"
             loading="eager"
             onError={() => {
               setFailedGalleryKeys((prev) => (
@@ -715,7 +702,13 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                     ${cartLoading ? 'cursor-wait opacity-70' : ''}
                   `}
                 >
-                  <span role="img" aria-hidden="true" className="text-sm leading-none">
+                  <BagPulseIcon
+                    status={pulseStatus}
+                    context="multi_card"
+                    size={28}
+                    disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
+                  />
+                  <span hidden role="img" aria-hidden="true" className="text-sm leading-none">
                     🛍️
                   </span>
                 </button>

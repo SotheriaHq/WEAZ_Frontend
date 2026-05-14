@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { featuredApi, type PublicFeaturedItem } from '@/api/FeaturedApi';
 import { unwrapApiResponse } from '@/types/auth';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface FeaturedSectionProps {
   filterType?: 'PRODUCT' | 'DESIGN';
@@ -123,10 +124,13 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({
             <div className="relative flex flex-col sm:flex-row">
               <div className="h-48 w-full shrink-0 overflow-hidden sm:h-auto sm:w-64">
                 {thumbnailUrl(spotlight) ? (
-                  <img
+                  <MediaRenderer
+                    kind="image"
                     src={thumbnailUrl(spotlight)!}
                     alt={spotlight.entityName}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    fit="cover"
+                    className="h-full w-full"
+                    mediaClassName="transition-transform duration-500 group-hover:scale-105"
                     loading="eager"
                   />
                 ) : (
@@ -222,10 +226,13 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({
           >
             <div className="relative h-40 w-full overflow-hidden bg-amber-50 dark:bg-amber-500/5">
               {thumbnailUrl(item) ? (
-                <img
+                <MediaRenderer
+                  kind="image"
                   src={thumbnailUrl(item)!}
                   alt={item.entityName}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  fit="cover"
+                  className="h-full w-full"
+                  mediaClassName="transition-transform duration-500 group-hover:scale-105"
                   loading="eager"
                 />
               ) : (

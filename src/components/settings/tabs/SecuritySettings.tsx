@@ -14,6 +14,64 @@ import {
   getPasswordPolicyErrorMessage,
 } from '@/lib/passwordPolicy';
 
+const describeTrustedDevice = (deviceLabel: string | null, userAgent: string | null) => {
+  const label = String(deviceLabel ?? '').trim();
+  if (label) {
+    return label;
+  }
+
+  const normalized = String(userAgent ?? '').toLowerCase();
+  if (!normalized) {
+    return 'Unknown device';
+  }
+
+  const browser = normalized.includes('chrome/')
+    ? 'Chrome'
+    : normalized.includes('edg/')
+      ? 'Edge'
+      : normalized.includes('safari/') && !normalized.includes('chrome/')
+        ? 'Safari'
+        : normalized.includes('firefox/')
+          ? 'Firefox'
+          : normalized.includes('okhttp/')
+            ? 'Android app'
+            : 'Device';
+
+  const os = normalized.includes('windows')
+    ? 'Windows'
+    : normalized.includes('mac os') || normalized.includes('macintosh')
+      ? 'macOS'
+      : normalized.includes('android') || normalized.includes('okhttp/')
+        ? 'Android'
+        : normalized.includes('iphone') || normalized.includes('ipad')
+          ? 'iPhone'
+          : normalized.includes('linux')
+            ? 'Linux'
+            : '';
+
+  return os ? `${browser} on ${os}` : browser;
+};
+
+const formatTrustedDeviceDate = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  const datePart = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+
+  const timePart = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+
+  return `${datePart} at ${timePart}`;
+};
+
 type TrustedDevice = {
   id: string;
   deviceLabel: string | null;
@@ -240,9 +298,10 @@ const SecuritySettings: React.FC = () => {
           <p className="text-sm text-gray-500">No recognized devices found.</p>
         ) : (
           <div className="space-y-3">
-            {devices.map((device) => {
+            {devices.map((device, index) => {
               const revoked = !!device.revokedAt;
-              const userAgent = device.lastUserAgent || 'Unknown device';
+              const deviceName = describeTrustedDevice(device.deviceLabel, device.lastUserAgent);
+              const isCurrentSession = index === 0 && !revoked;
               return (
                 <div
                   key={device.id}
@@ -250,19 +309,22 @@ const SecuritySettings: React.FC = () => {
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {device.deviceLabel || userAgent.slice(0, 80)}
+                      {deviceName}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Last seen: {new Date(device.lastSeenAt).toLocaleString()} {revoked ? '• Revoked' : ''}
+                      Last seen: {formatTrustedDeviceDate(device.lastSeenAt)} {revoked ? '• Revoked' : ''}
+                    </p>
+                    <p className={`text-xs font-medium ${isCurrentSession ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'}`}>
+                      {isCurrentSession ? 'Current session' : 'Past session'}
                     </p>
                   </div>
                   <button
                     type="button"
-                    disabled={revoked}
+                    disabled={revoked || isCurrentSession}
                     onClick={() => void handleRevokeDevice(device.id)}
                     className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Revoke
+                    {isCurrentSession ? 'This is you' : 'Revoke'}
                   </button>
                 </div>
               );

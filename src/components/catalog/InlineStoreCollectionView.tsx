@@ -249,7 +249,7 @@ const InlineStoreCollectionView: React.FC<InlineStoreCollectionViewProps> = ({
       setCartPreviewData(preview);
       setShowCartPreview(true);
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to load cart preview');
+      toast.error(e?.message || 'Failed to load bag preview');
     } finally {
       setAddingAll(false);
     }
@@ -277,7 +277,7 @@ const InlineStoreCollectionView: React.FC<InlineStoreCollectionViewProps> = ({
         const successCount = results.filter(Boolean).length;
         if (successCount > 0) {
           dispatch(openCartDrawer());
-          toast.success(`Added ${successCount} item${successCount === 1 ? '' : 's'} to cart`);
+          toast.success(`Added ${successCount} item${successCount === 1 ? '' : 's'} to your bag`);
         }
         if (successCount < selections.length) {
           toast.error('Some items could not be added');
@@ -414,7 +414,7 @@ const InlineStoreCollectionView: React.FC<InlineStoreCollectionViewProps> = ({
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition-colors shadow-sm disabled:opacity-60"
               >
                 <ShoppingCart className="w-4 h-4" />
-                {addingAll ? 'Loading…' : 'Add All to Cart'}
+                {addingAll ? 'Loading…' : 'Add All to Bag'}
               </button>
             )}
           </div>

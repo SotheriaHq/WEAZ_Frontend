@@ -83,7 +83,7 @@ const CreateStoreModal: React.FC<Props> = ({ open, onClose }) => {
           >
             <div className="shrink-0 border-b border-gray-200 px-6 py-4 dark:border-gray-800">
               <h3 className="text-lg font-semibold">Create a Store</h3>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              <p className="mt-1 text-sm text-theme-secondary">
                 Create a store to sell your products and manage listings.
               </p>
             </div>

@@ -8,7 +8,6 @@ import { EndUserProfile } from '../../pages/profile/EndUserProfile';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '@/context/AuthContext';
 import { closeSidebar, selectIsMobile, setSidebarMode } from '@/features/uiSlice';
-import { setUser } from '@/features/userSlice';
 import type { AppDispatch, RootState } from '@/store';
 import {
   useLocation,
@@ -16,15 +15,15 @@ import {
   Outlet,
   useParams,
   useSearchParams,
-  useNavigate,
 } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/api/httpClient';
-import { unwrapApiResponse } from '@/types/auth';
-import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
 import { toast } from 'sonner';
+import { ISLAND_BOTTOM_NAV_CLEARANCE_CLASS } from '@/components/navigation/IslandBottomNav';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 const Profile = lazy(() => import('../../pages/catalog/Catalog'));
+const PROFILE_MAIN_CLASS = `min-h-screen pt-16 transition-[margin] duration-300 ease-out ${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS}`;
 
 const computeSidebarMode = (pathname: string, isMobile: boolean) => {
   if (isMobile) return 'HIDDEN' as const;
@@ -70,7 +69,6 @@ const maskEmailForPrompt = (email?: string | null): string => {
 
 export const ProfileLayout: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const navigate = useNavigate();
   const { loading } = useAuth();
   const user = useSelector((state: RootState) => state.user.profile);
   const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
@@ -82,7 +80,6 @@ export const ProfileLayout: React.FC = () => {
   const isVisitorRoute = Boolean(routeBrandId);
   const [visitorType, setVisitorType] = useState<'BRAND' | 'REGULAR' | null>(null);
   const [visitorLoading, setVisitorLoading] = useState(false);
-  const [isRefreshingVerification, setIsRefreshingVerification] = useState(false);
   const [isResendingVerification, setIsResendingVerification] = useState(false);
 
   const verificationPromptContext = searchParams.get('verifyEmailPrompt') ?? '';
@@ -239,40 +236,6 @@ export const ProfileLayout: React.FC = () => {
     }, { replace: true });
   }, [searchParams, setSearchParams, user, verificationPromptContext, verificationPromptDetails.toastMessage]);
 
-  const refreshEmailVerificationStatus = async () => {
-    if (!user || isRefreshingVerification) return;
-
-    setIsRefreshingVerification(true);
-    try {
-      const response = await apiClient.get('/auth/profile');
-      const profilePayload = unwrapApiResponse<AuthProfileResponse | AuthUserDto>(response.data);
-      const refreshedUser =
-        'user' in profilePayload
-          ? (profilePayload as AuthProfileResponse).user
-          : (profilePayload as AuthUserDto);
-
-      if (!refreshedUser || !refreshedUser.id) {
-        toast.error('Unable to refresh your verification status right now.');
-        return;
-      }
-
-      dispatch(setUser(refreshedUser));
-
-      if (refreshedUser.isEmailVerified) {
-        toast.success('Your email is now verified.');
-        if (verificationNextPath) {
-          navigate(verificationNextPath, { replace: true });
-        }
-      } else {
-        toast.info('Email verification is still pending. Please click the link in your inbox.');
-      }
-    } catch {
-      toast.error('Unable to refresh your verification status right now.');
-    } finally {
-      setIsRefreshingVerification(false);
-    }
-  };
-
   const resendVerificationEmail = async () => {
     if (!user || isResendingVerification) return;
 
@@ -309,7 +272,7 @@ export const ProfileLayout: React.FC = () => {
             {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
             <Navbar />
             <main
-              className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
+              className={PROFILE_MAIN_CLASS}
               style={{ marginLeft: mainMarginLeft }}
             >
               <div className="p-4 sm:p-6">
@@ -343,7 +306,7 @@ export const ProfileLayout: React.FC = () => {
         {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
         <Navbar />
         <main
-          className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
+          className={PROFILE_MAIN_CLASS}
           style={{ marginLeft: mainMarginLeft }}
         >
           <div className="p-4 sm:p-6">
@@ -369,52 +332,29 @@ export const ProfileLayout: React.FC = () => {
         {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
         <Navbar />
         <main
-          className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
+          className={PROFILE_MAIN_CLASS}
           style={{ marginLeft: mainMarginLeft }}
         >
           {showEmailVerificationPrompt ? (
             <div className="px-4 sm:px-6 pt-4">
-              <div className="rounded-xl border border-purple-300/55 bg-purple-50/80 dark:bg-purple-500/10 dark:border-purple-400/30 px-3.5 sm:px-4 py-3">
-                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold leading-tight text-purple-800 dark:text-purple-200">
-                      {verificationPromptDetails.title}
-                    </p>
-                    <p className="text-xs sm:text-sm text-purple-700/90 dark:text-purple-100/80 mt-0.5">
-                      {verificationPromptDetails.description}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={resendVerificationEmail}
-                      disabled={isResendingVerification}
-                      className="inline-flex items-center justify-center rounded-xl border border-purple-500/40 bg-white/80 dark:bg-transparent px-4 py-2 text-sm font-semibold text-purple-800 dark:text-purple-200 hover:bg-purple-100/70 dark:hover:bg-purple-500/20 disabled:opacity-70 disabled:cursor-not-allowed transition"
-                    >
-                      <span className="inline-flex min-w-[8.75rem] justify-center">
-                        {isResendingVerification ? 'Resending...' : 'Resend Email'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={refreshEmailVerificationStatus}
-                      disabled={isRefreshingVerification}
-                      className="inline-flex items-center justify-center rounded-xl bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-strong)] disabled:opacity-70 disabled:cursor-not-allowed transition"
-                    >
-                      <span className="inline-flex min-w-[11.5rem] justify-center">
-                        {isRefreshingVerification
-                          ? 'Checking...'
-                          : verificationPromptDetails.actionLabel}
-                      </span>
-                    </button>
-                  </div>
-                </div>
+              <div className="mx-auto flex min-h-9 max-w-screen-xl items-center justify-between gap-3 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-900 dark:text-amber-100">
+                <p className="min-w-0 truncate font-medium">
+                  {verificationPromptDetails.description}
+                </p>
+                <button
+                  type="button"
+                  onClick={resendVerificationEmail}
+                  disabled={isResendingVerification}
+                  className="shrink-0 text-xs font-semibold text-amber-800 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-100"
+                >
+                  {isResendingVerification ? 'Sending...' : 'Resend Email'}
+                </button>
               </div>
             </div>
           ) : null}
           <div className="px-0 sm:px-2">
             {location.pathname === '/profile' ? (
-              user?.type === 'BRAND' ? <Profile /> : <EndUserProfile />
+              hasActiveBrandMembership(user) ? <Profile /> : <EndUserProfile />
             ) : isVisitorRoute && routeBrandId && location.pathname === `/profile/${routeBrandId}` ? (
               visitorType === 'BRAND' ? <Profile /> : <EndUserProfile />
             ) : (

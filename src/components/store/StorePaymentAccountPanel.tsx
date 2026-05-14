@@ -13,6 +13,7 @@ import {
   type StorePaymentAccountSummary,
   type StorePaymentBankOption,
 } from '@/api/StoreApi';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface StorePaymentAccountPanelProps {
   mode?: 'settings' | 'wizard';
@@ -148,12 +149,13 @@ const BankOptionIcon: React.FC<{ bankName: string }> = ({ bankName }) => {
   if (logoUrl && !logoFailed) {
     return (
       <span className="inline-flex h-6 w-6 items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white dark:border-white/20 dark:bg-white">
-        <img
+        <MediaRenderer
+          kind="image"
           src={logoUrl}
           alt={`${bankName} logo`}
-          className="h-full w-full object-contain"
+          className="h-full w-full"
+          maxHeightClassName="max-h-full"
           loading="eager"
-          referrerPolicy="no-referrer"
           onError={() => setLogoFailed(true)}
         />
       </span>

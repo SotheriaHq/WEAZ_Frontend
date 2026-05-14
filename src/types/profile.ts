@@ -102,7 +102,17 @@ export interface BrandProfileDto {
   averageRating?: number;
   totalReviews?: number;
   collectionsCount?: number;
+  designsCount?: number;
+  productsCount?: number;
   patchesCount?: number;
+  followersCount?: number;
+  totalThreads?: number;
+  totalLikes?: number;
+  totalShares?: number | null;
+  storeStatus?: 'OPEN' | 'CLOSED' | 'PENDING_VERIFICATION' | 'UNAVAILABLE' | null;
+  publicProfileUrl?: string | null;
+  qrTargetUrl?: string | null;
+  shareUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }

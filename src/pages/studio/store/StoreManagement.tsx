@@ -22,11 +22,16 @@ import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildStorefrontUrl } from '@/utils/publicLinks';
 import type { VerificationStatusResponse } from '@/types/verification';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
+import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
 export default function StoreManagement() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user.profile);
+  const embeddedSurface = useEmbeddedSurface();
+  const isEmbeddedMobile = embeddedSurface === 'mobile-app';
+  const showStudioFloatingControls = location.pathname.startsWith('/studio');
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<StoreStatusResponse | null>(null);
@@ -332,8 +337,8 @@ export default function StoreManagement() {
   if (!status) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white/70 p-6 dark:border-white/10 dark:bg-white/5">
-        <div className="font-semibold text-gray-900 dark:text-white">Store</div>
-        <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        <div className="font-semibold text-theme">Store</div>
+        <div className="mt-1 text-sm text-theme-secondary">
           Unable to load store status.
         </div>
       </div>
@@ -344,10 +349,10 @@ export default function StoreManagement() {
     if (isStoreOpenPending(user?.id)) {
       return (
         <div className="rounded-2xl border border-gray-200 bg-white/70 p-6 dark:border-white/10 dark:bg-white/5">
-          <div className="font-semibold text-gray-900 dark:text-white">
+          <div className="font-semibold text-theme">
             Finalizing Store
           </div>
-          <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          <div className="mt-1 text-sm text-theme-secondary">
             Your store is being activated. This usually takes a few seconds.
           </div>
         </div>
@@ -372,7 +377,7 @@ export default function StoreManagement() {
       ) : null}
 
       <div className="sticky top-0 z-30">
-        <div className="rounded-2xl border border-gray-200/60 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/90">
+        <div className="rounded-none border-0 bg-transparent px-1 py-2 shadow-none backdrop-blur-none md:rounded-2xl md:border md:border-gray-200/60 md:bg-white/90 md:px-4 md:py-3 md:shadow-lg md:backdrop-blur-xl md:dark:border-white/10 md:dark:bg-[#111118]/90">
           <div className="flex items-center gap-4">
             <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl border-2 border-white shadow-md dark:border-white/10">
               {avatarUrl ? (
@@ -392,10 +397,10 @@ export default function StoreManagement() {
             </div>
 
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-base font-bold leading-tight text-gray-900 dark:text-white">
+              <h1 className="truncate text-base font-bold leading-tight text-theme">
                 {brandName}
               </h1>
-              <p className="mt-0.5 truncate text-xs leading-tight text-gray-500 dark:text-gray-400">
+              <p className="mt-0.5 truncate text-xs leading-tight text-theme-secondary">
                 {brandDescription}
               </p>
             </div>
@@ -478,7 +483,13 @@ export default function StoreManagement() {
 
             <button
               type="button"
-              onClick={() => navigate('/profile')}
+              onClick={() => {
+                if (isEmbeddedMobile) {
+                  postStudioNativeEvent({ type: 'OPEN_NATIVE_ROUTE', path: '/profile?tab=Store' });
+                  return;
+                }
+                navigate('/profile');
+              }}
               className="group relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white/80 text-gray-600 shadow-sm transition-all hover:scale-105 hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-purple-400"
               aria-label="Preview as visitor"
             >
@@ -494,14 +505,14 @@ export default function StoreManagement() {
       {showVerificationPrompt ? (
         <section className="rounded-3xl border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-indigo-50 p-5 shadow-sm dark:border-sky-500/20 dark:from-sky-500/10 dark:via-white/5 dark:to-indigo-500/10">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-3xl">
+            <div className={isEmbeddedMobile ? 'max-w-none' : 'max-w-3xl'}>
               <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700 dark:text-sky-200">
                 {verificationPrompt.eyebrow}
               </div>
-              <h2 className="mt-2 text-xl font-semibold text-slate-900 dark:text-white">
+              <h2 className="mt-2 text-xl font-semibold text-theme">
                 {verificationPrompt.title}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              <p className="mt-2 text-sm leading-6 text-theme-secondary">
                 {verificationPrompt.description}
               </p>
             </div>
@@ -550,11 +561,13 @@ export default function StoreManagement() {
         logoFileId={resolvedAvatar.fileId}
       />
 
-      {analyticsOpen && analyticsCollapsed ? (
+      {showStudioFloatingControls && analyticsOpen && analyticsCollapsed ? (
         <button
           type="button"
           onClick={() => setAnalyticsCollapsed(false)}
-          className="fixed bottom-24 right-3 z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 text-sm font-semibold text-white shadow-2xl sm:right-6 lg:bottom-20"
+          className={`fixed right-3 z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 text-sm font-semibold text-white shadow-2xl sm:right-6 ${
+            isEmbeddedMobile ? 'bottom-[calc(env(safe-area-inset-bottom)+1rem)]' : 'bottom-24 lg:bottom-20'
+          }`}
           aria-label="Open analytics panel"
         >
           📊 Analytics
@@ -562,11 +575,17 @@ export default function StoreManagement() {
         </button>
       ) : null}
 
-      {analyticsOpen && !analyticsCollapsed ? (
-        <aside className="fixed inset-x-3 bottom-24 top-[88px] z-40 w-auto max-w-[94vw] overflow-y-auto rounded-2xl border border-gray-200 bg-white/95 shadow-2xl sm:inset-x-auto sm:bottom-6 sm:right-6 sm:top-24 sm:w-[320px] sm:max-w-[90vw] dark:border-white/10 dark:bg-white/5">
+      {showStudioFloatingControls && analyticsOpen && !analyticsCollapsed ? (
+        <aside
+          className={`fixed inset-x-3 z-40 w-auto max-w-[94vw] overflow-y-auto rounded-2xl border border-gray-200 bg-white/95 shadow-2xl sm:inset-x-auto sm:right-6 sm:w-[320px] sm:max-w-[90vw] dark:border-white/10 dark:bg-white/5 ${
+            isEmbeddedMobile
+              ? 'bottom-[calc(env(safe-area-inset-bottom)+1rem)] top-4'
+              : 'bottom-24 top-[88px] sm:bottom-6 sm:top-24'
+          }`}
+        >
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <div>
-              <h3 className="text-base font-bold text-gray-900 dark:text-white">
+              <h3 className="text-base font-bold text-theme">
                 Analytics
               </h3>
               <p className="text-xs text-gray-500">Live store performance</p>
@@ -588,13 +607,13 @@ export default function StoreManagement() {
               <div className="text-xs font-semibold text-gray-500">
                 Store Views (7d)
               </div>
-              <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+              <div className="mt-2 text-3xl font-bold text-theme">
                 {formatNumber(kpis.storeViews)}
               </div>
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+              <h4 className="text-sm font-semibold text-theme">
                 Top Performing
               </h4>
               {Array.isArray(overview?.topProducts) &&
@@ -618,7 +637,7 @@ export default function StoreManagement() {
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                        <p className="truncate text-sm font-medium text-theme">
                           {item.name}
                         </p>
                         <p className="text-xs text-gray-500">
@@ -634,7 +653,7 @@ export default function StoreManagement() {
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+              <h4 className="text-sm font-semibold text-theme">
                 Recent Orders
               </h4>
               {recentOrders.length > 0 ? (
@@ -642,7 +661,7 @@ export default function StoreManagement() {
                   {recentOrders.slice(0, 3).map((order: any) => (
                     <div key={order.id} className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs font-semibold text-gray-900 dark:text-white">
+                        <p className="text-xs font-semibold text-theme">
                           #{order.id}
                         </p>
                         <p className="text-xs text-gray-500">
@@ -661,7 +680,7 @@ export default function StoreManagement() {
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+              <h4 className="text-sm font-semibold text-theme">
                 Revenue (7 days)
               </h4>
               <div className="mt-3 space-y-2">
@@ -671,7 +690,7 @@ export default function StoreManagement() {
                     className="flex items-center justify-between text-xs text-gray-500"
                   >
                     <span>{entry.date}</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">
+                    <span className="font-semibold text-theme">
                       {formatCurrency(entry.amount || 0)}
                     </span>
                   </div>

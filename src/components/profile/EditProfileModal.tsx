@@ -401,7 +401,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
         {/* Main Modal Container */}
         <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-label="Brand setup">
-          <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-4xl neu-modal-surface bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in border border-gray-200 dark:border-gray-800">
+          <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-4xl neu-modal-surface surface-card rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in border border-theme">
 
           {/* Scrollable Content */}
           <form 
@@ -412,8 +412,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             {/* Modal Title + Close (inside body, no separate header) */}
             <div className="flex items-start justify-between gap-6">
               <div className="min-w-0">
-                <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Brand Setup</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Create your brand identity & story</p>
+                <h2 className="text-2xl font-bold tracking-tight text-theme">Brand Setup</h2>
+                <p className="text-sm text-theme-secondary mt-1">Create your brand identity & story</p>
               </div>
               <div className="flex items-center gap-2">
                 {showSkip && onSkip && (
@@ -421,7 +421,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     type="button"
                     onClick={onSkip}
                     disabled={isSubmitting}
-                    className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition"
+                    className="px-3 py-2 rounded-lg text-sm font-semibold text-theme-secondary hover:bg-gray-100 dark:hover:bg-white/10 transition"
                   >
                     Skip
                   </button>
@@ -448,30 +448,30 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   </svg>
                 </div>
                 <div>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Brand Identity</h3>
+                    <h3 className="text-lg font-bold text-theme">Brand Identity</h3>
                     <p className="text-xs text-gray-500">How you appear to customers</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Brand Name</label>
+                  <label className="text-sm font-semibold text-theme-secondary">Brand Name</label>
                   <input 
                     type="text" 
                     placeholder="e.g. Threadly Couture" 
-                    className="w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" 
+                    className="w-full h-12 px-4 rounded-lg border border-theme-strong surface-card text-theme placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" 
                     {...register('brandFullName')}
                   />
                   {errors.brandFullName && <p className="text-xs text-red-500 font-medium">{errors.brandFullName.message}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Username</label>
+                  <label className="text-sm font-semibold text-theme-secondary">Username</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">@</span>
                     <input 
                       type="text" 
                       placeholder="username" 
-                      className="w-full h-12 pl-8 pr-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 cursor-not-allowed" 
+                      className="w-full h-12 pl-8 pr-4 rounded-lg border border-theme-strong surface-subtle text-gray-500 cursor-not-allowed" 
                       value={user.username}
                       disabled
                       title="Username cannot be changed here"
@@ -481,11 +481,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 
                 <div className="md:col-span-2">
                    <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Email Address <span className="text-gray-400 font-normal text-xs ml-2">(Private)</span></label>
+                    <label className="text-sm font-semibold text-theme-secondary">Email Address <span className="text-gray-400 font-normal text-xs ml-2">(Private)</span></label>
                     <input 
                         type="email" 
                         placeholder="contact@brand.com" 
-                        className="w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 cursor-not-allowed" 
+                        className="w-full h-12 px-4 rounded-lg border border-theme-strong surface-subtle text-gray-500 cursor-not-allowed" 
                         value={user.email}
                         disabled
                     />
@@ -504,16 +504,16 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   </svg>
                 </div>
                 <div>
-                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">Story & Vision</h3>
+                   <h3 className="text-lg font-bold text-theme">Story & Vision</h3>
                    <p className="text-xs text-gray-500">What makes your brand unique?</p>
                 </div>
               </div>
 
               <div className="space-y-6">
                 <div className="space-y-2 relative">
-                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Brand Story</label>
+                    <label className="text-sm font-semibold text-theme-secondary">Brand Story</label>
                     <textarea 
-                        className="w-full h-40 p-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none leading-relaxed" 
+                        className="w-full h-40 p-4 rounded-lg border border-theme-strong surface-card text-theme placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none leading-relaxed" 
                         placeholder="Tell the world about your vision, heritage, and what makes your fashion unique..."
                         {...brandDescriptionField}
                         ref={(e) => {
@@ -532,11 +532,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <label className="text-sm font-semibold text-theme-secondary">
                         Brand Tags 
                         <span className="ml-2 text-xs font-normal text-gray-500">(Select up to {MAX_TAGS})</span>
                     </label>
-                    <div className="flex flex-wrap gap-2 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                    <div className="flex flex-wrap gap-2 p-4 rounded-xl border border-theme surface-subtle/40">
                       {tagOptions.map((tag) => {
                         const isSelected = selectedTags.includes(tag.value);
                         return (
@@ -548,7 +548,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                             className={`px-4 py-2 rounded-full text-xs font-semibold transition ${
                               isSelected
                                 ? 'bg-purple-600 text-white shadow-md'
-                                : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                : 'surface-card text-theme-secondary border border-theme hover:bg-gray-100 dark:hover:bg-gray-800'
                             }`}
                           >
                             #{tag.label}
@@ -574,7 +574,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   </svg>
                 </div>
                  <div>
-                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">Business Location</h3>
+                   <h3 className="text-lg font-bold text-theme">Business Location</h3>
                    <p className="text-xs text-gray-500">Where are you based?</p>
                 </div>
               </div>
@@ -658,18 +658,18 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 </div>
                 
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Phone Number</label>
+                  <label className="text-sm font-semibold text-theme-secondary">Phone Number</label>
                   <input 
                     type="tel" 
                     placeholder="+1 (555) 000-0000" 
-                    className="w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    className="w-full h-12 px-4 rounded-lg border border-theme-strong surface-card text-theme placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                     {...register('phoneNumber')}
                   />
                   {errors.phoneNumber && <p className="text-xs text-red-500 font-medium">{errors.phoneNumber.message}</p>}
                 </div>
                 
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Instagram Handle</label>
+                  <label className="text-sm font-semibold text-theme-secondary">Instagram Handle</label>
                   <div className="relative group">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-purple-600 transition-colors">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -681,7 +681,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     <input 
                       type="text" 
                       placeholder="instagram.com/" 
-                      className="w-full h-12 pl-12 pr-4 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                      className="w-full h-12 pl-12 pr-4 rounded-lg border border-theme-strong surface-card text-theme placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                       {...register('socialInstagram')}
                     />
                   </div>
@@ -698,7 +698,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-6 py-3 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition"
+                className="px-6 py-3 rounded-lg text-sm font-semibold text-theme-secondary hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition"
               >
                 Cancel
               </button>

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 export interface CarouselMediaItem {
   id: string;
@@ -159,18 +160,24 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
           <div className="relative w-full max-w-[80%] sm:max-w-[70%] lg:max-w-[55%] rounded-2xl shadow-2xl overflow-hidden mx-auto">
             <div className="relative w-full">
               {activeItem.type === 'image' ? (
-                <img
+                <MediaRenderer
+                  kind="image"
                   src={activeItem.url}
                   alt={activeItem.caption ?? 'Collection media'}
-                  className="w-full h-auto block rounded-2xl"
+                  className="block w-full rounded-2xl"
+                  mediaClassName="block h-auto w-full rounded-2xl"
+                  maxHeightClassName=""
                 />
               ) : (
-                <video
+                <MediaRenderer
+                  kind="video"
                   src={activeItem.url}
                   controls
                   muted
-                  className="w-full h-auto block rounded-2xl"
-                  ref={(el) => {
+                  className="block w-full rounded-2xl"
+                  mediaClassName="block h-auto w-full rounded-2xl"
+                  maxHeightClassName=""
+                  videoRef={(el) => {
                     if (el) videoRefs.current.set(activeItem.id, el);
                     else videoRefs.current.delete(activeItem.id);
                   }}

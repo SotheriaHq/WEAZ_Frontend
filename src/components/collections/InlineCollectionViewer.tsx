@@ -20,8 +20,10 @@ import { CollectionCartPreviewModal } from '@/components/collections/CollectionC
 import { getCollectionCartPreview, type CollectionCartPreviewResponse } from '@/api/collectionUploads';
 import { buildCollectionUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
-import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
+import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useBagging } from '@/hooks/useBagging';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface InlineCollectionViewerProps {
   collectionId: string;
@@ -52,6 +54,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const me = useSelector((s: RootState) => s.user.profile);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const dispatch = useDispatch<AppDispatch>();
+  const { bagProduct } = useBagging();
   const [resolvedItems, setResolvedItems] = useState<CarouselMediaItem[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [requestingAccess, setRequestingAccess] = useState(false);
@@ -291,7 +294,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       setCartPreviewData(preview);
       setShowCartPreview(true);
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to load cart preview');
+      toast.error(e?.message || 'Failed to load bag preview');
     } finally {
       setAddingAll(false);
     }
@@ -318,10 +321,10 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       const successCount = results.filter(Boolean).length;
       if (successCount > 0) {
         dispatch(openCartDrawer());
-        toast.success(`Added ${successCount} item${successCount === 1 ? '' : 's'} to cart`);
+        toast.success(`Added ${successCount} item${successCount === 1 ? '' : 's'} to your bag`);
       }
       if (successCount < selections.length) {
-        toast.error('Some items could not be added to cart');
+        toast.error('Some items could not be added to your bag');
       }
       setShowCartPreview(false);
     } finally {
@@ -330,15 +333,8 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   };
 
   const handleAddProductToCart = async (productId: string) => {
-    if (!isAuth) {
-      const returnTo = `${window.location.pathname}${window.location.search}`;
-      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
-      return;
-    }
     try {
-      await dispatch(addToCart({ productId, quantity: 1 })).unwrap();
-      dispatch(openCartDrawer());
-      toast.success('Bagged!');
+      await bagProduct({ id: productId });
     } catch (e: any) {
       toast.error(e?.message || 'Failed to bag item');
     }
@@ -635,7 +631,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                   disabled={addingAll}
                   className="text-xs px-3 py-1.5"
                 >
-                  {addingAll ? 'Adding…' : 'Add all to cart'}
+                  {addingAll ? 'Adding…' : 'Add all to Bag'}
                 </FrostedButton>
               ) : null}
             </div>
@@ -668,7 +664,14 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                       >
                         <div className="aspect-square bg-gray-100 dark:bg-zinc-800/50 flex items-center justify-center">
                           {image ? (
-                            <img src={image} alt={product.name} className="w-full h-full object-cover" loading="eager" />
+                            <MediaRenderer
+                              kind="image"
+                              src={image}
+                              alt={product.name}
+                              fit="cover"
+                              className="h-full w-full"
+                              loading="eager"
+                            />
                           ) : (
                             <span className="text-xs text-gray-400">No image</span>
                           )}
@@ -878,7 +881,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               >
                 <span aria-hidden="true" className="text-base">×</span>
               </button>
-              <CustomOrderComposerPage
+              <LazyCustomOrderComposerPage
                 embedded
                 configurationIdOverride={customConfigurationId}
                 onClose={() => setCustomComposerOpen(false)}

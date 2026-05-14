@@ -20,6 +20,7 @@ interface ProfileHeaderProps {
     isVerifiedBrand?: boolean;
     verifiedExplanationUrl?: string;
     tags?: string[];
+    description?: string;
     isOwner: boolean;
     profileVisibility: 'UNLOCKED' | 'LOCKED';
   };
@@ -37,6 +38,7 @@ interface ProfileHeaderProps {
   canEdit?: boolean;
   onEditProfile?: () => void;
   onShareProfile?: () => void;
+  onShowQrCode?: () => void;
 }
 
 const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
@@ -55,11 +57,12 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
   canEdit = false,
   onEditProfile,
   onShareProfile,
+  onShowQrCode,
 }) => {
   const location = useLocation();
   const hasBannerImage = showBanner && Boolean(profile.bannerImage);
-  const bannerLabel =
-    (profile.username ? `@${profile.username}` : `${profile.firstName} ${profile.lastName}` || '').trim() || 'Your Profile';
+  const profileName = `${profile.firstName} ${profile.lastName}`.trim();
+  const bannerLabel = (profile.username ? `@${profile.username}` : profileName).trim() || 'Your Profile';
 
   // Only show the external spinner for explicit upload operations — ImageWithFallback
   // handles the image-load shimmer internally (including signed URL resolution for S3).
@@ -76,7 +79,6 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
   for (let i = 0; i < tags.length; i += 3) {
     tagRows.push(tags.slice(i, i + 3));
   }
-
   return (
     <div className="w-full">
       {showBanner ? (
@@ -93,17 +95,17 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
               maxHeightClassName="max-h-64"
             />
           ) : (
-            <div className="h-64 rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex items-center justify-center p-6">
-                <div className="max-w-3xl w-full rounded-3xl border border-white/15 bg-white/10 backdrop-blur-md shadow-2xl px-6 py-4 text-center">
-                  <div className="text-white/80 text-sm sm:text-base font-semibold tracking-wide">
-                    {bannerLabel}
-                  </div>
-                  <div className="mt-1 text-white/60 text-xs sm:text-sm">
-                    {profile.isOwner
-                      ? 'Personalize your profile with a banner'
-                      : 'This user has not set a banner'}
-                  </div>
+            <div className="flex h-64 items-center justify-center overflow-hidden rounded-3xl bg-slate-900 px-6 text-center">
+              <div>
+                <div className="text-sm font-semibold tracking-wide text-white/80 sm:text-base">
+                  {bannerLabel}
                 </div>
+                <div className="mt-1 text-xs text-white/55 sm:text-sm">
+                  {profile.isOwner
+                    ? 'Add a banner from profile actions'
+                    : 'No banner added'}
+                </div>
+              </div>
             </div>
           )}
 
@@ -265,6 +267,17 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                 title="Share profile"
               >
                 <span aria-hidden="true">🔗</span>
+              </button>
+            ) : null}
+            {onShowQrCode ? (
+              <button
+                type="button"
+                onClick={onShowQrCode}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-lg text-gray-900 shadow-lg transition hover:scale-105 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 dark:bg-gray-900/85 dark:text-gray-100"
+                aria-label="Show brand QR code"
+                title="Show QR code"
+              >
+                <span aria-hidden="true">▦</span>
               </button>
             ) : null}
             {showPatchAction && onTogglePatch ? (

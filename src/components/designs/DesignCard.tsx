@@ -12,6 +12,7 @@ import { Link, Tag } from 'lucide-react';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
+import { useNavigate } from 'react-router-dom';
 
 interface DesignCardProps {
   item: MarketItem;
@@ -40,7 +41,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   onTogglePatch,
   patchBusy: patchBusyProp,
 }) => {
-  const [imgLoaded, setImgLoaded] = useState(false);
+  const navigate = useNavigate();
   const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const [commentText, setCommentText] = useState('');
@@ -178,6 +179,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   if (isHidden) return null;
 
   const isCustomAvailable = item.customAvailable === true;
+  const brandId = typeof item.brandId === 'string' ? item.brandId.trim() : '';
+  const canMessageBrand = Boolean(brandId);
 
   const brandAvatar = resolveProfileImageSource({
     brandLogo: item.brandLogo,
@@ -216,25 +219,17 @@ export const DesignCard: React.FC<DesignCardProps> = ({
             mediaClassName="w-full h-full object-contain"
           />
         ) : (
-          <>
-            {!imgLoaded && (
-              <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-purple-100/40 via-white/40 to-white/20 dark:from-purple-900/20 dark:via-purple-900/10 dark:to-gray-900/40" />
-            )}
-            <MediaRenderer
-              kind="image"
+          <ImageWithFallback
               src={item.media.url ?? ''}
+              fileId={item.media.fileId || null}
               alt={item.collectionTitle}
               fit="contain"
+              rounded="none"
+              containerClassName="h-full w-full"
               maxHeightClassName="max-h-none"
-              maxWidthClassName="max-w-full"
-              className={`w-full h-full transition-opacity duration-500 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-              mediaClassName="w-full h-full object-contain"
-              onLoad={() => setImgLoaded(true)}
-              onError={() => {
-                setImgLoaded(true);
-              }}
+              className="h-full w-full object-contain"
+              fallbackName={item.collectionTitle}
             />
-          </>
         )}
         
         {/* Gradient Overlay for Text Readability */}
@@ -390,21 +385,21 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               e.stopPropagation();
               onViewBrand?.(item.brandId, item);
             }}
-            className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 w-fit rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 transition-all"
+            className="flex items-center gap-2 mb-1 w-fit rounded-lg py-1 transition-all"
           >
-            <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border-2 border-white/60 shadow-md">
+            <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-xl border border-white/40 shadow-md">
               <ImageWithFallback
                 src={brandAvatar.src}
                 fileId={brandAvatar.fileId}
                 alt={item.brandName ?? item.username ?? 'Brand'}
                 fit="cover"
-                rounded="full"
+                rounded="xl"
                 fallbackName={brandAvatarFallback}
-                containerClassName="h-8 w-8 rounded-full"
+                containerClassName="h-8 w-8 rounded-xl"
                 className="h-8 w-8 object-cover"
               />
             </div>
-            <div className="flex-1 min-w-0 text-left">
+            <div className="min-w-0 text-left">
               {/* FIX #5: Responsive font sizing, removed truncate, allow wrapping with line-clamp */}
               <p 
                 className="font-bold leading-tight text-white drop-shadow line-clamp-2"
@@ -448,10 +443,10 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                   if (!isAuth) { toast.info('Please sign in to message.'); return; }
                   const content = commentText.trim();
                   if (!content || content.length > 4000) { toast.error('Message must be 1-4000 characters.'); return; }
-                  if (!item.brandId) { toast.error('Brand is unavailable for this design.'); return; }
+                  if (!brandId) { toast.error('Brand is unavailable for this design.'); return; }
                   setCommentBusy(true);
                   try {
-                    await messagingApi.sendBrandMessage(item.brandId, {
+                    const result = await messagingApi.sendBrandMessage(brandId, {
                       bodyText: content,
                       clientMessageId: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
                         ? crypto.randomUUID()
@@ -459,13 +454,17 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                     });
                     setCommentText('');
                     toast.success('Message sent');
+                    const threadId = result?.thread?.id;
+                    if (threadId) {
+                      navigate(`/messages?thread=${encodeURIComponent(threadId)}`);
+                    }
                   } catch (err: any) {
                     toast.error(err?.response?.data?.message ?? 'Failed to send message');
                   } finally { setCommentBusy(false); }
                 }}
-                placeholder="Message brand..."
+                placeholder={canMessageBrand ? 'Message brand...' : 'Brand unavailable'}
                 maxLength={4000}
-                disabled={commentBusy}
+                disabled={commentBusy || !canMessageBrand}
                 busy={commentBusy}
                 className="w-full"
                 variant="overlay"

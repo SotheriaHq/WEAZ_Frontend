@@ -29,6 +29,8 @@ import {
   customOrdersBuyerApi,
   type CustomOrderCheckoutBagLine,
 } from '@/api/CustomOrderApi';
+import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 // Promo code type
 interface PromoCode {
@@ -52,10 +54,12 @@ const CartItemThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt })
     return <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg" />;
   }
   return (
-    <img
+    <MediaRenderer
+      kind="image"
       src={url || src}
       alt={alt}
-      className="w-full h-full object-cover rounded-lg"
+      fit="cover"
+      className="h-full w-full rounded-lg"
       loading="eager"
     />
   );
@@ -260,7 +264,7 @@ const CartDrawer: React.FC = () => {
 
   const resolveCustomLineRoute = useCallback(
     (line: CustomOrderCheckoutBagLine): string => {
-      const isBrandUser = user?.type === 'BRAND';
+      const isBrandUser = hasActiveBrandMembership(user);
 
       if (line.customOrderId) {
         return isBrandUser
@@ -298,7 +302,7 @@ const CartDrawer: React.FC = () => {
 
       return '/studio/custom-orders';
     },
-    [user?.type],
+    [user],
   );
 
   const handleOpenCustomLine = useCallback(

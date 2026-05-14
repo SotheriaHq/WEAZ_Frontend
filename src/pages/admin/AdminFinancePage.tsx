@@ -16,6 +16,7 @@ import type {
   AdminFinancePaymentAttempt,
   AdminFinancePaymentDetail,
   AdminFinanceTransaction,
+  AdminPaymentSettlementDetail,
   AdminReconciliationItem,
   AdminReconciliationRun,
   AdminStalePaymentReconcileResult,
@@ -507,8 +508,9 @@ const AdminFinancePage: React.FC = () => {
         if (!mountedRef.current || orderDetailRequestRef.current !== requestId) return;
         setOrderDetailError(error?.response?.data?.message || 'Unable to load the linked order right now.');
       } finally {
-        if (!mountedRef.current || orderDetailRequestRef.current !== requestId) return;
-        setOrderDetailLoading(false);
+        if (mountedRef.current && orderDetailRequestRef.current === requestId) {
+          setOrderDetailLoading(false);
+        }
       }
     },
     [],
@@ -795,6 +797,13 @@ const AdminFinancePage: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
+              onClick={() => navigate('/admin/finance/settlement-policies')}
+              className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]"
+            >
+              Settlement policies
+            </button>
+            <button
+              type="button"
               onClick={refreshCurrentTab}
               className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]"
             >
@@ -906,6 +915,22 @@ const AdminFinancePage: React.FC = () => {
                   </div>
                 </TableWrap>
               </Panel>
+
+              {!overviewLoading && overview?.settlementState ? (
+                <Panel title="Settlement State" description="Held, released, pending, eligible, refunded, and wallet-visible settlement totals.">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <MetricCard label="Total held funds" value={amountOf(overview.settlementState.totalHeldFunds, overview.settlementState.currency || overview.currency)} note="Held across standard and custom orders" />
+                    <MetricCard label="Upfront released" value={amountOf(overview.settlementState.upfrontReleasedFunds, overview.settlementState.currency || overview.currency)} note="Released upfront portions" />
+                    <MetricCard label="Final release pending" value={amountOf(overview.settlementState.finalReleasePendingFunds, overview.settlementState.currency || overview.currency)} note="Waiting for trigger or delay" />
+                    <MetricCard label="Final release eligible" value={amountOf(overview.settlementState.finalReleaseEligibleFunds, overview.settlementState.currency || overview.currency)} note="Ready for payout eligibility" />
+                    <MetricCard label="Frozen funds" value={amountOf(overview.settlementState.frozenFunds, overview.settlementState.currency || overview.currency)} note="Temporarily blocked funds" />
+                    <MetricCard label="Refunded funds" value={amountOf(overview.settlementState.refundedFunds, overview.settlementState.currency || overview.currency)} note="Refunded or reversed settlement value" />
+                    <MetricCard label="Brand wallet available" value={amountOf(overview.settlementState.availableBrandWalletFunds, overview.settlementState.currency || overview.currency)} note="Available brand wallet funds" />
+                    <MetricCard label="Payout pending" value={amountOf(overview.settlementState.payoutPendingFunds, overview.settlementState.currency || overview.currency)} note="Queued or in-process payouts" />
+                    <MetricCard label="Paid out" value={amountOf(overview.settlementState.paidOutFunds, overview.settlementState.currency || overview.currency)} note="Already paid to brands" />
+                  </div>
+                </Panel>
+              ) : null}
             </div>
           )}
 
@@ -1684,6 +1709,19 @@ const AdminFinancePage: React.FC = () => {
                 ))}
               </div>
             </Panel>
+            <Panel title="Settlement Details" description="Read-only settlement snapshot, release mode, and release status for linked records.">
+              {Array.isArray(paymentDetail.settlementDetails) && paymentDetail.settlementDetails.length > 0 ? (
+                <div className="space-y-3">
+                  {paymentDetail.settlementDetails.map((detail, index) => (
+                    <PaymentSettlementCard key={`${detail.orderType}-${detail.orderId || detail.customOrderId || index}`} detail={detail} currency={paymentDetail.settlementCurrency || paymentDetail.currency} />
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-black/10 px-4 py-6 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+                  No settlement details were returned for this payment.
+                </div>
+              )}
+            </Panel>
             <Panel title="Provider Snapshots" description="Stored request and verification payloads">
               <Snapshot title="Request snapshot" value={paymentDetail.requestSnapshot} />
               <Snapshot title="Response snapshot" value={paymentDetail.responseSnapshot} />
@@ -1809,6 +1847,45 @@ const Snapshot: React.FC<{ title: string; value: unknown }> = ({ title, value })
   <div>
     <div className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">{title}</div>
     <pre className="overflow-x-auto rounded-2xl bg-slate-950 px-4 py-3 text-xs text-slate-100">{jsonPreview(value)}</pre>
+  </div>
+);
+
+const PaymentSettlementCard: React.FC<{
+  detail: AdminPaymentSettlementDetail;
+  currency: string;
+}> = ({ detail, currency }) => (
+  <div className="rounded-2xl border border-black/10 bg-slate-50/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <div className="font-semibold text-slate-900 dark:text-white">
+          {prettify(detail.orderType)} {detail.orderId ? compactId(detail.orderId) : detail.customOrderId ? compactId(detail.customOrderId) : ''}
+        </div>
+        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {detail.brand?.name || 'Brand'} • {prettify(detail.releaseStatus)}
+        </div>
+      </div>
+      <Badge tone={toneFor(detail.releaseStatus, 'escrow')} label={prettify(detail.releaseStatus)} />
+    </div>
+    <div className="mt-3 grid gap-3 md:grid-cols-2">
+      <DetailList
+        items={[
+          { label: 'Gross amount', value: amountOf(detail.grossAmount, currency) },
+          { label: 'Commission amount', value: amountOf(detail.commissionAmount, currency) },
+          { label: 'Brand net amount', value: amountOf(detail.brandNetAmount, currency) },
+          { label: 'Release mode', value: prettify(detail.releaseMode) },
+        ]}
+      />
+      <DetailList
+        items={[
+          { label: 'Upfront release percent', value: `${Number(detail.upfrontReleasePercent || 0).toFixed(2)}%` },
+          { label: 'Upfront released amount', value: amountOf(detail.upfrontReleasedAmount, currency) },
+          { label: 'Final held amount', value: amountOf(detail.finalHeldAmount, currency) },
+          { label: 'Snapshot id', value: detail.snapshotId || 'Not created' },
+          { label: 'Settlement policy id', value: detail.settlementPolicyId || 'No policy id' },
+          { label: 'Commission rule id', value: detail.commissionRuleId || 'No rule id' },
+        ]}
+      />
+    </div>
   </div>
 );
 

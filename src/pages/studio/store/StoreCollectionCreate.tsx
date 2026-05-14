@@ -2188,10 +2188,10 @@ const StoreCollectionCreate: React.FC = () => {
         className={`group relative rounded-lg border p-2.5 text-left transition-all duration-200 cursor-pointer ${
           selected
             ? "border-purple-300 bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:border-purple-400/60 dark:from-purple-600/20 dark:via-fuchsia-600/10 dark:to-pink-600/10 shadow-lg shadow-purple-500/10"
-            : "border-gray-200/80 dark:border-white/10 bg-white/90 dark:bg-white/5 hover:border-purple-300/70 hover:shadow-md"
+            : "surface-card hover:border-purple-300/70 hover:shadow-md"
         }`}
       >
-        <div className="relative mb-2 aspect-[5/4] w-full overflow-hidden rounded-lg border border-gray-200/70 bg-gray-100 dark:border-white/10 dark:bg-white/10">
+        <div className="relative mb-2 aspect-[5/4] w-full overflow-hidden rounded-lg border border-theme bg-theme-muted">
           {selected && (
             <span className="absolute right-2 top-2 z-10 rounded-full bg-purple-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
               Selected
@@ -2208,7 +2208,7 @@ const StoreCollectionCreate: React.FC = () => {
               rounded="none"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-[11px] text-gray-400">
+            <div className="flex h-full w-full items-center justify-center text-[11px] text-theme-secondary">
               No image
             </div>
           )}
@@ -2216,14 +2216,14 @@ const StoreCollectionCreate: React.FC = () => {
 
         <div className="min-w-0">
           <div className="min-w-0">
-            <p className="line-clamp-1 text-xs font-semibold text-gray-900 dark:text-white">
+            <p className="line-clamp-1 text-xs font-semibold text-theme">
               {product.name}
             </p>
             <div className="mt-0.5 flex items-center justify-between gap-2 text-[10px]">
-              <p className="font-semibold text-gray-700 dark:text-gray-200">
+              <p className="font-semibold text-theme">
                 {formatCurrency(product.price)}
               </p>
-              <p className="text-gray-500">
+              <p className="text-theme-secondary">
                 Stock:{" "}
                 {typeof product.totalStock === "number"
                   ? product.totalStock
@@ -2261,7 +2261,7 @@ const StoreCollectionCreate: React.FC = () => {
             className={`${actionButtonBase} ${
               selected
                 ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-sm"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                : "surface-control surface-interactive-hover"
             }`}
           >
             {selected ? "Selected" : "Select"}
@@ -2279,7 +2279,7 @@ const StoreCollectionCreate: React.FC = () => {
                 ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-sm"
                 : selected
                   ? "bg-slate-700 text-white hover:bg-slate-600"
-                  : "bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
+                  : "surface-control-muted cursor-not-allowed"
             }`}
           >
             {isPrimary ? "Primary" : "Set Primary"}
@@ -2316,7 +2316,7 @@ const StoreCollectionCreate: React.FC = () => {
   return (
     <div className="space-y-8">
       <nav
-        className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
+        className="flex flex-wrap items-center gap-2 text-xs text-theme-secondary"
         aria-label="Breadcrumb"
       >
         <button
@@ -2343,24 +2343,24 @@ const StoreCollectionCreate: React.FC = () => {
           Manage Collections
         </button>
         <span>/</span>
-        <span className="font-semibold text-gray-700 dark:text-gray-200">
+        <span className="font-semibold text-theme">
           {isExistingCollectionEditMode ? "Edit Collection" : "New Collection"}
         </span>
       </nav>
 
-      <div className="relative overflow-hidden rounded-3xl border border-purple-100/60 dark:border-white/10 bg-white/80 dark:bg-white/5 p-6">
+      <div className="surface-card relative overflow-hidden rounded-3xl border p-6">
         <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-gradient-to-br from-purple-400/20 via-fuchsia-300/10 to-transparent blur-2xl" />
         <div className="absolute -bottom-12 -left-10 h-40 w-40 rounded-full bg-gradient-to-tr from-indigo-300/20 via-purple-300/10 to-transparent blur-2xl" />
         <div className="relative">
           <p className="text-xs uppercase tracking-wide text-purple-500 font-semibold">
             Store Collections
           </p>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-2xl font-bold text-theme">
             {isExistingCollectionEditMode
               ? "Edit Collection"
               : "Create Collection"}
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-theme-secondary">
             {isExistingCollectionEditMode
               ? `Update metadata, product membership, and primary product order for this collection.`
               : `Select up to ${MAX_PRODUCTS} products and publish a store collection.`}
@@ -2370,11 +2370,11 @@ const StoreCollectionCreate: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <section className="lg:col-span-2 space-y-6">
-          <div className="rounded-2xl border border-purple-100/70 dark:border-white/10 bg-gradient-to-br from-white/90 via-purple-50/40 to-white/90 dark:from-white/5 dark:via-white/5 dark:to-white/5 p-6">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+          <div className="surface-card rounded-2xl border p-6">
+            <h2 className="text-base font-semibold text-theme">
               How would you like to build this collection?
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-sm text-theme-secondary mt-1">
               Start with existing products or create new items before
               publishing.
             </p>
@@ -2385,13 +2385,13 @@ const StoreCollectionCreate: React.FC = () => {
                 className={`rounded-xl border px-4 py-3 text-left transition ${
                   creationMode === "existing"
                     ? "border-purple-500 bg-purple-50/70 dark:bg-purple-500/10"
-                    : "border-gray-200 dark:border-white/10 hover:border-purple-300"
+                    : "border-theme hover:border-purple-300"
                 }`}
               >
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                <div className="text-sm font-semibold text-theme">
                   From Existing Products
                 </div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-theme-secondary mt-1">
                   Select from your existing store products.
                 </div>
               </button>
@@ -2401,26 +2401,26 @@ const StoreCollectionCreate: React.FC = () => {
                 className={`rounded-xl border px-4 py-3 text-left transition ${
                   creationMode === "new"
                     ? "border-purple-500 bg-purple-50/70 dark:bg-purple-500/10"
-                    : "border-gray-200 dark:border-white/10 hover:border-purple-300"
+                    : "border-theme hover:border-purple-300"
                 }`}
               >
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                <div className="text-sm font-semibold text-theme">
                   Create New Products
                 </div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-theme-secondary mt-1">
                   Create products and add them directly into this collection.
                 </div>
               </button>
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/90 dark:bg-white/5 p-6">
+          <div className="surface-card relative overflow-hidden rounded-2xl border p-6">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-400 via-fuchsia-400 to-indigo-400" />
             <div className="flex items-center justify-between mb-4 relative">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-lg font-semibold text-theme">
                 Products
               </h2>
-              <span className="text-xs font-semibold text-gray-500">
+              <span className="text-xs font-semibold text-theme-secondary">
                 Selected {selectedProductIds.length}/{MAX_PRODUCTS}
               </span>
             </div>
@@ -2453,8 +2453,8 @@ const StoreCollectionCreate: React.FC = () => {
                 className="!max-w-none"
               />
             ) : (
-              <div className="rounded-xl border border-dashed border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/5 p-4">
-                <p className="text-sm text-gray-600 dark:text-gray-300">
+              <div className="surface-subtle rounded-xl border border-dashed p-4">
+                <p className="text-sm text-theme-secondary">
                   Add products directly to this collection. Product-level draft
                   save is disabled in this flow.
                 </p>
@@ -2472,14 +2472,14 @@ const StoreCollectionCreate: React.FC = () => {
                     onClick={() => {
                       toast.info("Bulk upload is coming soon.");
                     }}
-                    className="rounded-lg border border-gray-200 dark:border-white/10 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300"
+                    className="surface-control surface-interactive-hover rounded-lg border px-4 py-2 text-xs font-semibold"
                   >
                     Bulk Upload (Soon)
                   </button>
                   <button
                     type="button"
                     onClick={() => void loadProducts()}
-                    className="rounded-lg border border-gray-200 dark:border-white/10 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300"
+                    className="surface-control surface-interactive-hover rounded-lg border px-4 py-2 text-xs font-semibold"
                   >
                     Refresh Products
                   </button>
@@ -2515,7 +2515,7 @@ const StoreCollectionCreate: React.FC = () => {
               <>
                 {sessionProducts.length === 0 &&
                 queuedSessionProductsVisible.length === 0 ? (
-                  <div className="mt-4 rounded-xl border border-dashed border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/5 p-6 text-sm text-gray-600 dark:text-gray-300">
+                  <div className="mt-4 rounded-xl border border-dashed border-theme bg-gray-50/60 dark:bg-white/5 p-6 text-sm text-theme-secondary">
                     No new products added yet. Use "Create a Product" to add
                     items to this collection.
                   </div>
@@ -2570,13 +2570,13 @@ const StoreCollectionCreate: React.FC = () => {
         <section className="space-y-6 lg:sticky lg:top-4 self-start">
           <div className="relative overflow-hidden rounded-2xl border border-purple-100/70 dark:border-white/10 bg-white/90 dark:bg-white/5 p-6 space-y-4">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white relative">
+            <h2 className="text-lg font-semibold text-theme relative">
               Collection Details
             </h2>
 
             <div className="rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/40 dark:bg-white/[0.02] p-3 sm:p-4">
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <p className="text-xs font-semibold uppercase tracking-wide text-theme-secondary">
                   Collection Metadata
                 </p>
                 <span className="text-[10px] font-medium text-gray-400">
@@ -2586,7 +2586,7 @@ const StoreCollectionCreate: React.FC = () => {
               <div className="space-y-4">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
+                    <label className="block text-xs font-semibold text-theme-secondary mb-1 flex items-center">
                       Title
                       <InfoTooltip text="The name of your store collection (e.g., 'Holiday Drop', 'Summer Capsule')." />
                     </label>
@@ -2595,12 +2595,12 @@ const StoreCollectionCreate: React.FC = () => {
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="e.g. Holiday Drop"
-                      className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                      className="w-full rounded-lg border border-theme bg-white/80 dark:bg-white/5 px-3 py-2 text-sm text-theme"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
+                    <label className="block text-xs font-semibold text-theme-secondary mb-1 flex items-center">
                       Description
                       <InfoTooltip text="A brief summary of this collection's theme, season, or purpose." />
                     </label>
@@ -2609,13 +2609,13 @@ const StoreCollectionCreate: React.FC = () => {
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Short description"
-                      className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                      className="w-full rounded-lg border border-theme bg-white/80 dark:bg-white/5 px-3 py-2 text-sm text-theme"
                     />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
+                      <label className="block text-xs font-semibold text-theme-secondary mb-1 flex items-center">
                         Category
                         <InfoTooltip text="The primary taxonomy category for this collection (e.g., Women's Wear). Helps with discovery." />
                       </label>
@@ -2643,7 +2643,7 @@ const StoreCollectionCreate: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
+                      <label className="block text-xs font-semibold text-theme-secondary mb-1 flex items-center">
                         Sub-Category
                         <InfoTooltip text="A more specific type within the selected category (e.g., Evening Wear, Casual Tops)." />
                       </label>
@@ -2676,7 +2676,7 @@ const StoreCollectionCreate: React.FC = () => {
 
                   {/* Filter Selector */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 flex items-center">
+                    <label className="block text-xs font-semibold text-theme-secondary mb-2 flex items-center">
                       Filters
                       <InfoTooltip text="Select filter dimensions (fabric, occasion, season, etc.) to generate relevant tag suggestions for your collection." />
                     </label>
@@ -2690,7 +2690,7 @@ const StoreCollectionCreate: React.FC = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
+                      <label className="block text-xs font-semibold text-theme-secondary mb-1 flex items-center">
                         Visibility
                         <InfoTooltip text="Public collections are visible to all users. Private collections are only visible to you." />
                       </label>
@@ -2706,7 +2706,7 @@ const StoreCollectionCreate: React.FC = () => {
                       </Select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
+                      <label className="block text-xs font-semibold text-theme-secondary mb-1 flex items-center">
                         Type
                         <InfoTooltip text="Target audience for this collection: everybody, male, or female." />
                       </label>
@@ -2726,14 +2726,14 @@ const StoreCollectionCreate: React.FC = () => {
 
                   {/* Tags */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center">
+                    <label className="block text-xs font-semibold text-theme-secondary mb-1.5 flex items-center">
                       Tags
                       <InfoTooltip text="Tags improve discoverability. Add them manually or click suggested tags from the filter selections above." />
                     </label>
                     {/* Filter-driven tag suggestions */}
                     {tagSuggestions.length > 0 && (
                       <div className="mb-2">
-                        <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1">
+                        <p className="text-[10px] text-theme-secondary mb-1">
                           Suggested tags from filters:
                         </p>
                         <div className="flex flex-wrap gap-1.5">
@@ -2762,14 +2762,14 @@ const StoreCollectionCreate: React.FC = () => {
                         </div>
                       </div>
                     )}
-                    <div className="bg-white dark:bg-zinc-900/60 border border-gray-300/80 dark:border-zinc-700/60 rounded-xl px-3 py-2 min-h-[46px] flex items-center gap-2 shadow-sm">
+                    <div className="surface-card/60 border border-theme-strong rounded-xl px-3 py-2 min-h-[46px] flex items-center gap-2 shadow-sm">
                       <input
                         type="text"
                         value={tagInput}
                         onChange={(e) => setTagInput(e.target.value)}
                         onKeyDown={handleTagKeyDown}
                         placeholder="Add tag..."
-                        className="bg-transparent border-none outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 w-24 flex-1 p-0 focus:ring-0"
+                        className="bg-transparent border-none outline-none text-sm text-theme placeholder-gray-400 dark:placeholder-gray-500 w-24 flex-1 p-0 focus:ring-0"
                       />
                       <button
                         type="button"
@@ -2808,8 +2808,8 @@ const StoreCollectionCreate: React.FC = () => {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 p-6">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+          <div className="rounded-2xl border border-theme bg-white/80 dark:bg-white/5 p-6">
+            <h3 className="text-sm font-semibold text-theme mb-3">
               Selected Products
             </h3>
             {readySelectedProductIds.length > 0 && !hasPrimarySelection && (
@@ -2849,7 +2849,7 @@ const StoreCollectionCreate: React.FC = () => {
                     return (
                       <div
                         key={entry.id}
-                        className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300"
+                        className="flex items-center justify-between text-xs text-theme-secondary"
                       >
                         <span className="line-clamp-1 flex items-center gap-2">
                           {displayName}
@@ -2928,7 +2928,7 @@ const StoreCollectionCreate: React.FC = () => {
             }
             await navigateAway("/studio/store?view=collections");
           })()}
-          className="rounded-lg border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-purple-300"
+          className="rounded-lg border border-theme bg-white/80 dark:bg-white/5 px-4 py-2 text-sm font-semibold text-theme-secondary hover:border-purple-300"
         >
           {isExistingCollectionEditMode ? "Discard changes" : "Back"}
         </button>
@@ -2998,11 +2998,11 @@ const StoreCollectionCreate: React.FC = () => {
                     <div className="text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 bg-clip-text text-transparent">
                       Product Details
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    <div className="text-xs text-theme-secondary mt-0.5">
                       {previewProduct.name}
                     </div>
                     {previewImages.length > 0 && (
-                      <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                      <div className="text-[11px] text-theme-secondary mt-0.5">
                         {previewImages.length} image
                         {previewImages.length === 1 ? "" : "s"}
                       </div>
@@ -3011,7 +3011,7 @@ const StoreCollectionCreate: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setPreviewProduct(null)}
-                    className="rounded-full bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800 dark:hover:to-pink-800 hover:text-purple-700 dark:hover:text-white transition-all duration-200 shadow-sm hover:shadow-md"
+                    className="rounded-full bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 px-4 py-2 text-xs font-semibold text-theme-secondary hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800 dark:hover:to-pink-800 hover:text-purple-700 dark:hover:text-white transition-all duration-200 shadow-sm hover:shadow-md"
                   >
                     Close
                   </button>
@@ -3078,7 +3078,7 @@ const StoreCollectionCreate: React.FC = () => {
                     </div>
                   </div>
                   {previewProduct.description ? (
-                    <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed bg-white/50 dark:bg-white/5 rounded-xl p-3 border border-gray-200/50 dark:border-white/10">
+                    <p className="text-sm text-theme-secondary leading-relaxed bg-white/50 dark:bg-white/5 rounded-xl p-3 border border-gray-200/50 dark:border-white/10">
                       {previewProduct.description}
                     </p>
                   ) : null}

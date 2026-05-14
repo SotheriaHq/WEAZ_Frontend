@@ -18,8 +18,6 @@ import { ProfileLayout } from './components/catalog/ProfileLayout';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
 import ErrorPage from './pages/ErrorPage';
-import CartDrawer from './components/designs/CartDrawer';
-import WishlistDrawer from './components/designs/WishlistDrawer';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
 import OrderConfirmation from './pages/checkout/OrderConfirmation';
 import PaymentReturnPage from './pages/checkout/PaymentReturnPage';
@@ -31,11 +29,12 @@ import {
   WatchLaterPlaceholder,
   TrendingPlaceholder,
 } from './pages/placeholders';
-import { GlobalModalRouter } from './components/modals/GlobalModalRouter';
 import ShopSetupWizardPage from './pages/studio/shop/ShopSetupWizardPage';
 import ShopSetupEssentialsPage from './pages/studio/shop/ShopSetupEssentialsPage';
 import StudioScaffold from './components/studio/StudioScaffold';
+import StudioHandoffGate from './components/studio/StudioHandoffGate';
 import RequireStoreSetup from './components/store/RequireStoreSetup';
+import { BagFlowProvider } from './features/bagging/BagFlowProvider';
 import {
   ProductAliasRedirect,
   ProfileAliasRedirect,
@@ -48,8 +47,17 @@ import type { AppDispatch, RootState } from '@/store';
 import { setViewportWidth } from '@/features/uiSlice';
 import RequireAdmin from './components/admin/RequireAdmin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { ThemeBackendSync } from '@/components/theme/ThemeBackendSync';
 
 const Market = lazy(() => import('./pages/Market'));
+const CartDrawer = lazy(() => import('./components/designs/CartDrawer'));
+const WishlistDrawer = lazy(() => import('./components/designs/WishlistDrawer'));
+const GlobalModalRouter = lazy(() =>
+  import('./components/modals/GlobalModalRouter').then((module) => ({
+    default: module.GlobalModalRouter,
+  })),
+);
 const MarketPlace = lazy(() => import('./pages/MarketPlace'));
 const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
 const Profile = lazy(() => import('./pages/catalog/Catalog'));
@@ -67,6 +75,8 @@ const StoreCollectionCreate = lazy(() => import('./pages/studio/store/StoreColle
 const StudioCustomOrdersPage = lazy(() => import('./pages/studio/CustomOrdersPage'));
 const StudioCustomOrderDetailPage = lazy(() => import('./pages/studio/StudioCustomOrderDetailPage'));
 const BrandPayoutsPage = lazy(() => import('./pages/store/BrandPayoutsPage'));
+const BrandStaffPage = lazy(() => import('./pages/studio/BrandStaffPage'));
+const BrandStaffInvitePage = lazy(() => import('./pages/studio/BrandStaffInvitePage'));
 const MyOrders = lazy(() => import('./pages/orders/MyOrders'));
 const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
 const CustomOrderComposerPage = lazy(() => import('./pages/custom-orders/CustomOrderComposerPage'));
@@ -84,6 +94,7 @@ const AdminContentManagementPage = lazy(() => import('./pages/admin/AdminContent
 const AdminTaxonomyPage = lazy(() => import('./pages/admin/AdminTaxonomyPage'));
 const AdminTagsPage = lazy(() => import('./pages/admin/AdminTagsPage'));
 const AdminFinancePage = lazy(() => import('./pages/admin/AdminFinancePage'));
+const AdminSettlementPoliciesPage = lazy(() => import('./pages/admin/AdminSettlementPoliciesPage'));
 const AdminPayoutsPage = lazy(() => import('./pages/admin/AdminPayoutsPage'));
 const AdminOrderDetailPage = lazy(() => import('./pages/admin/AdminOrderDetailPage'));
 const AdminOrdersPage = lazy(() => import('./pages/admin/AdminOrdersPage'));
@@ -119,10 +130,42 @@ const AppRouteFallback: React.FC = () => (
   </div>
 );
 
+const StudioRouteFallback: React.FC = () => {
+  const embeddedSurface = useEmbeddedSurface();
+  const isEmbeddedMobile = embeddedSurface === 'mobile-app';
+
+  return (
+    <div
+      className={`flex items-center justify-center bg-[color:var(--surface-primary)] px-5 text-center text-[color:var(--text-primary)] ${
+        isEmbeddedMobile ? 'min-h-[calc(100dvh-8rem)]' : 'min-h-[420px]'
+      }`}
+    >
+      <div className="w-full max-w-sm">
+        <div
+          className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[color:rgba(var(--brand-primary-rgb),0.22)] border-t-[color:var(--brand-primary)]"
+          aria-hidden="true"
+        />
+        <div className="text-base font-semibold">Studio</div>
+        <p className="mt-2 text-sm text-[color:var(--text-secondary)]">Loading workspace</p>
+      </div>
+    </div>
+  );
+};
+
 const noopStudioSelect = () => {};
+
+const StudioProtected: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <StudioHandoffGate>
+    <RequireBrand>{children}</RequireBrand>
+  </StudioHandoffGate>
+);
 
 const withRouteFallback = (element: React.ReactNode) => (
   <Suspense fallback={<AppRouteFallback />}>{element}</Suspense>
+);
+
+const withStudioContentFallback = (element: React.ReactNode) => (
+  <Suspense fallback={<StudioRouteFallback />}>{element}</Suspense>
 );
 
 const withStudioRouteFallback = (
@@ -132,7 +175,7 @@ const withStudioRouteFallback = (
   <Suspense
     fallback={
       <StudioScaffold active={active} onSelect={noopStudioSelect}>
-        <AppRouteFallback />
+        <StudioRouteFallback />
       </StudioScaffold>
     }
   >
@@ -202,6 +245,8 @@ const ViewportSync: React.FC<{ watchKey?: string }> = ({ watchKey }) => {
 
 const RootLayout: React.FC = () => {
   const location = useLocation();
+  const embeddedSurface = useEmbeddedSurface();
+  const isEmbeddedMobile = embeddedSurface === 'mobile-app';
   const [showRouteIntentProgress, setShowRouteIntentProgress] = useState(false);
   const routeIntentTimeoutRef = useRef<number | null>(null);
 
@@ -260,26 +305,51 @@ const RootLayout: React.FC = () => {
   }, [location.pathname]);
 
   return (
-    <>
-      {showRouteIntentProgress && (
-        <div className="pointer-events-none fixed inset-x-0 top-0 z-[2147483646] h-0.5 overflow-hidden">
-          <div className="h-full w-full animate-pulse bg-gradient-to-r from-fuchsia-500 via-indigo-500 to-cyan-500" />
-        </div>
-      )}
-      <ViewportSync watchKey={location.pathname} />
-      <CartDrawer />
-      <WishlistDrawer />
-      <GlobalModalRouter />
-      <Suspense fallback={<AppRouteFallback />}>
-        <Outlet />
-      </Suspense>
-    </>
+    <BagFlowProvider>
+      <>
+        {showRouteIntentProgress && (
+          <div className="pointer-events-none fixed inset-x-0 top-0 z-[2147483646] h-0.5 overflow-hidden">
+            <div className="h-full w-full animate-pulse bg-gradient-to-r from-fuchsia-500 via-indigo-500 to-cyan-500" />
+          </div>
+        )}
+        <ViewportSync watchKey={location.pathname} />
+        {!isEmbeddedMobile ? (
+          <Suspense fallback={null}>
+            <CartDrawer />
+            <WishlistDrawer />
+            <GlobalModalRouter />
+          </Suspense>
+        ) : null}
+        <Suspense fallback={<AppRouteFallback />}>
+          <Outlet />
+        </Suspense>
+      </>
+    </BagFlowProvider>
   );
 };
 
 const LegacyProductEditRedirect: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   return <Navigate to={id ? `/studio/store/products/${id}/edit` : '/studio/store'} replace />;
+};
+
+const StudioRedirect: React.FC<{ to: string }> = ({ to }) => {
+  const location = useLocation();
+  const currentParams = new URLSearchParams(location.search);
+  if (currentParams.get('surface') !== 'mobile-app') {
+    return <Navigate to={to} replace />;
+  }
+
+  const [pathnameWithSearch, hash = ''] = to.split('#');
+  const [pathname, search = ''] = pathnameWithSearch.split('?');
+  const nextParams = new URLSearchParams(search);
+  nextParams.set('surface', 'mobile-app');
+  const currentTheme = currentParams.get('theme');
+  if (currentTheme === 'light' || currentTheme === 'dark') {
+    nextParams.set('theme', currentTheme);
+  }
+  const query = nextParams.toString();
+  return <Navigate to={`${pathname}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`} replace />;
 };
 
 const LegacyBuyerCustomOrdersRedirect: React.FC = () => {
@@ -337,188 +407,200 @@ const router = createBrowserRouter([
       {
         path: '/studio',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               {withStudioRouteFallback('overview', <StudioHome />)}
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/store',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<StoreManagement />)}
+                {withStudioContentFallback(<StoreManagement />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/verification',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<StoreVerificationPage />)}
+                {withStudioContentFallback(<StoreVerificationPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/verification/apply',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<VerificationWizardPage />)}
+                {withStudioContentFallback(<VerificationWizardPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/verification/submitted',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<VerificationSubmittedPage />)}
+                {withStudioContentFallback(<VerificationSubmittedPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/store/collections',
-        element: <Navigate to="/studio/store?view=collections" replace />,
+        element: <StudioRedirect to="/studio/store?view=collections" />,
       },
       {
         path: '/studio/store/custom-orders',
-        element: <Navigate to="/studio/custom-orders" replace />,
+        element: <StudioRedirect to="/studio/custom-orders" />,
       },
       {
         path: '/studio/store/collections/new',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<StoreCollectionCreate />)}
+                {withStudioContentFallback(<StoreCollectionCreate />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/store/products/new',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<EditProduct />)}
+                {withStudioContentFallback(<EditProduct />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/store/products/:id/edit',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<EditProduct />)}
+                {withStudioContentFallback(<EditProduct />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/store/products/:id',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="store" onSelect={noopStudioSelect}>
-                {withRouteFallback(<ProductDetailsPage />)}
+                {withStudioContentFallback(<ProductDetailsPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/custom-orders',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="orders" onSelect={noopStudioSelect}>
-                {withRouteFallback(<StudioCustomOrdersPage />)}
+                {withStudioContentFallback(<StudioCustomOrdersPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/custom-orders/:orderId',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="orders" onSelect={noopStudioSelect}>
-                {withRouteFallback(<StudioCustomOrderDetailPage />)}
+                {withStudioContentFallback(<StudioCustomOrderDetailPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
+        ),
+      },
+      {
+        path: '/studio/staff',
+        element: (
+          <StudioProtected>
+            <RequireStoreSetup>
+              <StudioScaffold active="staff" onSelect={noopStudioSelect}>
+                {withStudioContentFallback(<BrandStaffPage />)}
+              </StudioScaffold>
+            </RequireStoreSetup>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/messages',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <StudioScaffold active="messages" onSelect={noopStudioSelect}>
-                {withRouteFallback(<MessagingManagementPage />)}
+                {withStudioContentFallback(<MessagingManagementPage />)}
               </StudioScaffold>
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/shop/setup',
-        element: <Navigate to="/studio/store/setup" replace />,
+        element: <StudioRedirect to="/studio/store/setup" />,
       },
       {
         path: '/studio/shop/essentials',
-        element: <Navigate to="/studio/store/essentials" replace />,
+        element: <StudioRedirect to="/studio/store/essentials" />,
       },
       {
         path: '/studio/store/setup',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <ShopSetupWizardPage />
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/store/essentials',
         element: (
-          <RequireBrand>
+          <StudioProtected>
             <RequireStoreSetup>
               <ShopSetupEssentialsPage />
             </RequireStoreSetup>
-          </RequireBrand>
+          </StudioProtected>
         ),
       },
       {
         path: '/studio/products',
-        element: <Navigate to="/studio/store" replace />,
+        element: <StudioRedirect to="/studio/store" />,
       },
       {
         path: '/studio/products/create',
-        element: <Navigate to="/studio/store/products/new" replace />,
+        element: <StudioRedirect to="/studio/store/products/new" />,
       },
       {
         path: '/studio/products/edit/:id',
@@ -557,6 +639,10 @@ const router = createBrowserRouter([
       {
         path: '/verify-email',
         element: <EmailVerifyPage />,
+      },
+      {
+        path: '/brand/staff/invite',
+        element: withRouteFallback(<BrandStaffInvitePage />),
       },
       {
         element: <GuestRoute />,
@@ -684,6 +770,7 @@ const router = createBrowserRouter([
           { path: 'orders', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminOrdersPage /></RequireAdminPermission> },
           { path: 'finance', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminFinancePage /></RequireAdminPermission> },
           { path: 'finance/payments/:reference', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminFinancePage /></RequireAdminPermission> },
+          { path: 'finance/settlement-policies', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminSettlementPoliciesPage /></RequireAdminPermission> },
           { path: 'orders/:orderId', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminOrderDetailPage /></RequireAdminPermission> },
           { path: 'payouts', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminPayoutsPage /></RequireAdminPermission> },
           { path: 'disputes', element: <RequireAdminPermission permission="DISPUTES_READ"><AdminDisputesPage /></RequireAdminPermission> },
@@ -705,6 +792,7 @@ const router = createBrowserRouter([
 
 const App: React.FC = () => (
   <AuthProvider>
+    <ThemeBackendSync />
     <DropdownManagerProvider>
       <BrandPatchProvider>
         <Toaster position="top-center" richColors closeButton />

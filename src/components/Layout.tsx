@@ -6,6 +6,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { useNotificationsBootstrap } from '@/hooks/useNotifications';
 import { setSidebarMode, closeSidebar, selectIsMobile } from '@/features/uiSlice';
+import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { ISLAND_BOTTOM_NAV_CLEARANCE_CLASS } from '@/components/navigation/IslandBottomNav';
 
 interface LayoutProps {
   children?: React.ReactNode;
@@ -32,6 +34,8 @@ const computeSidebarMode = (pathname: string, isMobile: boolean) => {
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
+  const embeddedSurface = useEmbeddedSurface();
+  const isEmbeddedMobile = embeddedSurface === 'mobile-app';
   
   const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
   const isMobile = useSelector(selectIsMobile);
@@ -43,7 +47,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     () => computeSidebarMode(location.pathname, isMobile),
     [location.pathname, isMobile]
   );
-  const isRouteSidebarHidden = location.pathname.startsWith('/studio');
+  const isRouteSidebarHidden = location.pathname.startsWith('/studio') || isEmbeddedMobile;
 
   // Update sidebar mode when route or viewport changes
   useEffect(() => {
@@ -58,20 +62,20 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // Calculate margins based on mode
   // RAIL: 72px left margin, HIDDEN: 0px left margin
-  const mainMarginLeft = computedSidebarMode === 'RAIL' ? '72px' : '0px';
+  const mainMarginLeft = !isEmbeddedMobile && computedSidebarMode === 'RAIL' ? '72px' : '0px';
 
   return (
     <div className="min-h-screen threadly-shell-bg text-gray-900 dark:text-white">
         
       {/* Navbar */}
-      <Navbar />
+      {!isEmbeddedMobile ? <Navbar /> : null}
 
       {/* Sidebar */}
       {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
        
       {/* Main Content Area */}
       <main
-        className="pt-16 pb-20 lg:pb-8 min-h-screen transition-[margin] duration-300 ease-out"
+        className={`min-h-screen transition-[margin] duration-300 ease-out ${isEmbeddedMobile ? 'pb-4 pt-0' : `${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS} pt-16`}`}
         style={{ marginLeft: mainMarginLeft }}
       >
         {/* will-change removed from main — it was promoting the entire page to

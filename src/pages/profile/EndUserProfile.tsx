@@ -17,7 +17,6 @@ import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type { SizeFitProfile, SizeFitSharesPayload } from '@/types/sizeFit';
 import ProfileActionsBar, { type ProfileAction } from '@/components/profile/ProfileActionsBar';
-import ProfileSettingsEntry from '@/components/profile/ProfileSettingsEntry';
 import { buildProfileUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
 import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS } from '@/lib/sizeCharts';
@@ -612,7 +611,7 @@ export const EndUserProfile: React.FC = () => {
         {/* Size card skeleton */}
         <div className="mb-6 h-28 rounded-2xl bg-gray-200 dark:bg-white/10" />
         {/* Tab bar skeleton */}
-        <div className="mb-5 flex gap-6 border-b border-gray-200 dark:border-white/10 pb-px">
+        <div className="mb-5 flex gap-6 border-b border-theme pb-px">
           {[70, 80, 70].map((w, i) => (
             <div key={i} className="h-4 rounded bg-gray-200 dark:bg-white/10" style={{ width: w }} />
           ))}
@@ -631,8 +630,8 @@ export const EndUserProfile: React.FC = () => {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
         <span className="text-5xl" aria-hidden="true">😕</span>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Profile Not Found</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <h2 className="text-xl font-bold text-theme">Profile Not Found</h2>
+        <p className="text-sm text-theme-secondary">
           {error || 'The requested profile could not be found.'}
         </p>
       </div>
@@ -659,12 +658,14 @@ export const EndUserProfile: React.FC = () => {
       icon: '✏️',
       label: 'Edit',
       onClick: () => setIsQuickEditOpen(true),
+      hidden: true,
     },
     {
       key: 'share',
       icon: '🔗',
       label: 'Share',
       onClick: handleShareProfile,
+      hidden: true,
     },
     {
       key: 'fits',
@@ -698,9 +699,6 @@ export const EndUserProfile: React.FC = () => {
 
   return (
     <div className="relative min-h-screen">
-      {/* Ambient gradient — top of page */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px] bg-gradient-to-b from-fuchsia-500/10 via-purple-500/5 to-transparent dark:from-fuchsia-400/8 dark:via-purple-500/8" />
-
       <div className="mx-auto w-full max-w-[1280px] px-3 pb-28 pt-4 sm:px-5 sm:pt-6 xl:pb-10">
 
         {/* ── PROFILE HEADER ── */}
@@ -790,14 +788,14 @@ export const EndUserProfile: React.FC = () => {
 
             {/* Identity */}
             <div className="min-w-0 flex-1 pt-0.5">
-              <h1 className="truncate text-xl font-black tracking-tight text-gray-900 dark:text-white sm:text-3xl">
+              <h1 className="truncate text-xl font-black tracking-tight text-theme sm:text-3xl">
                 {fullName}
               </h1>
-              <p className="mt-0.5 truncate text-sm text-gray-500 dark:text-gray-400">
+              <p className="mt-0.5 truncate text-sm text-theme-secondary">
                 @{profile.username}
               </p>
               {(profile.location || joinLabel) ? (
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-500 dark:text-gray-400 sm:text-xs">
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-theme-secondary sm:text-xs">
                   {profile.location ? (
                     <span className="flex items-center gap-0.5">
                       <span aria-hidden="true">📍</span> {profile.location}
@@ -866,15 +864,6 @@ export const EndUserProfile: React.FC = () => {
           {isOwner ? (
             <div className="mt-4">
               <ProfileActionsBar actions={profileActions} />
-            </div>
-          ) : null}
-
-          {isOwner ? (
-            <div className="mt-4">
-              <ProfileSettingsEntry
-                to="/settings"
-                description="Account, privacy, notifications & size fits"
-              />
             </div>
           ) : null}
 
@@ -1070,8 +1059,8 @@ export const EndUserProfile: React.FC = () => {
               animate={{ scale: 1, y: 0 }}
               className="relative z-10 w-full max-w-sm rounded-3xl border border-white/30 bg-white/95 p-5 shadow-2xl dark:border-white/10 dark:bg-zinc-900/95"
             >
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white">⚠️ Size/Fit Update Reminder</h3>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              <h3 className="text-base font-semibold text-theme">⚠️ Size/Fit Update Reminder</h3>
+              <p className="mt-2 text-sm text-theme-secondary">
                 Keep your size/fits current every {sizeFitProfile?.requireUpdateEveryDays ?? 14} days.
                 Your latest fitting values are attached to new orders so fulfillment stays accurate.
               </p>

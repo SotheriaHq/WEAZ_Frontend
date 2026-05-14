@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { productApi } from '@/api/ProductApi';
 import VLoader from '@/components/loaders/VLoader';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface PermanentDeleteProductModalProps {
   isOpen: boolean;
@@ -50,7 +51,13 @@ const PermanentDeleteProductModal: React.FC<PermanentDeleteProductModalProps> = 
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 dark:bg-zinc-800 flex-shrink-0">
               {productImage ? (
-                <img src={productImage} alt={product.name} className="w-full h-full object-cover" />
+                <MediaRenderer
+                  kind="image"
+                  src={productImage}
+                  alt={product.name}
+                  fit="cover"
+                  className="h-full w-full"
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-2xl">🗑️</div>
               )}

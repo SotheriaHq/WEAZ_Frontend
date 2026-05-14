@@ -16,6 +16,8 @@ interface AuthRequiredPromptProps {
   description?: string;
   /** Feature that requires auth */
   feature?: 'cart' | 'wishlist' | 'checkout' | 'profile' | 'default';
+  /** Optional close behavior for login/signup navigation when the pending action must persist. */
+  onAuthNavigate?: () => void;
 }
 
 /**
@@ -30,6 +32,7 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
   title,
   description,
   feature = 'default',
+  onAuthNavigate,
 }) => {
   const navigate = useNavigate();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -44,7 +47,7 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
   const featureContent: Record<string, { icon: React.ReactNode; title: string; description: string; emoji: string }> = {
     cart: {
       icon: <ShoppingBag className="w-8 h-8" />,
-      title: 'Sign in to view your cart',
+      title: 'Sign in to view your bag',
       description: 'Create an account or sign in to save items, track orders, and enjoy a personalized shopping experience.',
       emoji: '🛒',
     },
@@ -79,12 +82,14 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
   const displayDescription = description || content.description;
 
   const handleSignIn = () => {
-    onClose();
+    if (onAuthNavigate) onAuthNavigate();
+    else onClose();
     navigate('/login');
   };
 
   const handleSignUp = () => {
-    onClose();
+    if (onAuthNavigate) onAuthNavigate();
+    else onClose();
     navigate('/signup');
   };
 

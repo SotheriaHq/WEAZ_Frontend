@@ -64,9 +64,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     (error: unknown, { allowPersistedUser = false }: { allowPersistedUser?: boolean } = {}) => {
       if (isAxiosError(error)) {
         const status = error.response?.status ?? 0;
-        if (status === 401 || status === 403) {
+        if (status === 401) {
           dropStoredAccessToken();
           dispatch(clearUser());
+        } else if (status === 403) {
+          if (!allowPersistedUser) {
+            toast.error('You do not have permission to perform this action. Ask the brand owner for access.');
+          }
         } else if (status === 429) {
           if (!allowPersistedUser) {
             console.warn('Profile request throttled; preserving current state.');

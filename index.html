@@ -10,9 +10,15 @@
     <script>
       (function () {
         var storageKey = 'vite-ui-theme';
+        var embeddedSurfaceKey = 'threadly.studio.embeddedSurface';
+        var embeddedThemeKey = 'threadly.studio.embeddedTheme';
         var fallbackTheme = 'system';
         var root = document.documentElement;
         var storedTheme = null;
+        var params = new URLSearchParams(window.location.search);
+        var explicitEmbeddedSurface = params.get('surface') === 'mobile-app';
+        var sessionEmbeddedSurface = false;
+        var embeddedTheme = null;
 
         try {
           storedTheme = localStorage.getItem(storageKey);
@@ -20,10 +26,38 @@
           storedTheme = null;
         }
 
+        try {
+          sessionEmbeddedSurface = sessionStorage.getItem(embeddedSurfaceKey) === 'mobile-app';
+        } catch (_error) {
+          sessionEmbeddedSurface = false;
+        }
+
+        if (explicitEmbeddedSurface || sessionEmbeddedSurface) {
+          var requestedTheme = params.get('theme');
+          if (requestedTheme === 'light' || requestedTheme === 'dark') {
+            embeddedTheme = requestedTheme;
+            try {
+              sessionStorage.setItem(embeddedSurfaceKey, 'mobile-app');
+              sessionStorage.setItem(embeddedThemeKey, requestedTheme);
+            } catch (_error) {}
+          } else {
+            try {
+              var savedEmbeddedTheme = sessionStorage.getItem(embeddedThemeKey);
+              embeddedTheme =
+                savedEmbeddedTheme === 'light' || savedEmbeddedTheme === 'dark'
+                  ? savedEmbeddedTheme
+                  : null;
+            } catch (_error) {
+              embeddedTheme = null;
+            }
+          }
+        }
+
         var theme =
-          storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system'
+          embeddedTheme ||
+          (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system'
             ? storedTheme
-            : fallbackTheme;
+            : fallbackTheme);
 
         var prefersDark =
           window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -33,6 +67,7 @@
 
         root.classList.remove('light', 'dark');
         root.classList.add(className);
+        root.dataset.theme = className;
         root.dataset.themePreference = theme;
         root.style.colorScheme = className;
 

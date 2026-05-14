@@ -1,9 +1,9 @@
 import React from 'react';
-import { useTheme } from '../context/ThemeContext';
+import { useSyncedThemePreference } from '@/hooks/useSyncedThemePreference';
 import { Sun, Moon, Monitor } from 'lucide-react';
 
 export const ThemeSelector: React.FC = () => {
-  const { theme, setTheme } = useTheme();
+  const { themePreference, setThemePreference } = useSyncedThemePreference();
 
   const themes = [
     { value: 'light' as const, label: 'Light', icon: Sun },
@@ -12,17 +12,17 @@ export const ThemeSelector: React.FC = () => {
   ];
 
   return (
-    <div className="flex items-center space-x-2 bg-gray-100 dark:bg-[#000000] rounded-lg p-1">
+    <div className="flex items-center space-x-2 rounded-lg surface-control p-1">
       {themes.map((t) => {
-        const isActive = theme === t.value;
+        const isActive = themePreference === t.value;
         return (
           <button
             key={t.value}
-            onClick={() => setTheme(t.value)}
+            onClick={() => void setThemePreference(t.value)}
             className={`flex items-center space-x-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
               isActive
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700/50'
+                ? 'surface-card text-[color:var(--text-primary)] shadow-sm'
+                : 'text-[color:var(--text-secondary)] surface-interactive-hover'
             }`}
             aria-pressed={isActive}
           >

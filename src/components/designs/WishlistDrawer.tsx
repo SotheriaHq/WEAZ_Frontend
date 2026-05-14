@@ -16,10 +16,10 @@ import {
   selectWishlistPriceChangeNotices,
   clearWishlistNotices,
 } from '@/features/wishlistSlice';
-import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useBagging } from '@/hooks/useBagging';
 
 const WishlistDrawer: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -33,6 +33,7 @@ const WishlistDrawer: React.FC = () => {
   const priceChangeNotices = useSelector(selectWishlistPriceChangeNotices);
   const user = useSelector((state: RootState) => state.user.profile);
   const isAuthenticated = !!user;
+  const { bagProduct } = useBagging();
 
   useEffect(() => {
     if (!isOpen) {
@@ -155,17 +156,9 @@ const WishlistDrawer: React.FC = () => {
       return;
     }
 
-    if (requiresOptionSelection(product)) {
-      dispatch(closeWishlistDrawer());
-      navigate(resolveStoreProductRoute(product));
-      return;
-    }
-
     try {
-      await dispatch(addToCart({ productId: product.id, quantity: 1 })).unwrap();
       dispatch(closeWishlistDrawer());
-      dispatch(openCartDrawer());
-      toast.success('Bagged!');
+      await bagProduct({ id: product.id, name: product.name });
     } catch (error: any) {
       toast.error(error || 'Failed to bag item');
     }
@@ -225,7 +218,7 @@ const WishlistDrawer: React.FC = () => {
             >
               <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
               <div className="absolute inset-0 backdrop-blur-xl" />
-              <div className="absolute inset-0 bg-black/40" />
+              <div className="absolute inset-0 surface-overlay-strong" />
             </motion.div>
 
             <motion.div
@@ -238,16 +231,16 @@ const WishlistDrawer: React.FC = () => {
               aria-modal="true"
               aria-label="Wishlist"
             >
-              <div className="h-full bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl shadow-2xl border-l border-white/20 dark:border-white/10 flex flex-col">
-                <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
+              <div className="surface-modal h-full backdrop-blur-2xl shadow-2xl border-l flex flex-col">
+                <div className="flex items-center justify-between p-4 border-b border-theme">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-xl bg-gradient-to-br from-pink-500 to-red-500 shadow-lg shadow-pink-500/30">
                       <Heart size={20} className="text-white" fill="white" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-gray-900 dark:text-white">Your Wishlist</h2>
+                      <h2 className="text-lg font-bold text-theme">Your Wishlist</h2>
                       {total > 0 && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-theme-secondary">
                           {total} saved {total === 1 ? 'item' : 'items'}
                         </p>
                       )}
@@ -255,9 +248,9 @@ const WishlistDrawer: React.FC = () => {
                   </div>
                   <button
                     onClick={handleClose}
-                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    className="surface-interactive-hover p-2 rounded-full transition-colors"
                   >
-                    <X size={22} className="text-gray-500 dark:text-gray-400" />
+                    <X size={22} className="text-[color:var(--text-secondary)]" />
                   </button>
                 </div>
 
@@ -306,7 +299,7 @@ const WishlistDrawer: React.FC = () => {
 
                   {isLoading && items.length === 0 && total > 0 ? (
                     <div className="flex h-full items-center justify-center p-6">
-                      <div className="text-sm text-gray-500 dark:text-gray-400">Loading wishlist...</div>
+                      <div className="text-sm text-theme-secondary">Loading wishlist...</div>
                     </div>
                   ) : items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center p-6">
@@ -318,8 +311,8 @@ const WishlistDrawer: React.FC = () => {
                           <Sparkles size={18} className="text-white" />
                         </div>
                       </div>
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Start Your Collection</h3>
-                      <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-xs">
+                      <h3 className="text-xl font-bold text-theme mb-2">Start Your Collection</h3>
+                      <p className="text-theme-secondary mb-6 max-w-xs">
                         Save items you love to create your perfect African fashion wishlist
                       </p>
                       <button
@@ -349,17 +342,17 @@ const WishlistDrawer: React.FC = () => {
                             layout
                             className={`relative group rounded-xl border p-2.5 shadow-sm transition-all duration-300 ${
                               item.isAvailable === false
-                                ? 'bg-gray-50 dark:bg-zinc-900/60 border-gray-200/60 dark:border-white/5'
-                                : 'bg-white dark:bg-zinc-900 border-slate-100 dark:border-white/5 hover:shadow-md'
+                                ? 'surface-control opacity-90'
+                                : 'surface-card hover:shadow-md'
                             }`}
                           >
                             {/* Frosted overlay for unavailable items */}
                             {item.isAvailable === false && (
-                              <div className="absolute inset-0 z-10 rounded-xl bg-white/50 dark:bg-black/30 backdrop-blur-[1.5px] pointer-events-none" />
+                              <div className="surface-overlay-soft absolute inset-0 z-10 rounded-xl backdrop-blur-[1.5px] pointer-events-none" />
                             )}
                             <div className="flex gap-3">
                               <div
-                                className="relative size-[4.5rem] shrink-0 overflow-hidden rounded-lg cursor-pointer bg-gray-100 dark:bg-zinc-800"
+                                className="relative size-[4.5rem] shrink-0 overflow-hidden rounded-lg cursor-pointer bg-theme-muted"
                                 onClick={() => handleViewProduct(product)}
                               >
                                 {product.thumbnail ? (
@@ -370,7 +363,7 @@ const WishlistDrawer: React.FC = () => {
                                   />
                                 ) : (
                                   <div className="h-full w-full flex items-center justify-center">
-                                    <Heart size={20} className="text-gray-400" />
+                                    <Heart size={20} className="text-[color:var(--text-secondary)]" />
                                   </div>
                                 )}
 
@@ -391,7 +384,7 @@ const WishlistDrawer: React.FC = () => {
                                         </p>
                                       )}
                                       <h4
-                                        className="text-sm font-semibold text-gray-900 dark:text-white truncate cursor-pointer hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                                        className="text-sm font-semibold text-theme truncate cursor-pointer hover:text-[color:var(--brand-primary)] transition-colors"
                                         onClick={() => handleViewProduct(product)}
                                       >
                                         {product.name}
@@ -399,7 +392,7 @@ const WishlistDrawer: React.FC = () => {
                                     </div>
                                     <button
                                       onClick={() => handleRemoveItem(product.id)}
-                                      className="relative z-20 p-1.5 -mt-1 -mr-1 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
+                                      className="relative z-20 p-1.5 -mt-1 -mr-1 rounded-full text-[color:var(--text-secondary)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
                                       aria-label="Remove from wishlist"
                                     >
                                       <Trash2 size={14} />
@@ -407,11 +400,11 @@ const WishlistDrawer: React.FC = () => {
                                   </div>
 
                                   <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="text-sm font-bold text-gray-900 dark:text-white leading-none">
+                                    <span className="text-sm font-bold text-theme leading-none">
                                       {formatPrice(product.effectivePrice, product.brand?.currency)}
                                     </span>
                                     {isOnSale && (
-                                      <span className="text-[10px] text-gray-400 line-through">
+                                      <span className="text-[10px] text-theme-secondary line-through">
                                         {formatPrice(product.price, product.brand?.currency)}
                                       </span>
                                     )}

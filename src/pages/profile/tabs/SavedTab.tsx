@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ArrowRight, Bookmark } from 'lucide-react';
 import { apiClient } from '@/api/httpClient';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface SavedItem {
   id: string;
@@ -183,10 +184,13 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
           >
             <div className="relative mb-3 aspect-[4/5] overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800">
               {item.thumbnail ? (
-                <img
+                <MediaRenderer
+                  kind="image"
                   src={item.thumbnail}
                   alt={item.title}
-                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  fit="cover"
+                  className="h-full w-full"
+                  mediaClassName="transition-transform duration-300 group-hover:scale-105"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">

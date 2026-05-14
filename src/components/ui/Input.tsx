@@ -59,21 +59,21 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       ${sizeClasses[inputSize]} font-medium
       ${startIcon ? 'pl-10' : ''}
       ${endIcon ? 'pr-10' : ''}
-      bg-white dark:bg-zinc-900/60
+      bg-[color:var(--surface-primary)]
       border rounded-xl
-      text-gray-900 dark:text-white
-      placeholder-gray-400 dark:placeholder-zinc-500
+      text-[color:var(--text-primary)]
+      placeholder:text-[color:var(--text-secondary)]
       shadow-sm
       focus:outline-none focus:ring-0 focus:border-transparent
       transition-all duration-200
       ${
         error
           ? 'border-red-500 dark:border-red-500'
-          : 'border-gray-300/80 dark:border-zinc-700/60'
+          : 'border-[color:var(--border-default)]'
       }
       ${
         disabled
-          ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-zinc-800/50'
+          ? 'opacity-60 cursor-not-allowed bg-[color:var(--surface-muted)]'
           : ''
       }
     `;
@@ -85,7 +85,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       <div className={`${fullWidth ? 'w-full' : ''} ${className}`}>
         {/* Label */}
         {label && (
-          <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-300 mb-2">
+          <label className="block text-sm font-semibold text-[color:var(--text-secondary)] mb-2">
             {label}
             {required && <span className="text-purple-500 ml-1">*</span>}
           </label>
@@ -95,7 +95,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <div className="relative">
           {/* Start Icon */}
           {startIcon && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-secondary)]">
               {startIcon}
             </div>
           )}
@@ -110,7 +110,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
           {/* End Icon */}
           {endIcon && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--text-secondary)]">
               {endIcon}
             </div>
           )}
@@ -123,7 +123,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               {error ? (
                 <p className="text-xs text-red-500">{error}</p>
               ) : helperText ? (
-                <p className="text-xs text-gray-500 dark:text-zinc-500">{helperText}</p>
+                <p className="text-xs text-[color:var(--text-secondary)]">{helperText}</p>
               ) : null}
             </div>
             {showCounter && (
@@ -131,7 +131,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 className={`text-xs font-medium ${
                   isOverLimit
                     ? 'text-red-500'
-                    : 'text-gray-400 dark:text-zinc-500'
+                    : 'text-[color:var(--text-secondary)]'
                 }`}
               >
                 {charCount}/{maxCharCount}

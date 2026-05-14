@@ -39,6 +39,7 @@ const mockUser: AuthUserDto = {
   lastName: 'Brand',
   role: 'User',
   type: 'BRAND',
+  themePreference: 'system',
   isActive: 'Active',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),

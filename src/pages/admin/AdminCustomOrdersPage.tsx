@@ -39,6 +39,8 @@ interface PendingAdminAction {
   execute: () => Promise<boolean>;
 }
 
+const ENABLE_FABRIC_RULE_BASIS_MODERATION_PANEL = false;
+
 const AdminCustomOrdersPage: React.FC = () => {
   const navigate = useNavigate();
   const { orderId } = useParams<{ orderId: string }>();
@@ -819,7 +821,7 @@ const AdminCustomOrdersPage: React.FC = () => {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        {false ? (
+        {ENABLE_FABRIC_RULE_BASIS_MODERATION_PANEL ? (
         <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
           <div className="text-lg font-semibold text-slate-900 dark:text-white">Fabric-rule basis moderation</div>
           <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">

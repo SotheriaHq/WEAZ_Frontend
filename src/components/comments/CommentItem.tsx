@@ -8,6 +8,7 @@ import { CommentsApi } from '@/api/CommentsApi';
 import { toast } from 'sonner';
 import { useRealtime } from '@/realtime';
 import CommentInput from '@/components/ui/CommentInput';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 type Props = {
   comment: CommentV2Dto;
@@ -117,11 +118,12 @@ const CommentItem: React.FC<Props> = ({ comment, onThread, onReply, onDelete, cu
           title={`Open ${commenterDisplayName} profile`}
         >
           {comment.user?.profileImage ? (
-            <img
+            <MediaRenderer
+              kind="image"
               src={comment.user.profileImage}
               alt={comment.user?.username ?? 'User'}
-              className="h-8 w-8 rounded-xl object-cover"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              fit="cover"
+              className="h-8 w-8 rounded-xl"
             />
           ) : (
             <span>{(comment.user?.username ?? 'U').charAt(0).toUpperCase()}</span>
@@ -130,11 +132,12 @@ const CommentItem: React.FC<Props> = ({ comment, onThread, onReply, onDelete, cu
       ) : (
         <div className="h-8 w-8 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold">
           {comment.user?.profileImage ? (
-            <img
+            <MediaRenderer
+              kind="image"
               src={comment.user.profileImage}
               alt={comment.user?.username ?? 'User'}
-              className="h-8 w-8 rounded-xl object-cover"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              fit="cover"
+              className="h-8 w-8 rounded-xl"
             />
           ) : (
             <span>{(comment.user?.username ?? 'U').charAt(0).toUpperCase()}</span>

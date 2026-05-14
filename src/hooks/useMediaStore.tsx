@@ -5,7 +5,7 @@ import type { MediaItem, MediaItemKind } from '../types/media';
 type State = { items: MediaItem[] };
 
 type Action =
-  | { type: 'add'; files: File[] }
+  | { type: 'add'; files: File[]; maxItems?: number }
   | { type: 'remove'; id: string }
   | { type: 'clear' }
   | { type: 'set'; items: MediaItem[] }
@@ -39,7 +39,11 @@ function createItemFromFile(f: File): MediaItem {
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'add': {
-      const newItems = action.files.map(createItemFromFile);
+      const remaining =
+        typeof action.maxItems === 'number'
+          ? Math.max(0, action.maxItems - state.items.length)
+          : action.files.length;
+      const newItems = action.files.slice(0, remaining).map(createItemFromFile);
       return { items: [...state.items, ...newItems] };
     }
     case 'remove':
@@ -103,7 +107,7 @@ export function useMediaStore() {
 
   return {
     items: state.items,
-    addFiles: (files: File[]) => dispatch({ type: 'add', files }),
+    addFiles: (files: File[], maxItems?: number) => dispatch({ type: 'add', files, maxItems }),
     remove: (id: string) => dispatch({ type: 'remove', id }),
     clear: () => dispatch({ type: 'clear' }),
     set: (items: MediaItem[]) => dispatch({ type: 'set', items }),

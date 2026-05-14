@@ -9,7 +9,6 @@ import { useSignedFileUrl } from '@/hooks/useSignedFileUrl';
 import ProfileHeader from './ProfileHeader';
 import ImageCropModal from '@/components/upload/ImageCropModal';
 import ProfileImageModal from '@/components/profile/ProfileImageModal';
-import ProfileSettingsEntry from '@/components/profile/ProfileSettingsEntry';
 
 type OwnerHeaderProfileBase = {
   id: string;
@@ -22,6 +21,7 @@ type OwnerHeaderProfileBase = {
   isVerifiedBrand?: boolean;
   verifiedExplanationUrl?: string;
   tags?: string[];
+  description?: string;
   isOwner: true;
   profileVisibility: 'UNLOCKED' | 'LOCKED';
 };
@@ -30,6 +30,7 @@ interface OwnerCatalogMediaHeaderProps {
   profile: OwnerHeaderProfileBase;
   onEditProfile?: () => void;
   onShareProfile?: () => void;
+  onShowQrCode?: () => void;
   showPatchAction?: boolean;
   isPatched?: boolean;
   patchLoading?: boolean;
@@ -49,6 +50,7 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
   profile,
   onEditProfile,
   onShareProfile,
+  onShowQrCode,
   showPatchAction = false,
   isPatched = false,
   patchLoading = false,
@@ -312,6 +314,7 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
         canEdit
         onEditProfile={onEditProfile}
         onShareProfile={onShareProfile}
+        onShowQrCode={onShowQrCode}
         onEditAvatar={handleTriggerAvatarUpload}
         onEditBanner={handleTriggerBannerUpload}
         avatarLoading={avatarUploading}
@@ -323,13 +326,6 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
         patchLoading={patchLoading}
         onTogglePatch={onTogglePatch}
       />
-
-      <div className="mt-4 px-4 sm:px-6">
-        <ProfileSettingsEntry
-          to="/settings"
-          description="Store, payments, team & notifications"
-        />
-      </div>
 
       <ProfileImageModal
         open={isAvatarModalOpen && Boolean(localAvatarPreview ?? resolvedAvatarUrl)}

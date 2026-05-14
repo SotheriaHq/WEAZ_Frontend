@@ -15,6 +15,7 @@ interface ThumbnailStripProps {
   onDelete: (id: string) => void;
   onSetCover: (index: number) => void;
   onAddMore?: () => void;
+  canAddMore?: boolean;
   disabled?: boolean;
   progressById?: Record<string, number>;
   /** Show slot labels (Front, Left, Right…) beneath thumbnails */
@@ -47,6 +48,7 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
   onDelete,
   onSetCover: _onSetCover, // Used by parent for "Set as Cover" functionality
   onAddMore,
+  canAddMore = true,
   disabled = false,
   progressById,
   showSlotLabels = false,
@@ -205,7 +207,7 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
         </AnimatePresence>
 
         {/* Add More button */}
-        {onAddMore && !disabled && (
+        {onAddMore && !disabled && canAddMore && (
           <motion.button
             type="button"
             initial={{ opacity: 0 }}

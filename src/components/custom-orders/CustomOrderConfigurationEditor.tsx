@@ -50,6 +50,8 @@ type ConfigurationFormState = {
   rulesJson: string;
 };
 
+const ENABLE_LEGACY_YARD_SETUP_PANEL = false;
+
 const defaultRulesJson = JSON.stringify(
   [
     {
@@ -1432,7 +1434,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         ) : null}
       </div>
 
-      {false ? (
+      {ENABLE_LEGACY_YARD_SETUP_PANEL ? (
       <details className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10" open>
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
           Brand yard setup <span className="text-rose-500">*</span>

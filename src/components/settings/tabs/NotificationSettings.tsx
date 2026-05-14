@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 interface NotificationSettingsData {
   security: {
     login: boolean;
+    logout: boolean;
   };
   social: {
     threads: boolean;
@@ -172,7 +173,8 @@ const NotificationSettings: React.FC = () => {
       title: 'Security',
       category: 'security' as const,
       items: [
-        { id: 'login', label: 'Authentication Alerts', description: 'Get notified when login or logout activity occurs on your account' },
+        { id: 'login', label: 'Sign-in in-app alerts', description: 'Show an in-app notification when your account signs in. Email sign-in alerts are controlled in Email notifications.' },
+        { id: 'logout', label: 'Sign-out in-app alerts', description: 'Show an in-app notification when your account signs out from one or all devices.' },
       ],
     },
     {

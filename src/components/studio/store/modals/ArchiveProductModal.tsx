@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { productApi } from '@/api/ProductApi';
 import VLoader from '@/components/loaders/VLoader';
+import MediaRenderer from '@/components/media/MediaRenderer';
 
 const getProductInitials = (name: string): string => {
   if (!name) return 'P';
@@ -121,10 +122,12 @@ const ArchiveProductModal: React.FC<ArchiveProductModalProps> = ({
                   <span className="text-xl font-bold text-white">{initials}</span>
                 </div>
               ) : (
-                <img
+                <MediaRenderer
+                  kind="image"
                   src={productImage}
                   alt={product.name}
-                  className="h-full w-full object-cover"
+                  fit="cover"
+                  className="h-full w-full"
                   onError={() => setImageError(true)}
                 />
               )}
