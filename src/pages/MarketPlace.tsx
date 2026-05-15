@@ -14,21 +14,14 @@ import FeaturedSection from '@/components/FeaturedSection';
 import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import { normalizeSizingMode } from '@/types/sizing';
-
-interface RawProductsPayload {
-  items?: any[];
-  total?: number;
-  hasNextPage?: boolean;
-  nextCursor?: string | null;
-}
+import {
+  getProductRecencyTimestamp,
+  normalizeMarketProduct,
+  type MarketplaceProduct,
+  type RawProductsPayload,
+} from '@/utils/marketProductMapper';
 
 const BASE_FILTERS = ['FOR_YOU', 'MENSWEAR', 'WOMENSWEAR', 'EVERYBODY', 'ON_SALE'] as const;
-
-type MarketplaceProduct = StoreProduct & {
-  createdAt?: string;
-  updatedAt?: string;
-};
 
 // Speed in pixels per second for the marquee
 const MARQUEE_PX_PER_S = 40;
@@ -42,19 +35,6 @@ const ADMIN_FRESH_DROPS_LIMIT = 10;
 const MARKET_LOAD_PAGE_LIMIT = 120;
 const MARKET_LOAD_MAX_PAGES = 40;
 const MARKET_LOAD_MAX_ROWS = 4800;
-
-const parseTimestamp = (value?: string | null): number => {
-  if (!value) return 0;
-  const ts = new Date(value).getTime();
-  return Number.isFinite(ts) ? ts : 0;
-};
-
-const getProductRecencyTimestamp = (product: MarketplaceProduct): number => {
-  const createdTs = parseTimestamp(product.createdAt);
-  const updatedTs = parseTimestamp(product.updatedAt);
-  const publishedTs = parseTimestamp(product.publishAt ?? null);
-  return Math.max(createdTs, updatedTs, publishedTs);
-};
 
 const getUtcDayIndex = (nowMs: number): number => Math.floor(nowMs / FRESH_DROP_DAY_MS);
 
@@ -163,111 +143,6 @@ const ProductCarousel: React.FC<{
   );
 };
 
-const normalizeProduct = (raw: any): MarketplaceProduct | null => {
-  const id = String(raw?.id ?? '').trim();
-  if (!id) return null;
-
-  const brand = raw?.brand ?? raw?.collection?.brand ?? {};
-  const price = Number(raw?.price ?? 0);
-  const salePrice = raw?.salePrice != null ? Number(raw.salePrice) : null;
-  const totalStock = Number(raw?.totalStock ?? 0);
-  const now = Date.now();
-  const saleStartAt = raw?.saleStartAt ? new Date(raw.saleStartAt).getTime() : null;
-  const saleEndAt = raw?.saleEndAt ? new Date(raw.saleEndAt).getTime() : null;
-  const saleWindowValid = (!saleStartAt || saleStartAt <= now) && (!saleEndAt || saleEndAt >= now);
-  const isOnSale = Boolean(salePrice != null && salePrice > 0 && salePrice < price && saleWindowValid);
-  const effectivePrice = isOnSale ? Number(salePrice) : price;
-  const discountPercent = isOnSale ? Math.round(((price - Number(salePrice)) / price) * 100) : null;
-
-  const media = Array.isArray(raw?.media)
-    ? raw.media
-      .map((m: any) => {
-        const mediaId = m?.id ? String(m.id) : null;
-        const mediaUrl = m?.url ? String(m.url) : null;
-        if (!mediaId || !mediaUrl) return null;
-        return {
-          id: mediaId,
-          url: mediaUrl,
-          type: String(m?.type ?? 'image'),
-          isPrimary: Boolean(m?.isPrimary),
-        };
-      })
-      .filter(Boolean) as Array<{ id: string; url: string; type: string; isPrimary?: boolean }>
-    : [];
-
-  const sizeAvailability = Array.isArray(raw?.sizes)
-    ? raw.sizes.map((size: any) => ({
-      size: String(size),
-      inStock: totalStock > 0,
-      quantity: totalStock,
-    }))
-    : [];
-
-  const variants = Array.isArray(raw?.variants)
-    ? raw.variants
-      .map((v: any) => {
-        const id = String(v?.id ?? '').trim();
-        if (!id) return null;
-        return {
-          id,
-          size: v?.size != null ? String(v.size) : null,
-          color: v?.color != null ? String(v.color) : null,
-          stock: Number(v?.stock ?? 0),
-          price: v?.price != null ? Number(v.price) : null,
-          sku: v?.sku != null ? String(v.sku) : null,
-          colorHex: v?.colorHex != null ? String(v.colorHex) : null,
-        };
-      })
-      .filter((v: NonNullable<typeof variants>[number] | null): v is NonNullable<typeof v> => Boolean(v))
-    : [];
-
-  return {
-    id,
-    collectionId: String(raw?.collectionId ?? raw?.collection?.id ?? ''),
-    brandId: String(raw?.brandId ?? brand?.id ?? ''),
-    name: String(raw?.name ?? 'Product'),
-    description: raw?.description ? String(raw.description) : undefined,
-    price,
-    salePrice,
-    effectivePrice,
-    isOnSale,
-    discountPercent,
-    thumbnail: raw?.thumbnail ? String(raw.thumbnail) : undefined,
-    images: Array.isArray(raw?.images) ? raw.images.map((img: any) => String(img)) : [],
-    media,
-    sizes: Array.isArray(raw?.sizes) ? raw.sizes.map((size: any) => String(size)) : [],
-    sizingMode: normalizeSizingMode(raw?.sizingMode),
-    customMeasurementKeys: Array.isArray(raw?.customMeasurementKeys)
-      ? raw.customMeasurementKeys.map((k: any) => String(k))
-      : [],
-    customAvailable: Boolean(raw?.customAvailable ?? raw?.customOrderEnabled),
-    customOrderEnabled: Boolean(
-      raw?.customOrderEnabled ?? raw?.customAvailable,
-    ),
-    isCustomOrderOnly: Boolean(raw?.isCustomOrderOnly),
-    canBagWhenOutOfStock: Boolean(raw?.canBagWhenOutOfStock),
-    sizeAvailability,
-    colors: Array.isArray(raw?.colors) ? raw.colors.map((c: any) => String(c)) : [],
-    variants,
-    totalStock,
-    isLowStock: totalStock > 0 && totalStock <= 5,
-    isOutOfStock: totalStock <= 0,
-    isFeatured: Boolean(raw?.isFeatured),
-    isActive: typeof raw?.isActive === 'boolean' ? raw.isActive : undefined,
-    publishAt: raw?.publishAt ? String(raw.publishAt) : null,
-    createdAt: raw?.createdAt ? String(raw.createdAt) : undefined,
-    updatedAt: raw?.updatedAt ? String(raw.updatedAt) : undefined,
-    threadsCount: Number(raw?.threadsCount ?? 0),
-    viewsCount: Number(raw?.viewsCount ?? 0),
-    brand: {
-      id: String(brand?.id ?? raw?.brandId ?? ''),
-      name: String(brand?.brandName ?? brand?.name ?? 'Brand'),
-      logo: brand?.logoUrl ? String(brand.logoUrl) : undefined,
-      currency: String(brand?.currency ?? 'NGN'),
-    },
-  };
-};
-
 const isOutOfStockCustomOrderProduct = (product: MarketplaceProduct) =>
   Boolean(
     product.isCustomOrderOnly ||
@@ -329,7 +204,7 @@ const MarketPlace: React.FC = () => {
       }
 
       const mapped = aggregatedRows
-        .map((row) => normalizeProduct(row))
+        .map((row) => normalizeMarketProduct(row))
         .filter((p): p is MarketplaceProduct => Boolean(p));
 
       const dedupedById = new Map<string, MarketplaceProduct>();

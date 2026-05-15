@@ -6,9 +6,11 @@ import { motion } from 'framer-motion';
 import Masonry from 'react-masonry-css';
 import marketApi from '@/api/MarketApi';
 import { brandApi } from '@/api/BrandApi';
+import DesignApi from '@/api/DesignApi';
 import type { MarketItem } from '@/types/market';
 import DesignCard from '@/components/designs/DesignCard';
 import DesignSkeleton from '@/components/designs/DesignSkeleton';
+import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
 // Category chips live directly on page; tag chips removed for now
 import DesignViewModal from '@/components/designs/DesignViewModal';
 import VLoader from '@/components/loaders/VLoader';
@@ -18,8 +20,15 @@ import { toast } from 'sonner';
 import type { RootState } from '@/store';
 import FeaturedSection from '@/components/FeaturedSection';
 import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
-import { resolveProfileImageSource } from '@/utils/profileImage';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
+import { buildDesignRoute, buildProductRoute } from '@/utils/catalogRoutes';
+import { unwrapApiResponse, type ApiSuccessPayload } from '@/types/auth';
+import {
+  normalizeMarketProduct,
+  type MarketplaceProduct,
+  type RawProductsPayload,
+} from '@/utils/marketProductMapper';
+import { toDesignMarketItem } from '@/utils/designMarketItem';
 
 // Error type detection
 type ErrorType = 'network' | 'timeout' | 'server' | 'empty' | 'category_empty' | 'unknown';
@@ -238,6 +247,7 @@ const Market: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
   const [items, setItems] = useState<MarketItem[]>([]);
+  const [fallbackProducts, setFallbackProducts] = useState<MarketplaceProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -294,6 +304,26 @@ const Market: React.FC = () => {
         counts: 'combined',
       });
       setItems(feed.items);
+      if (feed.items.length === 0 && selectedCategory === 'ALL') {
+        try {
+          const response = await apiClient.get('/products/market', {
+            params: { limit: 24, sortBy: 'newest' },
+          });
+          const payload = unwrapApiResponse<RawProductsPayload>(
+            response.data as ApiSuccessPayload<RawProductsPayload>,
+          );
+          const products = Array.isArray(payload?.items)
+            ? payload.items
+              .map((row) => normalizeMarketProduct(row))
+              .filter((product): product is MarketplaceProduct => Boolean(product))
+            : [];
+          setFallbackProducts(products);
+        } catch {
+          setFallbackProducts([]);
+        }
+      } else {
+        setFallbackProducts([]);
+      }
       
       // Initialize Redux engagement state for all items (CRITICAL for thread persistence & real-time comment sync)
       feed.items.forEach((item) => {
@@ -329,67 +359,6 @@ const Market: React.FC = () => {
 
     let cancelled = false;
 
-    const toMarketItem = (detail: any, mediaOverrideId?: string | null): MarketItem | null => {
-      if (!detail) return null;
-      const medias = Array.isArray(detail.medias) ? detail.medias : [];
-      const selectedMedia =
-        medias.find((m: any) => m?.id === mediaOverrideId) ||
-        medias.find((m: any) => m?.id === detail.coverMediaId) ||
-        medias[0] ||
-        null;
-
-      if (!selectedMedia) return null;
-
-      const file = selectedMedia.file ?? {};
-      const mediaUrl =
-        (typeof file.s3Url === 'string' && file.s3Url) ||
-        (typeof file.url === 'string' && file.url) ||
-        (typeof selectedMedia.url === 'string' && selectedMedia.url) ||
-        '';
-
-      const ownerAvatar = resolveProfileImageSource(detail.owner ?? null);
-
-      return {
-        id: String(selectedMedia.id),
-        collectionId: String(detail.id),
-        coverMediaId: detail.coverMediaId ?? null,
-        collectionTitle: String(detail.title ?? 'Design'),
-        collectionDescription: typeof detail.description === 'string' ? detail.description : null,
-        brandId: String(detail.owner?.id ?? ''),
-        brandName: detail.owner?.brand?.brandName ?? detail.owner?.username ?? null,
-        username: detail.owner?.username ?? null,
-        brandLogo: ownerAvatar.src,
-        brandLogoFileId: ownerAvatar.fileId,
-        minPrice: typeof detail.minPrice === 'number' ? detail.minPrice : null,
-        maxPrice: typeof detail.maxPrice === 'number' ? detail.maxPrice : null,
-        saleMinPrice: typeof detail.saleMinPrice === 'number' ? detail.saleMinPrice : null,
-        saleMaxPrice: typeof detail.saleMaxPrice === 'number' ? detail.saleMaxPrice : null,
-        saleStartAt: typeof detail.saleStartAt === 'string' ? detail.saleStartAt : null,
-        saleEndAt: typeof detail.saleEndAt === 'string' ? detail.saleEndAt : null,
-        threadsCount: typeof detail.totalThreads === 'number' ? detail.totalThreads : null,
-        commentsCount: typeof detail.commentsCount === 'number' ? detail.commentsCount : null,
-        collectionCollabCount: null,
-        customMeasurementKeys: Array.isArray(detail.customMeasurementKeys)
-          ? detail.customMeasurementKeys
-          : [],
-        customAvailable:
-          detail.customOrderEnabled === true ||
-          detail.customAvailable === true,
-        tags: Array.isArray(detail.tags) ? detail.tags : [],
-        media: {
-          fileId: String(file.id ?? selectedMedia.id ?? ''),
-          url: mediaUrl,
-          previewUrl: mediaUrl,
-          type: String(selectedMedia.mediaType ?? file.mimeType ?? 'POST_IMAGE').toUpperCase().includes('VIDEO')
-            ? 'POST_VIDEO'
-            : 'POST_IMAGE',
-          aspectRatio: null,
-          createdAt: null,
-        },
-        isThreaded: false,
-      };
-    };
-
     const resolveRoutedItem = async () => {
       const fromFeed = items.find((item) => {
         if (openMediaId) return item.id === openMediaId;
@@ -405,13 +374,21 @@ const Market: React.FC = () => {
       if (!openDesignId) return;
 
       try {
-        const detail = await brandApi.getCollectionDetail(openDesignId, { scope: 'design' });
-        const fallbackItem = toMarketItem(detail, openMediaId);
+        const detail = await DesignApi.getDesignDetail(openDesignId);
+        const fallbackItem = toDesignMarketItem(detail, openMediaId);
         if (!cancelled && fallbackItem) {
           setViewItem(fallbackItem);
         }
       } catch {
-        // Keep current state if lookup fails; user can still browse feed.
+        try {
+          const detail = await brandApi.getCollectionDetail(openDesignId, { scope: 'design' });
+          const fallbackItem = toDesignMarketItem(detail, openMediaId);
+          if (!cancelled && fallbackItem) {
+            setViewItem(fallbackItem);
+          }
+        } catch {
+          // Keep current state if lookup fails; user can still browse feed.
+        }
       }
     };
 
@@ -534,8 +511,12 @@ const Market: React.FC = () => {
     return result;
   }, [items, selectedTag, selectedCategory]);
 
-  const handleViewCollection = (collectionId: string) => {
-    navigate(`/collections/${collectionId}`);
+  const handleViewCollection = (designId: string) => {
+    navigate(buildDesignRoute({ designId, legacyCollectionId: designId }));
+  };
+
+  const handleViewProduct = (product: StoreProduct) => {
+    navigate(buildProductRoute({ productId: product.id }));
   };
 
   const handleViewBrand = (brandId: string, item: MarketItem) => {
@@ -719,6 +700,23 @@ const Market: React.FC = () => {
             </div>
           ))}
         </Masonry>
+      ) : selectedCategory === 'ALL' && fallbackProducts.length > 0 ? (
+        <section className="space-y-4" data-entity-type="PRODUCT" data-card-branch="product">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-theme-secondary">Ready-to-wear</p>
+            <h2 className="text-2xl font-bold text-theme">Fresh products in market</h2>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {fallbackProducts.map((product) => (
+              <StoreProductCard
+                key={product.id}
+                product={product}
+                onViewProduct={handleViewProduct}
+                enableHoverGallery
+              />
+            ))}
+          </div>
+        </section>
       ) : selectedCategory === 'ALL' ? (
         // Empty database state - no designs at all
         <StateDisplay

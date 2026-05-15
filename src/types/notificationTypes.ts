@@ -69,7 +69,7 @@ export type NotificationType =
   typeof NotificationTypes[keyof typeof NotificationTypes];
 
 // Target types for routing
-export type TargetType = 'POST' | 'COLLECTION' | 'COLLECTION_MEDIA' | 'PRODUCT' | 'USER' | 'SYSTEM';
+export type TargetType = 'DESIGN' | 'POST' | 'COLLECTION' | 'COLLECTION_MEDIA' | 'PRODUCT' | 'USER' | 'SYSTEM';
 
 // Tracking categories for analytics
 export type TrackingCategory =

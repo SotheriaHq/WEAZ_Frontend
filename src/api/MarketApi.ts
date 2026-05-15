@@ -2,6 +2,7 @@ import { apiClient } from './httpClient';
 import { unwrapApiResponse } from '@/types/auth';
 import type { MarketFeedResponse, MarketItem, MarketMediaType } from '@/types/market';
 import { normalizeSizingMode } from '@/types/sizing';
+import { resolveCatalogEntityType } from '@/utils/catalogEntity';
 
 export interface GetMarketFeedParams {
   cursor?: string;
@@ -52,6 +53,7 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
 
   const mapped: MarketItem = {
     id: String(raw.id ?? mediaFileId ?? ''),
+    entityType: resolveCatalogEntityType(raw, 'DESIGN') ?? 'DESIGN',
     collectionId: String(raw.collectionId ?? collection.id ?? ''),
     coverMediaId:
       typeof raw.coverMediaId === 'string'

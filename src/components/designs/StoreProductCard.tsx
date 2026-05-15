@@ -5,6 +5,7 @@ import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { brandApi } from '@/api/BrandApi';
 import { toast } from 'sonner';
 import type { SizingMode } from '@/types/sizing';
+import type { CatalogEntityType } from '@/constants/catalogDomain';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagging } from '@/hooks/useBagging';
 import {
@@ -16,6 +17,7 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 
 export interface StoreProduct {
   id: string;
+  entityType?: CatalogEntityType;
   collectionId: string;
   brandId: string;
   name: string;
@@ -439,6 +441,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
   return (
     <article
+      data-entity-type={product.entityType ?? 'PRODUCT'}
+      data-card-branch="product"
       className={`
         group relative cursor-pointer overflow-hidden rounded-2xl
         bg-transparent shadow-sm transition-all duration-300 ease-out hover:shadow-lg

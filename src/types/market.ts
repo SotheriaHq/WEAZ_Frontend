@@ -1,4 +1,5 @@
 import type { SizingMode } from './sizing';
+import type { CatalogEntityType } from '@/constants/catalogDomain';
 
 export type MarketMediaType = 'POST_IMAGE' | 'POST_VIDEO' | string;
 
@@ -13,6 +14,9 @@ export interface MarketMedia {
 
 export interface MarketItem {
   id: string;
+  entityType: CatalogEntityType;
+  designId?: string | null;
+  legacyCollectionId?: string | null;
   collectionId: string;
   coverMediaId?: string | null;
   collectionTitle: string;

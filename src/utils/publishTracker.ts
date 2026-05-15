@@ -9,6 +9,8 @@ export interface PublishTask {
   status: PublishTaskStatus;
   progress: number;
   coverPreviewUrl?: string;
+  designId?: string;
+  legacyCollectionId?: string;
   collectionId?: string;
   message?: string;
   error?: string;
@@ -38,6 +40,12 @@ const normalizeOwnerId = (ownerId?: string | null) => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const normalizeEntityId = (value?: string | null) => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
 const resolveScopeOwnerId = (scope?: PublishTaskScope) => {
   return normalizeOwnerId(scope?.ownerId);
 };
@@ -62,6 +70,37 @@ const isTaskLike = (value: unknown): value is PublishTask => {
   );
 };
 
+export const normalizePublishTaskIdentifiers = (task: PublishTask): PublishTask => {
+  const legacyCollectionId =
+    normalizeEntityId(task.legacyCollectionId) ??
+    normalizeEntityId(task.collectionId);
+  const designId =
+    normalizeEntityId(task.designId) ??
+    legacyCollectionId;
+
+  return {
+    ...task,
+    ownerId: normalizeOwnerId(task.ownerId),
+    designId,
+    legacyCollectionId,
+    // Compatibility only: older profile cards still key publish state by the
+    // collection-backed design id while clients migrate to designId.
+    collectionId: legacyCollectionId,
+  };
+};
+
+export const getPublishTaskDesignId = (task: Pick<PublishTask, 'designId' | 'legacyCollectionId' | 'collectionId'>) => (
+  normalizeEntityId(task.designId) ??
+  normalizeEntityId(task.legacyCollectionId) ??
+  normalizeEntityId(task.collectionId)
+);
+
+export const getPublishTaskLegacyCollectionId = (task: Pick<PublishTask, 'legacyCollectionId' | 'collectionId' | 'designId'>) => (
+  normalizeEntityId(task.legacyCollectionId) ??
+  normalizeEntityId(task.collectionId) ??
+  normalizeEntityId(task.designId)
+);
+
 const normalizeTaskList = (tasks: PublishTask[]) => {
   const now = Date.now();
   const fresh = tasks
@@ -70,10 +109,7 @@ const normalizeTaskList = (tasks: PublishTask[]) => {
       if (task.status === 'published' && now - task.updatedAt > PUBLISHED_GRACE_MS) return false;
       return true;
     })
-    .map((task) => ({
-      ...task,
-      ownerId: normalizeOwnerId(task.ownerId),
-    }))
+    .map(normalizePublishTaskIdentifiers)
     .sort((a, b) => b.updatedAt - a.updatedAt);
 
   const byScope = new Map<string, PublishTask[]>();
@@ -102,10 +138,7 @@ const readRawPublishTasks = (): PublishTask[] => {
     return normalizeTaskList(
       parsed
       .filter(isTaskLike)
-        .map((task) => ({
-          ...task,
-          ownerId: normalizeOwnerId(task.ownerId),
-        })),
+        .map(normalizePublishTaskIdentifiers),
     );
   } catch {
     return [];
@@ -140,6 +173,8 @@ export const createPublishTask = (payload: {
   ownerId?: string | null;
   visibility?: 'PUBLIC' | 'PRIVATE';
   coverPreviewUrl?: string;
+  designId?: string;
+  legacyCollectionId?: string;
   collectionId?: string;
   message?: string;
 }): PublishTask => {
@@ -154,7 +189,9 @@ export const createPublishTask = (payload: {
     status: 'uploading',
     progress: 0,
     coverPreviewUrl: payload.coverPreviewUrl,
-    collectionId: payload.collectionId,
+    designId: normalizeEntityId(payload.designId) ?? normalizeEntityId(payload.legacyCollectionId) ?? normalizeEntityId(payload.collectionId),
+    legacyCollectionId: normalizeEntityId(payload.legacyCollectionId) ?? normalizeEntityId(payload.collectionId),
+    collectionId: normalizeEntityId(payload.legacyCollectionId) ?? normalizeEntityId(payload.collectionId),
     message: payload.message,
     updatedAt: now,
   };
@@ -184,7 +221,7 @@ export const updatePublishTask = (
       progress: update.progress === undefined ? task.progress : clampProgress(update.progress),
       updatedAt: Date.now(),
     };
-    return merged;
+    return normalizePublishTaskIdentifiers(merged);
   });
   writePublishTasks(next);
 };

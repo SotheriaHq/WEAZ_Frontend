@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Masonry from 'react-masonry-css';
 import type { CollectionDto } from '../../types/profile';
-import CollectionCard from './CollectionCard';
+import CatalogEntityCard from './CatalogEntityCard';
 import { useSelector } from 'react-redux';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
+import { resolveCatalogEntityType } from '@/utils/catalogEntity';
+import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
 
 interface CollectionsGridProps {
   collections: CollectionDto[];
@@ -37,6 +39,10 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   const collectionIds = useMemo(
     () => (collections ?? []).map((c) => c.id).filter(Boolean),
     [collections]
+  );
+  const collectionById = useMemo(
+    () => new Map((collections ?? []).map((collection) => [collection.id, collection])),
+    [collections],
   );
 
   const collectionIdsKey = useMemo(
@@ -81,10 +87,22 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
     try {
       setSavingIds((prev) => new Set(prev).add(collectionId));
       const isSaved = Boolean(savedMap[collectionId]);
+      const collection = collectionById.get(collectionId);
+      const entityType = resolveCatalogEntityType(
+        collection,
+        collection?.isAvailableInStore ? 'COLLECTION' : 'DESIGN',
+      ) ?? 'DESIGN';
+      const savedTarget = mapCatalogTargetForLegacyApi({
+        targetType: entityType,
+        targetId: collectionId,
+        designId: entityType === 'DESIGN' ? collectionId : undefined,
+        collectionId,
+        legacyCollectionId: entityType === 'DESIGN' ? collectionId : undefined,
+      });
       if (isSaved) {
-        await apiClient.delete('/saved', { data: { targetType: 'COLLECTION', targetId: collectionId } });
+        await apiClient.delete('/saved', { data: savedTarget });
       } else {
-        await apiClient.post('/saved', { targetType: 'COLLECTION', targetId: collectionId });
+        await apiClient.post('/saved', savedTarget);
       }
       setSavedMap((prev) => ({ ...prev, [collectionId]: !isSaved }));
       toast.success(isSaved ? 'Removed from saved.' : 'Saved for later.');
@@ -119,7 +137,7 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
     >
       {collections.map((collection) => (
         <div key={collection.id} className="w-full">
-          <CollectionCard 
+          <CatalogEntityCard
             collection={collection}
             onClick={() => onCollectionClick?.(collection.id)}
             onEdit={onEdit} 

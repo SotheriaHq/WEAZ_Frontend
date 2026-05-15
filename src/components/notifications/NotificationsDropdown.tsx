@@ -270,6 +270,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     if (fromPayload.trim()) return String(fromPayload).trim();
 
     if (n.target?.type === 'PRODUCT') return 'product';
+    if (n.target?.type === 'DESIGN') return 'design';
     if (n.target?.type === 'COLLECTION' || n.target?.type === 'COLLECTION_MEDIA') return 'design';
     if (n.target?.type === 'USER') return 'profile';
 

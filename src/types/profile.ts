@@ -1,6 +1,9 @@
+import type { CatalogEntityType } from '@/constants/catalogDomain';
+
 // Collection Types
 export interface CollectionDto {
   id: string;
+  entityType?: CatalogEntityType;
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   name: string;
   description?: string;

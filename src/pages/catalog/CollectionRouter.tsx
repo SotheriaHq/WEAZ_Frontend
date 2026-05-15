@@ -9,8 +9,9 @@
  * - Design collections → redirects to `/market?openDesign=<id>` (modal view)
  */
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { brandApi } from '@/api/BrandApi';
+import DesignApi from '@/api/DesignApi';
 import { Layout } from '@/components/Layout';
 import InlineStoreCollectionView from '@/components/catalog/InlineStoreCollectionView';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
@@ -19,6 +20,7 @@ import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 const CollectionRouter: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [type, setType] = useState<'store' | 'design' | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,6 +32,24 @@ const CollectionRouter: React.FC = () => {
 
     const detect = async () => {
       setLoading(true);
+      const buildMarketDesignRoute = () => {
+        const params = new URLSearchParams(location.search);
+        params.set('openDesign', id);
+        const query = params.toString();
+        return `/market${query ? `?${query}` : ''}${location.hash}`;
+      };
+
+      try {
+        const design = await DesignApi.getDesignDetail(id);
+        if (!mounted) return;
+        if (design) {
+          navigate(`/designs/${encodeURIComponent(id)}${location.search}${location.hash}`, { replace: true });
+          return;
+        }
+      } catch {
+        // Not an explicit design; continue with collection detection.
+      }
+
       try {
         // Use the general /collections/:id endpoint with scope=all
         // Backend will find the collection in either table
@@ -39,13 +59,13 @@ const CollectionRouter: React.FC = () => {
           setType('store');
         } else {
           // Design collections open in the modal on the market page
-          navigate(`/market?openDesign=${id}`, { replace: true });
+          navigate(buildMarketDesignRoute(), { replace: true });
           return;
         }
       } catch {
         if (mounted) {
           // Fallback: open as design modal on market page
-          navigate(`/market?openDesign=${id}`, { replace: true });
+          navigate(buildMarketDesignRoute(), { replace: true });
           return;
         }
       } finally {
@@ -55,7 +75,7 @@ const CollectionRouter: React.FC = () => {
 
     void detect();
     return () => { mounted = false; };
-  }, [id]);
+  }, [id, location.hash, location.search, navigate]);
 
   if (!id) return null;
 

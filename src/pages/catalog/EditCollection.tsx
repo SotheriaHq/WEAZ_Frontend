@@ -2,6 +2,7 @@
 // You can safely delete this file.
 import React, { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildDesignRoute } from '@/utils/catalogRoutes';
 
 const EditCollection: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -9,7 +10,7 @@ const EditCollection: React.FC = () => {
 
   useEffect(() => {
     if (id) {
-      navigate(`/profile/collections/edit/${id}`, { replace: true });
+      navigate(buildDesignRoute({ designId: id, legacyCollectionId: id, mode: 'edit' }), { replace: true });
     } else {
       navigate('/profile', { replace: true });
     }

@@ -27,6 +27,7 @@ import {
   CONTENT_DISPLAY_RENDERER_CLASS,
 } from '@/components/media/contentDisplayPresets';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
+import { buildDesignUrl } from '@/utils/publicUrlBuilder';
 
 type Props = {
   open: boolean;
@@ -466,7 +467,10 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/collections/${item.collectionId}`;
+    const shareUrl = buildDesignUrl({
+      id: item.collectionId,
+      legacyCollectionId: item.collectionId,
+    });
     try {
       await navigator.clipboard.writeText(shareUrl);
       toast.success('Link copied to clipboard.');
@@ -650,11 +654,12 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       isOwnBrandContent
                         ? 'Brands cannot place custom orders on their own designs'
                         : resolvingCustomConfiguration
-                          ? 'Checking bag setup for this design'
+                          ? 'Checking custom-order setup for this design'
                           : !customConfigurationId
-                            ? 'Check and bag this design'
-                          : 'Bag it from this design'
+                            ? 'Check custom-order setup for this design'
+                          : 'Request a custom order from this design'
                     }
+                    aria-label="Request custom order"
                   >
                     <BagPulseIcon
                       status={
@@ -668,7 +673,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       size={28}
                       disabled={openingCustomComposer || resolvingCustomConfiguration || isOwnBrandContent}
                     />
-                    {openingCustomComposer ? 'Loading...' : 'Bag It'}
+                    {openingCustomComposer ? 'Loading...' : 'Request Custom'}
                   </button>
                   <button
                     type="button"

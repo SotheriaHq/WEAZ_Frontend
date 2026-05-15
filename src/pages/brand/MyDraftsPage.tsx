@@ -10,6 +10,7 @@ import { Trash2, Eye } from 'lucide-react';
 import VLoader from '@/components/loaders/VLoader';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { buildDesignRoute } from '@/utils/catalogRoutes';
 
 interface DraftCollection {
   id: string;
@@ -102,7 +103,7 @@ const MyDraftsPage: React.FC = () => {
               All your designs are published or you haven't created any drafts yet.
             </p>
             <button
-              onClick={() => navigate('/profile/collections/create')}
+              onClick={() => navigate(buildDesignRoute({ mode: 'create' }))}
               className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
             >
               Create Design
@@ -173,7 +174,7 @@ const MyDraftsPage: React.FC = () => {
                   {/* Actions */}
                   <div className="flex gap-2">
                     <button
-                      onClick={() => navigate(`/profile/collections/edit/${draft.id}`)}
+                      onClick={() => navigate(buildDesignRoute({ designId: draft.id, legacyCollectionId: draft.id, mode: 'edit' }))}
                       className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <Eye className="h-4 w-4" />

@@ -35,6 +35,7 @@ import {
   isCustomOrderOnlyProduct,
 } from '@/lib/productAvailability';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { buildDesignRoute } from '@/utils/catalogRoutes';
 
 type StudioStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'DELETED';
 type OutletView = 'products' | 'collections';
@@ -2051,7 +2052,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => navigate('/profile/collections/create')}
+              onClick={() => navigate(buildDesignRoute({ mode: 'create' }))}
               className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors whitespace-nowrap"
             >
               🎨 Create Look

@@ -3,12 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ArrowRight, Bookmark } from 'lucide-react';
 import { apiClient } from '@/api/httpClient';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { buildCollectionRoute, buildDesignRoute, buildProductRoute } from '@/utils/catalogRoutes';
 
 interface SavedItem {
   id: string;
-  targetType: 'COLLECTION' | 'COLLECTION_MEDIA';
+  targetType: 'DESIGN' | 'PRODUCT' | 'COLLECTION' | 'COLLECTION_MEDIA';
   targetId: string;
+  designId?: string;
+  productId?: string;
   collectionId?: string;
+  legacyCollectionId?: string;
   title: string;
   thumbnail?: string;
   price?: number;
@@ -44,12 +48,22 @@ const toSavedItems = (raw: unknown): SavedItem[] => {
       const id = String(item.id ?? '');
       const targetId = String(item.targetId ?? '');
       if (!id || !targetId) return null;
+      const rawTargetType = String(item.targetType ?? '').toUpperCase();
+      const targetType: SavedItem['targetType'] =
+        rawTargetType === 'DESIGN' ||
+        rawTargetType === 'PRODUCT' ||
+        rawTargetType === 'COLLECTION_MEDIA'
+          ? rawTargetType
+          : 'COLLECTION';
 
       return {
         id,
-        targetType: item.targetType === 'COLLECTION_MEDIA' ? 'COLLECTION_MEDIA' : 'COLLECTION',
+        targetType,
         targetId,
+        designId: item.designId ? String(item.designId) : undefined,
+        productId: item.productId ? String(item.productId) : undefined,
         collectionId: item.collectionId ? String(item.collectionId) : undefined,
+        legacyCollectionId: item.legacyCollectionId ? String(item.legacyCollectionId) : undefined,
         title: String(item.title ?? 'Untitled'),
         thumbnail: typeof item.thumbnail === 'string' ? item.thumbnail : undefined,
         price: typeof item.price === 'number' ? item.price : undefined,
@@ -146,7 +160,7 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
           <div className="mb-4 text-6xl">🗂️</div>
           <h3 className="text-2xl font-bold text-gray-900 dark:text-white">No saved items yet</h3>
           <p className="mt-3 text-sm text-gray-500 dark:text-gray-400 sm:text-base">
-            Save designs to revisit them later. Your curated collection starts with a single click.
+            Save designs, products, and collections to revisit them later.
           </p>
           <button
             type="button"
@@ -175,9 +189,29 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
             key={item.id}
             type="button"
             onClick={() => {
-              const collectionId = item.targetType === 'COLLECTION' ? item.targetId : item.collectionId;
-              if (collectionId) {
-                navigate(`/collections/${collectionId}`);
+              if (item.targetType === 'COLLECTION_MEDIA') {
+                const designId = item.collectionId;
+                if (designId) {
+                  navigate(buildDesignRoute({ designId, legacyCollectionId: designId }));
+                }
+                return;
+              }
+              if (item.targetType === 'DESIGN') {
+                const designId = item.designId ?? item.targetId;
+                navigate(
+                  buildDesignRoute({
+                    designId,
+                    legacyCollectionId: item.legacyCollectionId ?? item.collectionId,
+                  }),
+                );
+                return;
+              }
+              if (item.targetType === 'PRODUCT') {
+                navigate(buildProductRoute({ productId: item.productId ?? item.targetId }));
+                return;
+              }
+              if (item.targetId) {
+                navigate(buildCollectionRoute({ collectionId: item.targetId }));
               }
             }}
             className="group overflow-hidden rounded-3xl border border-gray-200/70 bg-white/70 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"

@@ -16,7 +16,7 @@ import ProfileHeaderSkeleton from '../../components/profile/ProfileHeaderSkeleto
 import ReviewsTab from '../../components/profile/tabs/ReviewsTab';
 import AboutTab from '../../components/profile/tabs/AboutTab';
 import InlineCollectionViewer from '../../components/collections/InlineCollectionViewer';
-import CollectionCard from '../../components/profile/CollectionCard';
+import CatalogEntityCard from '../../components/profile/CatalogEntityCard';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { setUser } from '../../features/userSlice';
 import { brandApi } from '../../api/BrandApi';
@@ -37,7 +37,10 @@ import {
   subscribePublishTasks,
   prunePublishTasks,
   removePublishTask,
+  getPublishTaskDesignId,
+  getPublishTaskLegacyCollectionId,
 } from '@/utils/publishTracker';
+import { buildDesignRoute } from '@/utils/catalogRoutes';
 import { canManageCatalog, getActiveBrandId } from '@/lib/brandAccess';
 
 import ComingSoon from '../placeholders/ComingSoon';
@@ -183,7 +186,7 @@ const ProfilePage: React.FC = () => {
     if (navState.publishingTaskId) {
       const taskId = String(navState.publishingTaskId);
       const task = publishTasks.find((entry) => entry.id === taskId);
-      const lookupId = task?.collectionId || taskId;
+      const lookupId = (task ? getPublishTaskDesignId(task) : null) || taskId;
       const startedAt = typeof navState.publishingStartedAt === 'number' ? navState.publishingStartedAt : task?.startedAt ?? Date.now();
       setPublishingStates((prev) => ({
         ...prev,
@@ -602,8 +605,8 @@ const ProfilePage: React.FC = () => {
       let changed = false;
       const next = { ...prev };
       publishTasks.forEach((task) => {
-        const key = task.collectionId || task.id;
-        if (task.collectionId && task.id !== key && next[task.id]) {
+        const key = getPublishTaskDesignId(task) || task.id;
+        if (key !== task.id && next[task.id]) {
           delete next[task.id];
           changed = true;
         }
@@ -636,25 +639,27 @@ const ProfilePage: React.FC = () => {
   }, [publishTasks]);
 
   useEffect(() => {
-    const completed = publishTasks.filter((task) => task.status === 'published' && task.collectionId);
+    const completed = publishTasks.filter((task) => task.status === 'published' && getPublishTaskDesignId(task));
     if (completed.length === 0) return;
 
     const checkAndCleanup = async () => {
       for (const task of completed) {
-        const collectionId = task.collectionId;
-        if (!collectionId) continue;
+        const designId = getPublishTaskDesignId(task);
+        const legacyCollectionId = getPublishTaskLegacyCollectionId(task);
+        if (!designId) continue;
         try {
           if (!isVisitorView && user?.id) {
             await fetchCollections(user.id);
           }
           const latest = !isVisitorView ? collections : visitorCollections;
-          const isLive = latest.some((entry) => entry.id === collectionId);
+          const isLive = latest.some((entry) => entry.id === designId || entry.id === legacyCollectionId);
           if (isLive) {
             removePublishTask(task.id, publishTaskScope);
             setPublishingStates((prev) => {
               const next = { ...prev };
               delete next[task.id];
-              delete next[collectionId];
+              delete next[designId];
+              if (legacyCollectionId) delete next[legacyCollectionId];
               return next;
             });
           }
@@ -881,7 +886,7 @@ const ProfilePage: React.FC = () => {
         : (
             <button
               type="button"
-              onClick={() => navigate('/profile/collections/create')}
+              onClick={() => navigate(buildDesignRoute({ mode: 'create' }))}
               className="inline-flex items-center rounded-lg bg-black text-white px-4 py-2 text-sm font-semibold hover:bg-black/90"
             >
               Create first design
@@ -894,7 +899,9 @@ const ProfilePage: React.FC = () => {
     const linkedTask = state?.taskId
       ? publishTasks.find((entry) => entry.id === state.taskId)
       : publishTasks.find((entry) => entry.id === collectionId);
-    const targetCollectionId = linkedTask?.collectionId ?? (state?.taskId && state.taskId === collectionId ? null : collectionId);
+    const targetCollectionId = linkedTask
+      ? getPublishTaskLegacyCollectionId(linkedTask)
+      : (state?.taskId && state.taskId === collectionId ? null : collectionId);
 
     if (!targetCollectionId) {
       setPublishingStates((prev) => ({
@@ -1010,7 +1017,9 @@ const ProfilePage: React.FC = () => {
         const task = state.taskId
           ? publishTasks.find((entry) => entry.id === state.taskId)
           : publishTasks.find((entry) => entry.id === id);
-        const resolvedCollectionId = task?.collectionId ?? (state.taskId && state.taskId === id ? null : id);
+        const resolvedCollectionId = task
+          ? getPublishTaskLegacyCollectionId(task)
+          : (state.taskId && state.taskId === id ? null : id);
         return { id, state, resolvedCollectionId };
       });
 
@@ -1581,7 +1590,7 @@ const ProfilePage: React.FC = () => {
                             <div className="space-y-6">
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                                 {approvedCollectionData.map((collection) => (
-                                  <CollectionCard
+                                  <CatalogEntityCard
                                     key={collection.id}
                                     collection={collection}
                                     onClick={() => {
@@ -1727,13 +1736,13 @@ const ProfilePage: React.FC = () => {
                           collections={decoratedCollections}
                           isDraft={isDraftVisibility}
                           isDeleted={isDeletedVisibility}
-                          onEdit={isOwner ? (id) => navigate(`/profile/collections/edit/${id}`) : undefined}
+                          onEdit={isOwner ? (id) => navigate(buildDesignRoute({ designId: id, legacyCollectionId: id, mode: 'edit' })) : undefined}
                           onDelete={isOwner ? (id) => setCollectionToDelete(id) : undefined}
                           onRestore={isOwner ? (id) => setCollectionToRestore(id) : undefined}
                           onPermanentDelete={isOwner ? (id) => setCollectionToPermanentDelete(id) : undefined}
                           onCollectionClick={(id) => {
                             if (isDraftVisibility) {
-                              navigate(`/profile/collections/edit/${id}`);
+                              navigate(buildDesignRoute({ designId: id, legacyCollectionId: id, mode: 'edit' }));
                             } else if (isDeletedVisibility) {
                               return;
                             } else {
@@ -1987,7 +1996,7 @@ const ProfilePage: React.FC = () => {
         }}
         onConfirm={() => {
           setRecentlyDeletedDesign(null);
-          navigate('/profile/collections/create');
+          navigate(buildDesignRoute({ mode: 'create' }));
         }}
       />
 
