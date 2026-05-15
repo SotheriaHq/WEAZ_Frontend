@@ -94,14 +94,16 @@ describe('RequireAuthenticated', () => {
     localStorage.clear();
   });
 
-  it('shows a neutral auth check instead of private profile content while auth initializes', () => {
+  it('redirects signed-out users even while auth initializes', async () => {
     authState.loading = true;
 
     renderProtectedPage(null);
 
-    expect(screen.getByText('Checking your session')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Login page')).toBeInTheDocument();
+    });
+
     expect(screen.queryByText('Private profile content')).not.toBeInTheDocument();
-    expect(screen.queryByText('Login page')).not.toBeInTheDocument();
   });
 
   it('redirects signed-out users to login after auth initialization', async () => {
@@ -114,12 +116,19 @@ describe('RequireAuthenticated', () => {
     expect(screen.queryByText('Private profile content')).not.toBeInTheDocument();
   });
 
-  it('renders protected content for authenticated users', () => {
+  it('shows the system loader while an authenticated session is still confirming', () => {
     authState.loading = true;
 
     renderProtectedPage(baseUser);
 
-    expect(screen.getByText('Private profile content')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.queryByText('Checking your session')).not.toBeInTheDocument();
+    expect(screen.queryByText('Private profile content')).not.toBeInTheDocument();
+  });
+
+  it('renders protected content after auth finishes', () => {
+    renderProtectedPage(baseUser);
+
+    expect(screen.getByText('Private profile content')).toBeInTheDocument();
   });
 });
