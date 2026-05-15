@@ -1361,12 +1361,12 @@ const AdminTaxonomyPage: React.FC = () => {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-              {isMeasurementsRoute ? 'Measurement Points' : 'Taxonomy Configuration'}
+              {isMeasurementsRoute ? 'Measurement Points' : 'Taxonomy'}
             </h1>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
               {isMeasurementsRoute
                 ? 'Define the global measurement points brands and buyers use across sizing, custom orders, and size charts.'
-                : 'Manage product categories, sub-categories, and taxonomy used across the platform.'}
+                : 'Garment categories define what the item is. Garment subcategories define the specific item type. Do not use audience, occasion, style, cultural, price, or service terms as categories.'}
             </p>
           </div>
 
@@ -1382,7 +1382,7 @@ const AdminTaxonomyPage: React.FC = () => {
                     : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white'
                 }`}
               >
-                Taxonomy Tree
+                Garment categories
               </button>
               <button
                 type="button"
@@ -1402,10 +1402,17 @@ const AdminTaxonomyPage: React.FC = () => {
 
       {activeTab === 'taxonomy' ? (
         <section className="space-y-5">
+          <div className="rounded-2xl border border-indigo-200/60 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-400/30 dark:bg-indigo-500/10 dark:text-indigo-100">
+            <div className="font-semibold">Taxonomy governance</div>
+            <p className="mt-1 text-xs leading-5">
+              Discovery dimensions help creators describe style, culture, occasion, fabric, color, and fit. Hashtags are social/search terms and do not replace structured metadata.
+            </p>
+          </div>
+
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
               <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200">
-                {activeCategoryCount} active categories
+                {activeCategoryCount} active garment categories
               </span>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 dark:bg-white/10 dark:text-slate-200">
                 {categories.length} total
@@ -1421,7 +1428,7 @@ const AdminTaxonomyPage: React.FC = () => {
               <input
                 value={categorySearch}
                 onChange={(event) => setCategorySearch(event.target.value)}
-                placeholder="Search taxonomy..."
+                placeholder="Search garment categories..."
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white sm:w-[320px]"
               />
               <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
@@ -1437,7 +1444,7 @@ const AdminTaxonomyPage: React.FC = () => {
                 onClick={openCreateCategory}
                 className="rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
               >
-                Create Category
+                Create garment category
               </button>
             </div>
           </div>
@@ -1459,9 +1466,9 @@ const AdminTaxonomyPage: React.FC = () => {
               <table className="w-full min-w-[860px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-200/70 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-slate-400">
-                    <th className="px-6 py-4">Category Name</th>
+                    <th className="px-6 py-4">Garment category</th>
                     <th className="px-5 py-4">Status</th>
-                    <th className="px-5 py-4">Sub-categories</th>
+                    <th className="px-5 py-4">Garment subcategories</th>
                     <th className="px-6 py-4 text-right">Menu</th>
                   </tr>
                 </thead>
@@ -1519,21 +1526,21 @@ const AdminTaxonomyPage: React.FC = () => {
                                 onClick={() => openCreateSubCategory(category)}
                                 className="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
                               >
-                                Add sub-category
+                                Add garment type
                               </button>
                               <button
                                 type="button"
                                 onClick={() => openEditCategory(category)}
                                 className="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
                               >
-                                Edit category
+                                Edit garment category
                               </button>
                               <button
                                 type="button"
                                 onClick={() => toggleCategoryActive(category)}
                                 className="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
                               >
-                                {isCategoryActive ? 'Deactivate category' : 'Activate category'}
+                                {isCategoryActive ? 'Deactivate garment category' : 'Activate garment category'}
                               </button>
                             </div>
                           </details>
@@ -1544,7 +1551,7 @@ const AdminTaxonomyPage: React.FC = () => {
                   {filteredCategories.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-300">
-                        No taxonomy nodes found for this filter.
+                        No garment categories found for this filter.
                       </td>
                     </tr>
                   ) : null}
@@ -2142,13 +2149,13 @@ const AdminTaxonomyPage: React.FC = () => {
           setShowCategoryCreate(false);
           setEditingCategory(null);
         }}
-        title={editingCategory ? `Edit ${editingCategory.name}` : 'Create Category'}
+        title={editingCategory ? `Edit ${editingCategory.name}` : 'Create garment category'}
         size="sm"
         backdropStyle="light"
       >
         <form onSubmit={saveCategory} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200">Category name</label>
+            <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200">Garment category name</label>
             <input
               value={categoryFormName}
               onChange={(event) => setCategoryFormName(event.target.value)}
@@ -2157,11 +2164,12 @@ const AdminTaxonomyPage: React.FC = () => {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200">Description (optional)</label>
+            <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200">Description</label>
             <textarea
               value={categoryFormDescription}
               onChange={(event) => setCategoryFormDescription(event.target.value)}
               rows={3}
+              required
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
             />
           </div>
@@ -2188,10 +2196,10 @@ const AdminTaxonomyPage: React.FC = () => {
             </button>
             <button
               type="submit"
-              disabled={categorySaving || !categoryFormName.trim()}
+              disabled={categorySaving || !categoryFormName.trim() || !categoryFormDescription.trim()}
               className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
             >
-              {categorySaving ? 'Saving...' : editingCategory ? 'Update Category' : 'Create Category'}
+              {categorySaving ? 'Saving...' : editingCategory ? 'Update garment category' : 'Create garment category'}
             </button>
           </div>
         </form>
@@ -2203,13 +2211,13 @@ const AdminTaxonomyPage: React.FC = () => {
           setShowSubCategoryCreateFor(null);
           setEditingSubCategory(null);
         }}
-        title={editingSubCategory ? `Edit ${editingSubCategory.name}` : `Add sub-category to ${showSubCategoryCreateFor?.name ?? ''}`}
+        title={editingSubCategory ? `Edit ${editingSubCategory.name}` : `Add garment type to ${showSubCategoryCreateFor?.name ?? ''}`}
         size="sm"
         backdropStyle="light"
       >
         <form onSubmit={saveSubCategory} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200">Sub-category name</label>
+            <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200">Garment type name</label>
             <input
               value={subCategoryFormName}
               onChange={(event) => setSubCategoryFormName(event.target.value)}
@@ -2218,11 +2226,12 @@ const AdminTaxonomyPage: React.FC = () => {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200">Description (optional)</label>
+            <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200">Description</label>
             <textarea
               value={subCategoryFormDescription}
               onChange={(event) => setSubCategoryFormDescription(event.target.value)}
               rows={3}
+              required
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
             />
           </div>
@@ -2249,10 +2258,10 @@ const AdminTaxonomyPage: React.FC = () => {
             </button>
             <button
               type="submit"
-              disabled={subCategorySaving || !subCategoryFormName.trim()}
+              disabled={subCategorySaving || !subCategoryFormName.trim() || !subCategoryFormDescription.trim()}
               className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
             >
-              {subCategorySaving ? 'Saving...' : editingSubCategory ? 'Update Sub-category' : 'Create Sub-category'}
+              {subCategorySaving ? 'Saving...' : editingSubCategory ? 'Update garment type' : 'Create garment type'}
             </button>
           </div>
         </form>

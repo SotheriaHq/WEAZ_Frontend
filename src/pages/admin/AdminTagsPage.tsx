@@ -431,15 +431,15 @@ const AdminTagsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <AdminBreadcrumb segments={[{ label: 'Tags' }]} />
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🏷️ Tags</h1>
+      <AdminBreadcrumb segments={[{ label: 'Hashtag moderation' }]} />
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Hashtag moderation</h1>
 
       <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-gray-900 dark:text-white">Review queue</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Hashtag review queue</p>
             <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
-              Open any tag to review lifecycle history, usage actors, aliases, and moderation actions.
+              Hashtags are social/search terms. They do not create garment categories, discovery dimensions, or filter values.
             </p>
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -455,7 +455,7 @@ const AdminTagsPage: React.FC = () => {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search tags..."
+          placeholder="Search hashtags..."
           className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
         />
         <UniversalSelect
