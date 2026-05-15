@@ -54,9 +54,9 @@ type CatalogTabNoticeProps = {
 };
 
 const CatalogTabNotice: React.FC<CatalogTabNoticeProps> = ({ title, description }) => (
-  <div className="flex min-h-[400px] w-full items-center justify-center rounded-3xl border border-dashed border-gray-200 px-8 py-16 text-center dark:border-gray-800">
+  <div className="flex min-h-[400px] w-full items-center justify-center rounded-3xl bg-gray-50/50 px-8 py-16 text-center dark:bg-white/[0.03]">
     <div className="max-w-2xl space-y-4">
-      <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[24px] border border-gray-200 text-4xl shadow-sm dark:border-gray-800">
+      <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[24px] bg-white text-4xl shadow-sm dark:bg-white/5">
         💬
       </div>
       <div className="space-y-2">

@@ -159,7 +159,7 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="surface-card relative overflow-hidden rounded-3xl border backdrop-blur-xl"
+      className="surface-card relative overflow-hidden rounded-3xl backdrop-blur-xl"
     >
       {/* Animated gradient background */}
       <div className="absolute inset-0 overflow-hidden">
@@ -205,7 +205,7 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2 + index * 0.1 }}
-              className="surface-control flex items-center gap-2 rounded-full border px-4 py-2 shadow-sm"
+              className="surface-control flex items-center gap-2 rounded-full px-4 py-2 shadow-sm"
             >
               <span>{tip.icon}</span>
               <span className="text-sm text-theme-secondary">{tip.text}</span>
@@ -231,7 +231,7 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onViewAll}
-              className="surface-control surface-interactive-hover flex items-center gap-2 rounded-full border px-6 py-3 font-semibold transition-all"
+              className="surface-control surface-interactive-hover flex items-center gap-2 rounded-full px-6 py-3 font-semibold transition-all"
             >
               <TrendingUp className="w-5 h-5" />
               View All Designs

@@ -181,7 +181,7 @@ const ComingSoon: React.FC<ComingSoonProps> = ({
           >
             <div className="relative">
               {/* Icon badge */}
-              <div className={`w-32 h-32 rounded-3xl bg-white dark:bg-white/10 shadow-xl dark:shadow-none backdrop-blur-sm flex items-center justify-center border border-gray-200 dark:border-white/10`}>
+              <div className="flex h-32 w-32 items-center justify-center rounded-3xl bg-white shadow-xl backdrop-blur-sm dark:bg-white/10 dark:shadow-none">
                 <span className="text-7xl">{emoji}</span>
               </div>
               {/* Glow effect */}
@@ -211,7 +211,7 @@ const ComingSoon: React.FC<ComingSoonProps> = ({
           {/* ETA badge */}
           {eta && (
             <motion.div
-              className="inline-flex items-center gap-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-full px-4 py-2 mb-8 shadow-sm dark:shadow-none"
+              className="mb-8 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-sm dark:bg-white/5 dark:shadow-none"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.3 }}
@@ -236,7 +236,7 @@ const ComingSoon: React.FC<ComingSoonProps> = ({
                 {features.map((feature, index) => (
                   <motion.div
                     key={feature}
-                    className="flex items-center gap-2 bg-white dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-full px-4 py-2 shadow-sm dark:shadow-none"
+                    className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-sm backdrop-blur-sm dark:bg-white/5 dark:shadow-none"
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.5 + index * 0.1 }}
@@ -270,7 +270,7 @@ const ComingSoon: React.FC<ComingSoonProps> = ({
             )}
             <button
               onClick={() => navigate(backPath)}
-              className="flex items-center gap-2 px-6 py-3 rounded-full bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-white font-medium hover:bg-gray-50 dark:hover:bg-white/20 transition-all shadow-sm dark:shadow-none"
+              className="flex items-center gap-2 rounded-full bg-white px-6 py-3 font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 dark:bg-white/10 dark:text-white dark:shadow-none dark:hover:bg-white/20"
             >
               Back to Home
             </button>

@@ -45,7 +45,7 @@ export const StorefrontCatalogTab: React.FC<StorefrontCatalogTabProps> = ({
 
   if (products.length === 0) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center rounded-[2rem] border border-dashed border-gray-200 dark:border-white/10">
+      <div className="flex min-h-[40vh] items-center justify-center rounded-[2rem] bg-gray-50/50 dark:bg-white/[0.03]">
         <div className="text-center">
           <p className="text-4xl">🛍️</p>
           <h3 className="mt-4 text-lg font-bold text-gray-900 dark:text-white">Catalog empty</h3>

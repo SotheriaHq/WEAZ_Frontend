@@ -105,7 +105,7 @@ const NotFound: React.FC = () => {
 
         {/* Helpful info card */}
         <motion.div
-          className="bg-white/50 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl p-6 mb-8"
+          className="mb-8 rounded-2xl bg-white/50 p-6 backdrop-blur-sm dark:bg-white/5"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.4 }}
@@ -150,7 +150,7 @@ const NotFound: React.FC = () => {
           </button>
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-6 py-3 rounded-full bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/20 text-gray-900 dark:text-white font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition-all"
+            className="flex items-center gap-2 rounded-full bg-gray-100 px-6 py-3 font-medium text-gray-900 transition-all hover:bg-gray-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
           >
             <ArrowLeft className="w-5 h-5" />
             Go Back

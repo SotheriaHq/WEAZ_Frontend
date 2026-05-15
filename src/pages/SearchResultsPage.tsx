@@ -180,7 +180,7 @@ const SearchResultsPage: React.FC = () => {
         </div>
 
         {!query.trim() ? (
-          <div className="rounded-[2rem] border border-dashed border-gray-300 bg-white/70 p-10 text-center text-gray-600 dark:border-white/12 dark:bg-white/5 dark:text-gray-300">
+          <div className="rounded-[2rem] bg-white/70 p-10 text-center text-gray-600 dark:bg-white/5 dark:text-gray-300">
             Enter a search query to explore the catalog.
           </div>
         ) : null}
@@ -200,7 +200,7 @@ const SearchResultsPage: React.FC = () => {
         ) : null}
 
         {!isLoading && !error && query.trim() && results?.items.length === 0 ? (
-          <div className="rounded-[2rem] border border-dashed border-gray-300 bg-white/70 p-10 text-center dark:border-white/12 dark:bg-white/5">
+          <div className="rounded-[2rem] bg-white/70 p-10 text-center dark:bg-white/5">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">No results for “{query}”</h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">Try broader terms or switch tabs to inspect a different entity type.</p>
           </div>
