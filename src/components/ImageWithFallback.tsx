@@ -3,6 +3,7 @@ import DefaultAvatar from './DefaultAvatar';
 import { brandApi } from '@/api/BrandApi';
 import MediaRenderer from './media/MediaRenderer';
 import { cn } from '@/lib/utils';
+import { isKnownUnavailableSeedMediaUrl } from '@/utils/mediaSource';
 
 interface ImageWithFallbackProps {
   src?: string | null;
@@ -277,12 +278,13 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   // Without this guard, a null src causes the shimmer to show forever because
   // resolved stays null even after the useEffect completes with no URL.
   const hasSource = !!(fileId || src);
+  const isKnownUnavailableSource = isKnownUnavailableSeedMediaUrl(resolved ?? src);
   const isResolving = hasSource && !hadError && !resolved;
   // Shimmer should stay visible until the image is fully loaded, not just until the URL resolves.
   // Without this, there is a white flash between "URL resolved" and "image onLoad" because the
   // <img> is opacity-0 with no background behind it during that window.
-  const showShimmer = isResolving || (hasSource && !hadError && !loaded);
-  const showFallback = hadError;
+  const showFallback = hadError || isKnownUnavailableSource;
+  const showShimmer = !showFallback && (isResolving || (hasSource && !hadError && !loaded));
   const wrapperClassName = cn('overflow-hidden', roundClass(rounded), containerClassName);
 
   return (

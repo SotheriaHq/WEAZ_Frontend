@@ -329,6 +329,17 @@ export interface BulkUnpublishProductsResponse {
   message: string;
 }
 
+export const normalizeProductDto = (raw: ProductDto | null | undefined): ProductDto | null => {
+  if (!raw) return null;
+  const title = String((raw as any).title ?? raw.name ?? 'Product');
+  const name = String(raw.name ?? title);
+  return {
+    ...raw,
+    title,
+    name,
+  };
+};
+
 // =====================
 // Product API
 // =====================
@@ -348,8 +359,8 @@ export const productApi = {
       }>(`/products/${productId}`, {
         params: options?.includeDeleted ? { includeDeleted: true } : undefined,
       });
-      return (
-        response.data?.data ?? (response.data as unknown as ProductDto) ?? null
+      return normalizeProductDto(
+        response.data?.data ?? (response.data as unknown as ProductDto) ?? null,
       );
     } catch (error) {
       console.error("Failed to fetch product", error);

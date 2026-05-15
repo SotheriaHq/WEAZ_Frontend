@@ -62,6 +62,7 @@ const MarketPlace = lazy(() => import('./pages/MarketPlace'));
 const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
 const Profile = lazy(() => import('./pages/catalog/Catalog'));
 const CreateDesignPage = lazy(() => import('./pages/catalog/CreateDesign'));
+const DesignDetailsPage = lazy(() => import('./pages/catalog/DesignDetailsPage'));
 const CollectionRouter = lazy(() => import('./pages/catalog/CollectionRouter'));
 const ProductDetailsPage = lazy(() => import('./pages/catalog/ProductDetailsPage'));
 const SizeChartsPage = lazy(() => import('./pages/size-charts/SizeChartsPage'));
@@ -469,7 +470,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/designs/:id',
-        element: <DesignViewAliasRedirect />,
+        element: <Layout><DesignDetailsPage /></Layout>,
       },
       {
         path: '/products/create',

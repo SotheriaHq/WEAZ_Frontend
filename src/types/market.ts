@@ -15,6 +15,8 @@ export interface MarketMedia {
 export interface MarketItem {
   id: string;
   entityType: CatalogEntityType;
+  designId?: string | null;
+  legacyCollectionId?: string | null;
   collectionId: string;
   coverMediaId?: string | null;
   collectionTitle: string;

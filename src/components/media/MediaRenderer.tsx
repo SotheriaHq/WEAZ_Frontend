@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
+import { isKnownUnavailableSeedMediaUrl } from '@/utils/mediaSource';
 
 export type MediaKind = 'image' | 'video';
 
@@ -121,13 +122,17 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
     () => (typeof src === 'string' ? src.trim() : ''),
     [src],
   );
+  const isKnownUnavailableSource = React.useMemo(
+    () => isKnownUnavailableSeedMediaUrl(normalizedSrc),
+    [normalizedSrc],
+  );
   const [hasLoadError, setHasLoadError] = React.useState(false);
 
   React.useEffect(() => {
     setHasLoadError(false);
   }, [kind, normalizedSrc]);
 
-  const shouldRenderMedia = normalizedSrc.length > 0 && !hasLoadError;
+  const shouldRenderMedia = normalizedSrc.length > 0 && !hasLoadError && !isKnownUnavailableSource;
 
   if (!shouldRenderMedia) {
     return (
