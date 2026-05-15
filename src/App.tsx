@@ -9,7 +9,7 @@ import Success from './pages/Success';
 import LoginPage from './pages/Login';
 import AccountReactivationRequestPage from './pages/AccountReactivationRequestPage';
 // Removed separate BrandPublic visitor page; unified profile view handles both owner & visitor modes
-import ProtectedRoute from './components/ProtectedRoute';
+import ProtectedRoute, { RequireAuthenticated } from './components/ProtectedRoute';
 import GuestRoute from './components/GuestRoute';
 import { AuthProvider } from './context/AuthContext';
 import { DropdownManagerProvider } from './context/DropdownManagerContext';
@@ -686,9 +686,11 @@ const router = createBrowserRouter([
       {
         path: '/profile',
         element: (
-          <AdminProfileRouteGuard>
-            <ProfileLayout />
-          </AdminProfileRouteGuard>
+          <RequireAuthenticated>
+            <AdminProfileRouteGuard>
+              <ProfileLayout />
+            </AdminProfileRouteGuard>
+          </RequireAuthenticated>
         ),
         children: profileChildren,
       },
