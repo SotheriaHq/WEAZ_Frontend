@@ -73,9 +73,6 @@ export function determineNotificationRoute(notification: NormalizedNotification)
     // Fallback: type-specific routing for edge cases
     switch (type) {
         case NotificationTypes.THREAD:
-            if (target?.type === 'DESIGN') {
-                return buildDesignRoute({ designId: target.id });
-            }
             if (target?.type === 'COLLECTION') {
                 return `/market?openDesign=${target.id}`;
             }
@@ -85,12 +82,6 @@ export function determineNotificationRoute(notification: NormalizedNotification)
             return fallbackUrl;
 
         case NotificationTypes.COMMENT:
-            if (target?.type === 'DESIGN') {
-                return buildDesignRoute({
-                    designId: target.id,
-                    query: subTargetId ? { commentId: subTargetId } : undefined,
-                });
-            }
             if (target?.type === 'COLLECTION' && subTargetId) {
                 return `/market?openDesign=${target.id}&commentId=${subTargetId}`;
             }

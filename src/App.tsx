@@ -384,17 +384,6 @@ const DesignEditAliasRedirect: React.FC = () => {
   );
 };
 
-const DesignViewAliasRedirect: React.FC = () => {
-  const { id } = useParams<{ id?: string }>();
-  const location = useLocation();
-  const params = new URLSearchParams(location.search);
-  if (id && !params.has('openDesign')) {
-    params.set('openDesign', id);
-  }
-  const query = params.toString();
-  return <Navigate to={`/market${query ? `?${query}` : ''}${location.hash}`} replace />;
-};
-
 const ProductEditAliasRedirect: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   return <StudioRedirect to={id ? `/studio/store/products/${encodeURIComponent(id)}/edit` : '/studio/store/products/new'} preserveCurrentQuery />;

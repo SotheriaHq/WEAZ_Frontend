@@ -64,8 +64,9 @@ const DesignDetailsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <VLoader size={32} phase="loading" label="Loading design..." />
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
+        <VLoader size={32} phase="loading" showLabel={false} />
+        <p className="text-sm font-medium text-theme-secondary">Loading design...</p>
       </div>
     );
   }
