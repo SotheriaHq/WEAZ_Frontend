@@ -116,15 +116,13 @@ describe('RequireAuthenticated', () => {
     expect(screen.queryByText('Private profile content')).not.toBeInTheDocument();
   });
 
-  it('shows session refresh status while an authenticated session is still confirming', () => {
+  it('renders protected content while an authenticated session revalidates', () => {
     authState.loading = true;
 
     renderProtectedPage(baseUser);
 
-    expect(screen.getByRole('status')).toBeInTheDocument();
-    expect(screen.getByText('Refreshing your session')).toBeInTheDocument();
-    expect(screen.getByText('We are checking your saved sign-in before reopening this page.')).toBeInTheDocument();
-    expect(screen.queryByText('Private profile content')).not.toBeInTheDocument();
+    expect(screen.getByText('Private profile content')).toBeInTheDocument();
+    expect(screen.queryByText('Refreshing your session')).not.toBeInTheDocument();
   });
 
   it('renders protected content after auth finishes', () => {
