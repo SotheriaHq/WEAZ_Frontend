@@ -435,8 +435,8 @@ const router = createBrowserRouter([
         path: '/',
         element: <Layout />,
         children: [
-          { index: true, element: withRouteFallback(<Market />) },
-          { path: 'market', element: withRouteFallback(<Market />) },
+          { index: true, element: withRouteFallback(<Market mode="designs" />) },
+          { path: 'market', element: withRouteFallback(<Market mode="designs" />) },
           { path: 'market-place', element: withRouteFallback(<MarketPlace />) },
           { path: 'search', element: withRouteFallback(<SearchResultsPage />) },
           { path: 'subscriptions', element: <SubscriptionsPlaceholder /> },

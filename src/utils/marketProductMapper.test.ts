@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { shouldLoadProductFallback } from './marketFallback';
 import { normalizeMarketProduct } from './marketProductMapper';
 
 describe('normalizeMarketProduct', () => {
@@ -35,5 +36,43 @@ describe('normalizeMarketProduct', () => {
 
     expect(product?.name).toBe('Titled Product');
     expect(product?.entityType).toBe('PRODUCT');
+  });
+});
+
+describe('shouldLoadProductFallback', () => {
+  it('keeps product fallback disabled for the designs feed even when designs are empty', () => {
+    expect(
+      shouldLoadProductFallback({
+        mode: 'designs',
+        selectedCategory: 'ALL',
+        designItemCount: 0,
+      }),
+    ).toBe(false);
+  });
+
+  it('allows product fallback only for the explicit market context with an empty all-design feed', () => {
+    expect(
+      shouldLoadProductFallback({
+        mode: 'market',
+        selectedCategory: 'ALL',
+        designItemCount: 0,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldLoadProductFallback({
+        mode: 'market',
+        selectedCategory: 'AFRICAN',
+        designItemCount: 0,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldLoadProductFallback({
+        mode: 'market',
+        selectedCategory: 'ALL',
+        designItemCount: 2,
+      }),
+    ).toBe(false);
   });
 });

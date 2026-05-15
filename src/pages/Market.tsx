@@ -29,6 +29,7 @@ import {
   type RawProductsPayload,
 } from '@/utils/marketProductMapper';
 import { toDesignMarketItem } from '@/utils/designMarketItem';
+import { shouldLoadProductFallback, type MarketPageMode } from '@/utils/marketFallback';
 
 // Error type detection
 type ErrorType = 'network' | 'timeout' | 'server' | 'empty' | 'category_empty' | 'unknown';
@@ -242,7 +243,11 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
   );
 };
 
-const Market: React.FC = () => {
+interface MarketProps {
+  mode?: MarketPageMode;
+}
+
+const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
@@ -304,7 +309,13 @@ const Market: React.FC = () => {
         counts: 'combined',
       });
       setItems(feed.items);
-      if (feed.items.length === 0 && selectedCategory === 'ALL') {
+      if (
+        shouldLoadProductFallback({
+          mode,
+          selectedCategory,
+          designItemCount: feed.items.length,
+        })
+      ) {
         try {
           const response = await apiClient.get('/products/market', {
             params: { limit: 24, sortBy: 'newest' },
@@ -345,7 +356,7 @@ const Market: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedCategory, hasLoadedOnce, dispatch]);
+  }, [selectedCategory, hasLoadedOnce, dispatch, mode]);
 
   // Load feed on mount and when dependencies change
   useEffect(() => {
@@ -700,7 +711,11 @@ const Market: React.FC = () => {
             </div>
           ))}
         </Masonry>
-      ) : selectedCategory === 'ALL' && fallbackProducts.length > 0 ? (
+      ) : shouldLoadProductFallback({
+        mode,
+        selectedCategory,
+        designItemCount: filteredItems.length,
+      }) && fallbackProducts.length > 0 ? (
         <section className="space-y-4" data-entity-type="PRODUCT" data-card-branch="product">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-theme-secondary">Ready-to-wear</p>
@@ -765,7 +780,7 @@ export default Market;
 // Modal outside of main layout tree for z-index safety
 // Render within page to keep simple routing for now
 export const MarketPageWithView: React.FC = () => {
-  return <Market />;
+  return <Market mode="designs" />;
 };
 
 
