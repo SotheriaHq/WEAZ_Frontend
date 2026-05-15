@@ -68,6 +68,13 @@ import {
   removePublishTask,
 } from '@/utils/publishTracker';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
+import {
+  CREATOR_AUDIENCE_OPTIONS,
+  CREATOR_METADATA_HELP,
+  getAudienceLabel,
+  mapCreatorMetadataError,
+  normalizeHashtagLabel,
+} from '@/utils/creatorMetadata';
 import { TourOverlay, type TourStep } from '@/components/ui/TourOverlay';
 // ============================================================================
 
@@ -485,8 +492,10 @@ const CreateDesignInner: React.FC = () => {
     files.length >= DESIGN_REQUIRED_MEDIA_COUNT &&
     files.length <= DESIGN_MAX_MEDIA_COUNT &&
     selectedTags.length > 0 &&
+    getSelectedFilterValueIds().length > 0 &&
     categoryId.trim().length > 0 &&
-    categoryTypeId.trim().length > 0;
+    categoryTypeId.trim().length > 0 &&
+    type.trim().length > 0;
   const hasDraftContent = Boolean(
     title.trim().length > 0 ||
     description.trim().length > 0 ||
@@ -841,18 +850,21 @@ const CreateDesignInner: React.FC = () => {
   const handlePublishClick = () => {
     if (!isValid) {
       const reasons: string[] = [];
-      if (title.trim().length === 0) reasons.push("a title");
+      if (title.trim().length === 0) reasons.push("Add a title.");
       if (files.length < DESIGN_REQUIRED_MEDIA_COUNT)
         reasons.push(
-          `the required ${DESIGN_REQUIRED_MEDIA_COUNT} media slots (${DESIGN_MEDIA_SLOTS.slice(0, DESIGN_REQUIRED_MEDIA_COUNT).join(', ')})`,
+          `Add the required ${DESIGN_REQUIRED_MEDIA_COUNT} media slots (${DESIGN_MEDIA_SLOTS.slice(0, DESIGN_REQUIRED_MEDIA_COUNT).join(', ')}).`,
         );
       if (files.length > DESIGN_MAX_MEDIA_COUNT)
-        reasons.push(`no more than ${DESIGN_MAX_MEDIA_COUNT} media assets`);
-      if (selectedTags.length === 0) reasons.push("at least one tag");
-      if (categoryId.trim().length === 0) reasons.push("a category");
+        reasons.push(`Use no more than ${DESIGN_MAX_MEDIA_COUNT} media assets.`);
+      if (categoryId.trim().length === 0) reasons.push("Choose what this item is.");
       if (categoryTypeId.trim().length === 0)
-        reasons.push("a sub-category");
-      toast.error(`Please provide ${reasons.join(", ")}.`);
+        reasons.push("Choose a garment type.");
+      if (type.trim().length === 0) reasons.push("Choose who this item is for.");
+      if (getSelectedFilterValueIds().length === 0)
+        reasons.push("Add at least one style detail.");
+      if (selectedTags.length === 0) reasons.push("Add at least one hashtag.");
+      toast.error(reasons[0] ?? "Complete the required details before going live.");
       return;
     }
 
@@ -925,7 +937,7 @@ const CreateDesignInner: React.FC = () => {
           },
         });
 
-        toast.info('Publishing in background. You can keep browsing your profile.');
+        toast.info('Going live in the background. You can keep browsing your profile.');
 
         void (async () => {
           try {
@@ -1000,21 +1012,19 @@ const CreateDesignInner: React.FC = () => {
               legacyCollectionId: id,
               collectionId: id,
               coverPreviewUrl: undefined,
-              message: 'Published',
+              message: 'Live',
             }, publishTaskScope);
-            toast.success('Design published');
+            toast.success('Design is live');
             window.setTimeout(() => removePublishTask(task.id, publishTaskScope), 30_000);
           } catch (backgroundError) {
             const rawErrMsg =
               (backgroundError as any)?.response?.data?.message ||
-              (backgroundError instanceof Error ? backgroundError.message : 'Failed to publish design');
-            const errMsg = Array.isArray(rawErrMsg)
-              ? rawErrMsg[0] ?? 'Failed to publish design'
-              : String(rawErrMsg);
+              (backgroundError instanceof Error ? backgroundError.message : 'Failed to go live with design');
+            const errMsg = mapCreatorMetadataError(rawErrMsg, 'Failed to go live with design');
             updatePublishTask(task.id, {
               status: 'failed',
               progress: 100,
-              message: 'Publish failed',
+              message: 'Go live failed',
               error: errMsg,
             }, publishTaskScope);
             toast.error(errMsg);
@@ -1058,7 +1068,7 @@ const CreateDesignInner: React.FC = () => {
             publishingVisibility: visibility,
           },
         });
-        toast.info('Publishing in background. You can keep browsing your profile.');
+        toast.info('Going live in the background. You can keep browsing your profile.');
 
         void (async () => {
           let uploadedDesignId: string | undefined;
@@ -1091,7 +1101,7 @@ const CreateDesignInner: React.FC = () => {
                 updatePublishTask(task.id, {
                   status: value >= 100 ? 'finalizing' : 'uploading',
                   progress: mappedProgress,
-                  message: value >= 100 ? 'Draft uploaded. Preparing publish...' : 'Uploading media...',
+                  message: value >= 100 ? 'Draft uploaded. Preparing go-live...' : 'Uploading media...',
                 }, publishTaskScope);
               },
               false,
@@ -1099,7 +1109,7 @@ const CreateDesignInner: React.FC = () => {
 
             uploadedDesignId = extractDesignId(response);
             if (!uploadedDesignId) {
-              throw new Error('Upload completed but no design id was returned. Please retry publish.');
+              throw new Error('Upload completed but no design id was returned. Please retry go-live.');
             }
 
             if (pendingCustomOrderDraft) {
@@ -1130,7 +1140,7 @@ const CreateDesignInner: React.FC = () => {
               designId: uploadedDesignId,
               legacyCollectionId: uploadedDesignId,
               collectionId: uploadedDesignId,
-              message: 'Publishing design...',
+              message: 'Taking design live...',
             }, publishTaskScope);
 
             await finalizeDesignUploads(
@@ -1167,22 +1177,20 @@ const CreateDesignInner: React.FC = () => {
               legacyCollectionId: uploadedDesignId,
               collectionId: uploadedDesignId,
               coverPreviewUrl: undefined,
-              message: 'Published',
+              message: 'Live',
             }, publishTaskScope);
 
             if (user?.id) {
               await fetchCollections(user.id);
             }
 
-            toast.success('Design published');
+            toast.success('Design is live');
             window.setTimeout(() => removePublishTask(task.id, publishTaskScope), 30_000);
           } catch (backgroundError) {
             const rawErrMsg =
               (backgroundError as any)?.response?.data?.message ||
-              (backgroundError instanceof Error ? backgroundError.message : 'Failed to publish design');
-            const errMsg = Array.isArray(rawErrMsg)
-              ? rawErrMsg[0] ?? 'Failed to publish design'
-              : String(rawErrMsg);
+              (backgroundError instanceof Error ? backgroundError.message : 'Failed to go live with design');
+            const errMsg = mapCreatorMetadataError(rawErrMsg, 'Failed to go live with design');
             updatePublishTask(task.id, {
               status: 'failed',
               progress: 100,
@@ -1190,8 +1198,8 @@ const CreateDesignInner: React.FC = () => {
               legacyCollectionId: uploadedDesignId,
               collectionId: uploadedDesignId,
               message: uploadedDesignId
-                ? 'Uploaded with setup issue. Open editor to complete and republish.'
-                : 'Publish failed',
+                ? 'Uploaded with setup issue. Open editor to complete and go live again.'
+                : 'Go live failed',
               error: errMsg,
             }, publishTaskScope);
             toast.error(
@@ -1207,18 +1215,18 @@ const CreateDesignInner: React.FC = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.toLowerCase().includes("cancelled")) {
-        toast.info("Publish cancelled");
+        toast.info("Go-live cancelled");
         setShowPublishModal(false);
         return;
       }
       console.error(error);
       const errMsg = (error as any)?.response?.data?.message;
       toast.error(
-        typeof errMsg === "string"
-          ? errMsg
+        typeof errMsg === "string" || Array.isArray(errMsg)
+          ? mapCreatorMetadataError(errMsg, "Failed to go live with design")
           : isEditMode
             ? "Failed to update design"
-            : "Failed to publish design",
+            : "Failed to go live with design",
       );
       throw error; // Re-throw so modal can handle state
     } finally {
@@ -1317,9 +1325,9 @@ const CreateDesignInner: React.FC = () => {
       },
       {
         targetId: 'design-targeting-section',
-        title: 'Targeting & visibility',
+        title: 'Audience & visibility',
         description:
-          "Choose who sees this design — men, women, or everyone. Set it public or keep it private until it's ready.",
+          "Choose who this item is for, then decide whether everyone can see it or only you can.",
         emoji: '🎯',
         onEnter: () => setExpandedSections((prev) => ({ ...prev, targeting: true })),
         enterDelay: 350,
@@ -1476,7 +1484,7 @@ const CreateDesignInner: React.FC = () => {
                   ))}
                 </div>
                 <p className="text-center text-[10px] text-theme-secondary mt-1">
-                  * Required for publishing - fill Front, Back, Left, and Right
+                  * Required to go live - fill Front, Back, Left, and Right
                 </p>
               </div>
             ) : (
@@ -1617,14 +1625,14 @@ const CreateDesignInner: React.FC = () => {
                   required
                 />
 
-                <div className="surface-panel-subtle rounded-xl border p-3 sm:p-4">
+                <div className="surface-panel-subtle rounded-lg border border-gray-200/60 p-3 dark:border-white/10">
                   <div className="mb-3 flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wide text-theme-secondary">
-                      Design Metadata
+                      Creator metadata
                     </p>
                   </div>
                   <div className="pr-1 sm:pr-2">
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <div className="space-y-1">
                         <label className="text-sm font-medium text-theme flex items-center">
                           Tell Your Story
@@ -1654,7 +1662,7 @@ const CreateDesignInner: React.FC = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <UniversalSelect
-                          label="Category"
+                          label="What is it?"
                           value={categoryId}
                           onChange={setCategoryId}
                           options={categories.map((c) => ({
@@ -1664,7 +1672,7 @@ const CreateDesignInner: React.FC = () => {
                           placeholder={
                             loadingCategories
                               ? "Loading..."
-                              : "Select a category"
+                              : "Choose what this item is"
                           }
                           disabled={disabled}
                           searchable
@@ -1674,7 +1682,7 @@ const CreateDesignInner: React.FC = () => {
                         />
 
                         <UniversalSelect
-                          label="Sub-Category"
+                          label="Garment type"
                           value={categoryTypeId}
                           onChange={setCategoryTypeId}
                           options={categoryTypeOptions.map((categoryType) => ({
@@ -1685,7 +1693,7 @@ const CreateDesignInner: React.FC = () => {
                             loadingCategories
                               ? "Loading..."
                               : categoryTypeOptions.length
-                                ? "Select a sub-category"
+                                ? "Choose a garment type"
                                 : "No types available"
                           }
                           disabled={
@@ -1698,7 +1706,6 @@ const CreateDesignInner: React.FC = () => {
                         />
                       </div>
 
-                      {/* Filter Selector */}
                       <FilterSelector
                         value={filterSelection}
                         onChange={setFilterSelection}
@@ -1707,17 +1714,15 @@ const CreateDesignInner: React.FC = () => {
                         onTagSuggestions={handleFilterTagSuggestions}
                       />
 
-                      {/* Tags Section */}
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         <label className="text-sm font-medium text-theme flex items-center">
-                          🏷️ Tags (up to 10)
-                          <InfoTooltip text="Tags improve catalog discoverability. Add manually or use filter-driven suggestions. Up to 10 tags per design." />
+                          Hashtags (up to 10)
+                          <InfoTooltip text={CREATOR_METADATA_HELP.hashtags} />
                         </label>
 
-                        <div className="surface-panel-subtle p-4 rounded-xl border">
-                          {/* Selected tags */}
+                        <div className="surface-panel-subtle rounded-lg border border-gray-200/60 p-3 dark:border-white/10">
                           {selectedTags.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mb-3">
+                            <div className="mb-2 flex flex-wrap gap-1.5">
                               {selectedTags.map((tag, idx) => (
                                 <motion.span
                                   key={tag}
@@ -1726,7 +1731,7 @@ const CreateDesignInner: React.FC = () => {
                                   exit={{ scale: 0.8, opacity: 0 }}
                                   className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold ${tagStylePalette[idx % tagStylePalette.length]}`}
                                 >
-                                  #{tag}
+                                  {normalizeHashtagLabel(tag)}
                                   <button
                                     type="button"
                                     onClick={() => removeTag(tag)}
@@ -1739,7 +1744,6 @@ const CreateDesignInner: React.FC = () => {
                             </div>
                           )}
 
-                          {/* Search input */}
                           <div className="relative">
                             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-secondary)]" />
                             <input
@@ -1747,7 +1751,7 @@ const CreateDesignInner: React.FC = () => {
                               value={tagSearch}
                               onChange={(e) => setTagSearch(e.target.value)}
                               onKeyDown={handleTagInputKeyDown}
-                              placeholder="Search or create a tag..."
+                              placeholder="Search or create a hashtag..."
                               disabled={disabled || selectedTags.length >= 10}
                               className="threadly-search-input pl-10 pr-12"
                             />
@@ -1775,11 +1779,10 @@ const CreateDesignInner: React.FC = () => {
                             </button>
                           </div>
 
-                          {/* Popular tags */}
                           {filteredSuggestions.length > 0 && (
                             <div className="mt-3">
                               <p className="text-xs text-theme-secondary mb-2">
-                                Popular Tags:
+                                Popular hashtags:
                               </p>
                               <div className="flex flex-wrap gap-1.5">
                                 {filteredSuggestions.map((tag) => {
@@ -1798,7 +1801,7 @@ const CreateDesignInner: React.FC = () => {
                                           : ''
                                       }`}
                                     >
-                                      #{tag}
+                                      {normalizeHashtagLabel(tag)}
                                     </button>
                                   );
                                 })}
@@ -1931,41 +1934,37 @@ const CreateDesignInner: React.FC = () => {
             </div>
           </FormSection>
 
-          {/* Targeting & Visibility */}
+          {/* Audience & visibility */}
           <FormSection
             id="design-targeting-section"
-            title="Targeting & Visibility"
+            title="Audience & visibility"
             icon="🎯"
             isOpen={expandedSections.targeting}
             onToggle={() => toggleSection("targeting")}
           >
-            <div className="space-y-6">
-              {/* Target Audience */}
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-theme mb-3">
-                  Target Audience
+                <label className="mb-2 flex items-center text-sm font-medium text-theme">
+                  Who is it for?
+                  <InfoTooltip text={CREATOR_METADATA_HELP.audience} />
                 </label>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  {(["EVERYBODY", "MALE", "FEMALE"] as const).map((option) => (
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  {CREATOR_AUDIENCE_OPTIONS.map((option) => (
                     <button
-                      key={option}
+                      key={option.value}
                       type="button"
-                      onClick={() => setType(option)}
+                      onClick={() => setType(option.value)}
                       disabled={disabled}
                       className={`
-                        flex-1 py-3 px-4 rounded-xl border-2 font-medium transition-all
+                        flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-all
                         ${
-                          type === option
-                            ? "border-purple-500 bg-purple-500/10 text-purple-600 dark:text-purple-400"
-                            : "border-theme text-theme-secondary hover:border-purple-200 dark:hover:border-white/20"
+                          type === option.value
+                            ? "border-purple-400/80 bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                            : "border-gray-200/70 text-theme-secondary hover:border-purple-200 dark:border-white/10 dark:hover:border-white/20"
                         }
                       `}
                     >
-                      {option === "EVERYBODY"
-                        ? "Everybody"
-                        : option === "MALE"
-                          ? "Men"
-                          : "Women"}
+                      {option.label}
                     </button>
                   ))}
                 </div>
@@ -2007,12 +2006,12 @@ const CreateDesignInner: React.FC = () => {
                 disabled={disabled}
               />
 
-              {/* Visibility */}
               <div>
-                <label className="block text-sm font-medium text-theme mb-3">
-                  Who Can See This?
+                <label className="mb-2 flex items-center text-sm font-medium text-theme">
+                  Who can see this?
+                  <InfoTooltip text={CREATOR_METADATA_HELP.visibility} />
                 </label>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {(
                     [
                       {
@@ -2032,11 +2031,11 @@ const CreateDesignInner: React.FC = () => {
                     <label
                       key={option.value}
                       className={`
-                        flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all
+                        flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-all
                         ${
                           visibility === option.value
-                            ? "border-purple-500 bg-purple-500/10"
-                            : "border-theme surface-panel-subtle hover:border-purple-200 dark:hover:border-white/20"
+                            ? "border-purple-400/80 bg-purple-500/10"
+                            : "border-gray-200/70 surface-panel-subtle hover:border-purple-200 dark:border-white/10 dark:hover:border-white/20"
                         }
                       `}
                     >
@@ -2049,14 +2048,13 @@ const CreateDesignInner: React.FC = () => {
                         disabled={disabled}
                         className="sr-only"
                       />
-                      <span className="text-2xl">{option.emoji}</span>
                       <div>
                         <span
                           className={`font-medium ${visibility === option.value ? "text-purple-600 dark:text-purple-400" : "text-theme"}`}
                         >
                           {option.label}
                         </span>
-                        <p className="text-sm text-theme-secondary">
+                        <p className="text-xs text-theme-secondary">
                           {option.desc}
                         </p>
                       </div>
@@ -2107,10 +2105,10 @@ const CreateDesignInner: React.FC = () => {
                 <HiOutlineSparkles className="w-5 h-5" />
               )}
               {isSubmitting && submitIntent === "publish"
-                ? "Publishing..."
+                ? "Going live..."
                 : isEditMode
                   ? "Update Design"
-                  : "Publish Design"}
+                  : "Go live"}
             </button>
           </div>
         </div>
@@ -2340,17 +2338,21 @@ const CreateDesignInner: React.FC = () => {
                               {description || "—"}
                             </p>
                             <p>
-                              <span className="text-white/60">Category:</span>{" "}
+                              <span className="text-white/60">What is it?:</span>{" "}
                               {selectedCategory?.name || "—"}
                             </p>
                             <p>
-                              <span className="text-white/60">Audience:</span>{" "}
-                              {type}
+                              <span className="text-white/60">
+                                Who is it for?:
+                              </span>{" "}
+                              {getAudienceLabel(type)}
                             </p>
                           </div>
                           <div className="space-y-2">
                             <p>
-                              <span className="text-white/60">Visibility:</span>{" "}
+                              <span className="text-white/60">
+                                Who can see this?:
+                              </span>{" "}
                               {visibility}
                             </p>
                             <p>
@@ -2362,9 +2364,9 @@ const CreateDesignInner: React.FC = () => {
                                 : "—"}
                             </p>
                             <p>
-                              <span className="text-white/60">Tags:</span>{" "}
+                              <span className="text-white/60">Hashtags:</span>{" "}
                               {selectedTags.length
-                                ? selectedTags.join(", ")
+                                ? selectedTags.map(normalizeHashtagLabel).join(", ")
                                 : "—"}
                             </p>
                           </div>

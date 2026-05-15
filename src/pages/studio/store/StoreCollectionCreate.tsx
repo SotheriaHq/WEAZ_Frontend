@@ -38,6 +38,12 @@ import {
 import FilterSelector, {
   type FilterSelection,
 } from "@/components/categories/FilterSelector";
+import {
+  CREATOR_AUDIENCE_OPTIONS,
+  CREATOR_METADATA_HELP,
+  mapCreatorMetadataError,
+  normalizeHashtagLabel,
+} from "@/utils/creatorMetadata";
 
 const MAX_PRODUCTS = 5;
 const MAX_TAGS = 20;
@@ -1788,23 +1794,31 @@ const StoreCollectionCreate: React.FC = () => {
 
     if (action === "publish") {
       if (!categoryId) {
-        toast.error("Please select a category to publish.");
+        toast.error("Choose what this item is.");
         return;
       }
       if (!categoryTypeId) {
-        toast.error("Please select a sub-category to publish.");
+        toast.error("Choose a garment type.");
+        return;
+      }
+      if (!type) {
+        toast.error("Choose who this item is for.");
+        return;
+      }
+      if (selectedFilterValueIds.length === 0) {
+        toast.error("Add at least one style detail.");
         return;
       }
       if (normalizedTags.length === 0) {
-        toast.error("Please add at least one tag to publish.");
+        toast.error("Add at least one hashtag.");
         return;
       }
       if (readySelectedProductIds.length === 0) {
-        toast.error("Select at least one product to publish.");
+        toast.error("Select at least one product to go live.");
         return;
       }
       if (!hasAnyMedia) {
-        toast.error("At least one selected product needs an image to publish.");
+        toast.error("At least one selected product needs an image to go live.");
         return;
       }
     }
@@ -1930,7 +1944,7 @@ const StoreCollectionCreate: React.FC = () => {
       clearSessionFilterCache(sessionId);
       clearCollectionDraftSnapshot(sessionId);
       toast.success(
-        action === "publish" ? "Collection published." : "Draft saved.",
+        action === "publish" ? "Collection is live." : "Draft saved.",
       );
       navigate("/studio/store?view=collections");
     } catch (error: any) {
@@ -1950,12 +1964,14 @@ const StoreCollectionCreate: React.FC = () => {
         }
       }
       toast.error(
-        error?.response?.data?.message ??
-          (isExistingCollectionEditMode
+        mapCreatorMetadataError(
+          error?.response?.data?.message,
+          isExistingCollectionEditMode
             ? "Failed to update collection."
             : action === "publish"
-              ? "Failed to publish collection."
-              : "Failed to save draft."),
+              ? "Failed to go live with collection."
+              : "Failed to save draft.",
+        ),
       );
     } finally {
       submitLockRef.current = false;
@@ -2363,7 +2379,7 @@ const StoreCollectionCreate: React.FC = () => {
           <p className="text-sm text-theme-secondary">
             {isExistingCollectionEditMode
               ? `Update metadata, product membership, and primary product order for this collection.`
-              : `Select up to ${MAX_PRODUCTS} products and publish a store collection.`}
+              : `Select up to ${MAX_PRODUCTS} products and take a store collection live.`}
           </p>
         </div>
       </div>
@@ -2376,7 +2392,7 @@ const StoreCollectionCreate: React.FC = () => {
             </h2>
             <p className="text-sm text-theme-secondary mt-1">
               Start with existing products or create new items before
-              publishing.
+              going live.
             </p>
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
@@ -2435,7 +2451,7 @@ const StoreCollectionCreate: React.FC = () => {
             {readySelectedProductIds.length > 0 && !hasPrimarySelection && (
               <div className="mb-4 rounded-xl border border-amber-200/70 bg-amber-50/80 px-3 py-2 text-xs font-semibold text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300">
                 Choose one selected product as the primary product before you
-                can save or publish.
+                can save or go live.
               </div>
             )}
             {hasPendingSelectedProducts && (
@@ -2616,8 +2632,8 @@ const StoreCollectionCreate: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-theme-secondary mb-1 flex items-center">
-                        Category
-                        <InfoTooltip text="The primary taxonomy category for this collection (e.g., Women's Wear). Helps with discovery." />
+                        What is it?
+                        <InfoTooltip text="Choose the garment family this collection is built around." />
                       </label>
                       <Select
                         value={categoryId}
@@ -2644,8 +2660,8 @@ const StoreCollectionCreate: React.FC = () => {
 
                     <div>
                       <label className="block text-xs font-semibold text-theme-secondary mb-1 flex items-center">
-                        Sub-Category
-                        <InfoTooltip text="A more specific type within the selected category (e.g., Evening Wear, Casual Tops)." />
+                        Garment type
+                        <InfoTooltip text="Choose the specific garment type within the selected family." />
                       </label>
                       <Select
                         value={categoryTypeId}
@@ -2674,11 +2690,10 @@ const StoreCollectionCreate: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Filter Selector */}
                   <div>
                     <label className="block text-xs font-semibold text-theme-secondary mb-2 flex items-center">
-                      Filters
-                      <InfoTooltip text="Select filter dimensions (fabric, occasion, season, etc.) to generate relevant tag suggestions for your collection." />
+                      Style details
+                      <InfoTooltip text={CREATOR_METADATA_HELP.style} />
                     </label>
                     <FilterSelector
                       value={filterSelection}
@@ -2691,8 +2706,8 @@ const StoreCollectionCreate: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-theme-secondary mb-1 flex items-center">
-                        Visibility
-                        <InfoTooltip text="Public collections are visible to all users. Private collections are only visible to you." />
+                        Who can see this?
+                        <InfoTooltip text={CREATOR_METADATA_HELP.visibility} />
                       </label>
                       <Select
                         value={visibility}
@@ -2707,8 +2722,8 @@ const StoreCollectionCreate: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-theme-secondary mb-1 flex items-center">
-                        Type
-                        <InfoTooltip text="Target audience for this collection: everybody, male, or female." />
+                        Who is it for?
+                        <InfoTooltip text={CREATOR_METADATA_HELP.audience} />
                       </label>
                       <Select
                         value={type}
@@ -2717,20 +2732,20 @@ const StoreCollectionCreate: React.FC = () => {
                         }
                         variant="default"
                       >
-                        <option value="EVERYBODY">Everybody</option>
-                        <option value="MALE">Male</option>
-                        <option value="FEMALE">Female</option>
+                        {CREATOR_AUDIENCE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
                       </Select>
                     </div>
                   </div>
 
-                  {/* Tags */}
                   <div>
                     <label className="block text-xs font-semibold text-theme-secondary mb-1.5 flex items-center">
-                      Tags
-                      <InfoTooltip text="Tags improve discoverability. Add them manually or click suggested tags from the filter selections above." />
+                      Hashtags
+                      <InfoTooltip text={CREATOR_METADATA_HELP.hashtags} />
                     </label>
-                    {/* Filter-driven tag suggestions */}
                     {tagSuggestions.length > 0 && (
                       <div className="mb-2">
                         <p className="text-[10px] text-theme-secondary mb-1">
@@ -2756,7 +2771,7 @@ const StoreCollectionCreate: React.FC = () => {
                             text-purple-600 dark:text-purple-300 border border-purple-200/60 dark:border-purple-500/20
                             hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
                               >
-                                + {suggestion}
+                                + {normalizeHashtagLabel(suggestion)}
                               </button>
                             ))}
                         </div>
@@ -2768,7 +2783,7 @@ const StoreCollectionCreate: React.FC = () => {
                         value={tagInput}
                         onChange={(e) => setTagInput(e.target.value)}
                         onKeyDown={handleTagKeyDown}
-                        placeholder="Add tag..."
+                        placeholder="Add hashtag..."
                         className="bg-transparent border-none outline-none text-sm text-theme placeholder-gray-400 dark:placeholder-gray-500 w-24 flex-1 p-0 focus:ring-0"
                       />
                       <button
@@ -2784,7 +2799,7 @@ const StoreCollectionCreate: React.FC = () => {
                         {normalizedTags.map((tag, index) => (
                           <Tag
                             key={tag}
-                            label={tag}
+                            label={normalizeHashtagLabel(tag)}
                             color={getTagColor(tag, index)}
                             size="xs"
                             rightIcon={
@@ -2799,7 +2814,7 @@ const StoreCollectionCreate: React.FC = () => {
                       </div>
                     )}
                     <p className="mt-1 text-[11px] text-gray-500">
-                      {normalizedTags.length}/{MAX_TAGS} tags. Press Enter or
+                      {normalizedTags.length}/{MAX_TAGS} hashtags. Press Enter or
                       click Add.
                     </p>
                   </div>
@@ -2969,8 +2984,8 @@ const StoreCollectionCreate: React.FC = () => {
                 <VLoader size={14} phase="loading" showLabel={false} />
               )}
               {submitting && submitAction === "publish"
-                ? "Publishing..."
-                : "Publish"}
+                ? "Going live..."
+                : "Go live"}
             </button>
           </>
         )}

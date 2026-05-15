@@ -4,6 +4,7 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import VLoader from '@/components/loaders/VLoader';
+import { normalizeHashtagLabel } from '@/utils/creatorMetadata';
 
 interface CollectionSummary {
   title: string;
@@ -177,7 +178,7 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
                 ref={panelRef}
                 role="dialog"
                 aria-modal="true"
-                aria-label={`Review before publishing ${entityLabel.toLowerCase()}`}
+                aria-label={`Review before taking ${entityLabel.toLowerCase()} live`}
                 tabIndex={-1}
                 className="relative flex w-full max-w-[600px] max-h-[90vh] neu-modal-surface flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white/95 dark:border-white/10 dark:bg-gray-900/95 outline-none"
                 onClick={(e) => e.stopPropagation()}
@@ -187,7 +188,7 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h2 className="text-2xl font-bold text-gray-900 dark:text-white font-serif">Review Your {entityLabel}</h2>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Please review before publishing</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Please review before going live</p>
                     </div>
 
                     {state === 'confirm' && (
@@ -252,7 +253,7 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
                         onClick={handlePublish}
                         className="flex-1 py-3 px-4 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                       >
-                        ✨ Publish Now
+                        Go live
                       </button>
                     </div>
                   </div>
@@ -322,7 +323,7 @@ const ConfirmContent: React.FC<{
       
       {summary.category && (
         <SummaryRow 
-          label="Category" 
+          label="What is it?"
           value={`${summary.categoryEmoji || '📦'} ${summary.category}`} 
         />
       )}
@@ -341,25 +342,25 @@ const ConfirmContent: React.FC<{
       )}
 
       <SummaryRow 
-        label="Target Audience" 
+        label="Who is it for?"
         value={audienceLabel[summary.type]} 
       />
 
       <SummaryRow 
-        label="Visibility" 
+        label="Who can see this?"
         value={visibilityLabel[summary.visibility]} 
       />
 
       {/* Tags */}
       {summary.tags.length > 0 && (
         <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10">
-          <span className="text-xs text-gray-500 uppercase tracking-wide w-full mb-1">Tags</span>
+          <span className="text-xs text-gray-500 uppercase tracking-wide w-full mb-1">Hashtags</span>
           {summary.tags.map((tag) => (
             <span 
               key={tag}
               className="tag-badge px-2 py-1 rounded-full text-xs font-medium"
             >
-              {tag}
+              {normalizeHashtagLabel(tag)}
             </span>
           ))}
         </div>
@@ -414,7 +415,7 @@ const ConfirmContent: React.FC<{
       <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
         <span className="text-amber-300 flex-shrink-0 mt-0.5" aria-hidden="true">⚠️</span>
         <p className="text-sm text-amber-300">
-          💡 Tip: Adding more tags can help your {entityLabel.toLowerCase()} get discovered
+          Tip: Adding more hashtags can help your {entityLabel.toLowerCase()} get discovered
         </p>
       </div>
     )}
@@ -445,7 +446,7 @@ const LoadingContent: React.FC<{ progress?: number | null }> = ({ progress = nul
       <VLoader size={64} progress={progress} phase="loading" />
     </div>
     
-    <h3 className="text-lg text-gray-900 dark:text-white font-medium mb-1">Publishing your design...</h3>
+    <h3 className="text-lg text-gray-900 dark:text-white font-medium mb-1">Taking your design live...</h3>
     <p className="text-sm text-gray-400 mb-4">This may take a moment</p>
     
     {/* Animated dots */}
@@ -490,10 +491,10 @@ const SuccessContent: React.FC<{
     </motion.div>
 
     <h2 className="text-2xl font-bold text-gray-900 dark:text-white font-serif mb-2">
-      Your {entityLabel} is Live! 🎉
+      Your {entityLabel} is Live
     </h2>
     <p className="text-gray-500 dark:text-gray-400 mb-6">
-      <span className="text-gray-900 dark:text-white font-medium">{title}</span> has been published
+      <span className="text-gray-900 dark:text-white font-medium">{title}</span> is now live
     </p>
 
     {/* Action buttons */}

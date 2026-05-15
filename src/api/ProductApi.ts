@@ -44,6 +44,7 @@ function buildStoreProductPayload(data: Partial<ProductCreateDto>) {
     payload.salePrice = data.compareAtPrice;
 
   if (Array.isArray(data.tags)) payload.tags = data.tags;
+  if (data.gender !== undefined) payload.gender = data.gender;
   if (Array.isArray(data.filterValueIds)) {
     payload.filterValueIds = data.filterValueIds;
   }
@@ -160,6 +161,7 @@ export interface ProductCreateDto {
   subCategoryId?: string;
   /** @deprecated Use subCategoryId */
   categoryTypeId?: string;
+  gender?: "MALE" | "FEMALE" | "EVERYBODY";
   tags?: string[];
   filterValueIds?: string[];
   price: number;
@@ -207,6 +209,7 @@ export interface ProductDto {
   subCategoryId?: string;
   /** @deprecated Use subCategoryId */
   categoryTypeId?: string;
+  gender?: "MALE" | "FEMALE" | "EVERYBODY";
   tags?: string[];
   filterValueIds?: string[];
   filterSelection?: Record<string, string[]>;

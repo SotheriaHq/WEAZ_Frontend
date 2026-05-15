@@ -261,15 +261,26 @@ export function useCollectionUpload() {
       const normalizedSubCategoryId =
         optionalString(parsed.options.subCategoryId) ??
         optionalString(parsed.options.categoryTypeId);
+      const normalizedFilterValueIds = Array.isArray(parsed.options.filterValueIds)
+        ? parsed.options.filterValueIds.filter(
+            (value) => typeof value === "string" && value.trim().length > 0,
+          )
+        : [];
 
       if (normalizedTags.length === 0) {
-        throw new Error('Add at least one tag to describe this design.');
+        throw new Error('Add at least one hashtag.');
       }
       if (!normalizedCategoryId) {
-        throw new Error('Please select a category before publishing.');
+        throw new Error('Choose what this item is.');
       }
       if (!normalizedSubCategoryId) {
-        throw new Error('Please select a sub-category before publishing.');
+        throw new Error('Choose a garment type.');
+      }
+      if (!parsed.options.type) {
+        throw new Error('Choose who this item is for.');
+      }
+      if (normalizedFilterValueIds.length === 0) {
+        throw new Error('Add at least one style detail.');
       }
     }
 

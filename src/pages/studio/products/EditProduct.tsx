@@ -75,6 +75,13 @@ import {
   resolveBrandProfileSetupDestination,
 } from "@/utils/storeSetup";
 import { preprocessImageFile } from "@/utils/imagePreprocess";
+import {
+  CREATOR_AUDIENCE_OPTIONS,
+  CREATOR_METADATA_HELP,
+  type CreatorAudience,
+  mapCreatorMetadataError,
+  normalizeHashtagLabel,
+} from "@/utils/creatorMetadata";
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -294,6 +301,7 @@ interface FormState {
   categoryId: string;
   taxonomyCategoryId: string;
   categoryTypeId: string;
+  gender: CreatorAudience;
   tags: string[];
   price: number;
   compareAtPrice: number;
@@ -328,6 +336,7 @@ const defaultFormState: FormState = {
   categoryId: "",
   taxonomyCategoryId: "",
   categoryTypeId: "",
+  gender: "EVERYBODY",
   tags: [],
   price: 0,
   compareAtPrice: 0,
@@ -890,6 +899,12 @@ const EditProduct: React.FC = () => {
             (product as any).subCategoryId ||
             (product as any).categoryTypeId ||
             "",
+          gender:
+            product.gender === "MALE" ||
+            product.gender === "FEMALE" ||
+            product.gender === "EVERYBODY"
+              ? product.gender
+              : "EVERYBODY",
           tags: product.tags || [],
           price: product.price || 0,
           compareAtPrice:
@@ -1371,16 +1386,16 @@ const EditProduct: React.FC = () => {
       },
       {
         targetId: 'product-category-section',
-        title: 'Category & sub-category',
+        title: 'What is it? and garment type',
         description:
-          'Choose the main category, then the specific sub-category. This controls where the product appears in search and browse filters.',
+          'Choose the garment family, garment type, audience, and style details buyers use for discovery.',
         emoji: '🏷️',
       },
       {
         targetId: 'product-pricing-section',
-        title: 'Pricing & publish status',
+        title: 'Pricing & go-live status',
         description:
-          'Set the selling price, an optional compare-at price, and decide whether to publish now or keep as a draft.',
+          'Set the selling price, an optional compare-at price, and decide whether to go live now or keep this as a draft.',
         emoji: '💳',
         onEnter: () =>
           setCollapsedSections((prev) =>
@@ -1479,25 +1494,29 @@ const EditProduct: React.FC = () => {
       } else {
         const publishValidationErrors = [
           !form.variants.length
-            ? 'Add at least one size variant before publishing this product.'
+            ? 'Add at least one size variant before this product goes live.'
             : null,
           form.variants.length < MIN_PUBLISH_VARIANT_COUNT
-            ? `Add at least ${MIN_PUBLISH_VARIANT_COUNT} size variants before publishing this product.`
+            ? `Add at least ${MIN_PUBLISH_VARIANT_COUNT} size variants before this product goes live.`
             : null,
           hasMissingVariantSize
             ? `Each variant needs a supported size: ${PRODUCT_VARIANT_SIZE_LABELS}`
             : null,
           variantTotalStock <= 0
-            ? 'Add stock to at least one size variant before publishing this product.'
+            ? 'Add stock to at least one size variant before this product goes live.'
             : null,
           invalidVariantSizes.length > 0
             ? `Supported sizes: ${PRODUCT_VARIANT_SIZE_LABELS}`
             : null,
           !form.title.trim() ? 'Please enter a product title' : null,
           !form.description.trim() ? 'Please enter a product description' : null,
-          !form.taxonomyCategoryId ? 'Please select a category' : null,
-          !form.categoryTypeId ? 'Please select a sub-category' : null,
-          form.tags.length === 0 ? 'Add at least one tag before publishing' : null,
+          !form.taxonomyCategoryId ? 'Choose what this item is.' : null,
+          !form.categoryTypeId ? 'Choose a garment type.' : null,
+          !form.gender ? 'Choose who this item is for.' : null,
+          selectedFilterValueIds.length === 0
+            ? 'Add at least one style detail.'
+            : null,
+          form.tags.length === 0 ? 'Add at least one hashtag.' : null,
           form.price <= 0 ? 'Please enter a valid price' : null,
           form.onSale && form.compareAtPrice > 0 && form.compareAtPrice >= form.price
             ? 'Sale price must be less than the price'
@@ -1585,7 +1604,7 @@ const EditProduct: React.FC = () => {
           : null;
 
       if (shouldValidatePublish && form.customOrderEnabled && !pendingCustomOrderDraft) {
-        toast.error('Save the custom-order setup before publishing this product.');
+        toast.error('Save the custom-order setup before this product goes live.');
         return;
       }
 
@@ -1628,6 +1647,7 @@ const EditProduct: React.FC = () => {
           categoryId: payloadCategoryId,
           subCategoryId: payloadCategoryTypeId,
           categoryTypeId: payloadCategoryTypeId,
+          gender: form.gender,
           tags: form.tags,
           filterValueIds: selectedFilterValueIds,
           price: effectiveDraft
@@ -1816,7 +1836,12 @@ const EditProduct: React.FC = () => {
           error?.response?.data?.message ||
           error?.message ||
           "Failed to save product. No changes were committed.";
-        toast.error(message);
+        toast.error(
+          mapCreatorMetadataError(
+            message,
+            "Failed to save product. No changes were committed.",
+          ),
+        );
       } finally {
         setSaving(false);
       }
@@ -1911,6 +1936,7 @@ const EditProduct: React.FC = () => {
         categoryId: payloadCategoryId,
         subCategoryId: payloadCategoryTypeId,
         categoryTypeId: payloadCategoryTypeId,
+        gender: form.gender,
         tags: form.tags,
         filterValueIds: selectedFilterValueIds,
         price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
@@ -2009,7 +2035,12 @@ const EditProduct: React.FC = () => {
         error?.response?.data?.message ||
         error?.message ||
         "Failed to save product. Shipping policy may not have been saved.";
-      toast.error(message);
+      toast.error(
+        mapCreatorMetadataError(
+          message,
+          "Failed to save product. Shipping policy may not have been saved.",
+        ),
+      );
     } finally {
       setSaving(false);
       setPendingSaveDraft(false);
@@ -2860,23 +2891,20 @@ const EditProduct: React.FC = () => {
                   data-testid="product-title-input"
                 />
 
-                <div className="surface-subtle rounded-xl border p-3 sm:p-4">
+                <div className="surface-subtle rounded-lg border border-gray-200/60 p-3 dark:border-white/10">
                   <div className="mb-3 flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wide text-theme-secondary">
                       Product Metadata
                     </p>
-                    <span className="text-[10px] font-medium text-theme-secondary">
-                      Scroll inside panel
-                    </span>
                   </div>
 
-                  <div className="lg:max-h-[300px] lg:overflow-y-auto lg:pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <div className="space-y-4">
+                  <div className="lg:max-h-[340px] lg:overflow-y-auto lg:pr-1 scrollbar-threadly">
+                    <div className="space-y-3">
                       <div className="space-y-3" id="product-category-section">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                           <div className="md:col-span-6">
                             <UniversalSelect
-                              label="Category"
+                              label="What is it?"
                               value={form.taxonomyCategoryId}
                               onChange={(value) =>
                                 updateForm("taxonomyCategoryId", value)
@@ -2885,7 +2913,7 @@ const EditProduct: React.FC = () => {
                               placeholder={
                                 categoriesLoading
                                   ? 'Loading categories...'
-                                  : 'Select category'
+                                  : 'Choose what this item is'
                               }
                               disabled={
                                 categoriesLoading ||
@@ -2900,7 +2928,7 @@ const EditProduct: React.FC = () => {
 
                           <div className="md:col-span-6">
                             <UniversalSelect
-                              label="Sub-Category"
+                              label="Garment type"
                               value={form.categoryTypeId}
                               onChange={(value) =>
                                 updateForm("categoryTypeId", value)
@@ -2909,7 +2937,7 @@ const EditProduct: React.FC = () => {
                               placeholder={
                                 form.taxonomyCategoryId ||
                                 availableCategoryTypes.length > 0
-                                  ? 'Select sub-category'
+                                  ? 'Choose a garment type'
                                   : 'Select a category first'
                               }
                               disabled={
@@ -2930,6 +2958,19 @@ const EditProduct: React.FC = () => {
                             />
                           </div>
                         </div>
+
+                        <UniversalSelect
+                          label="Who is it for?"
+                          value={form.gender}
+                          onChange={(value) =>
+                            updateForm("gender", value as CreatorAudience)
+                          }
+                          options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
+                            value: option.value,
+                            label: option.label,
+                          }))}
+                          disabled={saving}
+                        />
 
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                           <div className="md:col-span-8">
@@ -2988,9 +3029,9 @@ const EditProduct: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="text-[11px] font-semibold text-theme-secondary mb-2 flex items-center">
-                          Filters
-                          <InfoTooltip text="Select filter dimensions (fabric, occasion, season, etc.) to generate relevant tag suggestions for your product." />
+                        <label className="mb-2 flex items-center text-[11px] font-semibold text-theme-secondary">
+                          Style details
+                          <InfoTooltip text={CREATOR_METADATA_HELP.style} />
                         </label>
                         <FilterSelector
                           value={filterSelection}
@@ -3002,8 +3043,8 @@ const EditProduct: React.FC = () => {
 
                       <div>
                         <label className="text-[11px] font-semibold text-theme-secondary mb-1.5 flex items-center">
-                          Tags
-                          <InfoTooltip text="Tags improve discoverability. Add them manually or click suggested tags from the filter selections above." />
+                          Hashtags
+                          <InfoTooltip text={CREATOR_METADATA_HELP.hashtags} />
                         </label>
                         {tagSuggestions.length > 0 && (
                           <div className="mb-2">
@@ -3030,19 +3071,19 @@ const EditProduct: React.FC = () => {
                                       text-purple-600 dark:text-purple-300 border border-purple-200/60 dark:border-purple-500/20
                                       hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
                                   >
-                                    + {suggestion}
+                                    + {normalizeHashtagLabel(suggestion)}
                                   </button>
                                 ))}
                             </div>
                           </div>
                         )}
-                        <div className="surface-control flex min-h-[44px] items-center gap-2 rounded-xl border px-3 py-2 shadow-sm">
+                        <div className="surface-control flex min-h-[42px] items-center gap-2 rounded-lg border border-gray-200/60 px-3 py-2 shadow-sm dark:border-white/10">
                           <input
                             type="text"
                             value={tagInput}
                             onChange={(e) => setTagInput(e.target.value)}
                             onKeyDown={handleTagKeyDown}
-                            placeholder="Add tag..."
+                            placeholder="Add hashtag..."
                             className="placeholder-theme bg-transparent border-none outline-none text-sm text-theme w-24 flex-1 p-0 focus:ring-0"
                           />
                           <button
@@ -3058,7 +3099,7 @@ const EditProduct: React.FC = () => {
                             {form.tags.map((tag, index) => (
                               <Tag
                                 key={tag}
-                                label={tag}
+                                label={normalizeHashtagLabel(tag)}
                                 color={getTagColor(tag, index)}
                                 size="xs"
                                 rightIcon={
@@ -3255,8 +3296,8 @@ const EditProduct: React.FC = () => {
                         {form.variants.length >= MIN_PUBLISH_VARIANT_COUNT ? '✅' : 'ℹ️'}
                       </span>
                       {form.variants.length >= MIN_PUBLISH_VARIANT_COUNT
-                        ? `Publish ready: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants.`
-                        : `Progress: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants added. Add ${MIN_PUBLISH_VARIANT_COUNT - form.variants.length} more to publish.`}
+                        ? `Go-live ready: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants.`
+                        : `Progress: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants added. Add ${MIN_PUBLISH_VARIANT_COUNT - form.variants.length} more to go live.`}
                     </p>
                   </div>
 
@@ -3922,7 +3963,7 @@ const EditProduct: React.FC = () => {
               )}
               <span className={(saving || submitLocked) && saveAction === "publish" ? "opacity-0" : ""}>
                 {isDraftEditMode
-                  ? "Publish Product"
+                  ? "Go live"
                   : isCollectionContext && isEditMode
                     ? "Save to Collection"
                     : isEditMode

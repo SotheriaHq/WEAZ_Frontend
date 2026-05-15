@@ -2,33 +2,54 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiChevronDown, FiX } from "react-icons/fi";
 import { brandApi, type FilterDimensionOption } from "@/api/BrandApi";
+import InfoTooltip from "@/components/ui/InfoTooltip";
+import {
+  CREATOR_FILTER_DIMENSION_ORDER,
+  CREATOR_METADATA_HELP,
+  LEGACY_DISCOVERY_DIMENSION_SLUGS,
+  getDiscoveryDimensionHelp,
+  getDiscoveryDimensionLabel,
+} from "@/utils/creatorMetadata";
 import { FILTER_TAG_SUGGESTIONS } from "./filterTagSuggestions";
 
-// =====================
-// Types
-// =====================
-
 export interface FilterSelection {
-  /** Map of dimensionId → array of selected FilterValue IDs */
+  /** Map of dimensionId to selected FilterValue IDs. */
   [dimensionId: string]: string[];
 }
 
 interface FilterSelectorProps {
-  /** Currently selected filter values: { dimensionId: valueId[] } */
   value: FilterSelection;
-  /** Called when selections change */
   onChange: (selection: FilterSelection) => void;
-  /** Entity type context (used to filter which dimensions apply) */
   entityType?: "DESIGN" | "COLLECTION" | "PRODUCT";
-  /** Whether the selector is disabled */
   disabled?: boolean;
-  /** Optional callback with suggested tags based on selected filters */
   onTagSuggestions?: (tags: string[]) => void;
 }
 
-// =====================
-// Component
-// =====================
+const appliesToEntity = (
+  dimension: FilterDimensionOption,
+  entityType: NonNullable<FilterSelectorProps["entityType"]>,
+) => {
+  const appliesTo = Array.isArray(dimension.appliesTo) ? dimension.appliesTo : [];
+  return (
+    appliesTo.includes(entityType) ||
+    (entityType === "DESIGN" && appliesTo.includes("COLLECTION"))
+  );
+};
+
+const sortDimensions = (dimensions: FilterDimensionOption[]) => {
+  const preferredOrder = new Map<string, number>(
+    CREATOR_FILTER_DIMENSION_ORDER.map((slug, index) => [slug, index]),
+  );
+
+  return [...dimensions].sort((left, right) => {
+    const leftOrder =
+      preferredOrder.get(String(left.slug ?? "").toLowerCase()) ?? 999;
+    const rightOrder =
+      preferredOrder.get(String(right.slug ?? "").toLowerCase()) ?? 999;
+    if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+    return left.name.localeCompare(right.name);
+  });
+};
 
 const FilterSelector: React.FC<FilterSelectorProps> = ({
   value,
@@ -39,6 +60,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
 }) => {
   const [dimensions, setDimensions] = useState<FilterDimensionOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [expandedDimensionId, setExpandedDimensionId] = useState<string | null>(
     null,
   );
@@ -46,37 +68,40 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
     Record<string, string>
   >({});
 
-  // Fetch filter dimensions on mount
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       try {
+        setLoadError(false);
         const fetched = await brandApi.getFilterDimensions();
         if (!mounted) return;
-        // Design filters are still legacy-tagged as COLLECTION in older backend rows.
-        const applicable = fetched.filter(
-          (d) =>
-            (d.appliesTo.includes(entityType) ||
-              (entityType === "DESIGN" && d.appliesTo.includes("COLLECTION"))) &&
-            d.name !== "Designer Location" &&
-            d.name !== "Price Range" &&
-            d.name !== "Color Family" &&
-            d.name !== "Fit / Shape"
-        );
-        setDimensions(applicable);
+
+        const applicable = fetched.filter((dimension) => {
+          const slug = String(dimension.slug ?? "").trim().toLowerCase();
+          return (
+            appliesToEntity(dimension, entityType) &&
+            !LEGACY_DISCOVERY_DIMENSION_SLUGS.has(slug)
+          );
+        });
+
+        setDimensions(sortDimensions(applicable));
       } catch (error) {
         console.error("Failed to load filter dimensions", error);
+        if (mounted) {
+          setDimensions([]);
+          setLoadError(true);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
     };
+
     void load();
     return () => {
       mounted = false;
     };
   }, [entityType]);
 
-  // Generate tag suggestions when filter values change
   useEffect(() => {
     if (!onTagSuggestions) return;
 
@@ -86,7 +111,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
       for (const val of dim.values) {
         if (selectedIds.includes(val.id)) {
           const tags = FILTER_TAG_SUGGESTIONS[val.slug];
-          if (tags) tags.forEach((t: string) => suggestions.add(t));
+          if (tags) tags.forEach((tag: string) => suggestions.add(tag));
         }
       }
     }
@@ -105,18 +130,11 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
     isMulti: boolean,
   ) => {
     const current = value[dimensionId] ?? [];
-    let next: string[];
-
-    if (current.includes(valueId)) {
-      // Deselect
-      next = current.filter((id) => id !== valueId);
-    } else if (isMulti) {
-      // Multi-select: add
-      next = [...current, valueId];
-    } else {
-      // Single-select: replace
-      next = [valueId];
-    }
+    const next = current.includes(valueId)
+      ? current.filter((id) => id !== valueId)
+      : isMulti
+        ? [...current, valueId]
+        : [valueId];
 
     onChange({ ...value, [dimensionId]: next });
   };
@@ -132,27 +150,43 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
     0,
   );
 
+  const renderNonBlockingState = (message: string) => (
+    <div className="rounded-lg border border-dashed border-gray-200/70 bg-gray-50/70 px-3 py-2 text-xs text-theme-secondary dark:border-white/10 dark:bg-white/[0.03]">
+      {message}
+    </div>
+  );
+
   if (loading) {
     return (
-      <div className="space-y-3 animate-pulse">
-        {[1, 2, 3].map((i) => (
+      <div className="space-y-2 animate-pulse">
+        {[1, 2, 3].map((index) => (
           <div
-            key={i}
-            className="h-12 rounded-xl bg-gray-200/50 dark:bg-white/5"
+            key={index}
+            className="h-10 rounded-lg bg-gray-200/50 dark:bg-white/5"
           />
         ))}
       </div>
     );
   }
 
-  if (dimensions.length === 0) return null;
+  if (loadError) {
+    return renderNonBlockingState(
+      "Style details could not load. You can save a draft, but choose at least one before going live.",
+    );
+  }
+
+  if (dimensions.length === 0) {
+    return renderNonBlockingState(
+      "No active style details are available right now. You can save a draft and try again before going live.",
+    );
+  }
 
   return (
-    <div className="space-y-2.5">
-      {/* Header */}
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-          🎨 Filters & Attributes
+        <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
+          Style details
+          <InfoTooltip text={CREATOR_METADATA_HELP.style} />
         </label>
         {selectedCount > 0 && (
           <span className="text-xs font-medium text-purple-600 dark:text-purple-400">
@@ -161,12 +195,13 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
         )}
       </div>
 
-      {/* Compact dimensions list */}
-      <div className="rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden divide-y divide-gray-200 dark:divide-white/10">
+      <div className="overflow-hidden rounded-lg border border-gray-200/60 bg-white/50 divide-y divide-gray-200/70 dark:border-white/10 dark:bg-white/[0.03] dark:divide-white/10">
         {dimensions.map((dim) => {
           const isExpanded = expandedDimensionId === dim.id;
           const selectedValues = value[dim.id] ?? [];
           const hasSelection = selectedValues.length > 0;
+          const label = getDiscoveryDimensionLabel(dim.slug, dim.name);
+          const helpText = getDiscoveryDimensionHelp(dim.slug);
           const selectedLabels = dim.values
             .filter((val) => selectedValues.includes(val.id))
             .map((val) => val.name);
@@ -179,7 +214,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
 
           return (
             <div key={dim.id}>
-              <div className="flex items-center gap-2 bg-white/80 dark:bg-white/5 px-3 py-2.5">
+              <div className="flex items-center gap-2 px-3 py-2">
                 <button
                   type="button"
                   onClick={() => toggleDimension(dim.id)}
@@ -189,21 +224,22 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        {dim.name}
+                        {label}
                       </span>
+                      {helpText && <InfoTooltip text={helpText} />}
                       {!dim.isMulti && (
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/10">
+                        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:bg-white/10 dark:text-gray-500">
                           Single
                         </span>
                       )}
                       {hasSelection && (
-                        <span className="inline-flex items-center justify-center min-w-5 h-5 rounded-full bg-purple-600 text-white text-[10px] font-bold px-1">
+                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-purple-600 px-1 text-[10px] font-bold text-white">
                           {selectedValues.length}
                         </span>
                       )}
                     </div>
                     {hasSelection && (
-                      <p className="mt-0.5 text-[11px] leading-4 whitespace-normal break-words text-gray-500 dark:text-gray-400">
+                      <p className="mt-0.5 whitespace-normal break-words text-[11px] leading-4 text-gray-500 dark:text-gray-400">
                         {selectedLabels.slice(0, 2).join(", ")}
                         {selectedLabels.length > 2
                           ? ` +${selectedLabels.length - 2}`
@@ -212,7 +248,9 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                     )}
                   </div>
                   <FiChevronDown
-                    className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                    className={`h-4 w-4 text-gray-500 transition-transform ${
+                      isExpanded ? "rotate-180" : ""
+                    }`}
                   />
                 </button>
                 {hasSelection && (
@@ -220,11 +258,11 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                     type="button"
                     onClick={() => clearDimension(dim.id)}
                     disabled={disabled}
-                    className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-white/20 transition-colors disabled:opacity-50"
+                    className="rounded-full p-1.5 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:hover:bg-white/20"
                     title="Clear selection"
-                    aria-label={`Clear ${dim.name}`}
+                    aria-label={`Clear ${label}`}
                   >
-                    <FiX className="w-3.5 h-3.5 text-gray-500" />
+                    <FiX className="h-3.5 w-3.5 text-gray-500" />
                   </button>
                 )}
               </div>
@@ -238,22 +276,22 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                     transition={{ duration: 0.18 }}
                     className="overflow-hidden"
                   >
-                    <div className="border-t border-gray-200/70 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] px-3 py-3">
+                    <div className="border-t border-gray-200/60 bg-gray-50/60 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.02]">
                       {dim.values.length > 8 && (
                         <input
                           type="text"
                           value={searchByDimension[dim.id] ?? ""}
-                          onChange={(e) =>
+                          onChange={(event) =>
                             setSearchByDimension((prev) => ({
                               ...prev,
-                              [dim.id]: e.target.value,
+                              [dim.id]: event.target.value,
                             }))
                           }
-                          placeholder={`Search ${dim.name.toLowerCase()}...`}
-                          className="mb-2.5 w-full rounded-lg border border-gray-300/80 dark:border-white/15 bg-white dark:bg-white/5 px-2.5 py-1.5 text-xs text-gray-800 dark:text-gray-200 placeholder:text-gray-400 focus:border-purple-400 focus:outline-none"
+                          placeholder={`Search ${label.toLowerCase()}...`}
+                          className="mb-2 w-full rounded-lg border border-gray-300/60 bg-white px-2.5 py-1.5 text-xs text-gray-800 placeholder:text-gray-400 focus:border-purple-400 focus:outline-none dark:border-white/15 dark:bg-white/5 dark:text-gray-200"
                         />
                       )}
-                      <div className="max-h-44 overflow-y-auto scrollbar-threadly-strong pr-1">
+                      <div className="max-h-44 overflow-y-auto pr-1 scrollbar-threadly-strong">
                         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                           {filteredValues.map((val) => {
                             const isSelected = selectedValues.includes(val.id);
@@ -265,23 +303,22 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                                   toggleValue(dim.id, val.id, dim.isMulti)
                                 }
                                 disabled={disabled}
-                                className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors
-                                  ${
-                                    isSelected
-                                      ? "border-purple-500 bg-purple-50 text-purple-700 dark:border-purple-400/60 dark:bg-purple-500/10 dark:text-purple-300"
-                                      : "border-gray-200 bg-white text-gray-700 hover:border-purple-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-purple-500/40"
-                                  }
-                                  disabled:opacity-50 disabled:cursor-not-allowed`}
+                                className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                                  isSelected
+                                    ? "border-purple-400/70 bg-purple-50 text-purple-700 dark:border-purple-400/60 dark:bg-purple-500/10 dark:text-purple-300"
+                                    : "border-gray-200/70 bg-white text-gray-700 hover:border-purple-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-purple-500/40"
+                                }`}
                               >
                                 <span
-                                  className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border text-[10px] font-bold
-                                    ${
-                                      isSelected
-                                        ? "border-purple-500 bg-purple-500 text-white dark:border-purple-400"
-                                        : "border-gray-300 text-transparent dark:border-white/30"
-                                    }`}
+                                  className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border ${
+                                    isSelected
+                                      ? "border-purple-500 bg-purple-500 text-white dark:border-purple-400"
+                                      : "border-gray-300 text-transparent dark:border-white/30"
+                                  }`}
                                 >
-                                  v
+                                  {isSelected ? (
+                                    <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                                  ) : null}
                                 </span>
                                 <span className="truncate">{val.name}</span>
                               </button>

@@ -107,7 +107,7 @@ const MediaUploadZone: React.FC<MediaUploadZoneProps> = ({
 
           {/* Slot requirements */}
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            Up to {maxFiles} files &nbsp;·&nbsp; Minimum 4 required to publish
+            Up to {maxFiles} files &nbsp;·&nbsp; Minimum 4 required to go live
           </p>
           <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
             Front, Left Side, Right Side, Back Side
