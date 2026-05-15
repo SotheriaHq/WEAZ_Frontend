@@ -13,6 +13,7 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { BRAND_TAG_OPTIONS } from '../../data/brandTags';
+import VLoader from '@/components/loaders/VLoader';
 
 // ----------------------------------------------------------------------------
 // Zod Schemas & Helpers
@@ -66,6 +67,7 @@ const profileSchema = z
   );
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
+type SubmitStatus = 'idle' | 'saving' | 'syncing' | 'almost' | 'complete';
 const MAX_TAGS = 5;
 const BUSINESS_TYPE_OPTIONS = [
   { value: 'Retailer', label: 'Retailer' },
@@ -162,6 +164,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   // Tags State
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagError, setTagError] = useState<string | null>(null);
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle');
 
   // Initial Values
   const initialValues = useMemo<ProfileFormValues>(() => {
@@ -207,12 +210,37 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const descriptionValue = watch('brandDescription');
   const selectedCountry = watch('brandCountry');
   const selectedState = watch('brandState');
+  const submitStatusMessage =
+    submitStatus === 'saving'
+      ? 'Saving your profile...'
+      : submitStatus === 'syncing'
+        ? 'Syncing your profile...'
+        : submitStatus === 'almost'
+          ? 'Almost ready - still finishing your update...'
+          : submitStatus === 'complete'
+            ? 'Profile saved.'
+            : null;
 
   // Initialize selected tags from profile/user
   useEffect(() => {
     setSelectedTags(initialValues.brandTags ?? []);
     setTagError(null);
   }, [initialValues]);
+
+  useEffect(() => {
+    if (!isSubmitting) {
+      if (submitStatus !== 'idle') setSubmitStatus('idle');
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setSubmitStatus((current) =>
+        current === 'saving' || current === 'syncing' ? 'almost' : current,
+      );
+    }, 4500);
+
+    return () => window.clearTimeout(timer);
+  }, [isSubmitting, submitStatus]);
 
   // Load Countries on Mount
   useEffect(() => {
@@ -284,6 +312,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
           return;
         }
 
+        setSubmitStatus('saving');
+
         const brandCountry = values.brandCountry?.trim() || undefined;
         const brandState = values.brandState?.trim() || undefined;
         const brandCity = values.brandCity?.trim() || undefined;
@@ -308,9 +338,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         const updatedUser = await brandApi.updateBrandProfile(user.id, payload);
         if (!updatedUser) throw new Error('Profile update failed.');
 
+        setSubmitStatus('syncing');
         toast.success('Profile updated successfully');
         await onSaved(updatedUser);
+        setSubmitStatus('complete');
       } catch (error) {
+        setSubmitStatus('idle');
         if (error instanceof Error) toast.error(error.message);
         else toast.error('Unable to update profile.');
       }
@@ -694,6 +727,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
             {/* Actions (inside body, no separate footer) */}
             <div className="flex justify-end gap-4 pt-2">
+              {isSubmitting && submitStatusMessage ? (
+                <div className="mr-auto flex min-h-11 items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 dark:bg-purple-500/10 dark:text-fuchsia-200" role="status" aria-live="polite">
+                  <VLoader size={18} phase={submitStatus === 'almost' ? 'finishing' : 'loading'} showLabel={false} />
+                  <span>{submitStatusMessage}</span>
+                </div>
+              ) : null}
               <button 
                 type="button"
                 onClick={onClose}
@@ -710,7 +749,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 className="min-w-[12rem] px-8 py-3 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg shadow-purple-500/20 transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <span className="inline-flex w-full items-center justify-center">
-                  {isSubmitting ? 'Saving profile...' : 'Save and Continue'}
+                  {submitStatusMessage ?? 'Save and Continue'}
                 </span>
               </button>
             </div>

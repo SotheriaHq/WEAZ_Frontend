@@ -104,6 +104,8 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           type="button"
           onClick={() => !disabled && setIsOpen(!isOpen)}
           disabled={disabled}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
           className={`
             relative w-full cursor-pointer rounded-2xl border text-left shadow-sm transition-colors duration-200
             flex items-center justify-between px-4 py-3.5 ${selectedAllowWrap ? 'items-start' : 'items-center'}
@@ -130,9 +132,9 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
         </button>
 
         {isOpen && (
-          <div className="absolute z-50 mt-1.5 max-h-60 w-full max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl glass-menu p-1.5 shadow-2xl animate-slideDown focus:outline-none scrollbar-hide">
+          <div className="absolute z-50 mt-1.5 w-full max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-[color:var(--border-default)] glass-menu p-1.5 shadow-2xl animate-slideDown focus-within:border-[color:var(--border-strong)] focus:outline-none">
             {searchable && (
-              <div className="sticky top-0 z-10 rounded-xl border surface-menu px-2 py-2 backdrop-blur-xl">
+              <div className="sticky top-0 z-10 rounded-xl bg-[color:var(--surface-primary)] px-2 py-2 backdrop-blur-xl">
                 <input
                   type="text"
                   value={searchTerm}
@@ -140,16 +142,24 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                   placeholder={searchPlaceholder}
                   autoComplete="off"
                   spellCheck={false}
-                  className="w-full rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-primary)] px-3 py-2 text-sm text-[color:var(--text-primary)] outline-none transition-colors focus:border-transparent focus:ring-0"
+                  className="w-full rounded-xl bg-[color:var(--surface-secondary)] px-3 py-2 text-sm text-[color:var(--text-primary)] outline-none transition-shadow placeholder:text-[color:var(--text-secondary)] focus:ring-2 focus:ring-[color:rgba(var(--brand-primary-rgb),0.18)]"
                 />
               </div>
             )}
-            <div className="space-y-1 p-1">
+            <div
+              role="listbox"
+              aria-label={label ?? placeholder}
+              className="max-h-56 space-y-1 overflow-y-auto overscroll-contain p-1 pr-1.5 scrollbar-threadly"
+              onWheel={(event) => event.stopPropagation()}
+              onTouchMove={(event) => event.stopPropagation()}
+            >
               {filteredOptions.map((option) => {
                 const isSelected = option.value === value;
                 return (
                   <div
                     key={option.value}
+                    role="option"
+                    aria-selected={isSelected}
                     onClick={() => handleSelect(option.value)}
                       className={`
                       relative cursor-pointer select-none rounded-xl ${optionCompact ? 'py-2 pl-2.5 pr-8' : 'py-2.5 pl-3 pr-9'} transition-colors

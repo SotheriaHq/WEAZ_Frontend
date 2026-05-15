@@ -116,13 +116,14 @@ describe('RequireAuthenticated', () => {
     expect(screen.queryByText('Private profile content')).not.toBeInTheDocument();
   });
 
-  it('shows the system loader while an authenticated session is still confirming', () => {
+  it('shows session refresh status while an authenticated session is still confirming', () => {
     authState.loading = true;
 
     renderProtectedPage(baseUser);
 
     expect(screen.getByRole('status')).toBeInTheDocument();
-    expect(screen.queryByText('Checking your session')).not.toBeInTheDocument();
+    expect(screen.getByText('Refreshing your session')).toBeInTheDocument();
+    expect(screen.getByText('We are checking your saved sign-in before reopening this page.')).toBeInTheDocument();
     expect(screen.queryByText('Private profile content')).not.toBeInTheDocument();
   });
 
