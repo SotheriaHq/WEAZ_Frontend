@@ -169,6 +169,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     return !!src;
   });
   const retryCountRef = React.useRef(0);
+  const imgRef = React.useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -246,6 +247,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     retryCountRef.current += 1;
     const timer = setTimeout(() => {
       setHadError(false);
+      setLoaded(false);
       if (!sourceCacheKey) return;
       // If the current URL failed to load, drop any cached mapping for this key
       // so the retry path is forced to request a fresh signed URL.
@@ -267,7 +269,10 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
             ? () => brandApi.getSignedS3KeyUrl(src, { forceRefresh: true })
             : async () => src ?? null;
       resolveSignedUrl(sourceCacheKey, fetcher).then((url) => {
-        if (url) setResolved(url);
+        if (url) {
+          setResolved(url);
+          setLoaded(false);
+        }
         else setHadError(true);
       });
     }, 2000);
@@ -287,6 +292,15 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const showShimmer = !showFallback && (isResolving || (hasSource && !hadError && !loaded));
   const wrapperClassName = cn('overflow-hidden', roundClass(rounded), containerClassName);
 
+  useEffect(() => {
+    if (loaded || showFallback || isResolving) return;
+    const image = imgRef.current;
+    if (!image) return;
+    if (image.complete && image.naturalWidth > 0) {
+      setLoaded(true);
+    }
+  }, [isResolving, loaded, resolved, showFallback]);
+
   return (
     <div className={cn('relative', wrapperClassName)} onClick={onClick}>
       {showShimmer && (
@@ -302,6 +316,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           src={resolved ?? ''}
           alt={alt}
           fit={fit}
+          imgRef={imgRef}
           onError={() => setHadError(true)}
           onLoad={() => setLoaded(true)}
           loading="eager"

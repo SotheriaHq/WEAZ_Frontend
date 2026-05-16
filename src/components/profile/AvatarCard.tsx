@@ -5,6 +5,7 @@ import ImageWithFallback from '../ImageWithFallback';
 
 interface AvatarCardProps {
   src?: string | null;
+  fileId?: string | null;
   name?: string | null;
   alt?: string;
   size?: 'sm' | 'md' | 'lg';
@@ -24,6 +25,7 @@ const sizeMap: Record<'sm' | 'md' | 'lg', string> = {
 
 const AvatarCard: React.FC<AvatarCardProps> = ({
   src,
+  fileId,
   name,
   alt = 'Profile image',
   size = 'md',
@@ -52,17 +54,18 @@ const AvatarCard: React.FC<AvatarCardProps> = ({
       tabIndex={clickable ? 0 : undefined}
       onKeyDown={handleKeyDown}
     >
-      {src ? (
+      {src || fileId ? (
         /* ImageWithFallback handles signed URL resolution for private S3 objects,
            shimmer while loading, and DefaultAvatar on error — all in one. */
         <ImageWithFallback
           src={src}
+          fileId={fileId}
           alt={alt}
           fit="cover"
-          containerClassName="w-full h-full"
+          containerClassName="w-full h-full bg-gray-100 dark:bg-white/10"
           rounded="xl"
           fallbackName={fallbackInitials ?? name ?? undefined}
-          maxHeightClassName={sizeMap[size].split(' ').find((c) => c.startsWith('max-h-')) || 'max-h-28'}
+          maxHeightClassName="max-h-full"
         />
       ) : (
         <DefaultAvatar name={fallbackInitials ?? name ?? alt ?? 'User'} className="w-full h-full" />

@@ -9,6 +9,7 @@ import { useSignedFileUrl } from '@/hooks/useSignedFileUrl';
 import ProfileHeader from './ProfileHeader';
 import ImageCropModal from '@/components/upload/ImageCropModal';
 import ProfileImageModal from '@/components/profile/ProfileImageModal';
+import { resolveBannerImageSource, resolveProfileImageSource } from '@/utils/profileImage';
 
 type OwnerHeaderProfileBase = {
   id: string;
@@ -24,6 +25,10 @@ type OwnerHeaderProfileBase = {
   description?: string;
   isOwner: true;
   profileVisibility: 'UNLOCKED' | 'LOCKED';
+  profileImage?: string | null;
+  profileImageFileId?: string | null;
+  bannerImage?: string | null;
+  bannerImageFileId?: string | null;
 };
 
 interface OwnerCatalogMediaHeaderProps {
@@ -71,10 +76,12 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
   const [localAvatarPreview, setLocalAvatarPreviewState] = useState<string | null>(null);
   const [cropTask, setCropTask] = useState<{ type: 'avatar' | 'banner'; file: File } | null>(null);
 
-  const avatarFileId = currentUser?.profileImageId ?? currentUser?.profileImageFile?.id ?? null;
-  const avatarInitial = currentUser?.profileImage ?? currentUser?.profileImageFile?.s3Url ?? null;
-  const bannerFileId = currentUser?.bannerImageId ?? currentUser?.bannerImageFile?.id ?? null;
-  const bannerInitial = currentUser?.bannerImage ?? currentUser?.bannerImageFile?.s3Url ?? null;
+  const avatarAsset = useMemo(() => resolveProfileImageSource(currentUser), [currentUser]);
+  const bannerAsset = useMemo(() => resolveBannerImageSource(currentUser), [currentUser]);
+  const avatarFileId = avatarAsset.fileId;
+  const avatarInitial = avatarAsset.src;
+  const bannerFileId = bannerAsset.fileId;
+  const bannerInitial = bannerAsset.src;
 
   const { url: resolvedAvatarUrl } = useSignedFileUrl(avatarFileId, avatarInitial);
   const { url: resolvedBannerUrl } = useSignedFileUrl(bannerFileId, bannerInitial);
@@ -285,9 +292,11 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
     () => ({
       ...profile,
       profileImage: (localAvatarPreview ?? resolvedAvatarUrl) ?? undefined,
+      profileImageFileId: avatarFileId,
       bannerImage: (bannerPreviewUrl ?? resolvedBannerUrl) ?? undefined,
+      bannerImageFileId: bannerFileId,
     }),
-    [bannerPreviewUrl, localAvatarPreview, profile, resolvedAvatarUrl, resolvedBannerUrl],
+    [avatarFileId, bannerFileId, bannerPreviewUrl, localAvatarPreview, profile, resolvedAvatarUrl, resolvedBannerUrl],
   );
 
   return (

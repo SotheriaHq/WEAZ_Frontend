@@ -13,6 +13,7 @@ import {
   useLocation,
   Navigate,
   Outlet,
+  useNavigate,
   useParams,
   useSearchParams,
 } from 'react-router-dom';
@@ -74,6 +75,7 @@ export const ProfileLayout: React.FC = () => {
   const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
   const isMobile = useSelector(selectIsMobile);
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { id: routeBrandId } = useParams<{ id?: string }>();
 
@@ -265,6 +267,11 @@ export const ProfileLayout: React.FC = () => {
     }
   };
 
+  const handleVerificationContinue = () => {
+    if (!verificationNextPath) return;
+    navigate(verificationNextPath);
+  };
+
   if (!isVisitorRoute) {
     if (loading && !user) {
       return (
@@ -331,27 +338,47 @@ export const ProfileLayout: React.FC = () => {
       <div className="min-h-screen bg-[color:var(--surface-primary)] text-gray-900 dark:text-white">
         {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
         <Navbar />
+        {showEmailVerificationPrompt ? (
+          <div
+            className="pointer-events-none fixed right-0 top-20 z-[70] px-4 sm:px-6"
+            style={{ left: mainMarginLeft }}
+          >
+            <div className="pointer-events-auto ml-auto flex w-full max-w-[min(92vw,30rem)] items-start gap-3 rounded-2xl border border-amber-300/35 bg-white/95 px-4 py-3 text-sm text-gray-800 shadow-xl shadow-amber-900/10 backdrop-blur-xl dark:border-amber-300/20 dark:bg-gray-950/92 dark:text-gray-100">
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-base dark:bg-amber-400/15">
+                <span aria-hidden="true">âœ‰ï¸</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">{verificationPromptDetails.title}</p>
+                <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-300">
+                  {verificationPromptDetails.description}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={resendVerificationEmail}
+                    disabled={isResendingVerification}
+                    className="rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isResendingVerification ? 'Sending...' : 'Resend email'}
+                  </button>
+                  {verificationNextPath ? (
+                    <button
+                      type="button"
+                      onClick={handleVerificationContinue}
+                      className="rounded-full px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-400/10"
+                    >
+                      {verificationPromptDetails.actionLabel}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <main
           className={PROFILE_MAIN_CLASS}
           style={{ marginLeft: mainMarginLeft }}
         >
-          {showEmailVerificationPrompt ? (
-            <div className="px-4 sm:px-6 pt-4">
-              <div className="mx-auto flex min-h-9 max-w-screen-xl items-center justify-between gap-3 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-900 dark:text-amber-100">
-                <p className="min-w-0 truncate font-medium">
-                  {verificationPromptDetails.description}
-                </p>
-                <button
-                  type="button"
-                  onClick={resendVerificationEmail}
-                  disabled={isResendingVerification}
-                  className="shrink-0 text-xs font-semibold text-amber-800 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-100"
-                >
-                  {isResendingVerification ? 'Sending...' : 'Resend Email'}
-                </button>
-              </div>
-            </div>
-          ) : null}
           <div className="px-0 sm:px-2">
             {location.pathname === '/profile' ? (
               hasActiveBrandMembership(user) ? <Profile /> : <EndUserProfile />

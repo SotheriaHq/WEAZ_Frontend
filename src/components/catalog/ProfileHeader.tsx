@@ -12,8 +12,10 @@ interface ProfileHeaderProps {
     username: string;
     firstName: string;
     lastName: string;
-    profileImage?: string;
-    bannerImage?: string;
+    profileImage?: string | null;
+    profileImageFileId?: string | null;
+    bannerImage?: string | null;
+    bannerImageFileId?: string | null;
     address?: string;
     location?: string;
     verificationBadgeVisible?: boolean;
@@ -60,7 +62,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
   onShowQrCode,
 }) => {
   const location = useLocation();
-  const hasBannerImage = showBanner && Boolean(profile.bannerImage);
+  const hasBannerImage = showBanner && Boolean(profile.bannerImage || profile.bannerImageFileId);
   const profileName = `${profile.firstName} ${profile.lastName}`.trim();
   const bannerLabel = (profile.username ? `@${profile.username}` : profileName).trim() || 'Your Profile';
 
@@ -88,6 +90,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                and degrades gracefully on error — no manual error/loading state needed. */
             <ImageWithFallback
               src={profile.bannerImage}
+              fileId={profile.bannerImageFileId}
               alt={`${profile.firstName} ${profile.lastName} banner`}
               fit="cover"
               containerClassName="w-full h-64 rounded-3xl overflow-hidden"
@@ -181,6 +184,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
             >
               <AvatarCard
                 src={profile.profileImage}
+                fileId={profile.profileImageFileId}
                 name={`${profile.firstName} ${profile.lastName}`}
                 alt={`${profile.firstName} ${profile.lastName}`}
                 size="lg"

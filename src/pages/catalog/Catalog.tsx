@@ -29,7 +29,7 @@ import { getStoreStatus, type StoreStatusResponse } from '../../api/StoreApi';
 import FrostedButton from '@/components/ui/FrostedButton';
 import CatalogShopTab from '@/components/catalog/CatalogShopTab';
 import BrandQrModal from '@/components/qr/BrandQrModal';
-import { resolveBannerImageSource } from '@/utils/profileImage';
+import { resolveBannerImageSource, resolveProfileImageSource } from '@/utils/profileImage';
 import { buildProfileUrl } from '@/utils/publicLinks';
 import {
   type PublishTask,
@@ -1146,10 +1146,18 @@ const ProfilePage: React.FC = () => {
       }),
     [visitorProfile?.bannerImage, visitorProfile?.bannerImageMeta],
   );
+  const visitorLogoAsset = useMemo(
+    () =>
+      resolveProfileImageSource({
+        profileImage: visitorProfile?.logoImage ?? null,
+        profileImageFile: visitorProfile?.logoImageMeta ?? null,
+      }),
+    [visitorProfile?.logoImage, visitorProfile?.logoImageMeta],
+  );
   const visitorBannerInitial = visitorBannerAsset.src;
-  const visitorLogoInitial = visitorProfile?.logoImage ?? visitorProfile?.logoImageMeta?.url ?? null;
+  const visitorLogoInitial = visitorLogoAsset.src;
   const { url: visitorBannerUrl } = useSignedFileUrlHook(visitorBannerAsset.fileId, visitorBannerInitial);
-  const { url: visitorLogoUrl } = useSignedFileUrlHook(visitorProfile?.logoImageMeta?.fileId ?? null, visitorLogoInitial);
+  const { url: visitorLogoUrl } = useSignedFileUrlHook(visitorLogoAsset.fileId, visitorLogoInitial);
 
   const viewDisplayData = useMemo(() => {
     if (isVisitorView && visitorProfile) {
@@ -1265,7 +1273,9 @@ const ProfilePage: React.FC = () => {
       firstName: viewDisplayData.brandName ?? '',
       lastName: '',
       profileImage: viewDisplayData.logoImage ?? undefined,
+      profileImageFileId: visitorLogoAsset.fileId,
       bannerImage: viewDisplayData.bannerImage ?? undefined,
+      bannerImageFileId: visitorBannerAsset.fileId,
       address: viewDisplayData.location ?? undefined,
       location: viewDisplayData.location ?? undefined,
       tags: viewDisplayData.hashtags ?? [],
@@ -1289,6 +1299,8 @@ const ProfilePage: React.FC = () => {
       viewDisplayData.username,
       viewDisplayData.verifiedExplanationUrl,
       viewDisplayData.verificationBadgeVisible,
+      visitorBannerAsset.fileId,
+      visitorLogoAsset.fileId,
     ],
   );
 
