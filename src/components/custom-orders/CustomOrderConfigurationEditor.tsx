@@ -1190,7 +1190,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   return (
     <section
       ref={containerRef}
-      className="rounded-xl border border-black/10 bg-white/80 p-3 dark:border-white/10 dark:bg-white/5"
+      className="rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-primary)]/90 p-2.5 shadow-sm dark:border-white/10 dark:bg-white/[0.04]"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <p className="text-xs text-slate-600 dark:text-slate-300">

@@ -36,6 +36,8 @@ describe('UniversalSelect', () => {
     expect(listbox.className).toContain('overscroll-contain');
 
     const dropdown = listbox.parentElement;
+    expect(dropdown?.parentElement).toBe(document.body);
+    expect(dropdown?.className).toContain('z-layer-dropdown');
     expect(dropdown?.className).toContain('border-[color:var(--border-default)]');
     expect(dropdown?.className).toContain('focus-within:border-[color:var(--border-strong)]');
 

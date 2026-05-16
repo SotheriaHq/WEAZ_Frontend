@@ -1,4 +1,12 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { createPortal } from 'react-dom';
 
 export interface UniversalSelectOption {
   value: string;
@@ -49,7 +57,9 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -68,11 +78,49 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
     });
   }, [options, searchable, searchTerm]);
 
+  const updateMenuPosition = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    const trigger = containerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportPadding = 8;
+    const gap = 6;
+    const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2);
+    const menuWidth = Math.min(Math.max(rect.width, 220), availableWidth);
+    const left = Math.min(
+      Math.max(viewportPadding, rect.left),
+      Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding),
+    );
+
+    const spaceBelow = window.innerHeight - rect.bottom - gap - viewportPadding;
+    const spaceAbove = rect.top - gap - viewportPadding;
+    const placeAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(
+      160,
+      Math.min(320, placeAbove ? spaceAbove : spaceBelow),
+    );
+    const top = placeAbove
+      ? Math.max(viewportPadding, rect.top - gap - maxHeight)
+      : Math.min(window.innerHeight - viewportPadding, rect.bottom + gap);
+
+    setMenuStyle({
+      position: 'fixed',
+      top,
+      left,
+      width: menuWidth,
+      maxHeight,
+      zIndex: 'var(--z-dropdown)',
+    });
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = event.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setIsOpen(false);
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -85,54 +133,55 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
     }
   }, [isOpen, searchTerm]);
 
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setMenuStyle(null);
+      return;
+    }
+
+    updateMenuPosition();
+  }, [filteredOptions.length, isOpen, updateMenuPosition]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handleWindowChange = () => updateMenuPosition();
+    window.addEventListener('resize', handleWindowChange);
+    window.addEventListener('scroll', handleWindowChange, true);
+
+    return () => {
+      window.removeEventListener('resize', handleWindowChange);
+      window.removeEventListener('scroll', handleWindowChange, true);
+    };
+  }, [isOpen, updateMenuPosition]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   const handleSelect = (optionValue: string) => {
     if (disabled) return;
     onChange(optionValue);
     setIsOpen(false);
   };
 
-  return (
-    <div className={`relative space-y-2 ${className}`} ref={containerRef}>
-      {label && (
-        <label className="block text-sm font-medium text-[color:var(--text-secondary)]">
-          {label}
-        </label>
-      )}
-      
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => !disabled && setIsOpen(!isOpen)}
-          disabled={disabled}
-          aria-haspopup="listbox"
-          aria-expanded={isOpen}
-          className={`
-            relative w-full cursor-pointer rounded-2xl border text-left shadow-sm transition-colors duration-200
-            flex items-center justify-between px-4 py-3.5 ${selectedAllowWrap ? 'items-start' : 'items-center'}
-            ${disabled ? 'cursor-not-allowed opacity-60 bg-[color:var(--surface-muted)]' : 'surface-menu backdrop-blur-xl hover:bg-[color:var(--surface-secondary)]'}
-            ${error 
-              ? 'border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.10)]' 
-              : 'border-[color:var(--border-default)] hover:border-[color:var(--border-strong)]'
-            }
-          `}
-        >
-          <span className={`flex min-w-0 flex-1 ${selectedAllowWrap ? 'items-start' : 'items-center'} ${!selectedOption ? 'text-[color:var(--text-secondary)]' : 'text-[color:var(--text-primary)]'}`}>
-            {selectedOption ? (
-              <span className={`flex min-w-0 gap-2 ${selectedAllowWrap ? 'items-start' : 'items-center'}`}>
-                {selectedOption.icon && <span className="flex-shrink-0 text-[color:var(--text-secondary)]">{selectedOption.icon}</span>}
-                <span className={selectedAllowWrap ? 'whitespace-normal break-words text-sm leading-5' : 'truncate'}>{selectedOption.label}</span>
-              </span>
-            ) : (
-              <span className={selectedAllowWrap ? 'whitespace-normal break-words text-sm leading-5' : 'truncate'}>{placeholder}</span>
-            )}
-          </span>
-          <span className="pointer-events-none flex items-center pr-2">
-            <span aria-hidden="true" className={`text-base leading-none text-[color:var(--text-secondary)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>⌄</span>
-          </span>
-        </button>
-
-        {isOpen && (
-          <div className="absolute z-50 mt-1.5 w-full max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-[color:var(--border-default)] glass-menu p-1.5 shadow-2xl animate-slideDown focus-within:border-[color:var(--border-strong)] focus:outline-none">
+  const dropdown =
+    isOpen && menuStyle && typeof document !== 'undefined'
+      ? createPortal(
+          <div
+            ref={menuRef}
+            style={menuStyle}
+            className="z-layer-dropdown overflow-hidden rounded-2xl border border-[color:var(--border-default)] glass-menu p-1.5 shadow-2xl animate-slideDown focus-within:border-[color:var(--border-strong)] focus:outline-none"
+          >
             {searchable && (
               <div className="sticky top-0 z-10 rounded-xl bg-[color:var(--surface-primary)] px-2 py-2 backdrop-blur-xl">
                 <input
@@ -161,11 +210,12 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                     role="option"
                     aria-selected={isSelected}
                     onClick={() => handleSelect(option.value)}
-                      className={`
+                    className={`
                       relative cursor-pointer select-none rounded-xl ${optionCompact ? 'py-2 pl-2.5 pr-8' : 'py-2.5 pl-3 pr-9'} transition-colors
-                      ${isSelected 
-                        ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-900 dark:text-purple-100' 
-                        : 'text-[color:var(--text-primary)] surface-interactive-hover'
+                      ${
+                        isSelected
+                          ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-900 dark:text-purple-100'
+                          : 'text-[color:var(--text-primary)] surface-interactive-hover'
                       }
                     `}
                   >
@@ -200,7 +250,10 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                     </div>
 
                     {isSelected && (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-purple-600 dark:text-purple-400" aria-hidden="true">
+                      <span
+                        className="absolute inset-y-0 right-0 flex items-center pr-4 text-purple-600 dark:text-purple-400"
+                        aria-hidden="true"
+                      >
                         ✓
                       </span>
                     )}
@@ -213,10 +266,68 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                 </div>
               )}
             </div>
-          </div>
-        )}
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <div className={`relative space-y-2 ${className}`} ref={containerRef}>
+      {label && (
+        <label className="block text-sm font-medium text-[color:var(--text-secondary)]">
+          {label}
+        </label>
+      )}
+
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+          disabled={disabled}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          className={`
+            relative w-full cursor-pointer rounded-2xl border text-left shadow-sm transition-colors duration-200
+            flex items-center justify-between px-4 py-3.5 ${selectedAllowWrap ? 'items-start' : 'items-center'}
+            ${disabled ? 'cursor-not-allowed opacity-60 bg-[color:var(--surface-muted)]' : 'surface-menu backdrop-blur-xl hover:bg-[color:var(--surface-secondary)]'}
+            ${
+              error
+                ? 'border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.10)]'
+                : 'border-[color:var(--border-default)] hover:border-[color:var(--border-strong)]'
+            }
+          `}
+        >
+          <span className={`flex min-w-0 flex-1 ${selectedAllowWrap ? 'items-start' : 'items-center'} ${!selectedOption ? 'text-[color:var(--text-secondary)]' : 'text-[color:var(--text-primary)]'}`}>
+            {selectedOption ? (
+              <span className={`flex min-w-0 gap-2 ${selectedAllowWrap ? 'items-start' : 'items-center'}`}>
+                {selectedOption.icon && (
+                  <span className="flex-shrink-0 text-[color:var(--text-secondary)]">
+                    {selectedOption.icon}
+                  </span>
+                )}
+                <span className={selectedAllowWrap ? 'whitespace-normal break-words text-sm leading-5' : 'truncate'}>
+                  {selectedOption.label}
+                </span>
+              </span>
+            ) : (
+              <span className={selectedAllowWrap ? 'whitespace-normal break-words text-sm leading-5' : 'truncate'}>
+                {placeholder}
+              </span>
+            )}
+          </span>
+          <span className="pointer-events-none flex items-center pr-2">
+            <span
+              aria-hidden="true"
+              className={`text-base leading-none text-[color:var(--text-secondary)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+            >
+              ⌄
+            </span>
+          </span>
+        </button>
+
+        {dropdown}
       </div>
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   );
 };

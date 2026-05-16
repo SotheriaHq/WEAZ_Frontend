@@ -71,7 +71,6 @@ import {
 import {
   CREATOR_AUDIENCE_OPTIONS,
   CREATOR_METADATA_HELP,
-  getAudienceLabel,
   mapCreatorMetadataError,
   normalizeHashtagLabel,
 } from '@/utils/creatorMetadata';
@@ -235,12 +234,6 @@ const CreateDesignInner: React.FC = () => {
   });
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [showCancelPrompt, setShowCancelPrompt] = useState(false);
-  const [showDraftPreview, setShowDraftPreview] = useState(false);
-  const showSaveDraftConfirm = false;
-  const showDraftSavedChoices = false;
-  const setShowSaveDraftConfirm = (_value: boolean) => {
-    void _value;
-  };
   const [submitIntent, setSubmitIntent] = useState<"draft" | "publish" | null>(
     null,
   );
@@ -1404,14 +1397,6 @@ const CreateDesignInner: React.FC = () => {
     navigate(`/profile?tab=Content&visibility=${visibility === 'PRIVATE' ? 'Private' : 'Public'}`, { replace: true });
   };
 
-  const handleGoToDrafts = () => {
-    navigate("/profile?tab=Content&visibility=Drafts", { replace: true });
-  };
-
-  const handleCreateNewDesign = () => {
-    navigate("/designs/create", { replace: true });
-  };
-
   const handleModalCloseRequest = () => {
     setShowPublishModal(false);
     setShowCancelPrompt(true);
@@ -1490,66 +1475,6 @@ const CreateDesignInner: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-transparent text-[var(--text-primary)] transition-colors duration-300">
-      {/* CreateStoreModal removed as per request */}
-      {/* Save Draft Confirmation */}
-      {false && showSaveDraftConfirm && (
-        <div className="fixed inset-0 z-layer-modal flex items-center justify-center">
-          <div
-            className="absolute inset-0 surface-overlay-strong"
-            onClick={() => setShowSaveDraftConfirm(false)}
-          />
-          <div className="surface-modal relative z-10 w-[min(92vw,420px)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border shadow-xl p-5 sm:p-6">
-            <h3 className="text-lg font-semibold mb-2">Save as Draft?</h3>
-            <p className="text-sm text-theme-secondary mb-4">
-              Your media will be uploaded and saved as a draft. You can continue
-              editing later.
-            </p>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
-                className="surface-control surface-interactive-hover w-full rounded-lg border px-4 py-2 sm:w-auto"
-                onClick={() => setShowSaveDraftConfirm(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className="w-full rounded-lg bg-purple-600 px-4 py-2 text-white disabled:opacity-50 sm:w-auto"
-                onClick={executeSaveDraft}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Saving…" : "Confirm"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {false && showDraftSavedChoices && (
-        <div className="fixed inset-0 z-layer-modal flex items-center justify-center">
-          <div className="absolute inset-0 surface-overlay-strong" />
-          <div className="surface-modal relative z-10 w-[min(92vw,460px)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border shadow-xl p-5 sm:p-6">
-            <h3 className="text-lg font-semibold mb-2">Draft saved</h3>
-            <p className="text-sm text-theme-secondary mb-5">
-              Choose what you want to do next.
-            </p>
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <button
-                className="surface-control surface-interactive-hover w-full rounded-lg border px-4 py-2 sm:w-auto"
-                onClick={handleCreateNewDesign}
-              >
-                Create New Design
-              </button>
-              <button
-                className="w-full rounded-lg bg-purple-600 px-4 py-2 text-white sm:w-auto"
-                onClick={handleGoToDrafts}
-              >
-                Go to Drafts
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main Content */}
       <main className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-32">
         <div className="mb-4 flex items-center justify-between sm:mb-6">
@@ -2102,7 +2027,7 @@ const CreateDesignInner: React.FC = () => {
               </div>
 
               {isMadeToOrder && (
-                <div className="max-h-[52vh] overflow-y-auto pr-1 scrollbar-hide">
+                <div className="max-h-[38vh] min-h-[260px] overflow-y-auto rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-secondary)]/60 p-2 pr-1 shadow-inner scrollbar-hide">
                   <CustomOrderConfigurationEditor
                     ref={customOrderEditorRef}
                     sourceType="DESIGN"
@@ -2446,137 +2371,6 @@ const CreateDesignInner: React.FC = () => {
                   />
                 </div>
 
-                {/* Draft Preview (read-only) */}
-                <AnimatePresence>
-                  {showDraftPreview && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-layer-modal flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-                      onClick={() => setShowDraftPreview(false)}
-                    >
-                      <motion.div
-                        initial={{ scale: 0.96, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.96, opacity: 0 }}
-                        className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl glass-panel-dark border border-white/10 p-6 space-y-4"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm text-white/60">
-                              Draft snapshot
-                            </p>
-                            <h3 className="text-xl font-semibold text-white">
-                              {title || "Untitled design"}
-                            </h3>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setShowDraftPreview(false)}
-                            className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
-                            aria-label="Close draft preview"
-                          >
-                            <FiX className="w-5 h-5" />
-                          </button>
-                        </div>
-
-                        {selectedFile?.url && (
-                          <div className="w-full rounded-xl">
-                            <MediaRenderer
-                              kind={
-                                selectedFile.kind === "video"
-                                  ? "video"
-                                  : "image"
-                              }
-                              src={selectedFile.url}
-                              alt="Draft cover"
-                              maxHeightClassName="max-h-[420px]"
-                            />
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white/90 text-sm">
-                          <div className="space-y-2">
-                            <p>
-                              <span className="text-white/60">
-                                Description:
-                              </span>{" "}
-                              {description || "—"}
-                            </p>
-                            <p>
-                              <span className="text-white/60">What is it?:</span>{" "}
-                              {selectedCategory?.name || "—"}
-                            </p>
-                            <p>
-                              <span className="text-white/60">
-                                Who is it for?:
-                              </span>{" "}
-                              {getAudienceLabel(type)}
-                            </p>
-                          </div>
-                          <div className="space-y-2">
-                            <p>
-                              <span className="text-white/60">
-                                Who can see this?:
-                              </span>{" "}
-                              {visibility}
-                            </p>
-                            <p>
-                              <span className="text-white/60">
-                                Price Range:
-                              </span>{" "}
-                              {minPrice || maxPrice
-                                ? `${minPrice || "—"} - ${maxPrice || "—"}`
-                                : "—"}
-                            </p>
-                            <p>
-                              <span className="text-white/60">Hashtags:</span>{" "}
-                              {selectedTags.length
-                                ? selectedTags.map(normalizeHashtagLabel).join(", ")
-                                : "—"}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div>
-                          <p className="text-white/70 text-sm mb-2">Media</p>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {files.map((file) => {
-                              const withUrl = resolveMediaWithUrl(file);
-                              if (!withUrl) return null;
-                              return (
-                                <div
-                                  key={withUrl.id}
-                                  className="rounded-xl flex items-center justify-center"
-                                >
-                                  <MediaRenderer
-                                    kind={
-                                      withUrl.kind === "video"
-                                        ? "video"
-                                        : "image"
-                                    }
-                                    src={withUrl.url}
-                                    alt=""
-                                    maxHeightClassName="max-h-32"
-                                    maxWidthClassName="max-w-[240px]"
-                                  />
-                                </div>
-                              );
-                            })}
-                            {files.length === 0 && (
-                              <div className="text-white/60 text-sm">
-                                No media yet
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
                 <button
                   className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-40"
                   onClick={handleFullscreenNext}
@@ -2633,12 +2427,16 @@ const FormSection: React.FC<{
 }> = ({ title, icon, isOpen, onToggle, children, className, id }) => (
   <div
     id={id}
-    className={`surface-card rounded-2xl border overflow-hidden backdrop-blur ${className ?? ""}`}
+    className={`surface-card relative rounded-2xl border border-[color:var(--border-strong)] ring-1 ring-[color:var(--border-default)]/60 backdrop-blur transition-shadow ${
+      isOpen ? "shadow-[0_14px_34px_rgba(15,23,42,0.08)]" : "shadow-sm"
+    } ${className ?? ""}`}
   >
     <button
       type="button"
       onClick={onToggle}
-      className="surface-interactive-hover w-full flex items-center justify-between p-3 text-left transition-colors sm:p-4"
+      className={`surface-interactive-hover w-full flex items-center justify-between rounded-t-2xl p-3 text-left transition-colors sm:p-4 ${
+        isOpen ? "border-b border-[color:var(--border-default)]/80" : "rounded-b-2xl"
+      }`}
     >
       <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-primary text-base sm:h-10 sm:w-10 sm:text-lg">
