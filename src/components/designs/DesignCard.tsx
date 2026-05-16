@@ -4,7 +4,7 @@ import type { RootState } from '@/store';
 import { messagingApi } from '@/api/MessagingApi';
 import { toast } from 'sonner';
 import ThreadButton from '@/components/ui/ThreadButton';
-import CommentInput from '@/components/ui/CommentInput';
+import InlineTextInput from '@/components/ui/CommentInput';
 import type { MarketItem } from '@/types/market';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { apiClient } from '@/api/httpClient';
@@ -45,8 +45,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   const navigate = useNavigate();
   const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
-  const [commentText, setCommentText] = useState('');
-  const [commentBusy, setCommentBusy] = useState(false);
+  const [directMessageText, setDirectMessageText] = useState('');
+  const [directMessageBusy, setDirectMessageBusy] = useState(false);
   const user = useSelector((s: RootState) => s.user.profile);
   const [isHidden, setIsHidden] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -435,12 +435,12 @@ export const DesignCard: React.FC<DesignCardProps> = ({
             {item.collectionTitle}
           </h3>
 
-          {/* Comment Input Area (Bottom) */}
+          {/* Direct message input area (bottom) */}
           <div className="flex items-center gap-2">
             <div className="flex-1 min-w-0">
-              <CommentInput
-                value={commentText}
-                onChange={setCommentText}
+              <InlineTextInput
+                value={directMessageText}
+                onChange={setDirectMessageText}
                 onSubmit={async () => {
                   if (!isAuth) {
                     toast.info('Please sign in to message this brand.');
@@ -448,11 +448,11 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                     navigate(`/login?next=${encodeURIComponent(next)}`);
                     return;
                   }
-                  const content = commentText.trim();
+                  const content = directMessageText.trim();
                   if (!content || content.length > 4000) { toast.error('Message must be 1-4000 characters.'); return; }
                   if (!brandId) { toast.error('Brand is unavailable for this design.'); return; }
                   if (ownsDesignBrand) { toast.info('This is your design.'); return; }
-                  setCommentBusy(true);
+                  setDirectMessageBusy(true);
                   try {
                     const result = await messagingApi.sendBrandMessage(brandId, {
                       bodyText: content,
@@ -460,7 +460,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                         ? crypto.randomUUID()
                         : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
                     });
-                    setCommentText('');
+                    setDirectMessageText('');
                     toast.success('Message sent');
                     const threadId = result?.thread?.id;
                     if (threadId) {
@@ -468,14 +468,15 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                     }
                   } catch (err: any) {
                     toast.error(err?.response?.data?.message ?? 'Failed to send message');
-                  } finally { setCommentBusy(false); }
+                  } finally { setDirectMessageBusy(false); }
                 }}
                 placeholder={ownsDesignBrand ? 'Your design' : canMessageBrand ? 'Message brand...' : 'Brand unavailable'}
                 maxLength={4000}
-                disabled={commentBusy || !canMessageBrand}
-                busy={commentBusy}
+                disabled={directMessageBusy || ownsDesignBrand}
+                busy={directMessageBusy}
                 className="w-full"
                 variant="overlay"
+                submitAriaLabel="Send direct message"
               />
             </div>
           </div>

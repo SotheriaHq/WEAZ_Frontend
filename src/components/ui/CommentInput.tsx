@@ -12,6 +12,7 @@ interface CommentInputProps {
   className?: string;
   maxLength?: number;
   variant?: 'default' | 'overlay';
+  submitAriaLabel?: string;
 }
 
 export const CommentInput: React.FC<CommentInputProps> = ({
@@ -24,6 +25,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
   className = "",
   maxLength = 500,
   variant = 'default',
+  submitAriaLabel = 'Send comment',
 }) => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !busy && !disabled) {
@@ -65,7 +67,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
       />
       <button
         type="button"
-        aria-label="Send comment"
+        aria-label={submitAriaLabel}
         disabled={busy || disabled || value.trim().length === 0}
         onClick={handleSubmit}
         className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white shadow-md hover:brightness-110 disabled:opacity-60"
