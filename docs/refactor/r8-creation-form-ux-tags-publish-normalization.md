@@ -11,6 +11,7 @@ Implemented:
 - Web tag suggestions now fall back from `/tags/trending` to `/tags` when trending fails or is empty after a reset.
 - Mobile selected hashtags are visible as chips on the composer and inside the tag sheet.
 - Design background publish placeholders can surface even when a preview URL is not available yet.
+- Web card thread actions now use the native-aligned thread spool motion instead of the old needle glyph.
 
 Not implemented:
 
@@ -115,7 +116,37 @@ Design create/edit already follows the desired pattern:
 
 R8 improved placeholder surfacing by allowing publish cards without preview URLs and preserving the task title. Product and StoreCollection flows do not yet share the same publish task abstraction and remain deferred for a later normalization pass.
 
-## 12. Fixes Applied
+## 12. Card Thread Animation Alignment
+
+Native mobile behavior found:
+
+- `threadly-mobile/components/catalog/ThreadRailAction.tsx` is the current native thread rail control.
+- It uses the thread spool glyph, not the old needle glyph.
+- On add, it spins and scales the spool over about 680ms, then reveals the count after about 520ms.
+- It respects reduced-motion settings.
+- It is used on the design feed action rail and collection/detail viewer action rail.
+- `ThreadTapBurstOverlay` exists as a richer stitch burst treatment, but the audit found no current call sites.
+
+Web old usage found:
+
+- `src/components/ui/ThreadButton.tsx` still swapped between needle and spool glyphs and animated a needle pass.
+- `ThreadButton` is used by web design cards and profile/catalog collection cards, so the old marker leaked into card thread actions.
+- `ProfileHeader` also used the old needle for the unpatched brand action; that was not a card, but it was a visible legacy marker and was aligned to the shared thread indicator for consistency.
+
+Fix result:
+
+- Added shared `ThreadActivityIndicator`.
+- Updated `ThreadButton` to use one spool-based visual state for idle, add, remove, pending, reduced-motion, and revert states.
+- Removed the old needle pass/glyph animation from web card thread controls.
+- Kept existing thread count, modal, optimistic engagement, routing, and backend payload behavior unchanged.
+- Updated profile patch action to reuse the same decorative thread indicator instead of the legacy needle glyph.
+
+Remaining platform differences:
+
+- Web uses CSS keyframes; native uses Reanimated shared values.
+- Web aligns the visible glyph, timing, reduced-motion handling, and count delay closely, but it does not port the unused native stitch-burst overlay.
+
+## 13. Fixes Applied
 
 - Replaced web audience button cards with `UniversalSelect`.
 - Kept age group as a compact `UniversalSelect`.
@@ -125,21 +156,22 @@ R8 improved placeholder surfacing by allowing publish cards without preview URLs
 - Added tag fallback test coverage.
 - Added mobile selected hashtag chip previews.
 - Added selected chip group to mobile multi-select sheets.
+- Added shared web `ThreadActivityIndicator` and replaced old needle-based card thread animation.
 - Preserved payload fields and compatibility aliases.
 
-## 13. Deferred Items
+## 14. Deferred Items
 
 - Backend audience/age applicability metadata for categories, subcategories, and filter values.
 - Full Product background publish tracker.
 - Full StoreCollection background publish tracker.
 - Shared cross-platform contract fixture for creator metadata labels and allowed enum values.
 
-## 14. Risks
+## 15. Risks
 
 - Existing records can still contain inactive legacy category/filter values; edit flows must continue to tolerate them.
 - Product/StoreCollection publishing can still feel less immediate than Design until they share a publish task layer.
 - Mobile manual QA is still required on device for tag sheet scrolling and keyboard behavior.
 
-## 15. Final Decision
+## 16. Final Decision
 
 R8 is acceptable as a scoped UX and reliability pass. Design creation is more compact and clear, seeded tags are more reliable, mobile tag state is more visible, and background publish behavior is documented with a low-risk Design placeholder improvement. No schema changes, migrations, DB resets, seeds, compatibility removals, or feed work were performed.

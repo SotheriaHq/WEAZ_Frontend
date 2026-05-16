@@ -5,6 +5,7 @@ import { getTagColor } from '@/utils/tagColors';
 import AvatarCard from '../profile/AvatarCard';
 import VLoader from '../loaders/VLoader';
 import ImageWithFallback from '../ImageWithFallback';
+import ThreadActivityIndicator from '../ui/ThreadActivityIndicator';
 
 interface ProfileHeaderProps {
   profile: {
@@ -298,7 +299,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                 aria-live="polite"
               >
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/80 text-sm shadow-sm ring-1 ring-black/5">
-                  {isPatched ? '🧵' : '🪡'}
+                  <ThreadActivityIndicator active={isPatched} size={18} state={patchLoading ? 'pending' : 'idle'} />
                 </span>
                 <span>{patchLoading ? 'Updating...' : isPatched ? 'Unpatch' : 'Patch'}</span>
               </button>

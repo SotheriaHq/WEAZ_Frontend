@@ -13,6 +13,7 @@ import { useRealtime } from '@/realtime';
 import ThreadListModal from '@/components/engagement/ThreadListModal';
 import { OfflineThreads } from '@/lib/offlineThreads';
 import { toast } from 'sonner';
+import ThreadActivityIndicator, { type ThreadActivityIndicatorState } from './ThreadActivityIndicator';
 
 import './ThreadButton.css';
 
@@ -56,13 +57,11 @@ const ThreadButton: React.FC<Props> = ({
   const [busy, setBusy] = React.useState(false);
   const [initializing, setInitializing] = React.useState(true);
   const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(false);
+  const [activityState, setActivityState] = React.useState<ThreadActivityIndicatorState>('idle');
   const [visualState, setVisualState] = React.useState<ThreadVisualState>(
     initialThreaded ? 'idle_threaded' : 'idle_unthreaded',
   );
-  const [iconAnimClass, setIconAnimClass] = React.useState('');
   const [countAnimClass, setCountAnimClass] = React.useState('');
-  const [needleVisible, setNeedleVisible] = React.useState(false);
-  const [trailVisible, setTrailVisible] = React.useState(false);
   const [revertNudge, setRevertNudge] = React.useState(false);
 
   const k = `${contentType}:${contentId}`;
@@ -99,16 +98,14 @@ const ThreadButton: React.FC<Props> = ({
       clearAnimationTimers();
 
       if (prefersReducedMotion) {
-        setIconAnimClass('thread-icon-reduced');
+        setActivityState('reduced');
         setCountAnimClass('thread-count-reduced');
-        setNeedleVisible(false);
-        setTrailVisible(false);
         setVisualState(nextThreaded ? 'animating_add' : 'animating_remove');
 
         queueTimer(
           window.setTimeout(() => {
-            setIconAnimClass('');
             setCountAnimClass('');
+            setActivityState('pending');
             setVisualState('pending_server_ack');
           }, 150),
         );
@@ -116,37 +113,27 @@ const ThreadButton: React.FC<Props> = ({
       }
 
       if (nextThreaded) {
-        setIconAnimClass('thread-icon-add');
+        setActivityState('adding');
         setCountAnimClass('');
-        setNeedleVisible(true);
-        setTrailVisible(true);
         setVisualState('animating_add');
 
         queueTimer(
           window.setTimeout(() => {
             setCountAnimClass('thread-count-up');
-          }, 340),
+          }, 520),
         );
         queueTimer(
           window.setTimeout(() => {
-            setNeedleVisible(false);
-            setTrailVisible(false);
-          }, 340),
-        );
-        queueTimer(
-          window.setTimeout(() => {
-            setIconAnimClass('');
             setCountAnimClass('');
+            setActivityState('pending');
             setVisualState('pending_server_ack');
-          }, 560),
+          }, 680),
         );
         return;
       }
 
-      setIconAnimClass('thread-icon-remove');
+      setActivityState('removing');
       setCountAnimClass('');
-      setNeedleVisible(false);
-      setTrailVisible(false);
       setVisualState('animating_remove');
 
       queueTimer(
@@ -156,8 +143,8 @@ const ThreadButton: React.FC<Props> = ({
       );
       queueTimer(
         window.setTimeout(() => {
-          setIconAnimClass('');
           setCountAnimClass('');
+          setActivityState('pending');
           setVisualState('pending_server_ack');
         }, 260),
       );
@@ -168,9 +155,11 @@ const ThreadButton: React.FC<Props> = ({
   const triggerRevert = useCallback(() => {
     setVisualState('revert_error');
     setRevertNudge(true);
+    setActivityState('revert');
 
     const nudgeTimer = window.setTimeout(() => {
       setRevertNudge(false);
+      setActivityState('idle');
       setVisualState(currentThreadedRef.current ? 'idle_threaded' : 'idle_unthreaded');
     }, 180);
 
@@ -179,7 +168,8 @@ const ThreadButton: React.FC<Props> = ({
 
   useEffect(() => {
     currentThreadedRef.current = item.threadedByMe;
-    if (!busy && visualState !== 'revert_error') {
+    if (!busy && visualState !== 'revert_error' && !visualState.startsWith('animating')) {
+      setActivityState('idle');
       setVisualState(item.threadedByMe ? 'idle_threaded' : 'idle_unthreaded');
     }
   }, [busy, item.threadedByMe, visualState]);
@@ -387,8 +377,6 @@ const ThreadButton: React.FC<Props> = ({
         const latestThreaded = currentThreadedRef.current;
         if (typeof queuedDesired === 'boolean' && queuedDesired !== latestThreaded) {
           void runToggle(queuedDesired);
-        } else if (visualState !== 'revert_error') {
-          setVisualState(latestThreaded ? 'idle_threaded' : 'idle_unthreaded');
         }
       }
     },
@@ -430,28 +418,7 @@ const ThreadButton: React.FC<Props> = ({
     .filter(Boolean)
     .join(' ');
 
-  const iconClassNames = ['thread-emoji-wrap', iconAnimClass].filter(Boolean).join(' ');
   const countClassNames = ['thread-count-btn', countAnimClass].filter(Boolean).join(' ');
-  const threadGlyphClassNames = [
-    'thread-glyph',
-    'thread-glyph-thread',
-    item.threadedByMe ? 'thread-glyph-visible' : 'thread-glyph-hidden',
-  ]
-    .filter(Boolean)
-    .join(' ');
-  const needleGlyphClassNames = [
-    'thread-glyph',
-    'thread-glyph-needle',
-    item.threadedByMe ? 'thread-glyph-hidden' : 'thread-glyph-visible',
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  const sizeStyle = {
-    width: size,
-    height: size,
-    ['--thread-size' as const]: `${size}px`,
-  } as React.CSSProperties;
 
   return (
     <div className={rootClassNames}>
@@ -465,18 +432,7 @@ const ThreadButton: React.FC<Props> = ({
         data-thread-state={visualState}
         className={buttonClassNames}
       >
-        <div style={sizeStyle} className={iconClassNames}>
-          <span aria-hidden="true" className="thread-overlay-layer">
-            {trailVisible ? <span className="thread-trail-pass" /> : null}
-            {needleVisible ? <span className="thread-needle-pass">🪡</span> : null}
-          </span>
-          <span aria-hidden="true" className={threadGlyphClassNames}>
-            🧵
-          </span>
-          <span aria-hidden="true" className={needleGlyphClassNames}>
-            🪡
-          </span>
-        </div>
+        <ThreadActivityIndicator active={item.threadedByMe} size={size} state={activityState} />
       </button>
 
       <button

@@ -1,0 +1,117 @@
+.thread-activity-indicator {
+  --thread-activity-size: 20px;
+  position: relative;
+  display: inline-flex;
+  width: var(--thread-activity-size);
+  height: var(--thread-activity-size);
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.thread-activity-indicator__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--thread-activity-size) * 0.98);
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.34));
+  transform-origin: center;
+}
+
+.thread-activity-indicator--active .thread-activity-indicator__glyph {
+  filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.48)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.34));
+}
+
+.thread-activity-indicator--adding {
+  animation: thread-activity-add 680ms cubic-bezier(0.2, 0.9, 0.2, 1.15);
+}
+
+.thread-activity-indicator--removing {
+  animation: thread-activity-remove 260ms cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.thread-activity-indicator--pending {
+  opacity: 0.84;
+}
+
+.thread-activity-indicator--reduced {
+  animation: thread-activity-reduced 150ms ease-out;
+}
+
+.thread-activity-indicator--revert {
+  animation: thread-activity-revert 180ms ease-out;
+}
+
+@keyframes thread-activity-add {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  38% {
+    transform: rotate(150deg) scale(1.72);
+  }
+  62% {
+    transform: rotate(250deg) scale(1.16);
+  }
+  82% {
+    transform: rotate(320deg) scale(1.34);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes thread-activity-remove {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  42% {
+    opacity: 0.88;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes thread-activity-reduced {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes thread-activity-revert {
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thread-activity-indicator--adding,
+  .thread-activity-indicator--removing,
+  .thread-activity-indicator--reduced,
+  .thread-activity-indicator--revert {
+    animation-duration: 1ms;
+  }
+}
