@@ -135,9 +135,9 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
   };
 
   const audienceLabel = {
-    EVERYBODY: 'Everybody',
-    MALE: 'Men',
-    FEMALE: 'Women',
+    EVERYBODY: 'Unisex / Everybody',
+    MALE: 'Menswear',
+    FEMALE: 'Womenswear',
   };
 
   const truncatedDescription = summary.description 

@@ -895,6 +895,7 @@ const CreateDesignInner: React.FC = () => {
       if (categoryTypeId.trim().length === 0)
         reasons.push("Choose a garment type.");
       if (type.trim().length === 0) reasons.push("Choose who this item is for.");
+      if (!targetAgeGroup) reasons.push("Choose an age group.");
       if (getSelectedFilterValueIds().length === 0)
         reasons.push("Add at least one style detail.");
       if (selectedTags.length === 0) reasons.push("Add at least one hashtag.");
@@ -1359,9 +1360,9 @@ const CreateDesignInner: React.FC = () => {
       },
       {
         targetId: 'design-targeting-section',
-        title: 'Audience & visibility',
+        title: 'Sizing & visibility',
         description:
-          "Choose who this item is for, then decide whether everyone can see it or only you can.",
+          "Set sizing expectations, then decide whether everyone can see it or only you can.",
         emoji: '🎯',
         onEnter: () => setExpandedSections((prev) => ({ ...prev, targeting: true })),
         enterDelay: 350,
@@ -1740,6 +1741,43 @@ const CreateDesignInner: React.FC = () => {
                         />
                       </div>
 
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div>
+                          <label className="mb-2 flex items-center text-sm font-medium text-theme">
+                            Who is it for?
+                            <InfoTooltip text={CREATOR_METADATA_HELP.audience} />
+                          </label>
+                          <div className="grid grid-cols-1 gap-2">
+                            {CREATOR_AUDIENCE_OPTIONS.map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => setType(option.value)}
+                                disabled={disabled}
+                                className={`rounded-lg border px-3 py-2 text-left text-sm font-medium transition-all ${
+                                  type === option.value
+                                    ? "border-purple-400/80 bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                                    : "border-gray-200/70 text-theme-secondary hover:border-purple-200 dark:border-white/10 dark:hover:border-white/20"
+                                }`}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <UniversalSelect
+                          label="Age group"
+                          value={targetAgeGroup}
+                          onChange={(value) => setTargetAgeGroup(value as DesignTargetAgeGroup)}
+                          options={DESIGN_TARGET_AGE_OPTIONS.map((option) => ({
+                            value: option.value,
+                            label: option.label,
+                          }))}
+                          disabled={disabled}
+                        />
+                      </div>
+
                       <FilterSelector
                         value={filterSelection}
                         onChange={setFilterSelection}
@@ -1970,42 +2008,15 @@ const CreateDesignInner: React.FC = () => {
             </div>
           </FormSection>
 
-          {/* Audience & visibility */}
+          {/* Sizing & visibility */}
           <FormSection
             id="design-targeting-section"
-            title="Audience & visibility"
+            title="Sizing & visibility"
             icon="🎯"
             isOpen={expandedSections.targeting}
             onToggle={() => toggleSection("targeting")}
           >
             <div className="space-y-4">
-              <div>
-                <label className="mb-2 flex items-center text-sm font-medium text-theme">
-                  Who is it for?
-                  <InfoTooltip text={CREATOR_METADATA_HELP.audience} />
-                </label>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  {CREATOR_AUDIENCE_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setType(option.value)}
-                      disabled={disabled}
-                      className={`
-                        flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-all
-                        ${
-                          type === option.value
-                            ? "border-purple-400/80 bg-purple-500/10 text-purple-600 dark:text-purple-400"
-                            : "border-gray-200/70 text-theme-secondary hover:border-purple-200 dark:border-white/10 dark:hover:border-white/20"
-                        }
-                      `}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <UniversalSelect
                 label="Sizing Mode"
                 value={sizingMode}
@@ -2025,17 +2036,6 @@ const CreateDesignInner: React.FC = () => {
                 value={fitPreference}
                 onChange={(value) => setFitPreference(value as DesignFitPreference)}
                 options={DESIGN_FIT_PREFERENCE_OPTIONS.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-                disabled={disabled}
-              />
-
-              <UniversalSelect
-                label="Target Age Group"
-                value={targetAgeGroup}
-                onChange={(value) => setTargetAgeGroup(value as DesignTargetAgeGroup)}
-                options={DESIGN_TARGET_AGE_OPTIONS.map((option) => ({
                   value: option.value,
                   label: option.label,
                 }))}

@@ -21,7 +21,7 @@ import {
 } from '@/api/StoreApi';
 import { primeStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
 
-const MAX_SPECIALIZATIONS = 3;
+const MAX_SPECIALIZATIONS = 4;
 const RESPONSE_TIME_OPTIONS = ['12h', '24h', '48h'];
 
 const BRAND_SPECIALIZATION_OPTIONS = [
@@ -36,12 +36,7 @@ const BRAND_SPECIALIZATION_OPTIONS = [
   { value: 'traditional-cultural-wear', label: 'Traditional / Cultural wear' },
   { value: 'streetwear', label: 'Streetwear' },
   { value: 'corporate-formalwear', label: 'Corporate / Formalwear' },
-  { value: 'luxury', label: 'Luxury' },
   { value: 'modest-fashion', label: 'Modest fashion' },
-  { value: 'accessories', label: 'Accessories' },
-  { value: 'footwear', label: 'Footwear' },
-  { value: 'bags', label: 'Bags' },
-  { value: 'jewelry', label: 'Jewelry' },
 ];
 const BRAND_SPECIALIZATION_VALUE_SET = new Set(BRAND_SPECIALIZATION_OPTIONS.map((option) => option.value));
 
@@ -126,7 +121,7 @@ const StoreGeneralSettings: React.FC = () => {
 
   const storeNameChanged = initialSettings ? storeName.trim() !== initialSettings.storeName : false;
   const normalizedTagSnapshot = selectedCategories.slice().sort().join('|');
-  const normalizedInitialTags = (initialSettings?.tags || []).slice().sort().join('|');
+  const normalizedInitialTags = normalizeSpecializationSelection(initialSettings?.tags || []).slice().sort().join('|');
 
   const isDirty = Boolean(
     initialSettings && (
@@ -303,7 +298,7 @@ const StoreGeneralSettings: React.FC = () => {
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Brand focus</label>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Choose up to 3 specializations that describe your store.
+                Choose up to {MAX_SPECIALIZATIONS} specializations that describe your store.
               </p>
               <div className="flex flex-wrap gap-2">
                 {specializationOptions.map((cat) => {

@@ -17,7 +17,7 @@ export const DESIGN_FIT_PREFERENCE_OPTIONS = [
 
 export const DESIGN_TARGET_AGE_OPTIONS = [
   { value: 'ADULT', label: 'Adult' },
-  { value: 'CHILD', label: 'Child' },
+  { value: 'CHILD', label: 'Kids' },
 ] as const;
 
 export type DesignFitPreference = (typeof DESIGN_FIT_PREFERENCE_OPTIONS)[number]['value'];

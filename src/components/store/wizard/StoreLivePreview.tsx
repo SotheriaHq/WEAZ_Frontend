@@ -18,12 +18,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   'traditional-cultural-wear': 'Traditional / Cultural wear',
   streetwear: 'Streetwear',
   'corporate-formalwear': 'Corporate / Formalwear',
-  luxury: 'Luxury',
   'modest-fashion': 'Modest fashion',
-  accessories: 'Accessories',
-  footwear: 'Footwear',
-  bags: 'Bags',
-  jewelry: 'Jewelry',
 };
 
 /**

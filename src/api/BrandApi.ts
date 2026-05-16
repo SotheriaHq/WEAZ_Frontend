@@ -20,6 +20,7 @@ import {
   isRemoteMediaValue,
 } from '../utils/renderableMedia';
 import { resolveCatalogEntityType } from '../utils/catalogEntity';
+import { filterV1GarmentCategories } from '../utils/v1Taxonomy';
 
 export interface UpdateBrandProfilePayload {
   brandFullName?: string;
@@ -207,7 +208,7 @@ const mapCategories = (
 ): CategoryOption[] => {
   const items = extractArrayPayload(payload);
 
-  return items
+  return filterV1GarmentCategories(items
     .map((c: any) => ({
       id: String(c?.id ?? ''),
       slug: String(c?.slug ?? ''),
@@ -229,13 +230,13 @@ const mapCategories = (
           .filter((t: CategoryTypeOption) => t.id.length > 0 && t.name.length > 0)
         : [],
     }))
-    .filter((c: { id: string; name: string }) => c.id.length > 0 && c.name.length > 0);
+    .filter((c: { id: string; name: string }) => c.id.length > 0 && c.name.length > 0));
 };
 
 const mapCategoriesWithSubCategories = (payload: unknown): CategoryOption[] => {
   const items = extractArrayPayload(payload);
 
-  return items
+  return filterV1GarmentCategories(items
     .map((c: any) => ({
       id: String(c?.id ?? ''),
       slug: String(c?.slug ?? ''),
@@ -257,7 +258,7 @@ const mapCategoriesWithSubCategories = (payload: unknown): CategoryOption[] => {
           .filter((t: CategoryTypeOption) => t.id.length > 0 && t.name.length > 0)
         : [],
     }))
-    .filter((c: CategoryOption) => c.id.length > 0 && c.name.length > 0);
+    .filter((c: CategoryOption) => c.id.length > 0 && c.name.length > 0));
 };
 
 const mapRatingDistribution = (

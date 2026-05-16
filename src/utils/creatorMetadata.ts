@@ -4,9 +4,9 @@ export const CREATOR_AUDIENCE_OPTIONS: Array<{
   value: CreatorAudience;
   label: string;
 }> = [
-  { value: "FEMALE", label: "Women" },
-  { value: "MALE", label: "Men" },
-  { value: "EVERYBODY", label: "Everyone / Unisex" },
+  { value: "FEMALE", label: "Womenswear" },
+  { value: "MALE", label: "Menswear" },
+  { value: "EVERYBODY", label: "Unisex / Everybody" },
 ];
 
 export const CREATOR_METADATA_HELP = {
@@ -57,7 +57,7 @@ export const LEGACY_DISCOVERY_DIMENSION_SLUGS = new Set([
 export function getAudienceLabel(value?: string | null): string {
   return (
     CREATOR_AUDIENCE_OPTIONS.find((option) => option.value === value)?.label ||
-    "Everyone / Unisex"
+    "Unisex / Everybody"
   );
 }
 

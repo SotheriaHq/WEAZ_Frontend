@@ -2,6 +2,7 @@ import { apiClient } from "./httpClient";
 import { createIdempotencyKey } from "./idempotency";
 import { unwrapApiResponse } from "../types/auth";
 import type { SizingMode } from '@/types/sizing';
+import { filterV1GarmentCategories } from '@/utils/v1Taxonomy';
 
 // =====================
 // Types
@@ -652,11 +653,12 @@ export const productApi = {
       const response = await apiClient.get<Category[]>(
         "/collections/categories",
       );
-      return (
+      const categories = (
         (response.data as any)?.data ??
         (response.data as unknown as Category[]) ??
         []
       );
+      return filterV1GarmentCategories(categories);
     } catch (error) {
       console.error("Failed to fetch categories", error);
       // Return default categories as fallback
@@ -665,9 +667,6 @@ export const productApi = {
         { id: "hoodies", name: "Hoodies", slug: "hoodies" },
         { id: "dresses", name: "Dresses", slug: "dresses" },
         { id: "pants", name: "Pants", slug: "pants" },
-        { id: "accessories", name: "Accessories", slug: "accessories" },
-        { id: "shoes", name: "Shoes", slug: "shoes" },
-        { id: "bags", name: "Bags", slug: "bags" },
       ];
     }
   },
