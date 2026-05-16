@@ -165,7 +165,7 @@ const RECOMMENDED_DEFAULTS: Partial<StoreWizardData> = {
 
 /**
  * Store Policies Step (Screen 1.4)
- * Step 3 of 4: Configure shipping, returns, and contact policies
+ * Configure shipping, returns, and contact policies.
  */
 const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
   data,
@@ -288,11 +288,11 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                     </span>
                   </div>
                   <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">
-                    Step 3 of 4
+                    Step 2 of 3
                   </span>
                 </div>
                 <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-purple-600 to-blue-500 w-1/2 rounded-full transition-all duration-500" />
+                  <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 transition-all duration-500" />
                 </div>
               </div>
             )}
@@ -386,6 +386,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       options={PROCESSING_TIMES}
                       placeholder="Select processing time"
                     />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      This becomes the default processing time for new products and custom-order setup.
+                    </p>
                   </div>
 
                   {/* Shipping Methods */}
@@ -1282,12 +1285,12 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 <div className="mb-6">
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-gray-500">Progress</span>
-                    <span className="text-purple-600 font-medium">Step 3 of 4</span>
+                    <span className="text-purple-600 font-medium">Step 2 of 3</span>
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
                     <div
                       className="bg-gradient-to-r from-purple-600 to-purple-700 h-full rounded-full transition-all duration-300"
-                      style={{ width: '50%' }}
+                      style={{ width: '66%' }}
                     />
                   </div>
                 </div>

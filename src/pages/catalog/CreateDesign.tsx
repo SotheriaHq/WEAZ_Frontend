@@ -32,6 +32,7 @@ import CustomOrderConfigurationEditor, {
   type CustomOrderConfigurationEditorHandle,
 } from '@/components/custom-orders/CustomOrderConfigurationEditor';
 import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
+import { getStorePolicies } from '@/api/StoreApi';
 
 // Context & Hooks
 import TextField from "../../components/forms/TextField";
@@ -75,6 +76,10 @@ import {
   mapCreatorMetadataError,
   normalizeHashtagLabel,
 } from '@/utils/creatorMetadata';
+import {
+  deriveProductionLeadDaysFromStoreTime,
+  getStoreProcessingTimeLabel,
+} from '@/utils/storeProcessing';
 import { TourOverlay, type TourStep } from '@/components/ui/TourOverlay';
 // ============================================================================
 
@@ -187,6 +192,8 @@ const CreateDesignInner: React.FC = () => {
   const [fitPreference, setFitPreference] = useState<DesignFitPreference>('REGULAR');
   const [targetAgeGroup, setTargetAgeGroup] = useState<DesignTargetAgeGroup>('ADULT');
   const [metadataEditedAt, setMetadataEditedAt] = useState<Date | null>(null);
+  const [storeProcessingTime, setStoreProcessingTime] = useState('');
+  const [storeCustomOrderLeadTime, setStoreCustomOrderLeadTime] = useState('');
   const [customMeasurementKeys, setCustomMeasurementKeys] = useState<string[]>(
     [],
   );
@@ -240,6 +247,17 @@ const CreateDesignInner: React.FC = () => {
       "bg-gradient-to-r from-indigo-500/70 to-cyan-500/70 text-white shadow-md",
     ],
     [],
+  );
+  const storeCustomOrderLeadTimeLabel = useMemo(
+    () => getStoreProcessingTimeLabel(storeCustomOrderLeadTime || storeProcessingTime),
+    [storeCustomOrderLeadTime, storeProcessingTime],
+  );
+  const storeDefaultProductionLeadDays = useMemo(
+    () =>
+      deriveProductionLeadDaysFromStoreTime(
+        storeCustomOrderLeadTime || storeProcessingTime,
+      ),
+    [storeCustomOrderLeadTime, storeProcessingTime],
   );
 
   // Track original items for deletion in edit mode
@@ -348,6 +366,21 @@ const CreateDesignInner: React.FC = () => {
       }
     };
 
+    const loadStoreProcessingDefaults = async () => {
+      try {
+        const policies = await getStorePolicies();
+        if (!mounted) return;
+        setStoreProcessingTime(policies.processingTime || '');
+        setStoreCustomOrderLeadTime(
+          policies.shippingRules?.customOrderSettings?.leadTime || '',
+        );
+      } catch {
+        if (!mounted) return;
+        setStoreProcessingTime('');
+        setStoreCustomOrderLeadTime('');
+      }
+    };
+
     const loadDesignDetail = async () => {
       if (!isEditMode || !id) return;
       try {
@@ -435,6 +468,7 @@ const CreateDesignInner: React.FC = () => {
       loadTagSuggestions(),
       loadCategories(),
       loadDesignDetail(),
+      loadStoreProcessingDefaults(),
     ]);
 
     return () => {
@@ -1458,9 +1492,9 @@ const CreateDesignInner: React.FC = () => {
           )}
         </AnimatePresence>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-4 sm:gap-6 items-start mb-8">
+        <div className="mb-8 grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)]">
           {/* Media Section */}
-          <section id="design-media-section" className="h-full min-w-0">
+          <section id="design-media-section" className="min-w-0">
             {files.length === 0 ? (
               <div className="space-y-3">
                 <MediaUploadZone
@@ -1603,16 +1637,16 @@ const CreateDesignInner: React.FC = () => {
           </section>
 
           {/* Design Details */}
-          <div className="h-full">
+          <div>
             <FormSection
               id="design-details-section"
               title="Design Details"
               icon="📝"
               isOpen={expandedSections.details}
               onToggle={() => toggleSection("details")}
-              className="h-full flex flex-col"
+              className="!border-gray-200/40 !bg-transparent !shadow-none dark:!border-white/10 lg:max-h-[560px] lg:overflow-y-auto scrollbar-hide"
             >
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <TextField
                   label="Design Title"
                   value={title}
@@ -1625,7 +1659,7 @@ const CreateDesignInner: React.FC = () => {
                   required
                 />
 
-                <div className="surface-panel-subtle rounded-lg border border-gray-200/60 p-3 dark:border-white/10">
+                <div className="rounded-lg border border-gray-200/40 bg-transparent p-3 dark:border-white/10">
                   <div className="mb-3 flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wide text-theme-secondary">
                       Creator metadata
@@ -1642,7 +1676,7 @@ const CreateDesignInner: React.FC = () => {
                           value={description}
                           onChange={(e) => setDescription(e.target.value)}
                           placeholder="Inspired by the warm coastal breeze of Lagos..."
-                          rows={4}
+                          rows={3}
                           disabled={disabled || titleDescriptionLocked}
                           className="surface-control placeholder-theme w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none"
                         />
@@ -1720,7 +1754,7 @@ const CreateDesignInner: React.FC = () => {
                           <InfoTooltip text={CREATOR_METADATA_HELP.hashtags} />
                         </label>
 
-                        <div className="surface-panel-subtle rounded-lg border border-gray-200/60 p-3 dark:border-white/10">
+                        <div className="rounded-lg border border-gray-200/40 bg-transparent p-3 dark:border-white/10">
                           {selectedTags.length > 0 && (
                             <div className="mb-2 flex flex-wrap gap-1.5">
                               {selectedTags.map((tag, idx) => (
@@ -1927,6 +1961,8 @@ const CreateDesignInner: React.FC = () => {
                   measurementKeys={customMeasurementKeys}
                   measurementGender={measurementGender}
                   defaultBaseCharge={minPrice}
+                  defaultProductionLeadDays={storeDefaultProductionLeadDays}
+                  defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}
                   disabled={disabled}
                   onRequiredMeasurementKeysChange={handleCustomOrderMeasurementKeysChange}
                 />

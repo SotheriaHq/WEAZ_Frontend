@@ -96,6 +96,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
               containerClassName="w-full h-64 rounded-3xl overflow-hidden"
               rounded="none"
               maxHeightClassName="max-h-64"
+              keepPreviousOnReload
             />
           ) : (
             <div className="flex h-64 items-center justify-center overflow-hidden rounded-3xl bg-slate-900 px-6 text-center">

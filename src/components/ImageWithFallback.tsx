@@ -115,6 +115,7 @@ const resolveSourceCacheKey = (fileId?: string | null, src?: string | null) => {
 
 // In-flight dedup: prevents concurrent requests for the same fileId/src
 const inflight = new Map<string, Promise<string | null>>();
+const lastGoodUrlCache = new Map<string, string>();
 
 const resolveSignedUrl = async (
   key: string,
@@ -153,6 +154,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   keepPreviousOnReload = false,
 }) => {
   const sourceCacheKey = resolveSourceCacheKey(fileId, src);
+  const cachedLastGoodUrl = sourceCacheKey ? lastGoodUrlCache.get(sourceCacheKey) ?? null : null;
   const [resolved, setResolved] = useState<string | null>(() => {
     // fileId-based: always resolve via cache, never use the raw ID
     if (fileId) return getCachedUrl(fileId) ?? null;
@@ -170,7 +172,9 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     if (src && isS3LikeUrl(src)) return !!(getCachedUrl(src) ?? src);
     return !!src;
   });
-  const [lastGoodUrl, setLastGoodUrl] = useState<string | null>(() => (loaded ? resolved : null));
+  const [lastGoodUrl, setLastGoodUrl] = useState<string | null>(() =>
+    cachedLastGoodUrl ?? (loaded ? resolved : null),
+  );
   const retryCountRef = React.useRef(0);
   const imgRef = React.useRef<HTMLImageElement | null>(null);
 
@@ -181,6 +185,12 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     const run = async () => {
       // If src/fileId changed, reset error
       setHadError(false);
+      if (sourceCacheKey) {
+        const cachedLastGood = lastGoodUrlCache.get(sourceCacheKey);
+        if (cachedLastGood) {
+          setLastGoodUrl(cachedLastGood);
+        }
+      }
       setLoaded(false);
 
       // When fileId exists, prefer resolving by fileId to avoid stale signed URLs.
@@ -242,7 +252,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     return () => {
       mounted = false;
     };
-  }, [fileId, src]);
+  }, [fileId, sourceCacheKey, src]);
 
   // Auto-retry once on error after a short delay
   useEffect(() => {
@@ -305,14 +315,20 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       setLoaded(true);
       if (resolved) {
         setLastGoodUrl(resolved);
+        if (sourceCacheKey) {
+          lastGoodUrlCache.set(sourceCacheKey, resolved);
+        }
       }
     }
-  }, [isResolving, loaded, resolved, showFallback]);
+  }, [isResolving, loaded, resolved, showFallback, sourceCacheKey]);
 
   const handleImageLoaded = () => {
     setLoaded(true);
     if (resolved) {
       setLastGoodUrl(resolved);
+      if (sourceCacheKey) {
+        lastGoodUrlCache.set(sourceCacheKey, resolved);
+      }
     }
   };
 

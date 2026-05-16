@@ -94,10 +94,13 @@ export const clearStoreProgressLocally = (userId?: string | null): void => {
 export const resolveStoreSetupDestination = (userId?: string | null): string => {
   if (typeof window === 'undefined') return '/studio/store/essentials';
 
-  const parsed = readStoreProgressLocally<{ essentialsComplete?: boolean }>(
+  const parsed = readStoreProgressLocally<{
+    essentialsComplete?: boolean;
+    setupWizardVersion?: number;
+  }>(
     userId,
   );
-  if (parsed?.essentialsComplete) {
+  if (parsed?.essentialsComplete && parsed.setupWizardVersion === 2) {
     return '/studio/store/setup';
   }
 

@@ -56,6 +56,13 @@ const metaCardClassName =
 const inputClassName =
   'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-black/40 dark:text-white';
 
+const InlineSpinner: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <span
+    className={`inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent ${className}`}
+    aria-hidden="true"
+  />
+);
+
 const BANK_MARK_EXCLUDED_TOKENS = new Set([
   'BANK',
   'MFB',
@@ -224,6 +231,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
   const isSuperAdmin = currentUserRole === 'SuperAdmin';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncAction, setSyncAction] = useState<'primary' | 'resync' | null>(null);
   const [accountResponse, setAccountResponse] = useState<StorePaymentAccountResponse | null>(null);
   const [banks, setBanks] = useState<StorePaymentBankOption[]>([]);
   const [bankCode, setBankCode] = useState('');
@@ -433,9 +441,11 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
   const executeSync = async ({
     useExistingAccountNumber,
     successMessage,
+    action = 'primary',
   }: {
     useExistingAccountNumber: boolean;
     successMessage: string;
+    action?: 'primary' | 'resync';
   }) => {
     const resolvedBankCode = bankCode || account?.bankCode || '';
     const resolvedAccountNumber = useExistingAccountNumber
@@ -453,6 +463,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
     }
 
     setSaving(true);
+    setSyncAction(action);
     try {
       await updateStorePaymentAccount({
         bankCode: resolvedBankCode,
@@ -469,6 +480,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
       await loadPanel(true).catch(() => {});
     } finally {
       setSaving(false);
+      setSyncAction(null);
     }
   };
 
@@ -641,6 +653,18 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
           {statusMeta.label}
         </div>
       </div>
+
+      {loading ? (
+        <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-100">
+          <InlineSpinner className="h-4 w-4" />
+          <div>
+            <div className="font-semibold">Loading payout details...</div>
+            <div className="text-xs text-blue-800/70 dark:text-blue-100/70">
+              Bank fields are disabled until your payout profile finishes loading.
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {account?.lastSyncError ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
@@ -858,9 +882,10 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
           type="button"
           onClick={() => void handlePrimarySave()}
           disabled={loading || saving}
-          className="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving
+          {syncAction === 'primary' ? <InlineSpinner /> : null}
+          {syncAction === 'primary'
             ? 'Syncing account...'
             : hasExistingAccount
               ? 'Save changes and sync'
@@ -872,20 +897,23 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
             executeSync({
               useExistingAccountNumber: true,
               successMessage: 'Current payout account resynced',
+              action: 'resync',
             })
           }
           disabled={loading || saving || !canResyncCurrentAccount}
-          className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
+          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
         >
-          Resync current account
+          {syncAction === 'resync' ? <InlineSpinner /> : null}
+          {syncAction === 'resync' ? 'Resyncing...' : 'Resync current account'}
         </button>
         <button
           type="button"
           onClick={() => void loadPanel()}
           disabled={loading || saving}
-          className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
+          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
         >
-          Refresh status
+          {loading ? <InlineSpinner /> : null}
+          {loading ? 'Refreshing...' : 'Refresh status'}
         </button>
       </div>
 

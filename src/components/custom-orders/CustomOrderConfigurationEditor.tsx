@@ -20,6 +20,8 @@ interface CustomOrderConfigurationEditorProps {
   measurementKeys: string[];
   measurementGender?: 'MEN' | 'WOMEN' | 'UNISEX';
   defaultBaseCharge?: string | number | null;
+  defaultProductionLeadDays?: string | number | null;
+  defaultProductionLeadLabel?: string | null;
   disabled?: boolean;
   onRequiredMeasurementKeysChange?: (keys: string[]) => void;
 }
@@ -264,7 +266,9 @@ const normalizeRulePayload = (
   });
 };
 
-const createDefaultForm = (): ConfigurationFormState => ({
+const createDefaultForm = (
+  defaultProductionLeadDays?: string | number | null,
+): ConfigurationFormState => ({
   buyerInstructionText: '',
   requiredMeasurementKeys: [],
   fabricRuleBasisId: '',
@@ -273,7 +277,7 @@ const createDefaultForm = (): ConfigurationFormState => ({
   rushEnabled: false,
   rushFee: '',
   rushProductionLeadDays: '',
-  productionLeadDays: '7',
+  productionLeadDays: String(defaultProductionLeadDays ?? '').trim() || '7',
   deliveryMinDays: '2',
   deliveryMaxDays: '5',
   deliveryScope: DEFAULT_DELIVERY_SCOPE,
@@ -333,6 +337,8 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   measurementKeys,
   measurementGender,
   defaultBaseCharge,
+  defaultProductionLeadDays,
+  defaultProductionLeadLabel,
   disabled = false,
   onRequiredMeasurementKeysChange,
 }, ref) => {
@@ -354,6 +360,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   );
   const [ruleRows, setRuleRows] = useState<RuleFormState[]>(() => createDefaultRules());
   const [averageBaseYards, setAverageBaseYards] = useState('');
+  const [hasEditedProductionLeadDays, setHasEditedProductionLeadDays] = useState(false);
   const [sizeExtraRows, setSizeExtraRows] = useState<SizeExtraYardFormState[]>([
     { sizeLabel: 'XL', extraYards: '1.5' },
     { sizeLabel: 'XXL', extraYards: '2' },
@@ -378,6 +385,13 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     }
     return String(parsed);
   }, [defaultBaseCharge]);
+
+  const normalizedDefaultProductionLeadDays = useMemo(() => {
+    if (defaultProductionLeadDays == null) return '';
+    const parsed = Number(defaultProductionLeadDays);
+    if (!Number.isFinite(parsed) || parsed <= 0) return '';
+    return String(Math.round(parsed));
+  }, [defaultProductionLeadDays]);
 
   const measurementFilter = useMemo(
     () => (measurementGender && measurementGender !== 'UNISEX' ? { gender: measurementGender } : undefined),
@@ -426,6 +440,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         setBrandId(null);
         setConfiguration(null);
         setHasEditedBaseCharge(false);
+        setHasEditedProductionLeadDays(false);
         setShowFabricRules(false);
         setFieldErrors({});
         setBases([]);
@@ -473,6 +488,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
 
         if (existingConfiguration) {
           setHasEditedBaseCharge(false);
+          setHasEditedProductionLeadDays(false);
           setShowFabricRules(true);
           const nextForm = mapConfigurationToForm(existingConfiguration);
           setForm(nextForm);
@@ -498,6 +514,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           setDefectPolicyPreset(parsePolicySelection(nextForm.defectPolicy, DEFECT_POLICY_OPTIONS));
         } else {
           setHasEditedBaseCharge(false);
+          setHasEditedProductionLeadDays(false);
           setShowFabricRules(false);
           setFieldErrors({});
           setAverageBaseYards('');
@@ -545,6 +562,28 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       };
     });
   }, [configuration, hasEditedBaseCharge, normalizedDefaultBaseCharge]);
+
+  useEffect(() => {
+    if (configuration || hasEditedProductionLeadDays || !normalizedDefaultProductionLeadDays) {
+      return;
+    }
+
+    setForm((current) => {
+      if (current.productionLeadDays === normalizedDefaultProductionLeadDays) {
+        return current;
+      }
+
+      return {
+        ...current,
+        productionLeadDays: normalizedDefaultProductionLeadDays,
+      };
+    });
+  }, [
+    configuration,
+    form.productionLeadDays,
+    hasEditedProductionLeadDays,
+    normalizedDefaultProductionLeadDays,
+  ]);
 
   useEffect(() => {
     if (configuration || !sourceId || !showFabricRules) {
@@ -840,6 +879,8 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       clearFieldErrors(['rushProductionLeadDays']);
     } else if (key === 'rushEnabled') {
       clearFieldErrors(['rushFee', 'rushProductionLeadDays']);
+    } else if (key === 'productionLeadDays') {
+      setHasEditedProductionLeadDays(true);
     }
     setForm((current) => ({ ...current, [key]: value }));
   };
@@ -1226,6 +1267,11 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             <span className={infoBadgeClassName} title="Production days before dispatch.">i</span>
           </span>
           <input value={form.productionLeadDays} onChange={(event) => updateForm('productionLeadDays', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="7" />
+          {normalizedDefaultProductionLeadDays ? (
+            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+              Default from store setup{defaultProductionLeadLabel ? `: ${defaultProductionLeadLabel}` : ''}. You can override for this item.
+            </p>
+          ) : null}
         </label>
         <label className="block">
           <span className={requiredFieldLabelClassName}>

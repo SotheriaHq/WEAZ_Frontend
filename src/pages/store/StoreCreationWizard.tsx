@@ -5,7 +5,6 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 
 // Step Components
-import StoreBasicInfoStep from '@/components/store/wizard/StoreBasicInfoStep';
 import StoreSocialStep from '@/components/store/wizard/StoreSocialStep';
 import StorePoliciesStep from '@/components/store/wizard/StorePoliciesStep';
 import StoreReviewStep from '@/components/store/wizard/StoreReviewStep';
@@ -20,7 +19,6 @@ import {
   updateStorePolicies,
   type StoreProfileUpdateData,
   type StorePoliciesUpdateData,
-  type StoreWizardPrefillResponse,
 } from '@/api/StoreApi';
 
 import type { StoreWizardData } from '@/types/storeWizard';
@@ -89,15 +87,13 @@ const initialData: StoreWizardData = {
   termsAccepted: false,
 };
 
-// All wizard steps in order (4 steps - catalog/media can be done from dashboard)
-type WizardStep = 
-  | 'basic-info'      // Step 1
-  | 'social'          // Step 2
-  | 'policies'        // Step 3
-  | 'review';         // Step 4
+// Essentials is now collected before this wizard. These are the remaining setup steps.
+type WizardStep =
+  | 'social'
+  | 'policies'
+  | 'review';
 
 const STEP_ORDER: WizardStep[] = [
-  'basic-info',
   'social',
   'policies',
   'review',
@@ -110,7 +106,8 @@ const MAX_STORE_TAGLINE_LEN = 100;
 const MAX_STORE_CONTACT_EMAIL_LEN = 254;
 const MAX_STORE_SOCIAL_HANDLE_LEN = 60;
 const MAX_STORE_WEBSITE_LEN = 200;
-const MAX_STORE_CATEGORIES = 3;
+const MAX_STORE_CATEGORIES = 4;
+const STORE_SETUP_WIZARD_VERSION = 2;
 
 const sanitizeWizardData = (data: StoreWizardData): StoreWizardData => {
   const safeString = (value: unknown, maxLen: number): string => {
@@ -144,21 +141,37 @@ const stepToNumber = (step: WizardStep): number => {
   return STEP_ORDER.indexOf(step) + 1;
 };
 
+const restoreWizardStep = (localDraft: Record<string, unknown> | null): WizardStep => {
+  if (!localDraft) return 'social';
+
+  const rawStep = Number(localDraft.step);
+  const hasNumericStep = Number.isFinite(rawStep);
+  if (!hasNumericStep) {
+    return 'social';
+  }
+
+  if (localDraft.setupWizardVersion !== STORE_SETUP_WIZARD_VERSION) {
+    return 'social';
+  }
+
+  const stepIndex = Math.min(Math.max(rawStep - 1, 0), STEP_ORDER.length - 1);
+  return STEP_ORDER[stepIndex] ?? 'social';
+};
+
 /**
  * Store Creation Wizard
- * Full 6-step onboarding flow for brands to create their store
+ * Store onboarding flow for brands after Store Essentials is complete.
  */
 const StoreCreationWizard: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
   
   // Current step state
-  const [currentStep, setCurrentStep] = useState<WizardStep>('basic-info');
+  const [currentStep, setCurrentStep] = useState<WizardStep>('social');
   const [wizardData, setWizardData] = useState<StoreWizardData>(initialData);
   const [hasLiveStore, setHasLiveStore] = useState<boolean>(false);
   const [saveState, setSaveState] = useState<WizardSaveState>('idle');
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
-  const [systemCategories, setSystemCategories] = useState<StoreWizardPrefillResponse['system']['categories']>([]);
   
   // Refs for autosave
   const lastSavedPayloadRef = useRef<string>('');
@@ -172,6 +185,7 @@ const StoreCreationWizard: React.FC = () => {
       const localData = {
         ...wizardData,
         step: stepToNumber(currentStep),
+        setupWizardVersion: STORE_SETUP_WIZARD_VERSION,
         savedAt: Date.now(),
         ownerUserId: user?.id ?? null,
       };
@@ -190,7 +204,7 @@ const StoreCreationWizard: React.FC = () => {
 
   // --- API SAVE LOGIC (Debounced, for server sync) ---
   const buildSavePayload = useCallback(() => {
-    const resolvedTags = wizardData.tags?.length ? wizardData.tags : wizardData.categories;
+    const resolvedTags = wizardData.categories?.length ? wizardData.categories : wizardData.tags;
     const payload: StoreProfileUpdateData = {
       tagline: wizardData.tagline,
       description: wizardData.description,
@@ -291,10 +305,18 @@ const StoreCreationWizard: React.FC = () => {
       const localDraft = readStoreProgressLocally<Record<string, unknown>>(
         user?.id,
       );
+      const localDraftForMerge = localDraft ? { ...localDraft } : null;
+      if (
+        localDraftForMerge &&
+        localDraftForMerge.setupWizardVersion !== STORE_SETUP_WIZARD_VERSION
+      ) {
+        delete localDraftForMerge.categories;
+        delete localDraftForMerge.tags;
+      }
 
       // Start with initial data, then layer local draft on top
-      let nextData: StoreWizardData = localDraft 
-        ? { ...initialData, ...(localDraft as Partial<StoreWizardData>) }
+      let nextData: StoreWizardData = localDraftForMerge
+        ? { ...initialData, ...(localDraftForMerge as Partial<StoreWizardData>) }
         : initialData;
 
       // 1) Server store status - only override server-synced fields
@@ -330,7 +352,6 @@ const StoreCreationWizard: React.FC = () => {
       try {
         const prefill = await getStoreWizardPrefill();
         if (!isCancelled && prefill) {
-          setSystemCategories(prefill.system?.categories ?? []);
           nextData = {
             ...nextData,
             // Canonical identity fields (always from prefill)
@@ -343,7 +364,7 @@ const StoreCreationWizard: React.FC = () => {
             twitter: nextData.twitter || prefill.brand.twitter || '',
             website: nextData.website || prefill.brand.website || '',
             tagline: nextData.tagline || prefill.brand.tagline || '',
-            tags: nextData.tags?.length ? nextData.tags : (prefill.brand.tags || []),
+            tags: nextData.tags?.length ? nextData.tags : [],
             responseTimeSla: nextData.responseTimeSla || prefill.brand.responseTimeSla || '24h',
           };
         }
@@ -425,22 +446,7 @@ const StoreCreationWizard: React.FC = () => {
       if (!isCancelled) {
         const sanitized = sanitizeWizardData(nextData);
         setWizardData(sanitized);
-        console.log('[StoreWizard] Hydrated data:', sanitized);
-        console.log('[StoreWizard] Local draft step:', localDraft?.step);
-        
-        // Restore step from local draft (clamped to valid range)
-        if (localDraft && typeof localDraft.step === 'number' && localDraft.step > 1) {
-          // Clamp to valid step range (wizard was reduced from 6 to 4 steps)
-          const clampedStepIndex = Math.min(localDraft.step - 1, STEP_ORDER.length - 1);
-          const restoredStep = STEP_ORDER[clampedStepIndex];
-          if (restoredStep) {
-            setCurrentStep(restoredStep);
-            toast.info(`Resuming from Step ${clampedStepIndex + 1}`);
-          }
-        } else if (localDraft && (localDraft as any).essentialsComplete) {
-          setCurrentStep('social');
-        }
-        
+        setCurrentStep(restoreWizardStep(localDraft));
         setIsLoadingDraft(false);
       }
     };
@@ -513,7 +519,6 @@ const StoreCreationWizard: React.FC = () => {
       setCurrentStep(STEP_ORDER[currentIndex - 1]);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      // On step 1, back goes to store essentials
       navigate('/studio/store/essentials');
     }
   }, [currentStep, navigate]);
@@ -565,20 +570,7 @@ const StoreCreationWizard: React.FC = () => {
   // --- RENDER ---
   return (
     <div className="transition-colors">
-      {/* Step 1: Basic Info */}
-      {currentStep === 'basic-info' && (
-        <StoreBasicInfoStep
-          data={wizardData}
-          onChange={handleDataChange}
-          availableCategories={systemCategories}
-          onBack={goToPrevStep}
-          onContinue={goToNextStep}
-          saveState={saveState}
-          isLoadingDraft={isLoadingDraft}
-        />
-      )}
-
-      {/* Step 2: Social & Verification */}
+      {/* Social & Verification */}
       {currentStep === 'social' && (
         <StoreSocialStep
           data={wizardData}
@@ -590,7 +582,7 @@ const StoreCreationWizard: React.FC = () => {
         />
       )}
 
-      {/* Step 3: Policies */}
+      {/* Policies */}
       {currentStep === 'policies' && (
         <StorePoliciesStep
           data={wizardData}
@@ -601,7 +593,7 @@ const StoreCreationWizard: React.FC = () => {
         />
       )}
 
-      {/* Step 4: Review & Publish */}
+      {/* Review & Publish */}
       {currentStep === 'review' && (
         <StoreReviewStep
           data={wizardData}

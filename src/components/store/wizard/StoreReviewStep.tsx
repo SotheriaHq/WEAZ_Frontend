@@ -1,11 +1,12 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { StoreWizardData } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import type { StorePaymentAccountSummary } from '@/api/StoreApi';
 import StorePaymentAccountPanel from '@/components/store/StorePaymentAccountPanel';
 
 // Step type for navigation
-type WizardStep = 'basic-info' | 'social' | 'policies' | 'review';
+type WizardStep = 'social' | 'policies' | 'review';
 
 interface StoreReviewStepProps {
   data: StoreWizardData;
@@ -28,12 +29,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   'traditional-cultural-wear': 'Traditional / Cultural wear',
   streetwear: 'Streetwear',
   'corporate-formalwear': 'Corporate / Formalwear',
-  luxury: 'Luxury',
   'modest-fashion': 'Modest fashion',
-  accessories: 'Accessories',
-  footwear: 'Footwear',
-  bags: 'Bags',
-  jewelry: 'Jewelry',
 };
 
 const ORDER_PROCESSING_LABELS: Record<StoreWizardData['orderProcessingMode'], string> = {
@@ -57,7 +53,7 @@ const CUSTOM_ORDER_LEAD_TIME_LABELS: Record<StoreWizardData['customOrderLeadTime
 
 /**
  * Store Review Step (Screen 1.10)
- * Step 4 of 4: Final review before publishing
+ * Final review before publishing
  */
 const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
   data,
@@ -67,6 +63,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
   onGoToStep,
   isSaving = false,
 }) => {
+  const navigate = useNavigate();
   const [expandedSection, setExpandedSection] = useState<string | null>('payments');
   const [paymentAccount, setPaymentAccount] = useState<StorePaymentAccountSummary | null>(null);
 
@@ -106,7 +103,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                 Review & Publish
               </h1>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Step 4 of 4 - Final review before going live
+                Final review before going live
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -210,14 +207,14 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
 
             {/* Section Reviews */}
             <div className="space-y-4">
-              {/* Basic Info */}
+              {/* Store essentials */}
               <SectionCard
-                title="Basic Information"
+                title="Store essentials"
                 subtitle="Store name, slug, brand focus & description"
                 isComplete={basicComplete}
                 isExpanded={expandedSection === 'basic'}
                 onToggle={() => toggleSection('basic')}
-                onEdit={() => onGoToStep?.('basic-info')}
+                onEdit={() => navigate('/studio/store/essentials')}
               >
                 <div className="grid grid-cols-2 gap-4 mt-4">
                   <InfoItem label="Store Name" value={data.name || '-'} />

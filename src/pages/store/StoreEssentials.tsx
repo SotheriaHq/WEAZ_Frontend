@@ -5,7 +5,7 @@ import { ArrowRight, Sparkles, Store, CheckCircle2, Circle } from 'lucide-react'
 import type { RootState } from '@/store';
 import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
 import Input from '@/components/ui/Input';
-import { saveStoreProgressLocally } from '@/utils/storeSetup';
+import { readStoreProgressLocally, saveStoreProgressLocally } from '@/utils/storeSetup';
 
 const MAX_SPECIALIZATIONS = 4;
 const MAX_DESCRIPTION = 500;
@@ -54,6 +54,14 @@ const normalizeSpecializationSelection = (
   return result;
 };
 
+type StoreEssentialsProgress = {
+  categories?: unknown;
+  tagline?: unknown;
+  description?: unknown;
+  essentialsComplete?: unknown;
+  setupWizardVersion?: unknown;
+};
+
 const StoreEssentials: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
@@ -86,10 +94,35 @@ const StoreEssentials: React.FC = () => {
         }
 
         // Best-effort prefill for quick-start
-        if (prefill.brand?.tagline) setTagline(prefill.brand.tagline);
-        if (prefill.brand?.description) setDescription(prefill.brand.description);
-        if (prefill.brand?.tags?.length) {
-          setSelected(normalizeSpecializationSelection(prefill.brand.tags, BRAND_SPECIALIZATION_OPTIONS));
+        const localProgress = readStoreProgressLocally<StoreEssentialsProgress>(
+          user?.id,
+        );
+        const localCategories = Array.isArray(localProgress?.categories)
+          ? normalizeSpecializationSelection(
+              localProgress.categories.filter(
+                (entry): entry is string => typeof entry === 'string',
+              ),
+              BRAND_SPECIALIZATION_OPTIONS,
+            )
+          : [];
+
+        if (typeof localProgress?.tagline === 'string') {
+          setTagline(localProgress.tagline);
+        } else if (prefill.brand?.tagline) {
+          setTagline(prefill.brand.tagline);
+        }
+
+        if (typeof localProgress?.description === 'string') {
+          setDescription(localProgress.description);
+        } else if (prefill.brand?.description) {
+          setDescription(prefill.brand.description);
+        }
+
+        if (
+          localProgress?.essentialsComplete === true &&
+          localProgress.setupWizardVersion === 2
+        ) {
+          setSelected(localCategories);
         }
       } catch (error) {
         // If this fails, still render the static brand-positioning options.
@@ -104,7 +137,7 @@ const StoreEssentials: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, user?.id]);
 
   useEffect(() => {
     // Confetti once on mount (best-effort)
@@ -122,7 +155,7 @@ const StoreEssentials: React.FC = () => {
     };
 
     void fire();
-  }, []);
+  }, [user?.id]);
 
   const specializationOptions = useMemo(() => BRAND_SPECIALIZATION_OPTIONS, []);
 
@@ -163,6 +196,7 @@ const StoreEssentials: React.FC = () => {
         tagline: tagline.trim(),
         description: description.trim(),
         step: 1,
+        setupWizardVersion: 2,
         essentialsComplete: true,
       };
 

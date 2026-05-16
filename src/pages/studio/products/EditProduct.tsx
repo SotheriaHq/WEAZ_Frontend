@@ -74,6 +74,10 @@ import {
   isBrandProfileComplete,
   resolveBrandProfileSetupDestination,
 } from "@/utils/storeSetup";
+import {
+  deriveProductionLeadDaysFromStoreTime,
+  getStoreProcessingTimeLabel,
+} from "@/utils/storeProcessing";
 import { preprocessImageFile } from "@/utils/imagePreprocess";
 import {
   CREATOR_AUDIENCE_OPTIONS,
@@ -478,6 +482,8 @@ const EditProduct: React.FC = () => {
     defaultFormState.customsRegion,
   ]);
   const [shippingRegionsLoading, setShippingRegionsLoading] = useState(true);
+  const [storeProcessingTime, setStoreProcessingTime] = useState('');
+  const [storeCustomOrderLeadTime, setStoreCustomOrderLeadTime] = useState('');
   const [saveAction, setSaveAction] = useState<"draft" | "publish" | null>(
     null,
   );
@@ -640,6 +646,21 @@ const EditProduct: React.FC = () => {
       ),
     [normalizedShippingRegions, savedShippingRegions],
   );
+  const storeProcessingTimeLabel = useMemo(
+    () => getStoreProcessingTimeLabel(storeProcessingTime),
+    [storeProcessingTime],
+  );
+  const storeCustomOrderLeadTimeLabel = useMemo(
+    () => getStoreProcessingTimeLabel(storeCustomOrderLeadTime || storeProcessingTime),
+    [storeCustomOrderLeadTime, storeProcessingTime],
+  );
+  const storeDefaultProductionLeadDays = useMemo(
+    () =>
+      deriveProductionLeadDaysFromStoreTime(
+        storeCustomOrderLeadTime || storeProcessingTime,
+      ),
+    [storeCustomOrderLeadTime, storeProcessingTime],
+  );
 
   const toggleShippingRegion = useCallback((regionCode: string) => {
     setShippingRegions((prev) => {
@@ -738,6 +759,10 @@ const EditProduct: React.FC = () => {
 
         setShippingRegions(resolved);
         setSavedShippingRegions(resolved);
+        setStoreProcessingTime(policies.processingTime || '');
+        setStoreCustomOrderLeadTime(
+          policies.shippingRules?.customOrderSettings?.leadTime || '',
+        );
         setForm((prev) => ({
           ...prev,
           customsRegion: resolved[0] ?? prev.customsRegion,
@@ -750,6 +775,8 @@ const EditProduct: React.FC = () => {
           defaultFormState.customsRegion;
         setShippingRegions([fallbackRegion]);
         setSavedShippingRegions([fallbackRegion]);
+        setStoreProcessingTime('');
+        setStoreCustomOrderLeadTime('');
         setForm((prev) => ({
           ...prev,
           customsRegion: fallbackRegion,
@@ -3577,6 +3604,8 @@ const EditProduct: React.FC = () => {
                         sourceTitle={form.title}
                         measurementKeys={form.customMeasurementKeys}
                         defaultBaseCharge={form.price > 0 ? form.price : null}
+                        defaultProductionLeadDays={storeDefaultProductionLeadDays}
+                        defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}
                         disabled={saving}
                       />
                     </div>
@@ -3734,6 +3763,15 @@ const EditProduct: React.FC = () => {
                               <p className="text-[11px] text-theme-secondary mb-2">
                                 Prefilled from Store Setup. Changes here update
                                 your store shipping regions.
+                              </p>
+                              <p className="mb-2 text-[11px] text-theme-secondary">
+                                Processing time defaults from Store Setup:{" "}
+                                <span className="font-semibold text-theme">
+                                  {shippingRegionsLoading
+                                    ? "Loading..."
+                                    : storeProcessingTimeLabel || "Not set"}
+                                </span>
+                                .
                               </p>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {SHIPPING_REGION_OPTIONS.map((opt) => {
