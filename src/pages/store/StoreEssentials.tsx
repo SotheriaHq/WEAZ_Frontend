@@ -7,7 +7,7 @@ import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
 import Input from '@/components/ui/Input';
 import { saveStoreProgressLocally } from '@/utils/storeSetup';
 
-const MAX_SPECIALIZATIONS = 3;
+const MAX_SPECIALIZATIONS = 4;
 const MAX_DESCRIPTION = 500;
 const BRAND_SPECIALIZATION_OPTIONS = [
   { value: 'womenswear', label: 'Womenswear' },
@@ -21,12 +21,7 @@ const BRAND_SPECIALIZATION_OPTIONS = [
   { value: 'traditional-cultural-wear', label: 'Traditional / Cultural wear' },
   { value: 'streetwear', label: 'Streetwear' },
   { value: 'corporate-formalwear', label: 'Corporate / Formalwear' },
-  { value: 'luxury', label: 'Luxury' },
   { value: 'modest-fashion', label: 'Modest fashion' },
-  { value: 'accessories', label: 'Accessories' },
-  { value: 'footwear', label: 'Footwear' },
-  { value: 'bags', label: 'Bags' },
-  { value: 'jewelry', label: 'Jewelry' },
 ];
 
 const normalizeToken = (value: string): string => value.trim().replace(/^#/, '').toLowerCase();
@@ -94,7 +89,7 @@ const StoreEssentials: React.FC = () => {
         if (prefill.brand?.tagline) setTagline(prefill.brand.tagline);
         if (prefill.brand?.description) setDescription(prefill.brand.description);
         if (prefill.brand?.tags?.length) {
-          setSelected(prefill.brand.tags.slice(0, MAX_SPECIALIZATIONS));
+          setSelected(normalizeSpecializationSelection(prefill.brand.tags, BRAND_SPECIALIZATION_OPTIONS));
         }
       } catch (error) {
         // If this fails, still render the static brand-positioning options.
@@ -232,7 +227,7 @@ const StoreEssentials: React.FC = () => {
                   <span className="text-gray-500 font-normal">(Select up to {MAX_SPECIALIZATIONS})</span>
                 </label>
                 <p className="mb-3 text-xs text-gray-500">
-                  Choose up to 3. This helps customers understand your store focus.
+                  Choose up to {MAX_SPECIALIZATIONS}. This helps customers understand your store focus.
                 </p>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
