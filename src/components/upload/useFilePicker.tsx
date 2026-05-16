@@ -63,7 +63,15 @@ export const useFilePicker = ({
 
     if (limited.length > 0) {
       setErrors([]);
-      onFiles?.(limited);
+      try {
+        onFiles?.(limited);
+      } finally {
+        window.setTimeout(() => {
+          setPendingCount(0);
+        }, 0);
+      }
+    } else {
+      setPendingCount(0);
     }
 
     if (errs.length > 0) {

@@ -39,4 +39,16 @@ describe('publishTracker identifiers', () => {
     expect(task.legacyCollectionId).toBe('old-collection-backed-design');
     expect(task.collectionId).toBe('old-collection-backed-design');
   });
+
+  it('preserves draft task kind and saved status for background draft cards', () => {
+    const task = normalizePublishTaskIdentifiers(baseTask({
+      kind: 'draft',
+      status: 'saved',
+      collectionId: 'draft-collection-1',
+    }));
+
+    expect(task.kind).toBe('draft');
+    expect(task.status).toBe('saved');
+    expect(getPublishTaskDesignId(task)).toBe('draft-collection-1');
+  });
 });

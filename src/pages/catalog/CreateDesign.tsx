@@ -68,7 +68,6 @@ import {
   updatePublishTask,
   removePublishTask,
 } from '@/utils/publishTracker';
-import { buildDesignRoute } from '@/utils/catalogRoutes';
 import {
   CREATOR_AUDIENCE_OPTIONS,
   CREATOR_METADATA_HELP,
@@ -80,10 +79,15 @@ import {
   deriveProductionLeadDaysFromStoreTime,
   getStoreProcessingTimeLabel,
 } from '@/utils/storeProcessing';
+import {
+  filterDesignCategoriesForAudience,
+  filterDesignCategoryTypesForAudience,
+} from '@/utils/designAudienceApplicability';
+import { normalizeDesignMediaResponse } from '@/utils/designMediaNormalization';
 import { TourOverlay, type TourStep } from '@/components/ui/TourOverlay';
 // ============================================================================
 
-type CategoryTypeOption = { id: string; name: string };
+type CategoryTypeOption = { id: string; slug?: string; name: string; categoryId?: string };
 type CategoryOption = {
   id: string;
   slug: string;
@@ -232,8 +236,11 @@ const CreateDesignInner: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [showCancelPrompt, setShowCancelPrompt] = useState(false);
   const [showDraftPreview, setShowDraftPreview] = useState(false);
-  const [showSaveDraftConfirm, setShowSaveDraftConfirm] = useState(false);
-  const [showDraftSavedChoices, setShowDraftSavedChoices] = useState(false);
+  const showSaveDraftConfirm = false;
+  const showDraftSavedChoices = false;
+  const setShowSaveDraftConfirm = (_value: boolean) => {
+    void _value;
+  };
   const [submitIntent, setSubmitIntent] = useState<"draft" | "publish" | null>(
     null,
   );
@@ -336,28 +343,15 @@ const CreateDesignInner: React.FC = () => {
           slug: c.slug,
           name: c.name,
           types: Array.isArray(c.types)
-            ? c.types.map((t) => ({ id: t.id, name: t.name }))
+            ? c.types.map((t) => ({
+                id: t.id,
+                slug: t.slug,
+                name: t.name,
+                categoryId: t.categoryId,
+              }))
             : [],
         }));
         setCategories(mapped);
-        if (mapped.length) {
-          setCategoryId((prev) =>
-            prev && mapped.some((category) => category.id === prev)
-              ? prev
-              : mapped[0].id,
-          );
-          setCategoryTypeId((prev) => {
-            if (
-              prev &&
-              mapped.some((category) =>
-                category.types.some((categoryType) => categoryType.id === prev),
-              )
-            ) {
-              return prev;
-            }
-            return mapped[0].types[0]?.id ?? "";
-          });
-        }
       } catch (error) {
         console.warn("Failed to load categories", error);
         if (mounted) setCategories([]);
@@ -431,24 +425,24 @@ const CreateDesignInner: React.FC = () => {
           : {};
         setFilterSelection(draftFilters);
 
-        if (d.medias && Array.isArray(d.medias)) {
+        const normalizedMedia = normalizeDesignMediaResponse(d);
+        if (normalizedMedia.length > 0) {
           const mediaResults = await Promise.all(
-            d.medias.map(async (m: any) => {
-              const fileId = m.file?.id || m.fileId;
-              const remoteUrl =
-                typeof m.file?.s3Url === "string" ? m.file.s3Url : "";
-              const signedUrl = fileId
-                ? await brandApi.getSignedFileUrl(fileId)
+            normalizedMedia.map(async (m) => {
+              if (m.remoteId) {
+                originalItemIds.current.add(m.remoteId);
+              }
+              const signedUrl = m.fileId
+                ? await brandApi.getSignedFileUrl(m.fileId).catch(() => null)
                 : null;
-              originalItemIds.current.add(m.id);
-              const previewUrl = signedUrl || remoteUrl;
+              const previewUrl = signedUrl || m.previewUrl;
               if (!previewUrl) return null;
               return {
                 id: m.id,
                 file: undefined,
                 previewUrl,
-                kind: m.type === "VIDEO" ? "video" : "image",
-                remoteId: m.id,
+                kind: m.kind,
+                remoteId: m.remoteId,
               } as MediaItem;
             }),
           );
@@ -476,28 +470,31 @@ const CreateDesignInner: React.FC = () => {
     };
   }, [id, isEditMode]);
 
+  const filteredCategories = useMemo(
+    () => filterDesignCategoriesForAudience(categories, type, targetAgeGroup),
+    [categories, targetAgeGroup, type],
+  );
+
   useEffect(() => {
     if (!categoryId) {
       setCategoryTypeId("");
       return;
     }
-    const selectedCategory = categories.find(
+    const selected = filteredCategories.find(
       (category) => category.id === categoryId,
     );
-    if (!selectedCategory) {
+    if (!selected) {
+      setCategoryId("");
       setCategoryTypeId("");
       return;
     }
     if (
       categoryTypeId &&
-      selectedCategory.types.some(
-        (categoryType) => categoryType.id === categoryTypeId,
-      )
+      !selected.types.some((categoryType) => categoryType.id === categoryTypeId)
     ) {
-      return;
+      setCategoryTypeId("");
     }
-    setCategoryTypeId(selectedCategory.types[0]?.id ?? "");
-  }, [categories, categoryId, categoryTypeId]);
+  }, [categoryId, categoryTypeId, filteredCategories]);
 
   // Keep selected/cover indices in range when files change
   useEffect(() => {
@@ -606,6 +603,26 @@ const CreateDesignInner: React.FC = () => {
     return withUrl?.url;
   }, [files, coverIndex, resolveMediaWithUrl]);
 
+  const buildCoverPreviewDataUrl = useCallback(
+    async (sourceFiles: MediaItem[] = files, sourceCoverIndex = coverIndex): Promise<string | undefined> => {
+      const coverItem = sourceFiles[sourceCoverIndex];
+      if (!coverItem || coverItem.kind !== 'image' || !coverItem.file) {
+        return undefined;
+      }
+      const file = coverItem.file;
+      if (file.size > 6 * 1024 * 1024) {
+        return undefined;
+      }
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : undefined);
+        reader.onerror = () => resolve(undefined);
+        reader.readAsDataURL(file);
+      });
+    },
+    [coverIndex, files],
+  );
+
   const fullscreenFile = useMemo(() => {
     if (fullscreenIndex === null) return null;
     return resolveMediaWithUrl(files[fullscreenIndex]);
@@ -646,8 +663,18 @@ const CreateDesignInner: React.FC = () => {
   }, []);
 
   // Get category name for summary
-  const selectedCategory = categories.find((c) => c.id === categoryId);
-  const categoryTypeOptions = selectedCategory?.types ?? [];
+  const selectedCategory = filteredCategories.find((c) => c.id === categoryId);
+  const categoryTypeOptions = useMemo(
+    () =>
+      selectedCategory
+        ? filterDesignCategoryTypesForAudience(
+            selectedCategory.types ?? [],
+            type,
+            targetAgeGroup,
+          )
+        : [],
+    [selectedCategory, targetAgeGroup, type],
+  );
   const measurementGender = useMemo(
     (): 'MEN' | 'WOMEN' | 'UNISEX' => (type === 'MALE' ? 'MEN' : type === 'FEMALE' ? 'WOMEN' : 'UNISEX'),
     [type],
@@ -752,6 +779,20 @@ const CreateDesignInner: React.FC = () => {
     setSelectedTags(selectedTags.filter((t) => t !== tag));
   };
 
+  const handleCategoryChange = (value: string) => {
+    setCategoryId(value);
+    const nextCategory = filteredCategories.find((category) => category.id === value);
+    setCategoryTypeId(nextCategory?.types[0]?.id ?? "");
+  };
+
+  const handleAudienceChange = (value: string) => {
+    setType(value as "MALE" | "FEMALE" | "EVERYBODY");
+  };
+
+  const handleAgeGroupChange = (value: string) => {
+    setTargetAgeGroup(value as DesignTargetAgeGroup);
+  };
+
   const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && tagSearch.trim()) {
       e.preventDefault();
@@ -764,7 +805,7 @@ const CreateDesignInner: React.FC = () => {
       toast.error('Add at least one detail to save a draft');
       return;
     }
-    setShowSaveDraftConfirm(true);
+    await executeSaveDraft();
   };
 
   const executeSaveDraft = async () => {
@@ -773,13 +814,7 @@ const CreateDesignInner: React.FC = () => {
 
     setSubmitIntent("draft");
     setIsSubmitting(true);
-    setShowSaveDraftConfirm(false);
     try {
-      const pendingCustomOrderDraft =
-        !isEditMode && isMadeToOrder
-          ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
-          : null;
-
       if (isEditMode && id && isMadeToOrder) {
         const saved = await customOrderEditorRef.current?.saveConfiguration({
           silentSuccess: true,
@@ -819,65 +854,159 @@ const CreateDesignInner: React.FC = () => {
           fitPreference,
           targetAgeGroup,
         } as any);
-      } else {
-        const response = await uploadDesign(
-          files,
-          draftTitle,
-          description,
-          parsedMinPrice,
-          parsedMaxPrice,
-          false,
-          finalTags,
-          {
-            categoryId,
-            subCategoryId: categoryTypeId,
-            categoryTypeId,
-            type,
-            visibility,
-            filterValueIds: getSelectedFilterValueIds(),
-            coverIndex,
-            sizingMode,
-            rtwSizeSystem: undefined,
-            customMeasurementKeys: normalizedCustomMeasurementKeys,
-            customOrderEnabled: isMadeToOrder,
-            fitPreference,
-            targetAgeGroup,
-          },
-          undefined,
-          false, // shouldPublish = false
-        );
-
-        const newDesignId = extractDesignId(response);
-        if (pendingCustomOrderDraft && newDesignId) {
-          await customOrderConfigurationsApi.create({
-            ...pendingCustomOrderDraft,
-            fabricRuleBasisId: String(pendingCustomOrderDraft.fabricRuleBasisId ?? '').trim() || (
-              await customOrderConfigurationsApi.createFabricRuleBasis({
-                label: `${draftTitle} fabric rules`,
-                measurementKeys: pendingCustomOrderDraft.requiredMeasurementKeys,
-                gender: measurementGender,
-              })
-            ).id,
-            sourceId: newDesignId,
-          });
+        setLastSaved(new Date());
+        if (user?.id) {
+          await fetchCollections(user.id);
         }
+        toast.success("Draft saved");
+        navigate("/profile?tab=Content&visibility=Drafts", { replace: true });
+        return;
       }
 
-      setLastSaved(new Date());
+      const pendingCustomOrderDraft =
+        isMadeToOrder
+          ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
+          : null;
+      const filesSnapshot = [...files];
+      const coverIndexSnapshot = coverIndex;
+      const draftTask = createPublishTask({
+        ownerId: user?.id,
+        kind: 'draft',
+        title: draftTitle,
+        visibility: 'PRIVATE',
+        message: 'Saving draft...',
+      });
 
-      if (user?.id) {
-        await fetchCollections(user.id);
-      }
+      navigate("/profile?tab=Content&visibility=Drafts", {
+        replace: true,
+        state: {
+          publishingTaskId: draftTask.id,
+          publishingTitle: draftTitle,
+          publishingStartedAt: draftTask.startedAt,
+          publishingVisibility: 'PRIVATE',
+          publishingKind: 'draft',
+        },
+      });
+      toast.info("Saving draft in the background. You can keep browsing your drafts.");
+      setIsSubmitting(false);
+      setSubmitIntent(null);
 
-      toast.success("Draft saved successfully!");
-      setShowDraftSavedChoices(true);
+      void (async () => {
+        let savedDesignId: string | undefined;
+        try {
+          const previewDataUrl = await buildCoverPreviewDataUrl(
+            filesSnapshot,
+            coverIndexSnapshot,
+          );
+          if (previewDataUrl) {
+            updatePublishTask(
+              draftTask.id,
+              {
+                coverPreviewUrl: previewDataUrl,
+                progress: 5,
+                message: 'Preparing draft media...',
+              },
+              publishTaskScope,
+            );
+          }
+
+          const response = await uploadDesign(
+            filesSnapshot,
+            draftTitle,
+            description,
+            parsedMinPrice,
+            parsedMaxPrice,
+            false,
+            finalTags,
+            {
+              categoryId,
+              subCategoryId: categoryTypeId,
+              categoryTypeId,
+              type,
+              visibility,
+              filterValueIds: getSelectedFilterValueIds(),
+              coverIndex: coverIndexSnapshot,
+              sizingMode,
+              rtwSizeSystem: undefined,
+              customMeasurementKeys: normalizedCustomMeasurementKeys,
+              customOrderEnabled: isMadeToOrder,
+              fitPreference,
+              targetAgeGroup,
+            },
+            (value: number) => {
+              updatePublishTask(
+                draftTask.id,
+                {
+                  status: value >= 100 ? 'finalizing' : 'uploading',
+                  progress: Math.max(5, Math.min(95, Math.round(value * 0.95))),
+                  message: value >= 100 ? 'Finalizing draft...' : 'Uploading draft media...',
+                },
+                publishTaskScope,
+              );
+            },
+            false,
+          );
+
+          savedDesignId = extractDesignId(response);
+          if (pendingCustomOrderDraft && savedDesignId) {
+            await customOrderConfigurationsApi.create({
+              ...pendingCustomOrderDraft,
+              fabricRuleBasisId: String(pendingCustomOrderDraft.fabricRuleBasisId ?? '').trim() || (
+                await customOrderConfigurationsApi.createFabricRuleBasis({
+                  label: `${draftTitle} fabric rules`,
+                  measurementKeys: pendingCustomOrderDraft.requiredMeasurementKeys,
+                  gender: measurementGender,
+                })
+              ).id,
+              sourceId: savedDesignId,
+            });
+          }
+
+          updatePublishTask(
+            draftTask.id,
+            {
+              status: 'saved',
+              progress: 100,
+              designId: savedDesignId,
+              legacyCollectionId: savedDesignId,
+              collectionId: savedDesignId,
+              message: 'Draft saved',
+            },
+            publishTaskScope,
+          );
+
+          toast.success("Draft saved");
+          window.setTimeout(() => removePublishTask(draftTask.id, publishTaskScope), 60_000);
+        } catch (error) {
+          const errMsg =
+            (error as any)?.response?.data?.message ||
+            (error instanceof Error ? error.message : 'Failed to save draft');
+          updatePublishTask(
+            draftTask.id,
+            {
+              status: 'failed',
+              progress: 100,
+              designId: savedDesignId,
+              legacyCollectionId: savedDesignId,
+              collectionId: savedDesignId,
+              message: 'Draft save failed',
+              error: String(errMsg),
+            },
+            publishTaskScope,
+          );
+          toast.error("Failed to save draft");
+        }
+      })();
     } catch (error) {
       console.error(error);
       toast.error("Failed to save draft");
-    } finally {
       setIsSubmitting(false);
       setSubmitIntent(null);
-      setShowSaveDraftConfirm(false);
+    } finally {
+      if (isEditMode) {
+        setIsSubmitting(false);
+        setSubmitIntent(null);
+      }
     }
   };
 
@@ -1276,27 +1405,11 @@ const CreateDesignInner: React.FC = () => {
   };
 
   const handleGoToDrafts = () => {
-    setShowDraftSavedChoices(false);
-    navigate("/profile?tab=Content&visibility=Drafts");
+    navigate("/profile?tab=Content&visibility=Drafts", { replace: true });
   };
 
   const handleCreateNewDesign = () => {
-    setShowDraftSavedChoices(false);
-    setTitle("");
-    setDescription("");
-    setMinPrice("");
-    setMaxPrice("");
-    setSelectedTags([]);
-    setTagSearch("");
-    setType("EVERYBODY");
-    setVisibility("PUBLIC");
-    setFitPreference('REGULAR');
-    setTargetAgeGroup('ADULT');
-    setCustomMeasurementKeys([]);
-    setCoverIndex(0);
-    setSelectedIndex(0);
-    mediaStore.clear();
-    navigate(buildDesignRoute({ mode: 'create' }));
+    navigate("/designs/create", { replace: true });
   };
 
   const handleModalCloseRequest = () => {
@@ -1379,7 +1492,7 @@ const CreateDesignInner: React.FC = () => {
     <div className="min-h-screen bg-transparent text-[var(--text-primary)] transition-colors duration-300">
       {/* CreateStoreModal removed as per request */}
       {/* Save Draft Confirmation */}
-      {showSaveDraftConfirm && (
+      {false && showSaveDraftConfirm && (
         <div className="fixed inset-0 z-layer-modal flex items-center justify-center">
           <div
             className="absolute inset-0 surface-overlay-strong"
@@ -1411,7 +1524,7 @@ const CreateDesignInner: React.FC = () => {
         </div>
       )}
 
-      {showDraftSavedChoices && (
+      {false && showDraftSavedChoices && (
         <div className="fixed inset-0 z-layer-modal flex items-center justify-center">
           <div className="absolute inset-0 surface-overlay-strong" />
           <div className="surface-modal relative z-10 w-[min(92vw,460px)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border shadow-xl p-5 sm:p-6">
@@ -1695,12 +1808,44 @@ const CreateDesignInner: React.FC = () => {
                         </p>
                       )}
 
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <label className="mb-2 flex items-center text-sm font-medium text-theme">
+                            Who is it for?
+                            <InfoTooltip text={CREATOR_METADATA_HELP.audience} />
+                          </label>
+                          <UniversalSelect
+                            value={type}
+                            onChange={handleAudienceChange}
+                            options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
+                              value: option.value,
+                              label: option.label,
+                            }))}
+                            placeholder="Choose who this item is for"
+                            disabled={disabled}
+                            optionCompact
+                          />
+                        </div>
+
+                        <UniversalSelect
+                          label="Age group"
+                          value={targetAgeGroup}
+                          onChange={handleAgeGroupChange}
+                          options={DESIGN_TARGET_AGE_OPTIONS.map((option) => ({
+                            value: option.value,
+                            label: option.label,
+                          }))}
+                          disabled={disabled}
+                          optionCompact
+                        />
+                      </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <UniversalSelect
                           label="What is it?"
                           value={categoryId}
-                          onChange={setCategoryId}
-                          options={categories.map((c) => ({
+                          onChange={handleCategoryChange}
+                          options={filteredCategories.map((c) => ({
                             value: c.id,
                             label: c.name,
                           }))}
@@ -1711,7 +1856,7 @@ const CreateDesignInner: React.FC = () => {
                           }
                           disabled={disabled}
                           searchable
-                          emptyMessage="No categories available"
+                          emptyMessage="No garment categories match this audience yet"
                           optionAllowWrap
                           selectedAllowWrap
                         />
@@ -1727,49 +1872,19 @@ const CreateDesignInner: React.FC = () => {
                           placeholder={
                             loadingCategories
                               ? "Loading..."
-                              : categoryTypeOptions.length
-                                ? "Choose a garment type"
-                                : "No types available"
+                              : categoryId
+                                ? categoryTypeOptions.length
+                                  ? "Choose a garment type"
+                                  : "No garment types match this audience"
+                                : "Choose what this item is first"
                           }
                           disabled={
-                            disabled || categoryTypeOptions.length === 0
+                            disabled || !categoryId || categoryTypeOptions.length === 0
                           }
                           searchable
-                          emptyMessage="No sub-categories available"
+                          emptyMessage="No garment types match this audience yet"
                           optionAllowWrap
                           selectedAllowWrap
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <label className="mb-2 flex items-center text-sm font-medium text-theme">
-                            Who is it for?
-                            <InfoTooltip text={CREATOR_METADATA_HELP.audience} />
-                          </label>
-                          <UniversalSelect
-                            value={type}
-                            onChange={(value) => setType(value as "MALE" | "FEMALE" | "EVERYBODY")}
-                            options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
-                              value: option.value,
-                              label: option.label,
-                            }))}
-                            placeholder="Choose who this item is for"
-                            disabled={disabled}
-                            optionCompact
-                          />
-                        </div>
-
-                        <UniversalSelect
-                          label="Age group"
-                          value={targetAgeGroup}
-                          onChange={(value) => setTargetAgeGroup(value as DesignTargetAgeGroup)}
-                          options={DESIGN_TARGET_AGE_OPTIONS.map((option) => ({
-                            value: option.value,
-                            label: option.label,
-                          }))}
-                          disabled={disabled}
-                          optionCompact
                         />
                       </div>
 
@@ -1886,7 +2001,7 @@ const CreateDesignInner: React.FC = () => {
         </div>
 
         {/* Form Sections */}
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
           {/* Pricing & Availability */}
           <FormSection
             id="design-pricing-section"
@@ -1894,6 +2009,7 @@ const CreateDesignInner: React.FC = () => {
             icon="💰"
             isOpen={expandedSections.pricing}
             onToggle={() => toggleSection("pricing")}
+            className="self-start"
           >
             <div className="space-y-4">
               <div>
@@ -1986,19 +2102,21 @@ const CreateDesignInner: React.FC = () => {
               </div>
 
               {isMadeToOrder && (
-                <CustomOrderConfigurationEditor
-                  ref={customOrderEditorRef}
-                  sourceType="DESIGN"
-                  sourceId={isEditMode ? id : undefined}
-                  sourceTitle={title}
-                  measurementKeys={customMeasurementKeys}
-                  measurementGender={measurementGender}
-                  defaultBaseCharge={minPrice}
-                  defaultProductionLeadDays={storeDefaultProductionLeadDays}
-                  defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}
-                  disabled={disabled}
-                  onRequiredMeasurementKeysChange={handleCustomOrderMeasurementKeysChange}
-                />
+                <div className="max-h-[52vh] overflow-y-auto pr-1 scrollbar-hide">
+                  <CustomOrderConfigurationEditor
+                    ref={customOrderEditorRef}
+                    sourceType="DESIGN"
+                    sourceId={isEditMode ? id : undefined}
+                    sourceTitle={title}
+                    measurementKeys={customMeasurementKeys}
+                    measurementGender={measurementGender}
+                    defaultBaseCharge={minPrice}
+                    defaultProductionLeadDays={storeDefaultProductionLeadDays}
+                    defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}
+                    disabled={disabled}
+                    onRequiredMeasurementKeysChange={handleCustomOrderMeasurementKeysChange}
+                  />
+                </div>
               )}
             </div>
           </FormSection>
@@ -2010,6 +2128,7 @@ const CreateDesignInner: React.FC = () => {
             icon="🎯"
             isOpen={expandedSections.targeting}
             onToggle={() => toggleSection("targeting")}
+            className="self-start"
           >
             <div className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

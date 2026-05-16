@@ -1,4 +1,5 @@
-export type PublishTaskStatus = 'uploading' | 'finalizing' | 'published' | 'failed';
+export type PublishTaskStatus = 'uploading' | 'finalizing' | 'published' | 'saved' | 'failed';
+export type PublishTaskKind = 'publish' | 'draft';
 
 export interface PublishTask {
   id: string;
@@ -7,6 +8,7 @@ export interface PublishTask {
   visibility?: 'PUBLIC' | 'PRIVATE';
   startedAt: number;
   status: PublishTaskStatus;
+  kind?: PublishTaskKind;
   progress: number;
   coverPreviewUrl?: string;
   designId?: string;
@@ -28,6 +30,7 @@ const MAX_TASKS_PER_SCOPE = 12;
 const MAX_TOTAL_TASKS = 120;
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 const PUBLISHED_GRACE_MS = 30 * 1000;
+const SAVED_GRACE_MS = 2 * 60 * 1000;
 
 const clampProgress = (value: number) => {
   if (!Number.isFinite(value)) return 0;
@@ -81,6 +84,7 @@ export const normalizePublishTaskIdentifiers = (task: PublishTask): PublishTask 
   return {
     ...task,
     ownerId: normalizeOwnerId(task.ownerId),
+    kind: task.kind === 'draft' ? 'draft' : 'publish',
     designId,
     legacyCollectionId,
     // Compatibility only: older profile cards still key publish state by the
@@ -107,6 +111,7 @@ const normalizeTaskList = (tasks: PublishTask[]) => {
     .filter((task) => {
       if (now - task.updatedAt > STALE_AFTER_MS) return false;
       if (task.status === 'published' && now - task.updatedAt > PUBLISHED_GRACE_MS) return false;
+      if (task.status === 'saved' && now - task.updatedAt > SAVED_GRACE_MS) return false;
       return true;
     })
     .map(normalizePublishTaskIdentifiers)
@@ -177,6 +182,7 @@ export const createPublishTask = (payload: {
   legacyCollectionId?: string;
   collectionId?: string;
   message?: string;
+  kind?: PublishTaskKind;
 }): PublishTask => {
   const id = `publish_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const now = Date.now();
@@ -187,6 +193,7 @@ export const createPublishTask = (payload: {
     visibility: payload.visibility,
     startedAt: now,
     status: 'uploading',
+    kind: payload.kind === 'draft' ? 'draft' : 'publish',
     progress: 0,
     coverPreviewUrl: payload.coverPreviewUrl,
     designId: normalizeEntityId(payload.designId) ?? normalizeEntityId(payload.legacyCollectionId) ?? normalizeEntityId(payload.collectionId),

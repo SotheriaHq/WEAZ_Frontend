@@ -32,6 +32,7 @@ import { resolveBannerImageSource, resolveProfileImageSource } from '@/utils/pro
 import { buildProfileUrl } from '@/utils/publicLinks';
 import {
   type PublishTask,
+  type PublishTaskKind,
   readPublishTasks,
   subscribePublishTasks,
   prunePublishTasks,
@@ -98,7 +99,7 @@ const ProfilePage: React.FC = () => {
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
   const [isBrandQrOpen, setIsBrandQrOpen] = useState(false);
-  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; title?: string; visibility?: 'PUBLIC' | 'PRIVATE' }>>({});
+  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; title?: string; visibility?: 'PUBLIC' | 'PRIVATE'; kind?: PublishTaskKind }>>({});
   const [publishTasks, setPublishTasks] = useState<PublishTask[]>([]);
 
   const navigate = useNavigate();
@@ -186,6 +187,7 @@ const ProfilePage: React.FC = () => {
       const taskId = String(navState.publishingTaskId);
       const task = publishTasks.find((entry) => entry.id === taskId);
       const lookupId = (task ? getPublishTaskDesignId(task) : null) || taskId;
+      const kind: PublishTaskKind = navState.publishingKind === 'draft' || task?.kind === 'draft' ? 'draft' : 'publish';
       const startedAt = typeof navState.publishingStartedAt === 'number' ? navState.publishingStartedAt : task?.startedAt ?? Date.now();
       setPublishingStates((prev) => ({
         ...prev,
@@ -196,6 +198,7 @@ const ProfilePage: React.FC = () => {
           progress: task?.progress,
           previewUrl: task?.coverPreviewUrl,
           taskId,
+          kind,
           visibility:
             navState.publishingVisibility === 'PRIVATE'
               ? 'PRIVATE'
@@ -205,10 +208,16 @@ const ProfilePage: React.FC = () => {
           message:
             task?.message ||
             (navState.publishingTitle
-              ? `Publishing "${navState.publishingTitle}"`
-              : 'Publishing your design'),
+              ? `${kind === 'draft' ? 'Saving draft' : 'Publishing'} "${navState.publishingTitle}"`
+              : kind === 'draft'
+                ? 'Saving your draft'
+                : 'Publishing your design'),
         },
       }));
+      if (kind === 'draft') {
+        setDraftsInitialized(true);
+        setDraftsLoading(false);
+      }
       if (isOwner && user?.id) {
         void fetchCollections(user.id);
       }
@@ -227,6 +236,7 @@ const ProfilePage: React.FC = () => {
           attempts: 0,
           progress: typeof navState.publishingProgress === 'number' ? navState.publishingProgress : undefined,
           visibility: navState.publishingVisibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC',
+          kind: 'publish',
           message: navState.publishingTitle ? `Publishing "${navState.publishingTitle}"` : 'Publishing your design',
         },
       }));
@@ -611,7 +621,13 @@ const ProfilePage: React.FC = () => {
         }
         const current = next[key];
         const nextStatus = task.status === 'failed' ? 'failed' : 'publishing';
-        const nextMessage = task.error || task.message || (task.status === 'failed' ? 'Publish failed' : 'Publishing your design...');
+        const isDraftTask = task.kind === 'draft';
+        const nextMessage =
+          task.error ||
+          task.message ||
+          (task.status === 'failed'
+            ? isDraftTask ? 'Draft save failed' : 'Publish failed'
+            : isDraftTask ? 'Saving your draft...' : 'Publishing your design...');
         if (
           !current ||
           current.status !== nextStatus ||
@@ -619,7 +635,8 @@ const ProfilePage: React.FC = () => {
           current.message !== nextMessage ||
           current.previewUrl !== task.coverPreviewUrl ||
           current.taskId !== task.id ||
-          current.title !== task.title
+          current.title !== task.title ||
+          current.kind !== task.kind
         ) {
           next[key] = {
             status: nextStatus,
@@ -630,6 +647,7 @@ const ProfilePage: React.FC = () => {
             taskId: task.id,
             title: task.title,
             visibility: task.visibility,
+            kind: task.kind,
             message: nextMessage,
           };
           changed = true;
@@ -640,7 +658,7 @@ const ProfilePage: React.FC = () => {
   }, [publishTasks]);
 
   useEffect(() => {
-    const completed = publishTasks.filter((task) => task.status === 'published' && getPublishTaskDesignId(task));
+    const completed = publishTasks.filter((task) => task.kind !== 'draft' && task.status === 'published' && getPublishTaskDesignId(task));
     if (completed.length === 0) return;
 
     const checkAndCleanup = async () => {
@@ -672,6 +690,48 @@ const ProfilePage: React.FC = () => {
 
     void checkAndCleanup();
   }, [collections, fetchCollections, isVisitorView, publishTaskScope, publishTasks, user?.id, visitorCollections]);
+
+  useEffect(() => {
+    if (!isOwner || visibilityFilter !== 'Drafts') return;
+    const savedDraftTasks = publishTasks.filter((task) => task.kind === 'draft' && task.status === 'saved');
+    if (savedDraftTasks.length === 0) return;
+
+    let cancelled = false;
+    const refreshDrafts = async () => {
+      try {
+        const items = await brandApi.getMyDraftCollections();
+        if (cancelled) return;
+        const uniqueDrafts = items.reduce((acc, draft) => {
+          if (!acc.some((entry) => entry.id === draft.id)) {
+            acc.push(draft);
+          }
+          return acc;
+        }, [] as typeof items);
+        setDrafts(uniqueDrafts);
+        setDraftsInitialized(true);
+        setDraftsLoading(false);
+        savedDraftTasks.forEach((task) => removePublishTask(task.id, publishTaskScope));
+        setPublishingStates((prev) => {
+          const next = { ...prev };
+          savedDraftTasks.forEach((task) => {
+            delete next[task.id];
+            const designId = getPublishTaskDesignId(task);
+            const legacyCollectionId = getPublishTaskLegacyCollectionId(task);
+            if (designId) delete next[designId];
+            if (legacyCollectionId) delete next[legacyCollectionId];
+          });
+          return next;
+        });
+      } catch (error) {
+        console.warn('Draft refresh after background save failed', error);
+      }
+    };
+
+    void refreshDrafts();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwner, publishTaskScope, publishTasks, visibilityFilter]);
 
   // Auto-clear stale failed publish states for collections that exist on the server
   useEffect(() => {
@@ -772,7 +832,9 @@ const ProfilePage: React.FC = () => {
       return {
         ...c,
         clientStatus: pub.status === 'publishing' ? 'publishing' : 'publish-failed',
-        clientStatusMessage: pub.message ?? (pub.status === 'publishing' ? 'Publishing...' : 'Publish failed'),
+        clientStatusMessage: pub.message ?? (pub.status === 'publishing'
+          ? pub.kind === 'draft' ? 'Saving draft...' : 'Publishing...'
+          : pub.kind === 'draft' ? 'Draft save failed' : 'Publish failed'),
         clientStatusMeta: {
           startedAt: pub.startedAt,
           attempts: pub.attempts,
@@ -780,21 +842,28 @@ const ProfilePage: React.FC = () => {
           progress: pub.progress,
           previewUrl: pub.previewUrl,
           taskId: pub.taskId,
+          kind: pub.kind,
         },
       } as CollectionDto;
     });
 
-    if (visibilityFilter !== 'Public' && visibilityFilter !== 'Private') {
+    if (visibilityFilter !== 'Public' && visibilityFilter !== 'Private' && visibilityFilter !== 'Drafts') {
       return decorated;
     }
 
     const decoratedIds = new Set(decorated.map((entry) => entry.id));
-    const targetVisibility = visibilityFilter === 'Private' ? 'PRIVATE' : 'PUBLIC';
+    const isDraftView = visibilityFilter === 'Drafts';
+    const targetVisibility = visibilityFilter === 'Private' || isDraftView ? 'PRIVATE' : 'PUBLIC';
     const placeholders: CollectionDto[] = Object.entries(publishingStates)
       .filter(([key, state]) => {
         if (decoratedIds.has(key)) return false;
         // Show both in-progress uploads AND failed tasks (so failed tasks surface as ghost cards)
         if (state.status !== 'publishing' && state.status !== 'failed') return false;
+        if (isDraftView) {
+          if (state.kind !== 'draft') return false;
+        } else if (state.kind === 'draft') {
+          return false;
+        }
         if ((state.visibility ?? 'PUBLIC') !== targetVisibility) return false;
         const query = searchQuery.trim().toLowerCase();
         if (!query) return true;
@@ -806,10 +875,10 @@ const ProfilePage: React.FC = () => {
         return {
           id: key,
           status: 'DRAFT',
-          name: state.title || (isFailed ? 'Publish failed' : 'Publishing design'),
-          description: isFailed ? 'Tap retry to republish' : 'Uploading in background',
+          name: state.title || (isFailed ? (isDraftView ? 'Draft save failed' : 'Publish failed') : (isDraftView ? 'Saving draft' : 'Publishing design')),
+          description: isFailed ? (isDraftView ? 'Tap retry to save again' : 'Tap retry to republish') : (isDraftView ? 'Saving in background' : 'Uploading in background'),
           ownerId: user?.id || '',
-          title: state.title || (isFailed ? 'Publish failed' : 'Publishing design'),
+          title: state.title || (isFailed ? (isDraftView ? 'Draft save failed' : 'Publish failed') : (isDraftView ? 'Saving draft' : 'Publishing design')),
           isPublic: targetVisibility !== 'PRIVATE',
           visibility: targetVisibility,
           type: 'EVERYBODY',
@@ -819,7 +888,7 @@ const ProfilePage: React.FC = () => {
           clientStatus: isFailed ? 'publish-failed' : 'publishing',
           clientStatusMessage: isFailed
             ? (state.message || 'Publish failed — tap Retry to try again')
-            : (state.message || 'Publishing your design...'),
+            : (state.message || (isDraftView ? 'Saving your draft...' : 'Publishing your design...')),
           clientStatusMeta: {
             startedAt: state.startedAt,
             attempts: state.attempts,
@@ -827,12 +896,18 @@ const ProfilePage: React.FC = () => {
             progress: state.progress,
             previewUrl: state.previewUrl,
             taskId: state.taskId,
+            kind: state.kind,
           },
         } as CollectionDto;
       });
 
     return [...placeholders, ...decorated];
   }, [publishingStates, searchAndVisibilityFiltered, searchQuery, user?.id, visibilityFilter]);
+
+  const hasPendingDraftTask = useMemo(
+    () => Object.values(publishingStates).some((state) => state.kind === 'draft' && (state.status === 'publishing' || state.status === 'failed')),
+    [publishingStates],
+  );
 
   const ownerContentError =
     visibilityFilter === 'Drafts'
@@ -842,7 +917,7 @@ const ProfilePage: React.FC = () => {
         : collectionsError;
   const ownerContentLoading =
     visibilityFilter === 'Drafts'
-      ? draftsLoading || !draftsInitialized
+      ? draftsLoading || (!draftsInitialized && !hasPendingDraftTask)
       : visibilityFilter === 'Deleted'
         ? deletedDesignsLoading
         : collectionsLoading;
@@ -1011,7 +1086,7 @@ const ProfilePage: React.FC = () => {
   // Poll publish status for any pending ids
   useEffect(() => {
     const pending = Object.entries(publishingStates)
-      .filter(([, state]) => state.status === 'publishing')
+      .filter(([, state]) => state.status === 'publishing' && state.kind !== 'draft')
       .map(([id, state]) => {
         const task = state.taskId
           ? publishTasks.find((entry) => entry.id === state.taskId)

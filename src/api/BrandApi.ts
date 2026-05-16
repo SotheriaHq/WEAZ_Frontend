@@ -1058,43 +1058,75 @@ export const brandApi = {
     };
 
     const mapDrafts = (items: any[]): CollectionDto[] =>
-      items.map((item: any) => ({
-        id: item.id,
-        name: item.title || '',
-        title: item.title || '',
-        description: item.description || '',
-        ownerId: '', // Not returned by draft endpoint, but implied to be current user
-        isPublic: false,
-        visibility: 'PRIVATE',
-        type: 'EVERYBODY', // Default
-        domain: 'DESIGN',
-        categoryId: '',
-        subCategoryId: '',
-        categoryTypeId: '',
-        coverImage: item.coverImage || '',
-        coverFileId: undefined,
-        itemCount: item.itemCount || 0,
-        postsCount: item.itemCount || 0,
-        threadsCount: 0,
-        commentsCount: 0,
-        minPrice: 0,
-        maxPrice: 0,
-        saleMinPrice: null,
-        saleMaxPrice: null,
-        saleStartAt: null,
-        saleEndAt: null,
-        isAvailableInStore: false,
-        createdAt: item.createdAt,
-        updatedAt: item.createdAt,
-        brandName: '',
-        username: '',
-        brandLogo: '',
-        brandLogoFileId: undefined,
-        tags: [],
-        // Extra fields for drafts
-        pendingCategoryName: item.pendingCategoryName,
-        draftReason: item.draftReason,
-      }));
+      items.map((item: any) => {
+        const mediaItems = Array.isArray(item.medias)
+          ? item.medias
+          : Array.isArray(item.media)
+            ? item.media
+            : Array.isArray(item.images)
+              ? item.images
+              : [];
+        const primaryMedia = mediaItems[0] ?? {};
+        const primaryFile = primaryMedia.file ?? {};
+        const coverImage =
+          item.coverImage ??
+          item.coverImageUrl ??
+          item.thumbnailUrl ??
+          primaryMedia.previewUrl ??
+          primaryMedia.remoteUrl ??
+          primaryMedia.url ??
+          primaryMedia.s3Url ??
+          primaryFile.signedUrl ??
+          primaryFile.s3Url ??
+          primaryFile.url ??
+          '';
+        const coverFileId =
+          item.coverFileId ??
+          item.coverImageFileId ??
+          primaryMedia.fileId ??
+          primaryMedia.fileUploadId ??
+          primaryFile.id ??
+          primaryFile.fileId;
+
+        return {
+          id: item.id,
+          name: item.title || '',
+          title: item.title || '',
+          description: item.description || '',
+          ownerId: '', // Not returned by draft endpoint, but implied to be current user
+          isPublic: false,
+          visibility: 'PRIVATE',
+          type: 'EVERYBODY', // Default
+          domain: 'DESIGN',
+          categoryId: '',
+          subCategoryId: '',
+          categoryTypeId: '',
+          coverImage,
+          coverFileId,
+          previewImages: coverImage || coverFileId ? [{ url: coverImage || null, fileId: coverFileId || null }] : [],
+          itemCount: item.itemCount || mediaItems.length || 0,
+          postsCount: item.itemCount || mediaItems.length || 0,
+          threadsCount: 0,
+          commentsCount: 0,
+          minPrice: 0,
+          maxPrice: 0,
+          saleMinPrice: null,
+          saleMaxPrice: null,
+          saleStartAt: null,
+          saleEndAt: null,
+          isAvailableInStore: false,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt ?? item.createdAt,
+          brandName: '',
+          username: '',
+          brandLogo: '',
+          brandLogoFileId: undefined,
+          tags: [],
+          // Extra fields for drafts
+          pendingCategoryName: item.pendingCategoryName,
+          draftReason: item.draftReason,
+        };
+      });
 
     const requestDrafts = async (): Promise<CollectionDto[]> => {
       const response = await apiClient.get('/designs/my/drafts');

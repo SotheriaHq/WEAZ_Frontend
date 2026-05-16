@@ -51,6 +51,7 @@ export interface CollectionDto {
     progress?: number;
     previewUrl?: string;
     taskId?: string;
+    kind?: 'publish' | 'draft';
   };
 }
 
