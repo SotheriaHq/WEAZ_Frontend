@@ -16,14 +16,23 @@ interface StoreBasicInfoStepProps {
 }
 
 const FALLBACK_CATEGORIES = [
-  { value: 'african', label: 'African Fashion' },
-  { value: 'western', label: 'Western Fashion' },
+  { value: 'womenswear', label: 'Womenswear' },
+  { value: 'menswear', label: 'Menswear' },
+  { value: 'unisex', label: 'Unisex' },
+  { value: 'kidswear', label: 'Kidswear' },
+  { value: 'bespoke-made-to-measure', label: 'Bespoke / Made-to-measure' },
+  { value: 'couture', label: 'Couture' },
+  { value: 'ready-to-wear', label: 'Ready-to-wear' },
+  { value: 'bridal', label: 'Bridal' },
+  { value: 'traditional-cultural-wear', label: 'Traditional / Cultural wear' },
   { value: 'streetwear', label: 'Streetwear' },
-  { value: 'vintage', label: 'Vintage' },
+  { value: 'corporate-formalwear', label: 'Corporate / Formalwear' },
   { value: 'luxury', label: 'Luxury' },
-  { value: 'sustainable', label: 'Sustainable' },
-  { value: 'plus-size', label: 'Plus Size' },
-  { value: 'modest', label: 'Modest Fashion' },
+  { value: 'modest-fashion', label: 'Modest fashion' },
+  { value: 'accessories', label: 'Accessories' },
+  { value: 'footwear', label: 'Footwear' },
+  { value: 'bags', label: 'Bags' },
+  { value: 'jewelry', label: 'Jewelry' },
 ];
 
 /**
@@ -33,15 +42,12 @@ const FALLBACK_CATEGORIES = [
  */
 const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
   data,
-  availableCategories,
   onBack,
   onContinue,
   saveState,
   isLoadingDraft,
 }) => {
-  const categories = availableCategories?.length
-    ? availableCategories.map((c) => ({ value: c.slug, label: c.name }))
-    : FALLBACK_CATEGORIES;
+  const categories = FALLBACK_CATEGORIES;
   const categoryLabelMap = new Map(categories.map((cat) => [cat.value, cat.label]));
   const selectedCategoryLabels = data.categories.map((cat) => categoryLabelMap.get(cat) ?? cat);
 
@@ -60,7 +66,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
       const missing: string[] = [];
       if (!nameValid) missing.push('Store Name');
       if (!slugValid) missing.push('Store Slug');
-      if (!categoriesValid) missing.push('At least 1 category (from Essentials)');
+      if (!categoriesValid) missing.push('At least 1 brand focus (from Essentials)');
       if (!descriptionValid) missing.push('Description (from Essentials)');
       toast.error(`Please complete: ${missing.join(', ')}`);
       return;
@@ -175,7 +181,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
 
               <div className="mt-4 space-y-3">
                 <div>
-                  <div className="text-xs uppercase tracking-wide text-gray-400">Categories</div>
+                  <div className="text-xs uppercase tracking-wide text-gray-400">Brand focus</div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {selectedCategoryLabels.length > 0 ? (
                       selectedCategoryLabels.map((label) => (
@@ -187,7 +193,7 @@ const StoreBasicInfoStep: React.FC<StoreBasicInfoStepProps> = ({
                         </span>
                       ))
                     ) : (
-                      <span className="text-xs text-amber-600">No categories selected yet.</span>
+                      <span className="text-xs text-amber-600">No brand focus selected yet.</span>
                     )}
                   </div>
                 </div>

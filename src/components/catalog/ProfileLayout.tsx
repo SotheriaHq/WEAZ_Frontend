@@ -13,7 +13,6 @@ import {
   useLocation,
   Navigate,
   Outlet,
-  useNavigate,
   useParams,
   useSearchParams,
 } from 'react-router-dom';
@@ -22,6 +21,9 @@ import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import { ISLAND_BOTTOM_NAV_CLEARANCE_CLASS } from '@/components/navigation/IslandBottomNav';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import { setUser } from '@/features/userSlice';
+import { unwrapApiResponse } from '@/types/auth';
+import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
 
 const Profile = lazy(() => import('../../pages/catalog/Catalog'));
 const PROFILE_MAIN_CLASS = `min-h-screen pt-16 transition-[margin] duration-300 ease-out ${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS}`;
@@ -33,12 +35,6 @@ const computeSidebarMode = (pathname: string, isMobile: boolean) => {
   if (pathname.startsWith('/settings') || pathname.startsWith('/profile/settings')) return 'HIDDEN' as const;
   if (pathname.startsWith('/studio')) return 'HIDDEN' as const;
   return 'RAIL' as const;
-};
-
-const sanitizeNextPath = (path: string): string | null => {
-  if (!path) return null;
-  if (!path.startsWith('/') || path.startsWith('//')) return null;
-  return path;
 };
 
 const maskEmailForPrompt = (email?: string | null): string => {
@@ -75,7 +71,6 @@ export const ProfileLayout: React.FC = () => {
   const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
   const isMobile = useSelector(selectIsMobile);
   const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { id: routeBrandId } = useParams<{ id?: string }>();
 
@@ -83,12 +78,9 @@ export const ProfileLayout: React.FC = () => {
   const [visitorType, setVisitorType] = useState<'BRAND' | 'REGULAR' | null>(null);
   const [visitorLoading, setVisitorLoading] = useState(false);
   const [isResendingVerification, setIsResendingVerification] = useState(false);
+  const [isCheckingVerification, setIsCheckingVerification] = useState(false);
 
   const verificationPromptContext = searchParams.get('verifyEmailPrompt') ?? '';
-  const verificationNextPath = useMemo(
-    () => sanitizeNextPath(searchParams.get('next')?.trim() ?? ''),
-    [searchParams],
-  );
 
   const computedSidebarMode = useMemo(
     () => computeSidebarMode(location.pathname, isMobile),
@@ -164,7 +156,7 @@ export const ProfileLayout: React.FC = () => {
         ),
         toastMessage:
           'Verify your email before creating designs. Check your inbox and click the verification link, then come back here.',
-        actionLabel: verificationNextPath ? "I've Verified - Continue" : "I've Verified",
+        actionLabel: 'Check status',
       };
     }
 
@@ -178,7 +170,7 @@ export const ProfileLayout: React.FC = () => {
         ),
         toastMessage:
           'Verify your email before creating catalog products. Check your inbox and click the verification link, then come back here.',
-        actionLabel: verificationNextPath ? "I've Verified - Continue" : "I've Verified",
+        actionLabel: 'Check status',
       };
     }
 
@@ -192,7 +184,7 @@ export const ProfileLayout: React.FC = () => {
         ),
         toastMessage:
           'Verify your email before starting store setup. Check your inbox for the verification link.',
-        actionLabel: verificationNextPath ? "I've Verified - Continue" : "I've Verified",
+        actionLabel: 'Check status',
       };
     }
 
@@ -205,9 +197,9 @@ export const ProfileLayout: React.FC = () => {
       ),
       toastMessage:
         'Verify your email before continuing. Check your inbox and click the verification link, or use the resend button on your profile if you have not received it.',
-      actionLabel: verificationNextPath ? "I've Verified - Continue" : "I've Verified",
+      actionLabel: 'Check status',
     };
-  }, [maskedVerificationEmail, verificationNextPath, verificationPromptContext]);
+  }, [maskedVerificationEmail, verificationPromptContext]);
 
   useEffect(() => {
     if (!user) return;
@@ -218,12 +210,15 @@ export const ProfileLayout: React.FC = () => {
       'Your email is verified successfully.';
 
     let shouldCleanQuery = false;
+    const staleProfileNext = location.pathname === '/profile' && searchParams.has('next');
 
     if (emailVerifiedFlag === '1') {
       toast.success(emailVerifiedMessage);
       shouldCleanQuery = true;
     } else if (!user.isEmailVerified && verificationPromptContext) {
       toast.info(verificationPromptDetails.toastMessage);
+      shouldCleanQuery = true;
+    } else if (staleProfileNext) {
       shouldCleanQuery = true;
     }
 
@@ -234,9 +229,10 @@ export const ProfileLayout: React.FC = () => {
       next.delete('emailVerified');
       next.delete('emailVerifiedMessage');
       next.delete('verifyEmailPrompt');
+      next.delete('next');
       return next;
     }, { replace: true });
-  }, [searchParams, setSearchParams, user, verificationPromptContext, verificationPromptDetails.toastMessage]);
+  }, [location.pathname, searchParams, setSearchParams, user, verificationPromptContext, verificationPromptDetails.toastMessage]);
 
   const resendVerificationEmail = async () => {
     if (!user || isResendingVerification) return;
@@ -267,9 +263,40 @@ export const ProfileLayout: React.FC = () => {
     }
   };
 
-  const handleVerificationContinue = () => {
-    if (!verificationNextPath) return;
-    navigate(verificationNextPath);
+  const refreshVerificationStatus = async () => {
+    if (!user || isCheckingVerification) return;
+
+    setIsCheckingVerification(true);
+    try {
+      const response = await apiClient.get('/auth/profile');
+      const profilePayload = unwrapApiResponse<AuthProfileResponse | AuthUserDto>(
+        response.data,
+      );
+      const refreshedUser =
+        'user' in profilePayload
+          ? (profilePayload as AuthProfileResponse).user
+          : (profilePayload as AuthUserDto);
+
+      if (refreshedUser?.id) {
+        dispatch(setUser(refreshedUser));
+      }
+
+      if (refreshedUser?.isEmailVerified) {
+        toast.success('Your email is verified.');
+        setSearchParams((current) => {
+          const next = new URLSearchParams(current);
+          next.delete('verifyEmailPrompt');
+          next.delete('next');
+          return next;
+        }, { replace: true });
+      } else {
+        toast.info('Still waiting for verification. Open the email link, then check again.');
+      }
+    } catch {
+      toast.error('Unable to check verification right now. Please try again shortly.');
+    } finally {
+      setIsCheckingVerification(false);
+    }
   };
 
   if (!isVisitorRoute) {
@@ -340,36 +367,35 @@ export const ProfileLayout: React.FC = () => {
         <Navbar />
         {showEmailVerificationPrompt ? (
           <div
-            className="pointer-events-none fixed right-0 top-20 z-[70] px-4 sm:px-6"
+            className="pointer-events-none fixed right-0 top-[4.75rem] z-[70] px-3 sm:px-5"
             style={{ left: mainMarginLeft }}
           >
-            <div className="pointer-events-auto ml-auto flex w-full max-w-[min(92vw,30rem)] items-start gap-3 rounded-2xl border border-amber-300/35 bg-white/95 px-4 py-3 text-sm text-gray-800 shadow-xl shadow-amber-900/10 backdrop-blur-xl dark:border-amber-300/20 dark:bg-gray-950/92 dark:text-gray-100">
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-base dark:bg-amber-400/15">
-                <span aria-hidden="true">âœ‰ï¸</span>
+            <div className="pointer-events-auto ml-auto flex w-full max-w-[min(90vw,22rem)] items-start gap-2 rounded-xl border border-amber-300/30 bg-white/94 px-3 py-2 text-xs text-gray-800 shadow-lg shadow-amber-900/10 backdrop-blur-xl dark:border-amber-300/20 dark:bg-gray-950/92 dark:text-gray-100">
+              <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-sm dark:bg-amber-400/15">
+                <span aria-hidden="true">{'\u2709'}</span>
               </div>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold">{verificationPromptDetails.title}</p>
-                <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-300">
+                <p className="truncate font-semibold">{verificationPromptDetails.title}</p>
+                <p className="mt-0.5 truncate text-[11px] leading-4 text-gray-600 dark:text-gray-300">
                   {verificationPromptDetails.description}
                 </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
                     onClick={resendVerificationEmail}
                     disabled={isResendingVerification}
-                    className="rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isResendingVerification ? 'Sending...' : 'Resend email'}
                   </button>
-                  {verificationNextPath ? (
-                    <button
-                      type="button"
-                      onClick={handleVerificationContinue}
-                      className="rounded-full px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-400/10"
-                    >
-                      {verificationPromptDetails.actionLabel}
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={refreshVerificationStatus}
+                    disabled={isCheckingVerification}
+                    className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-200 dark:hover:bg-amber-400/10"
+                  >
+                    {isCheckingVerification ? 'Checking...' : verificationPromptDetails.actionLabel}
+                  </button>
                 </div>
               </div>
             </div>

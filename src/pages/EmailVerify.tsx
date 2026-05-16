@@ -15,6 +15,9 @@ type VerifyStatus = 'verifying' | 'success' | 'error' | 'pending';
 const sanitizeNextPath = (path: string): string => {
   if (!path) return '/';
   if (!path.startsWith('/') || path.startsWith('//')) return '/';
+  if (path === '/studio/store' || path.startsWith('/studio/store/')) {
+    return '/profile';
+  }
   return path;
 };
 

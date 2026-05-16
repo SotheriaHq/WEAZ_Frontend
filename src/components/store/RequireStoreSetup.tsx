@@ -18,8 +18,6 @@ import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 const STATUS_RETRY_ATTEMPTS = 5;
 const STATUS_RETRY_DELAY_MS = 600;
 const STORE_STATUS_CACHE_TTL_MS = 5 * 60 * 1000;
-const EMAIL_VERIFICATION_RETURN_PATH_KEY =
-  'threadly.emailVerification.returnPath';
 
 type StoreStatusCache = {
   status: StoreStatusResponse | null;
@@ -134,12 +132,10 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
   }, [location.pathname]);
 
   const verificationPromptDestination = useMemo(() => {
-    const nextPath = `${location.pathname}${location.search}`;
     const params = new URLSearchParams();
     params.set('verifyEmailPrompt', 'store-setup');
-    params.set('next', nextPath);
     return `/profile?${params.toString()}`;
-  }, [location.pathname, location.search]);
+  }, []);
 
   const brandProfileSetupDestination = useMemo(() => {
     const nextPath = `${location.pathname}${location.search}`;
@@ -155,19 +151,6 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     hasBrandAccess && effectiveEmailVerified === false;
   const requiresProfileCompletion =
     hasBrandAccess && effectiveProfileComplete === false;
-
-  useEffect(() => {
-    if (!requiresEmailVerification) {
-      return;
-    }
-
-    try {
-      const nextPath = `${location.pathname}${location.search}`;
-      window.sessionStorage.setItem(EMAIL_VERIFICATION_RETURN_PATH_KEY, nextPath);
-    } catch {
-      // Ignore storage errors.
-    }
-  }, [requiresEmailVerification, location.pathname, location.search]);
 
   useEffect(() => {
     let mounted = true;

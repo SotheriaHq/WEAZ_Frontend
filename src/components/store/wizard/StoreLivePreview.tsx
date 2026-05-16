@@ -7,14 +7,23 @@ interface StoreLivePreviewProps {
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  african: 'African Fashion',
-  western: 'Western Fashion',
+  womenswear: 'Womenswear',
+  menswear: 'Menswear',
+  unisex: 'Unisex',
+  kidswear: 'Kidswear',
+  'bespoke-made-to-measure': 'Bespoke / Made-to-measure',
+  couture: 'Couture',
+  'ready-to-wear': 'Ready-to-wear',
+  bridal: 'Bridal',
+  'traditional-cultural-wear': 'Traditional / Cultural wear',
   streetwear: 'Streetwear',
-  vintage: 'Vintage',
+  'corporate-formalwear': 'Corporate / Formalwear',
   luxury: 'Luxury',
-  sustainable: 'Sustainable',
-  'plus-size': 'Plus Size',
-  modest: 'Modest Fashion',
+  'modest-fashion': 'Modest fashion',
+  accessories: 'Accessories',
+  footwear: 'Footwear',
+  bags: 'Bags',
+  jewelry: 'Jewelry',
 };
 
 /**
@@ -77,7 +86,7 @@ const StoreLivePreview: React.FC<StoreLivePreviewProps> = ({ data }) => {
                     </span>
                   ))
                 ) : (
-                  <span className="text-sm text-gray-400 dark:text-gray-500">Select categories</span>
+                  <span className="text-sm text-gray-400 dark:text-gray-500">Select brand focus</span>
                 )}
               </div>
             </div>

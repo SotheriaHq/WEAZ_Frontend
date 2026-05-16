@@ -26,7 +26,6 @@ import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQ
 import type { BrandProfileDto, CollectionDto } from '../../types/profile';
 import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedFileUrl';
 import { getStoreStatus, type StoreStatusResponse } from '../../api/StoreApi';
-import FrostedButton from '@/components/ui/FrostedButton';
 import CatalogShopTab from '@/components/catalog/CatalogShopTab';
 import BrandQrModal from '@/components/qr/BrandQrModal';
 import { resolveBannerImageSource, resolveProfileImageSource } from '@/utils/profileImage';
@@ -1396,34 +1395,33 @@ const ProfilePage: React.FC = () => {
         username={viewDisplayData.username ?? null}
       />
       {showStoreSetupNudge ? (
-        <div className="fixed bottom-24 right-4 sm:right-6 z-[60] w-[min(92vw,380px)]">
-          <div className="glass-menu-soft px-4 py-3">
+        <div className="fixed bottom-24 right-4 sm:right-6 z-[60] w-[min(88vw,270px)]">
+          <div className="glass-menu-soft px-3 py-2">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              <p className="truncate text-xs font-semibold text-gray-900 dark:text-gray-100">
                 Finish setting up your store
               </p>
-              <p className="text-xs text-gray-700/80 dark:text-white/70 mt-0.5">
-                Add categories, a tagline, and your Instagram. You can do it later.
+              <p className="mt-0.5 truncate text-[11px] text-gray-700/80 dark:text-white/70">
+                Add your focus, tagline, and Instagram.
               </p>
             </div>
-            <div className="mt-3 flex items-center justify-end gap-2">
-              <FrostedButton
-                size="sm"
-                variant="primary"
+            <div className="mt-2 flex items-center justify-end gap-1.5">
+              <button
+                type="button"
                 onClick={handleOpenStoreSetup}
-                loading={isStoreSetupNavigating}
-                className="min-w-[7.5rem] justify-center"
+                disabled={isStoreSetupNavigating}
+                className="rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-white dark:text-black dark:hover:bg-white/90"
               >
-                Set up
-              </FrostedButton>
-              <FrostedButton
-                size="sm"
-                variant="ghost"
+                {isStoreSetupNavigating ? 'Opening...' : 'Set up'}
+              </button>
+              <button
+                type="button"
                 onClick={dismissStoreSetupNudge}
                 disabled={isStoreSetupNavigating}
+                className="rounded-full px-3 py-1.5 text-[11px] font-semibold text-gray-700 transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-60 dark:text-white/75 dark:hover:bg-white/10"
               >
                 Not now
-              </FrostedButton>
+              </button>
             </div>
           </div>
         </div>

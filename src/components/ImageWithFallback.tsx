@@ -19,6 +19,7 @@ interface ImageWithFallbackProps {
   fallbackName?: string;
   draggable?: boolean;
   onClick?: () => void;
+  keepPreviousOnReload?: boolean;
 }
 
 const roundClass = (rounded: ImageWithFallbackProps['rounded']) => {
@@ -149,6 +150,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   fallbackName,
   draggable: _draggable = false,
   onClick,
+  keepPreviousOnReload = false,
 }) => {
   const sourceCacheKey = resolveSourceCacheKey(fileId, src);
   const [resolved, setResolved] = useState<string | null>(() => {
@@ -168,6 +170,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     if (src && isS3LikeUrl(src)) return !!(getCachedUrl(src) ?? src);
     return !!src;
   });
+  const [lastGoodUrl, setLastGoodUrl] = useState<string | null>(() => (loaded ? resolved : null));
   const retryCountRef = React.useRef(0);
   const imgRef = React.useRef<HTMLImageElement | null>(null);
 
@@ -289,7 +292,9 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   // Without this, there is a white flash between "URL resolved" and "image onLoad" because the
   // <img> is opacity-0 with no background behind it during that window.
   const showFallback = hadError || isKnownUnavailableSource;
-  const showShimmer = !showFallback && (isResolving || (hasSource && !hadError && !loaded));
+  const showPreviousImage =
+    keepPreviousOnReload && Boolean(lastGoodUrl) && !showFallback && hasSource && (isResolving || !loaded);
+  const showShimmer = !showPreviousImage && !showFallback && (isResolving || (hasSource && !hadError && !loaded));
   const wrapperClassName = cn('overflow-hidden', roundClass(rounded), containerClassName);
 
   useEffect(() => {
@@ -298,8 +303,18 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     if (!image) return;
     if (image.complete && image.naturalWidth > 0) {
       setLoaded(true);
+      if (resolved) {
+        setLastGoodUrl(resolved);
+      }
     }
   }, [isResolving, loaded, resolved, showFallback]);
+
+  const handleImageLoaded = () => {
+    setLoaded(true);
+    if (resolved) {
+      setLastGoodUrl(resolved);
+    }
+  };
 
   return (
     <div className={cn('relative', wrapperClassName)} onClick={onClick}>
@@ -310,6 +325,19 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       {showFallback && (
         <DefaultAvatar name={fallbackName ?? alt} className={cn('w-full h-full', roundClass(rounded), className)} />
       )}
+      {showPreviousImage && lastGoodUrl ? (
+        <MediaRenderer
+          kind="image"
+          src={lastGoodUrl}
+          alt=""
+          fit={fit}
+          loading="eager"
+          className="absolute inset-0 w-full h-full"
+          mediaClassName={cn('opacity-100', className)}
+          maxHeightClassName={maxHeightClassName ?? 'max-h-[70vh]'}
+          maxWidthClassName="max-w-full"
+        />
+      ) : null}
       {!isResolving && !showFallback && (
         <MediaRenderer
           kind="image"
@@ -318,7 +346,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           fit={fit}
           imgRef={imgRef}
           onError={() => setHadError(true)}
-          onLoad={() => setLoaded(true)}
+          onLoad={handleImageLoaded}
           loading="eager"
           className="w-full h-full"
           mediaClassName={`transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${className ?? ''}`}

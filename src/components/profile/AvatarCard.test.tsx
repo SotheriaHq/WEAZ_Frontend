@@ -8,6 +8,7 @@ vi.mock('../ImageWithFallback', () => ({
     fileId?: string | null;
     maxHeightClassName?: string;
     fallbackName?: string;
+    keepPreviousOnReload?: boolean;
   }) => (
     <div
       data-testid="avatar-image"
@@ -15,6 +16,7 @@ vi.mock('../ImageWithFallback', () => ({
       data-file-id={props.fileId ?? ''}
       data-max-height={props.maxHeightClassName ?? ''}
       data-fallback-name={props.fallbackName ?? ''}
+      data-keep-previous={props.keepPreviousOnReload ? 'true' : 'false'}
     />
   ),
 }));
@@ -40,6 +42,7 @@ describe('AvatarCard', () => {
     const image = screen.getByTestId('avatar-image');
     expect(image).toHaveAttribute('data-file-id', 'file_avatar_123');
     expect(image).toHaveAttribute('data-max-height', 'max-h-full');
+    expect(image).toHaveAttribute('data-keep-previous', 'true');
     expect(image).not.toHaveAttribute('data-max-height', 'max-h-28');
   });
 });

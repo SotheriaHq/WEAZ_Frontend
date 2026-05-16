@@ -11,12 +11,12 @@ interface StudioSidebarProps {
 const ALL_ITEMS = [
   { key: 'overview', label: 'Dashboard', path: '/studio', emoji: '📊', requiresSetup: true },
   { key: 'store', label: 'Store', path: '/studio/store', emoji: '🛍️', requiresSetup: false },
-  { key: 'orders', label: 'Orders', path: '/studio?tab=orders', emoji: '📦', requiresSetup: false },
+  { key: 'orders', label: 'Orders', path: '/studio?tab=orders', emoji: '📦', requiresSetup: true },
   { key: 'messages', label: 'Messages', path: '/studio/messages', emoji: '💬', requiresSetup: true },
-  { key: 'staff', label: 'Staff', path: '/studio/staff', emoji: '👥', requiresSetup: false },
-  { key: 'customers', label: 'Customers', path: '/studio?tab=customers', emoji: '👥', requiresSetup: false },
-  { key: 'analytics', label: 'Analytics', path: '/studio?tab=analytics', emoji: '📈', requiresSetup: false },
-  { key: 'finance', label: 'Finance', path: '/studio?tab=finance', emoji: '💰', requiresSetup: false },
+  { key: 'staff', label: 'Staff', path: '/studio/staff', emoji: '👥', requiresSetup: true },
+  { key: 'customers', label: 'Customers', path: '/studio?tab=customers', emoji: '👥', requiresSetup: true },
+  { key: 'analytics', label: 'Analytics', path: '/studio?tab=analytics', emoji: '📈', requiresSetup: true },
+  { key: 'finance', label: 'Finance', path: '/studio?tab=finance', emoji: '💰', requiresSetup: true },
 ];
 
 export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }) => {
@@ -44,9 +44,9 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
             {groups.map((group) => (
               <div key={group.title}>
                 <div className="space-y-1">
-                  {group.items.map(({ key, label, path, emoji }) => {
+                  {group.items.map(({ key, label, path, emoji, requiresSetup }) => {
                     const isActive = active === key;
-                    const isLocked = isSetupLocked && ALL_ITEMS.find((item) => item.key === key)?.requiresSetup;
+                    const isLocked = isSetupLocked && requiresSetup;
 
                     return (
                       <button
@@ -82,15 +82,18 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
       <IslandBottomNav
         ariaLabel="Studio navigation"
         maxWidthClassName="max-w-[560px]"
-        items={flatItems.map(({ key, label, path, emoji }) => ({
+        items={flatItems.map(({ key, label, path, emoji, requiresSetup }) => ({
           key,
           label,
           path,
           emoji,
           active: active === key,
-          disabled: Boolean(isSetupLocked && ALL_ITEMS.find((item) => item.key === key)?.requiresSetup),
+          disabled: Boolean(isSetupLocked && requiresSetup),
         }))}
-        onSelect={(item) => handleSelect(item.key, item.path)}
+        onSelect={(item) => {
+          if (item.disabled) return;
+          handleSelect(item.key, item.path);
+        }}
       />
     </>
   );

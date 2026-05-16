@@ -13,7 +13,6 @@ import { toast } from 'sonner';
 import {
   closeStore,
   getStoreGeneralSettings,
-  getStoreWizardPrefill,
   openStore,
   updateStorePolicies,
   updateStoreName,
@@ -22,19 +21,40 @@ import {
 } from '@/api/StoreApi';
 import { primeStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
 
-const MAX_CATEGORIES = 3;
+const MAX_SPECIALIZATIONS = 3;
 const RESPONSE_TIME_OPTIONS = ['12h', '24h', '48h'];
 
-const FALLBACK_CATEGORIES = [
-  { value: 'african', label: 'African Fashion' },
-  { value: 'western', label: 'Western Fashion' },
+const BRAND_SPECIALIZATION_OPTIONS = [
+  { value: 'womenswear', label: 'Womenswear' },
+  { value: 'menswear', label: 'Menswear' },
+  { value: 'unisex', label: 'Unisex' },
+  { value: 'kidswear', label: 'Kidswear' },
+  { value: 'bespoke-made-to-measure', label: 'Bespoke / Made-to-measure' },
+  { value: 'couture', label: 'Couture' },
+  { value: 'ready-to-wear', label: 'Ready-to-wear' },
+  { value: 'bridal', label: 'Bridal' },
+  { value: 'traditional-cultural-wear', label: 'Traditional / Cultural wear' },
   { value: 'streetwear', label: 'Streetwear' },
-  { value: 'vintage', label: 'Vintage' },
+  { value: 'corporate-formalwear', label: 'Corporate / Formalwear' },
   { value: 'luxury', label: 'Luxury' },
-  { value: 'sustainable', label: 'Sustainable' },
-  { value: 'plus-size', label: 'Plus Size' },
-  { value: 'modest', label: 'Modest Fashion' },
+  { value: 'modest-fashion', label: 'Modest fashion' },
+  { value: 'accessories', label: 'Accessories' },
+  { value: 'footwear', label: 'Footwear' },
+  { value: 'bags', label: 'Bags' },
+  { value: 'jewelry', label: 'Jewelry' },
 ];
+const BRAND_SPECIALIZATION_VALUE_SET = new Set(BRAND_SPECIALIZATION_OPTIONS.map((option) => option.value));
+
+const normalizeSpecializationSelection = (values: string[]): string[] => {
+  const result: string[] = [];
+  values.forEach((value) => {
+    const normalized = value.trim().replace(/^#/, '').toLowerCase();
+    if (!BRAND_SPECIALIZATION_VALUE_SET.has(normalized)) return;
+    if (result.includes(normalized)) return;
+    result.push(normalized);
+  });
+  return result.slice(0, MAX_SPECIALIZATIONS);
+};
 
 const StoreGeneralSettings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -53,20 +73,14 @@ const StoreGeneralSettings: React.FC = () => {
   const [brandColor, setBrandColor] = useState('#8B5CF6');
   const [isLive, setIsLive] = useState(false);
 
-  const [systemCategories, setSystemCategories] = useState<Array<{ id: string; slug: string; name: string }>>([]);
   const [initialSettings, setInitialSettings] = useState<StoreGeneralSettingsResponse | null>(null);
 
-  const categories = useMemo(() => {
-    if (systemCategories.length) {
-      return systemCategories.map((c) => ({ value: c.slug, label: c.name }));
-    }
-    return FALLBACK_CATEGORIES;
-  }, [systemCategories]);
+  const specializationOptions = useMemo(() => BRAND_SPECIALIZATION_OPTIONS, []);
 
   const toggleCategory = useCallback((value: string) => {
     setSelectedCategories((prev) => {
       if (prev.includes(value)) return prev.filter((item) => item !== value);
-      if (prev.length >= MAX_CATEGORIES) return prev;
+      if (prev.length >= MAX_SPECIALIZATIONS) return prev;
       return [...prev, value];
     });
   }, []);
@@ -85,7 +99,7 @@ const StoreGeneralSettings: React.FC = () => {
         setTagline(settings.tagline || '');
         setDescription(settings.description || '');
         setContactEmail(settings.contactEmail || '');
-        setSelectedCategories(settings.tags || []);
+        setSelectedCategories(normalizeSpecializationSelection(settings.tags || []));
         const resolvedResponseTime = RESPONSE_TIME_OPTIONS.includes(settings.responseTimeSla || '')
           ? (settings.responseTimeSla as string)
           : '24h';
@@ -97,14 +111,7 @@ const StoreGeneralSettings: React.FC = () => {
         toast.error('Failed to load store settings. Please refresh and try again.');
       }
 
-      try {
-        const prefill = await getStoreWizardPrefill();
-        if (!cancelled) {
-          setSystemCategories(prefill.system?.categories ?? []);
-        }
-      } catch (error) {
-        console.error('Failed to load store categories', error);
-      } finally {
+      finally {
         if (!cancelled) {
           setIsLoading(false);
         }
@@ -292,13 +299,16 @@ const StoreGeneralSettings: React.FC = () => {
               )}
             </div>
 
-            {/* Categories */}
+            {/* Brand focus */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Categories</label>
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Brand focus</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Choose up to 3 specializations that describe your store.
+              </p>
               <div className="flex flex-wrap gap-2">
-                {categories.map((cat) => {
+                {specializationOptions.map((cat) => {
                   const isSelected = selectedCategories.includes(cat.value);
-                  const isDisabled = !isSelected && selectedCategories.length >= MAX_CATEGORIES;
+                  const isDisabled = !isSelected && selectedCategories.length >= MAX_SPECIALIZATIONS;
                   return (
                     <button
                       key={cat.value}
@@ -319,7 +329,7 @@ const StoreGeneralSettings: React.FC = () => {
                   );
                 })}
               </div>
-              <p className="text-xs text-gray-500">{selectedCategories.length} of {MAX_CATEGORIES} selected</p>
+              <p className="text-xs text-gray-500">{selectedCategories.length} of {MAX_SPECIALIZATIONS} selected</p>
             </div>
           </div>
 
@@ -547,7 +557,7 @@ const StoreGeneralSettings: React.FC = () => {
             setTagline(initialSettings.tagline || '');
             setDescription(initialSettings.description || '');
             setContactEmail(initialSettings.contactEmail || '');
-            setSelectedCategories(initialSettings.tags || []);
+            setSelectedCategories(normalizeSpecializationSelection(initialSettings.tags || []));
             const resolvedResponseTime = RESPONSE_TIME_OPTIONS.includes(initialSettings.responseTimeSla || '')
               ? (initialSettings.responseTimeSla as string)
               : '24h';

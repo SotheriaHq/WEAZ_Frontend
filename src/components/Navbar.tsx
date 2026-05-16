@@ -141,7 +141,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
   const isStudioProfileMenu = profileMenuContext === 'studio';
   const showStudioMenuEntry = !isStudioProfileMenu && hasBrandAccess && storeSetupComplete === true;
 
-  const ProfileMenu = () => {
+  const renderProfileMenu = () => {
     if (!user) return null;
 
     return (
@@ -498,7 +498,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
             </FrostedButton>
           ) : null}
 
-          {user ? <ProfileMenu /> : null}
+          {user ? renderProfileMenu() : null}
         </div>
       </div>
     </nav>

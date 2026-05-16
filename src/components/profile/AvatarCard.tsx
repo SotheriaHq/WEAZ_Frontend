@@ -66,6 +66,7 @@ const AvatarCard: React.FC<AvatarCardProps> = ({
           rounded="xl"
           fallbackName={fallbackInitials ?? name ?? undefined}
           maxHeightClassName="max-h-full"
+          keepPreviousOnReload
         />
       ) : (
         <DefaultAvatar name={fallbackInitials ?? name ?? alt ?? 'User'} className="w-full h-full" />

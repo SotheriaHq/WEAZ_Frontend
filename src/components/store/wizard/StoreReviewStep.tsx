@@ -16,18 +16,24 @@ interface StoreReviewStepProps {
   isSaving?: boolean;
 }
 
-// Category labels
 const CATEGORY_LABELS: Record<string, string> = {
+  womenswear: 'Womenswear',
+  menswear: 'Menswear',
+  unisex: 'Unisex',
+  kidswear: 'Kidswear',
+  'bespoke-made-to-measure': 'Bespoke / Made-to-measure',
+  couture: 'Couture',
+  'ready-to-wear': 'Ready-to-wear',
+  bridal: 'Bridal',
+  'traditional-cultural-wear': 'Traditional / Cultural wear',
   streetwear: 'Streetwear',
-  casual: 'Casual Wear',
-  formal: 'Formal',
-  athletic: 'Athletic',
-  vintage: 'Vintage',
+  'corporate-formalwear': 'Corporate / Formalwear',
   luxury: 'Luxury',
-  sustainable: 'Sustainable',
+  'modest-fashion': 'Modest fashion',
   accessories: 'Accessories',
-  'african-fashion': 'African Fashion',
-  'western-fashion': 'Western Fashion',
+  footwear: 'Footwear',
+  bags: 'Bags',
+  jewelry: 'Jewelry',
 };
 
 const ORDER_PROCESSING_LABELS: Record<StoreWizardData['orderProcessingMode'], string> = {
@@ -207,7 +213,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
               {/* Basic Info */}
               <SectionCard
                 title="Basic Information"
-                subtitle="Store name, slug, category & description"
+                subtitle="Store name, slug, brand focus & description"
                 isComplete={basicComplete}
                 isExpanded={expandedSection === 'basic'}
                 onToggle={() => toggleSection('basic')}
@@ -217,7 +223,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                   <InfoItem label="Store Name" value={data.name || '-'} />
                   <InfoItem label="Store Slug" value={data.slug || '-'} />
                   <InfoItem
-                    label="Category"
+                    label="Brand focus"
                     value={
                       data.categories
                         .map((c) => CATEGORY_LABELS[c] || c)

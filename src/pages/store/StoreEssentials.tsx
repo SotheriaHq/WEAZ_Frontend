@@ -7,11 +7,31 @@ import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
 import Input from '@/components/ui/Input';
 import { saveStoreProgressLocally } from '@/utils/storeSetup';
 
-const MAX_CATEGORIES = 3;
+const MAX_SPECIALIZATIONS = 3;
 const MAX_DESCRIPTION = 500;
-const normalizeToken = (value: string): string => value.trim().toLowerCase();
+const BRAND_SPECIALIZATION_OPTIONS = [
+  { value: 'womenswear', label: 'Womenswear' },
+  { value: 'menswear', label: 'Menswear' },
+  { value: 'unisex', label: 'Unisex' },
+  { value: 'kidswear', label: 'Kidswear' },
+  { value: 'bespoke-made-to-measure', label: 'Bespoke / Made-to-measure' },
+  { value: 'couture', label: 'Couture' },
+  { value: 'ready-to-wear', label: 'Ready-to-wear' },
+  { value: 'bridal', label: 'Bridal' },
+  { value: 'traditional-cultural-wear', label: 'Traditional / Cultural wear' },
+  { value: 'streetwear', label: 'Streetwear' },
+  { value: 'corporate-formalwear', label: 'Corporate / Formalwear' },
+  { value: 'luxury', label: 'Luxury' },
+  { value: 'modest-fashion', label: 'Modest fashion' },
+  { value: 'accessories', label: 'Accessories' },
+  { value: 'footwear', label: 'Footwear' },
+  { value: 'bags', label: 'Bags' },
+  { value: 'jewelry', label: 'Jewelry' },
+];
 
-const normalizeCategorySelection = (
+const normalizeToken = (value: string): string => value.trim().replace(/^#/, '').toLowerCase();
+
+const normalizeSpecializationSelection = (
   values: string[],
   options: Array<{ value: string; label: string }>
 ): string[] => {
@@ -33,23 +53,10 @@ const normalizeCategorySelection = (
     if (!matched) continue;
     if (result.includes(matched)) continue;
     result.push(matched);
-    if (result.length >= MAX_CATEGORIES) break;
+    if (result.length >= MAX_SPECIALIZATIONS) break;
   }
 
   return result;
-};
-
-const getCategoryEmoji = (nameOrSlug: string): string | null => {
-  const value = nameOrSlug.toLowerCase();
-  if (value.includes('africa')) return '🌍';
-  if (value.includes('street')) return '👟';
-  if (value.includes('western')) return '🤠';
-  if (value.includes('vintage')) return '🕰️';
-  if (value.includes('lux')) return '💎';
-  if (value.includes('sustain')) return '🌱';
-  if (value.includes('plus')) return '👗';
-  if (value.includes('modest')) return '🧕';
-  return null;
 };
 
 const StoreEssentials: React.FC = () => {
@@ -57,7 +64,6 @@ const StoreEssentials: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [systemCategories, setSystemCategories] = useState<Array<{ id: string; slug: string; name: string }>>([]);
 
   const [selected, setSelected] = useState<string[]>([]);
   const [tagline, setTagline] = useState('');
@@ -84,16 +90,14 @@ const StoreEssentials: React.FC = () => {
           return;
         }
 
-        setSystemCategories(prefill.system?.categories ?? []);
-
         // Best-effort prefill for quick-start
         if (prefill.brand?.tagline) setTagline(prefill.brand.tagline);
         if (prefill.brand?.description) setDescription(prefill.brand.description);
         if (prefill.brand?.tags?.length) {
-          setSelected(prefill.brand.tags.slice(0, MAX_CATEGORIES));
+          setSelected(prefill.brand.tags.slice(0, MAX_SPECIALIZATIONS));
         }
       } catch (error) {
-        // If this fails, still render with empty lists; wizard will have fallback categories.
+        // If this fails, still render the static brand-positioning options.
         console.error('Failed to load store essentials prefill', error);
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -125,38 +129,23 @@ const StoreEssentials: React.FC = () => {
     void fire();
   }, []);
 
-  const categories = useMemo(() => {
-    if (systemCategories.length) {
-      return systemCategories.map((c) => ({ value: c.slug, label: c.name }));
-    }
-
-    return [
-      { value: 'african', label: 'African Fashion' },
-      { value: 'streetwear', label: 'Streetwear' },
-      { value: 'western', label: 'Western Fashion' },
-      { value: 'vintage', label: 'Vintage' },
-      { value: 'luxury', label: 'Luxury' },
-      { value: 'sustainable', label: 'Sustainable' },
-      { value: 'plus-size', label: 'Plus Size' },
-      { value: 'modest', label: 'Modest Fashion' },
-    ];
-  }, [systemCategories]);
+  const specializationOptions = useMemo(() => BRAND_SPECIALIZATION_OPTIONS, []);
 
   useEffect(() => {
-    if (!categories.length) return;
+    if (!specializationOptions.length) return;
 
     setSelected((prev) => {
-      const normalized = normalizeCategorySelection(prev, categories);
+      const normalized = normalizeSpecializationSelection(prev, specializationOptions);
       const unchanged = normalized.length === prev.length && normalized.every((value, index) => value === prev[index]);
       return unchanged ? prev : normalized;
     });
-  }, [categories]);
+  }, [specializationOptions]);
 
   const toggleCategory = useCallback(
     (value: string) => {
       setSelected((prev) => {
         if (prev.includes(value)) return prev.filter((v) => v !== value);
-        if (prev.length >= MAX_CATEGORIES) return prev;
+        if (prev.length >= MAX_SPECIALIZATIONS) return prev;
         return [...prev, value];
       });
     },
@@ -168,14 +157,14 @@ const StoreEssentials: React.FC = () => {
   const canSkip = descriptionValid;
 
   const persistAndContinue = useCallback(
-    async (skipCategories: boolean) => {
+    async (skipSpecializations: boolean) => {
       const payload = {
-        tags: skipCategories ? [] : selected,
+        tags: skipSpecializations ? [] : selected,
         tagline: tagline.trim(),
         description: description.trim(),
       };
       const localProgress = {
-        categories: skipCategories ? [] : selected,
+        categories: skipSpecializations ? [] : selected,
         tagline: tagline.trim(),
         description: description.trim(),
         step: 1,
@@ -201,9 +190,9 @@ const StoreEssentials: React.FC = () => {
   );
 
   const selectedLabels = useMemo(() => {
-    const map = new Map(categories.map((c) => [c.value, c.label]));
+    const map = new Map(specializationOptions.map((c) => [c.value, c.label]));
     return selected.map((slug) => map.get(slug) ?? slug);
-  }, [categories, selected]);
+  }, [specializationOptions, selected]);
 
   return (
     <div className="min-h-screen bg-transparent text-[var(--text-primary)]">
@@ -236,12 +225,15 @@ const StoreEssentials: React.FC = () => {
 
             {/* Form */}
             <div className="space-y-6">
-              {/* Categories */}
+              {/* Brand specialization */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   What best describes your brand?{' '}
-                  <span className="text-gray-500 font-normal">(Select up to {MAX_CATEGORIES})</span>
+                  <span className="text-gray-500 font-normal">(Select up to {MAX_SPECIALIZATIONS})</span>
                 </label>
+                <p className="mb-3 text-xs text-gray-500">
+                  Choose up to 3. This helps customers understand your store focus.
+                </p>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
                   {isLoading ? (
@@ -252,10 +244,9 @@ const StoreEssentials: React.FC = () => {
                       />
                     ))
                   ) : (
-                    categories.map((cat) => {
+                    specializationOptions.map((cat) => {
                       const isSelected = selected.includes(cat.value);
-                      const isDisabled = !isSelected && selected.length >= MAX_CATEGORIES;
-                      const emoji = getCategoryEmoji(cat.label) ?? getCategoryEmoji(cat.value);
+                      const isDisabled = !isSelected && selected.length >= MAX_SPECIALIZATIONS;
 
                       return (
                         <button
@@ -273,7 +264,6 @@ const StoreEssentials: React.FC = () => {
                           }
                         >
                           <div className="flex flex-col items-center gap-1">
-                            {emoji ? <span className="text-xl">{emoji}</span> : null}
                             <span className="text-center leading-tight">{cat.label}</span>
                           </div>
                         </button>
@@ -282,7 +272,7 @@ const StoreEssentials: React.FC = () => {
                   )}
                 </div>
 
-                <p className="text-sm text-gray-500">{selected.length} of {MAX_CATEGORIES} selected</p>
+                <p className="text-sm text-gray-500">{selected.length} of {MAX_SPECIALIZATIONS} selected</p>
               </div>
 
               {/* Tagline */}
@@ -364,7 +354,7 @@ const StoreEssentials: React.FC = () => {
                     <Circle className="w-4 h-4 text-gray-300" />
                   )}
                   <span className={"text-sm " + (canContinue ? 'text-gray-700' : 'text-gray-500')}>
-                    Categories (at least 1 required)
+                    Brand focus (at least 1 required)
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -384,7 +374,7 @@ const StoreEssentials: React.FC = () => {
               </div>
 
               <p className={"text-sm font-semibold mt-3 " + (canContinue ? 'text-green-600' : 'text-gray-400')}>
-                {canContinue ? 'Ready to continue!' : 'Add a description and select at least 1 category'}
+                {canContinue ? 'Ready to continue!' : 'Add a description and select at least 1 brand focus'}
               </p>
             </div>
 
