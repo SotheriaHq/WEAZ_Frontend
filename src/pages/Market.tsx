@@ -294,14 +294,17 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     }, { replace: true });
   }, [openCommentId, openDesignId, openMediaId, routeOpenKey, setSearchParams]);
 
-  const loadFeed = useCallback(async () => {
+  const loadFeed = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
     // First load shows skeleton; subsequent loads use a soft overlay
     if (!hasLoadedOnce) {
       setLoading(true);
-    } else {
+    } else if (!silent) {
       setRefreshing(true);
     }
-    setError(null);
+    if (!silent) {
+      setError(null);
+    }
     try {
       const feed = await marketApi.getFeed({
         // Backend may ignore category until supported
@@ -351,10 +354,14 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
       setHasLoadedOnce(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to load market feed';
-      setError(message);
+      if (!silent) {
+        setError(message);
+      }
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      if (!silent) {
+        setRefreshing(false);
+      }
     }
   }, [selectedCategory, hasLoadedOnce, dispatch, mode]);
 
@@ -483,8 +490,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && hasLoadedOnce) {
-        // Refresh data when page becomes visible again
-        void loadFeed();
+        void loadFeed({ silent: true });
       }
     };
     
@@ -621,8 +627,8 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
         onSeeAll={() => setGalleryOpen(true)}
       />
 
-      <div className="sticky top-16 z-20 -mx-1 mb-2 overflow-x-auto no-scrollbar px-1">
-        <div className="surface-menu inline-flex min-w-full items-center gap-5 border-b px-2 pt-1 text-sm backdrop-blur-md">
+      <div className="sticky top-16 z-20 mb-1 overflow-x-auto no-scrollbar px-2 py-1">
+        <div className="mx-auto flex w-max max-w-full items-center justify-center gap-2 border-b border-[color:var(--border-default)]/70 px-1 pb-1 text-sm">
         {[
           { slug: 'ALL', label: 'All' },
           { slug: 'AFRICAN_FASHION', label: 'African Fashion' },
@@ -636,19 +642,13 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
               key={cat.slug}
               onClick={() => startTransition(() => setSelectedCategory(cat.slug))}
               aria-pressed={active}
-              className={`relative shrink-0 pb-3 pt-2 text-sm font-semibold transition-colors ${
+              className={`relative shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                 active
-                  ? 'text-theme'
-                  : 'text-theme-secondary hover:text-theme'
+                  ? 'bg-[color:var(--brand-primary)]/10 text-[color:var(--brand-primary)]'
+                  : 'text-theme-secondary hover:bg-[color:var(--surface-muted)] hover:text-theme'
               }${isPending ? ' opacity-60' : ''}`}
             >
               {cat.label}
-              <span
-                aria-hidden="true"
-                className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-7 rounded-full transition-all ${
-                  active ? 'bg-[color:var(--text-primary)]' : 'bg-transparent'
-                }`}
-              />
             </button>
           );
         })}

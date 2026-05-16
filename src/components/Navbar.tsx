@@ -31,6 +31,7 @@ import { useEffect, useState } from 'react';
 import { useSyncedThemePreference } from '@/hooks/useSyncedThemePreference';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
 import { generateUserUid } from '@/utils/userUid';
@@ -127,17 +128,15 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
   }, []);
 
   const handleLocationShare = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (position) => void position,
-      (error) => void error,
-    );
+    toast.info('Location sharing coming soon.');
+  };
+  const handleHelpComingSoon = () => {
+    toast.info('Help center coming soon.');
   };
   const profileHomeRoute = user ? getProfileOrHomeUrl(user) : '/profile';
   const hasBrandAccess = hasActiveBrandMembership(user);
   const ordersRoute = hasBrandAccess ? '/studio?tab=orders' : '/profile?tab=orders';
   const savedRoute = hasBrandAccess ? '/profile?tab=Content' : profileHomeRoute;
-  const helpRoute = '/help/verified-badge';
   const isStudioProfileMenu = profileMenuContext === 'studio';
   const showStudioMenuEntry = !isStudioProfileMenu && hasBrandAccess && storeSetupComplete === true;
 
@@ -303,7 +302,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
           <DropdownItem
             leftIcon="🆘"
             onClick={() => {
-              navigate(helpRoute);
+              handleHelpComingSoon();
               setShowProfileMenu(false);
             }}
           >

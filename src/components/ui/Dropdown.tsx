@@ -284,7 +284,7 @@ interface DropdownItemProps extends React.ButtonHTMLAttributes<HTMLButtonElement
 }
 
 const toneClasses: Record<NonNullable<DropdownItemProps['tone']>, string> = {
-  default: 'text-[color:var(--text-primary)] surface-interactive-hover',
+  default: 'text-[color:var(--text-primary)] hover:bg-[color:var(--surface-muted)] focus-visible:bg-[color:var(--surface-muted)]',
   danger: 'text-rose-600 dark:text-rose-300 hover:bg-rose-500/10 dark:hover:bg-rose-500/15',
   success: 'text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15',
   warning: 'text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 dark:hover:bg-amber-500/15',
@@ -305,7 +305,7 @@ export const DropdownItem: React.FC<DropdownItemProps> = ({
     className={clsx(
       DROPDOWN_ITEM_BASE_CLASS,
       selected
-        ? 'bg-[color:var(--brand-primary)]/10 text-[color:var(--text-primary)] dark:bg-[color:var(--brand-primary)]/15'
+        ? 'bg-[color:var(--brand-primary)]/10 text-[color:var(--brand-primary)] dark:bg-[color:var(--brand-primary)]/15'
         : toneClasses[tone],
       className,
     )}

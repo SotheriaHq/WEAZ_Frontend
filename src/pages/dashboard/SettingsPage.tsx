@@ -83,7 +83,7 @@ const SettingsPage: React.FC = () => {
         <button 
           onClick={handleSubmit(onSubmit)}
           disabled={isSubmitting || !isDirty}
-          className="bg-black dark:bg-white text-white dark:text-black px-6 py-2.5 rounded-xl font-semibold text-sm hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2 shadow-lg shadow-purple-500/20"
+          className="flex items-center gap-2 rounded-xl bg-[color:var(--brand-primary)] px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition hover:bg-[color:var(--brand-primary-strong)] disabled:opacity-50"
         >
           {isSubmitting ? (
             <VLoader size={16} phase="loading" showLabel={false} />

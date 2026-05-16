@@ -96,11 +96,16 @@ type CategoryOption = {
 
 const DESIGN_SIZING_MODE_OPTIONS = [
   { value: 'NONE', label: 'No size specification' },
-  { value: 'RTW', label: 'Ready-to-Wear only' },
-  { value: 'RTW_PLUS_FITTINGS', label: 'Ready-to-Wear + fittings' },
-  { value: 'CUSTOM', label: 'Custom only' },
+  { value: 'CUSTOM', label: 'Custom order only' },
 ] as const;
 type DesignSizingMode = Extract<SizingMode, (typeof DESIGN_SIZING_MODE_OPTIONS)[number]['value']>;
+
+const normalizeDesignSizingModeForCreation = (value?: string | null): DesignSizingMode => {
+  if (value === 'CUSTOM' || value === 'RTW_PLUS_FITTINGS' || value === 'RTW_PLUS_CUSTOM') {
+    return 'CUSTOM';
+  }
+  return 'NONE';
+};
 
 const normalizeMeasurementLabel = (value: string) =>
   value.trim().toLowerCase().replace(/[\s_]+/g, ' ');
@@ -191,7 +196,7 @@ const CreateDesignInner: React.FC = () => {
     "EVERYBODY",
   );
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
-  const [sizingMode, setSizingMode] = useState<DesignSizingMode>('RTW_PLUS_FITTINGS');
+  const [sizingMode, setSizingMode] = useState<DesignSizingMode>('NONE');
   const [fitPreference, setFitPreference] = useState<DesignFitPreference>('REGULAR');
   const [targetAgeGroup, setTargetAgeGroup] = useState<DesignTargetAgeGroup>('ADULT');
   const [metadataEditedAt, setMetadataEditedAt] = useState<Date | null>(null);
@@ -271,7 +276,7 @@ const CreateDesignInner: React.FC = () => {
     perFileProgress,
     cancelUploads,
   } = useDesignUpload();
-  const { user, fetchCollections } = useBrandProfile();
+  const { user } = useBrandProfile();
   const publishTaskScope = useMemo(
     () => ({ ownerId: user?.id ?? undefined }),
     [user?.id],
@@ -382,11 +387,8 @@ const CreateDesignInner: React.FC = () => {
         setCategoryTypeId((d as any).subCategoryId || d.categoryTypeId || "");
         setType(d.type || "EVERYBODY");
         setVisibility(d.visibility || "PUBLIC");
-        setSizingMode(
-          d.sizingMode === 'CUSTOM' || d.sizingMode === 'RTW' || d.sizingMode === 'NONE'
-            ? d.sizingMode
-            : 'RTW_PLUS_FITTINGS',
-        );
+        const nextSizingMode = normalizeDesignSizingModeForCreation(d.sizingMode);
+        setSizingMode(nextSizingMode);
         setFitPreference(
           d.fitPreference === 'SLIM' ||
             d.fitPreference === 'LOOSE' ||
@@ -398,7 +400,7 @@ const CreateDesignInner: React.FC = () => {
         setCustomMeasurementKeys(
           Array.isArray(d.customMeasurementKeys) ? dedupeMeasurementKeysByLabel(d.customMeasurementKeys) : [],
         );
-        setIsMadeToOrder(Boolean((d as any).customOrderEnabled));
+        setIsMadeToOrder(Boolean((d as any).customOrderEnabled) || nextSizingMode === 'CUSTOM');
         setMetadataEditedAt(
           d.metadataEditedAt ? new Date(d.metadataEditedAt) : null,
         );
@@ -530,7 +532,7 @@ const CreateDesignInner: React.FC = () => {
     categoryTypeId.trim().length > 0 ||
     files.length > 0 ||
     isMadeToOrder ||
-    sizingMode !== 'RTW_PLUS_FITTINGS' ||
+    sizingMode !== 'NONE' ||
     fitPreference !== 'REGULAR' ||
     targetAgeGroup !== 'ADULT' ||
     normalizedCustomMeasurementKeys.length > 0 ||
@@ -786,6 +788,12 @@ const CreateDesignInner: React.FC = () => {
     setTargetAgeGroup(value as DesignTargetAgeGroup);
   };
 
+  const handleDesignSizingModeChange = (value: string) => {
+    const nextMode = normalizeDesignSizingModeForCreation(value);
+    setSizingMode(nextMode);
+    setIsMadeToOrder(nextMode === 'CUSTOM');
+  };
+
   const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && tagSearch.trim()) {
       e.preventDefault();
@@ -848,9 +856,6 @@ const CreateDesignInner: React.FC = () => {
           targetAgeGroup,
         } as any);
         setLastSaved(new Date());
-        if (user?.id) {
-          await fetchCollections(user.id);
-        }
         toast.success("Draft saved");
         navigate("/profile?tab=Content&visibility=Drafts", { replace: true });
         return;
@@ -1336,10 +1341,6 @@ const CreateDesignInner: React.FC = () => {
               coverPreviewUrl: undefined,
               message: 'Live',
             }, publishTaskScope);
-
-            if (user?.id) {
-              await fetchCollections(user.id);
-            }
 
             toast.success('Design is live');
             window.setTimeout(() => removePublishTask(task.id, publishTaskScope), 30_000);
@@ -1989,29 +1990,15 @@ const CreateDesignInner: React.FC = () => {
 
               {/* Checkboxes */}
               <div className="grid grid-cols-1 gap-2 mt-3">
-                <label className="surface-card flex items-start gap-3 p-3 rounded-xl border cursor-pointer hover:border-purple-500/30 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={false}
-                    onChange={() => {}}
-                    disabled={true}
-                    className="w-5 h-5 mt-0.5 rounded border-theme text-purple-600 focus:ring-purple-500 bg-theme"
-                  />
-                  <div>
-                    <span className="text-theme font-medium">
-                      Store availability
-                    </span>
-                    <p className="text-xs text-theme-secondary">
-                      Store collections are created in Store Studio.
-                    </p>
-                  </div>
-                </label>
-
                 <label className="surface-card flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors hover:border-purple-500/30">
                   <input
                     type="checkbox"
                     checked={isMadeToOrder}
-                    onChange={(e) => setIsMadeToOrder(e.target.checked)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsMadeToOrder(checked);
+                      setSizingMode(checked ? 'CUSTOM' : 'NONE');
+                    }}
                     disabled={disabled}
                     className="w-5 h-5 mt-0.5 rounded border-theme text-purple-600 focus:ring-purple-500 bg-theme"
                   />
@@ -2060,7 +2047,7 @@ const CreateDesignInner: React.FC = () => {
                 <UniversalSelect
                   label="Sizing Mode"
                   value={sizingMode}
-                  onChange={(value) => setSizingMode(value as DesignSizingMode)}
+                  onChange={handleDesignSizingModeChange}
                   options={DESIGN_SIZING_MODE_OPTIONS.map((option) => ({
                     value: option.value,
                     label: option.label,

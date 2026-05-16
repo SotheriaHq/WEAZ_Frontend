@@ -19,6 +19,12 @@ export interface PublishTask {
   updatedAt: number;
 }
 
+export type CompactPublishStatusInput = {
+  status: PublishTaskStatus | 'publishing' | 'publish-failed';
+  kind?: PublishTaskKind;
+  progress?: number | null;
+};
+
 type PublishTaskScope = {
   ownerId?: string | null;
 };
@@ -35,6 +41,24 @@ const SAVED_GRACE_MS = 2 * 60 * 1000;
 const clampProgress = (value: number) => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, Math.round(value)));
+};
+
+export const getCompactPublishTaskStatusLabel = ({
+  status,
+  kind = 'publish',
+  progress,
+}: CompactPublishStatusInput) => {
+  if (status === 'published') return 'Live';
+  if (status === 'saved') return 'Draft saved';
+  if (status === 'failed' || status === 'publish-failed') return 'Failed - Retry';
+  if (status === 'finalizing') return 'Finalizing...';
+
+  const safeProgress =
+    typeof progress === 'number' && Number.isFinite(progress)
+      ? Math.max(0, Math.min(99, Math.round(progress)))
+      : null;
+  const verb = kind === 'draft' ? 'Saving' : status === 'uploading' ? 'Uploading' : 'Publishing';
+  return safeProgress === null ? `${verb}...` : `${verb}... ${safeProgress}%`;
 };
 
 const normalizeOwnerId = (ownerId?: string | null) => {

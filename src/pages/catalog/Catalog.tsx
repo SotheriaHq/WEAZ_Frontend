@@ -39,6 +39,7 @@ import {
   removePublishTask,
   getPublishTaskDesignId,
   getPublishTaskLegacyCollectionId,
+  getCompactPublishTaskStatusLabel,
 } from '@/utils/publishTracker';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
 import { canManageCatalog, getActiveBrandId } from '@/lib/brandAccess';
@@ -205,21 +206,16 @@ const ProfilePage: React.FC = () => {
               : task?.visibility === 'PRIVATE'
                 ? 'PRIVATE'
                 : 'PUBLIC',
-          message:
-            task?.message ||
-            (navState.publishingTitle
-              ? `${kind === 'draft' ? 'Saving draft' : 'Publishing'} "${navState.publishingTitle}"`
-              : kind === 'draft'
-                ? 'Saving your draft'
-                : 'Publishing your design'),
+          message: task?.message || getCompactPublishTaskStatusLabel({
+            status: 'uploading',
+            kind,
+            progress: task?.progress,
+          }),
         },
       }));
       if (kind === 'draft') {
         setDraftsInitialized(true);
         setDraftsLoading(false);
-      }
-      if (isOwner && user?.id) {
-        void fetchCollections(user.id);
       }
       navigate(`${location.pathname}${location.search}`, { replace: true });
       return;
@@ -237,12 +233,13 @@ const ProfilePage: React.FC = () => {
           progress: typeof navState.publishingProgress === 'number' ? navState.publishingProgress : undefined,
           visibility: navState.publishingVisibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC',
           kind: 'publish',
-          message: navState.publishingTitle ? `Publishing "${navState.publishingTitle}"` : 'Publishing your design',
+          message: getCompactPublishTaskStatusLabel({
+            status: 'uploading',
+            kind: 'publish',
+            progress: typeof navState.publishingProgress === 'number' ? navState.publishingProgress : undefined,
+          }),
         },
       }));
-      if (isOwner && user?.id) {
-        void fetchCollections(user.id);
-      }
       // Clear state so refresh/back does not re-run
       navigate(`${location.pathname}${location.search}`, { replace: true });
       return;
@@ -625,9 +622,11 @@ const ProfilePage: React.FC = () => {
         const nextMessage =
           task.error ||
           task.message ||
-          (task.status === 'failed'
-            ? isDraftTask ? 'Draft save failed' : 'Publish failed'
-            : isDraftTask ? 'Saving your draft...' : 'Publishing your design...');
+          getCompactPublishTaskStatusLabel({
+            status: task.status === 'failed' ? 'failed' : task.status === 'finalizing' ? 'finalizing' : 'uploading',
+            kind: isDraftTask ? 'draft' : 'publish',
+            progress: task.progress,
+          });
         if (
           !current ||
           current.status !== nextStatus ||
@@ -832,9 +831,11 @@ const ProfilePage: React.FC = () => {
       return {
         ...c,
         clientStatus: pub.status === 'publishing' ? 'publishing' : 'publish-failed',
-        clientStatusMessage: pub.message ?? (pub.status === 'publishing'
-          ? pub.kind === 'draft' ? 'Saving draft...' : 'Publishing...'
-          : pub.kind === 'draft' ? 'Draft save failed' : 'Publish failed'),
+        clientStatusMessage: getCompactPublishTaskStatusLabel({
+          status: pub.status === 'publishing' ? 'uploading' : 'failed',
+          kind: pub.kind,
+          progress: pub.progress,
+        }),
         clientStatusMeta: {
           startedAt: pub.startedAt,
           attempts: pub.attempts,
@@ -872,11 +873,16 @@ const ProfilePage: React.FC = () => {
       .map(([key, state]) => {
         const nowIso = new Date(state.startedAt || Date.now()).toISOString();
         const isFailed = state.status === 'failed';
+        const compactMessage = getCompactPublishTaskStatusLabel({
+          status: isFailed ? 'failed' : 'uploading',
+          kind: state.kind,
+          progress: state.progress,
+        });
         return {
           id: key,
           status: 'DRAFT',
           name: state.title || (isFailed ? (isDraftView ? 'Draft save failed' : 'Publish failed') : (isDraftView ? 'Saving draft' : 'Publishing design')),
-          description: isFailed ? (isDraftView ? 'Tap retry to save again' : 'Tap retry to republish') : (isDraftView ? 'Saving in background' : 'Uploading in background'),
+          description: compactMessage,
           ownerId: user?.id || '',
           title: state.title || (isFailed ? (isDraftView ? 'Draft save failed' : 'Publish failed') : (isDraftView ? 'Saving draft' : 'Publishing design')),
           isPublic: targetVisibility !== 'PRIVATE',
@@ -886,9 +892,7 @@ const ProfilePage: React.FC = () => {
           createdAt: nowIso,
           updatedAt: nowIso,
           clientStatus: isFailed ? 'publish-failed' : 'publishing',
-          clientStatusMessage: isFailed
-            ? (state.message || 'Publish failed — tap Retry to try again')
-            : (state.message || (isDraftView ? 'Saving your draft...' : 'Publishing your design...')),
+          clientStatusMessage: compactMessage,
           clientStatusMeta: {
             startedAt: state.startedAt,
             attempts: state.attempts,
@@ -908,6 +912,10 @@ const ProfilePage: React.FC = () => {
     () => Object.values(publishingStates).some((state) => state.kind === 'draft' && (state.status === 'publishing' || state.status === 'failed')),
     [publishingStates],
   );
+  const hasPendingLiveTask = useMemo(
+    () => Object.values(publishingStates).some((state) => state.kind !== 'draft' && (state.status === 'publishing' || state.status === 'failed')),
+    [publishingStates],
+  );
 
   const ownerContentError =
     visibilityFilter === 'Drafts'
@@ -920,7 +928,7 @@ const ProfilePage: React.FC = () => {
       ? draftsLoading || (!draftsInitialized && !hasPendingDraftTask)
       : visibilityFilter === 'Deleted'
         ? deletedDesignsLoading
-        : collectionsLoading;
+        : collectionsLoading && !hasPendingLiveTask;
   const isDraftVisibility = visibilityFilter === 'Drafts';
   const isDeletedVisibility = visibilityFilter === 'Deleted';
 
@@ -941,7 +949,7 @@ const ProfilePage: React.FC = () => {
           <button
             type="button"
             onClick={() => handleOpenEditModal(true)}
-            className="inline-flex items-center rounded-lg bg-black text-white px-4 py-2 text-sm font-semibold hover:bg-black/90"
+            className="inline-flex items-center rounded-lg bg-[color:var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[color:var(--brand-primary-strong)]"
           >
             Complete brand profile
           </button>
@@ -952,7 +960,7 @@ const ProfilePage: React.FC = () => {
               type="button"
               onClick={handleOpenStoreSetup}
               disabled={isStoreSetupNavigating}
-              className="inline-flex items-center rounded-lg bg-black text-white px-4 py-2 text-sm font-semibold hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center rounded-lg bg-[color:var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[color:var(--brand-primary-strong)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isStoreSetupNavigating ? 'Opening setup...' : 'Continue store setup'}
             </button>
@@ -961,7 +969,7 @@ const ProfilePage: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate(buildDesignRoute({ mode: 'create' }))}
-              className="inline-flex items-center rounded-lg bg-black text-white px-4 py-2 text-sm font-semibold hover:bg-black/90"
+              className="inline-flex items-center rounded-lg bg-[color:var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[color:var(--brand-primary-strong)]"
             >
               Create first design
             </button>
@@ -1485,7 +1493,7 @@ const ProfilePage: React.FC = () => {
                 type="button"
                 onClick={handleOpenStoreSetup}
                 disabled={isStoreSetupNavigating}
-                className="rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-white dark:text-black dark:hover:bg-white/90"
+                className="rounded-full bg-[color:var(--brand-primary)] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[color:var(--brand-primary-strong)] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isStoreSetupNavigating ? 'Opening...' : 'Set up'}
               </button>

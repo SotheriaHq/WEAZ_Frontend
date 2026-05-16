@@ -15,6 +15,7 @@ import type { RootState } from '@/store';
 import VLoader from '@/components/loaders/VLoader';
 import { getCatalogEntityCardCopy, resolveCatalogEntityCardBranch } from './catalogEntityCardModel';
 import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
+import { getCompactPublishTaskStatusLabel } from '@/utils/publishTracker';
 
 export interface CollectionCardProps {
   collection: CollectionDto;
@@ -91,10 +92,14 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
   const clientStatus = collection.clientStatus;
   const isPublishing = clientStatus === 'publishing';
   const publishFailed = clientStatus === 'publish-failed';
-  const statusMessage = collection.clientStatusMessage || (isPublishing ? 'Publishing...' : publishFailed ? 'Publish failed' : undefined);
   const publishProgress = typeof collection.clientStatusMeta?.progress === 'number'
     ? Math.max(0, Math.min(100, Math.round(collection.clientStatusMeta.progress)))
     : null;
+  const compactStatusLabel = getCompactPublishTaskStatusLabel({
+    status: isPublishing ? 'uploading' : publishFailed ? 'publish-failed' : 'published',
+    kind: collection.clientStatusMeta?.kind,
+    progress: publishProgress,
+  });
   const clientPreviewUrl = collection.clientStatusMeta?.previewUrl;
   const hasPersistedCollectionId = !collection.id.startsWith('publish_');
 
@@ -319,20 +324,12 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
             {isPublishing ? (
               <>
                 <VLoader size={24} progress={publishProgress} phase="loading" showLabel={false} />
-                <div className="text-sm font-medium">{statusMessage}</div>
-                <div className="text-xs text-white/70">
-                  {publishProgress !== null ? `${publishProgress}% uploaded` : 'You can keep browsing; we will finish this in the background.'}
-                </div>
+                <div className="text-sm font-semibold">{compactStatusLabel}</div>
               </>
             ) : (
               <>
                 <AlertTriangle className="w-6 h-6 text-amber-300" />
-                <div className="text-sm font-semibold">{statusMessage || 'Publish delayed'}</div>
-                <div className="text-xs text-white/70">
-                  {hasPersistedCollectionId
-                    ? 'Open editor to fix and republish, or retry status check.'
-                    : 'Retry status after network stabilizes.'}
-                </div>
+                <div className="text-sm font-semibold">{compactStatusLabel}</div>
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   {hasPersistedCollectionId && onEdit ? (
                     <button

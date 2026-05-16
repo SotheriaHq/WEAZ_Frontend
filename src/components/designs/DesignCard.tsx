@@ -13,6 +13,7 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { useNavigate } from 'react-router-dom';
+import { isBrandOwner } from '@/lib/brandAccess';
 
 interface DesignCardProps {
   item: MarketItem;
@@ -180,7 +181,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({
 
   const isCustomAvailable = item.customAvailable === true;
   const brandId = typeof item.brandId === 'string' ? item.brandId.trim() : '';
-  const canMessageBrand = Boolean(brandId);
+  const ownsDesignBrand = Boolean(brandId && (user?.id === brandId || isBrandOwner(user, brandId)));
+  const canMessageBrand = Boolean(brandId) && !ownsDesignBrand;
 
   const brandAvatar = resolveProfileImageSource({
     brandLogo: item.brandLogo,
@@ -440,10 +442,16 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                 value={commentText}
                 onChange={setCommentText}
                 onSubmit={async () => {
-                  if (!isAuth) { toast.info('Please sign in to message.'); return; }
+                  if (!isAuth) {
+                    toast.info('Please sign in to message this brand.');
+                    const next = `${window.location.pathname}${window.location.search}`;
+                    navigate(`/login?next=${encodeURIComponent(next)}`);
+                    return;
+                  }
                   const content = commentText.trim();
                   if (!content || content.length > 4000) { toast.error('Message must be 1-4000 characters.'); return; }
                   if (!brandId) { toast.error('Brand is unavailable for this design.'); return; }
+                  if (ownsDesignBrand) { toast.info('This is your design.'); return; }
                   setCommentBusy(true);
                   try {
                     const result = await messagingApi.sendBrandMessage(brandId, {
@@ -462,7 +470,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                     toast.error(err?.response?.data?.message ?? 'Failed to send message');
                   } finally { setCommentBusy(false); }
                 }}
-                placeholder={canMessageBrand ? 'Message brand...' : 'Brand unavailable'}
+                placeholder={ownsDesignBrand ? 'Your design' : canMessageBrand ? 'Message brand...' : 'Brand unavailable'}
                 maxLength={4000}
                 disabled={commentBusy || !canMessageBrand}
                 busy={commentBusy}

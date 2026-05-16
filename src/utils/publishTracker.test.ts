@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getPublishTaskDesignId,
   getPublishTaskLegacyCollectionId,
+  getCompactPublishTaskStatusLabel,
   normalizePublishTaskIdentifiers,
   type PublishTask,
 } from './publishTracker';
@@ -50,5 +51,12 @@ describe('publishTracker identifiers', () => {
     expect(task.kind).toBe('draft');
     expect(task.status).toBe('saved');
     expect(getPublishTaskDesignId(task)).toBe('draft-collection-1');
+  });
+
+  it('formats compact status labels for pending cards', () => {
+    expect(getCompactPublishTaskStatusLabel({ status: 'uploading', kind: 'publish', progress: 45 })).toBe('Uploading... 45%');
+    expect(getCompactPublishTaskStatusLabel({ status: 'finalizing', kind: 'publish' })).toBe('Finalizing...');
+    expect(getCompactPublishTaskStatusLabel({ status: 'publish-failed', kind: 'publish' })).toBe('Failed - Retry');
+    expect(getCompactPublishTaskStatusLabel({ status: 'published', kind: 'publish' })).toBe('Live');
   });
 });

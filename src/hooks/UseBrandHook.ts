@@ -234,6 +234,11 @@ export const useBrandProfile = () => {
   const [collectionsLoading, setCollectionsLoading] = useState(true);
   const [collectionsError, setCollectionsError] = useState<string | null>(null);
   const collectionsFetchPromiseRef = useRef<Promise<void> | null>(null);
+  const collectionsRef = useRef<CollectionDto[]>([]);
+
+  useEffect(() => {
+    collectionsRef.current = collections;
+  }, [collections]);
 
   // Reviews state
   const [reviews, setReviews] = useState<ProductReviewResponse[]>([]);
@@ -273,7 +278,10 @@ export const useBrandProfile = () => {
       return collectionsFetchPromiseRef.current;
     }
 
-    setCollectionsLoading(true);
+    const shouldShowBlockingLoading = collectionsRef.current.length === 0;
+    if (shouldShowBlockingLoading) {
+      setCollectionsLoading(true);
+    }
     setCollectionsError(null);
 
     const requestPromise = (async () => {
