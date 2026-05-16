@@ -241,8 +241,14 @@ const AccountSecuritySettings: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const token = searchParams.get('emailChangeToken');
+    const rawToken = searchParams.get('emailChangeToken');
+    const token = rawToken?.trim() ?? '';
     if (!token) {
+      if (rawToken !== null) {
+        const next = new URLSearchParams(searchParams);
+        next.delete('emailChangeToken');
+        setSearchParams(next, { replace: true });
+      }
       return;
     }
 
