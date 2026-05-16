@@ -1742,28 +1742,22 @@ const CreateDesignInner: React.FC = () => {
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <div>
+                        <div className="space-y-2">
                           <label className="mb-2 flex items-center text-sm font-medium text-theme">
                             Who is it for?
                             <InfoTooltip text={CREATOR_METADATA_HELP.audience} />
                           </label>
-                          <div className="grid grid-cols-1 gap-2">
-                            {CREATOR_AUDIENCE_OPTIONS.map((option) => (
-                              <button
-                                key={option.value}
-                                type="button"
-                                onClick={() => setType(option.value)}
-                                disabled={disabled}
-                                className={`rounded-lg border px-3 py-2 text-left text-sm font-medium transition-all ${
-                                  type === option.value
-                                    ? "border-purple-400/80 bg-purple-500/10 text-purple-600 dark:text-purple-400"
-                                    : "border-gray-200/70 text-theme-secondary hover:border-purple-200 dark:border-white/10 dark:hover:border-white/20"
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
-                          </div>
+                          <UniversalSelect
+                            value={type}
+                            onChange={(value) => setType(value as "MALE" | "FEMALE" | "EVERYBODY")}
+                            options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
+                              value: option.value,
+                              label: option.label,
+                            }))}
+                            placeholder="Choose who this item is for"
+                            disabled={disabled}
+                            optionCompact
+                          />
                         </div>
 
                         <UniversalSelect
@@ -1775,6 +1769,7 @@ const CreateDesignInner: React.FC = () => {
                             label: option.label,
                           }))}
                           disabled={disabled}
+                          optionCompact
                         />
                       </div>
 
@@ -1891,7 +1886,7 @@ const CreateDesignInner: React.FC = () => {
         </div>
 
         {/* Form Sections */}
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {/* Pricing & Availability */}
           <FormSection
             id="design-pricing-section"
@@ -1943,17 +1938,17 @@ const CreateDesignInner: React.FC = () => {
               </div>
 
               {/* Info box */}
-              <div className="mt-8 p-3 rounded-xl bg-blue-50 border border-blue-200 text-gray-800 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-100 flex items-start gap-2">
-                <FiInfo className="w-5 h-5 text-blue-500 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm">
+              <div className="mt-7 rounded-xl border border-blue-200 bg-blue-50 p-2.5 text-gray-800 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-100 flex items-start gap-2">
+                <FiInfo className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs leading-5">
                   Setting a price range helps buyers know what to expect. Leave
                   empty if prices vary significantly.
                 </p>
               </div>
 
               {/* Checkboxes */}
-              <div className="space-y-3 mt-4">
-                <label className="surface-card flex items-start gap-3 p-4 rounded-xl border cursor-pointer hover:border-purple-500/30 transition-colors">
+              <div className="grid grid-cols-1 gap-2 mt-3">
+                <label className="surface-card flex items-start gap-3 p-3 rounded-xl border cursor-pointer hover:border-purple-500/30 transition-colors">
                   <input
                     type="checkbox"
                     checked={false}
@@ -1965,13 +1960,13 @@ const CreateDesignInner: React.FC = () => {
                     <span className="text-theme font-medium">
                       Store availability
                     </span>
-                    <p className="text-sm text-theme-secondary">
+                    <p className="text-xs text-theme-secondary">
                       Store collections are created in Store Studio.
                     </p>
                   </div>
                 </label>
 
-                <label className="surface-card flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors hover:border-purple-500/30">
+                <label className="surface-card flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors hover:border-purple-500/30">
                   <input
                     type="checkbox"
                     checked={isMadeToOrder}
@@ -1983,7 +1978,7 @@ const CreateDesignInner: React.FC = () => {
                     <span className="text-theme font-medium">
                       Custom Order
                     </span>
-                    <p className="text-sm text-theme-secondary">
+                    <p className="text-xs text-theme-secondary">
                       Allow buyers to request this design with their own measurements.
                     </p>
                   </div>
@@ -2016,38 +2011,42 @@ const CreateDesignInner: React.FC = () => {
             isOpen={expandedSections.targeting}
             onToggle={() => toggleSection("targeting")}
           >
-            <div className="space-y-4">
-              <UniversalSelect
-                label="Sizing Mode"
-                value={sizingMode}
-                onChange={(value) => setSizingMode(value as DesignSizingMode)}
-                options={DESIGN_SIZING_MODE_OPTIONS.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-                disabled={disabled}
-                searchable
-                optionAllowWrap
-                selectedAllowWrap
-              />
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <UniversalSelect
+                  label="Sizing Mode"
+                  value={sizingMode}
+                  onChange={(value) => setSizingMode(value as DesignSizingMode)}
+                  options={DESIGN_SIZING_MODE_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  disabled={disabled}
+                  searchable
+                  optionAllowWrap
+                  optionCompact
+                  selectedAllowWrap
+                />
 
-              <UniversalSelect
-                label="Fit Preference"
-                value={fitPreference}
-                onChange={(value) => setFitPreference(value as DesignFitPreference)}
-                options={DESIGN_FIT_PREFERENCE_OPTIONS.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-                disabled={disabled}
-              />
+                <UniversalSelect
+                  label="Fit Preference"
+                  value={fitPreference}
+                  onChange={(value) => setFitPreference(value as DesignFitPreference)}
+                  options={DESIGN_FIT_PREFERENCE_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  disabled={disabled}
+                  optionCompact
+                />
+              </div>
 
               <div>
                 <label className="mb-2 flex items-center text-sm font-medium text-theme">
                   Who can see this?
                   <InfoTooltip text={CREATOR_METADATA_HELP.visibility} />
                 </label>
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {(
                     [
                       {
@@ -2108,18 +2107,32 @@ const CreateDesignInner: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-sm text-theme-secondary">
             {lastSaved
-              ? `Design saved locally • Last edit: ${formatTimeAgo(lastSaved)}`
-              : "Unsaved changes"}
+              ? `${isEditMode ? "Design" : "Draft"} saved locally - Last edit: ${formatTimeAgo(lastSaved)}`
+              : isEditMode
+                ? "Unsaved changes"
+                : "Create a draft or go live when ready."}
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setShowCancelPrompt(true)}
+              disabled={disabled}
+              className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-5 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancel
+            </button>
             <button
               type="button"
               onClick={handleSaveDraft}
               disabled={disabled}
               className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-6 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              <FiFile className="w-4 h-4" />
-              Save Draft
+              {isSubmitting && submitIntent === "draft" ? (
+                <VLoader size={16} phase="loading" showLabel={false} />
+              ) : (
+                <FiFile className="w-4 h-4" />
+              )}
+              {isSubmitting && submitIntent === "draft" ? "Saving..." : "Save Draft"}
             </button>
             <button
               type="button"

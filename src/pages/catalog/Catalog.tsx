@@ -98,7 +98,7 @@ const ProfilePage: React.FC = () => {
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
   const [isBrandQrOpen, setIsBrandQrOpen] = useState(false);
-  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; visibility?: 'PUBLIC' | 'PRIVATE' }>>({});
+  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; title?: string; visibility?: 'PUBLIC' | 'PRIVATE' }>>({});
   const [publishTasks, setPublishTasks] = useState<PublishTask[]>([]);
 
   const navigate = useNavigate();
@@ -618,7 +618,8 @@ const ProfilePage: React.FC = () => {
           current.progress !== task.progress ||
           current.message !== nextMessage ||
           current.previewUrl !== task.coverPreviewUrl ||
-          current.taskId !== task.id
+          current.taskId !== task.id ||
+          current.title !== task.title
         ) {
           next[key] = {
             status: nextStatus,
@@ -627,6 +628,7 @@ const ProfilePage: React.FC = () => {
             progress: task.progress,
             previewUrl: task.coverPreviewUrl,
             taskId: task.id,
+            title: task.title,
             visibility: task.visibility,
             message: nextMessage,
           };
@@ -794,11 +796,9 @@ const ProfilePage: React.FC = () => {
         // Show both in-progress uploads AND failed tasks (so failed tasks surface as ghost cards)
         if (state.status !== 'publishing' && state.status !== 'failed') return false;
         if ((state.visibility ?? 'PUBLIC') !== targetVisibility) return false;
-        // Require a preview URL so we have something to show in the card
-        if (!state.previewUrl) return false;
         const query = searchQuery.trim().toLowerCase();
         if (!query) return true;
-        return (state.message ?? '').toLowerCase().includes(query);
+        return `${state.title ?? ''} ${state.message ?? ''}`.toLowerCase().includes(query);
       })
       .map(([key, state]) => {
         const nowIso = new Date(state.startedAt || Date.now()).toISOString();
@@ -806,10 +806,10 @@ const ProfilePage: React.FC = () => {
         return {
           id: key,
           status: 'DRAFT',
-          name: isFailed ? 'Publish failed' : (state.message || 'Publishing design'),
+          name: state.title || (isFailed ? 'Publish failed' : 'Publishing design'),
           description: isFailed ? 'Tap retry to republish' : 'Uploading in background',
           ownerId: user?.id || '',
-          title: isFailed ? 'Publish failed' : (state.message || 'Publishing design'),
+          title: state.title || (isFailed ? 'Publish failed' : 'Publishing design'),
           isPublic: targetVisibility !== 'PRIVATE',
           visibility: targetVisibility,
           type: 'EVERYBODY',

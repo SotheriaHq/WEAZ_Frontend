@@ -66,11 +66,15 @@ export const TagsApi = {
   },
 
   async getTrending(window: '1h' | '24h' | '7d' = '24h', limit = 20): Promise<TagSuggestion[]> {
-    const res = await apiClient.get('/tags/trending', {
-      params: { window, limit },
-    });
-    const parsed = extractSuggestions(res?.data);
-    if (parsed.length > 0) return parsed;
+    try {
+      const res = await apiClient.get('/tags/trending', {
+        params: { window, limit },
+      });
+      const parsed = extractSuggestions(res?.data);
+      if (parsed.length > 0) return parsed;
+    } catch {
+      // Fresh local resets can have no trending usage yet; fall back to seeded/popular tags.
+    }
 
     const fallback = await apiClient.get('/tags', { params: { limit } });
     return extractSuggestions(fallback?.data);

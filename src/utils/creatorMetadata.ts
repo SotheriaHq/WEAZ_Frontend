@@ -36,6 +36,9 @@ export const CREATOR_FILTER_DIMENSION_HELP: Record<string, string> = {
   style: CREATOR_METADATA_HELP.style,
   heritage: CREATOR_METADATA_HELP.heritage,
   occasion: CREATOR_METADATA_HELP.occasion,
+  fabric: "Choose the physical textile or material used, such as Ankara fabric.",
+  "color-family": "Choose the main color family buyers would recognize.",
+  fit: "Choose how the item is intended to sit on the body.",
 };
 
 export const CREATOR_FILTER_DIMENSION_ORDER = [
