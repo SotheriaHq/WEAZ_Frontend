@@ -1,6 +1,7 @@
 import { apiClient } from './httpClient';
 import type { ApiSuccessPayload } from '@/types/auth';
 import { unwrapApiResponse } from '@/types/auth';
+import type { AuthTokensResponse, AuthUserType } from '@/types/auth';
 export {
   PASSWORD_POLICY_HINT,
   PASSWORD_POLICY_MIN_LENGTH,
@@ -39,11 +40,90 @@ export type MessageResponse = {
   message: string;
 };
 
+export type GoogleAuthPayload = {
+  idToken: string;
+  type?: AuthUserType;
+  brandFullName?: string;
+};
+
+export type LoginOptionsPayload = {
+  email: string;
+};
+
+export type LoginOptionsResponse = {
+  requestId: string;
+  methods: {
+    password: boolean;
+    google: boolean;
+    passwordSetupAvailable: boolean;
+  };
+  message: string;
+};
+
+export type EmailLoginCodePurpose = 'PASSWORD_SETUP';
+
+export type RequestEmailLoginCodePayload = {
+  email: string;
+  purpose: EmailLoginCodePurpose;
+  requestId?: string;
+};
+
+export type ConfirmEmailLoginCodePayload = {
+  email: string;
+  code: string;
+  purpose: EmailLoginCodePurpose;
+};
+
+export type ConfirmEmailLoginCodeResponse = {
+  passwordSetupToken: string;
+  expiresInSeconds: number;
+};
+
+export type PasswordSetupPayload = {
+  passwordSetupToken: string;
+  newPassword: string;
+};
+
 const unwrapMessageResponse = (payload: unknown): MessageResponse => {
   return unwrapApiResponse<MessageResponse>(payload as ApiSuccessPayload<MessageResponse>);
 };
 
 export class AuthApi {
+  static async googleAuth(payload: GoogleAuthPayload): Promise<AuthTokensResponse> {
+    const response = await apiClient.post<ApiSuccessPayload<AuthTokensResponse>>('/auth/google', payload);
+    return unwrapApiResponse<AuthTokensResponse>(response.data);
+  }
+
+  static async googleLink(payload: Pick<GoogleAuthPayload, 'idToken'>): Promise<MessageResponse> {
+    const response = await apiClient.post('/auth/google/link', payload);
+    return unwrapMessageResponse(response.data);
+  }
+
+  static async getLoginOptions(payload: LoginOptionsPayload): Promise<LoginOptionsResponse> {
+    const response = await apiClient.post<ApiSuccessPayload<LoginOptionsResponse>>('/auth/login-options', payload);
+    return unwrapApiResponse<LoginOptionsResponse>(response.data);
+  }
+
+  static async requestEmailLoginCode(payload: RequestEmailLoginCodePayload): Promise<MessageResponse> {
+    const response = await apiClient.post('/auth/email-login-code/request', payload);
+    return unwrapMessageResponse(response.data);
+  }
+
+  static async confirmEmailLoginCode(
+    payload: ConfirmEmailLoginCodePayload,
+  ): Promise<ConfirmEmailLoginCodeResponse> {
+    const response = await apiClient.post<ApiSuccessPayload<ConfirmEmailLoginCodeResponse>>(
+      '/auth/email-login-code/confirm',
+      payload,
+    );
+    return unwrapApiResponse<ConfirmEmailLoginCodeResponse>(response.data);
+  }
+
+  static async setupPassword(payload: PasswordSetupPayload): Promise<MessageResponse> {
+    const response = await apiClient.post('/auth/password/setup', payload);
+    return unwrapMessageResponse(response.data);
+  }
+
   static async requestPasswordReset(email: string): Promise<MessageResponse> {
     const response = await apiClient.post('/auth/password-reset/request', { email });
     return unwrapMessageResponse(response.data);

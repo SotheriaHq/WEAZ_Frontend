@@ -23,6 +23,10 @@ function main() {
   const accountSecuritySource = read(
     'src/components/settings/tabs/AccountSecuritySettings.tsx',
   );
+  const authApiSource = read('src/api/AuthApi.ts');
+  const loginSource = read('src/pages/Login.tsx');
+  const signupSource = read('src/pages/SignUp.tsx');
+  const googleIdentitySource = read('src/auth/googleIdentity.ts');
   const envSource = read('.env.example');
 
   assertIncludes(appSource, "path: '/forgot-password'", 'Forgot-password route must be registered.');
@@ -157,6 +161,77 @@ function main() {
     envSource,
     'VITE_API_WITH_CREDENTIALS=',
     'Frontend env example must document credential mode.',
+  );
+
+  assertIncludes(
+    envSource,
+    'VITE_GOOGLE_CLIENT_ID=<google-web-client-id>',
+    'Frontend env example must document the public Google web client ID placeholder.',
+  );
+  assertIncludes(
+    authApiSource,
+    "'/auth/google'",
+    'AuthApi must expose the backend Google auth endpoint.',
+  );
+  assertIncludes(
+    authApiSource,
+    "'/auth/login-options'",
+    'AuthApi must expose the progressive login-options endpoint.',
+  );
+  assertIncludes(
+    authApiSource,
+    "'/auth/email-login-code/request'",
+    'AuthApi must expose password-setup email code request.',
+  );
+  assertIncludes(
+    authApiSource,
+    "'/auth/email-login-code/confirm'",
+    'AuthApi must expose password-setup email code confirmation.',
+  );
+  assertIncludes(
+    authApiSource,
+    "'/auth/password/setup'",
+    'AuthApi must expose Google-only password setup.',
+  );
+  assertIncludes(
+    loginSource,
+    'AuthApi.getLoginOptions',
+    'Login must resolve sign-in methods through login-options.',
+  );
+  assertIncludes(
+    loginSource,
+    'requestPasswordSetupCode',
+    'Login must include the Google-only password setup email-code path.',
+  );
+  assertIncludes(
+    loginSource,
+    'AuthApi.setupPassword',
+    'Login must submit the first-password setup token to the backend.',
+  );
+  assertIncludes(
+    loginSource,
+    'requestGoogleIdToken',
+    'Login must request a Google ID token before backend Google auth.',
+  );
+  assertIncludes(
+    signupSource,
+    'AuthApi.googleAuth',
+    'Signup must send Google ID tokens to the backend Google auth endpoint.',
+  );
+  assertIncludes(
+    signupSource,
+    'signup-google-button',
+    'Signup must render the Google signup action.',
+  );
+  assertIncludes(
+    googleIdentitySource,
+    'https://accounts.google.com/gsi/client',
+    'Web Google auth must use Google Identity Services.',
+  );
+  assert.doesNotMatch(
+    [envSource, authApiSource, loginSource, signupSource, googleIdentitySource].join('\n'),
+    /GOOGLE_CLIENT_SECRET|google-client-secret|client_secret/i,
+    'Frontend source and env example must not contain a Google client secret.',
   );
 }
 

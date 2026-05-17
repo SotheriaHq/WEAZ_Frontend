@@ -24,6 +24,7 @@ const tokenStorageKey = getEnvVar('VITE_TOKEN_STORAGE_KEY', 'THREADLY_ACCESS_TOK
 const userStorageKey = getEnvVar('VITE_USER_STORAGE_KEY', 'THREADLY_USER');
 const brandEndpointsEnabled = parseBoolean(getEnvVar('VITE_ENABLE_BRAND_DETAIL_ENDPOINTS', 'true'));
 const apiWithCredentials = parseBoolean(getEnvVar('VITE_API_WITH_CREDENTIALS', 'true'));
+const googleClientId = getEnvVar('VITE_GOOGLE_CLIENT_ID', '');
 
 export const env = {
   apiBaseUrl,
@@ -32,6 +33,10 @@ export const env = {
   userStorageKey,
   featureFlags: {
     brandDetailEndpoints: brandEndpointsEnabled,
+  },
+  google: {
+    clientId: googleClientId,
+    configured: googleClientId.length > 0 && !googleClientId.startsWith('<'),
   },
   api: {
     withCredentials: apiWithCredentials,
