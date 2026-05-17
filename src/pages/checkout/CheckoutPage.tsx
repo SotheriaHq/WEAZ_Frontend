@@ -53,6 +53,7 @@ import {
   type PaymentFormState,
   validatePaymentData,
 } from '@/pages/checkout/paymentFlow';
+import { BAG_IT_EMOJI } from '@/constants/bagging';
 
 /* ─── Constants ─── */
 
@@ -1714,7 +1715,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               {/* Items grouped by brand */}
               <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03] space-y-4">
-                <h3 className="font-semibold">🛍️ Bag lines</h3>
+                <h3 className="font-semibold">{BAG_IT_EMOJI} Bag lines</h3>
 
                 {brandGroups.length > 0 && brandGroups.map((group) => (
                   <div key={group.brandName} className="space-y-2">
@@ -1842,7 +1843,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                           rounded="none"
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-xl">🛍️</div>
+                        <div className="flex h-full w-full items-center justify-center text-xl">{BAG_IT_EMOJI}</div>
                       )}
                     </div>
                     <div className="min-w-0 flex-1 space-y-1">

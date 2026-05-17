@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import type { BagPulseStatus } from '@/api/StoreApi';
+import { BAG_IT_EMOJI } from '@/constants/bagging';
 
 export type BagPulseContext = 'single' | 'multi_card' | 'rail' | 'detail';
 
@@ -44,7 +45,7 @@ export const BagPulseIcon = memo(function BagPulseIcon({
       aria-hidden="true"
     >
       <span className="bag-pulse-ring" />
-      <span className="bag-pulse-core">🛍️</span>
+      <span className="bag-pulse-core">{BAG_IT_EMOJI}</span>
       {typeof count === 'number' && count > 0 ? (
         <span className="bag-pulse-count">{count > 99 ? '99+' : count}</span>
       ) : null}

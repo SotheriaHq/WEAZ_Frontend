@@ -31,6 +31,7 @@ import {
 } from '@/api/CustomOrderApi';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { MY_BAG_EMOJI } from '@/constants/bagging';
 
 // Promo code type
 interface PromoCode {
@@ -465,7 +466,7 @@ const CartDrawer: React.FC = () => {
                       <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 flex items-center justify-center">
                         <ShoppingBag size={48} className="text-purple-400 dark:text-purple-500" />
                       </div>
-                      <span className="absolute -top-1 -right-1 text-3xl">🛒</span>
+                      <span className="absolute -top-1 -right-1 text-3xl">{MY_BAG_EMOJI}</span>
                     </div>
                     <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
                       Your bag is empty

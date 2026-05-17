@@ -18,6 +18,7 @@ import { normalizeSizingMode } from '@/types/sizing';
 import { useActiveCustomOrderConfiguration } from '@/hooks/useActiveCustomOrderConfiguration';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagging } from '@/hooks/useBagging';
+import { BAG_IT_EMOJI, BAG_IT_LABEL } from '@/constants/bagging';
 import {
   isCustomOrderOnlyProduct,
   isStrictlyOutOfStockProduct,
@@ -750,8 +751,8 @@ export default function InlineProductDetail({
                     disabled={startingCustomOrder || customOrderAvailability.isLoading || !customOrderAvailability.isAvailable}
                     className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-purple-300/60 bg-purple-50 text-sm font-semibold text-purple-700 transition-all hover:border-purple-400 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-200 dark:hover:bg-purple-500/20"
                   >
-                    <span aria-hidden="true">✂️</span>
-                    {startingCustomOrder ? 'Bagging as custom order...' : 'Custom Bag It'}
+                    <span aria-hidden="true">{BAG_IT_EMOJI}</span>
+                    {startingCustomOrder ? 'Bagging as custom order...' : `Custom ${BAG_IT_LABEL}`}
                   </button>
                 </span>
               ) : null}
@@ -768,7 +769,7 @@ export default function InlineProductDetail({
                     size={32}
                     disabled={isStrictlyOutOfStock || startingCustomOrder || bagButtonLoading}
                   />
-                  {bagButtonLoading ? 'Bagging...' : 'Bag it'}
+                  {bagButtonLoading ? 'Bagging...' : BAG_IT_LABEL}
                 </button>
               ) : null}
             </div>
@@ -893,7 +894,7 @@ export default function InlineProductDetail({
                     disabled={savingMeasurements}
                     className="w-full py-3 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50"
                   >
-                    {savingMeasurements ? '⏳ Saving...' : '🛍️ Save Measurements & Bag it'}
+                    {savingMeasurements ? 'Saving...' : `${BAG_IT_EMOJI} Save Measurements & ${BAG_IT_LABEL}`}
                   </button>
                   <button
                     type="button"

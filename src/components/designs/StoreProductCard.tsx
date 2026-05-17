@@ -8,6 +8,7 @@ import type { SizingMode } from '@/types/sizing';
 import type { CatalogEntityType } from '@/constants/catalogDomain';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagging } from '@/hooks/useBagging';
+import { BAG_IT_LABEL } from '@/constants/bagging';
 import {
   getProductStockState,
   isCustomOrderOnlyProduct,
@@ -691,6 +692,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                   type="button"
                   onClick={handleQuickAddToCart}
                   disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
+                  aria-label={BAG_IT_LABEL}
                   title={
                     isOwnProduct
                       ? 'Brands cannot bag their own products'
@@ -698,7 +700,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                         ? 'Item is out of stock'
                         : isCustomOrderOnly
                           ? 'Bag as a custom order'
-                          : 'Bag it'
+                          : BAG_IT_LABEL
                   }
                   className={`
                     flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200
@@ -712,9 +714,6 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                     size={28}
                     disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
                   />
-                  <span hidden role="img" aria-hidden="true" className="text-sm leading-none">
-                    🛍️
-                  </span>
                 </button>
               ) : (
                 <div className="flex items-center gap-2 text-[10px] text-white/50">

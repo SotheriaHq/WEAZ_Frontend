@@ -20,6 +20,7 @@ import { BagApi } from '@/api/BagApi';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagFlow } from '@/features/bagging/BagFlowProvider';
+import { BAG_IT_LABEL } from '@/constants/bagging';
 import type { CommentV2Dto } from '@/types/comments';
 import {
   CONTENT_DISPLAY_FRAME_CLASS,
@@ -339,12 +340,19 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
       toast.info('Brands cannot place custom orders on their own designs.');
       return;
     }
-    if (!isAuth) {
-      toast.info('Please sign in to place a custom order.');
-      return;
-    }
     if (!item.collectionId) {
       toast.error('Design reference is unavailable for custom order.');
+      return;
+    }
+    const designName = item.collectionTitle || 'this design';
+    const designTarget = {
+      id: item.collectionId,
+      name: designName,
+      sourceType: 'DESIGN' as const,
+      sourceId: item.collectionId,
+    };
+    if (!isAuth) {
+      bagFlow?.openAuthPrompt(designTarget, 'OPEN_CUSTOM_FLOW');
       return;
     }
     if (openingCustomComposer) {
@@ -359,14 +367,13 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     try {
       const sourceStatus = await BagApi.getSourceBagStatus('DESIGN', item.collectionId);
       const duplicateClasses = sourceStatus.duplicateState?.classifications ?? [];
-      const designName = item.collectionTitle || 'this design';
       if (sourceStatus.custom.alreadyBagged || duplicateClasses.includes('IN_BAG')) {
-        bagFlow?.openExistingBag({ id: item.collectionId, name: designName }, sourceStatus);
+        bagFlow?.openExistingBag(designTarget, sourceStatus);
         toast.info('This custom request is already in your bag.');
         return;
       }
       if (duplicateClasses.includes('SUBMITTED_UNPAID')) {
-        bagFlow?.openExistingBag({ id: item.collectionId, name: designName }, sourceStatus);
+        bagFlow?.openExistingBag(designTarget, sourceStatus);
         toast.info('Resume this custom request from My Bag.');
         return;
       }
@@ -379,7 +386,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         return;
       }
       if (sourceStatus.ui.defaultAction === 'OPEN_FITTINGS') {
-        bagFlow?.openFittings({ id: item.collectionId, name: designName }, sourceStatus);
+        bagFlow?.openFittings(designTarget, sourceStatus);
         return;
       }
       if (
@@ -387,7 +394,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         sourceStatus.custom.requiresStaleConfirmation ||
         sourceStatus.custom.freshnessState === 'STALE'
       ) {
-        bagFlow?.openStaleConfirmation({ id: item.collectionId, name: designName }, sourceStatus);
+        bagFlow?.openStaleConfirmation(designTarget, sourceStatus);
         return;
       }
 
@@ -653,13 +660,13 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     title={
                       isOwnBrandContent
                         ? 'Brands cannot place custom orders on their own designs'
-                        : resolvingCustomConfiguration
-                          ? 'Checking custom-order setup for this design'
-                          : !customConfigurationId
-                            ? 'Check custom-order setup for this design'
-                          : 'Request a custom order from this design'
+                          : resolvingCustomConfiguration
+                            ? 'Checking custom-order setup for this design'
+                            : !customConfigurationId
+                              ? 'Check custom-order setup for this design'
+                          : 'Bag this design as a custom order'
                     }
-                    aria-label="Request custom order"
+                    aria-label={BAG_IT_LABEL}
                   >
                     <BagPulseIcon
                       status={
@@ -673,7 +680,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       size={28}
                       disabled={openingCustomComposer || resolvingCustomConfiguration || isOwnBrandContent}
                     />
-                    {openingCustomComposer ? 'Loading...' : 'Request Custom'}
+                    {openingCustomComposer ? 'Loading...' : BAG_IT_LABEL}
                   </button>
                   <button
                     type="button"

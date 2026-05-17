@@ -16,7 +16,7 @@ import { addToCart, fetchCart, fetchCustomBagCount, openCartDrawer } from '@/fea
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
-import { BagApi } from '@/api/BagApi';
+import { BagApi, type BagSourceType } from '@/api/BagApi';
 import type { BagDefaultAction, BagStatus } from '@/api/StoreApi';
 import ProductBagSelectorModal from '@/components/bagging/ProductBagSelectorModal';
 import BagFittingsModal from '@/components/bagging/BagFittingsModal';
@@ -25,6 +25,8 @@ import StaleFittingConfirmationModal from '@/components/bagging/StaleFittingConf
 type BagProductInput = {
   id: string;
   name?: string;
+  sourceType?: BagSourceType;
+  sourceId?: string;
 };
 
 type BagFlowTarget = {
@@ -42,6 +44,8 @@ type PendingAuthResume = {
 type PendingBagAction = {
   productId: string;
   productName?: string;
+  sourceType?: BagSourceType;
+  sourceId?: string;
   intendedAction: BagDefaultAction;
   returnPath: string;
 };
@@ -66,7 +70,7 @@ const readPendingBagAction = (): PendingBagAction | null => {
     const raw = window.sessionStorage.getItem(PENDING_BAG_ACTION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PendingBagAction;
-    return parsed?.productId ? parsed : null;
+    return parsed?.productId || parsed?.sourceId ? parsed : null;
   } catch {
     return null;
   }
@@ -213,8 +217,13 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
     const product = {
       id: pending.productId,
       name: pending.productName,
+      sourceType: pending.sourceType,
+      sourceId: pending.sourceId,
     };
-    const status = await BagApi.getProductBagStatus(pending.productId);
+    const status =
+      pending.sourceType && pending.sourceType !== 'PRODUCT'
+        ? await BagApi.getSourceBagStatus(pending.sourceType, pending.sourceId ?? pending.productId)
+        : await BagApi.getProductBagStatus(pending.productId);
     await routeResolvedStatus(product, status, pending.intendedAction);
     return true;
   }, [routeResolvedStatus]);
@@ -294,6 +303,8 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
       savePendingBagAction({
         productId: product.id,
         productName: product.name,
+        sourceType: product.sourceType,
+        sourceId: product.sourceId,
         intendedAction: action,
         returnPath,
       });

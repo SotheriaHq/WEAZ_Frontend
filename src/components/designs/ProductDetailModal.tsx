@@ -21,6 +21,7 @@ import {
   CONTENT_DISPLAY_RENDERER_CLASS,
 } from '@/components/media/contentDisplayPresets';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
+import { BAG_IT_EMOJI, BAG_IT_LABEL } from '@/constants/bagging';
 
 // Types
 export interface ProductDetailData {
@@ -612,7 +613,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         <button
                           onClick={handleAddToCart}
                           disabled={isAddingToCart || isOutOfStock || (product.sizes.length > 0 && !selectedSize)}
-                          title="Bag it"
+                          title={BAG_IT_LABEL}
                           className="w-full h-14 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                         >
                           <BagPulseIcon
@@ -621,7 +622,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             size={32}
                             disabled={isAddingToCart || isOutOfStock}
                           />
-                          {isAddingToCart ? 'Bagging...' : '🛍️ Bag it'}
+                          {isAddingToCart ? 'Bagging...' : `${BAG_IT_EMOJI} ${BAG_IT_LABEL}`}
                         </button>
                       ) : (
                         <div className="w-full h-14 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 font-medium flex items-center justify-center">
@@ -933,7 +934,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <button
                       onClick={handleAddToCart}
                       disabled={isAddingToCart || isOutOfStock || (product.sizes.length > 0 && !selectedSize)}
-                      title="Bag it"
+                      title={BAG_IT_LABEL}
                       className="flex-1 h-12 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                     >
                       <BagPulseIcon
@@ -942,7 +943,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         size={30}
                         disabled={isAddingToCart || isOutOfStock}
                       />
-                      {isAddingToCart ? 'Bagging...' : isOutOfStock ? 'Out of Stock' : '🛍️ Bag it'}
+                      {isAddingToCart ? 'Bagging...' : isOutOfStock ? 'Out of Stock' : `${BAG_IT_EMOJI} ${BAG_IT_LABEL}`}
                     </button>
                   ) : (
                     <div className="flex-1 h-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 font-medium flex items-center justify-center">

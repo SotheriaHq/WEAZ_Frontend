@@ -1,18 +1,22 @@
-import { configDefaults, defineConfig } from 'vitest/config';
-import path from 'path';
+import path from 'node:path';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(process.cwd(), 'src'),
     },
+    dedupe: ['react', 'react-dom'],
   },
   test: {
     environment: 'jsdom',
-    setupFiles: ['src/setupTests.ts'],
-    css: true,
-    globals: true,
-    // Start from Vitest defaults so node_modules and build outputs stay excluded.
-    exclude: [...configDefaults.exclude, 'e2e/**'],
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/e2e/**',
+      '**/tests/e2e/**',
+    ],
   },
 });

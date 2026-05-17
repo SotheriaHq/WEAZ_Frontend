@@ -41,6 +41,7 @@ import { COMPANY_NAME } from '@/lib/brand';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
+import { MY_BAG_EMOJI, MY_BAG_LABEL } from '@/constants/bagging';
 import {
   Dropdown as SharedDropdown,
   DropdownDivider,
@@ -439,9 +440,9 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
             type="button"
             onClick={() => dispatch(isCartOpen ? closeCartDrawer() : openCartDrawer())}
             className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)] sm:flex"
-            aria-label="Bag"
+            aria-label={MY_BAG_LABEL}
           >
-            <span aria-hidden="true" className="text-xl">🛍️</span>
+            <span aria-hidden="true" className="text-xl">{MY_BAG_EMOJI}</span>
             {cartQuantity > 0 ? (
               <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-xs font-bold text-white">
                 {cartQuantity > 99 ? '99+' : cartQuantity}

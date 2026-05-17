@@ -4,12 +4,15 @@ import { toast } from 'sonner';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { getBagStatus, type BagStatus } from '@/api/StoreApi';
+import { BagApi, type BagSourceType } from '@/api/BagApi';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
 
 type BagProductInput = {
   id: string;
   name?: string;
+  sourceType?: BagSourceType;
+  sourceId?: string;
 };
 
 type BagFittingsModalProps = {
@@ -110,7 +113,10 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
       };
 
       await SizeFitApi.updateProfile({ measurements: normalised });
-      const nextStatus = await getBagStatus(product.id);
+      const nextStatus =
+        product.sourceType && product.sourceType !== 'PRODUCT'
+          ? await BagApi.getSourceBagStatus(product.sourceType, product.sourceId ?? product.id)
+          : await getBagStatus(product.id);
       toast.success('Fittings updated.');
       onResolved?.(nextStatus);
     } catch (nextError: any) {

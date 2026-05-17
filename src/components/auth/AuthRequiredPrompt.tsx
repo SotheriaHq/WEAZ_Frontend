@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, LogIn, UserPlus, ShoppingBag, Heart, Sparkles, Lock } from 'lucide-react';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { BAG_IT_EMOJI, MY_BAG_EMOJI } from '@/constants/bagging';
 
 interface AuthRequiredPromptProps {
   /** Whether the prompt is visible */
@@ -49,7 +50,7 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
       icon: <ShoppingBag className="w-8 h-8" />,
       title: 'Sign in to view your bag',
       description: 'Create an account or sign in to save items, track orders, and enjoy a personalized shopping experience.',
-      emoji: '🛒',
+      emoji: MY_BAG_EMOJI,
     },
     wishlist: {
       icon: <Heart className="w-8 h-8" />,
@@ -174,7 +175,7 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
                   </h4>
                   <ul className="space-y-2 text-left">
                     {[
-                      '🛍️ Shop exclusive African fashion',
+                      `${BAG_IT_EMOJI} Shop exclusive African fashion`,
                       '💜 Save favorites to your wishlist',
                       '📦 Track your orders easily',
                       '🎁 Get personalized recommendations',

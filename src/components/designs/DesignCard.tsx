@@ -14,6 +14,10 @@ import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileIma
 import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { useNavigate } from 'react-router-dom';
 import { isBrandOwner } from '@/lib/brandAccess';
+import { BagApi } from '@/api/BagApi';
+import BagPulseIcon from '@/components/bagging/BagPulseIcon';
+import { useBagFlow } from '@/features/bagging/BagFlowProvider';
+import { BAG_IT_LABEL } from '@/constants/bagging';
 
 interface DesignCardProps {
   item: MarketItem;
@@ -45,8 +49,10 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   const navigate = useNavigate();
   const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const bagFlow = useBagFlow();
   const [directMessageText, setDirectMessageText] = useState('');
   const [directMessageBusy, setDirectMessageBusy] = useState(false);
+  const [bagBusy, setBagBusy] = useState(false);
   const user = useSelector((s: RootState) => s.user.profile);
   const [isHidden, setIsHidden] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -183,6 +189,85 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   const brandId = typeof item.brandId === 'string' ? item.brandId.trim() : '';
   const ownsDesignBrand = Boolean(brandId && (user?.id === brandId || isBrandOwner(user, brandId)));
   const canMessageBrand = Boolean(brandId) && !ownsDesignBrand;
+  const designBagTarget = {
+    id: item.collectionId,
+    name: item.collectionTitle || 'this design',
+    sourceType: 'DESIGN' as const,
+    sourceId: item.collectionId,
+  };
+
+  const handleBagDesign = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!isCustomAvailable) return;
+    if (ownsDesignBrand) {
+      toast.info('Brands cannot place custom orders on their own designs.');
+      return;
+    }
+    if (!item.collectionId) {
+      toast.error('Design reference is unavailable for bagging.');
+      return;
+    }
+    if (!bagFlow) {
+      toast.error('Bag is unavailable right now.');
+      return;
+    }
+    if (!isAuth) {
+      bagFlow.openAuthPrompt(designBagTarget, 'OPEN_CUSTOM_FLOW');
+      return;
+    }
+    if (bagBusy) return;
+
+    setBagBusy(true);
+    try {
+      const status = await BagApi.getSourceBagStatus('DESIGN', item.collectionId);
+      const duplicateClasses = status.duplicateState?.classifications ?? [];
+
+      if (status.custom.alreadyBagged || duplicateClasses.includes('IN_BAG')) {
+        bagFlow.openExistingBag(designBagTarget, status);
+        toast.info('This custom request is already in your bag.');
+        return;
+      }
+      if (duplicateClasses.includes('SUBMITTED_UNPAID')) {
+        bagFlow.openExistingBag(designBagTarget, status);
+        toast.info('Resume this custom request from My Bag.');
+        return;
+      }
+      if (duplicateClasses.includes('PAID_ACTIVE')) {
+        toast.error('You already have an active paid custom order for this design.');
+        return;
+      }
+      if (duplicateClasses.includes('COMPLETED_BLOCKED')) {
+        toast.error(status.duplicateState?.reason || 'This completed custom order cannot be repeated.');
+        return;
+      }
+
+      if (!status.canBag || status.ui.defaultAction === 'DISABLED') {
+        toast.error(status.ui.disabledReason || 'This design cannot be bagged right now.');
+        return;
+      }
+      if (status.ui.defaultAction === 'OPEN_FITTINGS') {
+        bagFlow.openFittings(designBagTarget, status);
+        return;
+      }
+      if (
+        status.ui.defaultAction === 'CONFIRM_STALE_FITTINGS' ||
+        status.custom.requiresStaleConfirmation ||
+        status.custom.freshnessState === 'STALE'
+      ) {
+        bagFlow.openStaleConfirmation(designBagTarget, status);
+        return;
+      }
+      if (status.ui.defaultAction === 'OPEN_CUSTOM_FLOW') {
+        bagFlow.openCustomFlow(designBagTarget, status);
+        return;
+      }
+      toast.error(status.ui.disabledReason || 'This design cannot be bagged right now.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to bag this design.');
+    } finally {
+      setBagBusy(false);
+    }
+  };
 
   const brandAvatar = resolveProfileImageSource({
     brandLogo: item.brandLogo,
@@ -353,6 +438,25 @@ export const DesignCard: React.FC<DesignCardProps> = ({
 
         {/* Vertical Action Bar (Right Side - Instagram/TikTok Style) */}
         <div className="absolute bottom-24 right-3 z-10 flex flex-col items-center gap-4">
+          {isCustomAvailable ? (
+            <button
+              type="button"
+              className="flex flex-col items-center text-white transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={handleBagDesign}
+              disabled={bagBusy || ownsDesignBrand}
+              aria-label={BAG_IT_LABEL}
+              title={ownsDesignBrand ? 'Brands cannot bag their own designs' : BAG_IT_LABEL}
+            >
+              <BagPulseIcon
+                status={bagBusy ? 'bagging' : ownsDesignBrand ? 'disabled' : 'not_bagged'}
+                context="rail"
+                size={34}
+                disabled={bagBusy || ownsDesignBrand}
+              />
+              <span className="text-xs font-bold mt-1 drop-shadow">{BAG_IT_LABEL}</span>
+            </button>
+          ) : null}
+
           <ThreadButton
             contentType="COLLECTION_MEDIA"
             contentId={item.id}

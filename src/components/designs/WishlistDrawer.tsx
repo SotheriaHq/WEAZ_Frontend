@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { X, Heart, ShoppingCart, Trash2, Sparkles, AlertTriangle, AlertCircle } from 'lucide-react';
+import { X, Heart, ShoppingBag, Trash2, Sparkles, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -20,6 +20,7 @@ import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useBagging } from '@/hooks/useBagging';
+import { BAG_IT_EMOJI, BAG_IT_LABEL } from '@/constants/bagging';
 
 const WishlistDrawer: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -427,8 +428,8 @@ const WishlistDrawer: React.FC = () => {
                                       disabled={isLoading}
                                       className={`ml-auto shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20 border border-indigo-100 dark:border-indigo-500/20`}
                                     >
-                                      <ShoppingCart size={12} />
-                                      {requiresOptionSelection(product) ? 'Select Options' : '🛍️ Bag it'}
+                                      <ShoppingBag size={12} />
+                                      {requiresOptionSelection(product) ? 'Select Options' : `${BAG_IT_EMOJI} ${BAG_IT_LABEL}`}
                                     </button>
                                   )}
                                 </div>

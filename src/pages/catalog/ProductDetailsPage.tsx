@@ -28,6 +28,7 @@ import { buildProductUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { useActiveCustomOrderConfiguration } from '@/hooks/useActiveCustomOrderConfiguration';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagging } from '@/hooks/useBagging';
+import { BAG_IT_EMOJI, BAG_IT_LABEL } from '@/constants/bagging';
 import ProductReviewSection from '@/components/reviews/ProductReviewSection';
 import { normalizeSizingMode } from '@/types/sizing';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
@@ -683,8 +684,8 @@ export default function ProductDetailsPage() {
                       </>
                     ) : (
                       <>
-                        <span aria-hidden="true">🛍️</span>
-                        Save Measurements & Bag it
+                        <span aria-hidden="true">{BAG_IT_EMOJI}</span>
+                        Save Measurements & {BAG_IT_LABEL}
                       </>
                     )}
                   </button>
@@ -988,7 +989,7 @@ export default function ProductDetailsPage() {
                           >
                             {startingCustomOrder
                               ? 'Opening custom-order bag...'
-                              : '✂️ Custom Bag It'}
+                              : `${BAG_IT_EMOJI} Custom ${BAG_IT_LABEL}`}
                           </button>
                         </span>
                       ) : null}
@@ -1008,7 +1009,7 @@ export default function ProductDetailsPage() {
                             size={32}
                             disabled={isOutOfStock || bagButtonLoading}
                           />
-                          {isOutOfStock ? 'Sold Out' : '🛍️ Bag it'}
+                          {isOutOfStock ? 'Sold Out' : `${BAG_IT_EMOJI} ${BAG_IT_LABEL}`}
                         </button>
                       ) : null}
                     </div>
