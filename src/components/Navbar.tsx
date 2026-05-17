@@ -127,9 +127,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleLocationShare = () => {
-    toast.info('Location sharing coming soon.');
-  };
   const handleHelpComingSoon = () => {
     toast.info('Help center coming soon.');
   };
@@ -288,16 +285,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
               ) : null}
             </>
           ) : null}
-
-          <DropdownItem
-            leftIcon="📍"
-            onClick={() => {
-              handleLocationShare();
-              setShowProfileMenu(false);
-            }}
-          >
-            {translate('location')}
-          </DropdownItem>
 
           <DropdownItem
             leftIcon="🆘"

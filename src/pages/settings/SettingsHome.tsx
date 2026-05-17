@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { toast } from 'sonner';
 import SettingsSidebar, {
   getGroupForKey,
   getItemForKey,
@@ -45,7 +46,53 @@ const ComingSoon: React.FC<{ title: string; description: string }> = ({
   </div>
 );
 
-/* ── Danger Zone (Store) ─────────────────────────────────────────── */
+/* ── Location settings ───────────────────────────────────────────── */
+const LocationSettings: React.FC = () => {
+  const handleShareLocation = () => {
+    toast.info('Location sharing is coming soon.');
+  };
+
+  return (
+    <div className="space-y-6">
+      <Link
+        to="/settings?tab=account-security"
+        className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
+      >
+        <span aria-hidden="true">👈</span>
+        Back to settings
+      </Link>
+
+      <div>
+        <h1 className="mb-2 text-2xl font-semibold text-gray-900 dark:text-white">
+          Location
+        </h1>
+        <p className="text-gray-500 dark:text-gray-400">
+          Choose whether Threadly can ask for your location to personalize nearby brands, delivery context, and future local discovery.
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-2xl" aria-hidden="true">
+          📍
+        </div>
+        <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+          Share your location?
+        </h2>
+        <p className="mb-5 max-w-xl text-sm leading-6 text-gray-600 dark:text-gray-300">
+          Threadly will always ask before using your location. Your precise location will not be shared with brands or other users from this screen.
+        </p>
+        <button
+          type="button"
+          onClick={handleShareLocation}
+          className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90"
+        >
+          Share location
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const StoreDangerZone: React.FC = () => (
   <div className="space-y-6">
     <div>
@@ -98,6 +145,7 @@ const sections: Record<string, React.ReactNode> = {
     />
   ),
   'profile-visibility': <ProfileVisibilitySettings />,
+  location: <LocationSettings />,
   'size-fits': <SizeFitSettings />,
   'hidden-content': <HiddenContentSettings />,
   billing: (

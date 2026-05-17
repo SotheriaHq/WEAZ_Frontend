@@ -31,6 +31,7 @@ const sidebarGroups: SidebarGroup[] = [
       { key: 'email-preferences', label: 'Email Preferences', path: '/settings?tab=email-preferences', icon: '📧', description: 'Scenario-level email delivery' },
       { key: 'privacy', label: 'Privacy', path: '/settings?tab=privacy', icon: '🛡️', description: 'Data & visibility' },
       { key: 'profile-visibility', label: 'Profile Visibility', path: '/settings?tab=profile-visibility', icon: '👁️', description: 'Who can see your profile' },
+      { key: 'location', label: 'Location', path: '/settings?tab=location', icon: '📍', description: 'Share location access' },
       { key: 'size-fits', label: 'Size & Fittings', path: '/settings?tab=size-fits', icon: '📏', description: 'Body measurements' },
       { key: 'hidden-content', label: 'Hidden Content', path: '/settings?tab=hidden-content', icon: '🙈', description: 'Manage hidden items' },
       { key: 'billing', label: 'Accounts', path: '/settings?tab=billing', icon: '🏦', description: 'Wallet, payout account, and payout history' },
