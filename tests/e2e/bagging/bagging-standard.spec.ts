@@ -20,8 +20,8 @@ test.describe('standard bagging', () => {
     await openSeedPath(page, baggingSeed.variantProductPath);
     await clickBagIt(page);
 
-    await expect(page.getByText(/select size|choose size|select color|choose color/i)).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole('button', { name: /add to bag|bag it/i })).toBeDisabled();
+    await expect(page.getByRole('dialog', { name: /select options/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: /add to bag/i })).toBeDisabled();
   });
 
   test('product requiring fittings opens fitting flow', async ({ page }) => {

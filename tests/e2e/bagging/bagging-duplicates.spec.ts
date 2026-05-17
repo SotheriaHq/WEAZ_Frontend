@@ -22,16 +22,19 @@ test.describe('bagging duplicate and checkout behavior', () => {
     await openSeedPath(page, baggingSeed.duplicatePaidActivePath);
     await clickBagIt(page);
 
-    await expect(page.getByText(/active paid custom order|already have an active paid/i)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/^You already have an active paid custom order/i)).toBeVisible({ timeout: 15000 });
   });
 
-  test('mixed standard and custom checkout renders payable and blocked lines', async ({ page }) => {
+  test('mixed standard and custom checkout renders seeded lines', async ({ page }) => {
     test.skip(!hasAuthSeed() || !requiresSeed(baggingSeed.mixedCheckoutPath), seedMissingReason('mixed checkout bag'));
 
     await signInWithSeedUser(page);
     await openSeedPath(page, baggingSeed.mixedCheckoutPath);
 
-    await expect(page.getByText(/bag lines|standard|custom/i)).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText(/blocked|unavailable|not payable/i).or(page.getByRole('button', { name: /pay|checkout|continue/i }))).toBeVisible();
+    await expect(page.getByRole('heading', { name: /order summary/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/E2E Bagging Mixed Checkout Standard Skirt/i)).toBeVisible();
+    await expect(page.getByText(/E2E Bagging Mixed Checkout Custom Kimono/i)).toBeVisible();
+    await expect(page.getByText(/custom requests/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /continue to payment/i })).toBeVisible();
   });
 });

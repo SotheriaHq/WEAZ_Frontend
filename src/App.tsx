@@ -80,6 +80,7 @@ const BrandStaffPage = lazy(() => import('./pages/studio/BrandStaffPage'));
 const BrandStaffInvitePage = lazy(() => import('./pages/studio/BrandStaffInvitePage'));
 const MyOrders = lazy(() => import('./pages/orders/MyOrders'));
 const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
+const CheckoutPage = lazy(() => import('./pages/checkout/CheckoutPage'));
 const CustomOrderComposerPage = lazy(() => import('./pages/custom-orders/CustomOrderComposerPage'));
 const CustomOrderCheckoutResumePage = lazy(() => import('./pages/custom-orders/CustomOrderCheckoutResumePage'));
 const MessagingManagementPage = lazy(() => import('./pages/messages/MessagingManagementPage'));
@@ -738,6 +739,7 @@ const router = createBrowserRouter([
         element: <ProtectedRoute />,
         children: [
           { path: '/bag', element: <Navigate to="/" replace /> },
+          { path: '/checkout', element: <Layout>{withRouteFallback(<CheckoutPage />)}</Layout> },
           { path: '/bag/payment-return', element: <Layout><PaymentReturnPage /></Layout> },
           { path: '/bag/confirmation', element: <Layout><OrderConfirmation /></Layout> },
           { path: '/orders', element: <Layout><MyOrders /></Layout> },

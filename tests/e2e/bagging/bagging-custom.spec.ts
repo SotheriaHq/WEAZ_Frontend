@@ -16,7 +16,7 @@ test.describe('custom bagging', () => {
     await openSeedPath(page, baggingSeed.customDesignPath);
     await clickBagIt(page);
 
-    await expect(page.getByText(/custom order|custom request|fittings|measurements/i)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: /create custom order/i })).toBeVisible({ timeout: 15000 });
   });
 
   test('custom product from market or product view enters custom flow', async ({ page }) => {
@@ -26,7 +26,7 @@ test.describe('custom bagging', () => {
     await openSeedPath(page, baggingSeed.customProductPath);
     await page.getByRole('button', { name: /custom bag it|bag as custom request|bag it as custom/i }).click();
 
-    await expect(page.getByText(/custom order|custom request|fittings|measurements/i)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: /create custom order/i })).toBeVisible({ timeout: 15000 });
   });
 
   test('missing fittings opens fitting flow for custom source', async ({ page }) => {

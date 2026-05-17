@@ -34,6 +34,20 @@ export type StandardBag = {
 
 const unwrap = <T>(data: unknown): T => unwrapApiResponse<T>(data as ApiSuccessPayload<T>);
 
+const shouldLogBagTiming = () => {
+  const mode = import.meta.env.MODE;
+  return import.meta.env.DEV || mode === 'test' || mode === 'e2e' || import.meta.env.VITE_BAGGING_OBSERVABILITY === 'true';
+};
+
+const logBagTiming = (label: string, startedAt: number, context: Record<string, unknown>) => {
+  if (!shouldLogBagTiming()) return;
+  console.debug('[bagging:timing]', {
+    event: `web.${label}.duration`,
+    durationMs: Math.round(performance.now() - startedAt),
+    ...context,
+  });
+};
+
 export const BagApi = {
   async getBagCount(): Promise<BagCount> {
     const response = await apiClient.get('/bag/count');
@@ -41,13 +55,23 @@ export const BagApi = {
   },
 
   async getProductBagStatus(productId: string): Promise<BagStatus> {
-    const response = await apiClient.get(`/store/products/${productId}/bag-status`);
-    return unwrap<BagStatus>(response.data);
+    const startedAt = performance.now();
+    try {
+      const response = await apiClient.get(`/store/products/${productId}/bag-status`);
+      return unwrap<BagStatus>(response.data);
+    } finally {
+      logBagTiming('product_status_request', startedAt, { productId });
+    }
   },
 
   async getSourceBagStatus(sourceType: BagSourceType, sourceId: string): Promise<BagStatus> {
-    const response = await apiClient.get(`/bag/sources/${sourceType}/${sourceId}/status`);
-    return unwrap<BagStatus>(response.data);
+    const startedAt = performance.now();
+    try {
+      const response = await apiClient.get(`/bag/sources/${sourceType}/${sourceId}/status`);
+      return unwrap<BagStatus>(response.data);
+    } finally {
+      logBagTiming('source_status_request', startedAt, { sourceType, sourceId });
+    }
   },
 
   async addStandardToBag(payload: StandardBagPayload): Promise<StandardBag> {

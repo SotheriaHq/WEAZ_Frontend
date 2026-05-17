@@ -28,11 +28,11 @@ export async function expectAuthPrompt(page: Page) {
 }
 
 export async function expectFittingsFlow(page: Page) {
-  await expect(page.getByText(/fittings|measurements|my fittings/i)).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('dialog', { name: /complete fittings/i })).toBeVisible({ timeout: 15000 });
 }
 
 export async function expectStaleFittingsPrompt(page: Page) {
-  await expect(page.getByText(/stale|continue with existing fittings|update fittings/i)).toBeVisible({
+  await expect(page.getByRole('dialog', { name: /review fittings before bagging/i })).toBeVisible({
     timeout: 15000,
   });
 }

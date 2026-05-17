@@ -6,7 +6,7 @@ export default defineConfig({
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
-    workers: process.env.CI ? 1 : undefined,
+    workers: process.env.CI || process.env.THREADLY_E2E_SERIAL ? 1 : undefined,
     reporter: 'list',
     use: {
         baseURL: process.env.PLAYWRIGHT_BASE_URL ?? process.env.VITE_E2E_BASE_URL ?? 'http://localhost:5173',
