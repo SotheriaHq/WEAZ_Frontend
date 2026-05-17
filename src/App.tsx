@@ -112,6 +112,7 @@ const AdminMessagingPage = lazy(() => import('./pages/admin/AdminMessagingPage')
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const EmailVerifyPage = lazy(() => import('./pages/EmailVerify'));
+const ChangeEmailConfirmPage = lazy(() => import('./pages/ChangeEmailConfirmPage'));
 
 const AppRouteFallback: React.FC = () => (
   /* Route chunk fallback that stays inside content flow instead of rendering
@@ -714,6 +715,10 @@ const router = createBrowserRouter([
       {
         path: '/verify-email',
         element: <EmailVerifyPage />,
+      },
+      {
+        path: '/change-email/confirm',
+        element: withRouteFallback(<ChangeEmailConfirmPage />),
       },
       {
         path: '/brand/staff/invite',

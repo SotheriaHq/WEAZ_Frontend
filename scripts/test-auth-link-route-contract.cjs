@@ -18,6 +18,7 @@ function main() {
   const appSource = read('src/App.tsx');
   const resetSource = read('src/pages/ResetPasswordPage.tsx');
   const verifySource = read('src/pages/EmailVerify.tsx');
+  const changeEmailConfirmSource = read('src/pages/ChangeEmailConfirmPage.tsx');
   const forgotSource = read('src/pages/ForgotPasswordPage.tsx');
   const accountSecuritySource = read(
     'src/components/settings/tabs/AccountSecuritySettings.tsx',
@@ -27,6 +28,9 @@ function main() {
   assertIncludes(appSource, "path: '/forgot-password'", 'Forgot-password route must be registered.');
   assertIncludes(appSource, "path: '/reset-password'", 'Reset-password route must be registered.');
   assertIncludes(appSource, "path: '/verify-email'", 'Verify-email route must be registered.');
+  assertIncludes(appSource, "path: '/change-email/confirm'", 'Email-change confirmation route must be registered.');
+  assertIncludes(appSource, "path: '/admin/reset-password'", 'Admin reset-password route must be registered.');
+  assertIncludes(appSource, "path: '/brand/staff/invite'", 'Brand staff invite route must be registered.');
 
   const verifyRouteIndex = appSource.indexOf("path: '/verify-email'");
   const guestRouteIndex = appSource.indexOf('element: <GuestRoute />');
@@ -39,6 +43,17 @@ function main() {
   assert.ok(
     protectedRouteIndex < 0 || verifyRouteIndex < protectedRouteIndex,
     'Verify-email must remain outside the protected route group.',
+  );
+
+  const changeEmailRouteIndex = appSource.indexOf("path: '/change-email/confirm'");
+  assert.ok(changeEmailRouteIndex >= 0, 'Email-change confirmation route must be present.');
+  assert.ok(
+    changeEmailRouteIndex < guestRouteIndex,
+    'Email-change confirmation must remain outside the guest-only route group.',
+  );
+  assert.ok(
+    protectedRouteIndex < 0 || changeEmailRouteIndex < protectedRouteIndex,
+    'Email-change confirmation must remain outside the protected route group.',
   );
 
   assert.match(
@@ -81,6 +96,27 @@ function main() {
     verifySource,
     /sanitizeNextPath/,
     'Verify-email must sanitize next-route handling.',
+  );
+
+  assert.match(
+    changeEmailConfirmSource,
+    /searchParams\.get\('token'\)\?\.trim\(\)/,
+    'Email-change confirmation must trim the query token.',
+  );
+  assert.match(
+    changeEmailConfirmSource,
+    /AuthApi\.confirmEmailChange\(token\)/,
+    'Email-change confirmation must call AuthApi.confirmEmailChange with the route token.',
+  );
+  assert.match(
+    changeEmailConfirmSource,
+    /window\.history\.replaceState\(\{\},\s*document\.title,\s*'\/change-email\/confirm'\)/,
+    'Email-change confirmation must remove the token from browser history.',
+  );
+  assert.doesNotMatch(
+    changeEmailConfirmSource,
+    /console\.(log|warn|error).*token/,
+    'Email-change confirmation must not log raw tokens.',
   );
 
   assert.match(
