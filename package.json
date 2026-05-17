@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
+    "test:auth-link-route-contract": "node scripts/test-auth-link-route-contract.cjs",
     "test:watch": "vitest --watch",
     "audit:theme": "node scripts/audit-theme-system.js"
   },
