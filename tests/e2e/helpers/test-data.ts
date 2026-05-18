@@ -11,6 +11,14 @@ export const baggingSeed = {
   duplicatePaidActivePath: process.env.THREADLY_E2E_DUPLICATE_PAID_ACTIVE_PATH ?? '',
   mixedCheckoutPath: process.env.THREADLY_E2E_MIXED_CHECKOUT_PATH ?? '/checkout',
   loggedOutBagPath: process.env.THREADLY_E2E_LOGGED_OUT_BAG_PATH ?? '',
+  collectionAllEligibleId: process.env.THREADLY_E2E_COLLECTION_ALL_ELIGIBLE_ID ?? '',
+  collectionAllEligiblePath: process.env.THREADLY_E2E_COLLECTION_ALL_ELIGIBLE_PATH ?? '',
+  collectionMixedId: process.env.THREADLY_E2E_COLLECTION_MIXED_ID ?? '',
+  collectionMixedPath: process.env.THREADLY_E2E_COLLECTION_MIXED_PATH ?? '',
+  collectionAlreadyInBagId: process.env.THREADLY_E2E_COLLECTION_ALREADY_IN_BAG_ID ?? '',
+  collectionAlreadyInBagPath: process.env.THREADLY_E2E_COLLECTION_ALREADY_IN_BAG_PATH ?? '',
+  collectionGalleryId: process.env.THREADLY_E2E_COLLECTION_GALLERY_ID ?? '',
+  collectionGalleryPath: process.env.THREADLY_E2E_COLLECTION_GALLERY_PATH ?? '',
 };
 
 export const hasAuthSeed = () =>

@@ -1,21 +1,36 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type BrowserContext, type Page } from '@playwright/test';
 import { baggingSeed } from './test-data';
 
-type StorageState = Awaited<ReturnType<Page['context']>> extends infer Context
-  ? Context extends { storageState: () => Promise<infer State> }
-    ? State
-    : never
-  : never;
+type StorageState = Awaited<ReturnType<BrowserContext['storageState']>>;
 
 let cachedSeedStorageState: StorageState | null = null;
 
-export async function signInWithSeedUser(page: Page) {
-  if (cachedSeedStorageState) {
-    await page.context().addCookies(cachedSeedStorageState.cookies);
-    await page.goto('/');
-    await expect(page.getByRole('button', { name: /profile menu/i })).toBeVisible({ timeout: 15000 });
-    return;
+async function restoreSeedUser(page: Page) {
+  if (!cachedSeedStorageState) return false;
+
+  await page.context().addCookies(cachedSeedStorageState.cookies);
+  await page.goto('/');
+  const origin = new URL(page.url()).origin;
+  const originState = cachedSeedStorageState.origins.find((entry) => entry.origin === origin);
+  if (originState?.localStorage?.length) {
+    await page.evaluate((entries) => {
+      entries.forEach((entry) => window.localStorage.setItem(entry.name, entry.value));
+    }, originState.localStorage);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    return true;
   }
+
+  try {
+    await expect(page.getByRole('button', { name: /profile menu/i })).toBeVisible({ timeout: 5000 });
+    return true;
+  } catch {
+    cachedSeedStorageState = null;
+    return false;
+  }
+}
+
+export async function signInWithSeedUser(page: Page) {
+  if (await restoreSeedUser(page)) return;
 
   await page.goto('/login');
 

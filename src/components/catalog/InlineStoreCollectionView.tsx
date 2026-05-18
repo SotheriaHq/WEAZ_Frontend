@@ -13,8 +13,9 @@ import { brandApi } from '@/api/BrandApi';
 import { toast } from 'sonner';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
-import { addToCart, openCartDrawer } from '@/features/cartSlice';
-import { getCollectionCartPreview, type CollectionCartPreviewResponse } from '@/api/collectionUploads';
+import { openCartDrawer } from '@/features/cartSlice';
+import { type CollectionCartPreviewResponse } from '@/api/collectionUploads';
+import { BagApi, type CollectionBagProductStatus, type CollectionBagStatus } from '@/api/BagApi';
 import { CollectionCartPreviewModal } from '@/components/collections/CollectionCartPreviewModal';
 import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
 import ImageWithFallback from '@/components/ImageWithFallback';
@@ -67,6 +68,52 @@ const formatPrice = (value?: number | null) => {
   } catch {
     return `₦${Math.round(value).toLocaleString()}`;
   }
+};
+
+const collectionBlockerCopy = (product: CollectionBagProductStatus) => {
+  if (product.inBag || product.defaultAction === 'ALREADY_IN_BAG') return 'Already in your bag';
+  if (product.stockState === 'OUT_OF_STOCK') return 'Out of stock';
+  if (product.defaultAction === 'OPEN_FITTINGS') return 'Measurements required';
+  if (product.defaultAction === 'CONFIRM_STALE_FITTINGS') return 'Confirm saved measurements first';
+  if (product.defaultAction === 'OPEN_CUSTOM_FLOW') return 'Custom flow required';
+  if (product.reason) return product.reason.split('_').join(' ').toLowerCase();
+  return 'Unavailable';
+};
+
+const canPreviewSelectProduct = (product: CollectionBagProductStatus) =>
+  product.defaultAction === 'ADD_STANDARD' || product.defaultAction === 'OPEN_SELECTOR';
+
+const collectionStatusToPreview = (status: CollectionBagStatus): CollectionCartPreviewResponse => {
+  const products = status.products.map((product) => {
+    const selectable = canPreviewSelectProduct(product);
+    return {
+      id: product.productId,
+      name: product.name,
+      price: product.price,
+      salePrice: null,
+      currency: product.currency || status.summary.currency || 'NGN',
+      thumbnail: product.coverImage,
+      images: product.media.map((media) => media.url).filter((url): url is string => Boolean(url)),
+      isAvailable: selectable,
+      unavailableReason: selectable ? undefined : collectionBlockerCopy(product),
+      variants: [],
+      sizes: product.availableSizes,
+      colors: product.availableColors,
+      defaultSize: product.availableSizes.length === 1 ? product.availableSizes[0] : undefined,
+      defaultColor: product.availableColors.length === 1 ? product.availableColors[0] : undefined,
+    };
+  });
+  const availableProducts = products.filter((product) => product.isAvailable);
+  return {
+    collectionId: status.collection.id,
+    collectionTitle: status.collection.title,
+    totalProducts: products.length,
+    availableCount: availableProducts.length,
+    unavailableCount: products.length - availableProducts.length,
+    totalPrice: availableProducts.reduce((sum, product) => sum + Number(product.salePrice ?? product.price ?? 0), 0),
+    currency: status.summary.currency || status.collection.priceRange.currency || 'NGN',
+    products,
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -245,8 +292,8 @@ const InlineStoreCollectionView: React.FC<InlineStoreCollectionViewProps> = ({
     }
     setAddingAll(true);
     try {
-      const preview = await getCollectionCartPreview(collectionId);
-      setCartPreviewData(preview);
+      const status = await BagApi.getCollectionBagStatus(collectionId);
+      setCartPreviewData(collectionStatusToPreview(status));
       setShowCartPreview(true);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load bag preview');
@@ -259,35 +306,41 @@ const InlineStoreCollectionView: React.FC<InlineStoreCollectionViewProps> = ({
     async (selections: Array<{ productId: string; quantity: number; variantSize?: string; variantColor?: string }>) => {
       setAddingAll(true);
       try {
-        const results = await Promise.all(
-          selections.map((s) =>
-            dispatch(
-              addToCart({
-                productId: s.productId,
-                quantity: s.quantity,
-                selectedSize: s.variantSize,
-                selectedColor: s.variantColor,
-              }),
-            )
-              .unwrap()
-              .then(() => true)
-              .catch(() => false),
+        const result = await BagApi.bagCollectionSelected(collectionId, {
+          productIds: selections.map((selection) => selection.productId),
+          selections: selections.reduce<Record<string, { quantity: number; selectedSize?: string; selectedColor?: string }>>(
+            (next, selection) => {
+              next[selection.productId] = {
+                quantity: selection.quantity,
+                selectedSize: selection.variantSize,
+                selectedColor: selection.variantColor,
+              };
+              return next;
+            },
+            {},
           ),
-        );
-        const successCount = results.filter(Boolean).length;
-        if (successCount > 0) {
+        });
+        if (result.summary.addedCount > 0) {
           dispatch(openCartDrawer());
-          toast.success(`Added ${successCount} item${successCount === 1 ? '' : 's'} to your bag`);
+          toast.success(`Added ${result.summary.addedCount} item${result.summary.addedCount === 1 ? '' : 's'} to your bag`);
         }
-        if (successCount < selections.length) {
-          toast.error('Some items could not be added');
+        if (result.summary.skippedCount > 0) {
+          toast.info(`${result.summary.skippedCount} item${result.summary.skippedCount === 1 ? '' : 's'} already in your bag`);
+        }
+        if (result.summary.blockedCount > 0) {
+          const blocked = result.blocked
+            .map((item) => item.reason.split('_').join(' ').toLowerCase())
+            .slice(0, 2)
+            .join(', ');
+          toast.error(blocked ? `Some items still need attention: ${blocked}` : 'Some selected items still need attention');
+          throw new Error('Collection selection has unresolved blockers');
         }
         setShowCartPreview(false);
       } finally {
         setAddingAll(false);
       }
     },
-    [dispatch],
+    [collectionId, dispatch],
   );
 
   // -----------------------------------------------------------------------

@@ -20,6 +20,14 @@ The bagging Playwright suite is wired for live Threadly seed data. Data-dependen
 - `THREADLY_E2E_DUPLICATE_PAID_ACTIVE_PATH`: source with a paid active duplicate.
 - `THREADLY_E2E_MIXED_CHECKOUT_PATH`: checkout route with mixed standard and custom lines.
 - `THREADLY_E2E_LOGGED_OUT_BAG_PATH`: baggable product or design path for auth prompt coverage.
+- `THREADLY_E2E_COLLECTION_ALL_ELIGIBLE_ID`: store collection where all linked products can be bagged.
+- `THREADLY_E2E_COLLECTION_ALL_ELIGIBLE_PATH`: route for the all-eligible store collection.
+- `THREADLY_E2E_COLLECTION_MIXED_ID`: store collection with eligible, size/color, fitting, stale, out-of-stock, and already-in-bag products.
+- `THREADLY_E2E_COLLECTION_MIXED_PATH`: route for the mixed-blocker store collection.
+- `THREADLY_E2E_COLLECTION_ALREADY_IN_BAG_ID`: store collection containing an item already in the buyer bag.
+- `THREADLY_E2E_COLLECTION_ALREADY_IN_BAG_PATH`: route for the already-in-bag collection.
+- `THREADLY_E2E_COLLECTION_GALLERY_ID`: media-rich store collection for native gallery/manual QA.
+- `THREADLY_E2E_COLLECTION_GALLERY_PATH`: route for the gallery collection.
 
 ## Selector Contract
 
@@ -29,5 +37,6 @@ The specs intentionally target buyer-visible copy and roles:
 - My Bag surface: dialog/body text matching `Your Bag` or `My Bag`.
 - Fittings: copy matching `Fittings`, `Measurements`, or `My Fittings`.
 - Stale fittings: copy matching `Continue with existing fittings` and `Update fittings`.
+- Collection bagging: route `/collections/:id`, button text `Add All to Bag`, modal title `Add Collection to Bag`, and backend mutation through `/bag/collections/:collectionId/bag-selected`.
 
 Seed data should keep these labels stable unless the product language changes across web and mobile together.

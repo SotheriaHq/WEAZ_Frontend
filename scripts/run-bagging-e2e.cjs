@@ -8,7 +8,7 @@ const envPath = resolve(__dirname, '..', '.env.e2e.bagging');
 const repoRoot = resolve(__dirname, '..', '..');
 const webRoot = resolve(__dirname, '..');
 const backendRoot = resolve(repoRoot, 'bthreadly');
-const backendPort = process.env.THREADLY_E2E_BACKEND_PORT || '3041';
+const backendPort = process.env.THREADLY_E2E_BACKEND_PORT || '3040';
 const webPort = process.env.THREADLY_E2E_WEB_PORT || '5173';
 const serverLogDir = resolve(webRoot, 'test-results', 'bagging-server-logs');
 

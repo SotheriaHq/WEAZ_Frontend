@@ -6,6 +6,7 @@ import type {
   CustomOrderCheckoutBagResponse,
 } from './CustomOrderApi';
 import type { SizingMode } from '@/types/sizing';
+import type { SizeRecommendationSnapshot } from '@/types/sizeFit';
 
 export type BagSourceType = 'PRODUCT' | 'DESIGN' | 'COLLECTION';
 
@@ -23,6 +24,8 @@ export type StandardBagPayload = {
   sizingMode?: SizingMode;
   requiredMeasurementKeys?: string[];
   sizeFitData?: Record<string, unknown>;
+  sizeRecommendationSnapshot?: SizeRecommendationSnapshot | Record<string, unknown>;
+  manualOverrideReason?: string;
 };
 
 export type StandardBag = {
@@ -31,6 +34,101 @@ export type StandardBag = {
   itemCount: number;
   totalQuantity?: number;
 };
+
+export interface CollectionBagProductStatus {
+  productId: string;
+  name: string;
+  coverImage: string | null;
+  coverImageId: string | null;
+  media: Array<{ url: string | null; fileId: string | null }>;
+  price: number;
+  currency: string;
+  canBag: boolean;
+  inBag: boolean;
+  reason: string | null;
+  stockState: string;
+  defaultAction:
+    | 'ADD_STANDARD'
+    | 'OPEN_SELECTOR'
+    | 'OPEN_FITTINGS'
+    | 'CONFIRM_STALE_FITTINGS'
+    | 'OPEN_CUSTOM_FLOW'
+    | 'ALREADY_IN_BAG'
+    | 'DISABLED';
+  requiresSize: boolean;
+  requiresColor: boolean;
+  availableSizes: string[];
+  availableColors: string[];
+  requiredMeasurementKeys: string[];
+  missingMeasurementKeys: string[];
+  freshnessState: string;
+  sourceStatus: BagStatus;
+}
+
+export interface CollectionBagStatus {
+  sourceType: 'COLLECTION';
+  sourceId: string;
+  collection: {
+    id: string;
+    title: string;
+    description: string | null;
+    brandId: string | null;
+    brandName: string | null;
+    coverImage: string | null;
+    coverImageId: string | null;
+    productCount: number;
+    priceRange: { min: number | null; max: number | null; currency: string };
+  };
+  summary: {
+    canBagAll: boolean;
+    canBagSelected: boolean;
+    eligibleCount: number;
+    blockedCount: number;
+    alreadyInBagCount: number;
+    requiresSelectionCount: number;
+    requiresFittingsCount: number;
+    staleFittingsCount: number;
+    outOfStockCount: number;
+    totalPrice: number;
+    currency: string;
+  };
+  products: CollectionBagProductStatus[];
+  ui: {
+    defaultAction: 'BAG_ALL' | 'BAG_SELECTED' | 'RESOLVE_BLOCKERS' | 'AUTH_REQUIRED' | 'DISABLED';
+    disabledReason: string | null;
+  };
+  featureFlags: { collectionReviewsEnabled: boolean };
+}
+
+export type CollectionBagSelection = {
+  selectedSize?: string;
+  selectedColor?: string;
+  quantity?: number;
+};
+
+export type CollectionBagMutationPayload = {
+  productIds?: string[];
+  selections?: Record<string, CollectionBagSelection>;
+  acknowledgements?: { staleFittingsAccepted?: boolean };
+};
+
+export interface CollectionBagMutationResult {
+  collectionId: string;
+  added: Array<{ productId: string; bagItemId: string; quantity: number }>;
+  skipped: Array<{ productId: string; reason: string }>;
+  blocked: Array<{
+    productId: string;
+    reason: string;
+    missingMeasurementKeys?: string[];
+    requiredMeasurementKeys?: string[];
+  }>;
+  summary: {
+    addedCount: number;
+    skippedCount: number;
+    blockedCount: number;
+    combinedBagCount: number;
+  };
+}
 
 const unwrap = <T>(data: unknown): T => unwrapApiResponse<T>(data as ApiSuccessPayload<T>);
 
@@ -71,6 +169,45 @@ export const BagApi = {
       return unwrap<BagStatus>(response.data);
     } finally {
       logBagTiming('source_status_request', startedAt, { sourceType, sourceId });
+    }
+  },
+
+  async getCollectionBagStatus(collectionId: string): Promise<CollectionBagStatus> {
+    const startedAt = performance.now();
+    try {
+      const response = await apiClient.get(`/bag/sources/COLLECTION/${collectionId}/status`);
+      return unwrap<CollectionBagStatus>(response.data);
+    } finally {
+      logBagTiming('collection_status_request', startedAt, { collectionId });
+    }
+  },
+
+  async bagCollectionAll(
+    collectionId: string,
+    payload: Omit<CollectionBagMutationPayload, 'productIds'> = {},
+  ): Promise<CollectionBagMutationResult> {
+    const startedAt = performance.now();
+    try {
+      const response = await apiClient.post(`/bag/collections/${collectionId}/bag-all`, payload);
+      return unwrap<CollectionBagMutationResult>(response.data);
+    } finally {
+      logBagTiming('collection_bag_all_request', startedAt, { collectionId });
+    }
+  },
+
+  async bagCollectionSelected(
+    collectionId: string,
+    payload: CollectionBagMutationPayload,
+  ): Promise<CollectionBagMutationResult> {
+    const startedAt = performance.now();
+    try {
+      const response = await apiClient.post(`/bag/collections/${collectionId}/bag-selected`, payload);
+      return unwrap<CollectionBagMutationResult>(response.data);
+    } finally {
+      logBagTiming('collection_bag_selected_request', startedAt, {
+        collectionId,
+        productCount: payload.productIds?.length ?? 0,
+      });
     }
   },
 
