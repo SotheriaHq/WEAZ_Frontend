@@ -8,12 +8,14 @@ import FinancePage from '@/pages/dashboard/FinancePage';
 import CustomersPage from '@/pages/dashboard/CustomersPage';
 import StoreManagement from '@/pages/studio/store/StoreManagement';
 import MessagingManagementPage from '@/pages/messages/MessagingManagementPage';
+import BrandReviewsDashboardPage from '@/pages/studio/BrandReviewsDashboardPage';
 
 const sections: Record<string, React.ReactNode> = {
   overview: <DashboardHome />,
   store: <StoreManagement />,
   orders: <UnifiedOrdersPage />,
   messages: <MessagingManagementPage />,
+  reviews: <BrandReviewsDashboardPage />,
   customers: <CustomersPage />,
   analytics: <AnalyticsPage />,
   finance: <FinancePage />,

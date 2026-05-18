@@ -121,4 +121,72 @@ describe('reviewApi lifecycle client', () => {
     expect(result.items[0].canEdit).toBe(true);
     expect(result.items[0].satisfaction).toBe('HAPPY');
   });
+
+  it('loads the buyer My Reviews lifecycle endpoint', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        data: {
+          items: [
+            {
+              ...reviewPayload,
+              target: { type: 'PRODUCT', id: 'product-1', name: 'Review Product' },
+            },
+          ],
+          nextCursor: 'cursor-2',
+        },
+      },
+    });
+
+    const result = await reviewApi.getMyReviews({ limit: 25, targetType: 'PRODUCT' }, 'buyer-1');
+
+    expect(get).toHaveBeenCalledWith('/reviews/me', { params: { limit: 25, targetType: 'PRODUCT' } });
+    expect(result.nextCursor).toBe('cursor-2');
+    expect(result.items[0].target?.name).toBe('Review Product');
+    expect(result.items[0].canDelete).toBe(true);
+  });
+
+  it('loads the brand lifecycle dashboard and normalizes breakdown counts', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        data: {
+          items: [reviewPayload],
+          summary: {
+            averageRating: 4.5,
+            reviewCount: 2,
+            statusCounts: { APPROVED: 1, FLAGGED: 1 },
+            targetTypeCounts: { PRODUCT: 2 },
+            flaggedCount: 1,
+          },
+          breakdown: {
+            targets: [
+              { targetType: 'PRODUCT', targetId: 'product-1', name: 'Review Product', reviewCount: 2, averageRating: 4.5 },
+            ],
+          },
+          nextCursor: null,
+        },
+      },
+    });
+
+    const result = await reviewApi.getBrandLifecycleDashboard({ status: 'FLAGGED' });
+
+    expect(get).toHaveBeenCalledWith('/brands/reviews/lifecycle', { params: { status: 'FLAGGED' } });
+    expect(result.summary.flaggedCount).toBe(1);
+    expect(result.breakdown.targets[0]).toMatchObject({ name: 'Review Product', reviewCount: 2 });
+  });
+
+  it('reports a brand lifecycle review with idempotency headers', async () => {
+    post.mockResolvedValueOnce({ data: { data: { ...reviewPayload, status: 'FLAGGED' } } });
+
+    const result = await reviewApi.reportBrandLifecycleReview('review-1', {
+      reason: 'OFF_TOPIC',
+      details: 'Unrelated to the garment.',
+    });
+
+    expect(post).toHaveBeenCalledWith(
+      '/brands/reviews/lifecycle/review-1/report',
+      { reason: 'OFF_TOPIC', details: 'Unrelated to the garment.' },
+      { headers: { 'Idempotency-Key': 'review-idem-key' } },
+    );
+    expect(result.status).toBe('FLAGGED');
+  });
 });

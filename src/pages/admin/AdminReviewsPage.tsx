@@ -3,6 +3,7 @@ import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   adminReviewsApi,
+  type AdminReviewAnalytics,
   type AdminLifecycleReview,
   type AdminLifecycleReviewListResponse,
   type AdminLifecycleReviewStatus,
@@ -67,6 +68,8 @@ const formatDate = (value?: string | null) => {
   return date.toLocaleString();
 };
 
+const formatNumber = (value: number) => new Intl.NumberFormat('en-NG').format(value);
+
 const excerpt = (value?: string | null) => {
   if (!value?.trim()) return 'No text review.';
   return value.length > 140 ? `${value.slice(0, 137)}...` : value;
@@ -103,6 +106,8 @@ const AdminReviewsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<AdminReviewAnalytics | null>(null);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminLifecycleReview | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
@@ -147,6 +152,22 @@ const AdminReviewsPage: React.FC = () => {
   useEffect(() => {
     void loadReviews();
   }, [loadReviews]);
+
+  const loadAnalytics = useCallback(async () => {
+    setAnalyticsError(null);
+    try {
+      const response = await adminReviewsApi.getReviewAnalytics();
+      const payload = unwrapApiResponse<AdminReviewAnalytics>(response.data as any);
+      setAnalytics(payload ?? null);
+    } catch (err: any) {
+      setAnalytics(null);
+      setAnalyticsError(err?.response?.data?.message || 'Failed to load review analytics');
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadAnalytics();
+  }, [loadAnalytics]);
 
   const loadDetail = async (reviewId: string) => {
     setDetailLoading(true);
@@ -200,12 +221,95 @@ const AdminReviewsPage: React.FC = () => {
         </div>
         <button
           type="button"
-          onClick={() => void loadReviews()}
+          onClick={() => {
+            void loadReviews();
+            void loadAnalytics();
+          }}
           className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
         >
           Refresh
         </button>
       </div>
+
+      <section className="rounded-xl border border-gray-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Review Analytics
+            </h2>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Aggregate lifecycle review health across buyer, brand, and moderation states.
+            </p>
+          </div>
+          {analyticsError ? (
+            <button
+              type="button"
+              onClick={() => void loadAnalytics()}
+              className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-500/20 dark:text-red-300 dark:hover:bg-red-500/10"
+            >
+              Retry analytics
+            </button>
+          ) : null}
+        </div>
+
+        {analyticsError ? (
+          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+            {analyticsError}
+          </div>
+        ) : !analytics ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="h-20 animate-pulse rounded-lg bg-gray-100 dark:bg-white/8" />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              {[
+                ['Total reviews', formatNumber(analytics.totalReviews)],
+                ['Active reviews', formatNumber(analytics.activeReviewCount)],
+                ['Average rating', `${analytics.averageRating.toFixed(1)}/5`],
+                ['Flagged', formatNumber(analytics.flaggedCount)],
+                ['Hidden/deleted', `${formatNumber(analytics.hiddenCount)} / ${formatNumber(analytics.deletedCount)}`],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
+                  <p className="mt-2 text-xl font-bold text-gray-900 dark:text-white">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="rounded-lg border border-gray-200 p-3 dark:border-white/10">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Top reviewed brands</p>
+                <div className="mt-3 space-y-2">
+                  {analytics.topReviewedBrands.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No brand review volume yet.</p>
+                  ) : analytics.topReviewedBrands.map((brand) => (
+                    <div key={brand.brandId ?? brand.name ?? 'brand'} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="truncate text-gray-700 dark:text-gray-200">{brand.name ?? brand.brandId ?? 'Unknown brand'}</span>
+                      <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{brand.reviewCount} · {brand.averageRating.toFixed(1)}/5</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-lg border border-gray-200 p-3 dark:border-white/10">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Top reviewed products</p>
+                <div className="mt-3 space-y-2">
+                  {analytics.topReviewedProducts.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No product review volume yet.</p>
+                  ) : analytics.topReviewedProducts.map((product) => (
+                    <div key={product.productId ?? product.name ?? 'product'} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="truncate text-gray-700 dark:text-gray-200">{product.name ?? product.productId ?? 'Unknown product'}</span>
+                      <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{product.reviewCount} · {product.averageRating.toFixed(1)}/5</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
 
       <section className="rounded-xl border border-gray-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">

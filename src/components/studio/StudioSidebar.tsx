@@ -9,6 +9,7 @@ interface StudioSidebarProps {
 }
 
 const ALL_ITEMS = [
+  { key: 'reviews', label: 'Reviews', path: '/studio?tab=reviews', emoji: '⭐', requiresSetup: true },
   { key: 'overview', label: 'Dashboard', path: '/studio', emoji: '📊', requiresSetup: true },
   { key: 'store', label: 'Store', path: '/studio/store', emoji: '🛍️', requiresSetup: false },
   { key: 'orders', label: 'Orders', path: '/studio?tab=orders', emoji: '📦', requiresSetup: true },

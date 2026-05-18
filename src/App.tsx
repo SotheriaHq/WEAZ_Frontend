@@ -79,6 +79,7 @@ const BrandPayoutsPage = lazy(() => import('./pages/store/BrandPayoutsPage'));
 const BrandStaffPage = lazy(() => import('./pages/studio/BrandStaffPage'));
 const BrandStaffInvitePage = lazy(() => import('./pages/studio/BrandStaffInvitePage'));
 const MyOrders = lazy(() => import('./pages/orders/MyOrders'));
+const MyReviewsPage = lazy(() => import('./pages/account/MyReviewsPage'));
 const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
 const CheckoutPage = lazy(() => import('./pages/checkout/CheckoutPage'));
 const CustomOrderComposerPage = lazy(() => import('./pages/custom-orders/CustomOrderComposerPage'));
@@ -727,6 +728,10 @@ const router = createBrowserRouter([
         element: withRouteFallback(<BrandStaffInvitePage />),
       },
       {
+        path: '/brand/reviews',
+        element: <StudioRedirect to="/studio?tab=reviews" />,
+      },
+      {
         element: <GuestRoute />,
         children: [
           { path: '/signup', element: <SignupPage /> },
@@ -744,6 +749,7 @@ const router = createBrowserRouter([
           { path: '/bag/payment-return', element: <Layout><PaymentReturnPage /></Layout> },
           { path: '/bag/confirmation', element: <Layout><OrderConfirmation /></Layout> },
           { path: '/orders', element: <Layout><MyOrders /></Layout> },
+          { path: '/account/reviews', element: <Layout><MyReviewsPage /></Layout> },
           { path: '/messages', element: <Layout><MessagingManagementPage /></Layout> },
           {
             path: '/store/payouts',

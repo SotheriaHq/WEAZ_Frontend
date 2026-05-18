@@ -309,6 +309,16 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
             My Orders
           </DropdownItem>
 
+          <DropdownItem
+            leftIcon="⭐"
+            onClick={() => {
+              navigate('/account/reviews');
+              setShowProfileMenu(false);
+            }}
+          >
+            My Reviews
+          </DropdownItem>
+
           {!isStudioProfileMenu ? (
             <DropdownItem
               leftIcon="🤍"

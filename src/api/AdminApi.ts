@@ -108,6 +108,32 @@ export interface AdminLifecycleReviewListResponse {
   nextCursor?: string | null;
 }
 
+export interface AdminReviewAnalytics {
+  totalReviews: number;
+  averageRating: number;
+  activeReviewCount: number;
+  statusCounts: Record<AdminLifecycleReviewStatus, number>;
+  targetTypeCounts: Record<AdminLifecycleReviewTargetType, number>;
+  satisfactionDistribution: Record<string, number>;
+  flaggedCount: number;
+  hiddenCount: number;
+  deletedCount: number;
+  pendingModerationCount: number;
+  reviewsCreatedOverTime: Record<string, number>;
+  topReviewedBrands: Array<{
+    brandId: string | null;
+    name: string | null;
+    reviewCount: number;
+    averageRating: number;
+  }>;
+  topReviewedProducts: Array<{
+    productId: string | null;
+    name: string | null;
+    reviewCount: number;
+    averageRating: number;
+  }>;
+}
+
 // ── Dashboard ──
 export const adminDashboardApi = {
   getStats: () =>
@@ -400,6 +426,8 @@ export const adminReviewsApi = {
     apiClient.get<AdminLifecycleReviewListResponse>('/admin/reviews/lifecycle', { params }),
   getLifecycleReview: (reviewId: string) =>
     apiClient.get<AdminLifecycleReview>(`/admin/reviews/lifecycle/${reviewId}`),
+  getReviewAnalytics: () =>
+    apiClient.get<AdminReviewAnalytics>('/admin/reviews/analytics'),
   getReports: (params?: Record<string, string>) =>
     apiClient.get('/admin/reviews/reports', { params }),
   moderateReview: (
