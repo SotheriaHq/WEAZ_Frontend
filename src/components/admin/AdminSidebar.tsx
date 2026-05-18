@@ -30,6 +30,7 @@ const navItems: NavItem[] = [
   { key: 'disputes', label: 'Disputes', path: '/admin/disputes', emoji: '⚖️', permission: 'DISPUTES_READ' },
   { key: 'messaging', label: 'Messaging', path: '/admin/messaging', emoji: '💬', permission: 'MESSAGING_READ' },
   { key: 'moderation', label: 'Moderation', path: '/admin/moderation', emoji: '🛡️', permission: 'MODERATION_READ' },
+  { key: 'reviews', label: 'Reviews', path: '/admin/reviews', emoji: '⭐', permission: 'MODERATION_READ' },
   { key: 'audit', label: 'Audit', path: '/admin/audit', emoji: '📋', permission: 'AUDIT_READ' },
   { key: 'settings', label: 'Settings', path: '/admin/settings', emoji: '⚙️', superAdminOnly: true },
 ];

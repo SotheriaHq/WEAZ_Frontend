@@ -8,7 +8,7 @@ import { unwrapApiResponse } from '@/types/auth';
 import { useUploadLimits } from '@/context/UploadLimitsContext';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 
-type Tab = 'sla' | 'flags' | 'uploads' | 'dashboard' | 'messaging';
+type Tab = 'sla' | 'flags' | 'uploads' | 'dashboard' | 'messaging' | 'reviews';
 
 /** Human-readable labels for upload config keys */
 const UPLOAD_KEY_LABELS: Record<string, { label: string; hint: string }> = {
@@ -30,6 +30,25 @@ type SizeUnit = 'KB' | 'MB' | 'GB';
 const UNIT_BYTES: Record<SizeUnit, number> = { KB: 1024, MB: 1024 * 1024, GB: 1024 * 1024 * 1024 };
 const UNITS: SizeUnit[] = ['KB', 'MB', 'GB'];
 const UNIT_OPTIONS = UNITS.map((u) => ({ value: u, label: u }));
+const REVIEW_FLAG_KEYS = [
+  'reviews.capture.enabled',
+  'reviews.prompt.afterCompletion.enabled',
+  'reviews.publicDisplay.product.enabled',
+  'reviews.publicDisplay.brand.enabled',
+  'reviews.publicDisplay.collection.enabled',
+  'reviews.publicDisplay.design.enabled',
+  'reviews.moderation.required',
+];
+const REVIEW_FLAG_LABELS: Record<string, { label: string; hint: string }> = {
+  'reviews.capture.enabled': { label: 'Review capture', hint: 'Allows buyers to submit, edit, and delete lifecycle reviews.' },
+  'reviews.prompt.afterCompletion.enabled': { label: 'Prompt after completion', hint: 'Creates optional prompts after completed standard/custom orders.' },
+  'reviews.publicDisplay.product.enabled': { label: 'Public product reviews', hint: 'Shows verified product review lists and summaries.' },
+  'reviews.publicDisplay.brand.enabled': { label: 'Public brand reviews', hint: 'Shows brand Reviews tab summaries and lists.' },
+  'reviews.publicDisplay.collection.enabled': { label: 'Public collection reviews', hint: 'Off by default; keep hidden unless explicitly enabled.' },
+  'reviews.publicDisplay.design.enabled': { label: 'Public design reviews', hint: 'Off by default; keep hidden unless explicitly enabled.' },
+  'reviews.moderation.required': { label: 'Moderation required', hint: 'New reviews enter pending moderation before public display.' },
+};
+const REVIEW_EDIT_WINDOW_KEY = 'reviews.editWindowHours';
 
 /** Pick the best human-readable unit for a byte value. */
 const bestUnit = (bytes: number): SizeUnit => {
@@ -73,12 +92,12 @@ const AdminSettingsPage: React.FC = () => {
       ]);
       const slaPayload = unwrapApiResponse<AdminSlaConfig[] | { items?: AdminSlaConfig[] }>(slaRes.data as any);
       const flagsPayload = unwrapApiResponse<FeatureFlag[] | { items?: FeatureFlag[] }>(flagsRes.data as any);
+      const configMap = Object.fromEntries((configEntries ?? []).map((entry) => [entry.key, entry.value]));
       setSlaConfigs(Array.isArray(slaPayload) ? slaPayload : slaPayload?.items ?? []);
       setFeatureFlags(Array.isArray(flagsPayload) ? flagsPayload : flagsPayload?.items ?? []);
       setUploadLimits(limitsData);
-      setSystemConfig(
-        Object.fromEntries((configEntries ?? []).map((entry) => [entry.key, entry.value])),
-      );
+      setSystemConfig(configMap);
+      setReviewConfigDraft(configMap[REVIEW_EDIT_WINDOW_KEY] ?? '24');
 
       // Initialize edited values with best-fit units
       const initialValues: Record<string, string> = {};
@@ -160,6 +179,7 @@ const AdminSettingsPage: React.FC = () => {
     { value: 'uploads', label: 'Upload Limits' },
     { value: 'dashboard', label: 'Dashboard' },
     { value: 'messaging', label: 'Messaging Rules' },
+    { value: 'reviews', label: 'Review Rules' },
   ];
 
   const showDailySignupCount = (systemConfig['admin.dashboard.showDailySignupCount'] ?? 'true') === 'true';
@@ -176,6 +196,7 @@ const AdminSettingsPage: React.FC = () => {
   ];
 
   const [messagingDirty, setMessagingDirty] = useState<Record<string, string>>({});
+  const [reviewConfigDraft, setReviewConfigDraft] = useState('');
 
   const getMessagingVal = (key: string) => messagingDirty[key] ?? systemConfig[key] ?? '';
   const setMessagingVal = (key: string, val: string) => setMessagingDirty((prev) => ({ ...prev, [key]: val }));
@@ -194,6 +215,38 @@ const AdminSettingsPage: React.FC = () => {
       await fetchData();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to save messaging rules');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const reviewFlags = featureFlags.filter((flag) => REVIEW_FLAG_KEYS.includes(flag.key));
+  const hasReviewEditWindowChange = reviewConfigDraft !== (systemConfig[REVIEW_EDIT_WINDOW_KEY] ?? '24');
+
+  const handleSaveReviewRules = async () => {
+    const editWindow = Number(reviewConfigDraft);
+    if (!Number.isInteger(editWindow) || editWindow < 1 || editWindow > 168) {
+      toast.error('Review edit window must be a whole number from 1 to 168 hours');
+      return;
+    }
+
+    if (!hasReviewEditWindowChange) {
+      toast.info('No review rule changes to save');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await configApi.bulkUpdateConfig([
+        {
+          key: REVIEW_EDIT_WINDOW_KEY,
+          value: String(editWindow),
+        },
+      ]);
+      setSystemConfig((prev) => ({ ...prev, [REVIEW_EDIT_WINDOW_KEY]: String(editWindow) }));
+      toast.success('Review edit window saved');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to save review rules');
     } finally {
       setSaving(false);
     }
@@ -407,6 +460,89 @@ const AdminSettingsPage: React.FC = () => {
                 </div>
               );
             })}
+          </div>
+        </div>
+      ) : tab === 'reviews' ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Review Lifecycle Rules</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Control review capture, public display, moderation, and the buyer edit window.
+                Collection and design public review display should stay off unless the product decision changes.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveReviewRules}
+              disabled={!hasReviewEditWindowChange || saving}
+              className="shrink-0 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {saving ? 'Saving...' : 'Save Rules'}
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-gray-200/60 bg-white/60 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">Edit window</div>
+                <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                  Buyers can edit reviews only inside this many hours from original creation. Editing does not reset the timer.
+                </div>
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={168}
+                step={1}
+                value={reviewConfigDraft}
+                onChange={(e) => setReviewConfigDraft(e.target.value)}
+                className="w-24 shrink-0 rounded-lg border border-gray-200/60 bg-white px-2.5 py-1.5 text-right text-sm font-mono outline-none focus:ring-1 focus:ring-purple-400/50 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                aria-label="Review edit window hours"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {reviewFlags.length === 0 ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+                Review feature flags are not present yet. Run backend bootstrap/migrations before using this control.
+              </div>
+            ) : (
+              reviewFlags.map((flag) => {
+                const info = REVIEW_FLAG_LABELS[flag.key] ?? { label: flag.key, hint: flag.description ?? '' };
+                const isCollectionOrDesign =
+                  flag.key === 'reviews.publicDisplay.collection.enabled' ||
+                  flag.key === 'reviews.publicDisplay.design.enabled';
+                return (
+                  <div
+                    key={flag.id}
+                    className="flex items-center justify-between gap-4 rounded-xl border border-gray-200/60 bg-white/60 p-4 dark:border-white/10 dark:bg-white/[0.03]"
+                  >
+                    <div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{info.label}</div>
+                      <div className="text-[11px] text-gray-500 dark:text-gray-400">{info.hint}</div>
+                      {isCollectionOrDesign && (
+                        <div className="mt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-300">
+                          Default OFF for Phase 16B-2.
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleFlag(flag)}
+                      className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition ${
+                        flag.enabled
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-500/20 dark:text-green-400'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
+                      }`}
+                    >
+                      {flag.enabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       ) : (

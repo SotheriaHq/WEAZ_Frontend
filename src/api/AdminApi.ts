@@ -46,6 +46,68 @@ import type {
 
 type Paginated<T> = { items: T[]; nextCursor?: string };
 
+export type AdminLifecycleReviewStatus = 'APPROVED' | 'PENDING_MODERATION' | 'HIDDEN' | 'FLAGGED' | 'DELETED';
+export type AdminLifecycleReviewTargetType = 'PRODUCT' | 'COLLECTION' | 'DESIGN' | 'CUSTOM_ORDER' | 'BRAND';
+
+export interface AdminLifecycleReview {
+  id: string;
+  reviewerId: string;
+  brandId: string | null;
+  productId: string | null;
+  collectionId: string | null;
+  legacyCollectionId: string | null;
+  designId: string | null;
+  orderId: string | null;
+  orderItemId: string | null;
+  customOrderId: string | null;
+  targetType: AdminLifecycleReviewTargetType;
+  rating: number;
+  satisfaction: string;
+  reviewText: string | null;
+  verifiedPurchase: boolean;
+  status: AdminLifecycleReviewStatus;
+  editWindowExpiresAt: string;
+  editedAt: string | null;
+  deletedAt: string | null;
+  deletedById?: string | null;
+  hiddenReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  reviewer?: {
+    id: string;
+    email: string;
+    username: string;
+    displayName: string;
+    profileImage?: string | null;
+  } | null;
+  brand?: {
+    id: string;
+    name: string;
+    logo?: string | null;
+  } | null;
+  target?: {
+    type: AdminLifecycleReviewTargetType;
+    id?: string | null;
+    name?: string | null;
+    mediaUrl?: string | null;
+    product?: Record<string, unknown> | null;
+    orderItem?: Record<string, unknown> | null;
+    customOrder?: Record<string, unknown> | null;
+  } | null;
+  deletedBy?: {
+    id: string;
+    email: string;
+    username: string;
+  } | null;
+}
+
+export interface AdminLifecycleReviewListResponse {
+  items: AdminLifecycleReview[];
+  nextCursor?: string | null;
+}
+
 // ── Dashboard ──
 export const adminDashboardApi = {
   getStats: () =>
@@ -334,12 +396,22 @@ export const adminModerationApi = {
 export const adminReviewsApi = {
   getReviews: (params?: Record<string, string>) =>
     apiClient.get('/admin/reviews', { params }),
+  getLifecycleReviews: (params?: Record<string, string>) =>
+    apiClient.get<AdminLifecycleReviewListResponse>('/admin/reviews/lifecycle', { params }),
+  getLifecycleReview: (reviewId: string) =>
+    apiClient.get<AdminLifecycleReview>(`/admin/reviews/lifecycle/${reviewId}`),
   getReports: (params?: Record<string, string>) =>
     apiClient.get('/admin/reviews/reports', { params }),
   moderateReview: (
     reviewId: string,
     data: { action: 'KEEP' | 'HIDE' | 'RESTORE' | 'DELETE'; reason?: string; moderatorNote?: string },
   ) => apiClient.patch(`/admin/reviews/${reviewId}/moderation`, data),
+  hideLifecycleReview: (reviewId: string, data: { reason?: string }) =>
+    apiClient.patch<AdminLifecycleReview>(`/admin/reviews/${reviewId}/hide`, data),
+  approveLifecycleReview: (reviewId: string) =>
+    apiClient.patch<AdminLifecycleReview>(`/admin/reviews/${reviewId}/approve`, {}),
+  flagLifecycleReview: (reviewId: string, data: { reason?: string }) =>
+    apiClient.patch<AdminLifecycleReview>(`/admin/reviews/${reviewId}/flag`, data),
 };
 
 // ── Audit Logs ──

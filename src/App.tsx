@@ -102,6 +102,7 @@ const AdminOrderDetailPage = lazy(() => import('./pages/admin/AdminOrderDetailPa
 const AdminOrdersPage = lazy(() => import('./pages/admin/AdminOrdersPage'));
 const AdminDisputesPage = lazy(() => import('./pages/admin/AdminDisputesPage'));
 const AdminModerationPage = lazy(() => import('./pages/admin/AdminModerationPage'));
+const AdminReviewsPage = lazy(() => import('./pages/admin/AdminReviewsPage'));
 const AdminAuditPage = lazy(() => import('./pages/admin/AdminAuditPage'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'));
 const AdminForceResetPasswordPage = lazy(() => import('./pages/admin/AdminForceResetPasswordPage'));
@@ -858,6 +859,7 @@ const router = createBrowserRouter([
           { path: 'disputes', element: <RequireAdminPermission permission="DISPUTES_READ"><AdminDisputesPage /></RequireAdminPermission> },
           { path: 'messaging', element: <RequireAdminPermission permission="MESSAGING_READ"><AdminMessagingPage /></RequireAdminPermission> },
           { path: 'moderation', element: <RequireAdminPermission permission="MODERATION_READ"><AdminModerationPage /></RequireAdminPermission> },
+          { path: 'reviews', element: <RequireAdminPermission permission="MODERATION_READ"><AdminReviewsPage /></RequireAdminPermission> },
           { path: 'audit', element: <RequireAdminPermission permission="AUDIT_READ"><AdminAuditPage /></RequireAdminPermission> },
           { path: 'settings', element: <RequireAdminPermission permission="SYSTEM_SLA_READ"><AdminSettingsPage /></RequireAdminPermission> },
           { path: 'settings/sla', element: <RequireAdminPermission permission="SYSTEM_SLA_READ"><AdminSettingsPage /></RequireAdminPermission> },
