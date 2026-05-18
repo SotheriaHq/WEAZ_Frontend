@@ -8,9 +8,12 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import VLoader from '@/components/loaders/VLoader';
 import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
+import ReviewFormModal from '@/components/reviews/ReviewFormModal';
+import ReviewPromptCard from '@/components/reviews/ReviewPromptCard';
 import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
 import { CustomOrderBadge, formatDateTime } from '@/components/custom-orders/CustomOrderUi';
 import { formatCustomOrderCode } from '@/components/custom-orders/customOrderFormatting';
+import reviewApi, { type ReviewPromptDto, type SubmitReviewPayload } from '@/api/ReviewApi';
 
 type BuyerOrderTab = 'all' | 'active' | 'awaiting' | 'completed' | 'cancelled';
 type OrdersView = 'standard' | 'custom';
@@ -100,6 +103,9 @@ const MyOrders: React.FC = () => {
   const [customSearchQuery, setCustomSearchQuery] = useState('');
   const deferredCustomSearchQuery = useDeferredValue(customSearchQuery);
   const [activeReviewItem, setActiveReviewItem] = useState<any | null>(null);
+  const [reviewPrompts, setReviewPrompts] = useState<ReviewPromptDto[]>([]);
+  const [activeReviewPrompt, setActiveReviewPrompt] = useState<ReviewPromptDto | null>(null);
+  const [skippingPromptId, setSkippingPromptId] = useState<string | null>(null);
 
   useEffect(() => {
     const paymentFailureReason =
@@ -170,6 +176,47 @@ const MyOrders: React.FC = () => {
   useEffect(() => {
     void loadOrders();
   }, [loadOrders]);
+
+  const loadReviewPrompts = useCallback(async () => {
+    if (!flags.writeEnabled) {
+      setReviewPrompts([]);
+      return;
+    }
+
+    try {
+      const prompts = await reviewApi.listReviewPrompts();
+      setReviewPrompts(prompts);
+    } catch (error) {
+      const status = (error as { status?: number })?.status;
+      if (status !== 401 && status !== 403) {
+        toast.error(error instanceof Error ? error.message : 'Failed to load review prompts');
+      }
+    }
+  }, [flags.writeEnabled]);
+
+  useEffect(() => {
+    void loadReviewPrompts();
+  }, [loadReviewPrompts]);
+
+  const submitPromptReview = async (payload: SubmitReviewPayload) => {
+    const saved = await reviewApi.submitReview(payload);
+    setReviewPrompts((current) => current.filter((prompt) => prompt.id !== payload.promptId));
+    setActiveReviewPrompt(null);
+    toast.success(saved.status === 'PENDING_MODERATION' ? 'Review submitted for moderation' : 'Review submitted');
+  };
+
+  const skipPrompt = async (prompt: ReviewPromptDto) => {
+    setSkippingPromptId(prompt.id);
+    try {
+      await reviewApi.skipReviewPrompt(prompt.id);
+      setReviewPrompts((current) => current.filter((item) => item.id !== prompt.id));
+      toast.success('Review prompt skipped');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to skip review prompt');
+    } finally {
+      setSkippingPromptId(null);
+    }
+  };
 
   const standardStats = useMemo(() => ({
     total: orders.length,
@@ -244,6 +291,26 @@ const MyOrders: React.FC = () => {
           })}
         </div>
       </section>
+
+      {reviewPrompts.length > 0 ? (
+        <section className="space-y-3 rounded-2xl border border-emerald-200 bg-white p-4 dark:border-emerald-500/20 dark:bg-white/[0.03]">
+          <div>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white">Reviews waiting for you</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              These prompts are optional and only appear after completed purchases.
+            </p>
+          </div>
+          {reviewPrompts.map((prompt) => (
+            <ReviewPromptCard
+              key={prompt.id}
+              prompt={prompt}
+              onReview={setActiveReviewPrompt}
+              onSkip={(item) => void skipPrompt(item)}
+              skipping={skippingPromptId === prompt.id}
+            />
+          ))}
+        </section>
+      ) : null}
 
       {!loading && ordersView === 'standard' ? (
         <>
@@ -553,6 +620,13 @@ const MyOrders: React.FC = () => {
         onDeleted={async () => {
           await loadOrders();
         }}
+      />
+      <ReviewFormModal
+        open={Boolean(activeReviewPrompt)}
+        mode="create"
+        prompt={activeReviewPrompt}
+        onClose={() => setActiveReviewPrompt(null)}
+        onSubmit={(payload) => submitPromptReview(payload as SubmitReviewPayload)}
       />
     </div>
   );

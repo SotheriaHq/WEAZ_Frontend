@@ -53,7 +53,7 @@ describe('ReviewsTab', () => {
       />,
     );
 
-    expect(screen.queryByRole('button', { name: 'Reply' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Report review' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Report review' })).toBeNull();
   });
 });

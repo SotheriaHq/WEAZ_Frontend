@@ -1891,6 +1891,8 @@ const ProfilePage: React.FC = () => {
                 />
               ) : (
                 <ReviewsTab
+                  brandId={shopBrandId || routeBrandId || user?.id || null}
+                  currentUserId={user?.id || null}
                   reviews={reviews}
                   averageRating={averageRating}
                   totalReviews={totalReviews}
