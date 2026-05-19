@@ -1,9 +1,10 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { render, screen, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DesignCard from './DesignCard';
 import { messagingApi } from '@/api/MessagingApi';
 import userReducer from '@/features/userSlice';
@@ -56,7 +57,9 @@ vi.mock('@/components/media/MediaRenderer', () => ({
 }));
 
 vi.mock('@/components/ImageWithFallback', () => ({
-  default: ({ alt }: { alt?: string }) => <img alt={alt ?? 'image'} />,
+  default: ({ alt }: { alt?: string }) => (
+    <div role="img" aria-label={alt ?? 'image'} data-testid="image-with-fallback" />
+  ),
 }));
 
 vi.mock('sonner', () => ({
@@ -191,6 +194,10 @@ describe('DesignCard direct message flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     navigateMock.mockReset();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it('routes signed-out users to login with the current URL as next', async () => {
