@@ -64,14 +64,23 @@ const NotificationSettings: React.FC = () => {
   }, []);
 
   const loadSettings = async () => {
-    try {
-      const data = await NotificationsApi.getSettings();
-      setSettings(data);
-    } catch (error) {
-      console.error('Failed to load notification settings', error);
-      toast.error('Failed to load settings');
-    } finally {
-      setLoading(false);
+    const retryDelays = [1000, 3000];
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, retryDelays[attempt - 1]));
+      }
+      try {
+        const data = await NotificationsApi.getSettings();
+        setSettings(data);
+        setLoading(false);
+        return;
+      } catch (error) {
+        console.warn('[background.notifications.load.failed]', error);
+        if (attempt === 2) {
+          toast.error('Failed to load settings');
+          setLoading(false);
+        }
+      }
     }
   };
 

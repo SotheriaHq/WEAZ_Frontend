@@ -43,6 +43,7 @@ export const env = {
     defaultConfig: {
       baseURL: apiBaseUrl,
       withCredentials: apiWithCredentials,
+      timeout: 15000,
     } as AxiosRequestConfig,
   },
 } as const;

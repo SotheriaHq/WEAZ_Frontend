@@ -35,8 +35,31 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const port = Number(env.VITE_DEV_PORT ?? DEFAULT_DEV_PORT) || DEFAULT_DEV_PORT;
 
+  const isProd = mode === 'production';
+
   return {
     plugins: [react()],
+    esbuild: isProd
+      ? {
+          pure: [
+            'console.log',
+            'console.info',
+            'console.debug',
+            'console.trace',
+            'console.assert',
+            'console.count',
+            'console.countReset',
+            'console.time',
+            'console.timeEnd',
+            'console.timeLog',
+            'console.group',
+            'console.groupCollapsed',
+            'console.groupEnd',
+            'console.table',
+            'console.dir',
+          ],
+        }
+      : {},
     server: {
       host: env.VITE_DEV_HOST || '0.0.0.0',
       port,
