@@ -6,9 +6,18 @@ import type {
   CustomOrderCheckoutBagResponse,
 } from './CustomOrderApi';
 import type { SizingMode } from '@/types/sizing';
-import type { SizeRecommendationSnapshot } from '@/types/sizeFit';
 
 export type BagSourceType = 'PRODUCT' | 'DESIGN' | 'COLLECTION';
+
+export interface SizeRecommendationSnapshot {
+  recommendedSize?: string | null;
+  selectedSize?: string | null;
+  confidence?: string | null;
+  region?: string | null;
+  measurements?: Record<string, unknown> | null;
+  reasons?: string[];
+  [key: string]: unknown;
+}
 
 export interface BagCount {
   standardQuantity: number;
