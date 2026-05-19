@@ -1,4 +1,4 @@
-# Web Vitest Stabilization Backlog - 2026-05-19
+# Web Vitest Stabilization Backlog — 2026-05-19
 
 ## Context
 During Phase 1 finalization, `npm run lint` passed and the Phase 1-specific DesignCard test gate was validated separately. The full command `npm run test -- --run` failed in broad unrelated suites.
