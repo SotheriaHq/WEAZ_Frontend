@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/run-e2e.cjs",
     "test:e2e:bagging": "playwright test tests/e2e/bagging --project=chromium",
     "test:e2e:bagging:seeded": "node scripts/run-bagging-e2e.cjs",
     "test:auth-link-route-contract": "node scripts/test-auth-link-route-contract.cjs",

@@ -2466,6 +2466,7 @@ const StoreCollectionCreate: React.FC = () => {
                 value={search}
                 onChange={setSearch}
                 showFilter={false}
+                collapsible={false}
                 className="!max-w-none"
               />
             ) : (

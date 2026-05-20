@@ -588,12 +588,10 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       setFilterStock('all');
     }
 
-    if (typeof query === 'string' && query !== searchQuery) {
-      setSearchQuery(query);
-    }
-    if (!query && searchQuery) {
-      setSearchQuery('');
-    }
+    setSearchQuery((current) => {
+      const nextQuery = typeof query === 'string' ? query : '';
+      return current === nextQuery ? current : nextQuery;
+    });
 
     if (
       collectionStatus &&
@@ -603,7 +601,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     } else if (!collectionStatus) {
       setCollectionStatusFilter('all');
     }
-  }, [location.search, searchQuery]);
+  }, [location.search]);
 
   useEffect(() => {
     if (outletView !== 'products') return;
@@ -1911,6 +1909,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     onChange={setSearchQuery}
                     placeholder="Search products..."
                     showFilter={false}
+                    collapsible={false}
                     className="!max-w-none w-full shadow-sm border-gray-200 dark:border-white/10 animate-in fade-in slide-in-from-left-2 duration-200"
                   />
                 )}

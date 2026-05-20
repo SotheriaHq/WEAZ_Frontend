@@ -1,0 +1,43 @@
+{
+  "cookies": [
+    {
+      "name": "refreshToken",
+      "value": "36907679-ec9e-4fb5-bd6c-1582d68553bf.49379d8fc6783c0e59c9a08b732bd5cd413abdb282ec9eef29abde6f6234a1f4",
+      "domain": "127.0.0.1",
+      "path": "/",
+      "expires": 1779885198.252526,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "accessToken",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlNDM2NjA0My1mNDdiLTQwNmMtOGQ1MC1jYTJiYWM5YjZhODIiLCJ1c2VybmFtZSI6ImJyYW5kX2RlbW8iLCJyb2xlIjoiVXNlciIsInR5cGUiOiJCUkFORCIsImVtYWlsIjoiYnJhbmRAZXhhbXBsZS5jb20iLCJmaXJzdE5hbWUiOiJEZW1vIiwibGFzdE5hbWUiOiJCcmFuZCIsImF1dGhWZXJzaW9uIjowLCJpYXQiOjE3NzkyODAzOTgsImV4cCI6MTc3OTMwOTE5OH0.VAQpFnc-9h3nZl9aelODIZtppJxbkqtB7SsmD_BeHGg",
+      "domain": "127.0.0.1",
+      "path": "/",
+      "expires": 1779309198.252676,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Strict"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:5173",
+      "localStorage": [
+        {
+          "name": "threadly-remembered-login",
+          "value": "{\"remember\":false,\"email\":\"\"}"
+        },
+        {
+          "name": "THREADLY_USER",
+          "value": "{\"id\":\"e4366043-f47b-406c-8d50-ca2bac9b6a82\",\"username\":\"brand_demo\",\"email\":\"brand@example.com\",\"firstName\":\"Demo\",\"lastName\":\"Brand\",\"role\":\"User\",\"type\":\"BRAND\",\"phoneNumber\":null,\"address\":null,\"brandFullName\":\"Vogue Vendor\",\"brandDescription\":\"Premium African fashion for modern buyers, weddings, and everyday statement dressing.\",\"brandCountry\":\"Nigeria\",\"brandState\":\"Lagos\",\"brandCity\":\"Lagos\",\"brandTags\":[\"ankara\",\"ready-to-wear\",\"occasionwear\"],\"brandBusinessType\":\"Fashion Brand\",\"socialInstagram\":\"https://instagram.com/voguevendor\",\"socialFacebook\":null,\"socialTwitter\":null,\"socialWebsite\":null,\"cacNumber\":null,\"tin\":null,\"ceoNin\":null,\"ceoFirstName\":null,\"ceoLastName\":null,\"companyLocation\":null,\"profileImage\":null,\"profileImageId\":null,\"profileImageFile\":null,\"bannerImage\":null,\"bannerImageId\":null,\"bannerImageFile\":null,\"isEmailVerified\":true,\"passwordCredentialStatus\":\"ENABLED\",\"storeId\":\"cab64f42-cc83-45ae-a0bd-14025dccf2b7\",\"brandMemberships\":[{\"brandId\":\"cab64f42-cc83-45ae-a0bd-14025dccf2b7\",\"brandName\":\"Vogue Vendor\",\"role\":\"OWNER\",\"status\":\"ACTIVE\",\"isOwner\":true}],\"activeBrandId\":\"cab64f42-cc83-45ae-a0bd-14025dccf2b7\",\"verificationStatus\":\"APPROVED\",\"isVerifiedBrand\":true,\"verificationBadgeVisible\":true,\"verifiedExplanationUrl\":\"/help/verified-badge\",\"isActive\":\"Active\",\"themePreference\":\"system\",\"status\":\"ACTIVE\",\"mustResetPassword\":false,\"createdAt\":\"2026-05-20T09:08:03.937Z\",\"updatedAt\":\"2026-05-20T12:33:01.402Z\"}"
+        },
+        {
+          "name": "threadly_tour_product_create",
+          "value": "1"
+        }
+      ]
+    }
+  ]
+}
