@@ -56,11 +56,30 @@ const getCollectionBasePath = (scope?: CollectionScope) =>
   scope === 'store' ? '/store-collections' : scope === 'all' ? '/collections' : '/designs';
 
 const SIGNED_URL_TTL_MS = 4 * 60 * 1000;
+const BRAND_PROFILE_TTL_MS = 30 * 1000;
+const COLLECTION_READ_TTL_MS = 30 * 1000;
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 const signedUrlPending = new Map<string, Promise<string | null>>();
+const brandProfileCache = new Map<string, { data: BrandProfileDto | null; expiresAt: number }>();
+const brandProfilePending = new Map<string, Promise<BrandProfileDto | null>>();
+const collectionListCache = new Map<string, { data: CollectionDto[]; expiresAt: number }>();
+const collectionListPending = new Map<string, Promise<CollectionDto[]>>();
+const collectionDetailCache = new Map<string, { data: any; expiresAt: number }>();
+const collectionDetailPending = new Map<string, Promise<any>>();
 
 type SignedUrlResolveOptions = {
   forceRefresh?: boolean;
+};
+
+type CollectionReadOptions = {
+  forceRefresh?: boolean;
+};
+
+const clearCollectionReadCache = () => {
+  collectionListCache.clear();
+  collectionListPending.clear();
+  collectionDetailCache.clear();
+  collectionDetailPending.clear();
 };
 
 const extractS3KeyFromMaybeMalformedUrl = (rawS3Url: string): string | null => {
@@ -763,10 +782,38 @@ export const brandApi = {
   },
 
   // Fetch brand profile details
-  async getBrandProfile(brandId: string): Promise<BrandProfileDto | null> {
+  async getBrandProfile(brandId: string, opts?: CollectionReadOptions): Promise<BrandProfileDto | null> {
     try {
-      const response = await apiClient.get(`/brands/${brandId}`);
-      return unwrapApiResponse<BrandProfileDto>(response.data);
+      const cacheKey = String(brandId ?? '').trim();
+      const forceRefresh = opts?.forceRefresh === true;
+      if (!cacheKey) return null;
+
+      if (forceRefresh) {
+        brandProfileCache.delete(cacheKey);
+        brandProfilePending.delete(cacheKey);
+      }
+
+      const cached = brandProfileCache.get(cacheKey);
+      if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+        return cached.data;
+      }
+
+      const pending = brandProfilePending.get(cacheKey);
+      if (!forceRefresh && pending) {
+        return pending;
+      }
+
+      const request = (async () => {
+        const response = await apiClient.get(`/brands/${cacheKey}`);
+        const data = unwrapApiResponse<BrandProfileDto>(response.data);
+        brandProfileCache.set(cacheKey, { data, expiresAt: Date.now() + BRAND_PROFILE_TTL_MS });
+        return data;
+      })();
+
+      brandProfilePending.set(cacheKey, request);
+      return await request.finally(() => {
+        brandProfilePending.delete(cacheKey);
+      });
     } catch (error) {
       console.error('Error fetching brand profile:', error);
       return null;
@@ -777,6 +824,8 @@ export const brandApi = {
   async updateBrandProfile(brandId: string, data: UpdateBrandProfilePayload): Promise<AuthUserDto | null> {
     try {
       const response = await apiClient.patch(`/brands/${brandId}`, data);
+      brandProfileCache.delete(brandId);
+      brandProfilePending.delete(brandId);
       return unwrapApiResponse<AuthUserDto>(response.data);
     } catch (error) {
       const message = extractApiErrorMessage(error) ?? 'Error updating brand profile';
@@ -793,10 +842,12 @@ export const brandApi = {
       scope?: CollectionScope;
       includeDeleted?: boolean;
       onlyDeleted?: boolean;
+      forceRefresh?: boolean;
     },
   ): Promise<CollectionDto[]> {
     try {
       const resolvedScope = opts?.scope ?? 'design';
+      const forceRefresh = opts?.forceRefresh === true;
       if (resolvedScope === 'all') {
         const [designs, storeCollections] = await Promise.all([
           this.getCollections(ownerId, { ...opts, scope: 'design' }),
@@ -805,19 +856,45 @@ export const brandApi = {
         return [...storeCollections, ...designs];
       }
 
+      const cacheKey = JSON.stringify({
+        ownerId,
+        scope: resolvedScope,
+        visibility: opts?.visibility ?? null,
+        includeDeleted: Boolean(opts?.includeDeleted),
+        onlyDeleted: Boolean(opts?.onlyDeleted),
+      });
+      if (forceRefresh) {
+        collectionListCache.delete(cacheKey);
+        collectionListPending.delete(cacheKey);
+      }
+      const cached = collectionListCache.get(cacheKey);
+      if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+        return cached.data;
+      }
+      const pending = collectionListPending.get(cacheKey);
+      if (!forceRefresh && pending) {
+        return pending;
+      }
+
       const params = new URLSearchParams();
       if (opts?.visibility) params.append('visibility', opts.visibility);
       if (opts?.includeDeleted) params.append('includeDeleted', 'true');
       if (opts?.onlyDeleted) params.append('onlyDeleted', 'true');
-      params.append('_cb', String(Date.now()));
+      if (forceRefresh) params.append('_cb', String(Date.now()));
       const query = params.toString();
       const basePath = getCollectionBasePath(resolvedScope);
-      const response = await apiClient.get(`${basePath}/user/${ownerId}${query ? `?${query}` : ''}`, {
-        headers: {
-          'Cache-Control': 'no-store',
-          Pragma: 'no-cache',
-        },
-      });
+      const request = (async () => {
+        const response = await apiClient.get(
+          `${basePath}/user/${ownerId}${query ? `?${query}` : ''}`,
+          forceRefresh
+            ? {
+                headers: {
+                  'Cache-Control': 'no-store',
+                  Pragma: 'no-cache',
+                },
+              }
+            : undefined,
+        );
       const data = unwrapApiResponse<{ items: unknown[]; hasNextPage: boolean; endCursor?: string }>(response.data);
 
       // Transform backend data to frontend format
@@ -1035,7 +1112,17 @@ export const brandApi = {
       const uniqueMapped = Array.from(dedupedByCollectionId.values());
 
 
-      return uniqueMapped;
+        collectionListCache.set(cacheKey, {
+          data: uniqueMapped,
+          expiresAt: Date.now() + COLLECTION_READ_TTL_MS,
+        });
+        return uniqueMapped;
+      })();
+
+      collectionListPending.set(cacheKey, request);
+      return await request.finally(() => {
+        collectionListPending.delete(cacheKey);
+      });
     } catch (error) {
       console.error('Error fetching collections:', error);
       return [];
@@ -1185,6 +1272,7 @@ export const brandApi = {
           isAvailableInStore: true,
         },
       });
+      clearCollectionReadCache();
       return unwrapApiResponse<CollectionDto>(finalized.data as any);
     } catch (error) {
       console.error('Error creating collection:', error);
@@ -1249,6 +1337,7 @@ export const brandApi = {
     try {
       const basePath = getCollectionBasePath(opts?.scope);
       const response = await apiClient.patch(`${basePath}/${collectionId}`, data);
+      clearCollectionReadCache();
       return unwrapApiResponse<CollectionDto>(response.data);
     } catch (error) {
       console.error('Error updating collection:', error);
@@ -1264,6 +1353,7 @@ export const brandApi = {
     try {
       const basePath = getCollectionBasePath(opts?.scope);
       await apiClient.delete(`${basePath}/${collectionId}`);
+      clearCollectionReadCache();
       return true;
     } catch (error) {
       console.error('Error deleting collection:', error);
@@ -1278,6 +1368,7 @@ export const brandApi = {
     try {
       const basePath = getCollectionBasePath(opts?.scope);
       await apiClient.post(`${basePath}/${collectionId}/restore`, null);
+      clearCollectionReadCache();
       return true;
     } catch (error) {
       console.error('Error restoring collection:', error);
@@ -1292,6 +1383,7 @@ export const brandApi = {
     try {
       const basePath = getCollectionBasePath(opts?.scope);
       await apiClient.delete(`${basePath}/${collectionId}/permanent`);
+      clearCollectionReadCache();
       return true;
     } catch (error) {
       console.error('Error permanently deleting collection:', error);
@@ -1306,6 +1398,7 @@ export const brandApi = {
     try {
       const basePath = getCollectionBasePath(opts?.scope);
       await apiClient.patch(`${basePath}/${collectionId}/archive`, {});
+      clearCollectionReadCache();
       return true;
     } catch (error) {
       console.error('Error archiving collection:', error);
@@ -1320,6 +1413,7 @@ export const brandApi = {
     try {
       const basePath = getCollectionBasePath(opts?.scope);
       await apiClient.patch(`${basePath}/${collectionId}/unarchive`, {});
+      clearCollectionReadCache();
       return true;
     } catch (error) {
       console.error('Error unarchiving collection:', error);
@@ -1334,6 +1428,7 @@ export const brandApi = {
     try {
       const basePath = getCollectionBasePath(opts?.scope);
       const response = await apiClient.post(`${basePath}/${collectionId}/duplicate`, null);
+      clearCollectionReadCache();
       return unwrapApiResponse<CollectionDto>(response.data);
     } catch (error) {
       console.error('Error duplicating collection:', error);
@@ -1344,6 +1439,7 @@ export const brandApi = {
   async deleteCollectionItem(collectionId: string, itemId: string): Promise<boolean> {
     try {
       await apiClient.delete(`/collections/${collectionId}/items/${itemId}`);
+      clearCollectionReadCache();
       return true;
     } catch (error) {
       console.error('Error deleting collection item:', error);
@@ -1603,18 +1699,53 @@ export const brandApi = {
   // Get one collection with medias
   async getCollectionDetail(
     collectionId: string,
-    opts?: { scope?: CollectionScope },
+    opts?: { scope?: CollectionScope; forceRefresh?: boolean },
   ): Promise<any> {
     try {
       const basePath = getCollectionBasePath(opts?.scope);
-      const response = await apiClient.get(`${basePath}/${collectionId}`, {
-        params: { _cb: Date.now() },
-        headers: {
-          'Cache-Control': 'no-store',
-          Pragma: 'no-cache',
-        },
+      const forceRefresh = opts?.forceRefresh === true;
+      const cacheKey = `${basePath}:${collectionId}`;
+
+      if (forceRefresh) {
+        collectionDetailCache.delete(cacheKey);
+        collectionDetailPending.delete(cacheKey);
+      }
+
+      const cached = collectionDetailCache.get(cacheKey);
+      if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+        return cached.data;
+      }
+
+      const pending = collectionDetailPending.get(cacheKey);
+      if (!forceRefresh && pending) {
+        return pending;
+      }
+
+      const request = (async () => {
+        const response = await apiClient.get(
+          `${basePath}/${collectionId}`,
+          forceRefresh
+            ? {
+                params: { _cb: Date.now() },
+                headers: {
+                  'Cache-Control': 'no-store',
+                  Pragma: 'no-cache',
+                },
+              }
+            : undefined,
+        );
+        const data = unwrapApiResponse<any>(response.data);
+        collectionDetailCache.set(cacheKey, {
+          data,
+          expiresAt: Date.now() + COLLECTION_READ_TTL_MS,
+        });
+        return data;
+      })();
+
+      collectionDetailPending.set(cacheKey, request);
+      return await request.finally(() => {
+        collectionDetailPending.delete(cacheKey);
       });
-      return unwrapApiResponse<any>(response.data);
     } catch (error: any) {
       console.error('Error fetching collection detail:', error);
       // Propagate the error so components can handle permission/not-found cases

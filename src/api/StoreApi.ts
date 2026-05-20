@@ -713,6 +713,15 @@ export interface StorePaymentAccountSummary {
   updatedAt: string | null;
 }
 
+const STORE_STATUS_TTL_MS = 30 * 1000;
+let storeStatusCache: { data: StoreStatusResponse; expiresAt: number } | null = null;
+let storeStatusPending: Promise<StoreStatusResponse> | null = null;
+
+const clearStoreStatusCache = () => {
+  storeStatusCache = null;
+  storeStatusPending = null;
+};
+
 export interface StorePaymentAccountResponse {
   brandId: string;
   provider: 'PAYSTACK' | string;
@@ -941,24 +950,46 @@ export const updateStoreName = async (payload: {
   return extractData<StoreGeneralSettingsResponse>(res);
 };
 
-export const getStoreStatus = async (): Promise<StoreStatusResponse> => {
-  const res = await apiClient.get('/store/status');
-  return extractData<StoreStatusResponse>(res);
+export const getStoreStatus = async (options?: { forceRefresh?: boolean }): Promise<StoreStatusResponse> => {
+  const forceRefresh = options?.forceRefresh === true;
+  if (!forceRefresh && storeStatusCache && storeStatusCache.expiresAt > Date.now()) {
+    return storeStatusCache.data;
+  }
+  if (!forceRefresh && storeStatusPending) {
+    return storeStatusPending;
+  }
+
+  storeStatusPending = (async () => {
+    const res = await apiClient.get('/store/status');
+    const data = extractData<StoreStatusResponse>(res);
+    storeStatusCache = { data, expiresAt: Date.now() + STORE_STATUS_TTL_MS };
+    return data;
+  })();
+
+  try {
+    return await storeStatusPending;
+  } finally {
+    storeStatusPending = null;
+  }
 };
 
 export const openStore = async (): Promise<{ success: boolean; message: string; brandId: string }> => {
   const res = await apiClient.post('/store/open');
+  clearStoreStatusCache();
   return extractData<{ success: boolean; message: string; brandId: string }>(res);
 };
 
 export const closeStore = async (): Promise<{ success: boolean; message: string; brandId: string }> => {
   const res = await apiClient.post('/store/close');
+  clearStoreStatusCache();
   return extractData<{ success: boolean; message: string; brandId: string }>(res);
 };
 
 export const updateStoreProfile = async (data: StoreProfileUpdateData): Promise<StoreStatusResponse> => {
   const res = await apiClient.patch('/store/profile', data);
-  return extractData<StoreStatusResponse>(res);
+  const status = extractData<StoreStatusResponse>(res);
+  storeStatusCache = { data: status, expiresAt: Date.now() + STORE_STATUS_TTL_MS };
+  return status;
 };
 
 export const getStorePolicies = async (): Promise<StorePoliciesResponse> => {

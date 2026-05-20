@@ -167,7 +167,7 @@ const PaymentReturnPage: React.FC = () => {
     options?: { replace?: boolean },
   ) => {
     if (status === 'PAID') {
-      await dispatch(fetchCart());
+      await dispatch(fetchCart({ force: true }));
       toast.success('Your order is placed successfully, Thank you for shopping.');
       navigate(`/bag/confirmation?reference=${encodeURIComponent(reference)}`, {
         replace: options?.replace,
@@ -305,7 +305,7 @@ const PaymentReturnPage: React.FC = () => {
     setPreparingUnifiedRetry(true);
     try {
       await customOrdersBuyerApi.prepareForUnifiedCheckout(attempt.customOrderId);
-      await dispatch(fetchCart());
+      await dispatch(fetchCart({ force: true }));
       dispatch(openCartDrawer());
       toast.success('Custom order is ready in your bag. Continue payment from unified checkout.');
       navigate('/bag');

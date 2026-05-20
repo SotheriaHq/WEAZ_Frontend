@@ -3,6 +3,8 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { apiClient } from '../api/httpClient';
 import { unwrapApiResponse } from '@/types/auth';
 
+const WISHLIST_READ_TTL_MS = 30 * 1000;
+
 // Types
 export interface WishlistProduct {
   id: string;
@@ -62,6 +64,8 @@ export interface WishlistState {
   error: string | null;
   // Track wishlisted product IDs for quick lookup
   wishlistedIds: Set<string>;
+  lastFetchedAt: number;
+  lastFetchKey: string | null;
   priceChangeNotices: Array<{ productId: string; name: string; oldPrice: number; newPrice: number; currency?: string }>;
 }
 
@@ -72,14 +76,35 @@ const initialState: WishlistState = {
   isDrawerOpen: false,
   error: null,
   wishlistedIds: new Set(),
+  lastFetchedAt: 0,
+  lastFetchKey: null,
   priceChangeNotices: [],
 };
+
+type FetchWishlistArgs = { page?: number; limit?: number; force?: boolean };
+type WishlistRootState = { wishlist: WishlistState };
+
+const getWishlistFetchKey = (params: FetchWishlistArgs = {}) =>
+  JSON.stringify({
+    page: params.page ?? 1,
+    limit: params.limit ?? null,
+  });
 
 // Async thunks
 export const fetchWishlist = createAsyncThunk(
   'wishlist/fetchWishlist',
-  async (params: { page?: number; limit?: number } = {}, { rejectWithValue }) => {
+  async (params: FetchWishlistArgs = {}, { getState, rejectWithValue }) => {
     try {
+      const wishlist = (getState() as WishlistRootState).wishlist;
+      const requestKey = getWishlistFetchKey(params);
+      if (
+        !params.force &&
+        wishlist.lastFetchKey === requestKey &&
+        wishlist.lastFetchedAt > 0 &&
+        Date.now() - wishlist.lastFetchedAt < WISHLIST_READ_TTL_MS
+      ) {
+        return { items: wishlist.items, total: wishlist.total };
+      }
       const response = await apiClient.get('/store/wishlist', { params });
       return unwrapApiResponse(response.data);
     } catch (error: any) {
@@ -157,13 +182,21 @@ export const wishlistSlice = createSlice({
         state.wishlistedIds.add(productId);
         state.total += 1;
       }
+      state.lastFetchedAt = 0;
+      state.lastFetchKey = null;
     },
   },
   extraReducers: (builder) => {
     // Fetch wishlist
     builder
-      .addCase(fetchWishlist.pending, (state) => {
-        state.isLoading = true;
+      .addCase(fetchWishlist.pending, (state, action) => {
+        const requestKey = getWishlistFetchKey(action.meta.arg);
+        const isFresh =
+          !action.meta.arg?.force &&
+          state.lastFetchKey === requestKey &&
+          state.lastFetchedAt > 0 &&
+          Date.now() - state.lastFetchedAt < WISHLIST_READ_TTL_MS;
+        state.isLoading = !isFresh;
         state.error = null;
       })
       .addCase(fetchWishlist.fulfilled, (state, action) => {
@@ -202,6 +235,8 @@ export const wishlistSlice = createSlice({
 
         state.items = items;
         state.total = typeof payload?.total === 'number' ? payload.total : items.length;
+        state.lastFetchedAt = Date.now();
+        state.lastFetchKey = getWishlistFetchKey(action.meta.arg);
         // Rebuild wishlisted IDs set
         state.wishlistedIds = new Set(
           items
@@ -225,6 +260,8 @@ export const wishlistSlice = createSlice({
           state.wishlistedIds.add(productId);
           state.total += 1;
         }
+        state.lastFetchedAt = 0;
+        state.lastFetchKey = null;
       })
       .addCase(addToWishlist.rejected, (state, action) => {
         state.error = action.payload as string;
@@ -240,6 +277,8 @@ export const wishlistSlice = createSlice({
         state.wishlistedIds.delete(productId);
         state.items = state.items.filter((item) => item.product.id !== productId);
         state.total = Math.max(0, state.total - 1);
+        state.lastFetchedAt = 0;
+        state.lastFetchKey = null;
       })
       .addCase(removeFromWishlist.rejected, (state, action) => {
         state.error = action.payload as string;

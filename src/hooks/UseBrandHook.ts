@@ -221,6 +221,7 @@ export const useBrandProfile = () => {
     areStableUserFieldsEqual,
   );
   const ownerBrandId = user?.id ?? user?.id ?? null;
+  const hasBrandMembership = hasActiveBrandMembership(user);
   const brandDetailEndpointsEnabled = env.featureFlags.brandDetailEndpoints;
   const { flags: reviewFlags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
 
@@ -228,6 +229,8 @@ export const useBrandProfile = () => {
   const [brandProfile, setBrandProfile] = useState<BrandProfileDto | null>(null);
   const [brandProfileLoading, setBrandProfileLoading] = useState(false);
   const [brandProfileError, setBrandProfileError] = useState<string | null>(null);
+  const brandProfileRef = useRef<BrandProfileDto | null>(null);
+  const brandProfileFetchPromiseRef = useRef<Promise<void> | null>(null);
 
   // Collections state
   const [collections, setCollections] = useState<CollectionDto[]>([]);
@@ -240,6 +243,10 @@ export const useBrandProfile = () => {
     collectionsRef.current = collections;
   }, [collections]);
 
+  useEffect(() => {
+    brandProfileRef.current = brandProfile;
+  }, [brandProfile]);
+
   // Reviews state
   const [reviews, setReviews] = useState<ProductReviewResponse[]>([]);
   const [averageRating, setAverageRating] = useState(0);
@@ -250,22 +257,38 @@ export const useBrandProfile = () => {
   const [loadedReviewsBrandId, setLoadedReviewsBrandId] = useState<string | null>(null);
 
   // Fetch brand profile
-  const fetchBrandProfile = useCallback(async (brandId: string) => {
-    setBrandProfileLoading(true);
-    setBrandProfileError(null);
-    try {
-      const profile = await brandApi.getBrandProfile(brandId);
-      if (profile) {
-        setBrandProfile(profile);
-      } else {
-        setBrandProfileError('Failed to load brand profile');
-      }
-    } catch (error) {
-      setBrandProfileError('An error occurred while loading brand profile');
-      console.error('Error fetching brand profile:', error);
-    } finally {
-      setBrandProfileLoading(false);
+  const fetchBrandProfile = useCallback(async (brandId: string, options?: { forceRefresh?: boolean }) => {
+    if (brandProfileFetchPromiseRef.current && !options?.forceRefresh) {
+      return brandProfileFetchPromiseRef.current;
     }
+
+    if (!brandProfileRef.current) {
+      setBrandProfileLoading(true);
+    }
+    setBrandProfileError(null);
+
+    const request = (async () => {
+      try {
+        const profile = await brandApi.getBrandProfile(brandId, {
+          forceRefresh: options?.forceRefresh,
+        });
+        if (profile) {
+          setBrandProfile(profile);
+        } else {
+          setBrandProfileError('Failed to load brand profile');
+        }
+      } catch (error) {
+        setBrandProfileError('An error occurred while loading brand profile');
+        console.error('Error fetching brand profile:', error);
+      } finally {
+        setBrandProfileLoading(false);
+      }
+    })();
+
+    brandProfileFetchPromiseRef.current = request.finally(() => {
+      brandProfileFetchPromiseRef.current = null;
+    });
+    return brandProfileFetchPromiseRef.current;
   }, []);
 
   useEffect(() => {
@@ -286,18 +309,9 @@ export const useBrandProfile = () => {
 
     const requestPromise = (async () => {
       try {
-        console.debug('[useBrandProfile.fetchCollections] start', { ownerId });
         // Request both public and approved-private collections by default
         const data = await brandApi.getCollections(ownerId, { visibility: 'all' });
         setCollections(data);
-        try {
-          const totals = data.reduce((acc, c) => {
-            acc.all += 1;
-            if (c.visibility === 'PRIVATE' || c.isPublic === false) acc.private += 1; else acc.public += 1;
-            return acc;
-          }, { all: 0, public: 0, private: 0 } as any);
-          console.debug('[useBrandProfile.fetchCollections] done', { count: data.length, ...totals });
-        } catch {}
       } catch (error) {
         setCollectionsError('Failed to load collections');
         console.error('Error fetching collections:', error);
@@ -376,12 +390,12 @@ export const useBrandProfile = () => {
   }, []);
 
   useEffect(() => {
-    if (!user?.id || !hasActiveBrandMembership(user)) {
+    if (!user?.id || !hasBrandMembership) {
       setBrandProfile(null);
       setBrandProfileError(null);
       setBrandProfileLoading(false);
     }
-  }, [user]);
+  }, [user?.id, hasBrandMembership]);
 
   // Initial data fetch
   useEffect(() => {
@@ -396,20 +410,20 @@ export const useBrandProfile = () => {
   }, [ownerBrandId, fetchCollections]);
 
   useEffect(() => {
-    if (!ownerBrandId || !hasActiveBrandMembership(user) || !brandDetailEndpointsEnabled) {
+    if (!ownerBrandId || !hasBrandMembership || !brandDetailEndpointsEnabled) {
       return;
     }
 
     void fetchBrandProfile(ownerBrandId);
-  }, [ownerBrandId, user, user?.updatedAt, brandDetailEndpointsEnabled, fetchBrandProfile]);
+  }, [ownerBrandId, hasBrandMembership, brandDetailEndpointsEnabled, fetchBrandProfile]);
 
   useEffect(() => {
-    if (!ownerBrandId || !hasActiveBrandMembership(user) || reviewFlagsLoading || !reviewFlags.readEnabled) {
+    if (!ownerBrandId || !hasBrandMembership || reviewFlagsLoading || !reviewFlags.readEnabled) {
       return;
     }
 
     void fetchReviews(ownerBrandId);
-  }, [ownerBrandId, user, fetchReviews, reviewFlags.readEnabled, reviewFlagsLoading]);
+  }, [ownerBrandId, hasBrandMembership, fetchReviews, reviewFlags.readEnabled, reviewFlagsLoading]);
 
   // Get display values with fallbacks
   const defaultFallbackTags =

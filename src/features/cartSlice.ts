@@ -4,6 +4,8 @@ import { apiClient } from '../api/httpClient';
 import { BagApi } from '@/api/BagApi';
 import type { SizingMode } from '@/types/sizing';
 
+const CART_READ_TTL_MS = 30 * 1000;
+
 // Types
 export interface ProductBrand {
   id: string;
@@ -47,6 +49,8 @@ export interface CartState {
   isLoading: boolean;
   isDrawerOpen: boolean;
   error: string | null;
+  lastFetchedAt: number;
+  customBagCountFetchedAt: number;
   removedItemNotices: Array<{ itemId: string; name: string; reason: 'out_of_stock' | 'unavailable' }>;
   priceChangeNotices: Array<{ itemId: string; name: string; oldPrice: number; newPrice: number; currency?: string }>;
 }
@@ -61,9 +65,14 @@ const initialState: CartState = {
   isLoading: false,
   isDrawerOpen: false,
   error: null,
+  lastFetchedAt: 0,
+  customBagCountFetchedAt: 0,
   removedItemNotices: [],
   priceChangeNotices: [],
 };
+
+type FetchCartArgs = { force?: boolean } | undefined;
+type CartRootState = { cart: CartState };
 
 const normalizeCartPayload = (payload: Partial<CartState> | null | undefined): CartState => {
   const items = Array.isArray(payload?.items) ? payload!.items : [];
@@ -114,8 +123,16 @@ const normalizeCartPayload = (payload: Partial<CartState> | null | undefined): C
 const unwrapResponse = (responseData: any) => responseData?.data ?? responseData;
 
 // Async thunks
-export const fetchCart = createAsyncThunk('cart/fetchCart', async (_, { rejectWithValue }) => {
+export const fetchCart = createAsyncThunk<
+  CartState,
+  FetchCartArgs,
+  { state: CartRootState; rejectValue: string }
+>('cart/fetchCart', async (args, { getState, rejectWithValue }) => {
   try {
+    const cart = getState().cart;
+    if (!args?.force && cart.lastFetchedAt > 0 && Date.now() - cart.lastFetchedAt < CART_READ_TTL_MS) {
+      return { ...cart, isLoading: false, error: null };
+    }
     const response = await apiClient.get('/store/cart');
     return unwrapResponse(response.data);
   } catch (error: any) {
@@ -195,10 +212,26 @@ export const clearCart = createAsyncThunk('cart/clearCart', async (_, { rejectWi
   }
 });
 
-export const fetchCustomBagCount = createAsyncThunk(
+export const fetchCustomBagCount = createAsyncThunk<
+  { standardQuantity: number; customLineCount: number; combinedCount: number },
+  { force?: boolean } | undefined,
+  { state: CartRootState; rejectValue: string }
+>(
   'cart/fetchCustomBagCount',
-  async (_, { rejectWithValue }) => {
+  async (args, { getState, rejectWithValue }) => {
     try {
+      const cart = (getState() as CartRootState).cart;
+      if (
+        !args?.force &&
+        cart.customBagCountFetchedAt > 0 &&
+        Date.now() - cart.customBagCountFetchedAt < CART_READ_TTL_MS
+      ) {
+        return {
+          standardQuantity: cart.totalQuantity,
+          customLineCount: cart.customBagCount,
+          combinedCount: cart.totalQuantity + cart.customBagCount,
+        };
+      }
       return await BagApi.getBagCount();
     } catch (error: any) {
       return rejectWithValue(
@@ -235,8 +268,10 @@ export const cartSlice = createSlice({
   extraReducers: (builder) => {
     // Fetch cart
     builder
-      .addCase(fetchCart.pending, (state) => {
-        state.isLoading = true;
+      .addCase(fetchCart.pending, (state, action) => {
+        const force = action.meta.arg?.force === true;
+        const isFresh = state.lastFetchedAt > 0 && Date.now() - state.lastFetchedAt < CART_READ_TTL_MS;
+        state.isLoading = force || !isFresh;
         state.error = null;
       })
       .addCase(fetchCart.fulfilled, (state, action: PayloadAction<CartState>) => {
@@ -275,6 +310,7 @@ export const cartSlice = createSlice({
         state.totalQuantity = normalized.totalQuantity;
         state.subtotal = normalized.subtotal;
         state.currency = normalized.currency;
+        state.lastFetchedAt = Date.now();
       })
       .addCase(fetchCart.rejected, (state, action) => {
         state.isLoading = false;
@@ -296,6 +332,7 @@ export const cartSlice = createSlice({
         state.subtotal = normalized.subtotal;
         state.currency = normalized.currency;
         state.isDrawerOpen = true; // Open drawer after adding
+        state.lastFetchedAt = Date.now();
       })
       .addCase(addToCart.rejected, (state, action) => {
         state.isLoading = false;
@@ -313,6 +350,7 @@ export const cartSlice = createSlice({
         state.itemCount = normalized.itemCount;
         state.totalQuantity = normalized.totalQuantity;
         state.subtotal = normalized.subtotal;
+        state.lastFetchedAt = Date.now();
       })
       .addCase(updateCartItem.rejected, (state, action) => {
         state.error = action.payload as string;
@@ -329,6 +367,7 @@ export const cartSlice = createSlice({
         state.itemCount = normalized.itemCount;
         state.totalQuantity = normalized.totalQuantity;
         state.subtotal = normalized.subtotal;
+        state.lastFetchedAt = Date.now();
       })
       .addCase(removeFromCart.rejected, (state, action) => {
         state.error = action.payload as string;
@@ -341,6 +380,7 @@ export const cartSlice = createSlice({
         state.itemCount = 0;
         state.totalQuantity = 0;
         state.subtotal = 0;
+        state.lastFetchedAt = Date.now();
       })
 
       // Custom bag count
@@ -351,6 +391,7 @@ export const cartSlice = createSlice({
         state.customBagCount = Number.isFinite(action.payload.customLineCount)
           ? Math.max(0, Math.trunc(action.payload.customLineCount))
           : 0;
+        state.customBagCountFetchedAt = Date.now();
       })
       .addCase(fetchCustomBagCount.rejected, (state) => {
         state.customBagCount = 0;

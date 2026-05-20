@@ -11,6 +11,7 @@ const DesignDetailsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [detail, setDetail] = useState<unknown | null>(null);
   const [item, setItem] = useState<MarketItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,10 +29,11 @@ const DesignDetailsPage: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const detail = await DesignApi.getDesignDetail(id);
-        const nextItem = toDesignMarketItem(detail, openMediaId);
+        const nextDetail = await DesignApi.getDesignDetail(id);
+        const nextItem = toDesignMarketItem(nextDetail, null);
         if (!mounted) return;
         if (nextItem) {
+          setDetail(nextDetail);
           setItem(nextItem);
           return;
         }
@@ -39,9 +41,10 @@ const DesignDetailsPage: React.FC = () => {
       } catch {
         try {
           const legacyDetail = await brandApi.getCollectionDetail(id, { scope: 'design' });
-          const nextItem = toDesignMarketItem(legacyDetail, openMediaId);
+          const nextItem = toDesignMarketItem(legacyDetail, null);
           if (!mounted) return;
           if (nextItem) {
+            setDetail(legacyDetail);
             setItem(nextItem);
             return;
           }
@@ -60,7 +63,13 @@ const DesignDetailsPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [id, openMediaId]);
+  }, [id]);
+
+  useEffect(() => {
+    if (!detail) return;
+    const nextItem = toDesignMarketItem(detail, openMediaId);
+    if (nextItem) setItem(nextItem);
+  }, [detail, openMediaId]);
 
   if (loading) {
     return (

@@ -52,9 +52,9 @@ export const UploadLimitsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return FALLBACK_LIMITS;
   });
 
-  const fetchLimits = async () => {
+  const fetchLimits = async (options?: { forceRefresh?: boolean }) => {
     try {
-      const data = await configApi.getUploadLimits();
+      const data = await configApi.getUploadLimits(options);
       setLimits(data);
       sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, _ts: Date.now() }));
     } catch {
@@ -78,7 +78,7 @@ export const UploadLimitsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   return (
-    <UploadLimitsContext.Provider value={{ limits, getLimitMB, getLimitBytes, refresh: fetchLimits }}>
+    <UploadLimitsContext.Provider value={{ limits, getLimitMB, getLimitBytes, refresh: () => fetchLimits({ forceRefresh: true }) }}>
       {children}
     </UploadLimitsContext.Provider>
   );

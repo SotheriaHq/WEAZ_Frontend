@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { brandApi } from '@/api/BrandApi';
 import AccessApi, { type AccessState } from '@/api/AccessApi';
 import { toast } from 'sonner';
@@ -45,6 +45,8 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const [locked, setLocked] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [detail, setDetail] = useState<any | null>(null);
+  const detailRef = useRef<any | null>(null);
+  const onBackRef = useRef(onBack);
   const [requestState, setRequestState] = useState<AccessState | null>(null);
   const [isThreaded, setIsThreaded] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -67,22 +69,30 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   /* showQr disabled — only brand profile QR codes active */
 
   useEffect(() => {
+    detailRef.current = detail;
+  }, [detail]);
+
+  useEffect(() => {
+    onBackRef.current = onBack;
+  }, [onBack]);
+
+  useEffect(() => {
     let mounted = true;
     const run = async () => {
       if (!collectionId) return;
-      setLoading(true);
+      const hasCurrentDetail = detailRef.current?.id === collectionId;
+      if (!hasCurrentDetail) {
+        setLoading(true);
+        setDetail(null);
+      }
       setLocked(false);
       setNotFound(false);
-      setDetail(null);
       setRequestState(null);
-      
-      console.log('[InlineCollectionViewer] Loading collection:', collectionId, 'User ID:', me?.id);
       
       try {
         const d = await brandApi.getCollectionDetail(collectionId);
         if (!mounted) return;
         if (d) {
-          console.log('[InlineCollectionViewer] Collection loaded:', d.id, 'Owner:', d.owner?.id, 'Visibility:', d.visibility);
           setDetail(d);
           setIsThreaded(false);
           setLocked(false);
@@ -94,29 +104,19 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
         if (mounted) {
           // Check if it's a 404 or permission error
           const status = e?.response?.status;
-          const errorData = e?.response?.data;
-          
-          console.error('[InlineCollectionViewer] Error loading collection:', {
-            status,
-            collectionId,
-            userId: me?.id,
-            errorData,
-            error: e.message
-          });
           
           if (status === 404 || status === 410) {
             setLocked(false);
             setNotFound(true);
             toast.error('Design not found.');
-            onBack();
+            onBackRef.current();
           } else if (status === 403 || status === 401) {
-            console.log('[InlineCollectionViewer] Setting locked state - permission denied');
             setLocked(true);
             setNotFound(false);
           } else {
             // Other error - show toast and go back
             toast.error('Failed to load design');
-            onBack();
+            onBackRef.current();
           }
         }
       } finally {
@@ -127,7 +127,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
     return () => {
       mounted = false;
     };
-  }, [collectionId, onBack, me?.id]);
+  }, [collectionId, me?.id]);
 
   const isOwner = useMemo(
     () => Boolean(me?.id && detail?.owner?.id && me.id === detail.owner.id),
@@ -511,7 +511,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                           if (res.state === 'APPROVED') {
                             toast.success('Access approved! Reloading collection...');
                             // Reload the collection
-                            const d = await brandApi.getCollectionDetail(collectionId);
+                            const d = await brandApi.getCollectionDetail(collectionId, { forceRefresh: true });
                             if (d) {
                               setDetail(d);
                               setLocked(false);

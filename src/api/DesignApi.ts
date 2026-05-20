@@ -2,6 +2,20 @@ import type { SizingMode } from '@/types/sizing';
 import { apiClient } from './httpClient';
 import { createIdempotencyKey } from './idempotency';
 
+const DESIGN_DETAIL_TTL_MS = 30 * 1000;
+const designDetailCache = new Map<string, { data: unknown; expiresAt: number }>();
+const designDetailPending = new Map<string, Promise<unknown>>();
+
+const clearDesignDetailCache = (designId?: string) => {
+  if (designId) {
+    designDetailCache.delete(designId);
+    designDetailPending.delete(designId);
+    return;
+  }
+  designDetailCache.clear();
+  designDetailPending.clear();
+};
+
 export type DesignAudience = 'MALE' | 'FEMALE' | 'EVERYBODY';
 export type DesignVisibility = 'PUBLIC' | 'PRIVATE';
 export type DesignFitPreference = 'SLIM' | 'REGULAR' | 'LOOSE' | 'OVERSIZED';
@@ -153,22 +167,55 @@ export async function finalizeDesignUploads(
     },
     { headers: { 'Idempotency-Key': createIdempotencyKey() } },
   );
+  clearDesignDetailCache(designId);
   return unwrapData<unknown>(response.data);
 }
 
-export async function getDesignDetail(designId: string) {
-  const response = await apiClient.get(`/designs/${designId}`, {
-    params: { _cb: Date.now() },
-    headers: {
-      'Cache-Control': 'no-store',
-      Pragma: 'no-cache',
-    },
+export async function getDesignDetail(
+  designId: string,
+  options?: { forceRefresh?: boolean },
+) {
+  const cacheKey = String(designId ?? '').trim();
+  const forceRefresh = options?.forceRefresh === true;
+  if (forceRefresh) clearDesignDetailCache(cacheKey);
+
+  const cached = designDetailCache.get(cacheKey);
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+
+  const pending = designDetailPending.get(cacheKey);
+  if (!forceRefresh && pending) {
+    return pending;
+  }
+
+  const request = (async () => {
+    const response = await apiClient.get(
+      `/designs/${cacheKey}`,
+      forceRefresh
+        ? {
+            params: { _cb: Date.now() },
+            headers: {
+              'Cache-Control': 'no-store',
+              Pragma: 'no-cache',
+            },
+          }
+        : undefined,
+    );
+    const data = unwrapData<unknown>(response.data);
+    designDetailCache.set(cacheKey, { data, expiresAt: Date.now() + DESIGN_DETAIL_TTL_MS });
+    return data;
+  })();
+
+  designDetailPending.set(cacheKey, request);
+  return await request.finally(() => {
+    designDetailPending.delete(cacheKey);
   });
-  return unwrapData<unknown>(response.data);
 }
 
 export async function updateDesign(designId: string, designMetadata: DesignMetadata) {
   const response = await apiClient.patch(`/designs/${designId}`, designMetadata);
+  clearDesignDetailCache(designId);
   return unwrapData<unknown>(response.data);
 }
 
@@ -186,11 +233,13 @@ export async function reorderDesignMedia(designId: string, mediaIds: string[]) {
   const response = await apiClient.patch(`/designs/${designId}/reorder-media`, {
     items: mediaIds.map((mediaId, orderIndex) => ({ mediaId, orderIndex })),
   });
+  clearDesignDetailCache(designId);
   return unwrapData<unknown>(response.data);
 }
 
 export async function deleteDesignMedia(designId: string, mediaId: string) {
   await apiClient.delete(`/designs/${designId}/media/${mediaId}`);
+  clearDesignDetailCache(designId);
 }
 
 export async function startDesignDraftSession(

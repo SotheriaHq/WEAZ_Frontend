@@ -165,8 +165,8 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
       if (action === 'ADD_STANDARD') {
         await dispatch(addToCart({ productId: product.id, quantity: 1 })).unwrap();
         await Promise.allSettled([
-          dispatch(fetchCart()).unwrap(),
-          dispatch(fetchCustomBagCount()).unwrap(),
+          dispatch(fetchCart({ force: true })).unwrap(),
+          dispatch(fetchCustomBagCount({ force: true })).unwrap(),
         ]);
         dispatch(openCartDrawer());
         return;

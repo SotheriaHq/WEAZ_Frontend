@@ -96,8 +96,8 @@ export function useBagging() {
 
   const refreshBagCounts = useCallback(async () => {
     await Promise.allSettled([
-      dispatch(fetchCart()).unwrap(),
-      dispatch(fetchCustomBagCount()).unwrap(),
+      dispatch(fetchCart({ force: true })).unwrap(),
+      dispatch(fetchCustomBagCount({ force: true })).unwrap(),
     ]);
   }, [dispatch]);
 
