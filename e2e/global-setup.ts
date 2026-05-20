@@ -21,7 +21,11 @@ export default async function globalSetup(config: FullConfig) {
 
     await performBrandLogin(page);
     await page.evaluate(() => {
-        window.localStorage.setItem('threadly_tour_product_create', '1');
+        const storage = (globalThis as unknown as {
+            localStorage: { setItem: (key: string, value: string) => void };
+        }).localStorage;
+
+        storage.setItem('threadly_tour_product_create', '1');
     });
     await context.storageState({ path: authStatePath });
     await browser.close();

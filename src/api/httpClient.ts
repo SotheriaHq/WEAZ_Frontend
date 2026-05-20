@@ -8,6 +8,7 @@ import type {
 import { unwrapApiResponse } from '../types/auth';
 import type { AuthTokensResponse } from '../types/auth';
 import { env } from '../config/env';
+import { finishNetworkTrace, startNetworkTrace } from './networkTrace';
 
 let consecutiveRefreshFailures = 0;
 let lastRefreshFailureAt = 0;
@@ -53,6 +54,18 @@ export const dropStoredAccessToken = () => {
 
 export const apiClient: AxiosInstance = axios.create(env.api.defaultConfig);
 const refreshClient: AxiosInstance = axios.create(env.api.defaultConfig);
+
+refreshClient.interceptors.request.use((config) => startNetworkTrace(config));
+refreshClient.interceptors.response.use(
+  (response) => {
+    finishNetworkTrace(response.config, response);
+    return response;
+  },
+  (error: AxiosError) => {
+    finishNetworkTrace(error.config, error.response, error);
+    return Promise.reject(error);
+  },
+);
 
 let refreshPromise: Promise<string | null> | null = null;
 
@@ -108,11 +121,15 @@ const attachAuthHeader = (config: InternalAxiosRequestConfig) => {
   return config;
 };
 
-apiClient.interceptors.request.use(attachAuthHeader);
+apiClient.interceptors.request.use((config) => startNetworkTrace(attachAuthHeader(config)));
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    finishNetworkTrace(response.config, response);
+    return response;
+  },
   async (error: AxiosError) => {
+    finishNetworkTrace(error.config, error.response, error);
     const { response, config } = error;
     if (!response || !config) {
       return Promise.reject(error);
