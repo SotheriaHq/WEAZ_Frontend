@@ -101,6 +101,59 @@ const isS3LikeUrl = (value?: string | null) => {
   return lower.includes('.s3.') || lower.includes('amazonaws.com');
 };
 
+const hasSignedUrlParams = (value?: string | null) => {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return Boolean(
+      parsed.searchParams.get('X-Amz-Signature') ||
+        parsed.searchParams.get('Signature') ||
+        parsed.searchParams.get('Expires') ||
+        parsed.searchParams.get('expires') ||
+        parsed.searchParams.get('token'),
+    );
+  } catch {
+    return false;
+  }
+};
+
+const parseCompactAmzDate = (value: string) => {
+  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(value);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second] = match;
+  const timestamp = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+  return Number.isFinite(timestamp) ? timestamp : null;
+};
+
+const getSignedUrlExpiresAt = (value: string) => {
+  try {
+    const parsed = new URL(value);
+    const unixExpires = parsed.searchParams.get('Expires') ?? parsed.searchParams.get('expires');
+    if (unixExpires) {
+      const timestamp = Number(unixExpires) * 1000;
+      if (Number.isFinite(timestamp)) return timestamp;
+    }
+
+    const amzDate = parsed.searchParams.get('X-Amz-Date');
+    const amzExpires = Number(parsed.searchParams.get('X-Amz-Expires'));
+    const amzStartedAt = amzDate ? parseCompactAmzDate(amzDate) : null;
+    if (amzStartedAt && Number.isFinite(amzExpires)) {
+      return amzStartedAt + amzExpires * 1000;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
+const isUsableInitialUrl = (value?: string | null) => {
+  if (!value || !/^https?:\/\//i.test(value)) return false;
+  if (!hasSignedUrlParams(value)) return true;
+  const expiresAt = getSignedUrlExpiresAt(value);
+  return Boolean(expiresAt && expiresAt > Date.now() + 30_000);
+};
+
 const isRawStorageKey = (value?: string | null) => {
   if (!value) return false;
   return !/^https?:\/\//i.test(value) && !value.includes('?');
@@ -156,6 +209,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const sourceCacheKey = resolveSourceCacheKey(fileId, src);
   const cachedLastGoodUrl = sourceCacheKey ? lastGoodUrlCache.get(sourceCacheKey) ?? null : null;
   const [resolved, setResolved] = useState<string | null>(() => {
+    if (isUsableInitialUrl(src)) return src ?? null;
     // fileId-based: always resolve via cache, never use the raw ID
     if (fileId) return getCachedUrl(fileId) ?? null;
     if (src && isRawStorageKey(src)) return getCachedUrl(`key:${src}`) ?? src;
@@ -167,6 +221,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   });
   const [hadError, setHadError] = useState(false);
   const [loaded, setLoaded] = useState(() => {
+    if (isUsableInitialUrl(src)) return true;
     if (fileId) return !!(getCachedUrl(fileId));
     if (src && isRawStorageKey(src)) return !!(getCachedUrl(`key:${src}`));
     if (src && isS3LikeUrl(src)) return !!(getCachedUrl(src) ?? src);
@@ -193,7 +248,12 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       }
       setLoaded(false);
 
-      // When fileId exists, prefer resolving by fileId to avoid stale signed URLs.
+      if (isUsableInitialUrl(src)) {
+        setResolved(src ?? null);
+        setLoaded(true);
+        return;
+      }
+
       if (!fileId && src && isS3LikeUrl(src)) {
         const url = await resolveSignedUrl(src, () => brandApi.getSignedS3Url(src));
         if (mounted) {

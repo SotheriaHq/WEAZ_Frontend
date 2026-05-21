@@ -57,6 +57,61 @@ const isS3LikeUrl = (value?: string | null) => {
   return lower.includes('.s3.') || lower.includes('amazonaws.com');
 };
 
+const isHttpUrl = (value?: string | null) => Boolean(value && /^https?:\/\//i.test(value));
+
+const hasSignedUrlParams = (value?: string | null) => {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return Boolean(
+      parsed.searchParams.get('X-Amz-Signature') ||
+        parsed.searchParams.get('Signature') ||
+        parsed.searchParams.get('Expires') ||
+        parsed.searchParams.get('expires') ||
+        parsed.searchParams.get('token'),
+    );
+  } catch {
+    return false;
+  }
+};
+
+const parseCompactAmzDate = (value: string) => {
+  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(value);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second] = match;
+  const timestamp = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+  return Number.isFinite(timestamp) ? timestamp : null;
+};
+
+const getSignedUrlExpiresAt = (value: string) => {
+  try {
+    const parsed = new URL(value);
+    const unixExpires = parsed.searchParams.get('Expires') ?? parsed.searchParams.get('expires');
+    if (unixExpires) {
+      const timestamp = Number(unixExpires) * 1000;
+      if (Number.isFinite(timestamp)) return timestamp;
+    }
+
+    const amzDate = parsed.searchParams.get('X-Amz-Date');
+    const amzExpires = Number(parsed.searchParams.get('X-Amz-Expires'));
+    const amzStartedAt = amzDate ? parseCompactAmzDate(amzDate) : null;
+    if (amzStartedAt && Number.isFinite(amzExpires)) {
+      return amzStartedAt + amzExpires * 1000;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
+const isUsableInitialUrl = (value?: string | null) => {
+  if (!isHttpUrl(value)) return false;
+  if (!hasSignedUrlParams(value)) return true;
+  const expiresAt = getSignedUrlExpiresAt(value!);
+  return Boolean(expiresAt && expiresAt > Date.now() + 30_000);
+};
+
 const isRawStorageKey = (value?: string | null) => {
   if (!value) return false;
   return !/^https?:\/\//i.test(value) && !value.includes('?');
@@ -69,6 +124,9 @@ const isRawStorageKey = (value?: string | null) => {
 export function useSignedFileUrl(fileId?: string | null, initial?: string | null) {
   const queryClient = useQueryClient();
   const [url, setUrl] = useState<string | null>(() => {
+    if (isUsableInitialUrl(initial)) {
+      return initial ?? null;
+    }
     // Try cache first for instant render
     if (fileId) {
       const cached = getCachedUrl(fileId);
@@ -82,7 +140,7 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
     }
     return initial ?? null;
   });
-  const [loading, setLoading] = useState<boolean>(Boolean(fileId));
+  const [loading, setLoading] = useState<boolean>(Boolean(fileId && !isUsableInitialUrl(initial)));
   const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
@@ -90,8 +148,14 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     setError(null);
 
-    // If no stable fileId is available, use initial-url optimization.
-    // When fileId exists, prefer resolving by fileId to avoid stale signed URLs.
+    if (isUsableInitialUrl(initial)) {
+      setUrl(initial ?? null);
+      setLoading(false);
+      return;
+    }
+
+    // Prefer a usable payload URL first; fileId resolution is only needed when
+    // the direct URL is missing or close to signed-URL expiry.
     if (!fileId && initial && !isS3LikeUrl(initial) && !isRawStorageKey(initial)) {
         setUrl(initial);
         setLoading(false);
@@ -180,10 +244,17 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
     setLoading(true);
     dedup(fileId, () =>
       queryClient.fetchQuery({
-        queryKey: queryKeys.media.signedUrl(fileId),
-        queryFn: () => brandApi.getSignedFileUrl(fileId),
+        queryKey: queryKeys.media.publicUrl(fileId),
+        queryFn: () => brandApi.getPublicFileUrl(fileId),
         staleTime: THREADLY_QUERY_STALE_TIME_MS,
-        gcTime: THREADLY_QUERY_STALE_TIME_MS,
+      }).then((publicUrl) => {
+        if (publicUrl) return publicUrl;
+        return queryClient.fetchQuery({
+          queryKey: queryKeys.media.signedUrl(fileId),
+          queryFn: () => brandApi.getPrivateSignedFileUrl(fileId),
+          staleTime: THREADLY_QUERY_STALE_TIME_MS,
+          gcTime: THREADLY_QUERY_STALE_TIME_MS,
+        });
       }),
     ).then((signed) => {
       if (!cancelled) {
@@ -197,13 +268,21 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
         retryTimer = setTimeout(() => {
           brandApi.invalidateSignedUrlCache(fileId);
           invalidateCachedUrl(fileId);
+          queryClient.removeQueries({ queryKey: queryKeys.media.publicUrl(fileId), exact: true });
           queryClient.removeQueries({ queryKey: queryKeys.media.signedUrl(fileId), exact: true });
           void dedup(fileId, () =>
             queryClient.fetchQuery({
-              queryKey: queryKeys.media.signedUrl(fileId),
-              queryFn: () => brandApi.getSignedFileUrl(fileId, { forceRefresh: true }),
+              queryKey: queryKeys.media.publicUrl(fileId),
+              queryFn: () => brandApi.getPublicFileUrl(fileId, { forceRefresh: true }),
               staleTime: THREADLY_QUERY_STALE_TIME_MS,
-              gcTime: THREADLY_QUERY_STALE_TIME_MS,
+            }).then((publicUrl) => {
+              if (publicUrl) return publicUrl;
+              return queryClient.fetchQuery({
+                queryKey: queryKeys.media.signedUrl(fileId),
+                queryFn: () => brandApi.getPrivateSignedFileUrl(fileId, { forceRefresh: true }),
+                staleTime: THREADLY_QUERY_STALE_TIME_MS,
+                gcTime: THREADLY_QUERY_STALE_TIME_MS,
+              });
             }),
           ).then((retrySigned) => {
             if (!cancelled) {

@@ -56,10 +56,13 @@ const getCollectionBasePath = (scope?: CollectionScope) =>
   scope === 'store' ? '/store-collections' : scope === 'all' ? '/collections' : '/designs';
 
 const SIGNED_URL_TTL_MS = 4 * 60 * 1000;
+const SIGNED_URL_REFRESH_SKEW_MS = 30 * 1000;
+const MISSING_SIGNED_URL_TTL_MS = 2 * 60 * 1000;
 const BRAND_PROFILE_TTL_MS = 30 * 1000;
 const COLLECTION_READ_TTL_MS = 30 * 1000;
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 const signedUrlPending = new Map<string, Promise<string | null>>();
+const signedUrlMissingCache = new Map<string, number>();
 const brandProfileCache = new Map<string, { data: BrandProfileDto | null; expiresAt: number }>();
 const brandProfilePending = new Map<string, Promise<BrandProfileDto | null>>();
 const collectionListCache = new Map<string, { data: CollectionDto[]; expiresAt: number }>();
@@ -69,6 +72,33 @@ const collectionDetailPending = new Map<string, Promise<any>>();
 
 type SignedUrlResolveOptions = {
   forceRefresh?: boolean;
+};
+
+const getPublicUrlCacheKey = (fileId: string) => `public:${fileId}`;
+const getPrivateSignedUrlCacheKey = (fileId: string) => `private:${fileId}`;
+
+const getSignedUrlCacheExpiresAt = (url: string): number => {
+  try {
+    const parsed = new URL(url);
+    const unixExpires = parsed.searchParams.get('Expires') ?? parsed.searchParams.get('expires');
+    if (unixExpires) {
+      const timestamp = Number(unixExpires) * 1000;
+      if (Number.isFinite(timestamp)) return Math.max(Date.now(), timestamp - SIGNED_URL_REFRESH_SKEW_MS);
+    }
+
+    const amzDate = parsed.searchParams.get('X-Amz-Date');
+    const amzExpires = Number(parsed.searchParams.get('X-Amz-Expires'));
+    const match = amzDate?.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+    if (match && Number.isFinite(amzExpires)) {
+      const [, year, month, day, hour, minute, second] = match;
+      const startedAt = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+      return Math.max(Date.now(), startedAt + amzExpires * 1000 - SIGNED_URL_REFRESH_SKEW_MS);
+    }
+  } catch {
+    return Date.now() + SIGNED_URL_TTL_MS;
+  }
+
+  return Date.now() + SIGNED_URL_TTL_MS;
 };
 
 type CollectionReadOptions = {
@@ -1509,21 +1539,36 @@ export const brandApi = {
     fileId: string,
     options?: SignedUrlResolveOptions,
   ): Promise<string | null> {
+    const publicUrl = await this.getPublicFileUrl(fileId, options);
+    if (publicUrl) return publicUrl;
+    return this.getPrivateSignedFileUrl(fileId, options);
+  },
+
+  async getPublicFileUrl(
+    fileId: string,
+    options?: SignedUrlResolveOptions,
+  ): Promise<string | null> {
     const cacheKey = String(fileId ?? '').trim();
     if (!cacheKey) return null;
     const forceRefresh = options?.forceRefresh === true;
+    const publicCacheKey = getPublicUrlCacheKey(cacheKey);
 
     if (forceRefresh) {
-      signedUrlCache.delete(cacheKey);
-      signedUrlPending.delete(cacheKey);
+      signedUrlCache.delete(publicCacheKey);
+      signedUrlPending.delete(publicCacheKey);
+      signedUrlMissingCache.delete(publicCacheKey);
     }
 
-    const existing = signedUrlCache.get(cacheKey);
+    const missingCachedUntil = signedUrlMissingCache.get(publicCacheKey);
+    if (missingCachedUntil && missingCachedUntil > Date.now()) return null;
+    if (missingCachedUntil) signedUrlMissingCache.delete(publicCacheKey);
+
+    const existing = signedUrlCache.get(publicCacheKey);
     if (existing && existing.expiresAt > Date.now()) {
       return existing.url;
     }
 
-    const inflight = signedUrlPending.get(cacheKey);
+    const inflight = signedUrlPending.get(publicCacheKey);
     if (inflight && !forceRefresh) {
       return inflight;
     }
@@ -1538,14 +1583,25 @@ export const brandApi = {
           (response.data as { url?: string })?.url ??
           null;
         if (typeof directUrl === 'string') {
-          signedUrlCache.set(cacheKey, {
+          signedUrlCache.set(publicCacheKey, {
             url: directUrl,
-            expiresAt: Date.now() + SIGNED_URL_TTL_MS,
+            expiresAt: getSignedUrlCacheExpiresAt(directUrl),
           });
           return directUrl;
         }
         return null;
       } catch (error) {
+        const status =
+          error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { status?: number } }).response?.status
+            : undefined;
+        if (status === 400 || status === 404) {
+          signedUrlMissingCache.set(publicCacheKey, Date.now() + MISSING_SIGNED_URL_TTL_MS);
+          return null;
+        }
+        if (status === 401 || status === 403) {
+          return null;
+        }
         if (
           error &&
           typeof error === 'object' &&
@@ -1558,11 +1614,75 @@ export const brandApi = {
         }
         return existing?.url ?? null;
       } finally {
-        signedUrlPending.delete(cacheKey);
+        signedUrlPending.delete(publicCacheKey);
       }
     })();
 
-    signedUrlPending.set(cacheKey, request);
+    signedUrlPending.set(publicCacheKey, request);
+    return request;
+  },
+
+  async getPrivateSignedFileUrl(
+    fileId: string,
+    options?: SignedUrlResolveOptions,
+  ): Promise<string | null> {
+    const cacheKey = String(fileId ?? '').trim();
+    if (!cacheKey) return null;
+    const forceRefresh = options?.forceRefresh === true;
+    const privateCacheKey = getPrivateSignedUrlCacheKey(cacheKey);
+
+    if (forceRefresh) {
+      signedUrlCache.delete(privateCacheKey);
+      signedUrlPending.delete(privateCacheKey);
+      signedUrlMissingCache.delete(privateCacheKey);
+    }
+
+    const missingCachedUntil = signedUrlMissingCache.get(privateCacheKey);
+    if (missingCachedUntil && missingCachedUntil > Date.now()) return null;
+    if (missingCachedUntil) signedUrlMissingCache.delete(privateCacheKey);
+
+    const existing = signedUrlCache.get(privateCacheKey);
+    if (existing && existing.expiresAt > Date.now()) {
+      return existing.url;
+    }
+
+    const inflight = signedUrlPending.get(privateCacheKey);
+    if (inflight && !forceRefresh) {
+      return inflight;
+    }
+
+    const request = (async (): Promise<string | null> => {
+      try {
+        const response = await apiClient.get(`/uploads/signed-url/${cacheKey}`);
+        const payload = unwrapApiResponse<{ url?: string }>(response.data);
+        const directUrl =
+          (payload as { url?: string })?.url ??
+          (response.data as { url?: string })?.url ??
+          null;
+        if (typeof directUrl === 'string') {
+          signedUrlCache.set(privateCacheKey, {
+            url: directUrl,
+            expiresAt: getSignedUrlCacheExpiresAt(directUrl),
+          });
+          return directUrl;
+        }
+        return null;
+      } catch (error) {
+        const status =
+          error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { status?: number } }).response?.status
+            : undefined;
+        if (status === 400 || status === 401 || status === 403 || status === 404) {
+          signedUrlMissingCache.set(privateCacheKey, Date.now() + MISSING_SIGNED_URL_TTL_MS);
+          return null;
+        }
+        return existing?.url ?? null;
+      } finally {
+        signedUrlPending.delete(privateCacheKey);
+      }
+    })();
+
+    signedUrlPending.set(privateCacheKey, request);
     return request;
   },
 
@@ -1695,6 +1815,12 @@ export const brandApi = {
     signedUrlPending.delete(rawKey);
     signedUrlCache.delete(normalizedKey);
     signedUrlPending.delete(normalizedKey);
+    signedUrlCache.delete(getPublicUrlCacheKey(normalizedKey));
+    signedUrlPending.delete(getPublicUrlCacheKey(normalizedKey));
+    signedUrlMissingCache.delete(getPublicUrlCacheKey(normalizedKey));
+    signedUrlCache.delete(getPrivateSignedUrlCacheKey(normalizedKey));
+    signedUrlPending.delete(getPrivateSignedUrlCacheKey(normalizedKey));
+    signedUrlMissingCache.delete(getPrivateSignedUrlCacheKey(normalizedKey));
   },
   // Get one collection with medias
   async getCollectionDetail(

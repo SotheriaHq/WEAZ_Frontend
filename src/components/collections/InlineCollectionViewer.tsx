@@ -211,21 +211,31 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       .sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
   }, [detail?.products]);
 
-  // Resolve signed URLs for media files to ensure content displays in modal/viewer
+  // Resolve media URLs only when the API payload does not already include a usable URL.
   useEffect(() => {
     let mounted = true;
     const run = async () => {
       const items = await Promise.all(
         mediaItems.map(async (item) => {
+          if (item.url && /^https?:\/\//i.test(item.url)) {
+            return item;
+          }
           if (item.fileId) {
             const fileId = item.fileId;
             try {
-              const url = await queryClient.fetchQuery({
-                queryKey: queryKeys.media.signedUrl(fileId),
-                queryFn: () => brandApi.getSignedFileUrl(fileId),
+              const publicUrl = await queryClient.fetchQuery({
+                queryKey: queryKeys.media.publicUrl(fileId),
+                queryFn: () => brandApi.getPublicFileUrl(fileId),
                 staleTime: THREADLY_QUERY_STALE_TIME_MS,
-                gcTime: THREADLY_QUERY_STALE_TIME_MS,
               });
+              const url =
+                publicUrl ??
+                (await queryClient.fetchQuery({
+                  queryKey: queryKeys.media.signedUrl(fileId),
+                  queryFn: () => brandApi.getPrivateSignedFileUrl(fileId),
+                  staleTime: THREADLY_QUERY_STALE_TIME_MS,
+                  gcTime: THREADLY_QUERY_STALE_TIME_MS,
+                }));
               return { ...item, url: url || item.url };
             } catch {
               return item;

@@ -70,18 +70,23 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const bagFlow = useBagFlow();
+  const itemId = item?.id ?? null;
+  const itemCollectionId = item?.collectionId ?? null;
+  const itemMediaType = item?.media?.type ?? null;
+  const itemMediaUrl = item?.media?.url ?? null;
+  const itemCommentsCount = item?.commentsCount ?? 0;
 
   const fallbackMedia = React.useMemo<ModalMedia | null>(() => {
-    if (!item) return null;
+    if (!itemId) return null;
     return {
-      id: item.id,
-      type: item.media?.type?.toUpperCase().includes('VIDEO') ? 'POST_VIDEO' : 'POST_IMAGE',
-      url: item.media?.url || '',
+      id: itemId,
+      type: itemMediaType?.toUpperCase().includes('VIDEO') ? 'POST_VIDEO' : 'POST_IMAGE',
+      url: itemMediaUrl || '',
     };
-  }, [item?.id, item?.media?.type, item?.media?.url]);
+  }, [itemId, itemMediaType, itemMediaUrl]);
 
   const activeMedia = mediaItems[activeMediaIndex] ?? fallbackMedia;
-  const activeMediaId = activeMedia?.id ?? item?.id ?? null;
+  const activeMediaId = activeMedia?.id ?? itemId;
 
   const isRegularViewer = authProfile?.type === 'REGULAR';
   const brandId = item?.brandId ?? null;
@@ -104,14 +109,14 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   });
 
   React.useEffect(() => {
-    if (!open || !item) return;
+    if (!open || !itemId) return;
 
-    setCommentCount(item.commentsCount ?? 0);
+    setCommentCount(itemCommentsCount);
     setExternalComment(null);
     const seeded: ModalMedia = {
-      id: item.id,
-      type: item.media?.type?.toUpperCase().includes('VIDEO') ? 'POST_VIDEO' : 'POST_IMAGE',
-      url: item.media?.url || '',
+      id: itemId,
+      type: itemMediaType?.toUpperCase().includes('VIDEO') ? 'POST_VIDEO' : 'POST_IMAGE',
+      url: itemMediaUrl || '',
     };
 
     // Avoid setting identical media state repeatedly when parent re-renders the same item object.
@@ -128,17 +133,17 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
       return [seeded];
     });
     setActiveMediaIndex(0);
-  }, [open, item?.id]);
+  }, [open, itemCommentsCount, itemId, itemMediaType, itemMediaUrl]);
 
   React.useEffect(() => {
     let mounted = true;
 
     const loadAllDesignMedia = async () => {
-      if (!open || !item?.collectionId) return;
+      if (!open || !itemCollectionId) return;
 
       setLoadingMedia(true);
       try {
-        const detail = await fetchCollectionDetailQuery(queryClient, item.collectionId, 'design');
+        const detail = await fetchCollectionDetailQuery(queryClient, itemCollectionId, 'design');
         const rawMedias = Array.isArray(detail?.medias) ? detail.medias : [];
 
         const parsed: ModalMedia[] = rawMedias
@@ -157,12 +162,21 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         const hydrated = await Promise.all(
           parsed.map(async (m) => {
             if (!m.fileId) return m;
+            if (m.url && /^https?:\/\//i.test(m.url)) return m;
             try {
-              const signed = await queryClient.fetchQuery({
+              const publicUrl = await queryClient.fetchQuery({
                 queryKey: queryKeys.media.publicUrl(m.fileId),
-                queryFn: () => brandApi.getSignedFileUrl(String(m.fileId)),
+                queryFn: () => brandApi.getPublicFileUrl(String(m.fileId)),
                 staleTime: THREADLY_QUERY_STALE_TIME_MS,
               });
+              const signed =
+                publicUrl ??
+                (await queryClient.fetchQuery({
+                  queryKey: queryKeys.media.signedUrl(m.fileId),
+                  queryFn: () => brandApi.getPrivateSignedFileUrl(String(m.fileId)),
+                  staleTime: THREADLY_QUERY_STALE_TIME_MS,
+                  gcTime: THREADLY_QUERY_STALE_TIME_MS,
+                }));
               return { ...m, url: signed || m.url };
             } catch {
               return m;
@@ -176,7 +190,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         if (!mounted) return;
         setMediaItems(nextMedias);
 
-        const preferredId = item.id;
+        const preferredId = itemId;
         const idx = nextMedias.findIndex((m) => m.id === preferredId);
         setActiveMediaIndex(idx >= 0 ? idx : 0);
       } catch {
@@ -194,13 +208,13 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     return () => {
       mounted = false;
     };
-  }, [open, item?.collectionId, item?.id, fallbackMedia, queryClient]);
+  }, [open, itemCollectionId, itemId, fallbackMedia, queryClient]);
 
   React.useEffect(() => {
     let mounted = true;
 
     const resolveCustomConfiguration = async () => {
-      if (!open || !item?.collectionId) {
+      if (!open || !itemCollectionId) {
         if (mounted) {
           setCustomConfigurationId(null);
           setResolvingCustomConfiguration(false);
@@ -210,7 +224,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
       setResolvingCustomConfiguration(true);
       try {
-        const activeConfiguration = await customOrderConfigurationsApi.getActiveForDesign(item.collectionId);
+        const activeConfiguration = await customOrderConfigurationsApi.getActiveForDesign(itemCollectionId);
         if (!mounted) return;
         setCustomConfigurationId(activeConfiguration?.id ?? null);
       } catch {
@@ -228,7 +242,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     return () => {
       mounted = false;
     };
-  }, [open, item?.collectionId]);
+  }, [open, itemCollectionId]);
 
   const onCommentCountChangeRef = React.useRef(onCommentCountChange);
   React.useEffect(() => {
